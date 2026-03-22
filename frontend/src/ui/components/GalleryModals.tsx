@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {Gallery, GalleryGroup, FlatGroup} from '../../logic/useGalleries';
+import IptcMetadataEditor, { IptcData } from './IptcMetadataEditor';
 
 interface GalleryModalsProps {
     availableGroups: FlatGroup[];
@@ -12,9 +13,9 @@ interface GalleryModalsProps {
     editingGallery?: Gallery | null;
 
     onCreateGroup: (name: string, slug: string, isPublic: boolean | null, parentId?: number | null) => Promise<void>;
-    onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: number | null, pw?: string, exp?: string) => Promise<void>;
+    onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: number | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
     onUpdateGroup: (id: number, name: string, slug: string, isPublic: boolean | null, parentId?: number | null) => Promise<void>;
-    onUpdateGallery: (id: number, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: number | null, pw?: string, exp?: string) => Promise<void>;
+    onUpdateGallery: (id: number, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: number | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
     onDeleteGroup: (id: number) => Promise<void>;
     onDeleteGallery: (id: number) => Promise<void>;
 }
@@ -56,6 +57,9 @@ export default function GalleryModals({
     const [galleryParentId, setGalleryParentId] = useState<number | ''>('');
     const [newGalleryPassword, setNewGalleryPassword] = useState('');
     const [newGalleryExpiresAt, setNewGalleryExpiresAt] = useState('');
+    const [allowClientMeta, setAllowClientMeta] = useState(false);
+    const [applyMeta, setApplyMeta] = useState(false);
+    const [iptcData, setIptcData] = useState<IptcData>({});
 
     // Sync Edit States via Render Phase Update
     const [prevGroupState, setPrevGroupState] = useState({
@@ -98,6 +102,19 @@ export default function GalleryModals({
                 setGalleryParentId(editingGallery.gallery_group_id || '');
                 setNewGalleryPassword(''); // pw is hidden, so empty
                 setNewGalleryExpiresAt(editingGallery.expires_at ? editingGallery.expires_at.split('T')[0] : '');
+                setAllowClientMeta(editingGallery.allow_client_metadata_edit || false);
+                setApplyMeta(editingGallery.apply_metadata_to_photos || false);
+                setIptcData({
+                    title: editingGallery.default_title || '',
+                    headline: editingGallery.default_headline || '',
+                    description: editingGallery.default_description || '',
+                    keywords: editingGallery.default_keywords || '',
+                    location: editingGallery.default_location || '',
+                    city: editingGallery.default_city || '',
+                    state: editingGallery.default_state || '',
+                    country: editingGallery.default_country || '',
+                    iso_country: editingGallery.default_iso_country || ''
+                });
             } else {
                 setNewGalleryName('');
                 setNewGallerySlug('');
@@ -108,6 +125,9 @@ export default function GalleryModals({
                 setGalleryParentId('');
                 setNewGalleryPassword('');
                 setNewGalleryExpiresAt('');
+                setAllowClientMeta(false);
+                setApplyMeta(false);
+                setIptcData({});
             }
         }
     }
@@ -154,9 +174,11 @@ export default function GalleryModals({
         setProcessing(true);
         try {
             if (editingGallery) {
-                await onUpdateGallery(editingGallery.id, newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : Number(galleryParentId), newGalleryPassword, newGalleryExpiresAt);
+                const metaOpts = { allow_client_metadata_edit: allowClientMeta, apply_metadata_to_photos: applyMeta, default_title: iptcData.title, default_headline: iptcData.headline, default_description: iptcData.description, default_keywords: iptcData.keywords, default_location: iptcData.location, default_city: iptcData.city, default_state: iptcData.state, default_country: iptcData.country, default_iso_country: iptcData.iso_country };
+                await onUpdateGallery(editingGallery.id, newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : Number(galleryParentId), newGalleryPassword, newGalleryExpiresAt, metaOpts);
             } else {
-                await onCreateGallery(newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : Number(galleryParentId), newGalleryPassword, newGalleryExpiresAt);
+                const metaOpts = { allow_client_metadata_edit: allowClientMeta, apply_metadata_to_photos: applyMeta, default_title: iptcData.title, default_headline: iptcData.headline, default_description: iptcData.description, default_keywords: iptcData.keywords, default_location: iptcData.location, default_city: iptcData.city, default_state: iptcData.state, default_country: iptcData.country, default_iso_country: iptcData.iso_country };
+                await onCreateGallery(newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : Number(galleryParentId), newGalleryPassword, newGalleryExpiresAt, metaOpts);
             }
             setGalleryModalOpen(false);
         } catch {
@@ -226,6 +248,47 @@ export default function GalleryModals({
                                                                                                          value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
                             </select>
                         </div>
+                        
+                        {newGalleryType === 'delivery' && (
+                            <div className="mt-6 pt-6 border-t border-base-300">
+                                <h4 className="font-bold text-lg mb-4">Metadaten & Berechtigungen</h4>
+                                
+                                <div className="form-control mb-4">
+                                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
+                                        <input type="checkbox" checked={allowClientMeta}
+                                               onChange={e => setAllowClientMeta(e.target.checked)}
+                                               className="checkbox checkbox-primary"/>
+                                        <div>
+                                            <span className="label-text font-bold block">Kunden dürfen Metadaten bearbeiten</span>
+                                            <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">
+                                                Erlaubt Kunden mit der Rolle "Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div className="form-control mb-4">
+                                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
+                                        <input type="checkbox" checked={applyMeta}
+                                               onChange={e => setApplyMeta(e.target.checked)}
+                                               className="checkbox checkbox-primary"/>
+                                        <div>
+                                            <span className="label-text font-bold block">Standard-Metadaten beim Upload anwenden</span>
+                                            <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">
+                                                Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten.
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {applyMeta && (
+                                    <div className="mb-6">
+                                        <IptcMetadataEditor data={iptcData} onChange={setIptcData} showArtist={false} />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
                         <div className="modal-action flex justify-between">
                             {editingGroup ? (
                                 <button type="button" className="btn btn-outline btn-error" onClick={async () => {

@@ -23,7 +23,7 @@ class FileDeliveryController extends Controller
             $needsWatermark = false;
         }
         $cleanFilename = basename($filename);
-        $baseStoragePath = env('PHOTO_STORAGE_PATH', base_path('../photos'));
+        $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/');
         $watermarkService = app(WatermarkService::class);
 
         if (str_starts_with($request->path(), "api/media/$slug/_thumbs/")) {

@@ -42,11 +42,14 @@ Route::get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'd
 
 Route::middleware('auth:api')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/photos/{photoId}/rate', [GalleryFrontendController::class, 'rate']);
     Route::post('/galleries/{id}/finish-rating', [MailController::class, 'finishRating']);
 
     Route::put('/photos/{id}/meta', [PhotoController::class, 'updateMetadata']);
+    Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions']);
+    Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata']);
     Route::delete('/photos/{id}', [PhotoController::class, 'destroy']);
 });
 

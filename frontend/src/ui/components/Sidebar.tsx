@@ -347,11 +347,23 @@ export default function Sidebar(props: SidebarProps) {
                 )}
             </div>
 
-            {user && (
-                <div className="p-6 border-t border-base-300">
-                    <button onClick={handleLogout} className="btn btn-outline btn-error w-full">Abmelden</button>
+            
+            
+            <div className="mt-auto border-t border-base-300 bg-base-200">
+                {user && (
+                    <div className="p-4">
+                        <button onClick={handleLogout} className="btn btn-outline btn-error w-full btn-sm">Abmelden</button>
+                    </div>
+                )}
+                <div className="p-4 pt-2 text-center text-xs opacity-50 flex flex-col gap-1">
+                    <p>&copy; {new Date().getFullYear()} Florian Reisinger</p>
+                    <div className="flex justify-center gap-3">
+                        <a href="https://reisinger.pictures/impressum" target="_blank" rel="noopener noreferrer" className="hover:underline">Impressum</a>
+                        <Link to="/privacy" className="hover:underline">Datenschutz</Link>
+                        <a href="https://reisinger.pictures/agb" target="_blank" rel="noopener noreferrer" className="hover:underline">AGB</a>
+                    </div>
                 </div>
-            )}
+            </div>
         </aside>
     );
 }

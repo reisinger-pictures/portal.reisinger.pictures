@@ -8,6 +8,7 @@ import PhotoDetailView from './ui/PhotoDetailView';
 import ManagementMetaGalleryView from './ui/management/ManagementMetaGalleryView';
 import SearchView from './ui/SearchView';
 import ErrorBoundary from './ui/components/ErrorBoundary';
+import Privacy from './ui/Privacy';
 
 function ProtectedRoute({children}: { children: React.ReactNode }) {
     const {user, isLoading, isError} = useAuth();
@@ -44,6 +45,7 @@ export default function App() {
                        element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                 <Route path="/mail-templates"
                        element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
                 <Route path="*" element={<Navigate to="/" replace/>}/>
             </Routes>
         </ErrorBoundary>

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
+use Illuminate\Support\Facades\Cache;
 
 class User extends Authenticatable implements JWTSubject
 {
@@ -53,9 +54,53 @@ class User extends Authenticatable implements JWTSubject
         return $this->roles()->where('name', 'admin')->exists();
     }
 
+    private function getSubGroupIds($parentIds) {
+        $allIds = $parentIds;
+        $children = GalleryGroup::whereIn('parent_id', $parentIds)->pluck('id')->toArray();
+        if (!empty($children)) {
+            $allIds = array_merge($allIds, $this->getSubGroupIds($children));
+        }
+        return array_unique($allIds);
+    }
+
+    public function getAllowedGalleryIds(): array
+    {
+        if ($this->is_admin) {
+            return Gallery::pluck('id')->toArray();
+        }
+
+        // 1. Direct assignments
+        $galleryIds = $this->galleries()->pluck('galleries.id')->toArray();
+
+        // 2. Group assignments (recursive)
+        $groupIds = $this->galleryGroups()->pluck('gallery_groups.id')->toArray();
+        $allGroupIds = $this->getSubGroupIds($groupIds);
+        
+        if (!empty($allGroupIds)) {
+            $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allGroupIds)->pluck('id')->toArray();
+            $galleryIds = array_unique(array_merge($galleryIds, $groupGalleryIds));
+        }
+
+        // 3. Domain Mapping (Only applies to Delivery galleries!)
+        if ($this->email) {
+            $domain = substr(strrchr($this->email, "@"), 1);
+            $mapping = DomainMapping::where('domain', $domain)->first();
+            
+            if ($mapping && $mapping->gallery_group_id) {
+                $domainGroupIds = $this->getSubGroupIds([$mapping->gallery_group_id]);
+                $domainGalleryIds = Gallery::whereIn('gallery_group_id', $domainGroupIds)
+                                           ->where('type', 'delivery')
+                                           ->pluck('id')->toArray();
+                $galleryIds = array_unique(array_merge($galleryIds, $domainGalleryIds));
+            }
+        }
+
+        return $galleryIds;
+    }
+
     public function canAccessGallery($galleryId): bool
     {
         if ($this->is_admin) return true;
-        return $this->galleries()->where('galleries.id', $galleryId)->exists();
+        return in_array($galleryId, $this->getAllowedGalleryIds());
     }
 }

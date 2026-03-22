@@ -66,9 +66,10 @@ export function useGallery(slug: string | undefined) {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'Authorization': 'Bearer ' + (localStorage.getItem('rp_jwt') || '')
+                // Authorization handled by HttpOnly cookie
             },
-            body: JSON.stringify({rating, comment})
+            body: JSON.stringify({rating, comment}),
+            credentials: 'include'
         });
 
         if (res.status === 401) {

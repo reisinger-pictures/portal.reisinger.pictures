@@ -50,10 +50,10 @@ export default function ManagementGalleryView() {
 
     const fetchRatings = async () => {
         try {
-            const headers = { 'Authorization': 'Bearer ' + (localStorage.getItem('rp_jwt') || '') };
+            const headers = { 'Accept': 'application/json' };
             const [resExport, resStatus] = await Promise.all([
-                fetch('/api/management/galleries/' + gallery!.id + '/export', { headers }),
-                fetch('/api/management/galleries/' + gallery!.id + '/rating-status', { headers })
+                fetch('/api/management/galleries/' + gallery!.id + '/export', { headers, credentials: 'include' }),
+                fetch('/api/management/galleries/' + gallery!.id + '/rating-status', { headers, credentials: 'include' })
             ]);
 
             if (!resExport.ok || !resStatus.ok) throw new Error('API Error');
@@ -99,7 +99,7 @@ export default function ManagementGalleryView() {
                 await fetch('/api/management/upload', {
                     method: 'POST',
                     headers: {
-                        'Authorization': 'Bearer ' + (localStorage.getItem('rp_jwt') || ''),
+                        
                         'Accept': 'application/json'
                     },
                     body: formData

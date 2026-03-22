@@ -89,7 +89,7 @@ return [
     |
     */
 
-    'ttl' => (int) env('JWT_TTL', 60),
+    'ttl' => (int) env('JWT_TTL', 240),
 
     /*
     |--------------------------------------------------------------------------
@@ -117,7 +117,7 @@ return [
     |
     */
 
-    'refresh_iat' => env('JWT_REFRESH_IAT', false),
+    'refresh_iat' => env('JWT_REFRESH_IAT', true),
     'refresh_ttl' => (int) env('JWT_REFRESH_TTL', 20160),
 
     /*
@@ -273,7 +273,7 @@ return [
     |
     */
 
-    'cookie_key_name' => 'token',
+    'cookie_key_name' => 'rp_jwt',
 
     /*
     |--------------------------------------------------------------------------

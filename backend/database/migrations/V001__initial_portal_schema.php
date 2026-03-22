@@ -92,6 +92,15 @@ return new class extends Migration {
             $table->timestamp('created_at')->useCurrent();
         });
 
+        // WICHTIG: domain_mappings muss NACH gallery_groups und roles angelegt werden!
+        Schema::create('domain_mappings', function (Blueprint $table) {
+            $table->id();
+            $table->string('domain')->unique();
+            $table->foreignId('role_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('gallery_group_id')->nullable()->constrained('gallery_groups')->onDelete('set null');
+            $table->timestamp('created_at')->useCurrent();
+        });
+
         Schema::create('galleries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('gallery_group_id')->nullable()->constrained()->onDelete('set null');
@@ -101,6 +110,20 @@ return new class extends Migration {
             $table->boolean('is_live')->default(false);
             $table->boolean('is_public')->default(false);
             $table->string('password_hash')->nullable();
+            
+            // Metadaten-Berechtigungen & Defaults
+            $table->boolean('allow_client_metadata_edit')->default(false);
+            $table->boolean('apply_metadata_to_photos')->default(false);
+            $table->string('default_headline')->nullable();
+            $table->string('default_title')->nullable();
+            $table->text('default_description')->nullable();
+            $table->string('default_keywords')->nullable();
+            $table->string('default_location')->nullable();
+            $table->string('default_city')->nullable();
+            $table->string('default_state')->nullable();
+            $table->string('default_country')->nullable();
+            $table->string('default_iso_country', 2)->nullable();
+
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('created_at')->useCurrent();
         });
@@ -116,11 +139,38 @@ return new class extends Migration {
             $table->string('lr_uuid', 64);
             $table->integer('width')->default(0);
             $table->integer('height')->default(0);
+            
+            // IPTC Metadaten
             $table->string('title')->nullable();
             $table->text('description')->nullable();
             $table->string('artist')->nullable();
+            $table->string('headline')->nullable();
+            $table->string('keywords')->nullable();
+            $table->string('location')->nullable();
+            $table->string('city')->nullable();
+            $table->string('state')->nullable();
+            $table->string('country')->nullable();
+            $table->string('iso_country', 2)->nullable();
+            
             $table->timestamp('created_at')->useCurrent();
             $table->unique(['gallery_id', 'lr_uuid']);
+        });
+
+        Schema::create('photo_metadata_versions', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('photo_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
+            $table->string('title')->nullable();
+            $table->text('description')->nullable();
+            $table->string('artist')->nullable();
+            $table->string('headline')->nullable();
+            $table->string('keywords')->nullable();
+            $table->string('location')->nullable();
+            $table->string('city')->nullable();
+            $table->string('state')->nullable();
+            $table->string('country')->nullable();
+            $table->string('iso_country', 2)->nullable();
+            $table->timestamp('created_at')->useCurrent();
         });
 
         Schema::create('ratings', function (Blueprint $table) {
@@ -197,6 +247,7 @@ return new class extends Migration {
         Schema::dropIfExists('user_galleries');
         Schema::dropIfExists('user_gallery_groups');
         Schema::dropIfExists('ratings');
+        Schema::dropIfExists('photo_metadata_versions');
         Schema::dropIfExists('photos');
         Schema::table('users', function (Blueprint $table) { $table->dropForeign(['current_ftp_gallery_id']); });
         Schema::dropIfExists('galleries');

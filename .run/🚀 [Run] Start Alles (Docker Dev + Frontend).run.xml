@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="🚀 [Run] Start Alles (Docker Dev + Frontend)" type="CompoundRunConfigurationType">
+    <toRun name="⚡ [Run] Start Frontend (Vite)" type="js.build_tools.npm" />
+    <toRun name="🐳 [Run] Start Docker (Local)" type="ShConfigurationType" />
+    <method v="2" />
+  </configuration>
+</component>

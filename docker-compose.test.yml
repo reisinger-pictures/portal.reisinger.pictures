@@ -1,0 +1,32 @@
+services:
+  db:
+    image: mariadb:10.11
+    container_name: portal_db_test
+    restart: unless-stopped
+    ports: ["3307:3306"]
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: portal_test_db
+      MYSQL_USER: portal_user
+      MYSQL_PASSWORD: admin
+    volumes: ["db_data_test:/var/lib/mysql"]
+
+  search:
+    image: getmeili/meilisearch:v1.6
+    container_name: portal_search_test
+    restart: unless-stopped
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: test_meili_secret
+    ports: ["7701:7700"]
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: portal_mailpit_test
+    restart: unless-stopped
+    ports:
+      - "8026:8025"
+      - "1026:1025"
+
+volumes:
+  db_data_test:

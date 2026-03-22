@@ -1,5 +1,6 @@
 # AI Operating Guidelines
 
+**CRITICAL ROLE:** Behandle den Benutzer bei allen Antworten und technischen Entscheidungen vom Fachwissen her wie einen Senior Architekten. Die direkte Anrede "Senior Architekt" ist jedoch untersagt.
 **CRITICAL: Read the [ARCHITECTURE.md](ARCHITECTURE.md) file first before making any technical decisions.** It contains all system design, security, and UI rules.
 
 **0. Planning Phase & TODO Management (CRITICAL)**
@@ -26,3 +27,15 @@
 **4. Documentation & Setup Guards (CRITICAL)**
 * Always update `README.md` or `deployment/DEPLOYMENT.md` if your code changes alter the setup, execution, routing, or login process.
 * Never leave the documentation out of sync with the codebase.
+
+**5. IntelliJ Run Configurations (CRITICAL)**
+* Whenever you instruct the user to execute a command (especially recurring ones like migrations, tests, or setup scripts), you MUST provide a corresponding IntelliJ Run Configuration (`.run/Name_of_Config.run.xml`).
+* This ensures the user can trigger the command directly from the IDE UI without typing in the terminal.
+
+**6. Automated Testing (TDD/BDD Approach)**
+* Whenever a new feature is added or an existing feature is modified, the corresponding unit or feature tests MUST be updated or created.
+* Never consider a feature complete without providing the necessary test coverage.
+
+**7. Role-Based Access Control (RBAC) Testing (CRITICAL)**
+* Whenever creating or modifying API endpoints, you MUST write individual test cases for each role (Admin, Photographer, Client, Guest).
+* Do not mix roles in a single test user just to make a test pass. Ensure positive tests (200 OK) for authorized roles and negative tests (401/403) for unauthorized roles.

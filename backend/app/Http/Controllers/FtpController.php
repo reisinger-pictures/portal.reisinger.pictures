@@ -104,7 +104,7 @@ class FtpController extends Controller
                 mkdir(dirname($thumbPath), 0755, true);
             }
 
-            $meta = $photoService->processImage($targetPath, $thumbPath, $defaultArtist);
+            $meta = $photoService->processImage($targetPath, $thumbPath, $gallery, $defaultArtist);
 
             Photo::updateOrCreate(
                 ['gallery_id' => $gallery->id, 'filename' => $filename],

@@ -139,18 +139,42 @@ class AuthController extends Controller
         ]);
     }
 
+    public function refresh()
+    {
+        try {
+            $token = Auth::guard('api')->refresh();
+            return $this->respondWithToken($token);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Token konnte nicht aktualisiert werden.'], 401);
+        }
+    }
+
     public function logout()
     {
         Auth::guard('api')->logout();
-        return response()->json(['message' => 'Successfully logged out']);
+        $cookie = cookie()->forget('rp_jwt');
+        return response()->json(['message' => 'Successfully logged out'])->withCookie($cookie);
     }
 
     protected function respondWithToken($token)
     {
+        $ttl = Auth::guard('api')->factory()->getTTL();
+        
+        $cookie = cookie(
+            'rp_jwt', 
+            $token, 
+            $ttl, 
+            '/', 
+            null, 
+            env('APP_ENV') !== 'local',
+            true, 
+            false, 
+            'Lax' 
+        );
+
         return response()->json([
-            'access_token' => $token,
-            'token_type' => 'bearer',
-            'expires_in' => Auth::guard('api')->factory()->getTTL() * 60
-        ]);
+            'success' => true,
+            'expires_in' => $ttl * 60
+        ])->withCookie($cookie);
     }
 }

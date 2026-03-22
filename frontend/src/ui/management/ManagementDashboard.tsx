@@ -31,7 +31,7 @@ export default function ManagementDashboard() {
         deleteGallery
     } = useProtectedGalleries();
     const [searchQuery, setSearchQuery] = useState('');
-    const {results: searchResults} = useSearch(searchQuery);
+    const {results: searchResults} = useSearch(searchQuery, false, true); // Leere Query überspringen
     const {user} = useAuth();
     const {results: personalFeed, isLoading: feedLoading} = useSearch('', true);
 

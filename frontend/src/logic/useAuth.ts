@@ -1,6 +1,7 @@
 import useSWR from 'swr';
 import {fetcher} from '../api';
 import {Gallery} from './useGalleries';
+import {useEffect} from 'react';
 
 export interface User {
     id: number;
@@ -19,15 +20,21 @@ export function useAuth() {
         shouldRetryOnError: false,
     });
 
+    if (user && user.roles && (window as any).__loggedUserId !== user.id) {
+        console.log('User Roles:', user.roles);
+        (window as any).__loggedUserId = user.id;
+    }
+
+    
+
     const login = async (email: string, password: string): Promise<void> => {
         const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify({email, password})
         });
         if (!response.ok) throw new Error('Login fehlgeschlagen');
-        const data = await response.json();
-        localStorage.setItem('rp_jwt', data.access_token);
         await mutate();
     };
 
@@ -35,6 +42,7 @@ export function useAuth() {
         const response = await fetch('/api/auth/register', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify({name, email})
         });
         const data = await response.json();
@@ -44,8 +52,16 @@ export function useAuth() {
         return data.message || 'Erfolgreich registriert';
     };
 
-    const logout = (): void => {
-        localStorage.removeItem('rp_jwt');
+    const logout = async (): Promise<void> => {
+        try {
+            await fetch('/api/auth/logout', { 
+                method: 'POST', 
+                headers: {'Accept': 'application/json'},
+                credentials: 'include' 
+            });
+        } catch (e) {
+            console.error('Logout Fehler', e);
+        }
         mutate(undefined, { revalidate: false });
     };
 

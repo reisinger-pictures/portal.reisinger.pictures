@@ -3,18 +3,24 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Scout\Searchable;
 
 class Gallery extends Model
 {
+    use HasFactory;
+
     use Searchable;
 
     public const UPDATED_AT = null;
     
     protected $visible = [
         'id', 'gallery_group_id', 'name', 'slug', 'type', 'is_live', 
-        'is_public', 'expires_at', 'created_at', 'full_path', 'photos', 'galleryGroup'
+        'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos', 
+        'default_headline', 'default_title', 'default_description', 'default_keywords', 
+        'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
+        'expires_at', 'created_at', 'full_path', 'photos', 'galleryGroup'
     ];
 
     protected $fillable = [
@@ -25,6 +31,17 @@ class Gallery extends Model
         'is_live',
         'is_public',
         'password_hash',
+        'allow_client_metadata_edit',
+        'apply_metadata_to_photos',
+        'default_headline',
+        'default_title',
+        'default_description',
+        'default_keywords',
+        'default_location',
+        'default_city',
+        'default_state',
+        'default_country',
+        'default_iso_country',
         'expires_at',
         'deleted_at'
     ];
@@ -32,6 +49,8 @@ class Gallery extends Model
     protected $casts = [
         'is_public' => 'boolean',
         'is_live' => 'boolean',
+        'allow_client_metadata_edit' => 'boolean',
+        'apply_metadata_to_photos' => 'boolean',
         'expires_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];

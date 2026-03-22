@@ -10,6 +10,17 @@ export interface Gallery {
     type: 'selection' | 'delivery';
     is_live: boolean;
     is_public: boolean;
+    allow_client_metadata_edit?: boolean;
+    apply_metadata_to_photos?: boolean;
+    default_headline?: string;
+    default_title?: string;
+    default_description?: string;
+    default_keywords?: string;
+    default_location?: string;
+    default_city?: string;
+    default_state?: string;
+    default_country?: string;
+    default_iso_country?: string;
     gallery_group_id?: number | null;
     expires_at?: string | null;
 }
@@ -68,7 +79,7 @@ export function useProtectedGalleries() {
         }
     };
 
-    const createGallery = async (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: number | null, password?: string, expiresAt?: string) => {
+    const createGallery = async (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: number | null, password?: string, expiresAt?: string, metadataOpts?: any) => {
         try {
             await apiMutate('/api/management/galleries', 'POST', {
                 name,
@@ -78,7 +89,8 @@ export function useProtectedGalleries() {
                 is_public: isPublic,
                 gallery_group_id: groupId,
                 password,
-                expires_at: expiresAt
+                expires_at: expiresAt,
+                ...metadataOpts
             });
             await mutate();
         } catch (e) {
@@ -106,8 +118,8 @@ export function useProtectedGalleries() {
         await mutate();
     };
 
-    const updateGallery = async (id: number, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: number | null, password?: string, expiresAt?: string) => {
-        await apiMutate('/api/management/galleries/' + id, 'PUT', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt });
+    const updateGallery = async (id: number, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: number | null, password?: string, expiresAt?: string, metadataOpts?: any) => {
+        await apiMutate('/api/management/galleries/' + id, 'PUT', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts });
         await mutate();
     };
 

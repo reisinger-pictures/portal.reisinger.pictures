@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="🐳 [Run] Start Docker (Local)" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="docker compose -f docker-compose.local.yml up -d" />
+  <configuration default="false" name="🧪 [Test] Backend: All Feature Tests" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="php artisan test" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-    <option name="SCRIPT_WORKING_DIR" value="$PROJECT_DIR$" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/backend" />
     <option name="EXECUTE_IN_TERMINAL" value="true" />
     <option name="EXECUTE_SCRIPT_FILE" value="false" />
     <method v="2" />

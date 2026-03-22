@@ -1,15 +1,15 @@
 <?php
 
-namespace AppHttpControllers;
+namespace App\Http\Controllers;
 
-use IlluminateHttpRequest;
-use AppModelsGallery;
-use AppModelsPhoto;
-use AppModelsDownloadLog;
-use ZipStreamZipStream;
-use IlluminateSupportFacadesLog;
-use AppServicesWatermarkService;
-use SymfonyComponentProcessProcess;
+use Illuminate\Http\Request;
+use App\Models\Gallery;
+use App\Models\Photo;
+use App\Models\DownloadLog;
+use ZipStream\ZipStream;
+use Illuminate\Support\Facades\Log;
+use App\Services\WatermarkService;
+use Symfony\Component\Process\Process;
 
 class DownloadController extends Controller
 {
@@ -39,6 +39,7 @@ class DownloadController extends Controller
         $artist = trim($photo->artist ?? config('app.name', 'Reisinger Foto Portal'), "\"\'");
         $copyright = 'Copyright ' . date('Y') . ' ' . $artist;
         $instructions = 'Licensed to / Downloaded by: ' . $userName;
+        $agbUrl = 'https://reisinger.pictures/agb';
 
         $args = [
             'exiftool',
@@ -54,14 +55,15 @@ class DownloadController extends Controller
             '-IPTC:CodedCharacterSet=utf8'
         ];
 
-        if (!empty($photo->title)) {
-            $args[] = "-ObjectName={$photo->title}";
-            $args[] = "-XPTitle={$photo->title}";
-        }
-        if (!empty($photo->description)) {
-            $args[] = "-Caption-Abstract={$photo->description}";
-            $args[] = "-ImageDescription={$photo->description}";
-        }
+        if (!empty($photo->title)) { $args[] = "-ObjectName={$photo->title}"; $args[] = "-XPTitle={$photo->title}"; }
+        if (!empty($photo->description)) { $args[] = "-Caption-Abstract={$photo->description}"; $args[] = "-ImageDescription={$photo->description}"; }
+        if (!empty($photo->headline)) { $args[] = "-Headline={$photo->headline}"; }
+        if (!empty($photo->keywords)) { $args[] = "-Keywords={$photo->keywords}"; }
+        if (!empty($photo->location)) { $args[] = "-Sub-location={$photo->location}"; }
+        if (!empty($photo->city)) { $args[] = "-City={$photo->city}"; }
+        if (!empty($photo->state)) { $args[] = "-Province-State={$photo->state}"; }
+        if (!empty($photo->country)) { $args[] = "-Country-PrimaryLocationName={$photo->country}"; }
+        if (!empty($photo->iso_country)) { $args[] = "-Country-PrimaryLocationCode={$photo->iso_country}"; }
 
         array_push(
             $args,
@@ -70,6 +72,8 @@ class DownloadController extends Controller
             "-Copyright={$copyright}",
             "-CopyrightNotice={$copyright}",
             "-SpecialInstructions={$instructions}",
+            "-UsageTerms={$agbUrl}",
+            "-Rights={$agbUrl}",
             $tempPath
         );
 
@@ -91,7 +95,7 @@ class DownloadController extends Controller
         $gallery = $photo->gallery;
         $user = $this->authorizeGalleryAccess($gallery);
 
-        $baseStoragePath = env('PHOTO_STORAGE_PATH', base_path('../photos'));
+        $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/');
         $sourcePath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
 
         if (!file_exists($sourcePath))
@@ -129,7 +133,7 @@ class DownloadController extends Controller
         $gallery = Gallery::with('photos')->findOrFail($galleryId);
         $user = $this->authorizeGalleryAccess($gallery);
 
-        $baseStoragePath = env('PHOTO_STORAGE_PATH', base_path('../photos'));
+        $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/');
         $userName = $user ? $user->name : 'Gast';
 
         DownloadLog::create([

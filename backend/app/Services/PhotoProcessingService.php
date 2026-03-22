@@ -4,65 +4,108 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
+use App\Models\Gallery;
 
 class PhotoProcessingService
 {
-    /**
-     * Extrahiert Metadaten (ExifTool) und generiert ein WebP Thumbnail (Imagick).
-     *
-     * @param string $targetPath Absoluter Pfad zum hochgeladenen Original-JPEG
-     * @param string $thumbPath Absoluter Pfad zum gewünschten Thumbnail-Ziel
-     * @param string|null $defaultArtist Fallback, falls das Bild keinen eigenen Artist enthält
-     * @return array Gibt Breite, Höhe, Titel, Beschreibung und Artist als Array zurück
-     */
-    public function processImage(string $targetPath, string $thumbPath, ?string $defaultArtist = null): array
+    public function processImage(string $targetPath, string $thumbPath, Gallery $gallery, ?string $defaultArtist = null): array
     {
-        // 1. Metadaten AUSLESEN (Exiftool)
-        $process = new Process([
-            'exiftool', '-json', '-Title', '-ObjectName', '-XPTitle', 
-            '-ImageDescription', '-Caption-Abstract', '-Artist', '-By-line', '-Copyright', $targetPath
-        ]);
-        $process->run();
-        $metaOutput = $process->getOutput();
-        $metaData = json_decode($metaOutput, true);
-        
-        $title = null; 
-        $desc = null; 
-        $artist = $defaultArtist;
-        
-        if (is_array($metaData) && isset($metaData[0])) {
-            $m = $metaData[0];
-            $title = $m['Title'] ?? $m['ObjectName'] ?? $m['XPTitle'] ?? null;
-            $desc = $m['ImageDescription'] ?? $m['Caption-Abstract'] ?? null;
-            $artist = $m['Artist'] ?? $m['By-line'] ?? $m['Copyright'] ?? $artist;
-        }
-
         $size = @getimagesize($targetPath);
         $width = $size ? (int) $size[0] : 0;
         $height = $size ? (int) $size[1] : 0;
 
-        // 2. Thumbnail generieren (Imagick)
-        try {
-            $im = new \Imagick($targetPath);
-            $im->autoOrient();
-            if ($width > 1024) {
-                $im->thumbnailImage(1024, 0, false);
-            }
-            $im->setImageFormat('webp');
-            $im->setImageCompressionQuality(80);
-            $im->writeImage($thumbPath);
-            $im->clear();
-            $im->destroy();
-        } catch (\Exception $e) {
-            Log::error("Imagick Error in PhotoProcessingService: " . $e->getMessage());
-        }
+        $applyDefaults = $gallery->type !== 'selection' && $gallery->apply_metadata_to_photos;
 
-        return [
+        $meta = [
             'width' => $width,
             'height' => $height,
-            'title' => $title,
-            'description' => $desc,
-            'artist' => $artist
+            'title' => $applyDefaults ? $gallery->default_title : null,
+            'description' => $applyDefaults ? $gallery->default_description : null,
+            'artist' => $defaultArtist,
+            'headline' => $applyDefaults ? $gallery->default_headline : null,
+            'keywords' => $applyDefaults ? $gallery->default_keywords : null,
+            'location' => $applyDefaults ? $gallery->default_location : null,
+            'city' => $applyDefaults ? $gallery->default_city : null,
+            'state' => $applyDefaults ? $gallery->default_state : null,
+            'country' => $applyDefaults ? $gallery->default_country : null,
+            'iso_country' => $applyDefaults ? $gallery->default_iso_country : null,
         ];
+
+        // Selection Galerien überspringen die Exif-Extraktion aus Performance-Gründen
+        if ($gallery->type === 'selection' || !$gallery->apply_metadata_to_photos) {
+            $this->generateThumbnail($targetPath, $thumbPath, $width);
+            return $meta;
+        }
+
+        // Metadaten via Exiftool auslesen
+        $process = new Process([
+            'exiftool', '-json', '-Title', '-ObjectName', '-XPTitle', 
+            '-ImageDescription', '-Caption-Abstract', '-Artist', '-By-line', '-Copyright',
+            '-Headline', '-Keywords', '-Sub-location', '-City', '-Province-State', 
+            '-Country-PrimaryLocationName', '-Country-PrimaryLocationCode',
+            $targetPath
+        ]);
+        $process->run();
+        $metaData = json_decode($process->getOutput(), true);
+        
+        if (is_array($metaData) && isset($metaData[0])) {
+            $m = $metaData[0];
+            $meta['title'] = $m['Title'] ?? $m['ObjectName'] ?? $m['XPTitle'] ?? $meta['title'];
+            $meta['description'] = $m['ImageDescription'] ?? $m['Caption-Abstract'] ?? $meta['description'];
+            $meta['artist'] = $m['Artist'] ?? $m['By-line'] ?? $m['Copyright'] ?? $meta['artist'];
+            $meta['headline'] = $m['Headline'] ?? $meta['headline'];
+            $meta['keywords'] = is_array($m['Keywords'] ?? null) ? implode(', ', $m['Keywords']) : ($m['Keywords'] ?? $meta['keywords']);
+            $meta['location'] = $m['Sub-location'] ?? $meta['location'];
+            $meta['city'] = $m['City'] ?? $meta['city'];
+            $meta['state'] = $m['Province-State'] ?? $meta['state'];
+            $meta['country'] = $m['Country-PrimaryLocationName'] ?? $meta['country'];
+            $meta['iso_country'] = $m['Country-PrimaryLocationCode'] ?? $meta['iso_country'];
+        }
+
+        $this->generateThumbnail($targetPath, $thumbPath, $width);
+
+        return $meta;
+    }
+
+    private function generateThumbnail(string $targetPath, string $thumbPath, int $width)
+    {
+        // 1. Priorität: PHP Imagick Extension (Produktion)
+        if (class_exists('Imagick')) {
+            try {
+                $im = new \Imagick($targetPath);
+                $im->autoOrient();
+                if ($width > 1024) {
+                    $im->thumbnailImage(1024, 0, false);
+                }
+                $im->setImageFormat('webp');
+                $im->setImageCompressionQuality(80);
+                $im->writeImage($thumbPath);
+                $im->clear();
+                $im->destroy();
+                return;
+            } catch (\Exception $e) {
+                Log::warning("Imagick Extension Error: " . $e->getMessage());
+            }
+        }
+
+        // 2. Fallback: ImageMagick via Kommandozeile (Local Dev / Windows)
+        try {
+            // Versuche ImageMagick 7 (magick)
+            $process = new Process(['magick', $targetPath, '-auto-orient', '-resize', '1024x>', '-quality', '80', $thumbPath]);
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                // Fallback auf ImageMagick 6 Legacy (convert)
+                $process = new Process(['convert', $targetPath, '-auto-orient', '-resize', '1024x>', '-quality', '80', $thumbPath]);
+                $process->run();
+
+                if (!$process->isSuccessful()) {
+                    throw new \RuntimeException('ImageMagick CLI Error: ' . $process->getErrorOutput());
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error("Thumbnail CLI Fallback failed: " . $e->getMessage());
+            throw $e; // Hard-Fail für den Test!
+        }
     }
 }

@@ -10,7 +10,7 @@ export default function ClientDashboard() {
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const {results: searchResults} = useSearch(searchQuery);
+    const {results: searchResults} = useSearch(searchQuery, false, true); // Leere Query überspringen
 
     if (!user) return null;
 

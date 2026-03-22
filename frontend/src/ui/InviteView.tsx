@@ -48,7 +48,6 @@ export default function InviteView() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Fehler beim Beitritt.');
 
-            localStorage.setItem('rp_jwt', data.access_token);
             navigate('/' + data.full_path, {replace: true});
         } catch (err: unknown) {
             setError((err as Error).message);

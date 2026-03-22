@@ -20,10 +20,10 @@ export function useSettings() {
     );
 
     const updateWatermark = async (formData: FormData) => {
-        const token = localStorage.getItem('rp_jwt');
         await fetch('/api/management/settings/watermark', {
             method: 'POST',
-            headers: {'Authorization': `Bearer ${token}`, 'Accept': 'application/json'},
+            headers: {'Accept': 'application/json'},
+            credentials: 'include',
             body: formData
         });
         mutate();

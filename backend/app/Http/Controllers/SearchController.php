@@ -17,7 +17,7 @@ class SearchController extends Controller
 
         // --- PERSONAL FEED MODE (Für das Fotografen-Dashboard) ---
         if ($request->boolean('personal') && $user) {
-            $allowedGalleryIds = $user->galleries()->pluck('galleries.id')->toArray();
+            $allowedGalleryIds = $user->getAllowedGalleryIds();
             if (empty($allowedGalleryIds)) {
                 return response()->json(['galleries' => [], 'photos' => []]);
             }
@@ -39,7 +39,7 @@ class SearchController extends Controller
             $publicGalleryIds = Gallery::where('is_public', true)->pluck('id')->toArray();
             
             if ($user && !$user->is_admin) {
-                $allowedGalleryIds = $user->galleries()->pluck('galleries.id')->toArray();
+                $allowedGalleryIds = $user->getAllowedGalleryIds();
                 $publicGalleryIds = array_unique(array_merge($allowedGalleryIds, $publicGalleryIds));
             } elseif ($user && $user->is_admin) {
                 $publicGalleryIds = Gallery::pluck('id')->toArray();

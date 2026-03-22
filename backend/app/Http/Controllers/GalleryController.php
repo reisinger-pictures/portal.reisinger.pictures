@@ -32,7 +32,7 @@ class GalleryController extends Controller
         $treeArray = json_decode(json_encode($tree), true);
 
         if (!$user->is_admin && $user->is_photographer) {
-            $allowedGalleryIds = $user->galleries()->pluck('galleries.id')->toArray();
+            $allowedGalleryIds = $user->getAllowedGalleryIds();
             
             $filterNode = function($groups) use (&$filterNode, $allowedGalleryIds) {
                 $result = [];
@@ -284,7 +284,7 @@ class GalleryController extends Controller
         $galleryIds = Gallery::whereIn('gallery_group_id', $groupIds)->pluck('id')->toArray();
 
         if (!$user->is_admin) {
-            $allowedGalleryIds = $user->galleries()->pluck('galleries.id')->toArray();
+            $allowedGalleryIds = $user->getAllowedGalleryIds();
             $galleryIds = array_intersect($galleryIds, $allowedGalleryIds);
         }
 
