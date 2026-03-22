@@ -28,3 +28,10 @@ db_data/
 search_data/
 photos/
 ftp/
+
+
+# Playwright E2E Tests
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/

@@ -21,7 +21,9 @@ class PhotoController extends Controller
         }
 
         // Kunden-Prüfung
-        $isClientWithRights = $photo->gallery->allow_client_metadata_edit && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
+        $isClientWithRights = $photo->gallery->allow_client_metadata_edit 
+            && $user->can_edit_metadata 
+            && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
         
         if ($isClientWithRights) {
             return ['allowed' => true, 'is_client' => true];

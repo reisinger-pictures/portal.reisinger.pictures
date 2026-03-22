@@ -23,8 +23,12 @@ return function(mode)
         local photoCount = #targetPhotos
 
         local jwt = nil
+        local loginFailed = false
+        local lastErr = ""
+        local lastDetail = ""
+        
         while true do
-            jwt = Api.login()
+            jwt, lastErr, lastDetail = Api.login()
             if jwt then
                 local isAllowed = Api.checkRole(jwt)
                 if isAllowed then break else
@@ -32,8 +36,62 @@ return function(mode)
                     return
                 end
             else
-                LrDialogs.message(Api.getTitle("Login erforderlich"), "Bitte trage die API Zugangsdaten im Zusatzmodul-Manager ein.", "warning")
-                return
+                local success = false
+                LrFunctionContext.callWithContext("LoginDialogContext", function(context)
+                    local f = LrView.osFactory()
+                    local prefs = import 'LrPrefs'.prefsForPlugin()
+                    local props = LrBinding.makePropertyTable(context)
+                    
+                    props.email = prefs.apiUser or ""
+                    props.password = prefs.apiPass or ""
+                    props.useTestUrl = prefs.useTestUrl == true
+
+                    local errUI = f:spacer { height = 0 } -- Fix: Verhindert nil-Loch im Lua-Array
+                    if loginFailed then
+                        local errText = "Fehler: " .. tostring(lastErr)
+                        if prefs.useTestUrl and lastDetail and lastDetail ~= "" then
+                           errText = errText .. "\n\n" .. lastDetail
+                        end
+                        errUI = f:edit_field {
+                            value = errText,
+                            width_in_chars = 50,
+                            height_in_lines = 5,
+                            text_color = import 'LrColor'(0.8, 0, 0)
+                        }
+                    end
+
+                    local contents = f:column {
+                        spacing = f:control_spacing(),
+                        f:static_text { 
+                            title = loginFailed and "Bitte Zugangsdaten prüfen." or "Bitte für das Reisinger Foto Portal anmelden.", 
+                            text_color = loginFailed and import 'LrColor'(0.8, 0, 0) or nil,
+                            margin_bottom = 5 
+                        },
+                        errUI,
+                        f:spacer { height = 5 },
+                        f:row { f:static_text { title = "E-Mail:", width = 80 }, f:edit_field { value = LrView.bind{key="email", bind_to_object=props}, fill_horizontal = 1, width_in_chars = 30 } },
+                        f:row { f:static_text { title = "Passwort:", width = 80 }, f:password_field { value = LrView.bind{key="password", bind_to_object=props}, fill_horizontal = 1, width_in_chars = 30 } },
+                        f:spacer { height = 5 },
+                        f:row { f:spacer { width = 80 }, f:checkbox { title = "Lokale Test-Umgebung (portal.test) verwenden", value = LrView.bind{key="useTestUrl", bind_to_object=props} } }
+                    }
+
+                    local res = LrDialogs.presentModalDialog {
+                        title = Api.getTitle("Login erforderlich"),
+                        contents = contents,
+                        actionVerb = "Anmelden",
+                        cancelVerb = "Abbrechen"
+                    }
+
+                    if res == "ok" then
+                        prefs.apiUser = props.email
+                        prefs.apiPass = props.password
+                        prefs.useTestUrl = props.useTestUrl
+                        loginFailed = true
+                        success = true
+                    end
+                end)
+                
+                if not success then return end -- User hat Abbrechen gedrückt
             end
         end
 

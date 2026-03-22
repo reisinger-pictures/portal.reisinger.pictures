@@ -41,16 +41,40 @@ function Api.call(endpoint, method, payload, jwt)
         local success, parsed = pcall(json.decode, resBody)
         if success then data = parsed end
     end
-    return data, status
+    return data, status, resBody, resHeaders
 end
 
 function Api.login()
     local prefs = LrPrefs.prefsForPlugin()
-    if not prefs.apiUser or not prefs.apiPass then return nil end
+    if not prefs.apiUser or not prefs.apiPass then return nil, "Keine Zugangsdaten eingegeben.", "" end
     local payload = { email = prefs.apiUser, password = prefs.apiPass }
-    local data, status = Api.call("/api/auth/login", "POST", payload, nil)
-    if status == 200 and data and data.access_token then return data.access_token end
-    return nil
+    local data, status, resBody, resHeaders = Api.call("/api/auth/login", "POST", payload, nil)
+    
+    local token = data and data.access_token
+    
+    -- LrHttp gibt resHeaders als Liste von Tabellen zurück: { {field="Set-Cookie", value="..."} }
+    if status == 200 and resHeaders and not token then
+        for _, header in ipairs(resHeaders) do
+            if type(header) == "table" and header.field and string.lower(header.field) == "set-cookie" then
+                if header.value then
+                    local match = string.match(header.value, "rp_jwt=([^;]+)")
+                    if match then 
+                        token = match
+                        break 
+                    end
+                end
+            end
+        end
+    end
+    
+    if status == 200 and token then return token, nil, nil end
+    
+    local err = (data and data.error) or "Unbekannter API Fehler"
+    local detail = "Status: " .. tostring(status) .. "\nURL: " .. Api.getApiUrl() .. "/api/auth/login\n"
+    if resBody and resBody ~= "" then detail = detail .. "Body: " .. string.sub(resBody, 1, 300) end
+    if resHeaders and resHeaders.error then detail = detail .. "\nCurl Error: " .. tostring(resHeaders.error.localizedMessage) end
+    
+    return nil, err, detail
 end
 
 function Api.checkRole(jwt)

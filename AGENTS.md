@@ -39,3 +39,10 @@
 **7. Role-Based Access Control (RBAC) Testing (CRITICAL)**
 * Whenever creating or modifying API endpoints, you MUST write individual test cases for each role (Admin, Photographer, Client, Guest).
 * Do not mix roles in a single test user just to make a test pass. Ensure positive tests (200 OK) for authorized roles and negative tests (401/403) for unauthorized roles.
+
+**8. Playwright E2E Testing Best Practices (Tailwind & DaisyUI)**
+* **Page Object Model (POM) & Test Helpers:** NEVER duplicate interaction logic (like Login, Sidebar navigation, or Modal handling) across multiple tests. Extract these into reusable helper classes or functions (e.g., `LoginPage`, `GalleryModal`) located in a `frontend/tests/e2e/helpers` directory. Tests must remain DRY.
+* **Semantic Locators First:** NEVER use Tailwind utility classes (like `.flex`, `.mt-4`, `.w-full`) for locators. They change frequently and break tests. Use `getByRole`, `getByLabel`, or `getByText` whenever possible.
+* **DaisyUI Modal Scoping (CRITICAL):** DaisyUI renders closed modals in the DOM. Always scope modal interactions to the active modal using `.locator('.modal-open')`. Failing to do so will result in Playwright trying to click hidden elements and timing out.
+* **Structural Selectors:** If semantic locators fail, rely on semantic structural classes (like `.card-title`, `.form-control`, `.stat-value`) rather than layout classes.
+* **Test Isolation:** Since the DB is seeded only once in `globalSetup`, tests must not destroy global state required by other tests. Use unique names/slugs for test creations.

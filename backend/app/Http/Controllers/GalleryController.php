@@ -190,10 +190,7 @@ class GalleryController extends Controller
     public function destroyGallery($id)
     {
         $gallery = Gallery::findOrFail($id);
-        $baseStoragePath = env('PHOTO_STORAGE_PATH', base_path('../photos'));
-        $targetDir = $baseStoragePath . '/' . $gallery->id;
-        
-        File::deleteDirectory($targetDir);
+        \Illuminate\Support\Facades\Storage::disk('photos')->deleteDirectory((string) $gallery->id);
         
         $gallery->delete();
         return response()->json(['success' => true]);

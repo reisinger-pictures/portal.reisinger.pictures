@@ -1,3 +1,4 @@
+-- admin.lrplugin/GalleryDialog.lua
 local LrView = import 'LrView'
 local LrDialogs = import 'LrDialogs'
 local LrBinding = import 'LrBinding'
@@ -19,6 +20,19 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
         props.gLive = (editingGallery and editingGallery.is_live) == true
         props.gPassword = ""
         props.gExpiresAt = ""
+        
+        -- Metadaten & Berechtigungen
+        props.allowClientMeta = editingGallery and (editingGallery.allow_client_metadata_edit == true) or false
+        props.applyMeta = editingGallery and (editingGallery.apply_metadata_to_photos == true) or false
+        props.defTitle = editingGallery and editingGallery.default_title or ""
+        props.defHeadline = editingGallery and editingGallery.default_headline or ""
+        props.defDesc = editingGallery and editingGallery.default_description or ""
+        props.defKeywords = editingGallery and editingGallery.default_keywords or ""
+        props.defLocation = editingGallery and editingGallery.default_location or ""
+        props.defCity = editingGallery and editingGallery.default_city or ""
+        props.defState = editingGallery and editingGallery.default_state or ""
+        props.defCountry = editingGallery and editingGallery.default_country or ""
+        props.defIso = editingGallery and editingGallery.default_iso_country or ""
         
         if editingGallery and editingGallery.expires_at and editingGallery.expires_at ~= "" then
             -- Laravel schickt meist ISO Format "YYYY-MM-DDTHH:mm:ss...", wir brauchen nur die ersten 10 Zeichen
@@ -84,6 +98,45 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
             f:edit_field { value = LrView.bind{key="gPassword", bind_to_object=props}, fill_horizontal = 1, placeholder_string = editingGallery and "(Unverändert lassen)" or "" }
         })
 
+        -- METADATEN BLOCK (Nur bei Delivery Galerien)
+        if mode == "delivery" then
+            table.insert(rows, f:spacer { height = 10 })
+            table.insert(rows, f:separator { fill_horizontal = 1 })
+            table.insert(rows, f:spacer { height = 5 })
+            table.insert(rows, f:static_text { title = "Metadaten & Berechtigungen", font = "<system/bold>" })
+
+            table.insert(rows, f:row {
+                f:spacer { width = 120 },
+                f:checkbox { title = "Kunden dürfen Metadaten bearbeiten", value = LrView.bind{key="allowClientMeta", bind_to_object=props} }
+            })
+
+            table.insert(rows, f:row {
+                f:spacer { width = 120 },
+                f:checkbox { title = "Standard-Metadaten beim Upload anwenden", value = LrView.bind{key="applyMeta", bind_to_object=props} }
+            })
+
+            -- Eingabefelder für Defaults (nur sichtbar wenn applyMeta true ist)
+            local iptcFields = f:column {
+                spacing = f:control_spacing(),
+                margin_top = 5,
+                margin_left = 120,
+                f:row { f:static_text { title="Titel:", width=90 }, f:edit_field { value = LrView.bind{key="defTitle", bind_to_object=props}, fill_horizontal=1 } },
+                f:row { f:static_text { title="Headline:", width=90 }, f:edit_field { value = LrView.bind{key="defHeadline", bind_to_object=props}, fill_horizontal=1 } },
+                f:row { f:static_text { title="Beschreibung:", width=90 }, f:edit_field { value = LrView.bind{key="defDesc", bind_to_object=props}, fill_horizontal=1, height_in_lines=3 } },
+                f:row { f:static_text { title="Keywords:", width=90 }, f:edit_field { value = LrView.bind{key="defKeywords", bind_to_object=props}, fill_horizontal=1 } },
+                f:row { f:static_text { title="Ort:", width=90 }, f:edit_field { value = LrView.bind{key="defLocation", bind_to_object=props}, fill_horizontal=1 } },
+                f:row { f:static_text { title="Stadt:", width=90 }, f:edit_field { value = LrView.bind{key="defCity", bind_to_object=props}, fill_horizontal=1 } },
+                f:row { f:static_text { title="Bundesland:", width=90 }, f:edit_field { value = LrView.bind{key="defState", bind_to_object=props}, fill_horizontal=1 } },
+                f:row { f:static_text { title="Land:", width=90 }, f:edit_field { value = LrView.bind{key="defCountry", bind_to_object=props}, fill_horizontal=1 } },
+                f:row { f:static_text { title="ISO (z.B. DE):", width=90 }, f:edit_field { value = LrView.bind{key="defIso", bind_to_object=props}, width_in_chars=5 } }
+            }
+
+            table.insert(rows, f:row {
+                visible = LrView.bind{key="applyMeta", bind_to_object=props},
+                iptcFields
+            })
+        end
+
         local res = LrDialogs.presentModalDialog {
             title = Api.getTitle(editingGallery and "Galerie bearbeiten" or "Neue Galerie anlegen"),
             contents = f:column(rows),
@@ -101,8 +154,24 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
                     is_live = (mode == "delivery") and props.gLive or false,
                     gallery_group_id = props.gGroup == -1 and nil or props.gGroup
                 }
+                
                 if props.gPassword ~= "" then payload.password = props.gPassword end
                 if props.gExpiresAt ~= "" then payload.expires_at = props.gExpiresAt end
+
+                -- Metadaten-Settings integrieren (Laravel konvertiert leere Strings in Datenbank-NULLs)
+                if mode == "delivery" then
+                    payload.allow_client_metadata_edit = props.allowClientMeta
+                    payload.apply_metadata_to_photos = props.applyMeta
+                    payload.default_title = props.defTitle
+                    payload.default_headline = props.defHeadline
+                    payload.default_description = props.defDesc
+                    payload.default_keywords = props.defKeywords
+                    payload.default_location = props.defLocation
+                    payload.default_city = props.defCity
+                    payload.default_state = props.defState
+                    payload.default_country = props.defCountry
+                    payload.default_iso_country = props.defIso
+                end
 
                 local endpoint = editingGallery and ("/api/management/galleries/" .. editingGallery.id) or "/api/management/galleries"
                 local apiMethod = editingGallery and "PUT" or "POST"
