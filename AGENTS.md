@@ -17,7 +17,11 @@
 **3. Database & Migrations Workflow**
 * ONLY ONE migration file (`V001__initial_portal_schema.php`).
 
-**4. Testing & Try-Catch Anti-Pattern**
-* **NEVER mask failing tests by wrapping production code in a `try-catch` block.**
-* **Test Isolation (No DB Reset):** E2E tests run directly against the local development environment (`portal_db`). They MUST be non-destructive. Always use highly dynamic names/identifiers (e.g., `Date.now()`) for created entities so tests do not collide with existing developer data or parallel runs.
-* Do not duplicate Playwright logic (use POM). Scope modals with `.locator('.modal-open')`.
+**4. Testing Guidelines**
+* Siehe zwingend **[TESTING.md](TESTING.md)** für alle Regeln rund um PHPUnit und Playwright E2E-Tests!
+
+**5. Definition of Done (DoD) & TODO Management**
+* **Test Planning Requirement:** Whenever you create a new TODO for a feature or refactoring, you MUST explicitly consider and define the types of tests (e.g., PHPUnit for backend logic, Playwright E2E for UI/workflows) required for that task. Include these test requirements directly in the TODO description or as distinct sub-tasks.
+* **Strict File Separation:** `AGENTS.todo.md` is EXCLUSIVELY for listing TODOs. Never write instructions, rules, or guidelines in the TODO file. Architecture and rules belong in `ARCHITECTURE.md` or `AGENTS.md`.
+* **Check-Off Condition:** A TODO can ONLY be checked off if the feature is 100% complete. This means: Production code works, PHPUnit tests are green, E2E tests are green, and external integrations (e.g., Lightroom Plugin) are adjusted and unbroken.
+* **System Integrity:** After checking off a TODO, the entire system MUST be in a fully functional, runnable state without workarounds.

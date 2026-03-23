@@ -8,6 +8,7 @@ import PhotoDetailView from './ui/PhotoDetailView';
 import ManagementMetaGalleryView from './ui/management/ManagementMetaGalleryView';
 import SearchView from './ui/SearchView';
 import ErrorBoundary from './ui/components/ErrorBoundary';
+import { UIProvider } from './ui/components/UIContext';
 import Privacy from './ui/Privacy';
 
 function ProtectedRoute({children}: { children: React.ReactNode }) {
@@ -23,7 +24,8 @@ export default function App() {
         <ErrorBoundary fallback={<div className="flex h-screen items-center justify-center p-8">
             <div className="alert alert-error">Kritischer Fehler. Bitte Seite neu laden.</div>
         </div>}>
-            <Routes>
+            <UIProvider>
+                <Routes>
                 <Route path="/reset-password" element={<ResetPassword/>}/>
 
                 <Route path="/meta/:id" element={
@@ -48,6 +50,7 @@ export default function App() {
                 <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
                 <Route path="*" element={<Navigate to="/" replace/>}/>
             </Routes>
+            </UIProvider>
         </ErrorBoundary>
     );
 }

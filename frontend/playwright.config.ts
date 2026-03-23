@@ -2,10 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  fullyParallel: false, // Sequenziell lassen, um UI-Ressourcen zu schonen
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 1, 
+  workers: process.env.CI ? 1 : 16,
   reporter: 'html',
   // globalSetup entfernt! Tests laufen nun zerstörungsfrei gegen die Dev-DB.
   use: {
@@ -14,6 +14,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'Desktop Chrome', use: { ...devices['Desktop Chrome'] } },
+    { name: 'Mobile Chrome', use: { ...devices['Galaxy S22 Ultra'] } },
   ],
 });

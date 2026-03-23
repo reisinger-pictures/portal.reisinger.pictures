@@ -47,3 +47,8 @@ The system strictly separates the selection phase (client rating) from the deliv
 ## 8. Authentication & Token Management
 * **Silent Token Refresh Pattern:** The frontend uses an Axios-like interceptor pattern in `api.ts` (`fetcher` and `apiMutate`). If an API request returns a `401 Unauthorized`, the request is paused, a silent background call to `/api/auth/refresh` is made to obtain a new JWT via `HttpOnly` cookie, and the original request is retried. A promise-lock (`isRefreshing`) prevents concurrent refresh spamming.
 * **JWT Storage (Security First):** The JWT is stored exclusively in secure, `HttpOnly` cookies (`rp_jwt`). `localStorage` is strictly avoided to eliminate XSS (Cross-Site Scripting) vulnerabilities regarding token theft. All frontend API calls must explicitly include `credentials: 'include'` to pass the cookie.
+## 9. Fail Fast Principle
+* **Data Boundary Validation:** Input validation is not enough. Uploaded files (e.g., SVGs for watermarks) or critical data structures MUST be verified for integrity *before* touching the disk or cache. If a file is corrupt, the process must abort immediately (Fail Fast) with a 422 response.
+
+## 10. Testing Guidelines
+Bitte beachte die ausgelagerten Test-Regeln in der [TESTING.md](TESTING.md).

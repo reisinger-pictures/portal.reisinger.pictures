@@ -19,7 +19,8 @@ use App\Http\Controllers\StatsController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FileDeliveryController;
 
-Route::middleware('throttle:10,1')->group(function () {
+$throttleLimit = env('AUTH_THROTTLE_LIMIT', 60);
+Route::middleware("throttle:$throttleLimit,1")->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
@@ -30,7 +31,7 @@ Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries']);
 Route::get('/sitemap-images.xml', [SitemapController::class, 'images']);
 
 Route::get('/invites/{token}', [InviteController::class, 'check']);
-Route::middleware('throttle:10,1')->post('/invites/redeem', [InviteController::class, 'redeem']);
+Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem']);
 
 Route::get('/search', [SearchController::class, 'search']);
 Route::get('/photos/{id}/context', [SearchController::class, 'photoContext']);

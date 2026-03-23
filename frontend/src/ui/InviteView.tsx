@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import {useNavigate, useParams} from 'react-router-dom';
 import PageLayout from './components/PageLayout';
+import { useAuth } from '../logic/useAuth';
 
 export default function InviteView() {
     const {token} = useParams<{ token: string }>();
     const navigate = useNavigate();
     const { mutate } = useSWRConfig();
+    const { user, isLoading: authLoading } = useAuth();
+    const [autoRedeeming, setAutoRedeeming] = useState(false);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -44,25 +47,47 @@ export default function InviteView() {
             const res = await fetch('/api/invites/redeem', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                credentials: 'include', // CRITICAL FIX: Damit das JWT-Cookie nicht verworfen wird
                 body: JSON.stringify({token, name, email, password})
             });
 
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Fehler beim Beitritt.');
 
-            // WICHTIG: SWR State global zurücksetzen, damit die neue Identität (Gast) erkannt wird
+            // SWR anweisen, die User-Session frisch zu laden
             await mutate(() => true, undefined, { revalidate: true });
-            
-            // Identität synchronisieren: SWR anweisen, den User-Status neu zu laden
-            await mutate('/api/auth/me', undefined, { revalidate: true });
+            await mutate('/api/auth/me');
             
             navigate('/' + data.full_path, {replace: true});
         } catch (err: unknown) {
-            setError((err as Error).message);
+            setError(err instanceof Error ? err.message : String(err));
         }
     };
 
-    if (loading) return <PageLayout>
+    
+    useEffect(() => {
+        if (!loading && !authLoading && user && galleryName && !requiresPassword && !error && !autoRedeeming) {
+            setAutoRedeeming(true);
+            fetch('/api/invites/redeem', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                credentials: 'include',
+                body: JSON.stringify({ token })
+            })
+            .then(r => r.json())
+            .then(resData => {
+                if (resData.full_path) {
+                    mutate('/api/auth/me');
+                    navigate('/' + resData.full_path, {replace: true});
+                } else {
+                    setAutoRedeeming(false);
+                }
+            })
+            .catch(() => setAutoRedeeming(false));
+        }
+    }, [loading, authLoading, user, galleryName, requiresPassword, error, token, autoRedeeming, navigate, mutate]);
+
+    if (loading || authLoading || autoRedeeming) return <PageLayout>
         <div className="flex h-full items-center justify-center"><span
             className="loading loading-spinner loading-lg text-primary"></span></div>
     </PageLayout>;

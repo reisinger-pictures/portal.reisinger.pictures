@@ -31,7 +31,9 @@ test.describe('Admin Workflow', () => {
 
         // Wenn das Modal nicht schließt, wirft das Backend einen 500er (Wahrscheinlich Mailpit nicht erreichbar!)
         // Prüfen, ob Erfolgs-Toast sichtbar ist (Timeout erhöht für evtl. SMTP/Mailpit-Latenz)
-        await expect(page.locator('.toast')).toBeVisible({ timeout: 15000 });
+        const toast = page.locator('.toast');
+        await expect(toast).toBeVisible({ timeout: 15000 });
+        await expect(toast).toContainText('Nutzer angelegt', { timeout: 5000 });
         
         // Modal sollte sich danach geschlossen haben
         await expect(modal.activeModal).toBeHidden();

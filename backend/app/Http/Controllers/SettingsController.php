@@ -22,7 +22,15 @@ class SettingsController extends Controller
     {
         if ($request->hasFile('svg')) {
             $request->validate(['svg' => 'file|mimes:svg']);
-            $request->file('svg')->move(storage_path('app/private'), 'watermark.svg');
+            $file = $request->file('svg');
+            
+            // Fail Fast: Ist es wirklich ein valides SVG?
+            $content = file_get_contents($file->getRealPath());
+            if (!str_contains($content, '<svg') || @simplexml_load_string($content) === false) {
+                return response()->json(['error' => 'Ungültige oder korrupte SVG-Datei.'], 422);
+            }
+
+            $file->move(storage_path('app/private'), 'watermark.svg');
             
             // Alte gecachte Master-PNGs aufräumen
             $oldCaches = glob(storage_path('app/private/watermark_master_*.png'));

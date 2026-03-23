@@ -137,22 +137,24 @@ class GalleryController extends Controller
             $isPublic = false;
         }
 
-        $gallery = Gallery::create([
-            'name' => $request->name,
-            'slug' => $slug,
-            'type' => $request->type,
-            'is_live' => $request->type === 'selection' ? false : ($request->is_live ?? false),
-            'is_public' => $isPublic,
-            'gallery_group_id' => $request->gallery_group_id,
-            'password_hash' => $request->password ? Hash::make($request->password) : null,
-            'expires_at' => $request->expires_at ? Carbon::parse($request->expires_at)->endOfDay() : null,
-        ]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $slug, $isPublic, $user) {
+            $gallery = Gallery::create([
+                'name' => $request->name,
+                'slug' => $slug,
+                'type' => $request->type,
+                'is_live' => $request->type === 'selection' ? false : ($request->is_live ?? false),
+                'is_public' => $isPublic,
+                'gallery_group_id' => $request->gallery_group_id,
+                'password_hash' => $request->password ? Hash::make($request->password) : null,
+                'expires_at' => $request->expires_at ? Carbon::parse($request->expires_at)->endOfDay() : null,
+            ]);
 
-        if ($user && !$user->is_admin && $user->is_photographer) {
-            $user->galleries()->syncWithoutDetaching([$gallery->id]);
-        }
+            if ($user && !$user->is_admin && $user->is_photographer) {
+                $user->galleries()->syncWithoutDetaching([$gallery->id]);
+            }
 
-        return response()->json(['success' => true, 'gallery' => $gallery]);
+            return response()->json(['success' => true, 'gallery' => $gallery]);
+        });
     }
 
     public function updateGallery(Request $request, $id)

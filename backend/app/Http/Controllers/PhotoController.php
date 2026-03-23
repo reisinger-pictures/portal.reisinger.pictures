@@ -56,30 +56,32 @@ class PhotoController extends Controller
             'iso_country' => 'nullable|string|max:2',
         ]);
 
-        // Versionierung: Nur wenn ein Kunde ändert, speichern wir den Vorzustand
-        if ($rights['is_client']) {
-            PhotoMetadataVersion::create([
-                'photo_id' => $photo->id,
-                'user_id' => $user->id,
-                'title' => $photo->title,
-                'description' => $photo->description,
-                'artist' => $photo->artist,
-                'headline' => $photo->headline,
-                'keywords' => $photo->keywords,
-                'location' => $photo->location,
-                'city' => $photo->city,
-                'state' => $photo->state,
-                'country' => $photo->country,
-                'iso_country' => $photo->iso_country,
-            ]);
-            
-            // SECURITY: Kunden dürfen niemals den Urheber (Artist) überschreiben
-            unset($validated['artist']);
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($photo, $user, $rights, $validated) {
+            // Versionierung: Nur wenn ein Kunde ändert, speichern wir den Vorzustand
+            if ($rights['is_client']) {
+                PhotoMetadataVersion::create([
+                    'photo_id' => $photo->id,
+                    'user_id' => $user->id,
+                    'title' => $photo->title,
+                    'description' => $photo->description,
+                    'artist' => $photo->artist,
+                    'headline' => $photo->headline,
+                    'keywords' => $photo->keywords,
+                    'location' => $photo->location,
+                    'city' => $photo->city,
+                    'state' => $photo->state,
+                    'country' => $photo->country,
+                    'iso_country' => $photo->iso_country,
+                ]);
+                
+                // SECURITY: Kunden dürfen niemals den Urheber (Artist) überschreiben
+                unset($validated['artist']);
+            }
 
-        $photo->update($validated);
+            $photo->update($validated);
 
-        return response()->json(['success' => true, 'photo' => $photo]);
+            return response()->json(['success' => true, 'photo' => $photo]);
+        });
     }
 
     

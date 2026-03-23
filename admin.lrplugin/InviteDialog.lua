@@ -11,6 +11,7 @@ return function(galleryId, jwt)
         local props = LrBinding.makePropertyTable(context)
         
         props.newInviteName = ""
+        props.linkType = "mass"
         props.generatedLink = ""
         props.invites = {{title = "Lade...", value = -1}}
         props.selectedInviteId = -1
@@ -53,7 +54,14 @@ return function(galleryId, jwt)
                 title = "Neuen Link generieren", fill_horizontal = 1,
                 f:column {
                     spacing = f:control_spacing(),
-                    f:row { f:static_text { title = "Name (Optional):", width = 120 }, f:edit_field { value = LrView.bind{key="newInviteName", bind_to_object=props}, fill_horizontal = 1 } },
+                    f:row { f:radio_button { title = "Massen-Link (Gäste geben E-Mail & Name selbst ein)", value = LrView.bind{key="linkType", bind_to_object=props}, checked_value = "mass" } },
+                    f:row { f:radio_button { title = "Persönlicher Link (Direkter Login ohne Eingabe)", value = LrView.bind{key="linkType", bind_to_object=props}, checked_value = "personal" } },
+                    f:row { 
+                        visible = LrView.bind { key = "linkType", bind_to_object = props, transform = function(v) return v == "personal" end },
+                        f:spacer { width = 20 },
+                        f:static_text { title = "Name des Gastes:", width = 100 }, 
+                        f:edit_field { value = LrView.bind{key="newInviteName", bind_to_object=props}, fill_horizontal = 1 } 
+                    },
                     f:row { 
                         f:spacer { width = 120 }, 
                         f:push_button { 
@@ -61,7 +69,7 @@ return function(galleryId, jwt)
                             action = function()
                                 LrTasks.startAsyncTask(function()
                                     local payload = {}
-                                    if props.newInviteName ~= "" then payload.name = props.newInviteName end
+                                    if props.linkType == "personal" and props.newInviteName ~= "" then payload.name = props.newInviteName end
                                     local resData, stat = Api.call("/api/management/galleries/" .. galleryId .. "/invites", "POST", payload, jwt)
                                     if stat == 200 and resData and resData.link then
                                         props.generatedLink = resData.link

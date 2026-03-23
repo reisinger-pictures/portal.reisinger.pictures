@@ -83,8 +83,19 @@ class InviteController extends Controller
         $invite = GalleryInvite::where('token', $request->token)->with('gallery')->firstOrFail();
         $gallery = $invite->gallery;
 
+        
         if ($gallery->password_hash && !Hash::check($request->password, $gallery->password_hash)) {
             return response()->json(['error' => 'Das Galerie-Passwort ist nicht korrekt.'], 403);
+        }
+
+        // NEU: Logged-in User Auto-Redeem
+        $currentUser = Auth::guard('api')->user();
+        if ($currentUser) {
+            $currentUser->galleries()->syncWithoutDetaching([$gallery->id]);
+            return response()->json([
+                'success' => true,
+                'full_path' => $gallery->full_path
+            ]);
         }
 
         if ($invite->name) {

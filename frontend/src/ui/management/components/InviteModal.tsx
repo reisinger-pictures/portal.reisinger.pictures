@@ -6,6 +6,7 @@ export default function InviteModal({galleryId, onClose}: { galleryId: number, o
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [newLink, setNewLink] = useState('');
+    const [linkType, setLinkType] = useState<'mass' | 'personal'>('mass');
 
     const {data: invites, mutate} = useSWR<{
         id: number,
@@ -60,21 +61,30 @@ export default function InviteModal({galleryId, onClose}: { galleryId: number, o
                     {/* Linke Spalte: Neu generieren */}
                     <div>
                         <h4 className="font-bold mb-2">Neuen Link generieren</h4>
-                        <div className="form-control">
-                            <label className="label">
-                                <span className="label-text">Für wen ist dieser Link? (Optional)</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={e => setName(e.target.value)}
-                                placeholder="z.B. Oma Erna"
-                                className="input input-sm input-bordered w-full"
-                            />
-                            <label className="label">
-                                <span className="label-text-alt opacity-70 whitespace-normal leading-tight mt-1">Wird hier ein Name eingetragen, muss sich der Gast nicht mehr namentlich anmelden.</span>
+                        <div className="form-control mb-3">
+                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300">
+                                <input type="radio" name="linkType" className="radio radio-primary radio-sm" checked={linkType === 'mass'} onChange={() => { setLinkType('mass'); setName(''); }} />
+                                <div>
+                                    <span className="label-text font-bold block">Massen-Link (Gruppen)</span>
+                                    <span className="label-text-alt opacity-70 block mt-1">Gäste geben E-Mail & Name selbst ein.<br/>Wichtig, um Bewertungen von mehreren Personen sauber zu trennen.</span>
+                                </div>
                             </label>
                         </div>
+                        <div className="form-control mb-3">
+                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300">
+                                <input type="radio" name="linkType" className="radio radio-primary radio-sm" checked={linkType === 'personal'} onChange={() => setLinkType('personal')} />
+                                <div>
+                                    <span className="label-text font-bold block">Persönlicher Link (Einzelperson)</span>
+                                    <span className="label-text-alt opacity-70 block mt-1">Der Gast wird direkt ohne Anmeldung durchgewunken.</span>
+                                </div>
+                            </label>
+                        </div>
+                        {linkType === 'personal' && (
+                            <div className="form-control pl-8 border-l-2 border-primary ml-2 mb-2">
+                                <label className="label py-1"><span className="label-text font-bold">Name des Gastes</span></label>
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="z.B. Oma Erna" className="input input-sm input-bordered w-full" />
+                            </div>
+                        )}
 
                         {newLink ? (
                             <div className="mt-4 p-3 bg-success/10 border border-success/20 rounded-box">

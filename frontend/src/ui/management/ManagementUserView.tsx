@@ -4,10 +4,12 @@ import {UserDetailed, useUsers} from '../../logic/useUsers';
 import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
 import DomainMappingTab from './components/DomainMappingTab';
 import UserPermissionsModal from './components/UserPermissionsModal';
+import { useUI } from '../components/UIContext';
 
 export default function ManagementUserView() {
     const {users, roles, mappings, createUser, updateUser, createMapping, deleteMapping} = useUsers();
     const {tree} = useProtectedGalleries();
+    const { showToast } = useUI();
 
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || 'users';
@@ -19,17 +21,9 @@ export default function ManagementUserView() {
     const [newName, setNewName] = useState('');
     const [newEmail, setNewEmail] = useState('');
     const [isCreating, setIsCreating] = useState(false);
-    
-    // Architektur: Toasts statt alerts
-    const [toastMessage, setToastMessage] = useState<{type: 'error'|'success', text: string} | null>(null);
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
     const flatGalleries = tree ? [...(tree.groups.flatMap(g => g.galleries || [])), ...(tree.root_galleries || [])] : [];
-
-    const showToast = (type: 'error'|'success', text: string) => {
-        setToastMessage({type, text});
-        setTimeout(() => setToastMessage(null), 4000);
-    };
 
     const handleSaveUser = async (id: number, selRoles: number[], selGroups: number[], selGalleries: number[], canEditMeta: boolean) => {
         try {
@@ -63,16 +57,6 @@ export default function ManagementUserView() {
 
     return (
         <div className="p-10 max-w-6xl mx-auto w-full relative">
-            {toastMessage && (
-                <div className="toast toast-top toast-center z-[100] mt-12 md:mt-4 transition-all">
-                    <div className={`alert alert-${toastMessage.type} shadow-xl`}>
-                        <span className={`iconify ${toastMessage.type === 'error' ? 'mdi--alert-circle' : 'mdi--check-circle'} text-xl`}></span>
-                        <span>{toastMessage.text}</span>
-                        <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setToastMessage(null)}>✕</button>
-                    </div>
-                </div>
-            )}
-
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h1 className="text-4xl font-bold">Benutzer &amp; Rechte</h1>
                 {activeTab === 'users' && (

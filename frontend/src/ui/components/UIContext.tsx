@@ -1,0 +1,93 @@
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+
+interface Toast {
+    id: number;
+    type: 'success' | 'error' | 'info';
+    text: string;
+}
+
+interface ConfirmOptions {
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmColor?: 'primary' | 'error' | 'warning' | 'info';
+}
+
+interface UIContextType {
+    showToast: (type: 'success' | 'error' | 'info', text: string) => void;
+    confirm: (options: ConfirmOptions) => Promise<boolean>;
+}
+
+const UIContext = createContext<UIContextType | undefined>(undefined);
+
+export const useUI = () => {
+    const context = useContext(UIContext);
+    if (!context) throw new Error('useUI must be used within UIProvider');
+    return context;
+};
+
+let toastIdCounter = 0;
+
+export const UIProvider = ({ children }: { children: ReactNode }) => {
+    const [toasts, setToasts] = useState<Toast[]>([]);
+    const [confirmState, setConfirmState] = useState<{ options: ConfirmOptions; resolve: (value: boolean) => void } | null>(null);
+
+    const showToast = useCallback((type: 'success' | 'error' | 'info', text: string) => {
+        const id = ++toastIdCounter;
+        setToasts(prev => [...prev, { id, type, text }]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+        }, 4000);
+    }, []);
+
+    const confirm = useCallback((options: ConfirmOptions) => {
+        return new Promise<boolean>((resolve) => {
+            setConfirmState({ options, resolve });
+        });
+    }, []);
+
+    const handleConfirm = (result: boolean) => {
+        if (confirmState) {
+            confirmState.resolve(result);
+            setConfirmState(null);
+        }
+    };
+
+    return (
+        <UIContext.Provider value={{ showToast, confirm }}>
+            {children}
+
+            {/* Global Toasts */}
+            <div className="toast toast-top toast-center toast-global mt-12 md:mt-4 transition-all pointer-events-none">
+                {toasts.map(toast => (
+                    <div key={toast.id} className={`alert alert-${toast.type} shadow-xl pointer-events-auto`}>
+                        <span className={`iconify ${toast.type === 'error' ? 'mdi--alert-circle' : toast.type === 'success' ? 'mdi--check-circle' : 'mdi--information'} text-xl`}></span>
+                        <span>{toast.text}</span>
+                        <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}>✕</button>
+                    </div>
+                ))}
+            </div>
+
+            {/* Global Confirm Modal */}
+            {confirmState && (
+                <div className="modal modal-open modal-global">
+                    <div className="modal-box relative">
+                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => handleConfirm(false)}>✕</button>
+                        <h3 className="font-bold text-xl mb-4">{confirmState.options.title}</h3>
+                        <p className="mb-8 opacity-80">{confirmState.options.message}</p>
+                        <div className="modal-action flex justify-end gap-2 mt-0">
+                            <button className="btn btn-ghost" onClick={() => handleConfirm(false)}>
+                                {confirmState.options.cancelText || 'Abbrechen'}
+                            </button>
+                            <button className={`btn btn-${confirmState.options.confirmColor || 'primary'}`} onClick={() => handleConfirm(true)}>
+                                {confirmState.options.confirmText || 'Bestätigen'}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="modal-backdrop" onClick={() => handleConfirm(false)}></div>
+                </div>
+            )}
+        </UIContext.Provider>
+    );
+};

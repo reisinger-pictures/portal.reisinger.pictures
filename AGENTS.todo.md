@@ -1,17 +1,36 @@
 # Backlog & Task Management
 
-## Offene Punkte
+### Phase 11: Deep Testing (E-Mails, Links, UI & Datei-Integrität)
+- [ ] **PHPUnit: Cleanup Command:** Feature-Test für `app:cleanup-galleries`. Abgelaufenes Datum mocken und sicherstellen, dass `Storage::disk('photos')` restlos gelöscht wird.
+- [ ] **E2E: PhotoSwipe & Lightbox UI (Desktop & Mobile):** Prüfen, ob der Klick auf ein Galerie-Bild die PhotoSwipe-Lightbox öffnet. Verifizieren, dass die benutzerdefinierten Metadaten (Title, Description, Artist) im `custom-caption` Overlay korrekt gerendert werden.
+- [ ] **E2E: Download Trigger (UI):** Sicherstellen, dass die "Einzel-Download" und "ZIP-Download" Buttons in der Galerie-Ansicht und Detail-Ansicht auf Desktop und Mobile klickbar sind und den Download-Request (bzw. die Navigation zur Download-Route) korrekt feuern.
+- [ ] **PHPUnit/E2E: Metadaten-Handling (IPTC) tiefergehend testen:** Edge-Cases prüfen, z.B. greifen Standard-Metadaten einer Galerie beim Upload wirklich? Können Kunden durch API-Manipulation verbotene Felder (z.B. Urheber/Artist) überschreiben (DAU/Hacking-Schutz)?
 
-### Phase 9: Globale Modal- & Toast-Architektur
-- [ ] **Architektur: Globaler Confirm-Dialog**: Ersetzen der blockierenden `window.confirm()` Aufrufe (z. B. beim Löschen von Galerien, Bildern oder Usern) durch ein asynchrones, globales DaisyUI-Confirm-Modal.
-- [ ] **Architektur: Toasts standardisieren**: Die derzeit isolierten Toast-States (z. B. in `ManagementUserView`) in einen globalen Zustand (`ToastContext` oder Zungstand/Zustand) auslagern, um `alert()` im gesamten Projekt elegant zu ersetzen.
+### Phase 11.2: Refactoring "Massen-Links" (Self-Invite)
+- [ ] **Backend/Frontend: Self-Invite für Massen-Links:** Wenn Gäste einen anonymen Massen-Link öffnen, geben sie ihre E-Mail ein und erhalten einen Magic-Link per Mail (kein direkter Login mehr).
+    - *Test-Requirement (PHPUnit):* Prüfen, ob der Redeem-Endpunkt bei fehlendem Namen im Token nicht einloggt, sondern den Mail-Versand anstößt.
+    - *Test-Requirement (E2E):* Gast gibt E-Mail ein, sieht Erfolgsmeldung, holt Link aus Mailpit und ist danach eingeloggt.
+- [ ] **Frontend: Rating Filter:** In der Auswahl-Ansicht nach "Meinen Bewertungen" (Sternen) und "Neu" filtern können.
+    - *Test-Requirement (E2E):* Klick auf Filter-Buttons blendet falsche Bilder aus; PhotoSwipe-Lightbox wischt nur durch sichtbare Bilder (DOM/Selector-Update).
 
-### Phase 10: Robustheit & Tests (DB Transactions & Mails)
-- [ ] **DB Transactions ausweiten:** Evaluieren und Einbauen von `DB::transaction()` bei weiteren Multi-Model-Operationen, um Partial-Writes zu verhindern (z.B. `GalleryController@storeGallery`, `PhotoController@updateMetadata`, `FtpController@process`).
-- [ ] **E-Mail Tests validieren:** In allen betroffenen Feature Tests (z.B. `UserControllerTest`, `AuthControllerTest`, `InviteTest`) `Mail::fake()` Assertions (z.B. `Mail::assertSent`) einbauen. Es muss getestet werden, dass bei erfolgreichen Transaktionen E-Mails wirklich in die Queue/an den Mailer übergeben werden.
-- [ ] **Soft-Fails für Benachrichtigungen:** Prüfen, ob `try-catch` beim E-Mail-Versand in bestimmten Kontexten sinnvoller ist (z.B. `MailController@finishRating`). Wenn ein Kunde seine Auswahl abschließt, sollte das Speichern dieses Status nicht am Mail-Versand an den Fotografen scheitern (harte 500er Fehler vermeiden).
+### Phase 11.3: UI/UX Refactoring Detailansicht (PhotoDetailView) & Profil
+- [ ] **Frontend: Responsive Grid & Read-Only Status:** Detailansicht auf Grid umbauen. Für Gäste ohne Rechte sauberen Text statt `disabled` Inputs rendern. Das Urheber-Feld ist in dieser Maske *immer* Read-Only.
+    - *Test-Requirement (E2E):* Gast-User prüfen (sieht keine Formularfelder, nur Text). Fotograf prüfen (sieht Inputs, aber Urheber ist gesperrt/Text). Layout darf keine horizontale Scrollbar haben.
+- [ ] **Frontend: Keyword-Chips (Schlagwörter):** Interaktive Custom-Komponente für Keywords (DaisyUI Badges mit "✕", Paste-Support, Trennung bei Enter/Komma).
+    - *Test-Requirement (E2E):* Text reinkopieren (Copy/Paste) und prüfen, ob korrekte Chips entstehen. Chips löschen und prüfen, ob `iptcData.keywords` korrekt aktualisiert wird.
+- [ ] **Backend/Frontend: Fotografen-Profil (Urheber):** Endpunkt (`PUT /api/auth/profile`) und UI in den Einstellungen, um `metadata_copyright` zu setzen.
+    - *Test-Requirement (PHPUnit):* Profil-Update Endpunkt validieren.
+    - *Test-Requirement (E2E):* Fotograf ändert Urheber in den Settings; neu hochgeladenes Bild übernimmt diesen Wert automatisch.
+- [ ] **Backend/Frontend: Download-Button & Counter:** "Herunterladen"-Button in der Detailansicht. Backend liefert `downloads_count` für dieses spezifische Bild.
+    - *Test-Requirement (PHPUnit):* API muss den aggregierten Counter aus den Logs pro Bild korrekt ausgeben.
+    - *Test-Requirement (E2E):* Counter wird angezeigt; Klick auf Button löst Download-Navigation aus.
 
-### Phase 11: Deep Testing (Ratings & Sessions)
-- [ ] **Test: Anonymer Rating-Workflow**: E2E Test, der einen Magic Link ohne Session aufruft, ein Rating abgibt und prüft, ob der Datensatz in `ratings` mit der `invite.local` E-Mail landet.
-- [ ] **Test: Angemeldeter User Magic Link**: E2E Test, der prüft was passiert, wenn ein Admin einen Magic Link klickt (Erwartung: Entweder Übernahme in bestehenden Account oder sauberer Logout/Login Wechsel).
-- [ ] **Fix: Weiße Seite Debugging**: Validieren, ob `ErrorBoundary` in `App.tsx` bei Identitätswechseln korrekt greift oder ob Root-Komponenten wegen null-Referenzen crashen.
+### Phase 11.4: PhotoSwipe Fullscreen-Features (Selection & Delivery)
+- [ ] **Frontend: PhotoSwipe Integration & Captions:** Bild öffnet sich bei Klick in der Lightbox. Metadaten (Titel, Beschreibung, Urheber) im `custom-caption` Overlay sauber formatiert anzeigen.
+    - *Test-Requirement (E2E):* Lightbox öffnet sich korrekt, Captions sind lesbar und entsprechen den hinterlegten IPTC-Daten.
+- [ ] **Frontend: PhotoSwipe Rating-UI (Selection):** Sterne-Rating und Kommentarfeld interaktiv in die PhotoSwipe-Ansicht injizieren (inkl. Event-Propagation-Fixes).
+    - *Test-Requirement (E2E):* Nutzer kann im Fullscreen bewerten und kommentieren. Status synchronisiert sich beim Weiterwischen. Tastatursteuerung (0-5) funktioniert, blockiert aber nicht die Texteingabe im Kommentarfeld.
+
+### Phase 12: Produktion & Deployment
+- [ ] **DevOps: Portainer Deployment:** Deployment-Anleitung in `DEPLOYMENT.md` überprüfen und abschließen.
+- [ ] **DevOps: Migration Policy (V002+):** Ab dem Prod-Deployment zwingend neue Migrationsdateien nutzen.

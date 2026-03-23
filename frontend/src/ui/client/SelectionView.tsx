@@ -5,11 +5,13 @@ import { apiMutate } from '../../api';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
 import 'photoswipe/style.css';
 import PageLayout from '../components/PageLayout';
+import { useUI } from '../components/UIContext';
 
 export default function SelectionView({ galleryData }: { galleryData: any }) {
     const navigate = useNavigate();
     const { gallery, photos, isLoading, ratePhoto, size, setSize, isReachingEnd } = galleryData;
     const { user } = useAuth();
+    const { showToast, confirm } = useUI();
     const galleryRef = useRef<HTMLDivElement>(null);
     const [finishing, setFinishing] = useState(false);
 
@@ -81,13 +83,13 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
     }, [photos.length]);
 
     const handleFinishRating = async () => {
-        if (!window.confirm('Auswahl wirklich abschließen? Der Fotograf wird benachrichtigt.')) return;
+        if (!(await confirm({ title: 'Auswahl abschließen?', message: 'Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird benachrichtigt.', confirmText: 'Abschließen', confirmColor: 'success' }))) return;
         setFinishing(true);
         try {
             await apiMutate('/api/galleries/' + gallery.id + '/finish-rating', 'POST');
-            alert('Der Fotograf wurde erfolgreich benachrichtigt!');
+            showToast('success', 'Der Fotograf wurde erfolgreich benachrichtigt!');
         } catch {
-            alert('Fehler beim Senden der Benachrichtigung.');
+            showToast('error', 'Fehler beim Senden der Benachrichtigung.');
         }
         setFinishing(false);
     };

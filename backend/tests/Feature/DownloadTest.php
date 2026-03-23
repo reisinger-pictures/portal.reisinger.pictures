@@ -8,6 +8,8 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
+use ZipArchive;
 
 class DownloadTest extends TestCase
 {
@@ -19,17 +21,19 @@ class DownloadTest extends TestCase
         Storage::fake('photos');
     }
 
-    public function test_authorized_user_can_download_single_image_and_log_is_created()
+    public function test_authorized_user_can_download_single_image_and_metadata_is_injected()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['name' => 'Max Mustermann']);
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         
-        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'download_test.jpg']);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'download_test.jpg', 'artist' => 'Test Fotograf']);
 
-        // Lege ein Dummy-File in den fake Storage
+        // Lege ein ECHTES Dummy-File (valid JPEG) in den fake Storage, damit ExifTool nicht crasht
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
-        $content = file_exists($fixturePath) ? file_get_contents($fixturePath) : 'dummy content';
+        $this->assertTrue(file_exists($fixturePath), "Fixture sample.jpg fehlt!");
+        
+        $content = file_get_contents($fixturePath);
         Storage::disk('photos')->put($gallery->id . '/download_test.jpg', $content);
         
         $token = auth('api')->login($user);
@@ -39,29 +43,75 @@ class DownloadTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertDownload();
-        
-        // Assert: Audit-Log wurde DSGVO-konform (ohne IP) geschrieben
+
+        // 1. Audit Log prüfen
         $this->assertDatabaseHas('download_logs', [
             'user_id' => $user->id,
             'item_type' => 'single_image',
             'item_identifier' => 'download_test.jpg'
         ]);
+
+        // 2. Metadaten des injizierten Bildes prüfen
+        $downloadedFilePath = $response->getFile()->getPathname();
+        
+        // Prüfe ob es ein valides Bild ist
+        $imageSize = @getimagesize($downloadedFilePath);
+        $this->assertNotFalse($imageSize, 'Die heruntergeladene Datei ist kein valides Bild.');
+
+        // Exiftool aufrufen, um die IPTC Daten zu lesen
+        $process = new Process(['exiftool', '-json', $downloadedFilePath]);
+        $process->run();
+        $this->assertTrue($process->isSuccessful(), 'ExifTool konnte nicht ausgeführt werden.');
+        
+        $metaData = json_decode($process->getOutput(), true)[0];
+
+        // Prüfen ob die Instruktionen injiziert wurden
+        $this->assertArrayHasKey('SpecialInstructions', $metaData, 'SpecialInstructions fehlen in den Metadaten.');
+        $this->assertStringContainsString('Max Mustermann', $metaData['SpecialInstructions']);
+        
+        // Prüfen ob Urheber erhalten blieb
+        $this->assertTrue(
+            isset($metaData['Creator']) || isset($metaData['By-line']) || isset($metaData['Artist']),
+            'Urheber (Creator/By-line/Artist) fehlt in den Metadaten.'
+        );
     }
 
-    public function test_guest_can_download_public_gallery_zip_and_log_is_created()
+    public function test_guest_can_download_public_gallery_zip_and_structure_is_valid()
     {
-        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true]);
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'slug' => 'test-zip']);
         Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'pic1.jpg']);
+        Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'pic2.jpg']);
         
-        Storage::disk('photos')->put($gallery->id . '/pic1.jpg', 'dummy');
+        $fixturePath = base_path('tests/Fixtures/sample.jpg');
+        $content = file_get_contents($fixturePath);
+        Storage::disk('photos')->put($gallery->id . '/pic1.jpg', $content);
+        Storage::disk('photos')->put($gallery->id . '/pic2.jpg', $content);
 
         // Aufruf ohne Authentifizierung
         $response = $this->get('/api/galleries/' . $gallery->id . '/download-zip');
-
         $response->assertStatus(200);
-        // Da wir ZipStream verwenden, ist der Header Content-Type application/zip oder application/octet-stream
-        $this->assertStringContainsString('attachment', $response->headers->get('Content-Disposition'));
         
+        // StreamedResponse fangen und in lokale temporäre Datei schreiben
+        $tempZipPath = storage_path('app/private/temp/test_dl_' . uniqid() . '.zip');
+        if (!is_dir(dirname($tempZipPath))) mkdir(dirname($tempZipPath), 0755, true);
+        
+        ob_start();
+        $response->sendContent();
+        $zipContent = ob_get_clean();
+        file_put_contents($tempZipPath, $zipContent);
+
+        // ZIP Struktur validieren
+        $zip = new ZipArchive();
+        $res = $zip->open($tempZipPath);
+        $this->assertTrue($res === true, 'Das generierte ZIP-Archiv ist korrupt.');
+        
+        // Prüfen, ob beide Dateien im Zip sind
+        $this->assertNotFalse($zip->locateName('pic1.jpg'), 'pic1.jpg fehlt im ZIP');
+        $this->assertNotFalse($zip->locateName('pic2.jpg'), 'pic2.jpg fehlt im ZIP');
+        $zip->close();
+        
+        unlink($tempZipPath);
+
         $this->assertDatabaseHas('download_logs', [
             'user_id' => null,
             'user_name_snapshot' => 'Gast',

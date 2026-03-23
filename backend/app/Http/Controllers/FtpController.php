@@ -106,10 +106,12 @@ class FtpController extends Controller
 
             $meta = $photoService->processImage($targetPath, $thumbPath, $gallery, $defaultArtist);
 
-            Photo::updateOrCreate(
-                ['gallery_id' => $gallery->id, 'filename' => $filename],
-                array_merge(['lr_uuid' => 'ftp-' . uniqid()], $meta)
-            );
+            \Illuminate\Support\Facades\DB::transaction(function () use ($gallery, $filename, $meta) {
+                Photo::updateOrCreate(
+                    ['gallery_id' => $gallery->id, 'filename' => $filename],
+                    array_merge(['lr_uuid' => 'ftp-' . uniqid()], $meta)
+                );
+            });
 
             $processedCount++;
         }

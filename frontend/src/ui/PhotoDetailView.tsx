@@ -7,6 +7,7 @@ import {useAuth} from '../logic/useAuth';
 import {usePhoto, PhotoVersion} from '../logic/usePhoto';
 import PageLayout from './components/PageLayout';
 import IptcMetadataEditor, { IptcData } from './components/IptcMetadataEditor';
+import { useUI } from './components/UIContext';
 
 interface Breadcrumb {
     name: string;
@@ -24,6 +25,7 @@ export default function PhotoDetailView() {
     const navigate = useNavigate();
     const {user} = useAuth();
     const {updateMetadata, deletePhoto, getVersions, revertMetadata} = usePhoto();
+    const { showToast, confirm } = useUI();
 
     const {data, error, isLoading, mutate} = useSWR<PhotoContextData>(
         id ? '/api/photos/' + id + '/context' : null, fetcher
@@ -74,18 +76,18 @@ export default function PhotoDetailView() {
             await updateMetadata(photo.id, iptcData);
             mutate();
         } catch {
-            alert('Fehler beim Speichern');
+            showToast('error', 'Fehler beim Speichern');
         }
         setSaving(false);
     };
 
     const handleDelete = async () => {
-        if (!window.confirm('Bild wirklich endgültig löschen?')) return;
+        if (!(await confirm({ title: 'Bild löschen?', message: 'Möchtest du dieses Bild wirklich endgültig löschen?', confirmText: 'Löschen', confirmColor: 'error' }))) return;
         try {
             await deletePhoto(photo.id);
             navigate(-1);
         } catch {
-            alert('Fehler beim Löschen');
+            showToast('error', 'Fehler beim Löschen');
         }
     };
 
@@ -96,19 +98,19 @@ export default function PhotoDetailView() {
             const versions = await getVersions(photo.id);
             setHistory(versions);
         } catch {
-            alert('Historie konnte nicht geladen werden.');
+            showToast('error', 'Historie konnte nicht geladen werden.');
         }
         setLoadingHistory(false);
     };
 
     const handleRevert = async (versionId: number) => {
-        if (!window.confirm('Möchtest du diese Metadaten-Version wirklich wiederherstellen? Dies überschreibt den aktuellen Stand.')) return;
+        if (!(await confirm({ title: 'Version wiederherstellen?', message: 'Möchtest du diese Metadaten-Version wirklich wiederherstellen? Dies überschreibt den aktuellen Stand.', confirmText: 'Wiederherstellen', confirmColor: 'warning' }))) return;
         try {
             await revertMetadata(photo.id, versionId);
             setIsHistoryOpen(false);
             mutate(); // Lade das aktuelle Foto nach dem Revert neu
         } catch {
-            alert('Fehler beim Wiederherstellen der Version.');
+            showToast('error', 'Fehler beim Wiederherstellen der Version.');
         }
     };
 

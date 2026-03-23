@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {Gallery, GalleryGroup, FlatGroup} from '../../logic/useGalleries';
 import IptcMetadataEditor, { IptcData } from './IptcMetadataEditor';
+import { useUI } from './UIContext';
 
 interface GalleryModalsProps {
     availableGroups: FlatGroup[];
@@ -37,6 +38,7 @@ export default function GalleryModals({
                                       }: GalleryModalsProps) {
     const [returnToGallery, setReturnToGallery] = useState(false);
     const [processing, setProcessing] = useState(false);
+    const { showToast, confirm } = useUI();
 
     const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -163,7 +165,7 @@ export default function GalleryModals({
             }
             closeGroupModal();
         } catch {
-            alert('Fehler beim Speichern');
+            showToast('error', 'Fehler beim Speichern');
         }
         setProcessing(false);
     };
@@ -182,7 +184,7 @@ export default function GalleryModals({
             }
             setGalleryModalOpen(false);
         } catch {
-            alert('Fehler beim Speichern');
+            showToast('error', 'Fehler beim Speichern');
         }
         setProcessing(false);
     };
@@ -292,7 +294,7 @@ export default function GalleryModals({
                         <div className="modal-action flex justify-between">
                             {editingGroup ? (
                                 <button type="button" className="btn btn-outline btn-error" onClick={async () => {
-                                    if (window.confirm('Diese Meta-Galerie wirklich löschen? ACHTUNG: Alle Unterordner werden dabei in die Root-Ebene verschoben!')) {
+                                    if (await confirm({ title: 'Meta-Galerie löschen?', message: 'ACHTUNG: Alle Unterordner werden dabei in die Root-Ebene verschoben!', confirmText: 'Löschen', confirmColor: 'error' })) {
                                         setProcessing(true);
                                         await onDeleteGroup(editingGroup.id);
                                         setProcessing(false);
@@ -431,7 +433,7 @@ export default function GalleryModals({
                         <div className="modal-action flex justify-between">
                             {editingGallery ? (
                                 <button type="button" className="btn btn-outline btn-error" onClick={async () => {
-                                    if (window.confirm('Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!')) {
+                                    if (await confirm({ title: 'Galerie löschen?', message: 'Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!', confirmText: 'Unwiderruflich löschen', confirmColor: 'error' })) {
                                         setProcessing(true);
                                         await onDeleteGallery(editingGallery.id);
                                         setProcessing(false);

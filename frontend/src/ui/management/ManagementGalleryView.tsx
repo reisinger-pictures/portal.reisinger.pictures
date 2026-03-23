@@ -209,9 +209,17 @@ export default function ManagementGalleryView() {
                             <a href={photo.url} data-pswp-width={photo.width || 2000}
                                data-pswp-height={photo.height || 1333}
                                className="pswp-item block relative aspect-square">
-                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded"
-                                     loading="lazy"/>
+                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded" loading="lazy"/>
                             </a>
+                            <div className="absolute top-2 right-2 opacity-100 z-10">
+                                <button onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    navigate('/photos/' + photo.id);
+                                }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
+                                    <span className="iconify mdi--information-variant text-lg"></span>
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>

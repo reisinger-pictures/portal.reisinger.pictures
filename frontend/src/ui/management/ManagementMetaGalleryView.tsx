@@ -89,9 +89,17 @@ export default function ManagementMetaGalleryView() {
                                data-pswp-height={photo.height || 1333}
                                className="pswp-item block relative aspect-square">
                                 <img src={photo.thumb_url}
-                                     className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow"
-                                     loading="lazy"/>
+                                     className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" loading="lazy"/>
                             </a>
+                            <div className="absolute top-2 right-2 opacity-100 z-10">
+                                <button onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    navigate('/photos/' + photo.id);
+                                }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
+                                    <span className="iconify mdi--information-variant text-lg"></span>
+                                </button>
+                            </div>
                             <div
                                 className="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-br truncate max-w-full">
                                 {photo.gallery?.name}
