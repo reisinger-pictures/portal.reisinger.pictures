@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Reisinger Foto Portal'),
 
     /*
     |--------------------------------------------------------------------------
@@ -53,6 +53,14 @@ return [
     */
 
     'url' => env('APP_URL', 'https://portal.test'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    | Used for generating absolute links to the decoupled frontend SPA.
+    */
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost:4321')),
 
     /*
     |--------------------------------------------------------------------------

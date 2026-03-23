@@ -105,8 +105,13 @@
         @apply outline-1 outline-offset-0;
     }
 
+    /* FIX: Form-Controls zwingend als Spalte anordnen, um gestauchte Labels in Modals zu verhindern */
+    .form-control {
+        @apply flex flex-col w-full;
+    }
+
     .label {
-        @apply mb-0.5;
+        @apply mb-0.5 justify-start gap-2;
     }
 
     /* Automatisches Sternchen für Pflichtfelder */

@@ -1,7 +1,6 @@
 import useSWR from 'swr';
 import {fetcher} from '../api';
 import {Gallery} from './useGalleries';
-import {useEffect} from 'react';
 
 export interface User {
     id: number;
@@ -25,8 +24,6 @@ export function useAuth() {
         (window as any).__loggedUserId = user.id;
     }
 
-    
-
     const login = async (email: string, password: string): Promise<void> => {
         const response = await fetch('/api/auth/login', {
             method: 'POST',
@@ -46,9 +43,7 @@ export function useAuth() {
             body: JSON.stringify({name, email})
         });
         const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.message || data.error || 'Registrierung fehlgeschlagen');
-        }
+        if (!response.ok) throw new Error(data.message || data.error || 'Registrierung fehlgeschlagen');
         return data.message || 'Erfolgreich registriert';
     };
 
@@ -62,7 +57,8 @@ export function useAuth() {
         } catch (e) {
             console.error('Logout Fehler', e);
         }
-        mutate(undefined, { revalidate: false });
+        // WICHTIG: Komplettes Revalidate erzwingen, damit SWR in den Error-State (401) wechselt
+        await mutate(); 
     };
 
     return {user, isLoading: !error && user === undefined, isError: error, login, register, logout};

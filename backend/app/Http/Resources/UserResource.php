@@ -13,7 +13,11 @@ class UserResource extends JsonResource {
             'is_photographer' => $this->is_photographer,
             'is_pending' => $this->is_pending,
             'can_edit_metadata' => $this->can_edit_metadata,
-            'roles' => $this->whenLoaded('roles', function() { return $this->roles->pluck('name'); }),
+            'roles' => $this->whenLoaded('roles', function() { 
+                return $this->roles->map(function($r) { 
+                    return ['id' => $r->id, 'name' => $r->name]; 
+                }); 
+            }),
             'gallery_groups' => $this->whenLoaded('galleryGroups'),
             'galleries' => GalleryResource::collection($this->whenLoaded('galleries')),
         ];

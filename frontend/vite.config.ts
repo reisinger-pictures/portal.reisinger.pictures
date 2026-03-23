@@ -11,6 +11,7 @@ export default defineConfig({
         target: 'https://portal.test', // Deine lokale Herd-Domain
         changeOrigin: true,
         secure: false, // Wichtig für lokale Zertifikate
+        cookieDomainRewrite: "localhost",
       }
     }
   }

@@ -19,12 +19,25 @@ export default function ManagementUserView() {
     const [newName, setNewName] = useState('');
     const [newEmail, setNewEmail] = useState('');
     const [isCreating, setIsCreating] = useState(false);
+    
+    // Architektur: Toasts statt alerts
+    const [toastMessage, setToastMessage] = useState<{type: 'error'|'success', text: string} | null>(null);
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
     const flatGalleries = tree ? [...(tree.groups.flatMap(g => g.galleries || [])), ...(tree.root_galleries || [])] : [];
 
+    const showToast = (type: 'error'|'success', text: string) => {
+        setToastMessage({type, text});
+        setTimeout(() => setToastMessage(null), 4000);
+    };
+
     const handleSaveUser = async (id: number, selRoles: number[], selGroups: number[], selGalleries: number[], canEditMeta: boolean) => {
-        await updateUser(id, selRoles, selGroups, selGalleries, canEditMeta);
+        try {
+            await updateUser(id, selRoles, selGroups, selGalleries, canEditMeta);
+            showToast('success', 'Nutzerrechte gespeichert.');
+        } catch {
+            showToast('error', 'Fehler beim Speichern der Rechte.');
+        }
         setEditingUser(null);
     };
 
@@ -36,9 +49,9 @@ export default function ManagementUserView() {
             setNewName('');
             setNewEmail('');
             setIsCreateModalOpen(false);
-            alert('Nutzer angelegt! Eine E-Mail zur Passwort-Einrichtung wurde verschickt.');
+            showToast('success', 'Nutzer angelegt! Eine E-Mail zur Einrichtung wurde verschickt.');
         } catch (err: unknown) {
-            alert('Fehler: ' + (err instanceof Error ? (err as Error).message : 'Nutzer konnte nicht angelegt werden.'));
+            showToast('error', 'Fehler: ' + (err instanceof Error ? (err as Error).message : 'Nutzer konnte nicht angelegt werden.'));
         }
         setIsCreating(false);
     };
@@ -49,7 +62,17 @@ export default function ManagementUserView() {
     );
 
     return (
-        <div className="p-10 max-w-6xl mx-auto w-full">
+        <div className="p-10 max-w-6xl mx-auto w-full relative">
+            {toastMessage && (
+                <div className="toast toast-top toast-center z-[100] mt-12 md:mt-4 transition-all">
+                    <div className={`alert alert-${toastMessage.type} shadow-xl`}>
+                        <span className={`iconify ${toastMessage.type === 'error' ? 'mdi--alert-circle' : 'mdi--check-circle'} text-xl`}></span>
+                        <span>{toastMessage.text}</span>
+                        <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setToastMessage(null)}>✕</button>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h1 className="text-4xl font-bold">Benutzer &amp; Rechte</h1>
                 {activeTab === 'users' && (
@@ -100,12 +123,12 @@ export default function ManagementUserView() {
                                     <td className="font-bold">{u.name}</td>
                                     <td>{u.email}</td>
                                     <td>
-                                        {u.roles.length > 0 ? u.roles.map(r => <span key={r.id}
+                                        {u.roles && u.roles.length > 0 ? u.roles.map(r => <span key={r.id}
                                                                                      className="badge badge-primary badge-sm mr-1">{r.name}</span>) :
                                             <span className="text-xs opacity-50">Keine Rolle</span>}
                                     </td>
                                     <td className="text-xs opacity-80">
-                                        {u.gallery_groups.length} Gruppen, {u.galleries.length} Galerien
+                                        {(u.gallery_groups || []).length} Gruppen, {(u.galleries || []).length} Galerien
                                     </td>
                                     <td>
                                         <button className="btn btn-xs btn-outline"

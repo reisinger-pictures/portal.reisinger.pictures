@@ -1,7 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="🚀 [Run] Start Alles (Docker Dev + Test)" type="CompoundRunConfigurationType">
-    <toRun name="🐳 [Run] Start Docker (Dev)" type="ShConfigurationType" />
-    <toRun name="🐳 [Run] Start Docker (Test)" type="ShConfigurationType" />
-    <method v="2" />
-  </configuration>
-</component>

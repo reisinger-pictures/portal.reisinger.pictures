@@ -29,37 +29,50 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email'
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => null // Passwort wird erst beim Setup gesetzt
-        ]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => null
+            ]);
 
-        // Token generieren & speichern
-        $token = Str::random(64);
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $user->email],
-            ['token' => Hash::make($token), 'created_at' => now()]
-        );
+            $token = Str::random(64);
+            \Illuminate\Support\Facades\DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $user->email],
+                ['token' => Hash::make($token), 'created_at' => now()]
+            );
 
-        // Einladungs-Email senden
-        $frontendUrl = rtrim(config('app.url'), '/');
-        $link = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
-        
-        $html = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
-                    <h2 style='color: #2A9D8F;'>Hallo {$user->name},</h2>
-                    <p>Es wurde ein Account für dich angelegt. Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:</p>
-                    <p style='margin: 30px 0;'>
-                        <a href='{$link}' style='background-color: #2A9D8F; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;'>Account aktivieren & Passwort setzen</a>
-                    </p>
-                    <p style='font-size: 0.9em; color: #666;'>Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br><a href='{$link}' style='color: #2A9D8F;'>{$link}</a></p>
-                 </div>";
+            $frontendUrl = rtrim(config('app.frontend_url'), '/');
+            $link = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+            $logoUrl = $frontendUrl . '/android-chrome-192x192.png';
+            
+            $html = "
+            <table width='100%' cellpadding='0' cellspacing='0' border='0' style='background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;'>
+                <tr><td align='center'>
+                    <table width='100%' cellpadding='0' cellspacing='0' border='0' style='max-width: 600px; background-color: #ffffff; border: 1px solid #e0e0e0;'>
+                        <tr><td align='center' style='padding: 30px 20px 10px 20px;'>
+                            <img src='{$logoUrl}' alt='Logo' width='64' height='64' style='display: block; border-radius: 8px;' />
+                        </td></tr>
+                        <tr><td style='padding: 20px 30px 30px 30px;'>
+                            <h2 style='color: #2A9D8F; margin-top: 0;'>Hallo {$user->name},</h2>
+                            <p style='color: #333333; line-height: 1.6; margin-bottom: 20px;'>Es wurde ein Account für dich angelegt. Klicke hier, um ein Passwort zu vergeben:</p>
+                            <table width='100%' cellpadding='0' cellspacing='0' border='0'>
+                                <tr><td align='center'>
+                                    <a href='{$link}' style='background-color: #2A9D8F; color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: bold; display: inline-block;'>Account aktivieren</a>
+                                </td></tr>
+                            </table>
+                        </td></tr>
+                    </table>
+                </td></tr>
+            </table>";
 
-        Mail::html($html, function($msg) use ($user) {
-            $msg->to($user->email)->subject('Dein neuer Account');
+            // Schlägt der Mail-Versand fehl (Exception), rollt die DB-Transaktion den User wieder zurück.
+            Mail::html($html, function($msg) use ($user) {
+                $msg->to($user->email)->subject('Dein neuer Account');
+            });
+
+            return response()->json(['success' => true, 'user' => new \App\Http\Resources\UserResource($user)]);
         });
-
-        return response()->json(['success' => true, 'user' => new \App\Http\Resources\UserResource($user)]);
     }
 
     public function update(Request $request, $id)
@@ -72,7 +85,6 @@ class UserController extends Controller
         ]);
 
         $user = User::findOrFail($id);
-        
         $user->roles()->sync($request->role_ids ?? []);
         $user->galleryGroups()->sync($request->gallery_group_ids ?? []);
         $user->galleries()->sync($request->gallery_ids ?? []);

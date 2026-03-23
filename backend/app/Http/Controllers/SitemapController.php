@@ -12,7 +12,7 @@ class SitemapController extends Controller
     public function galleries(Request $request)
     {
         $galleries = Gallery::where('is_public', true)->get();
-        $baseUrl = config('app.url');
+        $baseUrl = rtrim(config('app.frontend_url'), '/');
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
@@ -39,7 +39,7 @@ class SitemapController extends Controller
             $query->where('is_public', true);
         })->with('gallery')->get();
 
-        $baseUrl = config('app.url');
+        $baseUrl = rtrim(config('app.frontend_url'), '/');
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">' . "\n";

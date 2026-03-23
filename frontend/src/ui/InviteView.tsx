@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useSWRConfig } from 'swr';
 import {useNavigate, useParams} from 'react-router-dom';
 import PageLayout from './components/PageLayout';
 
 export default function InviteView() {
     const {token} = useParams<{ token: string }>();
     const navigate = useNavigate();
+    const { mutate } = useSWRConfig();
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -48,6 +50,12 @@ export default function InviteView() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Fehler beim Beitritt.');
 
+            // WICHTIG: SWR State global zurücksetzen, damit die neue Identität (Gast) erkannt wird
+            await mutate(() => true, undefined, { revalidate: true });
+            
+            // Identität synchronisieren: SWR anweisen, den User-Status neu zu laden
+            await mutate('/api/auth/me', undefined, { revalidate: true });
+            
             navigate('/' + data.full_path, {replace: true});
         } catch (err: unknown) {
             setError((err as Error).message);

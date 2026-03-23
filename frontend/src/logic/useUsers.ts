@@ -25,12 +25,16 @@ export interface DomainMapping {
 }
 
 export function useUsers() {
-    const {data: users, mutate: mutateUsers} = useSWR<UserDetailed[]>('/api/management/users', fetcher);
+    // any type because Laravel wraps collections in { data: [...] }
+    const {data: response, mutate: mutateUsers} = useSWR<any>('/api/management/users', fetcher);
     const {data: roles} = useSWR<Role[]>('/api/management/roles', fetcher);
     const {
         data: mappings,
         mutate: mutateMappings
     } = useSWR<DomainMapping[]>('/api/management/domain-mappings', fetcher);
+
+    // Safely unwrap the data array
+    const users: UserDetailed[] | undefined = response?.data ? response.data : response;
 
     const createUser = async (name: string, email: string) => {
         await apiMutate('/api/management/users', 'POST', {name, email});

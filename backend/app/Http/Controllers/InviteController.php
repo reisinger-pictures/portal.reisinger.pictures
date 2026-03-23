@@ -31,7 +31,7 @@ class InviteController extends Controller
 
         return response()->json([
             'success' => true,
-            'link' => url('/invite/' . $token)
+            'link' => rtrim(config('app.frontend_url'), '/') . '/invite/' . $token
         ]);
     }
 
@@ -43,16 +43,19 @@ class InviteController extends Controller
         ]);
 
         $gallery = Gallery::findOrFail($galleryId);
-        $token = Str::random(64);
         
-        GalleryInvite::create([
-            'gallery_id' => $gallery->id,
-            'token' => $token,
-            'name' => $request->name
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($gallery, $request) {
+            $token = Str::random(64);
+            
+            GalleryInvite::create([
+                'gallery_id' => $gallery->id,
+                'token' => $token,
+                'name' => $request->name
+            ]);
 
-        $link = url('/invite/' . $token);
-        Mail::to($request->email)->send(new GalleryInviteMail($gallery->name, $link));
+            $link = rtrim(config('app.frontend_url'), '/') . '/invite/' . $token;
+            Mail::to($request->email)->send(new GalleryInviteMail($gallery->name, $link));
+        });
 
         return response()->json(['success' => true]);
     }
@@ -116,9 +119,7 @@ class InviteController extends Controller
 
         $jwt = Auth::guard('api')->login($user);
 
-        return response()->json([
-            'success' => true,
-            'access_token' => $jwt,
+        return $this->respondWithToken($jwt, [
             'full_path' => $gallery->full_path
         ]);
     }

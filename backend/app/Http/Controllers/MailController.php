@@ -36,7 +36,7 @@ class MailController extends Controller
         $count = 0;
 
         foreach ($users as $user) {
-            $link = url('/' . $gallery->full_path);
+            $link = rtrim(config('app.frontend_url'), '/') . '/' . $gallery->full_path;
             $subject = str_replace(['{user_name}', '{gallery_name}'], [$user->name, $gallery->name], $request->subject);
             $body = str_replace(['{user_name}', '{gallery_name}', '{link}'], [$user->name, $gallery->name, $link], $request->body);
 
