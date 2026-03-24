@@ -80,16 +80,22 @@ class InviteController extends Controller
             'password' => 'nullable|string'
         ]);
 
-        $invite = GalleryInvite::where('token', $request->token)->with('gallery')->firstOrFail();
+        $invite = \App\Models\GalleryInvite::where('token', $request->token)->with('gallery')->firstOrFail();
         $gallery = $invite->gallery;
 
-        
-        if ($gallery->password_hash && !Hash::check($request->password, $gallery->password_hash)) {
+        if ($gallery->password_hash && !\Illuminate\Support\Facades\Hash::check($request->password, $gallery->password_hash)) {
             return response()->json(['error' => 'Das Galerie-Passwort ist nicht korrekt.'], 403);
         }
 
-        // NEU: Logged-in User Auto-Redeem
-        $currentUser = Auth::guard('api')->user();
+        $guard = \Illuminate\Support\Facades\Auth::guard('api');
+        $currentUser = $guard->user();
+        if (!$currentUser && $request->hasCookie('rp_jwt')) {
+            try {
+                $currentUser = $guard->setToken($request->cookie('rp_jwt'))->user();
+            } catch (\Exception $e) {
+                // Token ignorieren, falls abgelaufen/ungültig
+            }
+        }
         if ($currentUser) {
             $currentUser->galleries()->syncWithoutDetaching([$gallery->id]);
             return response()->json([
@@ -99,40 +105,46 @@ class InviteController extends Controller
         }
 
         if ($invite->name) {
-            // Benannter Invite: Erzeuge Dummy-Account on-the-fly
-            $email = Str::slug($invite->name) . '-' . substr($invite->token, 0, 8) . '@invite.local';
-            $user = User::firstOrCreate(
-                ['email' => $email],
-                ['name' => $invite->name]
-            );
+            // Benannter Invite: Erzeuge Dummy-Account on-the-fly und logge direkt ein
+            $email = \Illuminate\Support\Str::slug($invite->name) . '-' . substr($invite->token, 0, 8) . '@invite.local';
+            $user = \App\Models\User::firstOrCreate(['email' => $email], ['name' => $invite->name]);
+            $user->galleries()->syncWithoutDetaching([$gallery->id]);
+            $jwt = \Illuminate\Support\Facades\Auth::guard('api')->login($user);
+            return $this->respondWithToken($jwt, ['full_path' => $gallery->full_path]);
         } else {
-            // Klassischer anonymer Invite: E-Mail & Name sind zwingend
+            // Klassischer anonymer Invite: E-Mail & Name erfassen, dann Magic-Link schicken
             if (!$request->email || !$request->name) {
                 return response()->json(['error' => 'Name und E-Mail sind erforderlich.'], 400);
             }
-
-            $user = User::where('email', $request->email)->first();
-            
+            $user = \App\Models\User::where('email', $request->email)->first();
             if ($user) {
-                // Prevent Account Takeover
                 if ($user->password || $user->is_admin) {
                     return response()->json(['error' => 'Diese E-Mail ist bereits mit einem Passwort registriert. Bitte logge dich regulär ein.'], 403);
                 }
             } else {
-                $user = User::create([
-                    'email' => $request->email,
-                    'name' => $request->name
-                ]);
+                $user = \App\Models\User::create(['email' => $request->email, 'name' => $request->name]);
             }
+            $user->galleries()->syncWithoutDetaching([$gallery->id]);
+
+            // Generiere Token und sende E-Mail
+            $resetToken = \Illuminate\Support\Str::random(64);
+            \Illuminate\Support\Facades\DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $user->email], ['token' => \Illuminate\Support\Facades\Hash::make($resetToken), 'created_at' => now()]
+            );
+
+            $link = rtrim(config('app.frontend_url'), '/') . '/reset-password?token=' . $resetToken . '&email=' . urlencode($user->email);
+            $html = "<h2>Hallo {$user->name},</h2><p>Bitte klicke hier, um deine E-Mail zu bestätigen und die Galerie zu öffnen:</p><a href='{$link}'>Zur Galerie</a>";
+
+            \Illuminate\Support\Facades\Mail::html($html, function($msg) use ($user, $gallery) {
+                $msg->to($user->email)->subject("Einladung zur Galerie {$gallery->name}");
+            });
+
+            return response()->json([
+                'success' => true,
+                'requires_mail_verification' => true,
+                'message' => 'Bitte prüfe deine E-Mails. Wir haben dir einen Link gesendet, um die Anmeldung abzuschließen.'
+            ]);
         }
-
-        $user->galleries()->syncWithoutDetaching([$gallery->id]);
-
-        $jwt = Auth::guard('api')->login($user);
-
-        return $this->respondWithToken($jwt, [
-            'full_path' => $gallery->full_path
-        ]);
     }
 
     public function index($galleryId)

@@ -414,12 +414,16 @@ export default function GalleryModals({
                             <div className="form-control w-full md:w-1/2">
                                 <label className="label">
                                     <span className="label-text font-bold">Passwort</span>
-                                    {editingGallery && <span
-                                        className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">Nur eintragen, um altes zu überschreiben</span>}
                                 </label>
                                 <input type="text" value={newGalleryPassword}
                                        onChange={e => setNewGalleryPassword(e.target.value)}
-                                       className="input input-bordered w-full" placeholder="Leer = Nur Magic Link"/>
+                                       className="input input-bordered w-full" 
+                                       placeholder={editingGallery ? "Leer = Aktuelles Passwort behalten" : "Leer = Nur Magic Link"}/>
+                                {editingGallery && (
+                                    <label className="label pt-1 pb-0">
+                                        <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight">Nur ausfüllen, um das bestehende Passwort zu überschreiben.</span>
+                                    </label>
+                                )}
                             </div>
                             <div className="form-control w-full md:w-1/2">
                                 <label className="label"><span

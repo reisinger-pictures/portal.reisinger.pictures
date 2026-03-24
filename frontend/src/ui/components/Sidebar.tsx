@@ -60,13 +60,13 @@ export default function Sidebar(props: SidebarProps) {
     };
 
     const renderGroup = (group: GalleryGroup) => {
-        const safeChildren = Array.isArray(group.children) ? group.children : [];
-        const safeGalleries = Array.isArray(group.galleries) ? group.galleries : [];
+        const safeChildren = Array.isArray(group.children) ? [...group.children].sort((a, b) => a.name.localeCompare(b.name)) : [];
+        const safeGalleries = Array.isArray(group.galleries) ? [...group.galleries].sort((a, b) => a.name.localeCompare(b.name)) : [];
         return (
             <li key={"group-" + group.id}>
                 <details open>
                     <summary className="flex justify-between items-center pr-2">
-                        <span className="font-semibold text-base-content/80">📁 {group.name}</span>
+                        <span className="font-semibold text-base-content/80 truncate" title={group.name}>📁 {group.name}</span>
                         <div className="flex gap-1 ml-auto items-center">
                             {props.onEditGroup && (
                                 <div className="tooltip tooltip-left" data-tip="Meta-Galerie bearbeiten">
@@ -96,7 +96,7 @@ export default function Sidebar(props: SidebarProps) {
                 <div className="flex justify-between items-center w-full pr-2">
                     <Link to={'/' + gallery.full_path} className={`flex-1 truncate flex items-center gap-2 ${isExpired ? 'line-through opacity-50' : ''}`} onClick={props.onCloseMobile}>
                         <span className="iconify mdi--image-multiple-outline text-lg opacity-70 shrink-0"></span>
-                        <span className="truncate">{gallery.name}</span>
+                        <span className="truncate" title={gallery.name}>{gallery.name}</span>
                     </Link>
                     <div className="flex gap-1 ml-auto items-center mr-[14px]">
                         {props.onEditGallery && (
@@ -115,8 +115,8 @@ export default function Sidebar(props: SidebarProps) {
         );
     };
 
-    const safeGroups = Array.isArray(props.tree?.groups) ? props.tree?.groups : [];
-    const safeRootGalleries = Array.isArray(props.tree?.root_galleries) ? props.tree?.root_galleries : [];
+    const safeGroups = Array.isArray(props.tree?.groups) ? [...props.tree.groups].sort((a, b) => a.name.localeCompare(b.name)) : [];
+    const safeRootGalleries = Array.isArray(props.tree?.root_galleries) ? [...props.tree.root_galleries].sort((a, b) => a.name.localeCompare(b.name)) : [];
     const isAdminOrPhotog = user?.is_admin || user?.is_photographer;
     const isClient = !isAdminOrPhotog && user;
     const isGuest = !user;

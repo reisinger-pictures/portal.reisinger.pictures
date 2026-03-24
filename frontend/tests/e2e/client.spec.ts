@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from './helpers/AuthHelper';
 import { SidebarHelper } from './helpers/SidebarHelper';
 import { ModalHelper } from './helpers/ModalHelper';
+import path from 'path';
 
 test.describe.serial('Client Workflow', () => {
     let auth: AuthHelper;
@@ -31,8 +32,18 @@ test.describe.serial('Client Workflow', () => {
         await page.click(`text=${galleryName}`);
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
 
+        const fileInput = page.locator('input[type="file"]');
+        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
+        await fileInput.setInputFiles(sampleImagePath);
+        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 20000 });
+
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
-        await modal.fillInputByLabel('Für wen ist dieser Link?', 'Test Client');
+        
+        // Neues InviteModal UI: Wir müssen zuerst auf den persönlichen Link wechseln
+        await page.locator('text=Persönlicher Link (Einzelperson)').click();
+        
+        // Das Label wurde ebenfalls umbenannt
+        await modal.fillInputByLabel('Name des Gastes', 'Test Client');
         await modal.clickButton('Generieren');
 
         await expect(page.locator('text=Erfolgreich generiert!')).toBeVisible();
@@ -53,5 +64,20 @@ test.describe.serial('Client Workflow', () => {
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
         await expect(page.locator('p:has-text("Wähle deine Favoriten aus.")')).toBeVisible();
         await expect(page.getByRole('button', { name: 'Auswahl abschließen' })).toBeVisible();
+
+        // --- DAU Protection Check (Right-Click & Drag) ---
+        const image = page.locator('a.pswp-item img').first();
+        await expect(image).toBeVisible({ timeout: 15000 });
+
+        // 1. Prüfen, ob das Kontextmenü blockiert wird
+        const isPrevented = await image.evaluate((el) => {
+            const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+            el.dispatchEvent(event);
+            return event.defaultPrevented;
+        });
+        expect(isPrevented).toBe(true);
+
+        // 2. Prüfen, ob das Bild nicht gezogen werden kann (Drag & Drop)
+        await expect(image).toHaveAttribute('draggable', 'false');
     });
 });

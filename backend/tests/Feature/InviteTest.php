@@ -20,10 +20,9 @@ class InviteTest extends TestCase {
             'email' => 'guest@example.com'
         ]);
 
-        $response->assertStatus(200)
-                 ->assertJsonStructure(['success', 'full_path'])
-                 ->assertCookie('rp_jwt');
+        $response->assertStatus(200)->assertJsonStructure(['success', 'requires_mail_verification', 'message']);
         $this->assertDatabaseHas('users', ['email' => 'guest@example.com']);
+        $this->assertDatabaseHas('password_reset_tokens', ['email' => 'guest@example.com']);
     }
     public function test_send_invite_email_and_redeem_magic_link() {
         // 1. Admin & Galerie vorbereiten
@@ -73,7 +72,7 @@ class InviteTest extends TestCase {
         ]);
 
         $redeemResponse->assertStatus(200)
-                       ->assertCookie('rp_jwt');
+                       ->assertCookieMissing('rp_jwt');
 
         // 6. Prüfen, ob der Gast korrekt in der DB angelegt und verknüpft wurde
         $this->assertDatabaseHas('users', ['email' => 'magic-guest@example.com']);

@@ -41,7 +41,7 @@ test.describe.serial('User Setup via Mailpit Workflow', () => {
     test('New user extracts setup link from Mailpit and sets password', async ({ page }) => {
         // Extrahiere den kompletten Link aus dem href-Attribut
         const regex = /token=([a-zA-Z0-9]+)/;
-        const token = await mailpit.extractLinkFromLatestMessage(regex);
+        const token = await mailpit.extractLinkForEmail(newUserEmail, regex);
         
         expect(token).toBeTruthy();
         setupLink = `http://localhost:4321/reset-password?token=${token}&email=${encodeURIComponent(newUserEmail)}`;

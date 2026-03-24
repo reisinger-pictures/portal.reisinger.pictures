@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from './helpers/AuthHelper';
 import { SidebarHelper } from './helpers/SidebarHelper';
 import { ModalHelper } from './helpers/ModalHelper';
+import { MailpitHelper } from './helpers/MailpitHelper';
 import path from 'path';
 
 test.describe.serial('Gallery Invite Link Workflow', () => {
@@ -44,30 +45,68 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         inviteLinkAnon = await modal.activeModal.locator('input[readonly]').inputValue();
     });
 
-    test('Guest (Anonymous) redeems invite by providing name and email', async ({ page }) => {
+    test('Guest (Anonymous) redeems invite, receives mail and sets password', async ({ page, request }) => {
         expect(inviteLinkAnon).not.toBe('');
         
         await page.goto(inviteLinkAnon);
         await expect(page.locator('h2:has-text("Willkommen zur Fotoauswahl")')).toBeVisible();
         
+        const guestEmail = `gast-${uniqueId}@example.com`;
         await page.getByPlaceholder('z.B. Maria Muster').fill('Gast Bewerter');
-        await page.getByPlaceholder('maria@beispiel.de').fill(`gast-${uniqueId}@example.com`);
+        await page.getByPlaceholder('maria@beispiel.de').fill(guestEmail);
         await page.getByRole('button', { name: 'Galerie öffnen' }).click();
-        // networkidle entfernt (Anti-Pattern mit SWR)
+        
+        // Prüfung auf die neue Self-Invite Erfolgsmeldung
+        await expect(page.locator('.alert-success')).toContainText('Bitte prüfe deine E-Mails', { timeout: 15000 });
+
+        const mailpit = new MailpitHelper(request);
+        const regex = /token=([a-zA-Z0-9]+)/;
+        const token = await mailpit.extractLinkForEmail(guestEmail, regex);
+        
+        expect(token).toBeTruthy();
+        const setupLink = `http://localhost:4321/reset-password?token=${token}&email=${encodeURIComponent(guestEmail)}`;
+
+        // Navigiere zum Setup-Link
+        await page.goto(setupLink);
+        await expect(page.locator('h2:has-text("Account Setup")')).toBeVisible();
+        
+        // Passwort setzen
+        await page.fill('input[type="password"]', 'SecurePassword123!');
+        await page.locator('input[type="password"]').nth(1).fill('SecurePassword123!');
+        await page.getByRole('button', { name: 'Passwort speichern & Anmelden' }).click();
+
+        // Nach dem Passwort-Reset landen wir auf dem Dashboard.
+        await expect(page.locator('.loading-spinner')).toBeHidden({ timeout: 20000 });
+        
+        // Auf dem Dashboard wird die Galerie als h2 (in einer Card) angezeigt.
+        await expect(page.locator(`h2:has-text("${galleryName}")`)).toBeVisible({ timeout: 20000 });
+        
+        // Wir klicken auf die Karte, um die Galerie zu betreten.
+        await page.locator(`h2:has-text("${galleryName}")`).click();
+        
+        // Jetzt sind wir IN der Galerie. Dort ist der Name wieder eine h1.
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 20000 });
     });
 
     test('Logged-in User redeems anonymous invite directly', async ({ page }) => {
-        expect(inviteLinkAnon).not.toBe('');
+        // Sicherstellen, dass der Test nicht isoliert fehlschlägt
+        test.skip(inviteLinkAnon === '', 'Test requires link from previous step');
         
-        // Logge dich als Admin/Fotograf ein
         await auth.login();
-
-        // Rufe den Invite-Link auf
+        
+        // Wir fangen den API-Request ab, um sicherzustellen, dass das Auto-Redeem im Hintergrund feuert
+        // Aufruf des Magic Links
         await page.goto(inviteLinkAnon);
         
-        // Da der User angemeldet ist, wird das Formular gar nicht erst angezeigt,
-        // das Backend verknüpft die Galerie sofort mit dem bestehenden Account und leitet weiter.
-        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 20000 });
+        // Da AuthHelper.login nun auf den Abmelden-Button wartet, ist die Session hier etabliert.
+
+        // 2. Aufruf des Magic Links
+        await page.goto(inviteLinkAnon);
+        
+        // 3. Geduldiges Warten auf den Auto-Redeem Redirect in den /galleries/ Pfad (gemäß TESTING.md)
+        await expect(page).toHaveURL(/.*\/galleries\/.*/, { timeout: 20000 });
+        
+        // Finale Bestätigung: Der Name der Galerie ist als h1 sichtbar
+        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
     });
 });

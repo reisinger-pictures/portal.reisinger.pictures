@@ -5,10 +5,26 @@ export class AuthHelper {
 
     async login(email = 'florian@reisinger.pictures', password = 'admin') {
         await this.page.goto('/');
+        
+        // Hamburger-Menü auf Mobile öffnen, damit die Login-Felder klickbar werden
+        const menuBtn = this.page.locator('button:has(.mdi--menu)').first();
+        if (await menuBtn.isVisible()) {
+            await menuBtn.click({ force: true });
+            await this.page.waitForTimeout(500); // Kurz warten, bis das CSS-Menü reingefahren ist
+        }
+
         await this.page.fill('input[placeholder="E-Mail Adresse"]', email);
         await this.page.fill('input[placeholder="Passwort"]', password);
         await this.page.click('button:has-text("Login")');
-        await expect(this.page.locator('text=Reisinger Foto Portal').first()).toBeVisible({ timeout: 10000 });
+        
+        // Strenger Indikator: Wir warten auf den "Abmelden" Button. 
+        // Nur dann sind wir wirklich erfolgreich im Dashboard des Users angekommen!
+        // Strenger Indikator: Wir warten darauf, dass der Login-Button verschwindet.
+        // Das bedeutet, SWR hat die Session erkannt und das Dashboard geladen (funktioniert auf Desktop & Mobile!).
+        // Wir warten darauf, dass der Abmelden Button im DOM eingehängt wird.
+        // Dieser ist zwar auf Mobile im Menü versteckt, aber er existiert im DOM,
+        // sobald das Dashboard vollständig geladen und autorisiert wurde.
+        await expect(this.page.getByRole('button', { name: 'Abmelden' }).first()).toBeAttached({ timeout: 15000 });
     }
 
     async logout() {

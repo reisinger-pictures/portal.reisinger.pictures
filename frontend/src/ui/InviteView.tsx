@@ -3,6 +3,7 @@ import { useSWRConfig } from 'swr';
 import {useNavigate, useParams} from 'react-router-dom';
 import PageLayout from './components/PageLayout';
 import { useAuth } from '../logic/useAuth';
+import { apiMutate } from '../api';
 
 export default function InviteView() {
     const {token} = useParams<{ token: string }>();
@@ -16,6 +17,7 @@ export default function InviteView() {
     const [galleryName, setGalleryName] = useState('');
     const [requiresPassword, setRequiresPassword] = useState(false);
     const [inviteName, setInviteName] = useState('');
+    const [regSuccess, setRegSuccess] = useState('');
 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -53,6 +55,10 @@ export default function InviteView() {
 
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Fehler beim Beitritt.');
+            if (data.requires_mail_verification) {
+                setRegSuccess(data.message);
+                return;
+            }
 
             // SWR anweisen, die User-Session frisch zu laden
             await mutate(() => true, undefined, { revalidate: true });
@@ -66,15 +72,10 @@ export default function InviteView() {
 
     
     useEffect(() => {
+        // Auto-Redeem nur wenn: Nicht am Laden, User eingeloggt, Galerie bekannt, kein PW nötig
         if (!loading && !authLoading && user && galleryName && !requiresPassword && !error && !autoRedeeming) {
             setAutoRedeeming(true);
-            fetch('/api/invites/redeem', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-                credentials: 'include',
-                body: JSON.stringify({ token })
-            })
-            .then(r => r.json())
+            apiMutate<any>('/api/invites/redeem', 'POST', { token })
             .then(resData => {
                 if (resData.full_path) {
                     mutate('/api/auth/me');
@@ -83,7 +84,11 @@ export default function InviteView() {
                     setAutoRedeeming(false);
                 }
             })
-            .catch(() => setAutoRedeeming(false));
+            .catch((err) => {
+                console.error("Auto-redeem failed", err);
+                setError('Automatischer Beitritt fehlgeschlagen. Bitte manuell versuchen.');
+                setAutoRedeeming(false);
+            });
         }
     }, [loading, authLoading, user, galleryName, requiresPassword, error, token, autoRedeeming, navigate, mutate]);
 
@@ -113,14 +118,20 @@ export default function InviteView() {
 
                         {error && <div className="alert alert-error text-sm py-2 mb-4">{error}</div>}
 
-                        {inviteName && !requiresPassword ? (
+                        {regSuccess && (
+                        <div className="alert alert-success shadow-sm mb-4">
+                            <span className="iconify mdi--check-circle text-xl"></span>
+                            <span>{regSuccess}</span>
+                        </div>
+                    )}
+                    {!regSuccess && inviteName && !requiresPassword ? (
                             <div className="form-control mt-4">
                                 <button onClick={handleSubmit} className="btn btn-primary w-full text-lg">Weiter
                                     als {inviteName}</button>
                             </div>
                         ) : (
                             <form onSubmit={handleSubmit} className="space-y-4">
-                                {!inviteName && (
+                                {!regSuccess && !inviteName && (
                                     <>
                                         <div className="form-control">
                                             <label className="label"><span

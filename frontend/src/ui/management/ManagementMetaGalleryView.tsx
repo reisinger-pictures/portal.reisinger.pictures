@@ -36,6 +36,49 @@ export default function ManagementMetaGalleryView() {
                 children: 'a.pswp-item',
                 pswpModule: () => import('photoswipe')
             });
+
+            lightbox.on('uiRegister', function () {
+                lightbox!.pswp!.ui!.registerElement({
+                    name: 'custom-caption', order: 9, isButton: false, appendTo: 'wrapper', html: '',
+                    onInit: (el) => {
+                        lightbox!.pswp!.on('change', () => {
+                            const currSlideElement = lightbox!.pswp!.currSlide?.data?.element;
+                            if (currSlideElement) {
+                                const title = currSlideElement.getAttribute('data-title') || '';
+                                const desc = currSlideElement.getAttribute('data-desc') || '';
+                                const artist = currSlideElement.getAttribute('data-artist') || '';
+
+                                el.innerHTML = '';
+                                if (title || desc) {
+                                    const container = document.createElement('div');
+                                    container.className = 'absolute bottom-5 left-5 text-white drop-shadow-md max-w-[600px] font-sans leading-relaxed pointer-events-none p-4';
+
+                                    if (title) {
+                                        const b = document.createElement('b');
+                                        b.className = 'text-lg block mb-1';
+                                        b.textContent = title;
+                                        container.appendChild(b);
+                                    }
+                                    if (desc) {
+                                        const span = document.createElement('span');
+                                        span.textContent = desc;
+                                        container.appendChild(span);
+                                    }
+                                    if (artist) {
+                                        if (desc) container.appendChild(document.createElement('br'));
+                                        const small = document.createElement('small');
+                                        small.className = 'opacity-80 mt-1 block';
+                                        small.textContent = '© ' + artist;
+                                        container.appendChild(small);
+                                    }
+                                    el.appendChild(container);
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+
             lightbox.init();
         }
         return () => {
@@ -87,6 +130,9 @@ export default function ManagementMetaGalleryView() {
                         <div key={photo.id} className="relative group">
                             <a href={photo.url} data-pswp-width={photo.width || 2000}
                                data-pswp-height={photo.height || 1333}
+                               data-title={photo.title}
+                               data-desc={photo.description}
+                               data-artist={photo.artist}
                                className="pswp-item block relative aspect-square">
                                 <img src={photo.thumb_url}
                                      className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" loading="lazy"/>

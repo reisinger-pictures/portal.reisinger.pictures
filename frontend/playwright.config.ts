@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : 16,
+  workers: process.env.CI ? 1 : 8,
   reporter: 'html',
   // globalSetup entfernt! Tests laufen nun zerstörungsfrei gegen die Dev-DB.
   use: {
