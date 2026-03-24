@@ -29,7 +29,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             if (this.props.fallback) return this.props.fallback;
 
             return (
-                <div className="p-4 m-4 border border-error bg-error/10 rounded-box text-error">
+                <div className="p-4 m-4 border border-error bg-error/10 rounded-box text-error overflow-auto">
                     <h2 className="font-bold text-lg mb-2 flex items-center gap-2">
                         <span className="iconify mdi--alert"></span> Ein unerwarteter Fehler ist aufgetreten
                     </h2>

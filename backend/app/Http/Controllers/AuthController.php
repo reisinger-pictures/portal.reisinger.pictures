@@ -134,6 +134,20 @@ class AuthController extends Controller
         return $this->respondWithToken($token);
     }
 
+    public function updateProfile(Request $request)
+    {
+        $user = Auth::guard('api')->user();
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'metadata_copyright' => 'nullable|string|max:255'
+        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $validated) {
+            $user->update($validated);
+            $user->photos()->searchable();
+        });
+        return response()->json(['success' => true]);
+    }
+
     public function me()
     {
         $user = Auth::guard('api')->user();

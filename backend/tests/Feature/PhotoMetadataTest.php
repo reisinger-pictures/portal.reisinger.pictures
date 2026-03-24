@@ -73,26 +73,7 @@ class PhotoMetadataTest extends TestCase {
         $response->assertStatus(403);
     }
 
-    public function test_client_cannot_overwrite_artist_metadata_even_if_in_payload() {
-        $client = User::factory()->create(['can_edit_metadata' => true]);
-        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
-        
-        $gallery = Gallery::factory()->create([
-            'allow_client_metadata_edit' => true,
-            'type' => 'delivery'
-        ]);
-        $client->galleries()->attach($gallery);
-
-        $photo = Photo::factory()->create([
-            'gallery_id' => $gallery->id,
-            'artist' => 'Original Photographer'
-        ]);
-
-        $token = auth('api')->login($client);
-
-        // Der Client versucht, den Urheber im Payload mitzusenden (Hacking-Versuch)
-        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->putJson("/api/photos/{$photo->id}/meta", [
+    /meta", [
                              'title' => 'Allowed Title Change',
                              'artist' => 'Hacker Artist Name' 
                          ]);

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import Sidebar from './Sidebar';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSearch } from '../../logic/useSearch';
 import GalleryModals from './GalleryModals';
 import AdminWatermarkBanner from '../management/components/AdminWatermarkBanner';
 
@@ -21,6 +23,18 @@ export default function PageLayout({children, currentView, hideMobileHeader}: {
         deleteGroup,
         deleteGallery
     } = useProtectedGalleries();
+        const [searchQuery, setSearchQuery] = useState('');
+    const {results: searchResults} = useSearch(searchQuery, false, true);
+    const navigate = useNavigate();
+
+    const handleSearchSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchQuery.trim().length >= 2) {
+            navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+            setSearchQuery('');
+        }
+    };
+
     const [isGroupModalOpen, setGroupModalOpen] = useState(false);
     const [isGalleryModalOpen, setGalleryModalOpen] = useState(false);
     const [editingGroup, setEditingGroup] = useState<GalleryGroup | null>(null);
@@ -37,7 +51,7 @@ export default function PageLayout({children, currentView, hideMobileHeader}: {
                 )}
 
                 <div
-                    className={`fixed inset-y-0 left-0 z-50 w-80 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                    className={`fixed inset-y-0 left-0 z-50 w-full md:w-72 2xl:w-80 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                     <Sidebar
                         tree={tree} isLoading={isLoading} isError={isError}
                         currentView={currentView}
@@ -62,15 +76,48 @@ export default function PageLayout({children, currentView, hideMobileHeader}: {
                 </div>
 
                 <main className="flex-1 overflow-y-auto flex flex-col w-full relative bg-base-200">
-                    {!hideMobileHeader && (
-                        <header
-                            className="p-4 border-b border-base-300 bg-base-100 flex items-center gap-4 sticky top-0 z-30 md:hidden">
-                            <button className="btn btn-square btn-ghost" onClick={() => setIsSidebarOpen(true)}>
-                                <span className="iconify mdi--menu text-2xl"></span>
-                            </button>
-                            <div className="text-xl font-bold text-primary truncate">Reisinger Foto Portal</div>
-                        </header>
-                    )}
+                    <header className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-4">
+                        <button className="btn btn-square btn-ghost md:hidden" onClick={() => setIsSidebarOpen(true)}>
+                            <span className="iconify mdi--menu text-2xl"></span>
+                        </button>
+                        <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full md:max-w-4xl">
+                            <div className="join w-full shadow-sm">
+                                <input
+                                    type="text"
+                                    placeholder="Suche in allen Galerien..."
+                                    className="input input-bordered join-item w-full"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                                <button type="submit" className="btn btn-primary join-item">
+                                    <span className="iconify mdi--magnify text-xl"></span>
+                                </button>
+                            </div>
+                            {searchQuery.length >= 2 && searchResults && (
+                                <div className="absolute top-14 left-0 w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-50 max-h-[60vh] overflow-y-auto">
+                                    <ul className="menu p-2">
+                                        <li>
+                                            <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`} onClick={() => setSearchQuery('')} className="text-primary font-bold">
+                                                <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach "{searchQuery}"
+                                            </Link>
+                                        </li>
+                                        <div className="divider my-0"></div>
+                                        {searchResults.galleries.map(g => (
+                                            <li key={g.id}><Link to={'/' + g.full_path} onClick={() => setSearchQuery('')}>📁 {g.name}</Link></li>
+                                        ))}
+                                        {searchResults.photos.map(p => (
+                                            <li key={p.id}><Link to={'/photos/' + p.id} onClick={() => setSearchQuery('')}>
+                                                <span className="iconify mdi--image-outline opacity-70"></span> {p.filename}
+                                            </Link></li>
+                                        ))}
+                                        {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (
+                                            <li className="disabled"><span className="opacity-50">Keine direkten Treffer</span></li>
+                                        )}
+                                    </ul>
+                                </div>
+                            )}
+                        </form>
+                    </header>
                     {children}
                 </main>
                 <GalleryModals

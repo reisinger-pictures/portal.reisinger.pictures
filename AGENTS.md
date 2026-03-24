@@ -19,6 +19,7 @@
 
 **4. Testing Guidelines**
 * Siehe zwingend **[TESTING.md](TESTING.md)** für alle Regeln rund um PHPUnit und Playwright E2E-Tests!
+* **Multi-Path E2E Testing:** Stelle sicher, dass Features mit mehreren Einstiegswegen (z.B. Suche via Header-Bar vs. Suche via dedizierter Seite) in den Tests vollständig abgedeckt sind.
 
 **5. Definition of Done (DoD) & TODO Management**
 * **Test Planning Requirement:** Whenever you create a new TODO for a feature or refactoring, you MUST explicitly consider and define the types of tests (e.g., PHPUnit for backend logic, Playwright E2E for UI/workflows) required for that task. Include these test requirements directly in the TODO description or as distinct sub-tasks.

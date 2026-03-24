@@ -1,15 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {useSettings, WatermarkSettings} from '../../logic/useSettings';
+import {useAuth} from '../../logic/useAuth';
+import {apiMutate} from '../../api';
+import {useUI} from '../components/UIContext';
 
 export default function ManagementSettingsView() {
     const {watermark, updateWatermark} = useSettings();
+    const {user, mutate: mutateUser} = useAuth();
+    const {showToast} = useUI();
+
+    // Watermark State
     const [file, setFile] = useState<File | null>(null);
     const [scale, setScale] = useState<number>(0.1);
     const [opacity, setOpacity] = useState<number>(0.6);
     const [position, setPosition] = useState<string>('bottom-right');
-    const [saving, setSaving] = useState(false);
-
+    const [savingWatermark, setSavingWatermark] = useState(false);
     const [prevWatermark, setPrevWatermark] = useState<WatermarkSettings | null>(null);
+
+    // Profile State
+    const [profileName, setProfileName] = useState(user?.name || '');
+    const [profileCopyright, setProfileCopyright] = useState(user?.metadata_copyright || '');
+    const [savingProfile, setSavingProfile] = useState(false);
+
+    useEffect(() => {
+        if (user) {
+            setProfileName(user.name);
+            setProfileCopyright(user.metadata_copyright || '');
+        }
+    }, [user]);
 
     if (watermark && watermark !== prevWatermark) {
         setPrevWatermark(watermark);
@@ -18,9 +36,9 @@ export default function ManagementSettingsView() {
         setPosition(watermark.position);
     }
 
-    const handleSave = async (e: React.FormEvent) => {
+    const handleSaveWatermark = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSaving(true);
+        setSavingWatermark(true);
         const fd = new FormData();
         if (file) fd.append('svg', file);
         fd.append('scale', scale.toString());
@@ -28,14 +46,55 @@ export default function ManagementSettingsView() {
         fd.append('position', position);
 
         await updateWatermark(fd);
-        setSaving(false);
+        showToast('success', 'Wasserzeichen gespeichert');
+        setSavingWatermark(false);
         setFile(null);
     };
 
-    return (
-        <div className="p-10 max-w-4xl mx-auto w-full">
-            <h1 className="text-4xl font-bold mb-6">Einstellungen</h1>
+    const handleSaveProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSavingProfile(true);
+        try {
+            await apiMutate('/api/auth/profile', 'PUT', { name: profileName, metadata_copyright: profileCopyright });
+            await mutateUser();
+            showToast('success', 'Profil aktualisiert');
+        } catch {
+            showToast('error', 'Fehler beim Speichern');
+        }
+        setSavingProfile(false);
+    };
 
+    return (
+        <div className="p-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
+            <h1 className="text-4xl font-bold">Einstellungen</h1>
+
+            {/* Profil Card */}
+            <div className="card bg-base-200 border border-base-300">
+                <div className="card-body">
+                    <h2 className="card-title text-2xl mb-4">Profil & Standardwerte</h2>
+                    <form onSubmit={handleSaveProfile} className="space-y-6">
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">Dein Name</span></label>
+                            <input type="text" required value={profileName} onChange={e => setProfileName(e.target.value)} className="input input-bordered w-full"/>
+                        </div>
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text font-bold">Standard-Urheber (IPTC Copyright)</span>
+                                <span className="label-text-alt opacity-70">Dieser Wert wird in neue Bilder geschrieben, falls die Galerie Metadaten anwendet.</span>
+                            </label>
+                            <input type="text" value={profileCopyright} onChange={e => setProfileCopyright(e.target.value)} placeholder="z.B. Florian Reisinger" className="input input-bordered w-full"/>
+                        </div>
+                        <div>
+                            <button type="submit" disabled={savingProfile} className="btn btn-primary">
+                                {savingProfile ? <span className="loading loading-spinner"></span> : 'Profil speichern'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {/* Watermark Card */}
+            {user?.is_admin && (
             <div className="card bg-base-200 border border-base-300">
                 <div className="card-body">
                     <h2 className="card-title text-2xl mb-4">Wasserzeichen für Gäste</h2>
@@ -53,7 +112,7 @@ export default function ManagementSettingsView() {
                         </div>
                     )}
 
-                    <form onSubmit={handleSave} className="space-y-6">
+                    <form onSubmit={handleSaveWatermark} className="space-y-6">
                         <div className="form-control w-full">
                             <label className="label"><span
                                 className="label-text font-bold">Logo (nur .svg)</span></label>
@@ -96,14 +155,15 @@ export default function ManagementSettingsView() {
                         </div>
 
                         <div className="mt-6">
-                            <button type="submit" disabled={saving} className="btn btn-primary">
-                                {saving ?
+                            <button type="submit" disabled={savingWatermark} className="btn btn-primary">
+                                {savingWatermark ?
                                     <span className="loading loading-spinner"></span> : 'Speichern & Cache leeren'}
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
+            )}
         </div>
     );
 }

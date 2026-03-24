@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { AuthHelper } from './helpers/AuthHelper';
-import { SidebarHelper } from './helpers/SidebarHelper';
-import { ModalHelper } from './helpers/ModalHelper';
-import { MailpitHelper } from './helpers/MailpitHelper';
+import { AuthHelper } from '../helpers/AuthHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
+import { ModalHelper } from '../helpers/ModalHelper';
+import { MailpitHelper } from '../helpers/MailpitHelper';
 import path from 'path';
 
 test.describe.serial('Gallery Invite Link Workflow', () => {
@@ -27,9 +27,10 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
         await modal.clickButton('Speichern');
-        await expect(page.locator(`text=${galleryName}`).first()).toBeVisible({ timeout: 20000 });
+        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 20000 });
 
-        await page.click(`text=${galleryName}`);
+        await sidebar.openMobileMenu();
+        await page.locator(`a[title="${galleryName}"]`).first().click();
 
         const fileInput = page.locator('input[type="file"]');
         const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');

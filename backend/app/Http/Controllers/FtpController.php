@@ -78,7 +78,6 @@ class FtpController extends Controller
         }
 
         $processedCount = 0;
-        $defaultArtist = $user->metadata_copyright ?: $user->name;
         $photoService = app(PhotoProcessingService::class);
 
         foreach ($imageFiles as $file) {
@@ -104,12 +103,12 @@ class FtpController extends Controller
                 mkdir(dirname($thumbPath), 0755, true);
             }
 
-            $meta = $photoService->processImage($targetPath, $thumbPath, $gallery, $defaultArtist);
+            $meta = $photoService->processImage($targetPath, $thumbPath, $gallery);
 
             \Illuminate\Support\Facades\DB::transaction(function () use ($gallery, $filename, $meta) {
                 Photo::updateOrCreate(
                     ['gallery_id' => $gallery->id, 'filename' => $filename],
-                    array_merge(['lr_uuid' => 'ftp-' . uniqid()], $meta)
+                    array_merge(['lr_uuid' => 'ftp-' . uniqid(), 'user_id' => $user->id], $meta)
                 );
             });
 

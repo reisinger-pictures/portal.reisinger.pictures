@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { AuthHelper } from './helpers/AuthHelper';
-import { SidebarHelper } from './helpers/SidebarHelper';
-import { ModalHelper } from './helpers/ModalHelper';
+import { AuthHelper } from '../helpers/AuthHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
+import { ModalHelper } from '../helpers/ModalHelper';
 import path from 'path';
 
 test.describe.serial('Client Workflow', () => {
@@ -27,9 +27,10 @@ test.describe.serial('Client Workflow', () => {
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
         await modal.clickButton('Speichern');
         await expect(modal.activeModal).toBeHidden({ timeout: 10000 });
-        await expect(page.locator(`text=${galleryName}`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 15000 });
 
-        await page.click(`text=${galleryName}`);
+        await sidebar.openMobileMenu();
+        await page.locator(`a[title="${galleryName}"]`).first().click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
 
         const fileInput = page.locator('input[type="file"]');
@@ -79,5 +80,38 @@ test.describe.serial('Client Workflow', () => {
 
         // 2. Prüfen, ob das Bild nicht gezogen werden kann (Drag & Drop)
         await expect(image).toHaveAttribute('draggable', 'false');
+    });
+
+
+    test('Client can filter photos by rating and PhotoSwipe respects the filter', async ({ page }) => {
+        expect(inviteLink).not.toBe('');
+        await page.goto(inviteLink);
+        await page.getByRole('button', { name: 'Weiter als Test Client' }).click();
+        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
+
+        // Wait for image to load
+        const image = page.locator('a.pswp-item img').first();
+        await expect(image).toBeVisible({ timeout: 15000 });
+
+        // Rate the first image (click 5th star)
+        await page.locator('input.mask-star-2').nth(4).click();
+        await page.waitForTimeout(500); // give it a brief moment to update state
+
+        // Test Filter: "Neu (Unbewertet)"
+        await page.getByRole('button', { name: 'Neu (Unbewertet)' }).click();
+        // Since we only uploaded 1 sample image and rated it, the "Unbewertet" list should be empty
+        await expect(page.locator('a.pswp-item')).toHaveCount(0);
+
+        // Test Filter: "Meine Favoriten"
+        await page.getByRole('button', { name: 'Meine Favoriten' }).click();
+        await expect(page.locator('a.pswp-item')).toHaveCount(1);
+
+        // Verify PhotoSwipe opens and shows 1 of 1 (instead of crashing or showing wrong count)
+        await page.locator('a.pswp-item').first().click();
+        await expect(page.locator('.pswp')).toBeVisible();
+        await expect(async () => {
+            await page.locator('button.pswp__button--close').click({ force: true });
+            await expect(page.locator('.pswp')).toBeHidden({ timeout: 2000 });
+        }).toPass({ timeout: 15000 });
     });
 });

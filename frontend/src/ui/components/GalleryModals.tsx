@@ -108,7 +108,6 @@ export default function GalleryModals({
                 setApplyMeta(editingGallery.apply_metadata_to_photos || false);
                 setIptcData({
                     title: editingGallery.default_title || '',
-                    headline: editingGallery.default_headline || '',
                     description: editingGallery.default_description || '',
                     keywords: editingGallery.default_keywords || '',
                     location: editingGallery.default_location || '',
@@ -176,10 +175,10 @@ export default function GalleryModals({
         setProcessing(true);
         try {
             if (editingGallery) {
-                const metaOpts = { allow_client_metadata_edit: allowClientMeta, apply_metadata_to_photos: applyMeta, default_title: iptcData.title, default_headline: iptcData.headline, default_description: iptcData.description, default_keywords: iptcData.keywords, default_location: iptcData.location, default_city: iptcData.city, default_state: iptcData.state, default_country: iptcData.country, default_iso_country: iptcData.iso_country };
+                const metaOpts = { allow_client_metadata_edit: allowClientMeta, apply_metadata_to_photos: applyMeta, default_title: iptcData.title, default_description: iptcData.description, default_keywords: iptcData.keywords, default_location: iptcData.location, default_city: iptcData.city, default_state: iptcData.state, default_country: iptcData.country, default_iso_country: iptcData.iso_country };
                 await onUpdateGallery(editingGallery.id, newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : Number(galleryParentId), newGalleryPassword, newGalleryExpiresAt, metaOpts);
             } else {
-                const metaOpts = { allow_client_metadata_edit: allowClientMeta, apply_metadata_to_photos: applyMeta, default_title: iptcData.title, default_headline: iptcData.headline, default_description: iptcData.description, default_keywords: iptcData.keywords, default_location: iptcData.location, default_city: iptcData.city, default_state: iptcData.state, default_country: iptcData.country, default_iso_country: iptcData.iso_country };
+                const metaOpts = { allow_client_metadata_edit: allowClientMeta, apply_metadata_to_photos: applyMeta, default_title: iptcData.title, default_description: iptcData.description, default_keywords: iptcData.keywords, default_location: iptcData.location, default_city: iptcData.city, default_state: iptcData.state, default_country: iptcData.country, default_iso_country: iptcData.iso_country };
                 await onCreateGallery(newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : Number(galleryParentId), newGalleryPassword, newGalleryExpiresAt, metaOpts);
             }
             setGalleryModalOpen(false);

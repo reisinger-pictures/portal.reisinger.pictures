@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { AuthHelper } from './helpers/AuthHelper';
-import { SidebarHelper } from './helpers/SidebarHelper';
-import { ModalHelper } from './helpers/ModalHelper';
-import { MailpitHelper } from './helpers/MailpitHelper';
+import { AuthHelper } from '../helpers/AuthHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
+import { ModalHelper } from '../helpers/ModalHelper';
+import { MailpitHelper } from '../helpers/MailpitHelper';
 
 test.describe.serial('User Setup via Mailpit Workflow', () => {
     let auth: AuthHelper;

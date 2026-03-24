@@ -20,7 +20,7 @@ class PhotoFactory extends Factory
             'height' => 1333,
             'title' => $this->faker->sentence(),
             'description' => $this->faker->paragraph(),
-            'artist' => 'Test Artist',
+            'user_id' => \App\Models\User::factory(),
         ];
     }
 }

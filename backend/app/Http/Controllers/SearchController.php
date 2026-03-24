@@ -142,7 +142,8 @@ class SearchController extends Controller
 
         return response()->json([
             'photo' => $photo,
-            'breadcrumbs' => $breadcrumbs
+            'breadcrumbs' => $breadcrumbs,
+            'downloads_count' => \App\Models\DownloadLog::where('gallery_id', $photo->gallery_id)->where('item_type', 'single_image')->where('item_identifier', $photo->filename)->count()
         ]);
     }
 }

@@ -16,9 +16,9 @@ class Photo extends Model
 
     protected $visible = [
         'id', 'gallery_id', 'filename', 'lr_uuid', 'width', 'height', 
-        'title', 'description', 'artist', 'headline', 'keywords', 'location', 
+        'title', 'description', 'artist', 'keywords', 'location', 
         'city', 'state', 'country', 'iso_country', 'created_at', 'url', 'thumb_url', 
-        'rating', 'comment', 'gallery'
+        'rating', 'comment', 'gallery', 'artist'
     ];
 
     protected $fillable = [
@@ -29,8 +29,7 @@ class Photo extends Model
         'height',
         'title',
         'description',
-        'artist',
-        'headline',
+        'user_id',
         'keywords',
         'location',
         'city',
@@ -44,9 +43,28 @@ class Photo extends Model
         return $this->belongsTo(Gallery::class);
     }
 
+    protected $appends = ['artist'];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function getArtistAttribute()
+    {
+        if (!$this->user) return null;
+        return $this->user->metadata_copyright ?: $this->user->name;
+    }
+
     public function versions()
     {
         return $this->hasMany(PhotoMetadataVersion::class)->orderBy('id', 'desc');
+    }
+
+    public function shouldBeSearchable()
+    {
+        // Bilder aus Selection-Galerien komplett vom Suchindex ausschließen
+        return $this->gallery && $this->gallery->type !== 'selection';
     }
 
     public function toSearchableArray()
@@ -57,7 +75,6 @@ class Photo extends Model
             'title' => $this->title,
             'description' => $this->description,
             'artist' => $this->artist,
-            'headline' => $this->headline,
             'keywords' => $this->keywords,
             'location' => $this->location,
             'gallery_id' => $this->gallery_id,

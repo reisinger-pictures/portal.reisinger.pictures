@@ -57,7 +57,6 @@ class DownloadController extends Controller
 
         if (!empty($photo->title)) { $args[] = "-ObjectName={$photo->title}"; $args[] = "-XPTitle={$photo->title}"; }
         if (!empty($photo->description)) { $args[] = "-Caption-Abstract={$photo->description}"; $args[] = "-ImageDescription={$photo->description}"; }
-        if (!empty($photo->headline)) { $args[] = "-Headline={$photo->headline}"; }
         if (!empty($photo->keywords)) { $args[] = "-Keywords={$photo->keywords}"; }
         if (!empty($photo->location)) { $args[] = "-Sub-location={$photo->location}"; }
         if (!empty($photo->city)) { $args[] = "-City={$photo->city}"; }

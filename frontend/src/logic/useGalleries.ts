@@ -12,8 +12,7 @@ export interface Gallery {
     is_public: boolean;
     allow_client_metadata_edit?: boolean;
     apply_metadata_to_photos?: boolean;
-    default_headline?: string;
-    default_title?: string;
+        default_title?: string;
     default_description?: string;
     default_keywords?: string;
     default_location?: string;

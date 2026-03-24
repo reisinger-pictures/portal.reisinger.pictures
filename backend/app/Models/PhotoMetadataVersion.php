@@ -13,8 +13,6 @@ class PhotoMetadataVersion extends Model
         'user_id',
         'title',
         'description',
-        'artist',
-        'headline',
         'keywords',
         'location',
         'city',

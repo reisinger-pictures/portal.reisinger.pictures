@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 
 export class SidebarHelper {
     constructor(private page: Page) {}
@@ -26,5 +26,18 @@ export class SidebarHelper {
     async openNewGroupModal() {
         await this.openMobileMenu();
         await this.page.getByRole('button', { name: 'Meta-Galerie...' }).click();
+    }
+
+    async assertNotVerticallyScrollable() {
+        const sidebarMenu = this.page.locator('aside .overflow-y-auto').first();
+        if (await sidebarMenu.isVisible()) {
+            const isScrollable = await sidebarMenu.evaluate((el) => el.scrollHeight > el.clientHeight);
+            // Wirft einen Fehler, falls die Sidebar unerwartet vertikal scrollt (z.B. durch Layout-Bugs)
+            // Hinweis: Bei extrem vielen Galerien wird sie natürlich scrollen müssen, 
+            // diese Methode ist für Standard-Tests mit wenigen Einträgen gedacht.
+            if (isScrollable) {
+                throw new Error('Sidebar ist vertikal scrollbar, obwohl sie es nicht sein sollte.');
+            }
+        }
     }
 }

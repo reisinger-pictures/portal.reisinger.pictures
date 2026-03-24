@@ -30,12 +30,12 @@ export default function ClientDashboard() {
             )}
 
             <div
-                className={`fixed inset-y-0 left-0 z-50 w-80 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                className={`fixed inset-y-0 left-0 z-50 w-full md:w-72 2xl:w-80 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <Sidebar onCloseMobile={() => setIsSidebarOpen(false)}/>
             </div>
 
             <main className="flex-1 overflow-y-auto flex flex-col w-full relative bg-base-200">
-                <header className="p-4 border-b border-base-300 bg-base-100 flex items-center gap-4 sticky top-0 z-30">
+                <header className="p-4 border-b border-base-300 bg-base-100 sticky top-0 z-30 flex items-center gap-4 ">
                     <button className="btn btn-square btn-ghost md:hidden" onClick={() => setIsSidebarOpen(true)}>
                         <span className="iconify mdi--menu text-2xl"></span>
                     </button>

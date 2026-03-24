@@ -53,11 +53,11 @@ class ImageController extends Controller
         $thumbPath = Storage::disk('photos')->path($thumbsDir . '/' . md5($filename . '1024') . '.webp');
         
         $photoService = app(PhotoProcessingService::class);
-        $meta = $photoService->processImage($targetPath, $thumbPath, $gallery, $user->metadata_copyright ?: $user->name);
+        $meta = $photoService->processImage($targetPath, $thumbPath, $gallery);
 
         $photo = Photo::updateOrCreate(
             ['gallery_id' => $gallery->id, 'lr_uuid' => $request->lr_uuid],
-            array_merge(['filename' => $filename], $meta)
+            array_merge(['filename' => $filename, 'user_id' => $user->id], $meta)
         );
 
         return response()->json(['success' => true, 'photo_id' => $photo->id, 'filename' => $filename]);

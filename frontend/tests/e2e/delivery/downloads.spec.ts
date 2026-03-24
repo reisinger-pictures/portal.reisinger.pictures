@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { AuthHelper } from './helpers/AuthHelper';
-import { SidebarHelper } from './helpers/SidebarHelper';
-import { ModalHelper } from './helpers/ModalHelper';
+import { AuthHelper } from '../helpers/AuthHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
+import { ModalHelper } from '../helpers/ModalHelper';
 import path from 'path';
 
 test.describe.serial('Download Triggers UI', () => {
@@ -27,9 +27,10 @@ test.describe.serial('Download Triggers UI', () => {
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.selectByLabel('Sichtbarkeit', 'Öffentlich (Für alle sichtbar)');
         await modal.clickButton('Speichern');
-        await expect(page.locator(`text=${galleryName}`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 15000 });
         
-        await page.click(`text=${galleryName}`);
+        await sidebar.openMobileMenu();
+        await page.locator(`a[title="${galleryName}"]`).first().click();
 
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');

@@ -27,15 +27,19 @@ class GalleryFrontendController extends Controller
             $baseUrl = '/api/media/' . $gallery->slug;
             $photo->url = $baseUrl . '/' . $photo->filename;
             $photo->thumb_url = $baseUrl . '/_thumbs/' . md5($photo->filename . '1024') . '.webp';
-            
+
             if ($user) {
                 $rating = DB::table('ratings')
                     ->where('photo_id', $photo->id)
                     ->where('user_id', $user->id)
                     ->first();
-                $photo->rating = $rating ? $rating->rating : null; 
+                $photo->rating = $rating ? $rating->rating : null;
+                // NEU: Den Kommentar ebenfalls an das Foto-Objekt anheften!
+                $photo->comment = $rating ? $rating->comment : '';
             } else {
                 $photo->rating = null;
+                // NEU: Fallback für Gäste ohne Rating-Objekt
+                $photo->comment = '';
             }
 
             return $photo;
@@ -59,7 +63,7 @@ class GalleryFrontendController extends Controller
         ]);
 
         $photo = Photo::with('gallery')->findOrFail($photoId);
-        $user = auth('api')->user(); 
+        $user = auth('api')->user();
 
         if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
 

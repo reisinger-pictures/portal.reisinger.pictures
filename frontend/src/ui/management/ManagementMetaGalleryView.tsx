@@ -133,6 +133,7 @@ export default function ManagementMetaGalleryView() {
                                data-title={photo.title}
                                data-desc={photo.description}
                                data-artist={photo.artist}
+                               data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
                                 <img src={photo.thumb_url}
                                      className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" loading="lazy"/>
@@ -143,7 +144,7 @@ export default function ManagementMetaGalleryView() {
                                     e.stopPropagation();
                                     navigate('/photos/' + photo.id);
                                 }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
-                                    <span className="iconify mdi--information-variant text-lg"></span>
+                                    <span className="iconify mdi--open-in-new text-lg"></span>
                                 </button>
                             </div>
                             <div

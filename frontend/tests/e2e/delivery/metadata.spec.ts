@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { AuthHelper } from './helpers/AuthHelper';
-import { SidebarHelper } from './helpers/SidebarHelper';
-import { ModalHelper } from './helpers/ModalHelper';
+import { AuthHelper } from '../helpers/AuthHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
+import { ModalHelper } from '../helpers/ModalHelper';
 import path from 'path';
 
 test.describe.serial('Metadata & Detail View Workflow', () => {
@@ -25,9 +25,10 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.clickButton('Speichern');
-        await expect(page.locator(`text=${galleryName}`).first()).toBeVisible({ timeout: 10000 });
+        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 10000 });
 
-        await page.click(`text=${galleryName}`);
+        await sidebar.openMobileMenu();
+        await page.locator(`a[title="${galleryName}"]`).first().click();
         
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');
@@ -43,7 +44,7 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         await expect(page.locator('h4:has-text("IPTC Metadaten")')).toBeVisible();
 
         // 5. Metadaten bearbeiten
-        const titleInput = page.locator('div.form-control').filter({ hasText: 'Titel (Object Name)' }).locator('input');
+        const titleInput = page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input');
         await titleInput.fill('Playwright Test Title');
         
         await page.getByRole('button', { name: 'Speichern' }).click();

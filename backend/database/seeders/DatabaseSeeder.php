@@ -10,6 +10,15 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        
+        // Admin-User seeden, um Race-Conditions in parallelen E2E-Tests zu vermeiden
+        $adminUser = \App\Models\User::firstOrCreate(
+            ['email' => env('ADMIN_EMAIL', 'florian@reisinger.pictures')],
+            ['name' => 'Florian Reisinger', 'password' => \Illuminate\Support\Facades\Hash::make(env('ADMIN_PASSWORD', 'admin'))]
+        );
+        // IDs aus der initialen Migration (1=admin, 2=photographer, 3=client)
+        $adminUser->roles()->sync([1, 2, 3]);
+
         // 1. Root-Gruppe "Privat" (strikt privat)
         $privatGroup = GalleryGroup::create([
             'name' => 'Privat',

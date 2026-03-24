@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { AuthHelper } from './helpers/AuthHelper';
-import { SidebarHelper } from './helpers/SidebarHelper';
-import { ModalHelper } from './helpers/ModalHelper';
+import { AuthHelper } from '../helpers/AuthHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
+import { ModalHelper } from '../helpers/ModalHelper';
 import path from 'path';
 
 test.describe.serial('Photographer Core Workflow', () => {
@@ -29,27 +29,29 @@ test.describe.serial('Photographer Core Workflow', () => {
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.clickButton('Speichern');
 
-        await expect(page.locator(`text=${galleryName}`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 15000 });
     });
 
     test('Photographer can edit an existing gallery', async ({ page }) => {
-        const galLink = page.locator(`text=${galleryName}`).first();
+        const galLink = page.locator(`a[title="${galleryName}"]`).first();
         await galLink.scrollIntoViewIfNeeded();
+        await sidebar.openMobileMenu();
         await galLink.click();
-        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
+        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
 
         await page.locator('button[data-tip="Galerie bearbeiten"]').click();
         await modal.fillInputByLabel('Name der Galerie', editedName);
         await modal.clickButton('Speichern');
         
-        await expect(page.locator(`h1:has-text("${editedName}")`)).toBeVisible();
+        await expect(page.locator(`h1:has-text("${editedName}")`)).toBeVisible({ timeout: 15000 });
     });
 
     test('Photographer can upload an image to the gallery', async ({ page }) => {
-        const editedLink = page.locator(`text=${editedName}`).first();
-        await editedLink.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(1000); // Wait for Sidebar Re-Render
+        const editedLink = page.locator(`a[title="${editedName}"]`).first();
+        await sidebar.openMobileMenu();
         await editedLink.click();
-        await expect(page.locator(`h1:has-text("${editedName}")`)).toBeVisible();
+        await expect(page.locator(`h1:has-text("${editedName}")`)).toBeVisible({ timeout: 15000 });
 
         const fileInput = page.locator('input[type="file"]');
         await expect(fileInput).toBeAttached();

@@ -41,6 +41,7 @@ class User extends Authenticatable implements JWTSubject
     public function galleries() { return $this->belongsToMany(Gallery::class, 'user_galleries'); }
     
     public function currentFtpGallery() { return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id'); }
+    public function photos() { return $this->hasMany(Photo::class); }
 
     public function getIsPendingAttribute(): bool {
         return $this->roles()->count() === 0 && $this->galleryGroups()->count() === 0 && $this->galleries()->count() === 0;

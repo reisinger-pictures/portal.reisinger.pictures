@@ -28,7 +28,6 @@ class PhotoUploadTest extends TestCase
         $gallery = Gallery::factory()->create([
             'type' => 'delivery',
             'apply_metadata_to_photos' => true,
-            'default_headline' => 'Fallback Headline',
             'default_country' => 'Austria'
         ]);
         $user->galleries()->attach($gallery);
@@ -52,7 +51,6 @@ class PhotoUploadTest extends TestCase
         $this->assertDatabaseHas('photos', [
             'gallery_id' => $gallery->id,
             'lr_uuid' => 'uuid-12345',
-            'headline' => 'Fallback Headline',
             'country' => 'Austria'
         ]);
     }
@@ -66,8 +64,7 @@ class PhotoUploadTest extends TestCase
             'type' => 'selection',
             // Auch wenn Defaults gesetzt sind, darf Selection diese nicht anwenden!
             'apply_metadata_to_photos' => true, 
-            'default_headline' => 'Should be ignored'
-        ]);
+            ]);
         $user->galleries()->attach($gallery);
 
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
@@ -87,7 +84,6 @@ class PhotoUploadTest extends TestCase
         $this->assertDatabaseHas('photos', [
             'gallery_id' => $gallery->id,
             'lr_uuid' => 'uuid-selection',
-            'headline' => null // Wurde übersprungen!
-        ]);
+            ]);
     }
 }

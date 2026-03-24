@@ -46,8 +46,7 @@ class PhotoController extends Controller
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'artist' => 'nullable|string|max:255',
-            'headline' => 'nullable|string|max:255',
+            
             'keywords' => 'nullable|string|max:255',
             'location' => 'nullable|string|max:255',
             'city' => 'nullable|string|max:255',
@@ -64,8 +63,7 @@ class PhotoController extends Controller
                     'user_id' => $user->id,
                     'title' => $photo->title,
                     'description' => $photo->description,
-                    'artist' => $photo->artist,
-                    'headline' => $photo->headline,
+                    
                     'keywords' => $photo->keywords,
                     'location' => $photo->location,
                     'city' => $photo->city,
@@ -75,7 +73,7 @@ class PhotoController extends Controller
                 ]);
                 
                 // SECURITY: Kunden dürfen niemals den Urheber (Artist) überschreiben
-                unset($validated['artist']);
+                
             }
 
             $photo->update($validated);
@@ -116,8 +114,7 @@ class PhotoController extends Controller
         $photo->update([
             'title' => $version->title,
             'description' => $version->description,
-            'artist' => $version->artist,
-            'headline' => $version->headline,
+            
             'keywords' => $version->keywords,
             'location' => $version->location,
             'city' => $version->city,

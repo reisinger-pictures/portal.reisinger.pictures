@@ -27,7 +27,8 @@ class DownloadTest extends TestCase
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         
-        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'download_test.jpg', 'artist' => 'Test Fotograf']);
+        $photographer = User::factory()->create(['name' => 'Test Fotograf']);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'download_test.jpg', 'user_id' => $photographer->id]);
 
         // Lege ein ECHTES Dummy-File (valid JPEG) in den fake Storage, damit ExifTool nicht crasht
         $fixturePath = base_path('tests/Fixtures/sample.jpg');

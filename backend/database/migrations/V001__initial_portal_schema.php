@@ -114,7 +114,6 @@ return new class extends Migration {
             // Metadaten-Berechtigungen & Defaults
             $table->boolean('allow_client_metadata_edit')->default(false);
             $table->boolean('apply_metadata_to_photos')->default(false);
-            $table->string('default_headline')->nullable();
             $table->string('default_title')->nullable();
             $table->text('default_description')->nullable();
             $table->string('default_keywords')->nullable();
@@ -143,8 +142,7 @@ return new class extends Migration {
             // IPTC Metadaten
             $table->string('title')->nullable();
             $table->text('description')->nullable();
-            $table->string('artist')->nullable();
-            $table->string('headline')->nullable();
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
             $table->string('keywords')->nullable();
             $table->string('location')->nullable();
             $table->string('city')->nullable();
@@ -162,8 +160,6 @@ return new class extends Migration {
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
             $table->string('title')->nullable();
             $table->text('description')->nullable();
-            $table->string('artist')->nullable();
-            $table->string('headline')->nullable();
             $table->string('keywords')->nullable();
             $table->string('location')->nullable();
             $table->string('city')->nullable();
