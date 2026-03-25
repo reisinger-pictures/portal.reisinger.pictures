@@ -24,10 +24,10 @@ backend/.env
 !backend/.env.local
 
 # Data
-db_data/
-search_data/
-photos/
-ftp/
+/db_data/
+/search_data/
+/photos/
+/ftp/
 
 
 # Playwright E2E Tests
