@@ -2,13 +2,13 @@ import {useEffect, useRef, useState} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {useGallery} from '../../logic/useGallery';
 import {flattenGroups, Gallery, useProtectedGalleries} from '../../logic/useGalleries';
-import {useEmailTemplates} from '../../logic/useEmailTemplates';
 import {useAuth} from '../../logic/useAuth';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
 import 'photoswipe/style.css';
 import EmailComposerModal from './components/EmailComposerModal';
 import InviteModal from './components/InviteModal';
 import PageLayout from '../components/PageLayout';
+import GalleryHeader from '../components/GalleryHeader';
 import GalleryModals from '../components/GalleryModals';
 
 export default function ManagementGalleryView() {
@@ -26,11 +26,11 @@ export default function ManagementGalleryView() {
         size,
         setSize,
         isReachingEnd,
-        mutate
+        mutate,
+        breadcrumbs
     } = useGallery(slug);
     const {tree, updateGallery, deleteGallery} = useProtectedGalleries();
-    const {templates} = useEmailTemplates();
-    const {user} = useAuth();
+        const {user} = useAuth();
 
     const [isGalleryEditModalOpen, setGalleryEditModalOpen] = useState(false);
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
@@ -174,6 +174,7 @@ export default function ManagementGalleryView() {
                         </div>
                     </div>
                 )}
+                <GalleryHeader gallery={gallery} breadcrumbs={breadcrumbs} />
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h1 className="text-3xl font-bold flex items-center gap-2">
                         {gallery.name}
@@ -281,7 +282,7 @@ export default function ManagementGalleryView() {
                     isOpen={isMailModalOpen}
                     onClose={() => setIsMailModalOpen(false)}
                     galleryId={gallery.id}
-                    templates={templates}
+                    
                 />
 
                 {isInviteModalOpen && (

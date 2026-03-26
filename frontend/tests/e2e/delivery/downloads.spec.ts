@@ -27,10 +27,9 @@ test.describe.serial('Download Triggers UI', () => {
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.selectByLabel('Sichtbarkeit', 'Öffentlich (Für alle sichtbar)');
         await modal.clickButton('Speichern');
-        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
         
-        await sidebar.openMobileMenu();
-        await page.locator(`a[title="${galleryName}"]`).first().click();
+        await page.locator(`a:has-text("${galleryName}")`).first().click();
 
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');
@@ -45,6 +44,7 @@ test.describe.serial('Download Triggers UI', () => {
 
         // 3. Admin ausloggen, um in die Gast/Kunden-Ansicht zu wechseln
         await auth.logout();
+        await page.waitForTimeout(1500); // SWR Cache leeren lassen
 
         // 4. Als anonymer Gast die öffentliche Galerie aufrufen
         await page.goto(galleryUrl);

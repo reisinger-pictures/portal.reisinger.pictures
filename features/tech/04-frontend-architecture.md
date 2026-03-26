@@ -18,3 +18,11 @@ status: active
 - **Mobile-First:** Action buttons must not be hidden behind CSS `:hover` states.
 - **Feedback:** Use the global `UIContext` (Toast messages). Never use native `alert()`.
 - **State via URL:** Application state (search queries, tabs) MUST be derived from the URL.
+
+
+## 4. Routing & URL Patterns
+- **RESTful URLs:** Das Routing folgt REST-Konventionen, um Vorhersehbarkeit zu gewährleisten.
+  - `/galleries` -> Übersicht und Verwaltung aller Galerien und Ordner.
+  - `/:slug` (bzw. `/galleries/:slug`) -> Detailansicht einer spezifischen Galerie.
+- **Rollen-Ansichten (Views):** Anstatt unterschiedliche URLs für Fotografen und Kunden zu verwenden, wird die selbe Galerie-URL genutzt. Die Steuerung der Ansicht (Management vs. Client) erfolgt dynamisch über die Berechtigungsprüfung im Frontend.
+  - Ein erzwungener Wechsel in die Kundenansicht für Fotografen erfolgt über den URL-Parameter `?view=client`.

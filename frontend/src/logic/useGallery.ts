@@ -26,6 +26,8 @@ export interface PaginatedGalleryResponse {
     last_page: number;
     total: number;
     downloads_count: number;
+    wants_notifications: boolean;
+    breadcrumbs: {name: string, full_path: string, type: string}[];
 }
 
 export function useGallery(slug: string | undefined) {
@@ -51,6 +53,8 @@ export function useGallery(slug: string | undefined) {
 
     const isReachingEnd = data && data[data.length - 1]?.current_page >= data[data.length - 1]?.last_page;
     const totalPhotos = data?.[0]?.total || 0;
+    const wantsNotifications = data?.[0]?.wants_notifications || false;
+    const breadcrumbs = data?.[0]?.breadcrumbs || [];
 
     const ratePhoto = async (photoId: number, rating: number, comment: string = '') => {
         if (data) {
@@ -98,6 +102,9 @@ export function useGallery(slug: string | undefined) {
         size,
         setSize,
         isReachingEnd,
+        wantsNotifications,
+        breadcrumbs,
+        toggleOptIn: async (id: number, val: boolean) => { await fetch('/api/galleries/'+id+'/opt-in', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({wants_notifications: val})}); mutate(); },
         mutate
     };
 }

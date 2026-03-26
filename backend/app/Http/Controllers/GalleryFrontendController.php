@@ -45,9 +45,23 @@ class GalleryFrontendController extends Controller
             return $photo;
         });
 
+        $breadcrumbs = [];
+        $groupId = $gallery->gallery_group_id;
+        while ($groupId) {
+            $group = AppModelsGalleryGroup::find($groupId);
+            if ($group) {
+                array_unshift($breadcrumbs, ['name' => $group->name, 'full_path' => 'meta/' . $group->id, 'type' => 'group']);
+                $groupId = $group->parent_id;
+            } else {
+                break;
+            }
+        }
+
         return response()->json([
             'gallery' => $gallery,
+            'breadcrumbs' => $breadcrumbs,
             'downloads_count' => \App\Models\DownloadLog::where('gallery_id', $gallery->id)->count(),
+            'wants_notifications' => $user ? (bool) DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('user_id', $user->id)->value('wants_notifications') : false,
             'photos' => $photos->items(),
             'current_page' => $photos->currentPage(),
             'last_page' => $photos->lastPage(),

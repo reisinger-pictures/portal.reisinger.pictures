@@ -10,6 +10,7 @@ import SearchView from './ui/SearchView';
 import ErrorBoundary from './ui/components/ErrorBoundary';
 import { UIProvider } from './ui/components/UIContext';
 import Privacy from './ui/Privacy';
+import ClientNotificationsView from './ui/client/ClientNotificationsView';
 
 function ProtectedRoute({children}: { children: React.ReactNode }) {
     const {user, isLoading, isError} = useAuth();
@@ -30,6 +31,7 @@ export default function App() {
 
                 <Route path="/meta/:id" element={
                     <ProtectedRoute><ErrorBoundary><ManagementMetaGalleryView/></ErrorBoundary></ProtectedRoute>}/>
+                <Route path="/galleries" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                 <Route path="/galleries/*" element={<ErrorBoundary><GalleryView/></ErrorBoundary>}/>
                 <Route path="/photos/:id" element={<ErrorBoundary><PhotoDetailView/></ErrorBoundary>}/>
                 <Route path="/invite/:token" element={<ErrorBoundary><InviteView/></ErrorBoundary>}/>
@@ -45,9 +47,8 @@ export default function App() {
                        element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                 <Route path="/stats"
                        element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                <Route path="/mail-templates"
-                       element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
+                                <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
+                <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
                 <Route path="*" element={<Navigate to="/" replace/>}/>
             </Routes>
             </UIProvider>

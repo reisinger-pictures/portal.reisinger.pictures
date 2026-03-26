@@ -7,9 +7,9 @@ import Sidebar from '../components/Sidebar';
 import GalleryModals from '../components/GalleryModals';
 import ManagementUserView from './ManagementUserView';
 import ManagementSettingsView from './ManagementSettingsView';
+import ManagementStructureView from './ManagementStructureView';
 import ManagementFtpInbox from './ManagementFtpInbox';
 import ManagementStatsView from './ManagementStatsView';
-import ManagementMailTemplatesView from './ManagementMailTemplatesView';
 import ErrorBoundary from '../components/ErrorBoundary';
 import AdminWatermarkBanner from './components/AdminWatermarkBanner';
 
@@ -147,17 +147,13 @@ export default function ManagementDashboard() {
                     </header>
 
                     <ErrorBoundary>
+                        {currentView === 'galleries' && <ManagementStructureView tree={tree} onOpenGroupModal={() => setGroupModalOpen(true)} onOpenGalleryModal={() => setGalleryModalOpen(true)} onEditGroup={g => {setEditingGroup(g); setGroupModalOpen(true);}} onEditGallery={g => {setEditingGallery(g); setGalleryModalOpen(true);}} />}
                         {currentView === 'users' && <ManagementUserView/>}
                         {currentView === 'settings' && <ManagementSettingsView/>}
                         {currentView === 'stats' && <ManagementStatsView/>}
-                        {currentView === 'mail-templates' && <ManagementMailTemplatesView/>}
-                        {currentView === 'structure' && (
+                                                {currentView === 'structure' && (
                             <div className="p-6 md:p-10">
                                 {user?.is_photographer && <ManagementFtpInbox/>}
-                                <h1 className="text-3xl md:text-4xl font-bold mb-4">Galerie Struktur</h1>
-                                <p className="opacity-70 text-lg mb-8">Erstelle eine Galerie oder eine Meta-Galerie.
-                                    Wähle links eine Galerie aus der Struktur aus, um sie zu bearbeiten.</p>
-
                                 {user?.is_photographer && (
                                     <div className="mt-12 border-t border-base-300 pt-8">
                                         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
@@ -169,7 +165,7 @@ export default function ManagementDashboard() {
                                         ) : (
                                             <div className="space-y-8">
                                                 {personalFeed?.galleries && personalFeed.galleries.length > 0 && (
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                                                         {personalFeed.galleries.slice(0, 3).map(g => (
                                                             <Link key={g.id} to={'/' + g.full_path}
                                                                   className="card bg-base-100 shadow-sm hover:shadow-xl transition-all border border-base-300">
@@ -185,7 +181,7 @@ export default function ManagementDashboard() {
                                                 {personalFeed?.photos && personalFeed.photos.length > 0 && (
                                                     <div
                                                         className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                                                        {personalFeed.photos.slice(0, 16).map(p => (
+                                                        {personalFeed.photos.slice(0, 20).map(p => (
                                                             <Link key={p.id} to={'/photos/' + p.id}
                                                                   className="block relative aspect-square bg-base-300 rounded overflow-hidden group shadow-sm hover:shadow-md">
                                                                 <img src={p.thumb_url}

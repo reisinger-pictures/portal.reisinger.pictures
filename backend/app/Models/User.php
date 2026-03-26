@@ -37,8 +37,8 @@ class User extends Authenticatable implements JWTSubject
     public function getJWTCustomClaims() { return []; }
 
     public function roles() { return $this->belongsToMany(Role::class, 'user_roles'); }
-    public function galleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups'); }
-    public function galleries() { return $this->belongsToMany(Gallery::class, 'user_galleries'); }
+    public function galleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups')->withPivot('wants_notifications'); }
+    public function galleries() { return $this->belongsToMany(Gallery::class, 'user_galleries')->withPivot('wants_notifications'); }
     
     public function currentFtpGallery() { return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id'); }
     public function photos() { return $this->hasMany(Photo::class); }

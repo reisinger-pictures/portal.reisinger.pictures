@@ -6,16 +6,23 @@ status: active
 
 # Technical Concept: Email System & Notifications
 
-## 1. Hardcoded Templates
-- To simplify the architecture and deployment, email templates are **hardcoded** as Laravel Blade views (`resources/views/emails/`).
-- The previous database-driven `EmailTemplate` model has been removed.
+## 1. Hardcoded Templates (Blade)
+- Um die Architektur und das Deployment zu vereinfachen, wurde das datenbankgestützte Template-System (EmailTemplate Model) entfernt.
+- E-Mails werden nun ausschließlich über native Laravel Blade Views gerendert (`resources/views/emails/custom.blade.php`).
 
+## 2. Opt-In & Benachrichtigungs-Management (DSGVO / UX)
 
-## 2. Custom Messages
-- For manual triggers (e.g., the "Send Email" action in the gallery view), the frontend provides a text area. 
-- This custom text is injected into a standardized, branded HTML Blade layout to ensure a consistent corporate identity.
-- - Emails should be previewed in the browser before sending.
+- **Strikte Geschäftslogik (Client-Only):** Allgemeine E-Mail-Benachrichtigungen zu Galerien werden **ausschließlich** an Kunden versendet. Diese Regel ist strikt und das System ist nicht dafür vorgesehen, Fotografen über diesen Weg Updates zu schicken.
+- **Skalierbares UI-Design (Component Reuse):** Obwohl logisch nur Kunden benachrichtigt werden, sollen UI-Komponenten (wie Opt-In-Toggles) so generisch und rollenunabhängig wie möglich gebaut werden. Das Ziel ist es, "ganz andere UIs" für verschiedene Rollen zu vermeiden. Bestehende Komponenten sollen stattdessen leicht für andere Rollen oder zukünftige Features "upgegradet" werden können.
+- **Standardmäßig Deaktiviert:** Kunden und zugewiesene Benutzer erhalten nicht automatisch E-Mails über Galerie-Updates. Das Feld `wants_notifications` in den Pivot-Tabellen `user_galleries` und `user_gallery_groups` steht standardmäßig auf `false`.
+- **Lokaler Toggle:** Kunden können in der jeweiligen Galerieansicht (`DeliveryView` / `SelectionView`) Benachrichtigungen gezielt aktivieren.
+- **Zentrale Verwaltung:** Über die zentrale Ansicht "Benachrichtigungen" (`/notifications`) können Nutzer ihre Abonnements für alle zugewiesenen Meta-Galerien (Gruppen) und Einzel-Galerien zentral verwalten.
+- **Filterung beim Versand:** Der `MailController` filtert beim manuellen oder automatischen Versand strikt nach Nutzern, deren `wants_notifications` Flag auf `true` gesetzt ist.
 
-## 3. Local Testing
-- The `Mailpit` container catches all outgoing emails during local development.
-- **Testing:** Playwright and archunit tests MUST query the Mailpit API to extract tokens and verify email delivery instead of mocking the mailer.
+## 3. Custom Messages & Preview
+- Für manuelle E-Mails (z. B. der "E-Mail senden" Action-Button im Fotografen-Dashboard) existiert ein Modal, in dem der Fotograf eine individuelle HTML-Nachricht verfassen kann.
+- Dieses Modal bietet einen Live-Preview-Toggle, der die eingegebenen Variablen (z. B. `{user_name}`, `{link}`) durch Dummy-Daten ersetzt und das finale HTML rendert.
+
+## 4. Local Testing
+- Der `Mailpit` Container fängt alle ausgehenden E-Mails im lokalen Development-Modus ab.
+- E2E Tests (Playwright) und PHPUnit-Tests prüfen via Mailpit API die korrekte Zustellung und das Vorhandensein von Tokens/Links in den generierten HTML-Bodies.

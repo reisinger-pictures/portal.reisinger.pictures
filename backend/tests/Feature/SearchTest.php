@@ -41,4 +41,55 @@ class SearchTest extends TestCase {
         $this->assertIsArray($data);
         $this->assertArrayHasKey('galleries', $response->json());
     }
+
+    public function test_personal_feed_returns_allowed_galleries_and_photos() {
+        $photographer = User::factory()->create();
+        $photographer->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+
+        $ownGallery = Gallery::factory()->create(['name' => 'Own Gallery']);
+        $photographer->galleries()->attach($ownGallery);
+        Photo::factory()->create(['gallery_id' => $ownGallery->id]);
+
+        // Eine fremde Galerie, auf die der Fotograf keinen Zugriff hat
+        Gallery::factory()->create(['name' => 'Other Gallery']);
+
+        $token = auth('api')->login($photographer);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+                         ->getJson('/api/search?personal=true');
+
+        $response->assertStatus(200);
+        $data = $response->json();
+
+        $this->assertCount(1, $data['galleries']);
+        $this->assertEquals('Own Gallery', $data['galleries'][0]['name']);
+        $this->assertCount(1, $data['photos']);
+    }
+
+    public function test_search_respects_role_based_filtering() {
+        $admin = User::factory()->create();
+        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+
+        $client = User::factory()->create();
+        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+
+        Gallery::factory()->create(['is_public' => false, 'name' => 'Secret Admin Stuff']);
+        Gallery::factory()->create(['is_public' => true, 'name' => 'Public Showcase']);
+
+        // Admin sollte alles sehen
+        $adminToken = auth('api')->login($admin);
+        $adminResponse = $this->withHeaders(['Authorization' => "Bearer $adminToken"])
+                              ->getJson('/api/search?q=');
+        $adminResponse->assertStatus(200);
+        $this->assertCount(2, $adminResponse->json('galleries'));
+
+        // Client (ohne explizite Zuweisung) sollte nur öffentliche sehen
+        $clientToken = auth('api')->login($client);
+        $clientResponse = $this->withHeaders(['Authorization' => "Bearer $clientToken"])
+                               ->getJson('/api/search?q=');
+        $clientResponse->assertStatus(200);
+        $this->assertCount(1, $clientResponse->json('galleries'));
+        $this->assertEquals('Public Showcase', $clientResponse->json('galleries')[0]['name']);
+    }
+
 }

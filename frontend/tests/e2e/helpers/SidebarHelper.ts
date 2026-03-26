@@ -18,14 +18,15 @@ export class SidebarHelper {
     }
 
     async openNewGalleryModal() {
-        await this.openMobileMenu();
-        // exact: true verhindert, dass "Meta-Galerie..." mit ausgewählt wird
-        await this.page.getByRole('button', { name: 'Galerie...', exact: true }).click();
+        await this.navigateTo('Galerien');
+        const btn = this.page.getByRole('button', { name: 'Neue Galerie' });
+        await expect(btn).toBeVisible({ timeout: 10000 });
+        await btn.click();
     }
 
     async openNewGroupModal() {
-        await this.openMobileMenu();
-        await this.page.getByRole('button', { name: 'Meta-Galerie...' }).click();
+        await this.navigateTo('Galerien');
+        await this.page.getByRole('button', { name: 'Neuer Ordner' }).click();
     }
 
     async assertNotVerticallyScrollable() {

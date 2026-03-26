@@ -51,4 +51,28 @@ test.describe('Admin Workflow', () => {
         await sidebar.navigateTo('Einstellungen');
         await expect(page.locator('h1:has-text("Einstellungen")')).toBeVisible();
     });
+
+    test('Header Live-Search dropdown appears and handles navigation', async ({ page }) => {
+        await auth.login();
+
+        const headerSearchInput = page.locator('header input[placeholder="Suche in allen Galerien..."]');
+        await expect(headerSearchInput).toBeVisible();
+
+        // 1. Eingabe von 1 Zeichen -> Dropdown bleibt geschlossen
+        await headerSearchInput.fill('A');
+        await expect(page.locator('text=Suche nach "A"')).toBeHidden();
+
+        // 2. Eingabe von 2+ Zeichen -> Dropdown öffnet sich
+        await headerSearchInput.fill('Ab');
+        await expect(page.locator('text=Suche nach "Ab"')).toBeVisible({ timeout: 15000 });
+
+        // 3. Klick auf den Link
+        await page.locator('text=Suche nach "Ab"').click();
+        
+        // 4. Verifikation: Navigation zu SearchView und Input enthält den Wert aus der URL
+        await expect(page).toHaveURL(/.*\/search\?q=Ab/);
+        const searchViewInput = page.locator('input[placeholder="Galerien und Bilder suchen..."]');
+        await expect(searchViewInput).toHaveValue('Ab');
+    });
+
 });

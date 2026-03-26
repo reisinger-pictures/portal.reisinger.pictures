@@ -180,12 +180,14 @@ return new class extends Migration {
         Schema::create('user_gallery_groups', function (Blueprint $table) {
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('gallery_group_id')->constrained()->onDelete('cascade');
+            $table->boolean('wants_notifications')->default(false);
             $table->primary(['user_id', 'gallery_group_id']);
         });
 
         Schema::create('user_galleries', function (Blueprint $table) {
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('gallery_id')->constrained()->onDelete('cascade');
+            $table->boolean('wants_notifications')->default(false);
             $table->primary(['user_id', 'gallery_id']);
         });
 
@@ -214,19 +216,9 @@ return new class extends Migration {
             $table->text('value')->nullable();
         });
 
-        Schema::create('email_templates', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('subject');
-            $table->text('body');
-            $table->timestamp('created_at')->useCurrent();
-        });
+        
 
-        DB::table('email_templates')->insert([
-            'name' => 'Galerie Update',
-            'subject' => 'Neuigkeiten in deiner Galerie: {gallery_name}',
-            'body' => '<p>Hallo {user_name},</p><p>Es gibt Neuigkeiten in deiner Galerie <strong>{gallery_name}</strong>.</p><p><a href="{link}">Hier geht es zur Galerie</a></p>'
-        ]);
+        
     }
 
     public function down(): void {
@@ -236,7 +228,7 @@ return new class extends Migration {
         Schema::dropIfExists('cache');
         Schema::dropIfExists('cache_locks');
 
-        Schema::dropIfExists('email_templates');
+        
         Schema::dropIfExists('settings');
         Schema::dropIfExists('gallery_invites');
         Schema::dropIfExists('download_logs');

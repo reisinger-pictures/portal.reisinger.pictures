@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
 import 'photoswipe/style.css';
 import PageLayout from '../components/PageLayout';
+import GalleryHeader from '../components/GalleryHeader';
+import { useAuth } from '../../logic/useAuth';
 
 export default function DeliveryView({ galleryData }: { galleryData: any }) {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
     const galleryRef = useRef<HTMLDivElement>(null);
 
@@ -69,17 +72,27 @@ export default function DeliveryView({ galleryData }: { galleryData: any }) {
     return (
         <PageLayout>
             <div className="container mx-auto p-4 md:p-8 relative">
-                <button onClick={() => navigate('/')} className="btn btn-sm btn-ghost mb-4">&larr; Zurück zur Übersicht</button>
+                <GalleryHeader gallery={gallery} breadcrumbs={galleryData.breadcrumbs} />
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-bold mb-2">{gallery.name}</h1>
-                        <p className="opacity-70">Lade deine Bilder herunter.</p>
+                        <p className="opacity-70">Lade deine Bilder herunter.</p> 
+                
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-3 md:gap-4">
+                        {user && (
+                            <label className="cursor-pointer label gap-2 md:gap-3 bg-base-100 p-2 md:p-3 rounded-box border border-base-300 shadow-sm m-0">
+                                <span className="iconify mdi--bell-ring-outline text-xl text-primary hidden md:inline-block"></span>
+                                <div className="text-right">
+                                    <span className="font-bold text-sm block leading-none mb-1">E-Mail Updates</span>
+                                </div>
+                                <input type="checkbox" className="toggle toggle-primary toggle-sm md:toggle-md" checked={galleryData.wantsNotifications} onChange={(e) => galleryData.toggleOptIn(gallery.id, e.target.checked)} />
+                            </label>
+                        )}
                         {totalPhotos > 0 && (
                             <button onClick={() => window.open('/api/galleries/' + gallery.id + '/download-zip', '_self')} className="btn btn-primary">
-                                Alle herunterladen (.zip)
+                                <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> Alle herunterladen (.zip)
                             </button>
                         )}
                     </div>

@@ -27,10 +27,9 @@ test.describe.serial('Client Workflow', () => {
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
         await modal.clickButton('Speichern');
         await expect(modal.activeModal).toBeHidden({ timeout: 10000 });
-        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
 
-        await sidebar.openMobileMenu();
-        await page.locator(`a[title="${galleryName}"]`).first().click();
+        await page.locator(`a:has-text("${galleryName}")`).first().click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
 
         const fileInput = page.locator('input[type="file"]');
@@ -98,12 +97,12 @@ test.describe.serial('Client Workflow', () => {
         await page.waitForTimeout(500); // give it a brief moment to update state
 
         // Test Filter: "Neu (Unbewertet)"
-        await page.getByRole('button', { name: 'Neu (Unbewertet)' }).click();
+        await page.getByRole('button', { name: 'Neu', exact: true }).click();
         // Since we only uploaded 1 sample image and rated it, the "Unbewertet" list should be empty
         await expect(page.locator('a.pswp-item')).toHaveCount(0);
 
         // Test Filter: "Meine Favoriten"
-        await page.getByRole('button', { name: 'Meine Favoriten' }).click();
+        await page.getByRole('button', { name: 'Favoriten', exact: true }).click();
         await expect(page.locator('a.pswp-item')).toHaveCount(1);
 
         // Verify PhotoSwipe opens and shows 1 of 1 (instead of crashing or showing wrong count)

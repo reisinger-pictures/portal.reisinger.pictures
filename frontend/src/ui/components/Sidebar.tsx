@@ -142,6 +142,7 @@ export default function Sidebar(props: SidebarProps) {
                         <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--view-dashboard text-lg"></span> Dashboard</Link></li>
                         {user.is_admin && (
                             <>
+                                <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--folder-multiple text-lg"></span> Galerien</Link></li>
                                 <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--account-group text-lg"></span> Benutzer & Rechte</Link></li>
                                 <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--cog text-lg"></span> Einstellungen</Link></li>
                             </>
@@ -150,21 +151,11 @@ export default function Sidebar(props: SidebarProps) {
                 )}
             </ul>
 
-            {isAdminOrPhotog && props.currentView === 'structure' && (
-                <div className="p-4 flex gap-2 border-b border-base-300 shrink-0">
-                    <button onClick={props.onOpenGalleryModal} className="btn btn-primary btn-sm flex-1 truncate">Galerie...</button>
-                    <button onClick={props.onOpenGroupModal} className="btn btn-outline btn-sm flex-1 truncate">Meta-Galerie...</button>
-                </div>
-            )}
+            
 
             {/* Hier ist der Container mit overflow-auto für vertikales UND horizontales Scrollen */}
             <div className="flex-1 overflow-auto p-4">
-                {isAdminOrPhotog && props.tree && (
-                    <ul className="menu bg-base-200 w-full rounded-box p-0">
-                        {safeGroups.map(renderGroup)}
-                        {safeRootGalleries.map(renderGallery)}
-                    </ul>
-                )}
+                
             </div>
 
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">

@@ -17,7 +17,7 @@ class MailController extends Controller
         $request->validate(['subject' => 'required|string', 'body' => 'required|string']);
         $gallery = Gallery::with('galleryGroup')->findOrFail($galleryId);
 
-        $userIds = DB::table('user_galleries')->where('gallery_id', $gallery->id)->pluck('user_id')->toArray();
+        $userIds = DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('wants_notifications', true)->pluck('user_id')->toArray();
         $groupIds = [];
         $currentGroup = $gallery->galleryGroup;
         while ($currentGroup) {
@@ -25,7 +25,7 @@ class MailController extends Controller
             $currentGroup = GalleryGroup::find($currentGroup->parent_id);
         }
         if (!empty($groupIds)) {
-            $groupUserIds = DB::table('user_gallery_groups')->whereIn('gallery_group_id', $groupIds)->pluck('user_id')->toArray();
+            $groupUserIds = DB::table('user_gallery_groups')->whereIn('gallery_group_id', $groupIds)->where('wants_notifications', true)->pluck('user_id')->toArray();
             $userIds = array_merge($userIds, $groupUserIds);
         }
         $userIds = array_unique($userIds);
@@ -33,14 +33,16 @@ class MailController extends Controller
         if (empty($userIds)) return response()->json(['message' => 'Keine berechtigten User für diese Galerie gefunden.'], 404);
 
         $users = User::whereIn('id', $userIds)->whereNotNull('email')->get();
+        // Strikte Prüfung: Hat der abonnierte User auch wirklich noch das Recht, diese Galerie zu sehen?
+        $validUsers = $users->filter(fn($u) => $u->canAccessGallery($gallery->id));
         $count = 0;
 
-        foreach ($users as $user) {
+        foreach ($validUsers as $user) {
             $link = rtrim(config('app.frontend_url'), '/') . '/' . $gallery->full_path;
             $subject = str_replace(['{user_name}', '{gallery_name}'], [$user->name, $gallery->name], $request->subject);
             $body = str_replace(['{user_name}', '{gallery_name}', '{link}'], [$user->name, $gallery->name, $link], $request->body);
 
-            Mail::html($body, function ($message) use ($user, $subject) {
+            Mail::send('emails.custom', ['subject' => $subject, 'customBody' => $body], function ($message) use ($user, $subject) {
                 $message->to($user->email)->subject($subject);
             });
             $count++;

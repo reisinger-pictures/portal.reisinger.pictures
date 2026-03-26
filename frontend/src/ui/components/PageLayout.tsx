@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSearch } from '../../logic/useSearch';
 import GalleryModals from './GalleryModals';
 import AdminWatermarkBanner from '../management/components/AdminWatermarkBanner';
@@ -23,7 +23,13 @@ export default function PageLayout({children, currentView, hideMobileHeader}: {
         deleteGroup,
         deleteGallery
     } = useProtectedGalleries();
-        const [searchQuery, setSearchQuery] = useState('');
+        const [searchParams] = useSearchParams();
+    const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+    useEffect(() => {
+        setSearchQuery(searchParams.get('q') || '');
+    }, [searchParams]);
     const {results: searchResults} = useSearch(searchQuery, false, true);
     const navigate = useNavigate();
 
@@ -31,7 +37,7 @@ export default function PageLayout({children, currentView, hideMobileHeader}: {
         e.preventDefault();
         if (searchQuery.trim().length >= 2) {
             navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-            setSearchQuery('');
+            (document.activeElement as HTMLElement)?.blur();
         }
     };
 
@@ -88,25 +94,27 @@ export default function PageLayout({children, currentView, hideMobileHeader}: {
                                     className="input input-bordered join-item w-full"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
+                                    onFocus={() => setIsSearchFocused(true)}
+                                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                                 />
                                 <button type="submit" className="btn btn-primary join-item">
                                     <span className="iconify mdi--magnify text-xl"></span>
                                 </button>
                             </div>
-                            {searchQuery.length >= 2 && searchResults && (
+                            {isSearchFocused && searchQuery.length >= 2 && searchResults && (
                                 <div className="absolute top-14 left-0 w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-50 max-h-[60vh] overflow-y-auto">
                                     <ul className="menu p-2">
                                         <li>
-                                            <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`} onClick={() => setSearchQuery('')} className="text-primary font-bold">
+                                            <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`}  className="text-primary font-bold">
                                                 <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach "{searchQuery}"
                                             </Link>
                                         </li>
                                         <div className="divider my-0"></div>
                                         {searchResults.galleries.map(g => (
-                                            <li key={g.id}><Link to={'/' + g.full_path} onClick={() => setSearchQuery('')}>📁 {g.name}</Link></li>
+                                            <li key={g.id}><Link to={'/' + g.full_path} >📁 {g.name}</Link></li>
                                         ))}
                                         {searchResults.photos.map(p => (
-                                            <li key={p.id}><Link to={'/photos/' + p.id} onClick={() => setSearchQuery('')}>
+                                            <li key={p.id}><Link to={'/photos/' + p.id} >
                                                 <span className="iconify mdi--image-outline opacity-70"></span> {p.filename}
                                             </Link></li>
                                         ))}

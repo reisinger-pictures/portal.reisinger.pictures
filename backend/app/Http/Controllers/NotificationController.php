@@ -1,62 +1,66 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use Illuminate\Http\Request;
-use App\Models\Gallery;
-use App\Models\GalleryGroup;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
-class NotificationController extends Controller
-{
-    public function notifyUsers(Request $request, $galleryId)
-    {
-        $gallery = Gallery::with('galleryGroup')->findOrFail($galleryId);
-        
-        // 1. User mit direktem Galerie-Zugriff
-        $userIds = DB::table('user_galleries')->where('gallery_id', $gallery->id)->pluck('user_id')->toArray();
+class NotificationController extends Controller {
+    
+    public function preferences() {
+        $user = auth('api')->user();
+        if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
 
-        // 2. Vererbung: Finde alle übergeordneten Gruppen
-        $groupIds = [];
-        $currentGroup = $gallery->galleryGroup;
-        while ($currentGroup) {
-            $groupIds[] = $currentGroup->id;
-            $currentGroup = GalleryGroup::find($currentGroup->parent_id);
-        }
+        $user->load(['galleries' => function($q) { 
+            $q->select('galleries.id', 'galleries.name', 'galleries.type')->where('type', 'delivery'); 
+        }, 'galleryGroups' => function($q) { 
+            $q->select('gallery_groups.id', 'gallery_groups.name'); 
+        }]);
 
-        if (!empty($groupIds)) {
-            $groupUserIds = DB::table('user_gallery_groups')
-                ->whereIn('gallery_group_id', $groupIds)
-                ->pluck('user_id')
-                ->toArray();
-            $userIds = array_merge($userIds, $groupUserIds);
-        }
+        $galleries = $user->galleries->map(function($g) {
+            return [
+                'id' => $g->id, 
+                'name' => $g->name, 
+                'type' => 'gallery', 
+                'gallery_type' => $g->type,
+                'wants_notifications' => (bool) $g->pivot->wants_notifications
+            ];
+        });
 
-        // 3. Eindeutige User-IDs filtern und User laden
-        $userIds = array_unique($userIds);
-        
-        if (empty($userIds)) {
-            return response()->json(['message' => 'Keine berechtigten User gefunden.'], 404);
-        }
+        $groups = $user->galleryGroups->map(function($g) {
+            return [
+                'id' => $g->id, 
+                'name' => $g->name, 
+                'type' => 'group', 
+                'wants_notifications' => (bool) $g->pivot->wants_notifications
+            ];
+        });
 
-        $users = User::whereIn('id', $userIds)->whereNotNull('email')->get();
-        $count = 0;
+        return response()->json([
+            'galleries' => $galleries,
+            'groups' => $groups
+        ]);
+    }
 
-        foreach ($users as $user) {
-            $html = "<h2>Hallo {$user->name},</h2>
-                     <p>Es gibt Neuigkeiten in der Galerie <strong>{$gallery->name}</strong>!</p>
-                     <p>Du kannst die Galerie über deinen persönlichen Link ansehen.</p>";
+    public function toggleGalleryOptIn(Request $request, $id) {
+        $request->validate(['wants_notifications' => 'required|boolean']);
+        $user = auth('api')->user();
+        if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
 
-            // Nutzt den GmailRestTransport aus der config
-            Mail::html($html, function ($message) use ($user, $gallery) {
-                $message->to($user->email)
-                        ->subject("Neuigkeiten in Galerie: {$gallery->name}");
-            });
-            $count++;
-        }
+        DB::table('user_galleries')->updateOrInsert(
+            ['user_id' => $user->id, 'gallery_id' => $id],
+            ['wants_notifications' => $request->wants_notifications]
+        );
+        return response()->json(['success' => true]);
+    }
 
-        return response()->json(['success' => true, 'notified_count' => $count]);
+    public function toggleGroupOptIn(Request $request, $id) {
+        $request->validate(['wants_notifications' => 'required|boolean']);
+        $user = auth('api')->user();
+        if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
+
+        DB::table('user_gallery_groups')->updateOrInsert(
+            ['user_id' => $user->id, 'gallery_group_id' => $id],
+            ['wants_notifications' => $request->wants_notifications]
+        );
+        return response()->json(['success' => true]);
     }
 }

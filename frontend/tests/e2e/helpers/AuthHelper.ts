@@ -24,7 +24,7 @@ export class AuthHelper {
         // Wir warten darauf, dass der Abmelden Button im DOM eingehängt wird.
         // Dieser ist zwar auf Mobile im Menü versteckt, aber er existiert im DOM,
         // sobald das Dashboard vollständig geladen und autorisiert wurde.
-        await expect(this.page.getByRole('button', { name: 'Abmelden' }).first()).toBeAttached({ timeout: 15000 });
+        await expect(this.page.locator('button:has-text("Abmelden")').first()).toBeAttached({ timeout: 15000 });
     }
 
     async logout() {

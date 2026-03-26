@@ -73,23 +73,42 @@ class PhotoMetadataTest extends TestCase {
         $response->assertStatus(403);
     }
 
-    /meta", [
+    public function test_client_cannot_change_artist_metadata() {
+        $client = clone User::factory()->create(['can_edit_metadata' => true]);
+        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        
+        // Neu: Echten Fotografen anlegen, aus dem sich das 'artist' Attribut ableitet
+        $photographer = clone User::factory()->create(['name' => 'Original Photographer']);
+
+        $gallery = Gallery::factory()->create([
+            'allow_client_metadata_edit' => true,
+            'type' => 'delivery'
+        ]);
+        $client->galleries()->attach($gallery);
+
+        $photo = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $photographer->id, // Neu: Referenz statt Fake-Spalte
+            'title' => 'Old Title'
+        ]);
+
+        $token = auth('api')->login($client);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+                         ->putJson("/api/photos/{$photo->id}/meta", [
                              'title' => 'Allowed Title Change',
                              'artist' => 'Hacker Artist Name' 
                          ]);
 
         $response->assertStatus(200);
 
-        // Das Foto muss den neuen Titel haben...
         $this->assertDatabaseHas('photos', [
             'id' => $photo->id,
-            'title' => 'Allowed Title Change'
+            'title' => 'Allowed Title Change',
+            'user_id' => $photographer->id // Sicherstellen, dass die ID intakt bleibt
         ]);
 
-        // ... ABER der Artist muss zwingend erhalten geblieben sein!
-        $this->assertDatabaseHas('photos', [
-            'id' => $photo->id,
-            'artist' => 'Original Photographer'
-        ]);
+        // Prüfen, ob der Accessor weiterhin den Namen des Original-Fotografen ausspuckt
+        $this->assertEquals('Original Photographer', $photo->fresh()->artist);
     }
 }

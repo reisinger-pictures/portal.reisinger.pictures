@@ -25,9 +25,8 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.clickButton('Speichern');
-        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 15000 });
-        await sidebar.openMobileMenu();
-        await page.locator(`a[title="${galleryName}"]`).first().click();
+        await expect(page.locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await page.locator(`a:has-text("${galleryName}")`).first().click();
 
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');

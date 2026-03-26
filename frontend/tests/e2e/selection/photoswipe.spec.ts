@@ -28,10 +28,9 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
         await modal.clickButton('Speichern');
         await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
-        await expect(page.locator(`a[title="${galleryName}"]`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
 
-        await sidebar.openMobileMenu();
-        await page.locator(`a[title="${galleryName}"]`).first().click();
+        await page.locator(`a:has-text("${galleryName}")`).first().click();
 
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');
@@ -66,15 +65,17 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await expect(lightbox).toBeVisible();
 
         // 4. Rating via Button & Comment Input
-        const ratingBar = page.locator('#pswp-rating-btns');
+        const ratingBar = page.locator('#rating-portal-anchor .rating');
         await expect(ratingBar).toBeVisible();
 
         // Kommentar schreiben (MUSS vor dem Rating passieren, da das Rating zum nächsten Bild blättert!)
-        const commentInput = page.locator('#pswp-comment');
+        const commentInput = page.locator('#rating-portal-anchor input[type="text"]');
         await commentInput.fill('Episches Bild im Fullscreen!');
         
         // 5 Sterne vergeben (speichert Kommentar und blättert automatisch weiter)
-        await ratingBar.locator('button[data-rating="5"]').click();
+        const rateResponse = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
+        await ratingBar.locator('input.mask-star-2').nth(4).click({ force: true });
+        await rateResponse;
 
         // 5. Lightbox schließen
         await expect(async () => {
@@ -83,8 +84,9 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         }).toPass({ timeout: 15000 });
 
         // 6. Verify im Grid (Kartenansicht)
+        await page.waitForTimeout(1000);
         // Stern 5 sollte checked sein (index 4 in daisyUI rating)
-        const star5 = page.locator('input.mask-star-2').nth(4);
+        const star5 = page.locator('.card-body input.mask-star-2').nth(4);
         await expect(star5).toBeChecked();
         
         const gridComment = page.locator('input[placeholder="Kommentar..."]').first();
@@ -104,7 +106,7 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         }).toPass({ timeout: 15000 });
 
         // Stern 3 sollte checked sein (index 2)
-        const star3 = page.locator('input.mask-star-2').nth(2);
+        const star3 = page.locator('.card-body input.mask-star-2').nth(2);
         await expect(star3).toBeChecked();
     });
 });

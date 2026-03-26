@@ -29,3 +29,12 @@ Galleries are strictly divided into two mutually exclusive workflows:
 ## 3. Caching
 - The entire gallery tree structure is cached infinitely (`gallery_tree_admin`).
 - Flushed via Eloquent Model Events (`booted` -> `saved`/`deleted`).
+
+
+## 4. Role & View Preview (Tab-Switcher)
+- **Preview Capability:** Ein Tab-Switcher (implementiert über den URL-Parameter `?view=client`) erlaubt den fließenden Wechsel zwischen der Verwaltungsansicht (`ManagementGalleryView`) und der Kundenansicht (`ClientGalleryView`).
+- **Strict Access Control:** Dieser Switcher wird **ausschließlich** angezeigt, wenn der eingeloggte Nutzer für diese spezifische Galerie sowohl Verwaltungsrechte (Fotograf/Admin) als auch Kundenrechte besitzt. Hat ein Fotograf über einen Gast-Link Zugriff auf eine fremde Galerie, bleibt er strikt in der Kundenansicht gefangen.
+
+## 5. Management UI Pattern
+- **Explorer-Ansicht:** Die Struktur- und Galerieverwaltung befindet sich nicht in der Sidebar, sondern in einer eigenen, großzügigen Hauptansicht (`/galleries`). 
+- **Dashboard:** Das Root-Dashboard (`/`) dient ausschließlich als "Activity-Hub" (FTP-Inbox Status, die 3 neuesten Galerien und 20 neuesten Bilder).

@@ -49,6 +49,9 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/photos/{photoId}/rate', [GalleryFrontendController::class, 'rate']);
     Route::post('/galleries/{id}/finish-rating', [MailController::class, 'finishRating']);
 
+        Route::get('/notifications/preferences', [\App\Http\Controllers\NotificationController::class, 'preferences']);
+    Route::post('/galleries/{id}/opt-in', [\App\Http\Controllers\NotificationController::class, 'toggleGalleryOptIn']);
+    Route::post('/gallery-groups/{id}/opt-in', [\App\Http\Controllers\NotificationController::class, 'toggleGroupOptIn']);
     Route::put('/photos/{id}/meta', [PhotoController::class, 'updateMetadata']);
     Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions']);
     Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata']);
@@ -92,8 +95,4 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/stats', [StatsController::class, 'index']);
     Route::get('/management/logs', [StatsController::class, 'logs']);
 
-    Route::get('/management/email-templates', [EmailTemplateController::class, 'index']);
-    Route::post('/management/email-templates', [EmailTemplateController::class, 'store']);
-    Route::put('/management/email-templates/{id}', [EmailTemplateController::class, 'update']);
-    Route::delete('/management/email-templates/{id}', [EmailTemplateController::class, 'destroy']);
-});
+                });

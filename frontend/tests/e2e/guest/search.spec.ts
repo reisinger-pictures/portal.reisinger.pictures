@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { SidebarHelper } from '../helpers/SidebarHelper';
+import { AuthHelper } from '../helpers/AuthHelper';
 
 test.describe('Global Search Workflow', () => {
     let sidebar: SidebarHelper;
