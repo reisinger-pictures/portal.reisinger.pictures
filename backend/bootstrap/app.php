@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'management' => ManagementMiddleware::class,
         ]);
+
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

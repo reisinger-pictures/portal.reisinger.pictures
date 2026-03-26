@@ -8,7 +8,7 @@ status: active
 
 ## 1. Migration Strategy
 - **UUIDs:** To prevent ID guessing and enumeration attacks, we use UUIDs (or ULIDs) as primary keys instead of Auto-Increment BIGINTs.
-- **Migrations:** During active development, we use a single source of truth (`V001__initial_portal_schema.php`). Post-release, exactly *one* new migration file should be created per development iteration/feature.
+- **Migrations:** During active development, we use a single source of truth (`V001__initial_portal_schema.php`). Post-release, exactly *one* new migration file should be created per development iteration.
 
 ## 2. Timestamps & Soft Deletes
 - Many tables only use `created_at` to save space (Models must define `public const UPDATED_AT = null;`).

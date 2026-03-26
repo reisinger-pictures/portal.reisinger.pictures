@@ -16,6 +16,9 @@ class InviteController extends Controller
 {
     public function generate(Request $request, $galleryId)
     {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($galleryId)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+
         $request->validate([
             'name' => 'nullable|string|max:255'
         ]);
@@ -37,6 +40,9 @@ class InviteController extends Controller
 
     public function sendEmail(Request $request, $galleryId)
     {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($galleryId)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+
         $request->validate([
             'email' => 'required|email',
             'name' => 'nullable|string|max:255'
@@ -92,76 +98,71 @@ class InviteController extends Controller
         if (!$currentUser && $request->hasCookie('rp_jwt')) {
             try {
                 $currentUser = $guard->setToken($request->cookie('rp_jwt'))->user();
-            } catch (\Exception $e) {
-                // Token ignorieren, falls abgelaufen/ungültig
-            }
+            } catch (\Exception $e) {}
         }
+
+        $transientGalleries = [$gallery->id];
+
         if ($currentUser) {
-            $currentUser->galleries()->syncWithoutDetaching([$gallery->id]);
-            return response()->json([
-                'success' => true,
-                'full_path' => $gallery->full_path
-            ]);
+            $payload = $guard->payload();
+            $existing = $payload->get('transient_galleries');
+            if (!is_array($existing)) {
+                $existing = [];
+            }
+            $merged = array_values(array_unique(array_merge($existing, $transientGalleries)));
+            
+            $token = $guard->claims(['transient_galleries' => $merged])->login($currentUser);
+            return $this->respondWithToken($token, ['full_path' => $gallery->full_path]);
         }
 
-        if ($invite->name) {
-            // Benannter Invite: Erzeuge Dummy-Account on-the-fly und logge direkt ein
-            $email = \Illuminate\Support\Str::slug($invite->name) . '-' . substr($invite->token, 0, 8) . '@invite.local';
-            $user = \App\Models\User::firstOrCreate(['email' => $email], ['name' => $invite->name]);
-            $user->galleries()->syncWithoutDetaching([$gallery->id]);
-            $jwt = \Illuminate\Support\Facades\Auth::guard('api')->login($user);
-            return $this->respondWithToken($jwt, ['full_path' => $gallery->full_path]);
-        } else {
-            // Klassischer anonymer Invite: E-Mail & Name erfassen, dann Magic-Link schicken
-            if (!$request->email || !$request->name) {
-                return response()->json(['error' => 'Name und E-Mail sind erforderlich.'], 400);
+        // Anonymous Guest
+        $guestName = $invite->name ?? $request->name ?? 'Gast';
+        $guestEmail = $request->email;
+        $guestId = (string) \Illuminate\Support\Str::uuid();
+
+        if ($guestEmail) {
+            $realUser = \App\Models\User::where('email', $guestEmail)->first();
+            if ($realUser && ($realUser->password || $realUser->is_admin)) {
+                return response()->json(['error' => 'Diese E-Mail ist bereits mit einem Passwort registriert. Bitte logge dich regulär ein.'], 403);
             }
-            $user = \App\Models\User::where('email', $request->email)->first();
-            if ($user) {
-                if ($user->password || $user->is_admin) {
-                    return response()->json(['error' => 'Diese E-Mail ist bereits mit einem Passwort registriert. Bitte logge dich regulär ein.'], 403);
-                }
-            } else {
-                $user = \App\Models\User::create(['email' => $request->email, 'name' => $request->name]);
-            }
-            $user->galleries()->syncWithoutDetaching([$gallery->id]);
-
-            // Generiere Token und sende E-Mail
-            $resetToken = \Illuminate\Support\Str::random(64);
-            \Illuminate\Support\Facades\DB::table('password_reset_tokens')->updateOrInsert(
-                ['email' => $user->email], ['token' => \Illuminate\Support\Facades\Hash::make($resetToken), 'created_at' => now()]
-            );
-
-            $link = rtrim(config('app.frontend_url'), '/') . '/reset-password?token=' . $resetToken . '&email=' . urlencode($user->email);
-            $html = "<h2>Hallo {$user->name},</h2><p>Bitte klicke hier, um deine E-Mail zu bestätigen und die Galerie zu öffnen:</p><a href='{$link}'>Zur Galerie</a>";
-
-            \Illuminate\Support\Facades\Mail::html($html, function($msg) use ($user, $gallery) {
-                $msg->to($user->email)->subject("Einladung zur Galerie {$gallery->name}");
-            });
-
-            return response()->json([
-                'success' => true,
-                'requires_mail_verification' => true,
-                'message' => 'Bitte prüfe deine E-Mails. Wir haben dir einen Link gesendet, um die Anmeldung abzuschließen.'
-            ]);
         }
+
+        $factory = app(\PHPOpenSourceSaver\JWTAuth\Factory::class);
+        $payload = $factory->customClaims([
+            'sub' => 'guest_' . $guestId,
+            'guest_id' => $guestId,
+            'guest_name' => $guestName,
+            'transient_galleries' => $transientGalleries
+        ])->make();
+        $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
+
+        return $this->respondWithToken($token, ['full_path' => $gallery->full_path]);
     }
 
     public function index($galleryId)
     {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($galleryId)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+
         return response()->json(\App\Models\GalleryInvite::where('gallery_id', $galleryId)->orderBy('id', 'desc')->get());
     }
 
     public function update(Request $request, $id)
     {
-        $request->validate(['name' => 'nullable|string|max:255']);
         $invite = \App\Models\GalleryInvite::findOrFail($id);
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($invite->gallery_id)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $request->validate(['name' => 'nullable|string|max:255']);
         $invite->update(['name' => $request->name]);
         return response()->json(['success' => true]);
     }
 
     public function destroy($id)
     {
+        $invite = \App\Models\GalleryInvite::findOrFail($id);
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($invite->gallery_id)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+
         \App\Models\GalleryInvite::destroy($id);
         return response()->json(['success' => true]);
     }

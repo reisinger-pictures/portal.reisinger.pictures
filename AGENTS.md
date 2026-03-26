@@ -26,25 +26,37 @@
 * ALWAYS output a single `import_gemini.mjs` Node.js script to apply changes.
 * ONLY ONE migration file (`V001__initial_portal_schema.php`). Update it instead of creating new ones.
 
-**4. Testing Guidelines & DoD**
+
+**4. Testing Guidelines & Definition of Done (DoD)**
 * Review **[TESTING.md](TESTING.md)** for PHPUnit and Playwright E2E rules.
 * **Multi-Path E2E Testing:** Ensure features with multiple entry points are fully covered.
-* **System Integrity:** The system MUST be in a fully functional, runnable state without workarounds after a task is done.
+* **Strict Definition of Done (DoD):** A task is only truly DONE (`- [x] TODO:`) when:
+  1. **Feature Complete:** Meets all requirements defined in the respective `/features` doc.
+  2. **Tested:** Playwright (E2E) and/or PHPUnit tests are written, updated, and passing. No flaky `sleep()` calls.
+  3. **Secure:** IDOR and role-checks (`canAccessGallery`) are implemented. JSON responses do not leak sensitive fields.
+  4. **Documented:** `/features` markdown files are up-to-date with technical decisions.
+  5. **Runnable:** The system works locally without workarounds.
 
-**5. Agent Roles (Planner / Maker / Checker)**
-We enforce a strict separation of concerns.
 
-### Role 1: Planner Agent ("Architect / Update Target State")
-* **Goal:** Define the target state. Update or create Markdown documentation in `/features`.
-* **Task Derivation:** Append actionable implementation steps to `AGENTS.todo.md`. Format: `- [ ] TODO: [Description] -> [Link]`
+**5. Agent Roles & Strict Definition of Done (DoD)**
+We enforce a strict separation of concerns. An agent must fulfill its specific DoD before completing a turn.
+
+### Role 1: Planner Agent ("Architect")
+* **Goal:** Define the target state and estimate effort.
+* **DoD (Definition of Done):**
+  - [ ] The technical concept is documented or updated in the corresponding `/features` markdown file.
+  - [ ] Actionable, bite-sized tasks are appended to `AGENTS.todo.md`.
 
 ### Role 2: Implementation Agent ("Maker")
-* **Goal:** Execute tasks and write code from `AGENTS.todo.md`.
-* **Documentation:** Document technical decisions in the corresponding `/features` markdown file.
-* **Task Update:** Change task text in `AGENTS.todo.md` to `- [ ] (Ready for Review) TODO: ...`
+* **Goal:** Execute tasks from `AGENTS.todo.md`.
+* **DoD (Definition of Done):**
+  - [ ] Code is written following the stack rules (SWR, Tailwind v4, etc.).
+  - [ ] E2E (Playwright) or Backend (PHPUnit) tests are added/updated and use patient assertions.
+  - [ ] The task status in `AGENTS.todo.md` is changed to `- [ ] (Ready for Review) TODO: ...`
 
 ### Role 3: Review Agent ("Checker")
-* **Goal:** Quality assurance. Pick `(Ready for Review)` tasks.
-* **Action:** Validate code against the linked markdown document and `TESTING.md`.
-* **Task Update (Pass):** `- [x] TODO: ...`
-* **Task Update (Fail):** `- [ ] (Needs Fix) TODO: ...` (Write fixes into the markdown doc).
+* **Goal:** Quality assurance.
+* **DoD (Definition of Done):**
+  - [ ] Code is validated against the linked `/features` document.
+  - [ ] IDOR/Security checks are confirmed.
+  - [ ] Task is either checked off (`- [x]`) or rejected (`(Needs Fix)`) in `AGENTS.todo.md`.

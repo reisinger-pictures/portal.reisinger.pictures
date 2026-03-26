@@ -31,9 +31,15 @@ class GalleryFrontendController extends Controller
             if ($user) {
                 $rating = DB::table('ratings')
                     ->where('photo_id', $photo->id)
-                    ->where('user_id', $user->id)
+                    ->where(function($q) use ($user) {
+                        if ($user->id) {
+                            $q->where('user_id', $user->id);
+                        } else {
+                            $q->where('guest_id', $user->guest_id);
+                        }
+                    })
                     ->first();
-                $photo->rating = $rating ? $rating->rating : null;
+                $photo->rating = $rating ? (int) $rating->rating : null;
                 // NEU: Den Kommentar ebenfalls an das Foto-Objekt anheften!
                 $photo->comment = $rating ? $rating->comment : '';
             } else {
@@ -88,8 +94,16 @@ class GalleryFrontendController extends Controller
         }
 
         DB::table('ratings')->updateOrInsert(
-            ['photo_id' => $photo->id, 'user_id' => $user->id],
-            ['rating' => $request->rating, 'comment' => $request->comment ?? '']
+            [
+                'photo_id' => $photo->id,
+                'user_id' => $user->id,
+                'guest_id' => $user->guest_id
+            ],
+            [
+                'rating' => $request->rating,
+                'comment' => $request->comment ?? '',
+                'guest_name' => $user->id ? null : $user->name
+            ]
         );
 
         return response()->json(['success' => true]);

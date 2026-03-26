@@ -159,6 +159,11 @@ class GalleryController extends Controller
 
     public function updateGallery(Request $request, $id)
     {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($id)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         $gallery = Gallery::findOrFail($id);
         
         $validated = $request->validate([
@@ -191,6 +196,11 @@ class GalleryController extends Controller
 
     public function destroyGallery($id)
     {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($id)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         $gallery = Gallery::findOrFail($id);
         \Illuminate\Support\Facades\Storage::disk('photos')->deleteDirectory((string) $gallery->id);
         
@@ -201,10 +211,14 @@ class GalleryController extends Controller
 
     public function ratingStatus($id)
     {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($id)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         $gallery = Gallery::findOrFail($id);
         $totalPhotos = $gallery->photos()->count();
 
-        // Finde alle User, die mit dieser Galerie verknüpft sind (inklusive Magic Link Gäste)
         $users = \App\Models\User::whereHas('galleries', function($q) use ($id) {
             $q->where('galleries.id', $id);
         })->get();
@@ -227,6 +241,24 @@ class GalleryController extends Controller
             ];
         }
 
+        $guestRatings = DB::table('ratings')
+            ->join('photos', 'ratings.photo_id', '=', 'photos.id')
+            ->where('photos.gallery_id', $id)
+            ->whereNull('ratings.user_id')
+            ->select('ratings.guest_id', 'ratings.guest_name', DB::raw('COUNT(IF(ratings.rating > 0, 1, NULL)) as rated_count'))
+            ->groupBy('ratings.guest_id', 'ratings.guest_name')
+            ->get();
+
+        foreach ($guestRatings as $gr) {
+            $status[] = [
+                'user_id' => 'guest_' . $gr->guest_id,
+                'name' => $gr->guest_name ?? 'Gast',
+                'email' => '@invite.local',
+                'rated_count' => $gr->rated_count,
+                'total_photos' => $totalPhotos
+            ];
+        }
+
         return response()->json([
             'users' => $status,
             'total_photos' => $totalPhotos
@@ -235,15 +267,20 @@ class GalleryController extends Controller
 
     public function exportRatings($id)
     {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->canAccessGallery($id)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         Gallery::findOrFail($id);
         $photos = Photo::where('gallery_id', $id)->get();
         $export = [];
 
         foreach ($photos as $photo) {
             $ratings = DB::table('ratings')
-                ->join('users', 'ratings.user_id', '=', 'users.id')
+                ->leftJoin('users', 'ratings.user_id', '=', 'users.id')
                 ->where('photo_id', $photo->id)
-                ->select('ratings.rating', 'ratings.comment', 'users.name')
+                ->select('ratings.rating', 'ratings.comment', 'ratings.guest_name', 'ratings.guest_id', 'users.name')
                 ->get();
 
             if ($ratings->isEmpty()) continue;
@@ -253,7 +290,8 @@ class GalleryController extends Controller
             $comments = [];
             foreach ($ratings as $r) {
                 $ratingStr = $r->rating > 0 ? $r->rating . ' Sterne' : 'Ignoriert';
-                $line = "{$r->name} ({$ratingStr})";
+                $displayName = $r->name ?? ($r->guest_name ?? 'Gast (' . substr($r->guest_id, 0, 8) . ')');
+                $line = "{$displayName} ({$ratingStr})";
                 if (!empty($r->comment)) $line .= ": {$r->comment}";
                 $comments[] = $line;
             }

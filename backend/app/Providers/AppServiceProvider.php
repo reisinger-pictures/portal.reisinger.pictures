@@ -21,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Support\Facades\Auth::provider('transient_eloquent', function ($app, array $config) {
+            return new \App\Auth\TransientUserProvider($app['hash'], $config['model']);
+        });
         // Den neuen Custom Transport in Laravel's Mail-Manager integrieren
         Mail::extend('gmail_rest', function (array $config) {
             return new GmailRestTransport(

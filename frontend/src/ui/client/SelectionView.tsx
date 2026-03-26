@@ -19,7 +19,7 @@ const DaisyUIRatingBridge = ({ photo, ratePhoto }: { photo: any, ratePhoto: any 
 
     const stopProp = (e: any) => e.stopPropagation();
 
-    const currentRating = photo.rating || 0;
+    const currentRating = Number(photo.rating) || 0;
 
     const handleRatingClick = (rating: number) => {
         ratePhoto(photo.id, rating, comment);
@@ -74,11 +74,11 @@ const GridPhotoActions = ({ photo, ratePhoto }: { photo: any, ratePhoto: any }) 
     return (
         <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3">
             <div className="rating rating-sm">
-                <input type="radio" name={`grid_rating_${photo.id}`} className="rating-hidden" checked={(photo.rating || 0) === 0} onChange={() => ratePhoto(photo.id, 0, comment)} />
+                <input type="radio" name={`grid_rating_${photo.id}`} className="rating-hidden" checked={Number(photo.rating || 0) === 0} onChange={() => ratePhoto(photo.id, 0, comment)} />
                 {[1, 2, 3, 4, 5].map(star => (
                     <input key={star} type="radio" name={`grid_rating_${photo.id}`}
                            className="mask mask-star-2 bg-primary"
-                           checked={photo.rating === star}
+                           checked={Number(photo.rating) === star}
                            onChange={() => ratePhoto(photo.id, star, comment)} />
                 ))}
             </div>
@@ -99,14 +99,14 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
 
     const [ratingFilter, setRatingFilter] = useState<string>('all');
     const filteredPhotos = photos.filter((p: any) => {
-        if (ratingFilter === 'rated') return p.rating && p.rating > 0;
+        if (ratingFilter === 'rated') return p.rating && Number(p.rating) > 0;
         if (ratingFilter === 'unrated') return p.rating === null || p.rating === undefined;
-        if (ratingFilter === '0') return p.rating === 0;
-        if (ratingFilter === '1') return p.rating === 1;
-        if (ratingFilter === '2') return p.rating === 2;
-        if (ratingFilter === '3') return p.rating === 3;
-        if (ratingFilter === '4') return p.rating === 4;
-        if (ratingFilter === '5') return p.rating === 5;
+        if (ratingFilter === '0') return Number(p.rating) === 0;
+        if (ratingFilter === '1') return Number(p.rating) === 1;
+        if (ratingFilter === '2') return Number(p.rating) === 2;
+        if (ratingFilter === '3') return Number(p.rating) === 3;
+        if (ratingFilter === '4') return Number(p.rating) === 4;
+        if (ratingFilter === '5') return Number(p.rating) === 5;
         return true;
     });
 

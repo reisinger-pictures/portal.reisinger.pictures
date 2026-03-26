@@ -14,6 +14,9 @@ class User extends Authenticatable implements JWTSubject
 
     public const UPDATED_AT = null;
 
+    public $guest_id = null;
+    public $transient_galleries = [];
+
     protected $visible = [
         'id', 'name', 'email', 'metadata_copyright', 'can_edit_metadata', 
         'current_ftp_gallery_id', 'created_at', 'is_admin', 'is_photographer', 
@@ -44,6 +47,7 @@ class User extends Authenticatable implements JWTSubject
     public function photos() { return $this->hasMany(Photo::class); }
 
     public function getIsPendingAttribute(): bool {
+        if ($this->guest_id) return false;
         return $this->roles()->count() === 0 && $this->galleryGroups()->count() === 0 && $this->galleries()->count() === 0;
     }
 
@@ -66,6 +70,10 @@ class User extends Authenticatable implements JWTSubject
 
     public function getAllowedGalleryIds(): array
     {
+        if ($this->guest_id) {
+            return $this->transient_galleries ?? [];
+        }
+
         if ($this->is_admin) {
             return Gallery::pluck('id')->toArray();
         }
@@ -94,6 +102,10 @@ class User extends Authenticatable implements JWTSubject
                                            ->pluck('id')->toArray();
                 $galleryIds = array_unique(array_merge($galleryIds, $domainGalleryIds));
             }
+        }
+
+        if (!empty($this->transient_galleries)) {
+            $galleryIds = array_unique(array_merge($galleryIds, $this->transient_galleries));
         }
 
         return $galleryIds;

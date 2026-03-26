@@ -35,5 +35,27 @@ class GalleryUpdateDeleteTest extends TestCase {
 
         // Verzeichnis muss vom Storage gelöscht worden sein
         $this->assertFalse(Storage::disk('photos')->exists((string)$gallery->id));
+    
+    public function test_photographer_cannot_update_or_delete_other_photographers_gallery() {
+        $photog1 = User::factory()->create();
+        $photog1->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+
+        $photog2 = User::factory()->create();
+        $photog2->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+
+        $gallery = Gallery::factory()->create();
+        $photog1->galleries()->attach($gallery);
+
+        $token2 = auth('api')->login($photog2);
+
+        // Update
+        $this->withHeaders(['Authorization' => "Bearer $token2"])
+             ->putJson("/api/management/galleries/{$gallery->id}", ['name' => 'Hacked'])
+             ->assertStatus(403);
+
+        // Delete
+        $this->withHeaders(['Authorization' => "Bearer $token2"])
+             ->deleteJson("/api/management/galleries/{$gallery->id}")
+             ->assertStatus(403);
     }
 }

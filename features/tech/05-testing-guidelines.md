@@ -17,6 +17,7 @@ status: active
 - **Mobile-First Validation:** E2E tests must be explicitly executed against mobile viewports to verify touch targets and z-index issues.
 
 ## 3. Backend Tests (PHPUnit)
+- **Negative Testing (IDOR):** Jeder Endpunkt, der auf eine spezifische Ressource zugreift (Galerie, Foto, Download), MUSS explizit mit einem unberechtigten Nutzer getestet werden (Insecure Direct Object Reference Protection). Es muss zwingend ein 403 (Forbidden) oder 404 (Not Found) Statuscode erwartet werden.
 - **API Resources:** In PHPUnit, do not just check HTTP status codes. Always assert the JSON response structure to ensure no unintended fields (e.g., `password_hash`) are leaked.
 - **Email & Link Integrity:** - Mocking emails is forbidden. Tests must query the local Mailpit API.
   - Tests MUST parse the HTML body of the email, extract generated action links (e.g., Magic Links), and confirm that navigating to these links resolves successfully (HTTP 200).

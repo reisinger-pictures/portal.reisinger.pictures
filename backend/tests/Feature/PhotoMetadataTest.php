@@ -110,5 +110,30 @@ class PhotoMetadataTest extends TestCase {
 
         // Prüfen, ob der Accessor weiterhin den Namen des Original-Fotografen ausspuckt
         $this->assertEquals('Original Photographer', $photo->fresh()->artist);
+    
+    public function test_photographer_cannot_update_or_delete_other_photographers_photo() {
+        $photog1 = User::factory()->create();
+        $photog1->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+
+        $photog2 = User::factory()->create();
+        $photog2->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+
+        $gallery1 = Gallery::factory()->create();
+        $photog1->galleries()->attach($gallery1);
+        
+        $photo1 = Photo::factory()->create(['gallery_id' => $gallery1->id]);
+
+        $token2 = auth('api')->login($photog2);
+
+        // Update Meta
+        $this->withHeaders(['Authorization' => "Bearer $token2"])
+             ->putJson("/api/photos/{$photo1->id}/meta", ['title' => 'Hacked by P2'])
+             ->assertStatus(403);
+
+        // Delete
+        $this->withHeaders(['Authorization' => "Bearer $token2"])
+             ->deleteJson("/api/photos/{$photo1->id}")
+             ->assertStatus(403);
     }
 }
+

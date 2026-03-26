@@ -119,5 +119,23 @@ class DownloadTest extends TestCase
             'item_type' => 'full_zip',
             'gallery_id' => $gallery->id
         ]);
+    
+    public function test_user_cannot_download_private_photo_from_unauthorized_gallery() {
+        $user1 = User::factory()->create(); // no access
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'secret.jpg']);
+
+        $token1 = auth('api')->login($user1);
+
+        // Single Image Download
+        $this->withHeaders(['Authorization' => "Bearer $token1"])
+             ->get("/api/photos/{$photo->id}/download")
+             ->assertStatus(403);
+
+        // ZIP Download
+        $this->withHeaders(['Authorization' => "Bearer $token1"])
+             ->get("/api/galleries/{$gallery->id}/download-zip")
+             ->assertStatus(403);
     }
 }
+
