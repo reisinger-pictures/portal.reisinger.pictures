@@ -16,8 +16,8 @@ class DomainMappingController extends Controller
     {
         $request->validate([
             'domain' => 'required|string|unique:domain_mappings',
-            'role_id' => 'nullable|integer|exists:roles,id',
-            'gallery_group_id' => 'nullable|integer|exists:gallery_groups,id',
+            'role_id' => 'nullable|string|exists:roles,id',
+            'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
         ]);
 
         $mapping = DomainMapping::create($request->only(['domain', 'role_id', 'gallery_group_id']));

@@ -32,7 +32,7 @@ class PhotoProcessingService
 
         // Selection Galerien überspringen die Exif-Extraktion aus Performance-Gründen
         if ($gallery->type === 'selection' || !$gallery->apply_metadata_to_photos) {
-            $this->generateThumbnail($targetPath, $thumbPath, $width);
+            // Thumbnail wird lazy generiert
             return $meta;
         }
 
@@ -59,7 +59,7 @@ class PhotoProcessingService
             $meta['iso_country'] = $m['Country-PrimaryLocationCode'] ?? $meta['iso_country'];
         }
 
-        $this->generateThumbnail($targetPath, $thumbPath, $width);
+        // Thumbnail wird lazy generiert
 
         return $meta;
     }

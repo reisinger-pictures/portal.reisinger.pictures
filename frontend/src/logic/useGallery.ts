@@ -3,14 +3,15 @@ import {fetcher} from '../api';
 import {Gallery} from './useGalleries';
 
 export interface Photo {
-    id: number;
-    gallery_id: number;
+    id: string;
+    gallery_id: string;
     filename: string;
     lr_uuid: string;
     width: number;
     height: number;
     url: string;
     thumb_url: string;
+    srcset?: string;
     rating: number;
     comment: string;
     gallery?: Gallery;
@@ -56,7 +57,7 @@ export function useGallery(slug: string | undefined) {
     const wantsNotifications = data?.[0]?.wants_notifications || false;
     const breadcrumbs = data?.[0]?.breadcrumbs || [];
 
-    const ratePhoto = async (photoId: number, rating: number, comment: string = '') => {
+    const ratePhoto = async (photoId: string, rating: number, comment: string = '') => {
         if (data) {
             const newData = data.map(page => ({
                 ...page,
@@ -104,7 +105,7 @@ export function useGallery(slug: string | undefined) {
         isReachingEnd,
         wantsNotifications,
         breadcrumbs,
-        toggleOptIn: async (id: number, val: boolean) => { await fetch('/api/galleries/'+id+'/opt-in', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({wants_notifications: val})}); mutate(); },
+        toggleOptIn: async (id: string, val: boolean) => { await fetch('/api/galleries/'+id+'/opt-in', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({wants_notifications: val})}); mutate(); },
         mutate
     };
 }

@@ -1,3 +1,4 @@
+import ResponsiveImage from '../components/ResponsiveImage';
 import { useState } from 'react';
 import {Link, useLocation, useNavigate} from 'react-router-dom';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
@@ -184,9 +185,7 @@ export default function ManagementDashboard() {
                                                         {personalFeed.photos.slice(0, 20).map(p => (
                                                             <Link key={p.id} to={'/photos/' + p.id}
                                                                   className="block relative aspect-square bg-base-300 rounded overflow-hidden group shadow-sm hover:shadow-md">
-                                                                <img src={p.thumb_url}
-                                                                     className="object-cover w-full h-full group-hover:scale-105 transition-transform"
-                                                                     loading="lazy"/>
+                                                                <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
                                                             </Link>
                                                         ))}
                                                     </div>

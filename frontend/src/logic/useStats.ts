@@ -11,7 +11,7 @@ export interface StatsData {
 }
 
 export interface LogEntry {
-    id: number;
+    id: string;
     user_name_snapshot: string | null;
     gallery_name_snapshot: string | null;
     item_type: 'single_image' | 'full_zip';

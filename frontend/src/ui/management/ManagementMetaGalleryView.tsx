@@ -1,3 +1,4 @@
+import ResponsiveImage from '../components/ResponsiveImage';
 import {useEffect, useRef, useState} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {flattenGroups, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
@@ -135,8 +136,7 @@ export default function ManagementMetaGalleryView() {
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <img src={photo.thumb_url}
-                                     className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" loading="lazy"/>
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" />
                             </a>
                             <div className="absolute top-2 right-2 opacity-100 z-10">
                                 <button onClick={(e) => {

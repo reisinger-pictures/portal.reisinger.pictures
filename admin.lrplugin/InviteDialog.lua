@@ -13,8 +13,8 @@ return function(galleryId, jwt)
         props.newInviteName = ""
         props.linkType = "mass"
         props.generatedLink = ""
-        props.invites = {{title = "Lade...", value = -1}}
-        props.selectedInviteId = -1
+        props.invites = {{title = "Lade...", value = ""}}
+        props.selectedInviteId = ""
         props.selectedInviteLink = ""
 
         local function loadInvites()
@@ -26,7 +26,7 @@ return function(galleryId, jwt)
                         local name = (inv.name and inv.name ~= "") and inv.name or "Anonym"
                         table.insert(items, { title = name .. " (" .. string.sub(inv.token, 1, 8) .. "...)", value = inv.id, token = inv.token })
                     end
-                    if #items == 0 then table.insert(items, { title = "Keine Einladungen vorhanden", value = -1 }) end
+                    if #items == 0 then table.insert(items, { title = "Keine Einladungen vorhanden", value = "" }) end
                     props.invites = items
                     props.selectedInviteId = items[1].value
                 end
@@ -35,7 +35,7 @@ return function(galleryId, jwt)
         loadInvites()
 
         props:addObserver("selectedInviteId", function()
-            if props.selectedInviteId == -1 then
+            if props.selectedInviteId == "" then
                 props.selectedInviteLink = ""
             else
                 for _, item in ipairs(props.invites) do
@@ -94,7 +94,7 @@ return function(galleryId, jwt)
                         f:spacer { width = 120 }, 
                         f:push_button { 
                             title = "Widerrufen", 
-                            enabled = LrView.bind { key = "selectedInviteId", bind_to_object = props, transform = function(v) return v ~= -1 end }, 
+                            enabled = LrView.bind { key = "selectedInviteId", bind_to_object = props, transform = function(v) return v ~= "" end }, 
                             action = function()
                                 local confirm = LrDialogs.confirm(Api.getTitle("Widerrufen?"), "Link wird sofort ungültig.", "Widerrufen", "Abbrechen")
                                 if confirm == "ok" then

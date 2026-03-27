@@ -83,7 +83,7 @@ class GalleryController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
-            'parent_id' => 'nullable|integer|exists:gallery_groups,id',
+            'parent_id' => 'nullable|string|exists:gallery_groups,id',
             'is_public' => 'nullable|boolean'
         ]);
         
@@ -112,7 +112,7 @@ class GalleryController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'type' => 'required|in:selection,delivery',
-            'gallery_group_id' => 'nullable|integer|exists:gallery_groups,id',
+            'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
             'is_public' => 'boolean',
             'is_live' => 'boolean',
             'password' => 'nullable|string',
@@ -171,7 +171,7 @@ class GalleryController extends Controller
             'type' => 'nullable|in:selection,delivery',
             'is_live' => 'nullable|boolean',
             'is_public' => 'nullable|boolean',
-            'gallery_group_id' => 'nullable|integer|exists:gallery_groups,id',
+            'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
         ]);
 
         if (isset($validated['type']) && $validated['type'] === 'selection') {
@@ -330,8 +330,11 @@ class GalleryController extends Controller
         $photos->getCollection()->transform(function ($photo) {
             $photo->load('gallery');
             $baseUrl = '/api/media/' . $photo->gallery->slug;
-            $photo->url = $baseUrl . '/' . $photo->filename;
-            $photo->thumb_url = $baseUrl . '/_thumbs/' . md5($photo->filename . '1024') . '.webp';
+            $photo->url = $baseUrl . '/_' . 'thumbs/2000/' . $photo->id . '.webp';
+            $photo->thumb_url = $baseUrl . '/_thumbs/800/' . $photo->id . '.webp';
+            $photo->srcset = $baseUrl . '/_thumbs/400/' . $photo->filename . '.webp 400w, ' . 
+                           $baseUrl . '/_thumbs/800/' . $photo->filename . '.webp 800w, ' . 
+                           $baseUrl . '/_thumbs/1200/' . $photo->filename . '.webp 1200w';
             return $photo;
         });
 

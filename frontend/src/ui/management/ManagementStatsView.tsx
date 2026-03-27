@@ -1,9 +1,11 @@
 import {useState} from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {useStats} from '../../logic/useStats';
 import {Legend, Pie, PieChart, ResponsiveContainer, Tooltip} from 'recharts';
 
 export default function ManagementStatsView() {
-    const [page, setPage] = useState(1);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const page = parseInt(searchParams.get('page') || '1', 10);
     const {stats, logs, isLoading} = useStats(page);
 
     const rawChartData = stats ? [
@@ -178,11 +180,11 @@ export default function ManagementStatsView() {
                                 <div
                                     className="flex justify-between items-center p-4 border-t border-base-300 bg-base-100 flex-wrap gap-2">
                                     <button className="btn btn-sm btn-outline" disabled={page === 1}
-                                            onClick={() => setPage(p => p - 1)}>&larr; Zurück
+                                            onClick={() => setSearchParams(prev => { prev.set('page', String(page - 1)); return prev; })}>&larr; Zurück
                                     </button>
                                     <span className="text-sm font-semibold">Seite {page} von {logs.last_page}</span>
                                     <button className="btn btn-sm btn-outline" disabled={page === logs.last_page}
-                                            onClick={() => setPage(p => p + 1)}>Weiter &rarr;</button>
+                                            onClick={() => setSearchParams(prev => { prev.set('page', String(page + 1)); return prev; })}>Weiter &rarr;</button>
                                 </div>
                             )}
                         </div>

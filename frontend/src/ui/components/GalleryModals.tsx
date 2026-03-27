@@ -13,12 +13,12 @@ interface GalleryModalsProps {
     editingGroup?: GalleryGroup | null;
     editingGallery?: Gallery | null;
 
-    onCreateGroup: (name: string, slug: string, isPublic: boolean | null, parentId?: number | null) => Promise<void>;
-    onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: number | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
-    onUpdateGroup: (id: number, name: string, slug: string, isPublic: boolean | null, parentId?: number | null) => Promise<void>;
-    onUpdateGallery: (id: number, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: number | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
-    onDeleteGroup: (id: number) => Promise<void>;
-    onDeleteGallery: (id: number) => Promise<void>;
+    onCreateGroup: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => Promise<void>;
+    onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
+    onUpdateGroup: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => Promise<void>;
+    onUpdateGallery: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
+    onDeleteGroup: (id: string) => Promise<void>;
+    onDeleteGallery: (id: string) => Promise<void>;
 }
 
 export default function GalleryModals({
@@ -47,7 +47,7 @@ export default function GalleryModals({
     const [newGroupSlug, setNewGroupSlug] = useState('');
     const [groupSlugEdited, setGroupSlugEdited] = useState(false);
     const [newGroupIsPublic, setNewGroupIsPublic] = useState<'null' | 'true' | 'false'>('null');
-    const [groupParentId, setGroupParentId] = useState<number | ''>('');
+    const [groupParentId, setGroupParentId] = useState<string>('');
 
     // Gallery State
     const [newGalleryName, setNewGalleryName] = useState('');
@@ -56,7 +56,7 @@ export default function GalleryModals({
     const [newGalleryType, setNewGalleryType] = useState<'selection' | 'delivery'>('delivery');
     const [newGalleryIsPublic, setNewGalleryIsPublic] = useState(false);
     const [newGalleryIsLive, setNewGalleryIsLive] = useState(false);
-    const [galleryParentId, setGalleryParentId] = useState<number | ''>('');
+    const [galleryParentId, setGalleryParentId] = useState<string>('');
     const [newGalleryPassword, setNewGalleryPassword] = useState('');
     const [newGalleryExpiresAt, setNewGalleryExpiresAt] = useState('');
     const [allowClientMeta, setAllowClientMeta] = useState(false);
@@ -158,9 +158,9 @@ export default function GalleryModals({
         const isPub = newGroupIsPublic === 'null' ? null : newGroupIsPublic === 'true';
         try {
             if (editingGroup) {
-                await onUpdateGroup(editingGroup.id, newGroupName, newGroupSlug, isPub, groupParentId === '' ? null : Number(groupParentId));
+                await onUpdateGroup(editingGroup.id, newGroupName, newGroupSlug, isPub, groupParentId === '' ? null : groupParentId);
             } else {
-                await onCreateGroup(newGroupName, newGroupSlug, isPub, groupParentId === '' ? null : Number(groupParentId));
+                await onCreateGroup(newGroupName, newGroupSlug, isPub, groupParentId === '' ? null : groupParentId);
             }
             closeGroupModal();
         } catch {
@@ -176,10 +176,10 @@ export default function GalleryModals({
         try {
             if (editingGallery) {
                 const metaOpts = { allow_client_metadata_edit: allowClientMeta, apply_metadata_to_photos: applyMeta, default_title: iptcData.title, default_description: iptcData.description, default_keywords: iptcData.keywords, default_location: iptcData.location, default_city: iptcData.city, default_state: iptcData.state, default_country: iptcData.country, default_iso_country: iptcData.iso_country };
-                await onUpdateGallery(editingGallery.id, newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : Number(galleryParentId), newGalleryPassword, newGalleryExpiresAt, metaOpts);
+                await onUpdateGallery(editingGallery.id, newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : galleryParentId, newGalleryPassword, newGalleryExpiresAt, metaOpts);
             } else {
                 const metaOpts = { allow_client_metadata_edit: allowClientMeta, apply_metadata_to_photos: applyMeta, default_title: iptcData.title, default_description: iptcData.description, default_keywords: iptcData.keywords, default_location: iptcData.location, default_city: iptcData.city, default_state: iptcData.state, default_country: iptcData.country, default_iso_country: iptcData.iso_country };
-                await onCreateGallery(newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : Number(galleryParentId), newGalleryPassword, newGalleryExpiresAt, metaOpts);
+                await onCreateGallery(newGalleryName, newGallerySlug, newGalleryType, newGalleryIsLive, newGalleryIsPublic, galleryParentId === '' ? null : galleryParentId, newGalleryPassword, newGalleryExpiresAt, metaOpts);
             }
             setGalleryModalOpen(false);
         } catch {
@@ -193,7 +193,7 @@ export default function GalleryModals({
         if (val === 'selection') setNewGalleryIsLive(false);
     };
 
-    const selectedParent = availableGroups.find(g => g.id === (galleryParentId === '' ? null : Number(galleryParentId)));
+    const selectedParent = availableGroups.find(g => g.id === (galleryParentId === '' ? null : galleryParentId));
     let isVisibilityForced = selectedParent?.is_public !== undefined && selectedParent?.is_public !== null;
     let forcedVisibility = selectedParent?.is_public;
 
@@ -242,7 +242,7 @@ export default function GalleryModals({
                             <label className="label"><span
                                 className="label-text font-bold">Übergeordnete Meta-Galerie</span></label>
                             <select value={groupParentId}
-                                    onChange={e => setGroupParentId(e.target.value ? Number(e.target.value) : '')}
+                                    onChange={e => setGroupParentId(e.target.value)}
                                     className="select select-bordered w-full">
                                 <option value="">-- Keine --</option>
                                 {availableGroups.filter(g => g.id !== editingGroup?.id).map(g => <option key={g.id}
@@ -386,7 +386,7 @@ export default function GalleryModals({
                         <div className="form-control w-full mb-4">
                             <label className="label"><span className="label-text font-bold">In welchem Ordner soll die Galerie liegen?</span></label>
                             <select value={galleryParentId}
-                                    onChange={e => setGalleryParentId(e.target.value ? Number(e.target.value) : '')}
+                                    onChange={e => setGalleryParentId(e.target.value)}
                                     className="select select-bordered w-full">
                                 <option value="">-- Oberste Ebene (Root) --</option>
                                 {availableGroups.map(g => <option key={g.id}

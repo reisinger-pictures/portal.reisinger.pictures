@@ -119,7 +119,8 @@ class DownloadTest extends TestCase
             'item_type' => 'full_zip',
             'gallery_id' => $gallery->id
         ]);
-    
+    }
+
     public function test_user_cannot_download_private_photo_from_unauthorized_gallery() {
         $user1 = User::factory()->create(); // no access
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);

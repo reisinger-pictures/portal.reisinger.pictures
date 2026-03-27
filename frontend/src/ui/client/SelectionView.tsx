@@ -1,3 +1,4 @@
+import ResponsiveImage from '../components/ResponsiveImage';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
@@ -53,7 +54,7 @@ const DaisyUIRatingBridge = ({ photo, ratePhoto }: { photo: any, ratePhoto: any 
                 placeholder="Kommentar hinzufügen... (Speichert automatisch)"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                onBlur={() => ratePhoto(photo.id, currentRating, comment)}
+                onBlur={() => { if (comment !== (photo.comment || '')) ratePhoto(photo.id, currentRating, comment); }}
                 onKeyDown={(e) => {
                     e.stopPropagation();
                     if(e.key === 'Enter') e.currentTarget.blur();
@@ -85,7 +86,7 @@ const GridPhotoActions = ({ photo, ratePhoto }: { photo: any, ratePhoto: any }) 
             <input type="text" placeholder="Kommentar..."
                    value={comment}
                    onChange={e => setComment(e.target.value)}
-                   onBlur={() => ratePhoto(photo.id, photo.rating || 0, comment)}
+                   onBlur={() => { if (comment !== (photo.comment || '')) ratePhoto(photo.id, Number(photo.rating || 0), comment); }}
                    onKeyDown={(e) => { if(e.key === 'Enter') e.currentTarget.blur(); }}
                    className="input input-bordered input-xs w-full text-center"/>
         </div>
@@ -121,7 +122,7 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
     }, [filteredPhotos, ratePhoto]);
 
     // Anstatt des ganzen Objekts speichern wir nur die ID, um Bug-freies Live-Update zu garantieren
-    const [currentPhotoId, setCurrentPhotoId] = useState<number | null>(null);
+    const [currentPhotoId, setCurrentPhotoId] = useState<string | null>(null);
     const currentPhotoInLightbox = currentPhotoId ? filteredPhotos.find((p: any) => p.id === currentPhotoId) : null;
 
     useEffect(() => {
@@ -158,12 +159,12 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
 
             lightbox.on('change', () => {
                 const currPhotoId = lightbox!.pswp!.currSlide?.data?.element?.dataset.photoId;
-                setCurrentPhotoId(currPhotoId ? parseInt(currPhotoId) : null);
+                setCurrentPhotoId(currPhotoId ? currPhotoId : null);
             });
 
             lightbox.on('afterInit', () => {
                 const currPhotoId = lightbox!.pswp!.currSlide?.data?.element?.dataset.photoId;
-                setCurrentPhotoId(currPhotoId ? parseInt(currPhotoId) : null);
+                setCurrentPhotoId(currPhotoId ? currPhotoId : null);
             });
 
             lightbox.on('destroy', () => {
@@ -178,8 +179,8 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
                 if (key >= 0 && key <= 5) {
                     const currPhotoId = lightbox.pswp.currSlide?.data?.element?.dataset.photoId;
                     if (currPhotoId) {
-                        const photo = latestDataRef.current.photos.find((p: any) => p.id === parseInt(currPhotoId));
-                        latestDataRef.current.ratePhoto(parseInt(currPhotoId), key, photo?.comment || '');
+                        const photo = latestDataRef.current.photos.find((p: any) => p.id === currPhotoId);
+                        latestDataRef.current.ratePhoto(currPhotoId, key, photo?.comment || '');
                         lightbox.pswp.next();
                     }
                 }
@@ -274,7 +275,7 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <img src={photo.thumb_url} className="object-cover w-full h-full select-none" draggable={false} loading="lazy"/>
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none" draggable={false} />
                             </a>
 
                             {user ? <GridPhotoActions photo={photo} ratePhoto={ratePhoto} /> : <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3"></div>}

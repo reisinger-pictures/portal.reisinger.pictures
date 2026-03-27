@@ -72,6 +72,12 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         const commentInput = page.locator('#rating-portal-anchor input[type="text"]');
         await commentInput.fill('Episches Bild im Fullscreen!');
         
+        // Race-Condition Fix: Wir bestätigen den Kommentar erst mit Enter und warten auf die API.
+        // Das verhindert, dass der OnBlur-Event (beim Klicken des Sterns) das neue Rating mit 0 überschreibt.
+        const commentResp = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
+        await commentInput.press('Enter');
+        await commentResp;
+        
         // 5 Sterne vergeben (speichert Kommentar und blättert automatisch weiter)
         const rateResponse = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
         await ratingBar.locator('input.mask-star-2').nth(4).click({ force: true });

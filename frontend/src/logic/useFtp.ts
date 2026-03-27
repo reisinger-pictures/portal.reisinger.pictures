@@ -5,7 +5,7 @@ export interface FtpStatus {
     ftp_folder: string;
     file_count: number;
     current_target_gallery: {
-        id: number;
+        id: string;
         name: string;
         slug: string;
     } | null;
@@ -14,7 +14,7 @@ export interface FtpStatus {
 export function useFtp() {
     const {data: status, mutate, isLoading} = useSWR<FtpStatus>('/api/management/ftp/status', fetcher);
 
-    const setTargetGallery = async (gallery_id: number | null) => {
+    const setTargetGallery = async (gallery_id: string | null) => {
         await apiMutate('/api/management/ftp/target', 'POST', {gallery_id});
         mutate();
     };

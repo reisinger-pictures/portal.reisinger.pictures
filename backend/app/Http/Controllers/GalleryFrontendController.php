@@ -25,8 +25,11 @@ class GalleryFrontendController extends Controller
 
         $photos->getCollection()->transform(function ($photo) use ($gallery, $user) {
             $baseUrl = '/api/media/' . $gallery->slug;
-            $photo->url = $baseUrl . '/' . $photo->filename;
-            $photo->thumb_url = $baseUrl . '/_thumbs/' . md5($photo->filename . '1024') . '.webp';
+            $photo->url = $baseUrl . '/_' . 'thumbs/2000/' . $photo->id . '.webp';
+            $photo->thumb_url = $baseUrl . '/_thumbs/800/' . $photo->id . '.webp';
+            $photo->srcset = $baseUrl . '/_thumbs/400/' . $photo->filename . '.webp 400w, ' . 
+                           $baseUrl . '/_thumbs/800/' . $photo->filename . '.webp 800w, ' . 
+                           $baseUrl . '/_thumbs/1200/' . $photo->filename . '.webp 1200w';
 
             if ($user) {
                 $rating = DB::table('ratings')
@@ -93,18 +96,29 @@ class GalleryFrontendController extends Controller
             }
         }
 
-        DB::table('ratings')->updateOrInsert(
-            [
-                'photo_id' => $photo->id,
-                'user_id' => $user->id,
-                'guest_id' => $user->guest_id
-            ],
-            [
+        $existingRating = DB::table('ratings')->where([
+            'photo_id' => $photo->id,
+            'user_id' => $user->id,
+            'guest_id' => $user->guest_id
+        ])->first();
+
+        if ($existingRating) {
+            DB::table('ratings')->where('id', $existingRating->id)->update([
                 'rating' => $request->rating,
                 'comment' => $request->comment ?? '',
                 'guest_name' => $user->id ? null : $user->name
-            ]
-        );
+            ]);
+        } else {
+            DB::table('ratings')->insert([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'photo_id' => $photo->id,
+                'user_id' => $user->id,
+                'guest_id' => $user->guest_id,
+                'rating' => $request->rating,
+                'comment' => $request->comment ?? '',
+                'guest_name' => $user->id ? null : $user->name
+            ]);
+        }
 
         return response()->json(['success' => true]);
     }

@@ -25,7 +25,7 @@ export default function ManagementUserView() {
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
     const flatGalleries = tree ? [...(tree.groups.flatMap(g => g.galleries || [])), ...(tree.root_galleries || [])] : [];
 
-    const handleSaveUser = async (id: number, selRoles: number[], selGroups: number[], selGalleries: number[], canEditMeta: boolean) => {
+    const handleSaveUser = async (id: string, selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean) => {
         try {
             await updateUser(id, selRoles, selGroups, selGalleries, canEditMeta);
             showToast('success', 'Nutzerrechte gespeichert.');

@@ -1,3 +1,4 @@
+import ResponsiveImage from '../components/ResponsiveImage';
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
@@ -124,7 +125,7 @@ export default function DeliveryView({ galleryData }: { galleryData: any }) {
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <img src={photo.thumb_url} className="object-cover w-full h-full select-none" draggable={false} loading="lazy"/>
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none" draggable={false} />
                             </a>
 
                             <div className="absolute top-2 right-2 opacity-100">

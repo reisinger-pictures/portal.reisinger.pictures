@@ -15,7 +15,7 @@ return function(editingGroup, treeData, jwt, onSuccess)
         props.gSlug = editingGroup and editingGroup.slug or ""
         props.slugEdited = editingGroup and true or false
         props.gPublic = editingGroup and (editingGroup.is_public == nil and "null" or (editingGroup.is_public and "true" or "false")) or "null"
-        props.gParent = editingGroup and (editingGroup.parent_id or -1) or -1
+        props.gParent = editingGroup and (editingGroup.parent_id or "") or ""
 
         local isAutoUpdating = false
         props:addObserver("gName", function()
@@ -29,7 +29,7 @@ return function(editingGroup, treeData, jwt, onSuccess)
             if not isAutoUpdating then props.slugEdited = true end
         end)
 
-        local parentItems = { {title="-- Keine (Root Ebene) --", value=-1} }
+        local parentItems = { {title="-- Keine (Root Ebene) --", value=""} }
         for _, g in ipairs(Utils.flattenGroups(treeData.groups)) do 
             if not editingGroup or g.value ~= editingGroup.id then
                 table.insert(parentItems, g) 
@@ -73,7 +73,7 @@ return function(editingGroup, treeData, jwt, onSuccess)
                     name = props.gName,
                     slug = props.gSlug,
                     is_public = isPub,
-                    parent_id = props.gParent == -1 and nil or props.gParent
+                    parent_id = props.gParent == "" and nil or props.gParent
                 }
                 
                 local endpoint = editingGroup and ("/api/management/gallery-groups/" .. editingGroup.id) or "/api/management/gallery-groups"

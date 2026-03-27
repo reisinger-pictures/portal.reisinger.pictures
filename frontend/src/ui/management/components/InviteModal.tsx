@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../../../api';
+import { useUI } from '../../components/UIContext';
 
-export default function InviteModal({galleryId, onClose}: { galleryId: number, onClose: () => void }) {
+export default function InviteModal({galleryId, onClose}: { galleryId: string, onClose: () => void }) {
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [newLink, setNewLink] = useState('');
     const [linkType, setLinkType] = useState<'mass' | 'personal'>('mass');
+    const { showToast, confirm } = useUI();
 
     const {data: invites, mutate} = useSWR<{
         id: number,
@@ -27,18 +29,18 @@ export default function InviteModal({galleryId, onClose}: { galleryId: number, o
                 mutate(); // Liste aktualisieren
             }
         } catch {
-            alert('Netzwerkfehler');
+            showToast('error', 'Netzwerkfehler');
         }
         setLoading(false);
     };
 
-    const handleUpdate = async (id: number, newName: string) => {
+    const handleUpdate = async (id: string, newName: string) => {
         await apiMutate(`/api/management/invites/${id}`, 'PUT', {name: newName});
         mutate();
     };
 
-    const handleDelete = async (id: number) => {
-        if (!window.confirm('Einladung wirklich widerrufen? Der Link funktioniert dann nicht mehr.')) return;
+    const handleDelete = async (id: string) => {
+        if (!(await confirm({ title: 'Einladung widerrufen?', message: 'Einladung wirklich widerrufen? Der Link funktioniert dann nicht mehr.', confirmText: 'Widerrufen', confirmColor: 'error' }))) return;
         await apiMutate(`/api/management/invites/${id}`, 'DELETE');
         mutate();
     };
@@ -46,7 +48,7 @@ export default function InviteModal({galleryId, onClose}: { galleryId: number, o
     const copyLink = (token: string | undefined = undefined) => {
         const url = token ? (window.location.origin + '/invite/' + token) : newLink;
         navigator.clipboard.writeText(url);
-        alert('Kopiert!');
+        showToast('success', 'Kopiert!');
     };
 
     return (

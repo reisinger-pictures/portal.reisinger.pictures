@@ -110,7 +110,8 @@ class PhotoMetadataTest extends TestCase {
 
         // Prüfen, ob der Accessor weiterhin den Namen des Original-Fotografen ausspuckt
         $this->assertEquals('Original Photographer', $photo->fresh()->artist);
-    
+    }
+
     public function test_photographer_cannot_update_or_delete_other_photographers_photo() {
         $photog1 = User::factory()->create();
         $photog1->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));

@@ -41,7 +41,7 @@ class FtpController extends Controller
      */
     public function setTarget(Request $request)
     {
-        $request->validate(['gallery_id' => 'nullable|integer|exists:galleries,id']);
+        $request->validate(['gallery_id' => 'nullable|string|exists:galleries,id']);
         $user = auth('api')->user();
 
         if ($request->gallery_id && !$user->is_photographer) {

@@ -113,13 +113,13 @@ return function(mode)
             
             local function updateDropdown()
                 local flatGroups = Utils.flattenGroups(treeData.groups)
-                if #flatGroups == 0 then table.insert(flatGroups, { title = "Keine Meta-Galerien", value = -1 }) end
+                if #flatGroups == 0 then table.insert(flatGroups, { title = "Keine Meta-Galerien", value = "" }) end
                 props.groupItems = flatGroups
                 
                 local foundGroup = false
                 for _, item in ipairs(flatGroups) do if item.value == props.selectedGroupId then foundGroup = true break end end
                 if not foundGroup then props.selectedGroupId = flatGroups[1].value end
-                props.hasGroup = (#flatGroups > 0 and flatGroups[1].value ~= -1)
+                props.hasGroup = (#flatGroups > 0 and flatGroups[1].value ~= "")
 
                 local flatGalleries = Utils.flattenGalleries(treeData)
                 props.galleries = flatGalleries
@@ -127,13 +127,13 @@ return function(mode)
                 local foundGal = false
                 for _, item in ipairs(flatGalleries) do if item.value == props.selectedGalleryId then foundGal = true break end end
                 if not foundGal then props.selectedGalleryId = flatGalleries[1].value end
-                props.hasGallery = (#flatGalleries > 0 and flatGalleries[1].value ~= -1)
+                props.hasGallery = (#flatGalleries > 0 and flatGalleries[1].value ~= "")
             end
 
             props.groupItems = {}
-            props.selectedGroupId = -1
+            props.selectedGroupId = ""
             props.galleries = {}
-            props.selectedGalleryId = -1
+            props.selectedGalleryId = ""
             props.canConvertToDelivery = false
             props.convertToDelivery = false
 
@@ -281,7 +281,7 @@ return function(mode)
             }
 
             if result == "ok" then
-                if not props.hasGallery or props.selectedGalleryId == -1 then LrDialogs.message(Api.getTitle("Abbruch"), "Bitte eine Galerie auswählen.", "warning"); return end
+                if not props.hasGallery or props.selectedGalleryId == "" then LrDialogs.message(Api.getTitle("Abbruch"), "Bitte eine Galerie auswählen.", "warning"); return end
                 if photoCount == 0 then LrDialogs.message(Api.getTitle("Keine Bilder"), "Bitte markiere Bilder im Lightroom Raster.", "warning"); return end
 
                 LrTasks.startAsyncTask(function()

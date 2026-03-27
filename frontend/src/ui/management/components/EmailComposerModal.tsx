@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import {apiMutate} from '../../../api';
+import { useUI } from '../../components/UIContext';
 
 interface EmailComposerModalProps {
     isOpen: boolean;
     onClose: () => void;
-    galleryId: number;
+    galleryId: string;
 }
 
 export default function EmailComposerModal({isOpen, onClose, galleryId}: EmailComposerModalProps) {
@@ -12,6 +13,7 @@ export default function EmailComposerModal({isOpen, onClose, galleryId}: EmailCo
     const [mailBody, setMailBody] = useState('<p>Hallo {user_name},</p><p>Es gibt Neuigkeiten in deiner Galerie <strong>{gallery_name}</strong>.</p><p><a href="{link}">Hier geht es zur Galerie</a></p>');
     const [sendingMail, setSendingMail] = useState(false);
     const [previewMode, setPreviewMode] = useState(false);
+    const { showToast } = useUI();
 
     if (!isOpen) return null;
 
@@ -23,10 +25,10 @@ export default function EmailComposerModal({isOpen, onClose, galleryId}: EmailCo
                 `/api/management/galleries/${galleryId}/send-custom-email`, 'POST', 
                 { subject: mailSubject, body: mailBody }
             );
-            alert('Erfolg! ' + data.notified_count + ' E-Mails versendet.');
+            showToast('success', 'Erfolg! ' + data.notified_count + ' E-Mails versendet.');
             onClose();
         } catch (err: unknown) {
-            alert('Fehler: ' + (err instanceof Error ? (err as Error).message : 'Unknown error'));
+            showToast('error', 'Fehler: ' + (err instanceof Error ? (err as Error).message : 'Unknown error'));
         }
         setSendingMail(false);
     };

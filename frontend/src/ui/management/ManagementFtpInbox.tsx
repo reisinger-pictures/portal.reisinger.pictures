@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import {useFtp} from '../../logic/useFtp';
 import {useProtectedGalleries} from '../../logic/useGalleries';
+import { useUI } from '../components/UIContext';
 
 export default function ManagementFtpInbox() {
     const {status, isLoading, setTargetGallery, processInbox} = useFtp();
     const {tree} = useProtectedGalleries();
-    const [selectedId, setSelectedId] = useState<number | ''>('');
+    const [selectedId, setSelectedId] = useState<string>('');
     const [processing, setProcessing] = useState(false);
+    const { showToast } = useUI();
 
     if (isLoading || !status) return <div className="p-4"><span className="loading loading-spinner"></span></div>;
 
@@ -20,14 +22,14 @@ export default function ManagementFtpInbox() {
     ];
 
     const handleSetTarget = async () => {
-        await setTargetGallery(selectedId === '' ? null : Number(selectedId));
+        await setTargetGallery(selectedId === '' ? null : selectedId);
         setSelectedId('');
     };
 
     const handleProcess = async () => {
         setProcessing(true);
         const data = await processInbox();
-        alert(`Import abgeschlossen. ${data.processed} Bilder wurden verschoben.`);
+        showToast('success', `Import abgeschlossen. ${data.processed} Bilder wurden verschoben.`);
         setProcessing(false);
     };
 
@@ -68,7 +70,7 @@ export default function ManagementFtpInbox() {
                         ) : (
                             <div className="flex gap-2">
                                 <select value={selectedId}
-                                        onChange={e => setSelectedId(e.target.value ? Number(e.target.value) : '')}
+                                        onChange={e => setSelectedId(e.target.value)}
                                         className="select select-bordered flex-1">
                                     <option value="">-- Ziel-Galerie auswählen --</option>
                                     {flatGalleries.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}

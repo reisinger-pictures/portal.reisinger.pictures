@@ -3,7 +3,7 @@ import {fetcher} from '../api';
 import {Gallery} from './useGalleries';
 
 export interface User {
-    id: number;
+    id: string;
     name: string;
     email: string;
     is_admin: boolean;

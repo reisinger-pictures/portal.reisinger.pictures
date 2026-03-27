@@ -15,7 +15,7 @@ class ImageController extends Controller
     public function upload(Request $request)
     {
         $request->validate([
-            'gallery_id' => 'required|integer',
+            'gallery_id' => 'required|string',
             'lr_uuid' => 'required|string',
             'file' => 'required|image|max:20480',
         ]);

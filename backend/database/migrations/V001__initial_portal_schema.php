@@ -4,6 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 return new class extends Migration {
     public function up(): void {
@@ -21,7 +22,7 @@ return new class extends Migration {
 
         // --- Job Tables ---
         Schema::create('jobs', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('queue')->index();
             $table->longText('payload');
             $table->unsignedTinyInteger('attempts');
@@ -42,7 +43,7 @@ return new class extends Migration {
             $table->integer('finished_at')->nullable();
         });
         Schema::create('failed_jobs', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('uuid')->unique();
             $table->text('connection');
             $table->text('queue');
@@ -52,7 +53,7 @@ return new class extends Migration {
         });
 
         Schema::create('users', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('email')->unique();
             $table->string('name');
             $table->string('password')->nullable();
@@ -69,23 +70,23 @@ return new class extends Migration {
         });
 
         Schema::create('roles', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name', 50)->unique();
         });
 
         DB::table('roles')->insert([
-            ['name' => 'admin'], ['name' => 'photographer'], ['name' => 'client']
+            ['id' => Str::uuid()->toString(), 'name' => 'admin'], ['id' => Str::uuid()->toString(), 'name' => 'photographer'], ['id' => Str::uuid()->toString(), 'name' => 'client']
         ]);
 
         Schema::create('user_roles', function (Blueprint $table) {
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('role_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('role_id')->constrained()->onDelete('cascade');
             $table->primary(['user_id', 'role_id']);
         });
 
         Schema::create('gallery_groups', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('parent_id')->nullable()->constrained('gallery_groups')->onDelete('set null');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('parent_id')->nullable()->constrained('gallery_groups')->onDelete('set null');
             $table->string('name');
             $table->string('slug')->unique();
             $table->boolean('is_public')->nullable()->default(null);
@@ -94,16 +95,16 @@ return new class extends Migration {
 
         // WICHTIG: domain_mappings muss NACH gallery_groups und roles angelegt werden!
         Schema::create('domain_mappings', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('domain')->unique();
-            $table->foreignId('role_id')->nullable()->constrained()->onDelete('set null');
-            $table->foreignId('gallery_group_id')->nullable()->constrained('gallery_groups')->onDelete('set null');
+            $table->foreignUuid('role_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignUuid('gallery_group_id')->nullable()->constrained('gallery_groups')->onDelete('set null');
             $table->timestamp('created_at')->useCurrent();
         });
 
         Schema::create('galleries', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('gallery_group_id')->nullable()->constrained()->onDelete('set null');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('gallery_group_id')->nullable()->constrained()->onDelete('set null');
             $table->string('name');
             $table->string('slug')->unique();
             $table->enum('type', ['selection', 'delivery'])->default('delivery');
@@ -128,12 +129,12 @@ return new class extends Migration {
         });
 
         Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('current_ftp_gallery_id')->nullable()->constrained('galleries')->onDelete('set null');
+            $table->foreignUuid('current_ftp_gallery_id')->nullable()->constrained('galleries')->onDelete('set null');
         });
 
         Schema::create('photos', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('gallery_id')->constrained()->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('gallery_id')->constrained()->onDelete('cascade');
             $table->string('filename');
             $table->string('lr_uuid', 64);
             $table->integer('width')->default(0);
@@ -142,7 +143,7 @@ return new class extends Migration {
             // IPTC Metadaten
             $table->string('title')->nullable();
             $table->text('description')->nullable();
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignUuid('user_id')->nullable()->constrained()->onDelete('set null');
             $table->string('keywords')->nullable();
             $table->string('location')->nullable();
             $table->string('city')->nullable();
@@ -155,9 +156,9 @@ return new class extends Migration {
         });
 
         Schema::create('photo_metadata_versions', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('photo_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('photo_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('user_id')->nullable()->constrained()->onDelete('set null');
             $table->string('title')->nullable();
             $table->text('description')->nullable();
             $table->string('keywords')->nullable();
@@ -170,9 +171,9 @@ return new class extends Migration {
         });
 
         Schema::create('ratings', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('photo_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('photo_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('user_id')->nullable()->constrained()->onDelete('cascade');
             $table->uuid('guest_id')->nullable()->index();
             $table->string('guest_name')->nullable();
             $table->tinyInteger('rating');
@@ -181,24 +182,24 @@ return new class extends Migration {
         });
 
         Schema::create('user_gallery_groups', function (Blueprint $table) {
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('gallery_group_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('gallery_group_id')->constrained()->onDelete('cascade');
             $table->boolean('wants_notifications')->default(false);
             $table->primary(['user_id', 'gallery_group_id']);
         });
 
         Schema::create('user_galleries', function (Blueprint $table) {
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('gallery_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('gallery_id')->constrained()->onDelete('cascade');
             $table->boolean('wants_notifications')->default(false);
             $table->primary(['user_id', 'gallery_id']);
         });
 
         Schema::create('download_logs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('user_id')->nullable()->constrained()->onDelete('set null');
             $table->string('user_name_snapshot')->nullable();
-            $table->foreignId('gallery_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignUuid('gallery_id')->nullable()->constrained()->onDelete('set null');
             $table->string('gallery_name_snapshot')->nullable();
             $table->enum('item_type', ['single_image', 'full_zip']);
             $table->string('item_identifier');
@@ -207,8 +208,8 @@ return new class extends Migration {
         });
 
         Schema::create('gallery_invites', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('gallery_id')->constrained()->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('gallery_id')->constrained()->onDelete('cascade');
             $table->string('token', 64)->unique();
             $table->string('name')->nullable();
             $table->timestamp('created_at')->useCurrent();

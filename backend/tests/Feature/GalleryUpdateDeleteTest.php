@@ -35,7 +35,8 @@ class GalleryUpdateDeleteTest extends TestCase {
 
         // Verzeichnis muss vom Storage gelöscht worden sein
         $this->assertFalse(Storage::disk('photos')->exists((string)$gallery->id));
-    
+    }
+
     public function test_photographer_cannot_update_or_delete_other_photographers_gallery() {
         $photog1 = User::factory()->create();
         $photog1->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));

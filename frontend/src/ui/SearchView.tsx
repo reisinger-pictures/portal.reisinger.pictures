@@ -1,3 +1,4 @@
+import ResponsiveImage from './components/ResponsiveImage';
 import { useEffect, useState } from 'react';
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 import {useSearch} from '../logic/useSearch';
@@ -106,9 +107,7 @@ export default function SearchView() {
                                             {results.photos.map(p => (
                                                 <Link key={p.id} to={`/photos/${p.id}`}
                                                       className="block relative aspect-square bg-base-300 rounded overflow-hidden group shadow-md hover:shadow-xl transition-shadow">
-                                                    <img src={p.thumb_url} alt={p.filename}
-                                                         className="object-cover w-full h-full group-hover:scale-105 transition-transform"
-                                                         loading="lazy"/>
+                                                    <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} alt={p.filename} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
                                                     <div
                                                         className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-100 text-white text-xs truncate">
                                                         {p.filename}

@@ -3,7 +3,7 @@ import {apiMutate, fetcher} from '../api';
 import {useAuth} from './useAuth';
 
 export interface Gallery {
-    id: number;
+    id: string;
     name: string;
     slug: string;
     full_path: string;
@@ -20,14 +20,14 @@ export interface Gallery {
     default_state?: string;
     default_country?: string;
     default_iso_country?: string;
-    gallery_group_id?: number | null;
+    gallery_group_id?: string | null;
     expires_at?: string | null;
 }
 
 export interface GalleryGroup {
-    id: number;
+    id: string;
     name: string;
-    parent_id: number | null;
+    parent_id: string | null;
     slug?: string;
     is_public?: boolean | null;
     children?: GalleryGroup[];
@@ -40,7 +40,7 @@ export interface GalleryTreeResponse {
 }
 
 export interface FlatGroup {
-    id: number;
+    id: string;
     name: string;
     depth: number;
     is_public: boolean | null;
@@ -64,7 +64,7 @@ export function useProtectedGalleries() {
         fetcher
     );
 
-    const createGroup = async (name: string, slug: string, isPublic: boolean | null, parentId?: number | null) => {
+    const createGroup = async (name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => {
         try {
             await apiMutate('/api/management/gallery-groups', 'POST', {
                 name,
@@ -78,7 +78,7 @@ export function useProtectedGalleries() {
         }
     };
 
-    const createGallery = async (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: number | null, password?: string, expiresAt?: string, metadataOpts?: any) => {
+    const createGallery = async (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: any) => {
         try {
             await apiMutate('/api/management/galleries', 'POST', {
                 name,
@@ -97,7 +97,7 @@ export function useProtectedGalleries() {
         }
     };
 
-    const deleteGallery = async (id: number) => {
+    const deleteGallery = async (id: string) => {
         try {
             await apiMutate(`/api/management/galleries/${id}`, 'DELETE');
             await mutate();
@@ -107,17 +107,17 @@ export function useProtectedGalleries() {
     };
 
 
-    const updateGroup = async (id: number, name: string, slug: string, isPublic: boolean | null, parentId?: number | null) => {
+    const updateGroup = async (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => {
         await apiMutate('/api/management/gallery-groups/' + id, 'PUT', { name, slug, is_public: isPublic, parent_id: parentId });
         await mutate();
     };
 
-    const deleteGroup = async (id: number) => {
+    const deleteGroup = async (id: string) => {
         await apiMutate('/api/management/gallery-groups/' + id, 'DELETE');
         await mutate();
     };
 
-    const updateGallery = async (id: number, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: number | null, password?: string, expiresAt?: string, metadataOpts?: any) => {
+    const updateGallery = async (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: any) => {
         await apiMutate('/api/management/galleries/' + id, 'PUT', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts });
         await mutate();
     };

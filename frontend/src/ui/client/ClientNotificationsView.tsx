@@ -18,7 +18,7 @@ interface PreferencesData {
 export default function ClientNotificationsView() {
     const { data, error, isLoading, mutate } = useSWR<PreferencesData>('/api/notifications/preferences', fetcher);
 
-    const toggleOptIn = async (id: number, type: 'gallery' | 'group', currentValue: boolean) => {
+    const toggleOptIn = async (id: string, type: 'gallery' | 'group', currentValue: boolean) => {
         const endpoint = type === 'gallery' ? `/api/galleries/${id}/opt-in` : `/api/gallery-groups/${id}/opt-in`;
         
         // Optimistic UI Update

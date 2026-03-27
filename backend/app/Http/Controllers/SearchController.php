@@ -27,7 +27,10 @@ class SearchController extends Controller
             $photos->transform(function($p) {
                 $p->load('gallery');
                 $baseUrl = '/api/media/' . $p->gallery->slug;
-                $p->thumb_url = $baseUrl . '/_thumbs/' . md5($p->filename . '1024') . '.webp';
+                $p->thumb_url = $baseUrl . '/_thumbs/800/' . $p->id . '.webp';
+            $p->srcset = $baseUrl . '/_thumbs/400/' . $p->filename . '.webp 400w, ' . 
+                           $baseUrl . '/_thumbs/800/' . $p->filename . '.webp 800w, ' . 
+                           $baseUrl . '/_thumbs/1200/' . $p->filename . '.webp 1200w';
                 return $p;
             });
 
@@ -55,7 +58,10 @@ class SearchController extends Controller
             $photos->transform(function($p) {
                 $p->load('gallery');
                 $baseUrl = '/api/media/' . $p->gallery->slug;
-                $p->thumb_url = $baseUrl . '/_thumbs/' . md5($p->filename . '1024') . '.webp';
+                $p->thumb_url = $baseUrl . '/_thumbs/800/' . $p->id . '.webp';
+            $p->srcset = $baseUrl . '/_thumbs/400/' . $p->filename . '.webp 400w, ' . 
+                           $baseUrl . '/_thumbs/800/' . $p->filename . '.webp 800w, ' . 
+                           $baseUrl . '/_thumbs/1200/' . $p->filename . '.webp 1200w';
                 return $p;
             });
 
@@ -89,7 +95,10 @@ class SearchController extends Controller
             $photos->transform(function($p) {
                 $p->load('gallery');
                 $baseUrl = '/api/media/' . $p->gallery->slug;
-                $p->thumb_url = $baseUrl . '/_thumbs/' . md5($p->filename . '1024') . '.webp';
+                $p->thumb_url = $baseUrl . '/_thumbs/800/' . $p->id . '.webp';
+            $p->srcset = $baseUrl . '/_thumbs/400/' . $p->filename . '.webp 400w, ' . 
+                           $baseUrl . '/_thumbs/800/' . $p->filename . '.webp 800w, ' . 
+                           $baseUrl . '/_thumbs/1200/' . $p->filename . '.webp 1200w';
                 return $p;
             });
 
@@ -137,8 +146,11 @@ class SearchController extends Controller
         }
 
         $baseUrl = '/api/media/' . $photo->gallery->slug;
-        $photo->url = $baseUrl . '/' . $photo->filename;
-        $photo->thumb_url = $baseUrl . '/_thumbs/' . md5($photo->filename . '1024') . '.webp';
+        $photo->url = $baseUrl . '/_' . 'thumbs/2000/' . $photo->id . '.webp';
+        $photo->thumb_url = $baseUrl . '/_thumbs/800/' . $photo->id . '.webp';
+            $photo->srcset = $baseUrl . '/_thumbs/400/' . $photo->filename . '.webp 400w, ' . 
+                           $baseUrl . '/_thumbs/800/' . $photo->filename . '.webp 800w, ' . 
+                           $baseUrl . '/_thumbs/1200/' . $photo->filename . '.webp 1200w';
 
         return response()->json([
             'photo' => $photo,

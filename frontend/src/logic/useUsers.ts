@@ -3,12 +3,12 @@ import {apiMutate, fetcher} from '../api';
 import {Gallery, GalleryGroup} from './useGalleries';
 
 export interface Role {
-    id: number;
+    id: string;
     name: string;
 }
 
 export interface UserDetailed {
-    id: number;
+    id: string;
     name: string;
     email: string;
     can_edit_metadata: boolean;
@@ -18,7 +18,7 @@ export interface UserDetailed {
 }
 
 export interface DomainMapping {
-    id: number;
+    id: string;
     domain: string;
     role?: Role;
     gallery_group?: GalleryGroup;
@@ -41,7 +41,7 @@ export function useUsers() {
         mutateUsers();
     };
 
-    const updateUser = async (id: number, role_ids: number[], gallery_group_ids: number[], gallery_ids: number[], can_edit_metadata: boolean) => {
+    const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean) => {
         await apiMutate(`/api/management/users/${id}`, 'PUT', {
             role_ids,
             gallery_group_ids,
@@ -51,12 +51,12 @@ export function useUsers() {
         mutateUsers();
     };
 
-    const createMapping = async (domain: string, role_id: number | null, gallery_group_id: number | null) => {
+    const createMapping = async (domain: string, role_id: string | null, gallery_group_id: number | null) => {
         await apiMutate('/api/management/domain-mappings', 'POST', {domain, role_id, gallery_group_id});
         mutateMappings();
     };
 
-    const deleteMapping = async (id: number) => {
+    const deleteMapping = async (id: string) => {
         await apiMutate(`/api/management/domain-mappings/${id}`, 'DELETE');
         mutateMappings();
     };

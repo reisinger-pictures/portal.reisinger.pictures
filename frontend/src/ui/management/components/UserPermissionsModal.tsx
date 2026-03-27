@@ -8,7 +8,7 @@ interface UserPermissionsModalProps {
     flatGroups: FlatGroup[];
     flatGalleries: Gallery[];
     onClose: () => void;
-    onSave: (id: number, roles: number[], groups: number[], galleries: number[], canEditMeta: boolean) => Promise<void>;
+    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean) => Promise<void>;
 }
 
 export default function UserPermissionsModal({
@@ -19,12 +19,12 @@ export default function UserPermissionsModal({
                                                  onClose,
                                                  onSave
                                              }: UserPermissionsModalProps) {
-    const [selRoles, setSelRoles] = useState<number[]>(user.roles.map(r => r.id));
-    const [selGroups, setSelGroups] = useState<number[]>(user.gallery_groups.map(g => g.id));
-    const [selGalleries, setSelGalleries] = useState<number[]>(user.galleries.map(g => g.id));
+    const [selRoles, setSelRoles] = useState<string[]>(user.roles.map(r => r.id));
+    const [selGroups, setSelGroups] = useState<string[]>(user.gallery_groups.map(g => g.id));
+    const [selGalleries, setSelGalleries] = useState<string[]>(user.galleries.map(g => g.id));
     const [canEditMeta, setCanEditMeta] = useState<boolean>(user.can_edit_metadata || false);
 
-    const toggleItem = (arr: number[], setArr: React.Dispatch<React.SetStateAction<number[]>>, id: number) => {
+    const toggleItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: number) => {
         setArr(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
     };
 

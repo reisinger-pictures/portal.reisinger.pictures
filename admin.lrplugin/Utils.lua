@@ -58,7 +58,7 @@ function Utils.flattenGalleries(tree)
             table.insert(flat, { title = icon .. gal.name .. live, value = gal.id, raw = gal })
         end
     end
-    if #flat == 0 then table.insert(flat, { title = "Keine Galerien vorhanden", value = -1 }) end
+    if #flat == 0 then table.insert(flat, { title = "Keine Galerien vorhanden", value = "" }) end
     return flat
 end
 

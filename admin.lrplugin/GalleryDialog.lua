@@ -16,7 +16,7 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
         props.gSlug = editingGallery and editingGallery.slug or ""
         props.slugEdited = editingGallery and true or false
         props.gPublic = editingGallery and (editingGallery.is_public and "true" or "false") or "false"
-        props.gGroup = editingGallery and (editingGallery.gallery_group_id or -1) or -1
+        props.gGroup = editingGallery and (editingGallery.gallery_group_id or "") or ""
         props.gLive = (editingGallery and editingGallery.is_live) == true
         props.gPassword = ""
         props.gExpiresAt = ""
@@ -51,7 +51,7 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
             if not isAutoUpdating then props.slugEdited = true end
         end)
 
-        local groupItems = { { title = "-- Keine (Root Ebene) --", value = -1 } }
+        local groupItems = { { title = "-- Keine (Root Ebene) --", value = "" } }
         for _, g in ipairs(Utils.flattenGroups(treeData.groups)) do table.insert(groupItems, g) end
 
         local rows = { spacing = f:control_spacing() }
@@ -152,7 +152,7 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
                     type = mode,
                     is_public = (mode == "selection") and false or (props.gPublic == "true"),
                     is_live = (mode == "delivery") and props.gLive or false,
-                    gallery_group_id = props.gGroup == -1 and nil or props.gGroup
+                    gallery_group_id = props.gGroup == "" and nil or props.gGroup
                 }
                 
                 if props.gPassword ~= "" then payload.password = props.gPassword end

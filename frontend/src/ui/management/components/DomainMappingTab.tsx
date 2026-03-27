@@ -7,7 +7,7 @@ interface DomainMappingTabProps {
     roles?: Role[];
     flatGroups: FlatGroup[];
     onCreateMapping: (domain: string, role_id: number | null, group_id: number | null) => Promise<void>;
-    onDeleteMapping: (id: number) => Promise<void>;
+    onDeleteMapping: (id: string) => Promise<void>;
 }
 
 export default function DomainMappingTab({
@@ -18,8 +18,8 @@ export default function DomainMappingTab({
                                              onDeleteMapping
                                          }: DomainMappingTabProps) {
     const [newDomain, setNewDomain] = useState('');
-    const [newRole, setNewRole] = useState<number | ''>('');
-    const [newGroup, setNewGroup] = useState<number | ''>('');
+    const [newRole, setNewRole] = useState<string>('');
+    const [newGroup, setNewGroup] = useState<string>('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -67,7 +67,7 @@ export default function DomainMappingTab({
                                         className="input input-sm input-bordered w-full"/></div>
                             <div>
                                 <select value={newRole}
-                                        onChange={e => setNewRole(e.target.value ? Number(e.target.value) : '')}
+                                        onChange={e => setNewRole(e.target.value)}
                                         className="select select-sm select-bordered w-full">
                                     <option value="">-- Keine Rolle --</option>
                                     {roles?.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
@@ -75,7 +75,7 @@ export default function DomainMappingTab({
                             </div>
                             <div>
                                 <select value={newGroup}
-                                        onChange={e => setNewGroup(e.target.value ? Number(e.target.value) : '')}
+                                        onChange={e => setNewGroup(e.target.value)}
                                         className="select select-sm select-bordered w-full">
                                     <option value="">-- Keine Gruppe --</option>
                                     {flatGroups.map(g => <option key={g.id}
