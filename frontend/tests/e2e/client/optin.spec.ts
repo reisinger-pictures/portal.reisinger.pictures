@@ -21,7 +21,7 @@ test.describe('Client Notifications Opt-In', () => {
 
         // Galerie öffnen
         await page.goto('/galleries');
-        await page.locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
         
         // Kundenansicht simulieren

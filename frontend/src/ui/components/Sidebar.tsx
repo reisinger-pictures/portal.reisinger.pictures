@@ -102,9 +102,7 @@ export default function Sidebar(props: SidebarProps) {
         );
     };
 
-    const safeGroups = Array.isArray(props.tree?.groups) ? [...props.tree.groups].sort((a, b) => a.name.localeCompare(b.name)) : [];
-    const safeRootGalleries = Array.isArray(props.tree?.root_galleries) ? [...props.tree.root_galleries].sort((a, b) => a.name.localeCompare(b.name)) : [];
-    const isAdminOrPhotog = user?.is_admin || user?.is_photographer;
+            const isAdminOrPhotog = user?.is_admin || user?.is_photographer;
     const isGuest = !user;
 
     return (

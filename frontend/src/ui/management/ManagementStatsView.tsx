@@ -1,4 +1,3 @@
-import {useState} from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {useStats} from '../../logic/useStats';
 import {Legend, Pie, PieChart, ResponsiveContainer, Tooltip} from 'recharts';

@@ -35,12 +35,12 @@ test.describe.serial('Photographer Core Workflow', () => {
         const response = await responsePromise;
         expect(response.status()).toBe(200);
 
-        await expect(page.locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
     });
 
     test('Photographer can edit an existing gallery', async ({ page }) => {
         await sidebar.navigateTo('Galerien');
-        const galLink = page.locator('a').filter({ hasText: galleryName }).first();
+        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
         await galLink.click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
 
@@ -53,7 +53,7 @@ test.describe.serial('Photographer Core Workflow', () => {
 
     test('Photographer can upload an image to the gallery', async ({ page }) => {
         await sidebar.navigateTo('Galerien');
-        const editedLink = page.locator('a').filter({ hasText: editedName }).first();
+        const editedLink = page.locator('main').locator('a').filter({ hasText: editedName }).first();
         await editedLink.click();
         await expect(page.locator(`h1:has-text("${editedName}")`)).toBeVisible({ timeout: 15000 });
 
@@ -83,7 +83,7 @@ test.describe.serial('Photographer Core Workflow', () => {
     test('Photographer can toggle between management and client view using the tab switcher', async ({ page }) => {
         // 1. Zur Galerie navigieren
         await sidebar.navigateTo('Galerien');
-        const editedLink = page.locator('a').filter({ hasText: editedName }).first();
+        const editedLink = page.locator('main').locator('a').filter({ hasText: editedName }).first();
         await editedLink.click();
         await expect(page.locator(`h1:has-text("${editedName}")`)).toBeVisible({ timeout: 15000 });
 

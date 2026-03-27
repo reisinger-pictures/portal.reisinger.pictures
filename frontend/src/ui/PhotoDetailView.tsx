@@ -109,7 +109,7 @@ export default function PhotoDetailView() {
         setLoadingHistory(false);
     };
 
-    const handleRevert = async (versionId: number) => {
+    const handleRevert = async (versionId: string) => {
         if (!(await confirm({ title: 'Version wiederherstellen?', message: 'Möchtest du diese Metadaten-Version wirklich wiederherstellen? Dies überschreibt den aktuellen Stand.', confirmText: 'Wiederherstellen', confirmColor: 'warning' }))) return;
         try {
             await revertMetadata(photo.id, versionId);

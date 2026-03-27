@@ -26,9 +26,9 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
         await modal.clickButton('Speichern');
-        await expect(page.locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 20000 });
+        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 20000 });
 
-        await page.locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
 
         const fileInput = page.locator('input[type="file"]');
         const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');

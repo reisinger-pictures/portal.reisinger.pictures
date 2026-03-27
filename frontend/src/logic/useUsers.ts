@@ -51,7 +51,7 @@ export function useUsers() {
         mutateUsers();
     };
 
-    const createMapping = async (domain: string, role_id: string | null, gallery_group_id: number | null) => {
+    const createMapping = async (domain: string, role_id: string | null, gallery_group_id: string | null) => {
         await apiMutate('/api/management/domain-mappings', 'POST', {domain, role_id, gallery_group_id});
         mutateMappings();
     };

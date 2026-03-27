@@ -22,10 +22,12 @@ Roles are strictly separated.
 - **Pending:** Users who have registered an account but have no assigned roles or gallery mappings yet.
 - **Registered users with roles and magic links:** Users who have registered an account must have access based on their role and additionally must temporarily have the permissionset of the accessed magic link.
 
-## 3. Domain Mapping
+## 3. Domain Mapping (Evaluation & Revocation)
 - Used for B2B clients (e.g., editorial offices).
 - If a user registers with a specific email domain (e.g., `@firma.com`), they are automatically mapped to a specific `Role` and `GalleryGroup`.
 - **Constraint:** Domain Mapping grants access *only* to `delivery` galleries within the mapped group, never to `selection` galleries.
+- **Revocation Behavior (Important):** - The access to Delivery galleries is evaluated **dynamically** on every request (`getAllowedGalleryIds()`). If you delete a domain mapping, the user *instantly* loses access to those galleries.
+  - However, the `Role` and the `GalleryGroup` assignment granted during registration are synced persistently to the user's database record (`user_roles`, `user_gallery_groups`). Deleting the mapping does **not** revoke the Role or the Group assignment automatically. This requires manual adjustment in the User Management UI.
 
 ## 4. IDOR Protection
 - Every controller method accessing a specific resource (e.g., a photo or a gallery) MUST verify that the authenticated user's ID (or transient claim) is linked to that resource via the `getAllowedGalleryIds()` logic.

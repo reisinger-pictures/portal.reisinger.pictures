@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
 interface Toast {
     id: number;
@@ -11,7 +11,7 @@ interface ConfirmOptions {
     message: string;
     confirmText?: string;
     cancelText?: string;
-    confirmColor?: 'primary' | 'error' | 'warning' | 'info';
+    confirmColor?: 'primary' | 'error' | 'warning' | 'info' | 'success';
 }
 
 interface UIContextType {

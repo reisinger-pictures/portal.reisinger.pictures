@@ -136,15 +136,26 @@ class AuthController extends Controller
 
     public function updateProfile(Request $request)
     {
-        $user = Auth::guard('api')->user();
+        $user = \Illuminate\Support\Facades\Auth::guard('api')->user();
+        
+        // Zwingend formatieren, bevor die Validation (und Unique-Regel) greift!
+        if ($request->has('ftp_slug') && !empty($request->input('ftp_slug'))) {
+            $request->merge([
+                'ftp_slug' => \Illuminate\Support\Str::slug($request->input('ftp_slug'))
+            ]);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'metadata_copyright' => 'nullable|string|max:255'
+            'metadata_copyright' => 'nullable|string|max:255',
+            'ftp_slug' => 'sometimes|required|string|max:255|unique:users,ftp_slug,' . $user->id
         ]);
+
         \Illuminate\Support\Facades\DB::transaction(function () use ($user, $validated) {
             $user->update($validated);
             $user->photos()->searchable();
         });
+
         return response()->json(['success' => true]);
     }
 
@@ -160,6 +171,8 @@ class AuthController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'metadata_copyright' => $user->metadata_copyright,
+            'ftp_slug' => $user->ftp_slug,
             'is_admin' => $user->is_admin,
             'is_photographer' => $user->is_photographer,
             'is_pending' => $user->is_pending,

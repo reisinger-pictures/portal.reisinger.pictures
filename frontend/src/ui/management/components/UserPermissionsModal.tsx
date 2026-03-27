@@ -24,7 +24,7 @@ export default function UserPermissionsModal({
     const [selGalleries, setSelGalleries] = useState<string[]>(user.galleries.map(g => g.id));
     const [canEditMeta, setCanEditMeta] = useState<boolean>(user.can_edit_metadata || false);
 
-    const toggleItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: number) => {
+    const toggleItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
         setArr(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
     };
 

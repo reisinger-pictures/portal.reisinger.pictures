@@ -57,14 +57,16 @@ class MailController extends Controller
         $gallery = Gallery::findOrFail($galleryId);
         $user = auth('api')->user();
 
-        // Wir informieren die Fotografen der Galerie, ansonsten als Fallback die Admins.
-        $notifiedUsers = User::whereHas('roles', function($q) { $q->whereIn('name', ['photographer', 'admin']); })
-            ->whereHas('galleries', function($q) use ($gallery) { $q->where('galleries.id', $gallery->id); })
-            ->get();
-
-        if ($notifiedUsers->isEmpty()) {
-            $notifiedUsers = User::whereHas('roles', function($q) { $q->where('name', 'admin'); })->get();
-        }
+        // Strikte Logik: Wir informieren NUR Fotografen/Admins, die explizit dieser Galerie
+        // zugewiesen sind UND Benachrichtigungen (wants_notifications = true) aktiviert haben.
+        $notifiedUsers = User::whereHas('roles', function($q) { 
+            $q->whereIn('name', ['photographer', 'admin']); 
+        })
+        ->whereHas('galleries', function($q) use ($gallery) { 
+            $q->where('galleries.id', $gallery->id)
+              ->where('user_galleries.wants_notifications', true); 
+        })
+        ->get();
         
         foreach($notifiedUsers as $notifiedUser) {
             Mail::html(

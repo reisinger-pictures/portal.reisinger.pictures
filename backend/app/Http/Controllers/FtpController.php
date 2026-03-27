@@ -18,7 +18,7 @@ class FtpController extends Controller
     public function status()
     {
         $user = auth('api')->user();
-        $inboxPath = $this->getInboxPath($user->id);
+        $inboxPath = $this->getInboxPath($user);
 
         $fileCount = 0;
         if (is_dir($inboxPath)) {
@@ -30,7 +30,7 @@ class FtpController extends Controller
         $user->load('currentFtpGallery');
 
         return response()->json([
-            'ftp_folder' => '/ftp/' . $user->id,
+            'ftp_folder' => '/ftp/' . ($user->ftp_slug ?? $user->id),
             'file_count' => $fileCount,
             'current_target_gallery' => $user->currentFtpGallery
         ]);
@@ -66,7 +66,7 @@ class FtpController extends Controller
         }
 
         $gallery = Gallery::find($user->current_ftp_gallery_id);
-        $inboxPath = $this->getInboxPath($user->id);
+        $inboxPath = $this->getInboxPath($user);
 
         if (!is_dir($inboxPath)) {
             return response()->json(['success' => true, 'processed' => 0]);
@@ -121,9 +121,10 @@ class FtpController extends Controller
     /**
      * Hilfsmethode zur Bestimmung des lokalen Pfads der User-Inbox.
      */
-    private function getInboxPath($userId)
+    private function getInboxPath($user)
     {
+        $folder = $user->ftp_slug ?? $user->id;
         // Nutzt den Pfad aus der Filesystem-Config
-        return Storage::disk('ftp_inbox')->path((string) $userId);
+        return Storage::disk('ftp_inbox')->path((string) $folder);
     }
 }

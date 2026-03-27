@@ -34,15 +34,14 @@ class GalleryApiTest extends TestCase
 
         $response->assertStatus(200)
                  ->assertJsonPath('success', true)
-                 ->assertJsonPath('gallery.name', 'Hochzeit Müller');
+                 ->assertJsonPath('gallery.name', 'Hochzeit Müller')
+                 ->assertJsonMissing(['password_hash']); // Leak Prevention Test
                  
         $this->assertDatabaseHas('galleries', ['name' => 'Hochzeit Müller']);
     }
 
     public function test_pure_admin_cannot_create_gallery(): void
     {
-        // Ein Admin hat per Definition Zugriff auf alle Ressourcen, aber das Erstellen 
-        // von Galerien ist ein operativer Prozess, der Fotografen vorbehalten ist.
         $admin = $this->createUserWithRole('admin');
         $token = Auth::guard('api')->login($admin);
 

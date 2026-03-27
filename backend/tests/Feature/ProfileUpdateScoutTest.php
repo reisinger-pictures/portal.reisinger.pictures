@@ -46,4 +46,32 @@ class ProfileUpdateScoutTest extends TestCase
         $photo->refresh();
         $this->assertEquals('New Awesome Copyright', $photo->artist);
     }
+
+    public function test_updating_ftp_slug_validates_uniqueness_and_formats_it()
+    {
+        $user1 = User::factory()->create(['ftp_slug' => 'florian']);
+        $user2 = User::factory()->create(['ftp_slug' => 'max']);
+        $token = auth('api')->login($user2);
+
+        // 1. Conflict Test (422)
+        $responseConflict = $this->withHeaders(['Authorization' => "Bearer $token"])
+                         ->putJson('/api/auth/profile', [
+                             'name' => 'Max',
+                             'ftp_slug' => 'florian' // Gehört schon user1
+                         ]);
+        $responseConflict->assertStatus(422);
+
+        // 2. Format & Success Test (200)
+        $responseSuccess = $this->withHeaders(['Authorization' => "Bearer $token"])
+                         ->putJson('/api/auth/profile', [
+                             'name' => 'Max',
+                             'ftp_slug' => 'Max NeÚ' // Sollte zu max-neu werden
+                         ]);
+        $responseSuccess->assertStatus(200);
+        
+        $this->assertDatabaseHas('users', [
+            'id' => $user2->id,
+            'ftp_slug' => 'max-neu'
+        ]);
+    }
 }

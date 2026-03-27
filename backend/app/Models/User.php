@@ -20,7 +20,7 @@ class User extends Authenticatable implements JWTSubject
 
     protected $visible = [
         'id', 'name', 'email', 'metadata_copyright', 'can_edit_metadata', 
-        'current_ftp_gallery_id', 'created_at', 'is_admin', 'is_photographer', 
+        'current_ftp_gallery_id', 'ftp_slug', 'created_at', 'is_admin', 'is_photographer', 
         'is_pending', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
     ];
 
@@ -30,8 +30,25 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'metadata_copyright',
         'can_edit_metadata',
-        'current_ftp_gallery_id'
+        'current_ftp_gallery_id',
+        'ftp_slug'
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($user) {
+            if (empty($user->ftp_slug) && !empty($user->email)) {
+                $baseSlug = \Illuminate\Support\Str::slug(explode('@', $user->email)[0]);
+                $ftpSlug = $baseSlug;
+                $counter = 1;
+                while (static::where('ftp_slug', $ftpSlug)->exists()) {
+                    $ftpSlug = $baseSlug . $counter;
+                    $counter++;
+                }
+                $user->ftp_slug = $ftpSlug;
+            }
+        });
+    }
 
     protected $casts = [
         'can_edit_metadata' => 'boolean'

@@ -30,7 +30,7 @@ export default function ManagementGalleryView() {
         breadcrumbs
     } = useGallery(slug);
     const {tree, updateGallery, deleteGallery} = useProtectedGalleries();
-        const {user} = useAuth();
+    const {user} = useAuth();
 
     const [isGalleryEditModalOpen, setGalleryEditModalOpen] = useState(false);
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
@@ -41,7 +41,6 @@ export default function ManagementGalleryView() {
     const [isMailModalOpen, setIsMailModalOpen] = useState(false);
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     
-    // Rating Modal State
     const [toastMessage, setToastMessage] = useState<{type: 'error'|'success', text: string} | null>(null);
     const [showRatingsModal, setShowRatingsModal] = useState(false);
     const [ratingsData, setRatingsData] = useState<any[]>([]);
@@ -142,7 +141,6 @@ export default function ManagementGalleryView() {
                 await fetch('/api/management/upload', {
                     method: 'POST',
                     headers: {
-                        
                         'Accept': 'application/json'
                     },
                     body: formData
@@ -259,15 +257,19 @@ export default function ManagementGalleryView() {
                                className="pswp-item block relative aspect-square">
                                 <img src={photo.thumb_url} className="object-cover w-full h-full rounded" loading="lazy"/>
                             </a>
-                            <div className="absolute top-2 right-2 opacity-100 z-10">
-                                <button onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    navigate('/photos/' + photo.id);
-                                }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
-                                    <span className="iconify mdi--open-in-new text-lg"></span>
-                                </button>
-                            </div>
+                            
+                            {/* Nur bei Delivery-Galerien den Button "Details & Metadaten" anzeigen */}
+                            {gallery.type === 'delivery' && (
+                                <div className="absolute top-2 right-2 opacity-100 z-10">
+                                    <button onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        navigate('/photos/' + photo.id);
+                                    }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
+                                        <span className="iconify mdi--open-in-new text-lg"></span>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -282,7 +284,6 @@ export default function ManagementGalleryView() {
                     isOpen={isMailModalOpen}
                     onClose={() => setIsMailModalOpen(false)}
                     galleryId={gallery.id}
-                    
                 />
 
                 {isInviteModalOpen && (
@@ -291,21 +292,16 @@ export default function ManagementGalleryView() {
 
                 <GalleryModals
                     availableGroups={flattenGroups(safeGroups)}
-                    isGroupModalOpen={false} setGroupModalOpen={() => {
-                }}
+                    isGroupModalOpen={false} setGroupModalOpen={() => {}}
                     isGalleryModalOpen={isGalleryEditModalOpen} setGalleryModalOpen={setGalleryEditModalOpen}
                     editingGallery={gallery as unknown as Gallery}
-                    onCreateGroup={async () => {
-                    }} onCreateGallery={async () => {
-                }}
-                    onUpdateGroup={async () => {
-                    }}
+                    onCreateGroup={async () => {}} onCreateGallery={async () => {}}
+                    onUpdateGroup={async () => {}}
                     onUpdateGallery={async (...args) => {
                         await updateGallery(...args);
                         mutate();
                     }}
-                    onDeleteGroup={async () => {
-                    }}
+                    onDeleteGroup={async () => {}}
                     onDeleteGallery={async (id) => {
                         await deleteGallery(id);
                         navigate('/');
@@ -319,7 +315,6 @@ export default function ManagementGalleryView() {
                             <h3 className="font-bold text-2xl mb-6 shrink-0">Bewertungen & Status</h3>
                             
                             <div className="flex-1 overflow-y-auto pr-2 space-y-8">
-                                {/* Bereich: Beteiligte Personen */}
                                 <div>
                                     <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
                                         <span className="iconify mdi--account-group"></span> Beteiligte Personen
@@ -355,7 +350,6 @@ export default function ManagementGalleryView() {
                                     </div>
                                 </div>
 
-                                {/* Bereich: Bild-Bewertungen */}
                                 <div>
                                     <h4 className="font-bold text-lg mb-3 flex items-center gap-2 mt-4">
                                         <span className="iconify mdi--image-multiple"></span> Detaillierte Auswertungen (Bild-Bewertungen)

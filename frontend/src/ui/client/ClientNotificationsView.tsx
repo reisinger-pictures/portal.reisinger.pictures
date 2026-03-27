@@ -3,7 +3,7 @@ import { fetcher, apiMutate } from '../../api';
 import PageLayout from '../components/PageLayout';
 
 interface PrefItem {
-    id: number;
+    id: string;
     name: string;
     type: 'gallery' | 'group';
     gallery_type?: 'selection' | 'delivery';

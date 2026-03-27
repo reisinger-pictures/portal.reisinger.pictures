@@ -4,6 +4,7 @@ export interface IptcData {
     title?: string;
     description?: string;
     artist?: string;
+    headline?: string;
         keywords?: string;
     location?: string;
     city?: string;

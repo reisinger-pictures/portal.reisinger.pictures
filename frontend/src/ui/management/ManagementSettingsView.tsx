@@ -20,12 +20,14 @@ export default function ManagementSettingsView() {
     // Profile State
     const [profileName, setProfileName] = useState(user?.name || '');
     const [profileCopyright, setProfileCopyright] = useState(user?.metadata_copyright || '');
+    const [ftpSlug, setFtpSlug] = useState(user?.ftp_slug || '');
     const [savingProfile, setSavingProfile] = useState(false);
 
     useEffect(() => {
         if (user) {
             setProfileName(user.name);
             setProfileCopyright(user.metadata_copyright || '');
+            setFtpSlug(user.ftp_slug || '');
         }
     }, [user]);
 
@@ -55,7 +57,9 @@ export default function ManagementSettingsView() {
         e.preventDefault();
         setSavingProfile(true);
         try {
-            await apiMutate('/api/auth/profile', 'PUT', { name: profileName, metadata_copyright: profileCopyright });
+            const payload: any = { name: profileName, metadata_copyright: profileCopyright };
+            if (user?.is_photographer) payload.ftp_slug = ftpSlug;
+            await apiMutate('/api/auth/profile', 'PUT', payload);
             await mutateUser();
             showToast('success', 'Profil aktualisiert');
         } catch {
@@ -77,12 +81,25 @@ export default function ManagementSettingsView() {
                             <label className="label"><span className="label-text font-bold">Dein Name</span></label>
                             <input type="text" required value={profileName} onChange={e => setProfileName(e.target.value)} className="input input-bordered w-full"/>
                         </div>
+                        
+                        {user?.is_photographer && (
+                            <div className="form-control">
+                                <label className="label">
+                                    <span className="label-text font-bold">FTP Upload Ordner (Slug)</span>
+                                    <span className="label-text-alt opacity-70">Der Ordnername für deine FTP-Uploads. Muss eindeutig sein.</span>
+                                </label>
+                                <div className="join w-full">
+                                    <span className="btn no-animation join-item bg-base-300 border-base-300 font-mono text-sm px-3 opacity-70 cursor-default">/ftp/</span>
+                                    <input type="text" required value={ftpSlug} onChange={e => setFtpSlug(e.target.value)} placeholder="z.B. max" className="input input-bordered join-item w-full font-mono text-sm"/>
+                                </div>
+                            </div>
+                        )}
                         <div className="form-control">
                             <label className="label">
                                 <span className="label-text font-bold">Standard-Urheber (IPTC Copyright)</span>
                                 <span className="label-text-alt opacity-70">Dieser Wert wird in neue Bilder geschrieben, falls die Galerie Metadaten anwendet.</span>
                             </label>
-                            <input type="text" value={profileCopyright} onChange={e => setProfileCopyright(e.target.value)} placeholder="z.B. Florian Reisinger" className="input input-bordered w-full"/>
+                            <input type="text" value={profileCopyright} onChange={e => setProfileCopyright(e.target.value)} placeholder="z.B. Max Mustermann" className="input input-bordered w-full"/>
                         </div>
                         <div>
                             <button type="submit" disabled={savingProfile} className="btn btn-primary">

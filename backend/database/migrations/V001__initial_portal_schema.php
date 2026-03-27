@@ -57,6 +57,7 @@ return new class extends Migration {
             $table->string('email')->unique();
             $table->string('name');
             $table->string('password')->nullable();
+            $table->string('ftp_slug')->unique()->nullable();
             $table->string('metadata_copyright')->nullable();
             $table->boolean('can_edit_metadata')->default(false);
             $table->timestamp('created_at')->useCurrent();

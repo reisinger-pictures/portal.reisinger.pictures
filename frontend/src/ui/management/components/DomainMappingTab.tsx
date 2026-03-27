@@ -6,7 +6,7 @@ interface DomainMappingTabProps {
     mappings?: DomainMapping[];
     roles?: Role[];
     flatGroups: FlatGroup[];
-    onCreateMapping: (domain: string, role_id: number | null, group_id: number | null) => Promise<void>;
+    onCreateMapping: (domain: string, role_id: string | null, group_id: string | null) => Promise<void>;
     onDeleteMapping: (id: string) => Promise<void>;
 }
 

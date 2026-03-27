@@ -6,7 +6,7 @@ import Sidebar from './components/Sidebar';
 import AdminWatermarkBanner from './management/components/AdminWatermarkBanner';
 
 export default function SearchView() {
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [searchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
     const [localQuery, setLocalQuery] = useState(query);
     const {results, isLoading, isError} = useSearch(query);

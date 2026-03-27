@@ -6,6 +6,8 @@ export interface User {
     id: string;
     name: string;
     email: string;
+    metadata_copyright?: string | null;
+    ftp_slug?: string | null;
     is_admin: boolean;
     is_photographer: boolean;
     is_pending: boolean;
@@ -61,5 +63,5 @@ export function useAuth() {
         await mutate(); 
     };
 
-    return {user, isLoading: !error && user === undefined, isError: error, login, register, logout};
+    return {user, isLoading: !error && user === undefined, isError: error, login, register, logout, mutate};
 }

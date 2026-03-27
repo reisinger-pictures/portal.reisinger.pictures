@@ -6,7 +6,7 @@ import { useSearch } from '../../logic/useSearch';
 import GalleryModals from './GalleryModals';
 import AdminWatermarkBanner from '../management/components/AdminWatermarkBanner';
 
-export default function PageLayout({children, currentView, hideMobileHeader}: {
+export default function PageLayout({children, currentView}: {
     children: React.ReactNode,
     currentView?: string,
     hideMobileHeader?: boolean

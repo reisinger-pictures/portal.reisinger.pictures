@@ -27,9 +27,9 @@ test.describe.serial('Client Workflow', () => {
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
         await modal.clickButton('Speichern');
         await expect(modal.activeModal).toBeHidden({ timeout: 10000 });
-        await expect(page.locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
 
-        await page.locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
 
         const fileInput = page.locator('input[type="file"]');

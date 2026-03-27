@@ -1,6 +1,5 @@
 import ResponsiveImage from '../components/ResponsiveImage';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../logic/useAuth';
 import { apiMutate } from '../../api';
@@ -94,7 +93,7 @@ const GridPhotoActions = ({ photo, ratePhoto }: { photo: any, ratePhoto: any }) 
 };
 
 export default function SelectionView({ galleryData }: { galleryData: any }) {
-    const navigate = useNavigate();
+    // const navigate = useNavigate();
     const { gallery, photos, isLoading, ratePhoto, size, setSize, isReachingEnd } = galleryData;
     const { user } = useAuth();
 

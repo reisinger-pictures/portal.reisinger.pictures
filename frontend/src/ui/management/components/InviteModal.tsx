@@ -11,7 +11,7 @@ export default function InviteModal({galleryId, onClose}: { galleryId: string, o
     const { showToast, confirm } = useUI();
 
     const {data: invites, mutate} = useSWR<{
-        id: number,
+        id: string,
         name: string,
         token: string
     }[]>(`/api/management/galleries/${galleryId}/invites`, fetcher);

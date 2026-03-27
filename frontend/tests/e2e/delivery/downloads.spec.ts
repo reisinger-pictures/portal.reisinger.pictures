@@ -27,9 +27,9 @@ test.describe.serial('Download Triggers UI', () => {
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.selectByLabel('Sichtbarkeit', 'Öffentlich (Für alle sichtbar)');
         await modal.clickButton('Speichern');
-        await expect(page.locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
         
-        await page.locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
 
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');
