@@ -82,10 +82,14 @@ export default function PageLayout({children, currentView}: {
                 </div>
 
                 <main className="flex-1 overflow-y-auto flex flex-col w-full relative bg-base-200">
-                    <header className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-4">
-                        <button className="btn btn-square btn-ghost md:hidden" onClick={() => setIsSidebarOpen(true)}>
+                    <header className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
+                        <button className="btn btn-square btn-ghost md:hidden shrink-0" onClick={() => setIsSidebarOpen(true)}>
                             <span className="iconify mdi--menu text-2xl"></span>
                         </button>
+                        <Link to="/" className="md:hidden flex items-center gap-2 shrink-0 mr-1">
+                            <img src="/android-chrome-192x192.png" alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
+                            <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">Reisinger Portal</span>
+                        </Link>
                         <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full md:max-w-4xl">
                             <div className="join w-full shadow-sm">
                                 <input

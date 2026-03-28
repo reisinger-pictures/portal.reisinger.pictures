@@ -7,7 +7,6 @@ call php artisan test
 if %errorlevel% neq 0 (
     echo ❌ Backend Tests fehlgeschlagen! Deployment abgebrochen.
     cd ..
-    pause
     exit /b %errorlevel%
 )
 cd ..
@@ -21,7 +20,6 @@ call pnpm test:e2e
 if %errorlevel% neq 0 (
     echo ❌ Frontend E2E Tests fehlgeschlagen! Deployment abgebrochen.
     cd ..
-    pause
     exit /b %errorlevel%
 )
 
@@ -34,7 +32,6 @@ call pnpm build
 if %errorlevel% neq 0 (
     echo ❌ Frontend Build fehlgeschlagen! Deployment abgebrochen.
     cd ..
-    pause
     exit /b %errorlevel%
 )
 cd ..

@@ -76,10 +76,11 @@ class SearchController extends Controller
         $galleryQuery = Gallery::search($q);
 
         if (!$user || !$user->is_admin) {
-            $allowedGalleryIds = $user ? $user->galleries()->pluck('galleries.id')->toArray() : [];
+            $allowedGalleryIds = $user ? $user->getAllowedGalleryIds() : [];
             $publicGalleryIds = Gallery::where('is_public', true)->pluck('id')->toArray();
-            // Strict casting & re-indexing for Meilisearch JSON compatibility
-            $allowedGalleryIds = array_values(array_map('intval', array_unique(array_merge($allowedGalleryIds, $publicGalleryIds))));
+            
+            // Clean up and merge unique string UUIDs for Meilisearch JSON compatibility
+            $allowedGalleryIds = array_values(array_unique(array_merge($allowedGalleryIds, $publicGalleryIds)));
 
             if (empty($allowedGalleryIds)) {
                 return response()->json(['galleries' => [], 'photos' => []]);

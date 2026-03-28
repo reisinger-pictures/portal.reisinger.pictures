@@ -37,12 +37,14 @@ export default function SearchView() {
                 </div>
 
                 <main className="flex-1 overflow-y-auto flex flex-col w-full relative bg-base-200">
-                    <header
-                        className="p-4 border-b border-base-300 bg-base-100 flex items-center gap-4  md:hidden">
-                        <button className="btn btn-square btn-ghost" onClick={() => setIsSidebarOpen(true)}>
+                    <header className="p-4 border-b border-base-300 bg-base-100 flex items-center gap-3 md:hidden">
+                        <button className="btn btn-square btn-ghost shrink-0" onClick={() => setIsSidebarOpen(true)}>
                             <span className="iconify mdi--menu text-2xl"></span>
                         </button>
-                        <h1 className="text-xl font-bold text-primary">Entdecken</h1>
+                        <Link to="/" className="flex items-center gap-2 shrink-0">
+                            <img src="/android-chrome-192x192.png" alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
+                            <span className="font-bold text-base truncate">Reisinger Foto Portal</span>
+                        </Link>
                     </header>
 
                     <div className="container mx-auto max-w-7xl p-4 md:p-8">
