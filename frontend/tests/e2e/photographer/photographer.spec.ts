@@ -111,4 +111,39 @@ test.describe.serial('Photographer Core Workflow', () => {
         await expect(page.locator('text=Lade deine Bilder herunter.')).toBeHidden();
     });
 
+
+    test('Photographer can update profile settings and verify FTP slug in dashboard', async ({ page }) => {
+        // 1. Zu den Einstellungen navigieren
+        await sidebar.navigateTo('Einstellungen');
+        await expect(page.locator('h1:has-text("Einstellungen")')).toBeVisible();
+
+        // 2. Generiere eindeutige Test-Werte
+        const uniqueSuffix = Date.now().toString().slice(-6);
+        const newName = `Test Photog ${uniqueSuffix}`;
+        const newSlug = `ftp-${uniqueSuffix}`;
+        const newCopyright = `© ${newName}`;
+
+        // 3. Felder ausfüllen
+        await page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input').fill(newName);
+        await page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input').fill(newSlug);
+        await page.locator('.form-control').filter({ hasText: 'Standard-Urheber' }).locator('input').fill(newCopyright);
+
+        // 4. Speichern & auf Toast warten
+        await page.getByRole('button', { name: 'Profil speichern' }).click();
+        const toast = page.locator('.toast');
+        await expect(toast).toBeVisible({ timeout: 15000 });
+        await expect(toast).toContainText('Profil aktualisiert', { timeout: 5000 });
+
+        // 5. HARD REFRESH: Prüfen, ob die Daten wirklich persistiert wurden
+        await page.reload();
+        await expect(page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input')).toHaveValue(newName, { timeout: 15000 });
+        await expect(page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input')).toHaveValue(newSlug);
+
+        // 6. Navigation zum Dashboard und FTP-Widget Validierung
+        await page.goto('/');
+        await expect(page.locator('h2:has-text("FTP Inbox")')).toBeVisible({ timeout: 15000 });
+        
+        // Prüfen, ob der neue Slug im FTP-Pfad angezeigt wird
+        await expect(page.locator(`code:has-text("/ftp/${newSlug}")`)).toBeVisible();
+    });
 });

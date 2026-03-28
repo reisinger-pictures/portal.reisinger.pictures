@@ -1,7 +1,7 @@
 # 📝 Backlog / Nächster Sprint
 
-Alle bekannten Entwicklungs-Tasks für das Release 1.0 sind erfolgreich abgeschlossen. Bereit für den Live-Gang!
+🎉 **Release 1.0 ist erfolgreich in Produktion!**
+Alle Kern-Tasks für diesen Meilenstein sind offiziell abgeschlossen.
 
-
-## Hotfixes & Nacharbeiten
-- [ ] **Produktion:** Überprüfen, ob `ftp_slug` und `metadata_copyright` nach dem Container-Neustart korrekt gespeichert werden. (Ursache war vermutlich PHP OPcache nach Rclone-Sync).
+## Feature-Lücken & Zukünftige Iterationen
+- [ ] **Frontend:** "Smart Assistance" (IPTC Auto-Complete) in `IptcMetadataEditor.tsx`. *Hinweis:* Muss mit einem echten Geodaten-Set (z.B. PLZ/Städte-Datenbank für D-A-CH) gelöst werden, da statische Arrays hier nicht skalieren.

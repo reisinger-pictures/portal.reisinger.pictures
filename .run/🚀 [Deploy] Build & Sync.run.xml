@@ -1,13 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Build and sync Frontend" type="BatchConfigurationType" factoryName="Batch">
+  <configuration default="false" name="🚀 [Deploy] Build &amp; Sync" type="BatchConfigurationType" factoryName="Batch">
     <module name="portal.reisinger.pictures" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
     <option name="PARENT_ENVS" value="true" />
-    <option name="SCRIPT_NAME" value="sync.bat" />
+    <option name="SCRIPT_NAME" value="build_and_sync.bat" />
     <option name="PARAMETERS" value="" />
-    <method v="2">
-      <option name="Make" enabled="true" />
-    </method>
+    <method v="2" />
   </configuration>
 </component>

@@ -14,4 +14,5 @@
 - storage/app/public/**
 - storage/app/private/temp/**
 - out/**
+- bootstrap/cache/**
 + **
