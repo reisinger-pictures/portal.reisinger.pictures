@@ -18,6 +18,8 @@ status: active
 - **Mobile-First:** Action buttons must not be hidden behind CSS `:hover` states.
 - **Feedback:** Use the global `UIContext` (Toast messages). Never use native `alert()`.
 - **State via URL:** Application state (search queries, tabs) MUST be derived from the URL.
+- **Forms:** Strict use of `react-hook-form` and `zod` for form state management and validation. Avoid cascading `useState` hooks for form fields.
+- **Component Granularity (SRP):** Strictly separate concerns. Components should be small and focused. Extract modals, complex forms, and distinct UI sections (like cards or dropzones) into their own sub-components to prevent "God-Components" and minimize unnecessary re-renders.
 
 
 ## 4. Routing & URL Patterns

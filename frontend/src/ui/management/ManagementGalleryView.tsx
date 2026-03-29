@@ -1,15 +1,17 @@
-import {useEffect, useRef, useState} from 'react';
+import {useRef, useState} from 'react';
+import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams} from 'react-router-dom';
 import {useGallery} from '../../logic/useGallery';
 import {flattenGroups, Gallery, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
-import PhotoSwipeLightbox from 'photoswipe/lightbox';
-import 'photoswipe/style.css';
 import EmailComposerModal from './components/EmailComposerModal';
 import InviteModal from './components/InviteModal';
 import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import GalleryModals from '../components/GalleryModals';
+import UploadDropzone from './components/UploadDropzone';
+import RatingStatusModal from './components/RatingStatusModal';
+import GalleryMetadataDefaultsModal from './components/GalleryMetadataDefaultsModal';
 
 export default function ManagementGalleryView() {
     const params = useParams();
@@ -36,122 +38,12 @@ export default function ManagementGalleryView() {
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
 
     const galleryRef = useRef<HTMLDivElement>(null);
-    const [uploading, setUploading] = useState(false);
-    const [isDragging, setIsDragging] = useState(false);
     const [isMailModalOpen, setIsMailModalOpen] = useState(false);
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-    
-    const [toastMessage, setToastMessage] = useState<{type: 'error'|'success', text: string} | null>(null);
     const [showRatingsModal, setShowRatingsModal] = useState(false);
-    const [ratingsData, setRatingsData] = useState<any[]>([]);
-    const [ratingStatusData, setRatingStatusData] = useState<any[]>([]);
-    const [totalGalleryPhotos, setTotalGalleryPhotos] = useState(0);
+    const [isMetadataModalOpen, setIsMetadataModalOpen] = useState(false);
 
-    const fetchRatings = async () => {
-        try {
-            const headers = { 'Accept': 'application/json' };
-            const [resExport, resStatus] = await Promise.all([
-                fetch('/api/management/galleries/' + gallery!.id + '/export', { headers, credentials: 'include' }),
-                fetch('/api/management/galleries/' + gallery!.id + '/rating-status', { headers, credentials: 'include' })
-            ]);
-
-            if (!resExport.ok || !resStatus.ok) throw new Error('API Error');
-
-            const dataExport = await resExport.json();
-            const dataStatus = await resStatus.json();
-
-            setRatingsData(dataExport);
-            setRatingStatusData(dataStatus.users);
-            setTotalGalleryPhotos(dataStatus.total_photos);
-
-            setShowRatingsModal(true);
-        } catch (e) {
-            setToastMessage({ type: 'error', text: 'Die Bewertungen konnten nicht geladen werden.' });
-            setTimeout(() => setToastMessage(null), 4000);
-        }
-    };
-
-    useEffect(() => {
-        let lightbox: PhotoSwipeLightbox | null = null;
-        if (galleryRef.current && photos.length > 0) {
-            lightbox = new PhotoSwipeLightbox({
-                gallery: galleryRef.current,
-                children: 'a.pswp-item',
-                pswpModule: () => import('photoswipe')
-            });
-
-            lightbox.on('uiRegister', function () {
-                lightbox!.pswp!.ui!.registerElement({
-                    name: 'custom-caption', order: 9, isButton: false, appendTo: 'wrapper', html: '',
-                    onInit: (el) => {
-                        lightbox!.pswp!.on('change', () => {
-                            const currSlideElement = lightbox!.pswp!.currSlide?.data?.element;
-                            if (currSlideElement) {
-                                const title = currSlideElement.getAttribute('data-title') || '';
-                                const desc = currSlideElement.getAttribute('data-desc') || '';
-                                const artist = currSlideElement.getAttribute('data-artist') || '';
-
-                                el.innerHTML = '';
-                                if (title || desc) {
-                                    const container = document.createElement('div');
-                                    container.className = 'absolute bottom-5 left-5 text-white drop-shadow-md max-w-[600px] font-sans leading-relaxed pointer-events-none p-4';
-
-                                    if (title) {
-                                        const b = document.createElement('b');
-                                        b.className = 'text-lg block mb-1';
-                                        b.textContent = title;
-                                        container.appendChild(b);
-                                    }
-                                    if (desc) {
-                                        const span = document.createElement('span');
-                                        span.textContent = desc;
-                                        container.appendChild(span);
-                                    }
-                                    if (artist) {
-                                        if (desc) container.appendChild(document.createElement('br'));
-                                        const small = document.createElement('small');
-                                        small.className = 'opacity-80 mt-1 block';
-                                        small.textContent = '© ' + artist;
-                                        container.appendChild(small);
-                                    }
-                                    el.appendChild(container);
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-
-            lightbox.init();
-        }
-        return () => {
-            if (lightbox) lightbox.destroy();
-        };
-    }, [photos.length]);
-
-    const handleWebUpload = async (files: FileList | null) => {
-        if (!files || !gallery) return;
-        setUploading(true);
-        for (const file of Array.from(files)) {
-            const formData = new FormData();
-            formData.append('gallery_id', gallery.id.toString());
-            formData.append('lr_uuid', 'web-' + Math.random().toString(36).substring(2, 15));
-            formData.append('file', file);
-            try {
-                await fetch('/api/management/upload', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json'
-                    },
-                    body: formData
-                });
-            } catch (err) {
-                console.error(err);
-            }
-        }
-        setUploading(false);
-        mutate();
-    };
+    usePhotoSwipe({ galleryRef, dependencies: [photos.length] });
 
     if (isLoading && photos.length === 0) return <PageLayout>
         <div className="flex h-full items-center justify-center"><span className="loading loading-spinner"></span></div>
@@ -163,16 +55,8 @@ export default function ManagementGalleryView() {
     return (
         <PageLayout>
             <div className="container mx-auto p-4 md:p-8">
-                {toastMessage && (
-                    <div className="toast toast-top toast-center z-[100] mt-12 md:mt-4 transition-all">
-                        <div className={`alert alert-${toastMessage.type} shadow-xl`}>
-                            <span className="iconify mdi--alert-circle text-xl"></span>
-                            <span>{toastMessage.text}</span>
-                            <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setToastMessage(null)}>✕</button>
-                        </div>
-                    </div>
-                )}
                 <GalleryHeader gallery={gallery} breadcrumbs={breadcrumbs} />
+                
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h1 className="text-3xl font-bold flex items-center gap-2">
                         {gallery.name}
@@ -189,8 +73,13 @@ export default function ManagementGalleryView() {
                         {user?.is_photographer && (
                             <div className="flex gap-2">
                                 {gallery.type === 'selection' && (
-                                    <button onClick={fetchRatings} className="btn btn-secondary btn-sm">
+                                    <button onClick={() => setShowRatingsModal(true)} className="btn btn-secondary btn-sm">
                                         <span className="iconify mdi--star-outline"></span> Bewertungen...
+                                    </button>
+                                )}
+                                {gallery.type === 'delivery' && (
+                                    <button onClick={() => setIsMetadataModalOpen(true)} className="btn btn-secondary btn-sm">
+                                        <span className="iconify mdi--tag-multiple"></span> Vorgaben...
                                     </button>
                                 )}
                                 <button onClick={() => setIsInviteModalOpen(true)} className="btn btn-outline btn-sm">
@@ -205,42 +94,20 @@ export default function ManagementGalleryView() {
                 </div>
 
                 {user?.is_photographer && (
-                    <div
-                        onDragOver={(e) => {
-                            e.preventDefault();
-                            setIsDragging(true);
-                        }}
-                        onDragLeave={() => setIsDragging(false)}
-                        onDrop={(e) => {
-                            e.preventDefault();
-                            setIsDragging(false);
-                            handleWebUpload(e.dataTransfer.files);
-                        }}
-                        className={`mb-8 p-6 md:p-10 border-2 border-dashed rounded-box flex flex-col items-center justify-center text-center transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-base-content/30 bg-base-200'}`}
-                    >
-                        <span className="iconify mdi--cloud-upload text-5xl mb-3 text-primary"></span>
-                        <h3 className="font-bold text-xl mb-1">Bilder hierher ziehen</h3>
-                        <p className="text-sm opacity-70 mb-6">oder auf den Button klicken, um Dateien auszuwählen</p>
-                        <input type="file" multiple accept="image/*" onChange={(e) => handleWebUpload(e.target.files)}
-                               disabled={uploading}
-                               className="file-input file-input-bordered file-input-primary file-input-sm w-full max-w-xs"/>
-                    </div>
+                    <UploadDropzone galleryId={gallery.id} onUploadComplete={() => mutate()} />
                 )}
 
                 {!isLoading && photos.length === 0 && (
-                    <div
-                        className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300">
+                    <div className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300">
                         <span className="iconify mdi--image-off-outline text-6xl mb-4"></span>
                         <h3 className="text-2xl font-bold">Noch keine Bilder vorhanden</h3>
                         {gallery.is_live ? (
                             <p className="mt-2 text-warning flex items-center gap-2">
                                 <span className="iconify mdi--autorenew animate-spin"></span>
-                                Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10
-                                Sekunden.
+                                Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10 Sekunden.
                             </p>
                         ) : (
-                            <p className="mt-2">Lade Bilder per Drag & Drop hoch oder importiere sie über die
-                                FTP-Inbox.</p>
+                            <p className="mt-2">Lade Bilder per Drag & Drop hoch oder importiere sie über die FTP-Inbox.</p>
                         )}
                     </div>
                 )}
@@ -255,10 +122,9 @@ export default function ManagementGalleryView() {
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded" loading="lazy"/>
+                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded" loading="lazy" alt={photo.filename}/>
                             </a>
                             
-                            {/* Nur bei Delivery-Galerien den Button "Details & Metadaten" anzeigen */}
                             {gallery.type === 'delivery' && (
                                 <div className="absolute top-2 right-2 opacity-100 z-10">
                                     <button onClick={(e) => {
@@ -280,15 +146,13 @@ export default function ManagementGalleryView() {
                     </div>
                 )}
 
-                <EmailComposerModal
-                    isOpen={isMailModalOpen}
-                    onClose={() => setIsMailModalOpen(false)}
-                    galleryId={gallery.id}
-                />
-
-                {isInviteModalOpen && (
-                    <InviteModal galleryId={gallery.id} onClose={() => setIsInviteModalOpen(false)}/>
-                )}
+                {/* --- Modals --- */}
+                <EmailComposerModal isOpen={isMailModalOpen} onClose={() => setIsMailModalOpen(false)} galleryId={gallery.id} />
+                
+                {isInviteModalOpen && <InviteModal galleryId={gallery.id} onClose={() => setIsInviteModalOpen(false)}/>}
+                
+                <RatingStatusModal galleryId={gallery.id} isOpen={showRatingsModal} onClose={() => setShowRatingsModal(false)} />
+                <GalleryMetadataDefaultsModal isOpen={isMetadataModalOpen} onClose={() => setIsMetadataModalOpen(false)} gallery={gallery as unknown as Gallery} onUpdate={async (...args) => { await updateGallery(...args); mutate(); }} />
 
                 <GalleryModals
                     availableGroups={flattenGroups(safeGroups)}
@@ -307,83 +171,6 @@ export default function ManagementGalleryView() {
                         navigate('/');
                     }}
                 />
-
-                {showRatingsModal && (
-                    <div className="modal modal-open z-50">
-                        <div className="modal-box max-w-5xl relative flex flex-col max-h-[90vh]">
-                            <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setShowRatingsModal(false)}>✕</button>
-                            <h3 className="font-bold text-2xl mb-6 shrink-0">Bewertungen & Status</h3>
-                            
-                            <div className="flex-1 overflow-y-auto pr-2 space-y-8">
-                                <div>
-                                    <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
-                                        <span className="iconify mdi--account-group"></span> Beteiligte Personen
-                                    </h4>
-                                    <div className="overflow-x-auto border border-base-300 rounded-box">
-                                        <table className="table table-zebra w-full">
-                                            <thead className="bg-base-200">
-                                                <tr>
-                                                    <th>Name</th>
-                                                    <th>Status</th>
-                                                    <th>Fortschritt</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {ratingStatusData.map(u => (
-                                                    <tr key={u.user_id}>
-                                                        <td className="font-bold">
-                                                            {u.name}
-                                                            {u.email && !u.email.includes('@invite.local') && <span className="block text-xs opacity-70 font-normal">{u.email}</span>}
-                                                            {u.email && u.email.includes('@invite.local') && <span className="block text-xs opacity-50 font-normal">Via Magic Link</span>}
-                                                        </td>
-                                                        <td className="whitespace-nowrap">{u.rated_count} von {totalGalleryPhotos} Bildern</td>
-                                                        <td className="w-1/3 min-w-[100px]">
-                                                            <progress className="progress progress-primary w-full" value={u.rated_count} max={totalGalleryPhotos || 1}></progress>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {ratingStatusData.length === 0 && (
-                                                    <tr><td colSpan={3} className="text-center py-6 opacity-50">Es sind aktuell keine Personen für diese Galerie freigeschaltet.<br/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren.</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h4 className="font-bold text-lg mb-3 flex items-center gap-2 mt-4">
-                                        <span className="iconify mdi--image-multiple"></span> Detaillierte Auswertungen (Bild-Bewertungen)
-                                    </h4>
-                                    <div className="overflow-x-auto border border-base-300 rounded-box">
-                                        <table className="table table-zebra w-full">
-                                            <thead className="bg-base-200">
-                                                <tr>
-                                                    <th>Bild</th>
-                                                    <th>Dateiname</th>
-                                                    <th>Ø Sterne</th>
-                                                    <th>Kommentare</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {ratingsData.map(r => (
-                                                    <tr key={r.lr_uuid}>
-                                                        <td><img src={r.thumb_url} className="w-12 h-12 object-cover rounded shadow-sm" /></td>
-                                                        <td className="font-mono text-xs">{r.filename}</td>
-                                                        <td className="whitespace-nowrap">{r.avg_rating > 0 ? '⭐'.repeat(r.avg_rating) : <span className="opacity-50">-</span>}</td>
-                                                        <td className="whitespace-pre-wrap text-sm">{r.all_comments || <span className="opacity-50">-</span>}</td>
-                                                    </tr>
-                                                ))}
-                                                {ratingsData.length === 0 && <tr><td colSpan={4} className="text-center py-8 opacity-50">Noch keine Bewertungen vorhanden.</td></tr>}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="modal-backdrop" onClick={() => setShowRatingsModal(false)}></div>
-                    </div>
-                )}
-
             </div>
         </PageLayout>
     );

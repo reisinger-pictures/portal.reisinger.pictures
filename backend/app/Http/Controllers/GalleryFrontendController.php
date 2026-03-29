@@ -24,12 +24,7 @@ class GalleryFrontendController extends Controller
         $photos = $gallery->photos()->paginate(50);
 
         $photos->getCollection()->transform(function ($photo) use ($gallery, $user) {
-            $baseUrl = '/api/media/' . $gallery->slug;
-            $photo->url = $baseUrl . '/_' . 'thumbs/2000/' . $photo->id . '.webp';
-            $photo->thumb_url = $baseUrl . '/_thumbs/800/' . $photo->id . '.webp';
-            $photo->srcset = $baseUrl . '/_thumbs/400/' . $photo->filename . '.webp 400w, ' . 
-                           $baseUrl . '/_thumbs/800/' . $photo->filename . '.webp 800w, ' . 
-                           $baseUrl . '/_thumbs/1200/' . $photo->filename . '.webp 1200w';
+            // URL Generierung wurde ins Photo Model ausgelagert
 
             if ($user) {
                 $rating = DB::table('ratings')

@@ -44,7 +44,8 @@ class Photo extends Model
         return $this->belongsTo(Gallery::class);
     }
 
-    protected $appends = ['artist'];
+    protected $appends = ['artist', 'url', 'thumb_url', 'srcset'];
+    protected $with = ['gallery'];
 
     public function user()
     {
@@ -55,6 +56,25 @@ class Photo extends Model
     {
         if (!$this->user) return null;
         return $this->user->metadata_copyright ?: $this->user->name;
+    }
+
+    
+    public function getUrlAttribute() {
+        if (!$this->gallery) return null;
+        return '/api/media/' . $this->gallery->slug . '/_thumbs/2000/' . $this->id . '.webp';
+    }
+
+    public function getThumbUrlAttribute() {
+        if (!$this->gallery) return null;
+        return '/api/media/' . $this->gallery->slug . '/_thumbs/800/' . $this->id . '.webp';
+    }
+
+    public function getSrcsetAttribute() {
+        if (!$this->gallery) return null;
+        $baseUrl = '/api/media/' . $this->gallery->slug;
+        return $baseUrl . '/_thumbs/400/' . $this->filename . '.webp 400w, ' . 
+               $baseUrl . '/_thumbs/800/' . $this->filename . '.webp 800w, ' . 
+               $baseUrl . '/_thumbs/1200/' . $this->filename . '.webp 1200w';
     }
 
     public function versions()

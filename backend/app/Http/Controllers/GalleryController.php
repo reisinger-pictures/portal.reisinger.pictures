@@ -173,14 +173,40 @@ class GalleryController extends Controller
                 $user->galleries()->syncWithoutDetaching([$gallery->id]);
             }
 
-            return response()->json(['success' => true, 'gallery' => $gallery]);
+            
+        // Retroaktive Synchronisation der Standard-Metadaten
+        if ($gallery->apply_metadata_to_photos) {
+            $updated = false;
+            foreach ($gallery->photos as $photo) {
+                $changed = false;
+                if (empty($photo->title) && $gallery->default_title) { $photo->title = $gallery->default_title; $changed = true; }
+                if (empty($photo->description) && $gallery->default_description) { $photo->description = $gallery->default_description; $changed = true; }
+                if (empty($photo->keywords) && $gallery->default_keywords) { $photo->keywords = $gallery->default_keywords; $changed = true; }
+                if (empty($photo->location) && $gallery->default_location) { $photo->location = $gallery->default_location; $changed = true; }
+                if (empty($photo->city) && $gallery->default_city) { $photo->city = $gallery->default_city; $changed = true; }
+                if (empty($photo->state) && $gallery->default_state) { $photo->state = $gallery->default_state; $changed = true; }
+                if (empty($photo->country) && $gallery->default_country) { $photo->country = $gallery->default_country; $changed = true; }
+                if (empty($photo->iso_country) && $gallery->default_iso_country) { $photo->iso_country = $gallery->default_iso_country; $changed = true; }
+                
+                if ($changed) {
+                    $photo->save();
+                    $updated = true;
+                }
+            }
+            // Suchindex aktualisieren, falls sich etwas geändert hat
+            if ($updated) {
+                $gallery->photos()->searchable();
+            }
+        }
+        
+        return response()->json(['success' => true, 'gallery' => $gallery]);
         });
     }
 
     public function updateGallery(Request $request, $id)
     {
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->canAccessGallery($id)) {
+        if (!$user->canAccessGallery($id)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
@@ -221,13 +247,39 @@ class GalleryController extends Controller
         }
 
         $gallery->update($validated);
+        
+        // Retroaktive Synchronisation der Standard-Metadaten
+        if ($gallery->apply_metadata_to_photos) {
+            $updated = false;
+            foreach ($gallery->photos as $photo) {
+                $changed = false;
+                if (empty($photo->title) && $gallery->default_title) { $photo->title = $gallery->default_title; $changed = true; }
+                if (empty($photo->description) && $gallery->default_description) { $photo->description = $gallery->default_description; $changed = true; }
+                if (empty($photo->keywords) && $gallery->default_keywords) { $photo->keywords = $gallery->default_keywords; $changed = true; }
+                if (empty($photo->location) && $gallery->default_location) { $photo->location = $gallery->default_location; $changed = true; }
+                if (empty($photo->city) && $gallery->default_city) { $photo->city = $gallery->default_city; $changed = true; }
+                if (empty($photo->state) && $gallery->default_state) { $photo->state = $gallery->default_state; $changed = true; }
+                if (empty($photo->country) && $gallery->default_country) { $photo->country = $gallery->default_country; $changed = true; }
+                if (empty($photo->iso_country) && $gallery->default_iso_country) { $photo->iso_country = $gallery->default_iso_country; $changed = true; }
+                
+                if ($changed) {
+                    $photo->save();
+                    $updated = true;
+                }
+            }
+            // Suchindex aktualisieren, falls sich etwas geändert hat
+            if ($updated) {
+                $gallery->photos()->searchable();
+            }
+        }
+        
         return response()->json(['success' => true, 'gallery' => $gallery]);
     }
 
     public function destroyGallery($id)
     {
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->canAccessGallery($id)) {
+        if (!$user->canAccessGallery($id)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
@@ -242,7 +294,7 @@ class GalleryController extends Controller
     public function ratingStatus($id)
     {
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->canAccessGallery($id)) {
+        if (!$user->canAccessGallery($id)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
@@ -298,7 +350,7 @@ class GalleryController extends Controller
     public function exportRatings($id)
     {
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->canAccessGallery($id)) {
+        if (!$user->canAccessGallery($id)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
@@ -359,12 +411,7 @@ class GalleryController extends Controller
 
         $photos->getCollection()->transform(function ($photo) {
             $photo->load('gallery');
-            $baseUrl = '/api/media/' . $photo->gallery->slug;
-            $photo->url = $baseUrl . '/_' . 'thumbs/2000/' . $photo->id . '.webp';
-            $photo->thumb_url = $baseUrl . '/_thumbs/800/' . $photo->id . '.webp';
-            $photo->srcset = $baseUrl . '/_thumbs/400/' . $photo->filename . '.webp 400w, ' . 
-                           $baseUrl . '/_thumbs/800/' . $photo->filename . '.webp 800w, ' . 
-                           $baseUrl . '/_thumbs/1200/' . $photo->filename . '.webp 1200w';
+            // URL Generierung wurde ins Photo Model ausgelagert
             return $photo;
         });
 

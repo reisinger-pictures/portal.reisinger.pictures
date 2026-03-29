@@ -36,5 +36,6 @@ Galleries are strictly divided into two mutually exclusive workflows:
 - **Strict Access Control:** Dieser Switcher wird **ausschließlich** angezeigt, wenn der eingeloggte Nutzer für diese spezifische Galerie sowohl Verwaltungsrechte (Fotograf/Admin) als auch Kundenrechte besitzt. Hat ein Fotograf über einen Gast-Link Zugriff auf eine fremde Galerie, bleibt er strikt in der Kundenansicht gefangen.
 
 ## 5. Management UI Pattern
-- **Explorer-Ansicht:** Die Struktur- und Galerieverwaltung befindet sich nicht in der Sidebar, sondern in einer eigenen, großzügigen Hauptansicht (`/galleries`). 
+- **Explorer-Ansicht:** Die Struktur- und Galerieverwaltung befindet sich nicht in der Sidebar, sondern in einer eigenen, großzügigen Hauptansicht (`/galleries`).
+- **Modulare Dialoge:** Um den Haupt-Erstellungsdialog für Galerien schlank zu halten, wurden die komplexen IPTC-Standard-Metadaten und Berechtigungen in einen separaten Dialog (`GalleryMetadataDefaultsModal`) ausgelagert. 
 - **Dashboard:** Das Root-Dashboard (`/`) dient ausschließlich als "Activity-Hub" (FTP-Inbox Status, die 3 neuesten Galerien und 20 neuesten Bilder).

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
-import path from 'path';
+import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Metadata & Detail View Workflow', () => {
     let auth: AuthHelper;
@@ -16,42 +16,38 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         auth = new AuthHelper(page);
         sidebar = new SidebarHelper(page);
         modal = new ModalHelper(page);
+        await auth.login();
     });
 
     test('Photographer can view and edit metadata in detail view', async ({ page }) => {
-        await auth.login();
-
-        // 1. Galerie erstellen
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.clickButton('Speichern');
         await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
-        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
-
-        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
         
-        // 2. Bild hochladen
-        const fileInput = page.locator('input[type="file"]');
-        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
-        await fileInput.setInputFiles(sampleImagePath);
+        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        await expect(galLink).toBeVisible({ timeout: 15000 });
+        await galLink.click();
 
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
 
-        // 3. In die Detailansicht navigieren
         await page.locator('button[title="Details & Metadaten"]').first().click();
-
-        // 4. Warten bis Detail View geladen ist
         await expect(page.locator('h4:has-text("IPTC Metadaten")')).toBeVisible();
 
-        // 5. Metadaten bearbeiten
         const titleInput = page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input');
         await titleInput.fill('Playwright Test Title');
-        
-        await page.getByRole('button', { name: 'Speichern' }).click();
 
-        // Prüfen ob der Speichern-Button wieder freigegeben wurde (Spinner ist weg)
+        const cityInput = page.locator('.form-control').filter({ hasText: 'Stadt' }).locator('input[type="text"]');
+        await cityInput.click();
+        await cityInput.pressSequentially('Salzburg', { delay: 100 });
+
+        const dropdownItem = page.locator('li').filter({ hasText: 'Salzburg' }).first();
+        await expect(dropdownItem).toBeVisible({ timeout: 15000 });
+        await dropdownItem.click();
+
+        await expect(page.locator('div.form-control').filter({ hasText: 'Bundesland' }).locator('input[type="text"]')).toHaveValue('Salzburg');
+        await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page.getByRole('button', { name: 'Speichern' })).toBeEnabled({ timeout: 5000 });
     });
 });

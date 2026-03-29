@@ -1,8 +1,7 @@
 import ResponsiveImage from '../components/ResponsiveImage';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
+import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import { useNavigate } from 'react-router-dom';
-import PhotoSwipeLightbox from 'photoswipe/lightbox';
-import 'photoswipe/style.css';
 import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import { useAuth } from '../../logic/useAuth';
@@ -13,62 +12,7 @@ export default function DeliveryView({ galleryData }: { galleryData: any }) {
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
     const galleryRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        let lightbox: PhotoSwipeLightbox | null = null;
-        if (galleryRef.current && photos.length > 0) {
-            lightbox = new PhotoSwipeLightbox({
-                gallery: galleryRef.current,
-                children: 'a.pswp-item',
-                pswpModule: () => import('photoswipe')
-            });
-
-            lightbox.on('uiRegister', function () {
-                lightbox!.pswp!.ui!.registerElement({
-                    name: 'custom-caption', order: 9, isButton: false, appendTo: 'wrapper', html: '',
-                    onInit: (el) => {
-                        lightbox!.pswp!.on('change', () => {
-                            const currSlideElement = lightbox!.pswp!.currSlide?.data?.element;
-                            if (currSlideElement) {
-                                const title = currSlideElement.getAttribute('data-title') || '';
-                                const desc = currSlideElement.getAttribute('data-desc') || '';
-                                const artist = currSlideElement.getAttribute('data-artist') || '';
-
-                                el.innerHTML = '';
-                                if (title || desc) {
-                                    const container = document.createElement('div');
-                                    container.className = 'absolute bottom-5 left-5 text-white drop-shadow-md max-w-[600px] font-sans leading-relaxed pointer-events-none p-4';
-
-                                    if (title) {
-                                        const b = document.createElement('b');
-                                        b.className = 'text-lg block mb-1';
-                                        b.textContent = title;
-                                        container.appendChild(b);
-                                    }
-                                    if (desc) {
-                                        const span = document.createElement('span');
-                                        span.textContent = desc;
-                                        container.appendChild(span);
-                                    }
-                                    if (artist) {
-                                        if (desc) container.appendChild(document.createElement('br'));
-                                        const small = document.createElement('small');
-                                        small.className = 'opacity-80 mt-1 block';
-                                        small.textContent = '© ' + artist;
-                                        container.appendChild(small);
-                                    }
-                                    el.appendChild(container);
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-            lightbox.init();
-        }
-        return () => {
-            if (lightbox) lightbox.destroy();
-        };
-    }, [photos.length]);
+    usePhotoSwipe({ galleryRef, dependencies: [photos.length] });
 
     return (
         <PageLayout>

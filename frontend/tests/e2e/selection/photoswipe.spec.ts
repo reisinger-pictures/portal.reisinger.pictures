@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
-import path from 'path';
+import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('PhotoSwipe in Selection Gallery', () => {
     let auth: AuthHelper;
@@ -26,7 +26,7 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
         await modal.clickButton('Speichern');
         await savePromise;
         await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
@@ -35,12 +35,8 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
         // 2. Bild hochladen
-        const fileInput = page.locator('input[type="file"]');
-        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
-        await fileInput.setInputFiles(sampleImagePath);
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
 
         // 3. Invite Link für Gast generieren
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
@@ -67,6 +63,7 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         // 3. Assert: Lightbox sichtbar
         const lightbox = page.locator('.pswp');
         await expect(lightbox).toBeVisible();
+        await expect(page.locator('#rating-portal-anchor')).toBeVisible({ timeout: 15000 }); // Beweis, dass Slide interaktiv ist
 
         // 4. Rating via Button & Comment Input
         const ratingBar = page.locator('#rating-portal-anchor .rating');
@@ -84,12 +81,12 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         
         // 5 Sterne vergeben (speichert Kommentar und blättert automatisch weiter)
         const rateResponse = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
-        await ratingBar.locator('input.mask-star-2').nth(4).click({ force: true });
+        await ratingBar.locator('input.mask-star-2').nth(4).click();
         await rateResponse;
 
         // 5. Lightbox schließen
         await expect(async () => {
-            await page.locator('button.pswp__button--close').click({ force: true });
+            await page.locator('button.pswp__button--close').click();
             await expect(lightbox).toBeHidden({ timeout: 2000 });
         }).toPass({ timeout: 15000 });
 
@@ -97,7 +94,7 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await page.waitForTimeout(1000);
         // Stern 5 sollte checked sein (index 4 in daisyUI rating)
         const star5 = page.locator('.card-body input.mask-star-2').nth(4);
-        await expect(star5).toBeChecked();
+        await expect(star5).toBeChecked({ timeout: 5000 });
         
         const gridComment = page.locator('input[placeholder="Kommentar..."]').first();
         await expect(gridComment).toHaveValue('Episches Bild im Fullscreen!');
@@ -105,13 +102,16 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         // 7. Rating via Keyboard Shortcut
         await page.locator('a.pswp-item').first().click();
         await expect(lightbox).toBeVisible();
+        await expect(page.locator('#rating-portal-anchor')).toBeVisible({ timeout: 15000 }); // Beweis, dass Slide interaktiv ist
         
         // Drücke '3' auf der Tastatur
+        const rateResponse2 = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
         await page.keyboard.press('3');
+        await rateResponse2;
 
         // Lightbox wieder schließen
         await expect(async () => {
-            await page.locator('button.pswp__button--close').click({ force: true });
+            await page.locator('button.pswp__button--close').click();
             await expect(lightbox).toBeHidden({ timeout: 2000 });
         }).toPass({ timeout: 15000 });
 

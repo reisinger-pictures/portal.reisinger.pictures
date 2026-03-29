@@ -7,8 +7,10 @@ status: active
 # Technical Concept: Testing Guidelines
 
 ## 1. Philosophy & Robustness
+- **No `force: true` in Playwright:** Bypassing actionability checks defeats the purpose of E2E tests. If Playwright cannot click an element naturally, a human probably can't either. Always wait for elements to become stable and uncovered (e.g., wait for animations to finish or modals to close via `toBeHidden()`) instead of forcing clicks.
 - **No Try-Catch Anti-Pattern:** Never mask failing tests by wrapping production code or assertions in `try-catch` blocks purely to pass a test. Exceptions must bubble up and fail the test clearly.
 - **Patient Asserts (Auto-Retries):** Never use static `sleep()` or `waitForLoadState('networkidle')` in E2E tests. Always use asynchronous assertions with sufficient timeouts (e.g., `await expect(locator).toBeVisible({ timeout: 15000 })`).
+- **Anti-Flakiness (Network vs. UI):** Do NOT use `page.waitForResponse()` when waiting for UI updates (like debounced search results). Network interception is highly prone to race conditions (e.g., firing too early or cache hits). Always trigger the action (e.g., `fill()`) and wait patiently for the resulting UI element to become visible using Playwright's auto-retrying assertions.
 - **Single Reason to Fail (SRP):** Tests (PHPUnit & Playwright) MUST focus on a single behavior. Avoid monolithic 20-step tests.
 
 ## 2. E2E Tests (Playwright)

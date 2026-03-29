@@ -41,6 +41,7 @@ return [
             ],
             \App\Models\Location::class => [
                 'filterableAttributes' => ['type'],
+                'sortableAttributes' => ['population'],
             ],
         ],
     ],

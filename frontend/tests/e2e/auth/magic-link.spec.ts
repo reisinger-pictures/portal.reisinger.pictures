@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
-import path from 'path';
+import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Gallery Invite Link Workflow', () => {
     let auth: AuthHelper;
@@ -25,19 +25,16 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
         await modal.clickButton('Speichern');
         await savePromise;
+        await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
         await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 20000 });
 
         await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
-        const fileInput = page.locator('input[type="file"]');
-        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
-        await fileInput.setInputFiles(sampleImagePath);
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 20000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
 
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
 

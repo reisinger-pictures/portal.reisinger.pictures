@@ -1,11 +1,10 @@
 import ResponsiveImage from '../components/ResponsiveImage';
-import {useEffect, useRef, useState} from 'react';
+import {useRef, useState} from 'react';
+import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams} from 'react-router-dom';
 import {flattenGroups, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import {useMetaGallery} from '../../logic/useMetaGallery';
-import PhotoSwipeLightbox from 'photoswipe/lightbox';
-import 'photoswipe/style.css';
 import PageLayout from '../components/PageLayout';
 import GalleryModals from '../components/GalleryModals';
 
@@ -29,63 +28,7 @@ export default function ManagementMetaGalleryView() {
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
     const galleryRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        let lightbox: PhotoSwipeLightbox | null = null;
-        if (galleryRef.current && photos.length > 0) {
-            lightbox = new PhotoSwipeLightbox({
-                gallery: galleryRef.current,
-                children: 'a.pswp-item',
-                pswpModule: () => import('photoswipe')
-            });
-
-            lightbox.on('uiRegister', function () {
-                lightbox!.pswp!.ui!.registerElement({
-                    name: 'custom-caption', order: 9, isButton: false, appendTo: 'wrapper', html: '',
-                    onInit: (el) => {
-                        lightbox!.pswp!.on('change', () => {
-                            const currSlideElement = lightbox!.pswp!.currSlide?.data?.element;
-                            if (currSlideElement) {
-                                const title = currSlideElement.getAttribute('data-title') || '';
-                                const desc = currSlideElement.getAttribute('data-desc') || '';
-                                const artist = currSlideElement.getAttribute('data-artist') || '';
-
-                                el.innerHTML = '';
-                                if (title || desc) {
-                                    const container = document.createElement('div');
-                                    container.className = 'absolute bottom-5 left-5 text-white drop-shadow-md max-w-[600px] font-sans leading-relaxed pointer-events-none p-4';
-
-                                    if (title) {
-                                        const b = document.createElement('b');
-                                        b.className = 'text-lg block mb-1';
-                                        b.textContent = title;
-                                        container.appendChild(b);
-                                    }
-                                    if (desc) {
-                                        const span = document.createElement('span');
-                                        span.textContent = desc;
-                                        container.appendChild(span);
-                                    }
-                                    if (artist) {
-                                        if (desc) container.appendChild(document.createElement('br'));
-                                        const small = document.createElement('small');
-                                        small.className = 'opacity-80 mt-1 block';
-                                        small.textContent = '© ' + artist;
-                                        container.appendChild(small);
-                                    }
-                                    el.appendChild(container);
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-
-            lightbox.init();
-        }
-        return () => {
-            if (lightbox) lightbox.destroy();
-        };
-    }, [photos.length]);
+    usePhotoSwipe({ galleryRef, dependencies: [photos.length] });
 
     if (isLoading && photos.length === 0) return <PageLayout>
         <div className="flex h-full items-center justify-center"><span className="loading loading-spinner"></span></div>

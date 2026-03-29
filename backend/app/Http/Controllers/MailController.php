@@ -69,12 +69,12 @@ class MailController extends Controller
         ->get();
         
         foreach($notifiedUsers as $notifiedUser) {
-            Mail::html(
-                "<p>Hallo {$notifiedUser->name},</p><p>Der Kunde <b>{$user->name}</b> ({$user->email}) hat die Auswahl in der Galerie <b>{$gallery->name}</b> soeben abgeschlossen.</p>", 
-                function($msg) use ($notifiedUser, $gallery) {
-                    $msg->to($notifiedUser->email)->subject("Auswahl abgeschlossen: {$gallery->name}");
-                }
-            );
+            Mail::send('emails.notification', [
+                'userName' => $notifiedUser->name,
+                'messageBody' => "<p>Der Kunde <b>{$user->name}</b> ({$user->email}) hat die Auswahl in der Galerie <b>{$gallery->name}</b> soeben abgeschlossen.</p>"
+            ], function($msg) use ($notifiedUser, $gallery) {
+                $msg->to($notifiedUser->email)->subject("Auswahl abgeschlossen: {$gallery->name}");
+            });
         }
 
         return response()->json(['success' => true]);

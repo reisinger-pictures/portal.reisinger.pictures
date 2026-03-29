@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
-import path from 'path';
+import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Download Triggers UI', () => {
     let auth: AuthHelper;
@@ -26,7 +26,7 @@ test.describe.serial('Download Triggers UI', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.selectByLabel('Sichtbarkeit', 'Öffentlich (Für alle sichtbar)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
         await modal.clickButton('Speichern');
         await savePromise;
         await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
@@ -34,14 +34,8 @@ test.describe.serial('Download Triggers UI', () => {
         await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
         // 2. Bild hochladen
-        const fileInput = page.locator('input[type="file"]');
-        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
-        await fileInput.setInputFiles(sampleImagePath);
-        
-        // Warten, bis das Bild im DOM gerendert wurde
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
 
         // URL der Galerie merken
         const galleryUrl = page.url();
@@ -54,7 +48,7 @@ test.describe.serial('Download Triggers UI', () => {
         await page.goto(galleryUrl);
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass({ timeout: 15000 });
 
         // 5. Test: Einzel-Download
         // Wir fangen das Download-Event ab, bevor wir klicken

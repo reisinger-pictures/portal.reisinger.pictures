@@ -1,96 +1,16 @@
 import ResponsiveImage from '../components/ResponsiveImage';
 import { useEffect, useRef, useState } from 'react';
+import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import { createPortal } from 'react-dom';
+import DaisyUIRatingBridge from './components/DaisyUIRatingBridge';
+import GridPhotoActions from './components/GridPhotoActions';
 import { useAuth } from '../../logic/useAuth';
 import { apiMutate } from '../../api';
-import PhotoSwipeLightbox from 'photoswipe/lightbox';
-import 'photoswipe/style.css';
 import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import { useUI } from '../components/UIContext';
 
-// --- REACT PORTAL KOMPONENTE FÜR PHOTOSWIPE ---
-const DaisyUIRatingBridge = ({ photo, ratePhoto }: { photo: any, ratePhoto: any }) => {
-    const [comment, setComment] = useState(photo?.comment || '');
 
-    useEffect(() => {
-        setComment(photo?.comment || '');
-    }, [photo.id, photo.comment]);
-
-    const stopProp = (e: any) => e.stopPropagation();
-
-    const currentRating = Number(photo.rating) || 0;
-
-    const handleRatingClick = (rating: number) => {
-        ratePhoto(photo.id, rating, comment);
-    };
-
-    return (
-        <div className="w-full max-w-lg mx-auto flex flex-col items-center gap-3 text-base-content"
-             onPointerDown={stopProp} onMouseDown={stopProp} onTouchStart={stopProp}>
-
-            <div className="bg-base-100/90 backdrop-blur-md px-6 py-3 rounded-full shadow-2xl pointer-events-auto border border-base-content/10 flex items-center justify-center">
-                <div className="rating rating-lg gap-1">
-                    <input type="radio" name={`lightbox_rating_${photo.id}`} className="rating-hidden" checked={currentRating === 0} readOnly onClick={() => handleRatingClick(0)} />
-                    {[1, 2, 3, 4, 5].map(star => (
-                        <input
-                            key={star}
-                            type="radio"
-                            name={`lightbox_rating_${photo.id}`}
-                            className="mask mask-star-2 bg-primary"
-                            checked={currentRating === star}
-                            readOnly
-                            onClick={() => handleRatingClick(star)}
-                            title={`${star} Stern${star > 1 ? 'e' : ''} (Shortcut: ${star})`}
-                        />
-                    ))}
-                </div>
-            </div>
-
-            <input
-                type="text"
-                className="input input-bordered w-full bg-base-100/90 backdrop-blur-md shadow-2xl pointer-events-auto text-center placeholder-base-content/50 border-base-content/10"
-                placeholder="Kommentar hinzufügen... (Speichert automatisch)"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                onBlur={() => { if (comment !== (photo.comment || '')) ratePhoto(photo.id, currentRating, comment); }}
-                onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if(e.key === 'Enter') e.currentTarget.blur();
-                }}
-            />
-        </div>
-    );
-};
-
-// --- GRID KOMPONENTE (Damit das Textfeld beim Tippen nicht den Fokus verliert) ---
-const GridPhotoActions = ({ photo, ratePhoto }: { photo: any, ratePhoto: any }) => {
-    const [comment, setComment] = useState(photo.comment || '');
-
-    useEffect(() => {
-        setComment(photo.comment || '');
-    }, [photo.comment]);
-
-    return (
-        <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3">
-            <div className="rating rating-sm">
-                <input type="radio" name={`grid_rating_${photo.id}`} className="rating-hidden" checked={Number(photo.rating || 0) === 0} onChange={() => ratePhoto(photo.id, 0, comment)} />
-                {[1, 2, 3, 4, 5].map(star => (
-                    <input key={star} type="radio" name={`grid_rating_${photo.id}`}
-                           className="mask mask-star-2 bg-primary"
-                           checked={Number(photo.rating) === star}
-                           onChange={() => ratePhoto(photo.id, star, comment)} />
-                ))}
-            </div>
-            <input type="text" placeholder="Kommentar..."
-                   value={comment}
-                   onChange={e => setComment(e.target.value)}
-                   onBlur={() => { if (comment !== (photo.comment || '')) ratePhoto(photo.id, Number(photo.rating || 0), comment); }}
-                   onKeyDown={(e) => { if(e.key === 'Enter') e.currentTarget.blur(); }}
-                   className="input input-bordered input-xs w-full text-center"/>
-        </div>
-    );
-};
 
 export default function SelectionView({ galleryData }: { galleryData: any }) {
     // const navigate = useNavigate();
@@ -112,7 +32,6 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
 
     const { showToast, confirm } = useUI();
     const galleryRef = useRef<HTMLDivElement>(null);
-    const lightboxRef = useRef<any>(null);
     const [finishing, setFinishing] = useState(false);
 
     const latestDataRef = useRef({ photos: filteredPhotos, ratePhoto });
@@ -134,19 +53,13 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
         return () => document.removeEventListener('contextmenu', handleContextMenu);
     }, []);
 
-    useEffect(() => {
-        let lightbox: PhotoSwipeLightbox | null = null;
-        if (galleryRef.current && filteredPhotos.length > 0) {
-            lightbox = new PhotoSwipeLightbox({
-                arrowKeys: true,
-                gallery: galleryRef.current,
-                children: 'a.pswp-item',
-                pswpModule: () => import('photoswipe')
-            });
-
+    usePhotoSwipe({
+        galleryRef,
+        dependencies: [filteredPhotos.length, user],
+        onInit: (lightbox) => {
             lightbox.on('uiRegister', function () {
                 if (user) {
-                    lightbox!.pswp!.ui!.registerElement({
+                    lightbox.pswp!.ui!.registerElement({
                         name: 'rating-portal-container',
                         order: 10,
                         isButton: false,
@@ -157,12 +70,12 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
             });
 
             lightbox.on('change', () => {
-                const currPhotoId = lightbox!.pswp!.currSlide?.data?.element?.dataset.photoId;
+                const currPhotoId = lightbox.pswp!.currSlide?.data?.element?.dataset.photoId;
                 setCurrentPhotoId(currPhotoId ? currPhotoId : null);
             });
 
             lightbox.on('afterInit', () => {
-                const currPhotoId = lightbox!.pswp!.currSlide?.data?.element?.dataset.photoId;
+                const currPhotoId = lightbox.pswp!.currSlide?.data?.element?.dataset.photoId;
                 setCurrentPhotoId(currPhotoId ? currPhotoId : null);
             });
 
@@ -176,26 +89,23 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
 
                 const key = parseInt(e.key, 10);
                 if (key >= 0 && key <= 5) {
-                    const currPhotoId = lightbox.pswp.currSlide?.data?.element?.dataset.photoId;
+                    const currPhotoId = lightbox.pswp!.currSlide?.data?.element?.dataset.photoId;
                     if (currPhotoId) {
                         const photo = latestDataRef.current.photos.find((p: any) => p.id === currPhotoId);
                         latestDataRef.current.ratePhoto(currPhotoId, key, photo?.comment || '');
-                        lightbox.pswp.next();
+                        lightbox.pswp!.next();
                     }
                 }
             };
-            document.addEventListener('keydown', handleKeyDown);
+            lightbox.on('beforeOpen', () => {
+                document.addEventListener('keydown', handleKeyDown);
+            });
 
-            lightboxRef.current = lightbox;
-            lightbox.init();
-
-            return () => {
+            lightbox.on('destroy', () => {
                 document.removeEventListener('keydown', handleKeyDown);
-                if (lightbox) lightbox.destroy();
-            };
+            });
         }
-        return () => {};
-    }, [filteredPhotos.length, user]);
+    });
 
     const handleFinishRating = async () => {
         if (!(await confirm({ title: 'Auswahl abschließen?', message: 'Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird benachrichtigt.', confirmText: 'Abschließen', confirmColor: 'success' }))) return;

@@ -4,9 +4,10 @@ import useSWR from 'swr';
 import {fetcher} from '../api';
 import {Photo} from '../logic/useGallery';
 import {useAuth} from '../logic/useAuth';
-import {usePhoto, PhotoVersion} from '../logic/usePhoto';
+import {usePhoto} from '../logic/usePhoto';
 import PageLayout from './components/PageLayout';
 import IptcMetadataEditor, { IptcData } from './components/IptcMetadataEditor';
+import PhotoHistoryModal from './components/PhotoHistoryModal';
 import { useUI } from './components/UIContext';
 
 interface Breadcrumb {
@@ -25,7 +26,7 @@ export default function PhotoDetailView() {
     const {id} = useParams<{ id: string }>();
     const navigate = useNavigate();
     const {user} = useAuth();
-    const {updateMetadata, deletePhoto, getVersions, revertMetadata} = usePhoto();
+    const {updateMetadata, deletePhoto} = usePhoto();
     const { showToast, confirm } = useUI();
 
     const {data, error, isLoading, mutate} = useSWR<PhotoContextData>(
@@ -35,10 +36,7 @@ export default function PhotoDetailView() {
     const [iptcData, setIptcData] = useState<IptcData>({});
     const [saving, setSaving] = useState(false);
 
-    // History Modal State
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [history, setHistory] = useState<PhotoVersion[]>([]);
-    const [loadingHistory, setLoadingHistory] = useState(false);
 
     // SWR Dependency Fix: Formular nur aktualisieren, wenn sich die DB-Werte WIRKLICH ändern
     const photoHash = data?.photo ? JSON.stringify([
@@ -97,28 +95,7 @@ export default function PhotoDetailView() {
         }
     };
 
-    const openHistory = async () => {
-        setIsHistoryOpen(true);
-        setLoadingHistory(true);
-        try {
-            const versions = await getVersions(photo.id);
-            setHistory(versions);
-        } catch {
-            showToast('error', 'Historie konnte nicht geladen werden.');
-        }
-        setLoadingHistory(false);
-    };
 
-    const handleRevert = async (versionId: string) => {
-        if (!(await confirm({ title: 'Version wiederherstellen?', message: 'Möchtest du diese Metadaten-Version wirklich wiederherstellen? Dies überschreibt den aktuellen Stand.', confirmText: 'Wiederherstellen', confirmColor: 'warning' }))) return;
-        try {
-            await revertMetadata(photo.id, versionId);
-            setIsHistoryOpen(false);
-            mutate();
-        } catch {
-            showToast('error', 'Fehler beim Wiederherstellen der Version.');
-        }
-    };
 
     return (
         <PageLayout hideMobileHeader>
@@ -177,12 +154,12 @@ export default function PhotoDetailView() {
                             showArtist={isPhotogOrAdmin}
                         >
                             {canEdit && (
-                                <div className="flex gap-2 mt-6 pt-4 border-t border-base-300">
-                                    <button onClick={handleSaveMeta} disabled={saving} className="btn btn-primary flex-1">
+                                <div className="flex flex-col sm:flex-row gap-2 mt-6 pt-4 border-t border-base-300">
+                                    <button onClick={handleSaveMeta} disabled={saving} className="btn btn-primary flex-1 w-full">
                                         {saving ? <span className="loading loading-spinner"></span> : 'Speichern'}
                                     </button>
                                     {isPhotogOrAdmin && (
-                                        <button onClick={openHistory} className="btn btn-outline" title="Änderungshistorie anzeigen">
+                                        <button onClick={() => setIsHistoryOpen(true)} className="btn btn-outline w-full sm:w-auto" title="Änderungshistorie anzeigen">
                                             <span className="iconify mdi--history"></span> Historie
                                         </button>
                                     )}
@@ -195,58 +172,7 @@ export default function PhotoDetailView() {
                 </div>
             </div>
 
-            {/* History Modal */}
-            {isHistoryOpen && (
-                <div className="modal modal-open">
-                    <div className="modal-box max-w-4xl relative">
-                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setIsHistoryOpen(false)}>✕</button>
-                        <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
-                            <span className="iconify mdi--history text-primary"></span> Änderungshistorie (Vor-Zustände)
-                        </h3>
-                        <p className="text-sm opacity-70 mb-4">Hier werden die ursprünglichen Metadaten gespeichert, <strong>bevor</strong> ein Kunde eine Änderung vorgenommen hat.</p>
-
-                        {loadingHistory ? (
-                            <div className="flex justify-center p-8"><span className="loading loading-spinner"></span></div>
-                        ) : (
-                            <div className="overflow-x-auto border border-base-300 rounded-box">
-                                <table className="table table-zebra w-full text-sm">
-                                    <thead className="bg-base-200">
-                                    <tr>
-                                        <th>Zeitpunkt</th>
-                                        <th>Geändert von</th>
-                                        <th>Titel / Beschreibung</th>
-                                        <th className="text-right">Aktion</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    {history.map(ver => (
-                                        <tr key={ver.id}>
-                                            <td className="whitespace-nowrap">{new Date(ver.created_at).toLocaleString('de-DE')}</td>
-                                            <td>{ver.user?.name || 'Unbekannt'}</td>
-                                            <td>
-                                                <div className="max-w-[300px] truncate" title={ver.title}>{ver.title || '-'}</div>
-                                                <div className="max-w-[300px] truncate opacity-70" title={ver.description}>{ver.description || '-'}</div>
-                                            </td>
-                                            <td className="text-right">
-                                                <button onClick={() => handleRevert(ver.id)} className="btn btn-xs btn-outline btn-warning">
-                                                    Wiederherstellen
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {history.length === 0 && (
-                                        <tr>
-                                            <td colSpan={4} className="text-center py-6 opacity-50">Keine vorherigen Versionen gefunden.</td>
-                                        </tr>
-                                    )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                    <div className="modal-backdrop" onClick={() => setIsHistoryOpen(false)}></div>
-                </div>
-            )}
+            <PhotoHistoryModal photoId={photo.id} isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} onReverted={() => mutate()} />
         </PageLayout>
     );
 }

@@ -17,7 +17,8 @@ class Location extends Model
         'name',
         'state',
         'country',
-        'iso_country'
+        'iso_country',
+        'population'
     ];
 
     public function toSearchableArray()
@@ -29,6 +30,7 @@ class Location extends Model
             'state' => $this->state,
             'country' => $this->country,
             'iso_country' => $this->iso_country,
+            'population' => (int) $this->population,
         ];
     }
 }

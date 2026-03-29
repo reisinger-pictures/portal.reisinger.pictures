@@ -8,7 +8,8 @@ status: active
 
 ## 1. Hardcoded Templates (Blade)
 - Um die Architektur und das Deployment zu vereinfachen, wurde das datenbankgestützte Template-System (EmailTemplate Model) entfernt.
-- E-Mails werden nun ausschließlich über native Laravel Blade Views gerendert (`resources/views/emails/custom.blade.php`).
+- **Architektur-Richtlinie (STRIKT):** E-Mails werden **ausschließlich** über native Laravel Blade Views gerendert (z.B. `custom.blade.php`, `activate.blade.php`, `notification.blade.php`).
+- **Verbot von Inline-HTML:** Das Verwenden von `Mail::html()` mit hartcodierten HTML-Strings innerhalb von Controllern ist untersagt, um das Corporate Design (Logo, Layout) konsistent über alle System-E-Mails hinweg zu garantieren.
 
 ## 2. Opt-In & Benachrichtigungs-Management (DSGVO / UX)
 

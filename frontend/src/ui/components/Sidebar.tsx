@@ -1,5 +1,5 @@
-import {useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
+import SidebarLoginForm from './SidebarLoginForm';
 import {useAuth} from '../../logic/useAuth';
 import {Gallery, GalleryGroup, GalleryTreeResponse} from '../../logic/useGalleries';
 
@@ -16,29 +16,12 @@ interface SidebarProps {
 }
 
 export default function Sidebar(props: SidebarProps) {
-    const {user, login, logout} = useAuth();
+    const {user, logout} = useAuth();
     const navigate = useNavigate();
-
-    const [loginEmail, setLoginEmail] = useState('');
-    const [loginPassword, setLoginPassword] = useState('');
-    const [authError, setAuthError] = useState('');
-    const [isLoggingIn, setIsLoggingIn] = useState(false);
 
     const handleLogout = async () => {
         await logout();
         navigate('/');
-    };
-
-    const handleSidebarLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoggingIn(true);
-        setAuthError('');
-        try {
-            await login(loginEmail, loginPassword);
-        } catch {
-            setAuthError('Login fehlgeschlagen.');
-        }
-        setIsLoggingIn(false);
     };
 
     const renderGroup = (group: GalleryGroup) => {
@@ -121,17 +104,7 @@ export default function Sidebar(props: SidebarProps) {
             </div>
 
             {isGuest && (
-                <div className="p-6 border-b border-base-300 bg-base-100">
-                    <h3 className="font-bold mb-3 flex items-center gap-2"><span className="iconify mdi--login"></span> Anmelden</h3>
-                    <form onSubmit={handleSidebarLogin} className="space-y-3">
-                        <input type="email" required placeholder="E-Mail Adresse" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="input input-sm input-bordered w-full"/>
-                        <input type="password" required placeholder="Passwort" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="input input-sm input-bordered w-full"/>
-                        {authError && <p className="text-xs text-error font-semibold leading-tight">{authError}</p>}
-                        <button type="submit" className="btn btn-sm btn-primary w-full mt-2" disabled={isLoggingIn}>
-                            {isLoggingIn ? <span className="loading loading-spinner"></span> : 'Login'}
-                        </button>
-                    </form>
-                </div>
+                <SidebarLoginForm />
             )}
 
             <ul className="menu bg-base-200 w-full p-2 border-b border-base-300 shrink-0">

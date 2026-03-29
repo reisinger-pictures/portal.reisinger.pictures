@@ -10,11 +10,9 @@ export class SidebarHelper {
         if (await menuBtn.isVisible()) {
             // Ist das Menü ZU?
             if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
-                await this.page.waitForTimeout(200); // Hydration Puffer
-                await menuBtn.click();
+                                await menuBtn.click();
                 await backdrop.waitFor({ state: 'visible', timeout: 5000 });
-                await this.page.waitForTimeout(350); // CSS-Animation abwarten
-            }
+                            }
         }
         
         // Da der AuthHelper jetzt garantiert, dass wir eingeloggt sind, 
@@ -23,7 +21,6 @@ export class SidebarHelper {
         await link.waitFor({ state: 'visible', timeout: 5000 });
         await link.click();
         
-        await this.page.waitForTimeout(400); 
     }
 
     async openNewGalleryModal() {

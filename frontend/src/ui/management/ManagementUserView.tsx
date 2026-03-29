@@ -4,6 +4,7 @@ import {UserDetailed, useUsers} from '../../logic/useUsers';
 import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
 import DomainMappingTab from './components/DomainMappingTab';
 import UserPermissionsModal from './components/UserPermissionsModal';
+import CreateUserModal from './components/CreateUserModal';
 import { useUI } from '../components/UIContext';
 
 export default function ManagementUserView() {
@@ -18,9 +19,6 @@ export default function ManagementUserView() {
     const [searchTerm, setSearchTerm] = useState('');
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [newName, setNewName] = useState('');
-    const [newEmail, setNewEmail] = useState('');
-    const [isCreating, setIsCreating] = useState(false);
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
     const flatGalleries = tree ? [...(tree.groups.flatMap(g => g.galleries || [])), ...(tree.root_galleries || [])] : [];
@@ -35,20 +33,6 @@ export default function ManagementUserView() {
         setEditingUser(null);
     };
 
-    const handleCreateUser = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsCreating(true);
-        try {
-            await createUser(newName, newEmail);
-            setNewName('');
-            setNewEmail('');
-            setIsCreateModalOpen(false);
-            showToast('success', 'Nutzer angelegt! Eine E-Mail zur Einrichtung wurde verschickt.');
-        } catch (err: unknown) {
-            showToast('error', 'Fehler: ' + (err instanceof Error ? (err as Error).message : 'Nutzer konnte nicht angelegt werden.'));
-        }
-        setIsCreating(false);
-    };
 
     const filteredUsers = users?.filter(u =>
         u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -164,41 +148,11 @@ export default function ManagementUserView() {
                 />
             )}
 
-            {isCreateModalOpen && (
-                <div className="modal modal-open">
-                    <div className="modal-box relative">
-                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-                                onClick={() => setIsCreateModalOpen(false)}>✕
-                        </button>
-                        <h3 className="font-bold text-lg mb-4">Neuen Nutzer einladen</h3>
-                        <p className="text-sm opacity-70 mb-4">Der Nutzer erhält eine E-Mail mit einem Link, um sein
-                            Passwort festzulegen.</p>
-                        <form onSubmit={handleCreateUser} className="space-y-4">
-                            <div className="form-control">
-                                <label className="label"><span className="label-text font-bold">Name</span></label>
-                                <input type="text" required value={newName} onChange={e => setNewName(e.target.value)}
-                                       className="input input-bordered"/>
-                            </div>
-                            <div className="form-control">
-                                <label className="label"><span
-                                    className="label-text font-bold">E-Mail Adresse</span></label>
-                                <input type="email" required value={newEmail}
-                                       onChange={e => setNewEmail(e.target.value)} className="input input-bordered"/>
-                            </div>
-                            <div className="modal-action">
-                                <button type="button" className="btn btn-ghost"
-                                        onClick={() => setIsCreateModalOpen(false)}>Abbrechen
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={isCreating}>
-                                    {isCreating ?
-                                        <span className="loading loading-spinner"></span> : 'Nutzer anlegen & Einladen'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                    <div className="modal-backdrop"></div>
-                </div>
-            )}
+            <CreateUserModal 
+                isOpen={isCreateModalOpen} 
+                onClose={() => setIsCreateModalOpen(false)} 
+                onCreate={createUser} 
+            />
         </div>
     );
 }

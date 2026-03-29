@@ -13,6 +13,7 @@ return new class extends Migration {
             $table->string('state')->nullable();
             $table->string('country')->nullable();
             $table->string('iso_country', 2)->nullable();
+            $table->unsignedBigInteger('population')->default(0);
         });
     }
 

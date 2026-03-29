@@ -6,7 +6,9 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
     workers: process.env.CI ? 1 : 8,
-    reporter: 'html',
+    reporter: [
+        ['html', {open: 'never'}]
+    ],
     // globalSetup entfernt! Tests laufen nun zerstörungsfrei gegen die Dev-DB.
     use: {
         baseURL: 'http://localhost:4321',
@@ -14,7 +16,7 @@ export default defineConfig({
         video: 'retain-on-failure',
     },
     projects: [
-        {name: 'Desktop Chrome', use: {...devices['Desktop Chrome']  ,viewport: {width: 1920, height: 1080},}},
+        {name: 'Desktop Chrome', use: {...devices['Desktop Chrome'], viewport: {width: 1920, height: 1080},}},
         {name: 'Mobile Chrome', use: {...devices['Galaxy A55']}},
     ],
 });

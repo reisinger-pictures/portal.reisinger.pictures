@@ -17,7 +17,9 @@ export class ModalHelper {
     }
 
     async clickButton(buttonText: string) {
-        await this.activeModal.getByRole('button', { name: buttonText }).click();
+        const btn = this.activeModal.getByRole('button', { name: buttonText });
+        await btn.scrollIntoViewIfNeeded();
+        await btn.click();
     }
     
     async closeModal() {

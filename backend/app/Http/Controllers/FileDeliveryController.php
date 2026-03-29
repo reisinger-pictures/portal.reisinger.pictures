@@ -21,7 +21,7 @@ class FileDeliveryController extends Controller
         }
 
         $needsWatermark = true;
-        if ($user && ($user->is_admin || $user->canAccessGallery($gallery->id))) {
+        if ($user && ($user->canAccessGallery($gallery->id))) {
             $needsWatermark = false;
         }
         

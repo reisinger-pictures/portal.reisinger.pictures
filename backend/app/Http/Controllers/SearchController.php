@@ -26,11 +26,7 @@ class SearchController extends Controller
 
             $photos->transform(function($p) {
                 $p->load('gallery');
-                $baseUrl = '/api/media/' . $p->gallery->slug;
-                $p->thumb_url = $baseUrl . '/_thumbs/800/' . $p->id . '.webp';
-            $p->srcset = $baseUrl . '/_thumbs/400/' . $p->filename . '.webp 400w, ' . 
-                           $baseUrl . '/_thumbs/800/' . $p->filename . '.webp 800w, ' . 
-                           $baseUrl . '/_thumbs/1200/' . $p->filename . '.webp 1200w';
+                // URL Generierung wurde ins Photo Model ausgelagert
                 return $p;
             });
 
@@ -57,11 +53,7 @@ class SearchController extends Controller
 
             $photos->transform(function($p) {
                 $p->load('gallery');
-                $baseUrl = '/api/media/' . $p->gallery->slug;
-                $p->thumb_url = $baseUrl . '/_thumbs/800/' . $p->id . '.webp';
-            $p->srcset = $baseUrl . '/_thumbs/400/' . $p->filename . '.webp 400w, ' . 
-                           $baseUrl . '/_thumbs/800/' . $p->filename . '.webp 800w, ' . 
-                           $baseUrl . '/_thumbs/1200/' . $p->filename . '.webp 1200w';
+                // URL Generierung wurde ins Photo Model ausgelagert
                 return $p;
             });
 
@@ -95,11 +87,7 @@ class SearchController extends Controller
 
             $photos->transform(function($p) {
                 $p->load('gallery');
-                $baseUrl = '/api/media/' . $p->gallery->slug;
-                $p->thumb_url = $baseUrl . '/_thumbs/800/' . $p->id . '.webp';
-            $p->srcset = $baseUrl . '/_thumbs/400/' . $p->filename . '.webp 400w, ' . 
-                           $baseUrl . '/_thumbs/800/' . $p->filename . '.webp 800w, ' . 
-                           $baseUrl . '/_thumbs/1200/' . $p->filename . '.webp 1200w';
+                // URL Generierung wurde ins Photo Model ausgelagert
                 return $p;
             });
 
@@ -146,12 +134,7 @@ class SearchController extends Controller
             }
         }
 
-        $baseUrl = '/api/media/' . $photo->gallery->slug;
-        $photo->url = $baseUrl . '/_' . 'thumbs/2000/' . $photo->id . '.webp';
-        $photo->thumb_url = $baseUrl . '/_thumbs/800/' . $photo->id . '.webp';
-            $photo->srcset = $baseUrl . '/_thumbs/400/' . $photo->filename . '.webp 400w, ' . 
-                           $baseUrl . '/_thumbs/800/' . $photo->filename . '.webp 800w, ' . 
-                           $baseUrl . '/_thumbs/1200/' . $photo->filename . '.webp 1200w';
+        // URL Generierung wurde ins Photo Model ausgelagert
 
         return response()->json([
             'photo' => $photo,
@@ -170,12 +153,14 @@ class SearchController extends Controller
         }
 
         try {
+            // Nutzung von Meilisearch für Typo-Toleranz und Relevanz-basiertes Ranking
             $locations = \App\Models\Location::search($q)
                 ->where('type', $type)
+                ->orderBy('population', 'desc')
                 ->take(10)
                 ->get();
         } catch (\Exception $e) {
-            Log::warning("Meilisearch Location error: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning("Location DB error: " . $e->getMessage());
             $locations = collect();
         }
 

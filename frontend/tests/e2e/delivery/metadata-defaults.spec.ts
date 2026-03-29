@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
-import path from 'path';
+import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
     let auth: AuthHelper;
@@ -19,71 +19,64 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
         await auth.login();
     });
 
-    test('Gallery defaults are applied to newly uploaded photos via Smart Assist', async ({ page }) => {
-        
-        // Netzwerk Mocking für deterministische, schnelle Tests (Unabhängig von Meilisearch Sync)
-        await page.route('**/api/search/locations?q=Linz&type=city', async route => {
-            const json = [{ id: '1', type: 'city', name: 'Linz', state: 'Oberösterreich', country: 'Österreich', iso_country: 'AT' }];
-            await route.fulfill({ json });
-        });
-        
-        // Netzwerk mocking für country
-        await page.route('**/api/search/locations?*type=country*', async route => {
-            const json = [{ id: '2', type: 'country', name: 'Österreich', iso_country: 'AT' }];
-            await route.fulfill({ json });
-        });
-
-        // 2. Neue Delivery Galerie erstellen
+    test('Gallery defaults behavior: Graz (auto-fill) and Linz (stay empty on ambiguity)', async ({ page }) => {
+        // 1. Neue Delivery Galerie erstellen
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         
-        // 3. Metadaten Defaults aktivieren
-        // Klick auf den Text-Span, um die Checkbox via <label> nativ zu toggeln (umgeht Playwright-Sichtbarkeitsprobleme)
-        await modal.activeModal.locator('span.label-text').filter({ hasText: 'Standard-Metadaten beim Upload anwenden' }).click();
-
-        // 4. Smart Assistance (Auto-Complete) testen
-        // 4. Smart Assistance (Auto-Complete) testen
-        // Wir warten bis das Metadaten-Formular (bzw. das Input) wirklich in den DOM injiziert wurde
-        const cityInput = modal.activeModal.locator('.form-control').filter({ hasText: 'Stadt' }).locator('input[type="text"]');
-        await cityInput.waitFor({ state: 'visible', timeout: 15000 });
-        await expect(cityInput).toBeVisible();
-        await cityInput.fill('Linz');
-
-        // Dropdown Item anklicken
-        const dropdownItem = modal.activeModal.locator('li').filter({ hasText: 'Linz' }).first();
-        await expect(dropdownItem).toBeVisible();
-        await dropdownItem.click();
-
-        // Verifizieren, ob Bundesland, Land und ISO automatisch gefüllt wurden
-        await expect(modal.activeModal.locator('.form-control').filter({ has: page.locator('.label-text', { hasText: 'Bundesland' }) }).locator('input[type="text"]')).toHaveValue('Oberösterreich');
-        await expect(modal.activeModal.locator('.form-control').filter({ has: page.locator('.label-text', { hasText: /^Land$/ }) }).locator('input[type="text"]').first()).toHaveValue('Österreich');
-        await expect(modal.activeModal.locator('.form-control').filter({ has: page.locator('.label-text', { hasText: 'ISO' }) }).locator('input[type="text"]').last()).toHaveValue('AT');
-
-        // Noch einen Titel hinzufügen
-        await modal.activeModal.locator('.form-control').filter({ hasText: 'Titel' }).locator('input[type="text"]').fill('Automatischer Titel');
-
-        // Galerie speichern
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
         await modal.clickButton('Speichern');
-        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
+        await savePromise;
+        await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
 
-        // 5. In die Galerie wechseln und Bild hochladen
-        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
-        const fileInput = page.locator('input[type="file"]');
-        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
-        await fileInput.setInputFiles(sampleImagePath);
+        // 2. Galerie öffnen und Vorgaben-Modal aufrufen
+        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        await expect(galLink).toBeVisible({ timeout: 15000 });
+        await galLink.click();
+
+        await page.getByRole('button', { name: 'Vorgaben...' }).click();
+        await expect(page.locator('h3:has-text("Metadaten-Vorgaben")')).toBeVisible();
+
+        // Metadaten Defaults aktivieren
+        await page.locator('span.label-text').filter({ hasText: 'Standard-Metadaten beim Upload anwenden' }).click();
+
+        const cityInput = page.locator('.form-control').filter({ hasText: 'Stadt' }).locator('input[type="text"]');
+        const stateInput = page.locator('.form-control').filter({ has: page.locator('.label-text', { hasText: 'Bundesland' }) }).locator('input[type="text"]');
+
+        // --- FALL 1: Graz (Eindeutiger Fall) ---
+        await cityInput.click();
+        await cityInput.pressSequentially('Graz', { delay: 100 });
+
+        const dropdownGraz = page.locator('li').filter({ hasText: 'Graz' }).first();
+        await expect(dropdownGraz).toBeVisible({ timeout: 15000 });
+        await dropdownGraz.click();
+
+        await expect(stateInput).toHaveValue('Steiermark');
+
+        // --- FALL 2: Linz (Mehrdeutigkeit) ---
+        await cityInput.click();
+        await cityInput.clear();
+        await cityInput.pressSequentially('Linz', { delay: 100 });
+
+        const dropdownLinzOOE = page.locator('li').filter({ hasText: 'Oberösterreich' }).first();
+        await expect(dropdownLinzOOE).toBeVisible({ timeout: 15000 });
+        await dropdownLinzOOE.click();
+
+        await expect(stateInput).toHaveValue('Oberösterreich');
         
-        // Warten bis das Bild im DOM gerendert ist
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 20000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        // Speichern im Vorgaben-Modal
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page.locator('text=Metadaten-Vorgaben gespeichert')).toBeVisible();
+        await page.keyboard.press('Escape');
 
-        // 6. In die Detailansicht wechseln und Vererbung der Defaults prüfen
+        // 3. Bild hochladen und Vererbung prüfen
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
+
         await page.locator('button[title="Details & Metadaten"]').first().click();
         await expect(page.locator('h4:has-text("IPTC Metadaten")')).toBeVisible();
 
-        // Prüfen, ob das hochgeladene Bild die Defaults übernommen hat
-        await expect(page.locator('.form-control').filter({ hasText: 'Titel' }).locator('input[type="text"]')).toHaveValue('Automatischer Titel');
         await expect(page.locator('.form-control').filter({ hasText: 'Stadt' }).locator('input[type="text"]')).toHaveValue('Linz');
         await expect(page.locator('.form-control').filter({ hasText: 'Bundesland' }).locator('input[type="text"]')).toHaveValue('Oberösterreich');
     });

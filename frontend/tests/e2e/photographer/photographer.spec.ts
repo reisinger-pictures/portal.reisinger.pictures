@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
+import { UploadHelper } from '../helpers/UploadHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
-import path from 'path';
 
 test.describe.serial('Photographer Core Workflow', () => {
     let auth: AuthHelper;
@@ -99,16 +99,8 @@ test.describe.serial('Photographer Core Workflow', () => {
         await editedLink.click();
         await expect(page.locator(`h1:has-text("${editedName}")`)).toBeVisible({ timeout: 15000 });
 
-        const fileInput = page.locator('input[type="file"]');
-        await expect(fileInput).toBeAttached();
-        
-        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
-        await fileInput.setInputFiles(sampleImagePath);
-
-        await expect(page.locator('text=Noch keine Bilder vorhanden')).toBeHidden({ timeout: 15000 });
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 20000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
     });
 
     test('Photographer sees the new gallery and photo in personal feed on dashboard', async ({ page }) => {

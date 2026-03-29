@@ -66,7 +66,8 @@ class ImportLocations extends Command
                         'name' => $data[1],
                         'state' => $stateName,
                         'country' => 'Österreich',
-                        'iso_country' => 'AT'
+                        'iso_country' => 'AT',
+                        'population' => isset($data[14]) ? (int) $data[14] : 0
                     ];
                     $count++;
 
@@ -114,7 +115,8 @@ class ImportLocations extends Command
                     'name' => $data[4],
                     'state' => null,
                     'country' => null,
-                    'iso_country' => $data[0]
+                    'iso_country' => $data[0],
+                    'population' => isset($data[7]) ? (int) $data[7] : 0
                 ];
             }
         }
@@ -125,6 +127,7 @@ class ImportLocations extends Command
         $this->info(count($countryInserts) . ' Länder erfolgreich importiert.');
 
         $this->info('Synchronisiere mit Meilisearch...');
+        $this->call('scout:sync-index-settings');
         $this->call('scout:import', ['model' => Location::class]);
 
         $this->info('✅ Import abgeschlossen!');

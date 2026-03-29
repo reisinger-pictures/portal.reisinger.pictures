@@ -16,14 +16,15 @@ test.describe('Client Notifications Opt-In', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
         await modal.clickButton('Speichern');
         await savePromise;
         await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
 
         // Galerie öffnen
-        await page.goto('/galleries');
-        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
+        const galleryLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        await expect(galleryLink).toBeVisible({ timeout: 15000 });
+        await galleryLink.click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
         
         // Kundenansicht simulieren
@@ -37,7 +38,7 @@ test.describe('Client Notifications Opt-In', () => {
         
         // Auf API warten
         const optInResponse = page.waitForResponse(res => res.url().includes('/opt-in') && res.request().method() === 'POST');
-        await toggle.click({ force: true });
+        await toggle.click();
         await optInResponse;
         
         // Neuladen um Persistenz zu verifizieren

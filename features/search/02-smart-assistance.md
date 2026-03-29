@@ -12,10 +12,10 @@ status: active
 - Aktuell wird primär der Österreich-Datensatz (`AT.zip`) verwendet.
 - **Automatisierung:** Der Command wird automatisch am Ende des `DatabaseSeeder` ausgeführt, damit nach einem `migrate:fresh --seed` die Daten sofort in der lokalen DB und in Meilisearch zur Verfügung stehen.
 
-## 2. Struktur in Meilisearch
-- Die Tabelle `locations` wird über Laravel Scout direkt in Meilisearch indiziert.
-- Ein Feld `type` unterscheidet zwischen `city` und `country`.
-- **Wichtig:** In der `scout.php` ist `type` als `filterableAttribute` definiert, damit das Frontend gezielt Anfragen nach Städten oder Ländern abfeuern kann.
+## 2. Integration von Meilisearch (Typo-Toleranz)
+- Für die Suche nach Ortsdaten wird direkt Meilisearch genutzt (`Location::search()`), um von der eingebauten Typo-Toleranz zu profitieren.
+- Zwar unterstützt Meilisearch nativ keine Substring-Suche innerhalb einzelner zusammenhängender Wörter (Infix-Suche), dafür verzeiht es aber Tippfehler der Nutzer (z.B. "Salsburg" -> "Salzburg").
+- Die Ergebnisse werden zusätzlich über Meilisearch nach `population` (Einwohnerzahl) absteigend sortiert, um bekannte Großstädte zu priorisieren.
 
 ## 3. Frontend-Verhalten (Geplant)
 - Das Frontend fragt bei Eingaben in den Feldern "Stadt" und "Land" den Meilisearch-Index ab.

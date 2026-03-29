@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
-import path from 'path';
+import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('PhotoSwipe & Lightbox UI', () => {
     let auth: AuthHelper;
@@ -24,19 +24,18 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
         // 1. Galerie erstellen
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
         await modal.clickButton('Speichern');
         await savePromise;
-        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
-        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
+        await expect(modal.activeModal).toBeHidden({ timeout: 10000 });
+        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        await expect(galLink).toBeAttached({ timeout: 20000 });
+        await galLink.scrollIntoViewIfNeeded();
+        await galLink.click();
 
         // 2. Bild hochladen
-        const fileInput = page.locator('input[type="file"]');
-        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
-        await fileInput.setInputFiles(sampleImagePath);
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
 
         // 3. Metadaten pflegen
         await page.locator('button[title="Details & Metadaten"]').first().click();
@@ -57,13 +56,13 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
         await page.locator('button.btn-ghost:has(.mdi--arrow-left)').click();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass({ timeout: 15000 });
 
         // HARD REFRESH: Wir zwingen die SPA, den Cache zu ignorieren und die frischen DB-Daten zu laden
         await page.reload();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass({ timeout: 15000 });
 
         // WARTEN auf DOM: Das Attribut muss nun die neuen Daten aus der DB enthalten
         await expect(page.locator('a.pswp-item').first()).toHaveAttribute('data-title', 'Episches Testbild', { timeout: 15000 });
@@ -86,7 +85,7 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
         // PhotoSwipe ignoriert Schließen-Events, solange die Öffnungs-Animation läuft.
         // Wir wiederholen den Klick asynchron, bis die Lightbox wirklich zu ist.
         await expect(async () => {
-            await page.locator('button.pswp__button--close').click({ force: true });
+            await page.locator('button.pswp__button--close').click();
             await expect(lightbox).toBeHidden({ timeout: 2000 });
         }).toPass({ timeout: 15000 });
     });

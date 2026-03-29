@@ -76,29 +76,13 @@ class AuthController extends Controller
 
             $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
             $link = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
-            $logoUrl = $frontendUrl . '/android-chrome-192x192.png';
             
-            $html = "
-            <table width='100%' cellpadding='0' cellspacing='0' border='0' style='background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;'>
-                <tr><td align='center'>
-                    <table width='100%' cellpadding='0' cellspacing='0' border='0' style='max-width: 600px; background-color: #ffffff; border: 1px solid #e0e0e0;'>
-                        <tr><td align='center' style='padding: 30px 20px 10px 20px;'>
-                            <img src='{$logoUrl}' alt='Logo' width='64' height='64' style='display: block; border-radius: 8px;' />
-                        </td></tr>
-                        <tr><td style='padding: 20px 30px 30px 30px;'>
-                            <h2 style='color: #2A9D8F; margin-top: 0;'>Hallo {$user->name},</h2>
-                            <p style='color: #333333; line-height: 1.6; margin-bottom: 20px;'>Willkommen! Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:</p>
-                            <table width='100%' cellpadding='0' cellspacing='0' border='0'>
-                                <tr><td align='center'>
-                                    <a href='{$link}' style='background-color: #2A9D8F; color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: bold; display: inline-block;'>Account aktivieren</a>
-                                </td></tr>
-                            </table>
-                        </td></tr>
-                    </table>
-                </td></tr>
-            </table>";
-
-            Mail::html($html, function($msg) use ($user) {
+            Mail::send('emails.activate', [
+                'userName' => $user->name,
+                'introText' => 'Willkommen! Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:',
+                'actionUrl' => $link,
+                'actionText' => 'Account aktivieren'
+            ], function($msg) use ($user) {
                 $msg->to($user->email)->subject('Account aktivieren');
             });
 

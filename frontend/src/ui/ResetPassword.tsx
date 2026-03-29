@@ -1,7 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSWRConfig } from 'swr';
 import { apiMutate } from '../api';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+const resetSchema = z.object({
+    password: z.string().min(8, 'Das Passwort muss mindestens 8 Zeichen lang sein.'),
+    passwordConfirm: z.string()
+}).refine((data) => data.password === data.passwordConfirm, {
+    message: "Die Passwörter stimmen nicht überein.",
+    path: ["passwordConfirm"],
+});
+
+type ResetFormValues = z.infer<typeof resetSchema>;
 
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
@@ -10,10 +23,15 @@ export default function ResetPassword() {
     const navigate = useNavigate();
     const { mutate } = useSWRConfig();
 
-    const [password, setPassword] = useState('');
-    const [passwordConfirm, setPasswordConfirm] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [globalError, setGlobalError] = useState('');
+
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting }
+    } = useForm<ResetFormValues>({
+        resolver: zodResolver(resetSchema)
+    });
 
     useEffect(() => {
         // Sicherheitsmaßnahme: Eventuell hängengebliebene Cookies/Sessions serverseitig löschen,
@@ -21,23 +39,11 @@ export default function ResetPassword() {
         fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     }, []);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
+    const onSubmit = async (data: ResetFormValues) => {
+        setGlobalError('');
 
-        if (password !== passwordConfirm) {
-            setError('Die Passwörter stimmen nicht überein.');
-            return;
-        }
-
-        if (password.length < 8) {
-            setError('Das Passwort muss mindestens 8 Zeichen lang sein.');
-            return;
-        }
-
-        setLoading(true);
         try {
-            await apiMutate('/api/auth/reset-password', 'POST', {email, token, password});
+            await apiMutate('/api/auth/reset-password', 'POST', { email, token, password: data.password });
             
             // Durch das mutieren der SWR Route weiß die App, dass sie nun eingeloggt ist.
             await mutate('/api/auth/me');
@@ -45,9 +51,8 @@ export default function ResetPassword() {
             // Redirect ins Dashboard
             navigate('/', { replace: true });
         } catch (err: unknown) {
-            setError(err instanceof Error ? (err as Error).message : 'Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen.');
+            setGlobalError(err instanceof Error ? err.message : 'Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen.');
         }
-        setLoading(false);
     };
 
     if (!token || !email) {
@@ -61,22 +66,32 @@ export default function ResetPassword() {
                     <h2 className="card-title text-2xl font-bold mb-2 text-primary">Account Setup</h2>
                     <p className="text-sm opacity-70 mb-4">Setze ein neues Passwort für den Account <strong>{email}</strong>.</p>
 
-                    {error && <div className="alert alert-error text-sm py-2 mb-4 shadow-sm">{error}</div>}
+                    {globalError && <div className="alert alert-error text-sm py-2 mb-4 shadow-sm">{globalError}</div>}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Neues Passwort</span></label>
-                            <input type="password" required minLength={8} value={password}
-                                   onChange={e => setPassword(e.target.value)} className="input input-bordered"/>
+                            <input 
+                                type="password" 
+                                {...register('password')} 
+                                className={`input input-bordered ${errors.password ? 'input-error' : ''}`}
+                            />
+                            {errors.password && <span className="text-error text-xs mt-1">{errors.password.message}</span>}
                         </div>
+                        
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Passwort bestätigen</span></label>
-                            <input type="password" required minLength={8} value={passwordConfirm}
-                                   onChange={e => setPasswordConfirm(e.target.value)} className="input input-bordered"/>
+                            <input 
+                                type="password" 
+                                {...register('passwordConfirm')} 
+                                className={`input input-bordered ${errors.passwordConfirm ? 'input-error' : ''}`}
+                            />
+                            {errors.passwordConfirm && <span className="text-error text-xs mt-1">{errors.passwordConfirm.message}</span>}
                         </div>
+                        
                         <div className="form-control mt-6">
-                            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-                                {loading ? <span className="loading loading-spinner"></span> : 'Passwort speichern & Anmelden'}
+                            <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
+                                {isSubmitting ? <span className="loading loading-spinner"></span> : 'Passwort speichern & Anmelden'}
                             </button>
                         </div>
                     </form>

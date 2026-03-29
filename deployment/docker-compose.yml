@@ -96,6 +96,7 @@ services:
         sed -ri -e 's!/var/www/!/var/www/html/public!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf;
       fi;
       php artisan optimize:clear;
+      php artisan app:import-locations &
       apache2-foreground
       "
     networks:

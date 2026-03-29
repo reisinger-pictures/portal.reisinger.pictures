@@ -21,10 +21,6 @@ export function useAuth() {
         shouldRetryOnError: false,
     });
 
-    if (user && user.roles && (window as any).__loggedUserId !== user.id) {
-        console.log('User Roles:', user.roles);
-        (window as any).__loggedUserId = user.id;
-    }
 
     const login = async (email: string, password: string): Promise<void> => {
         const response = await fetch('/api/auth/login', {

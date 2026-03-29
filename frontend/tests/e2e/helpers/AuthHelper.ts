@@ -19,7 +19,6 @@ export class AuthHelper {
             if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
                 await menuBtn.evaluate((el: HTMLElement) => el.click());
                 await backdrop.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-                await this.page.waitForTimeout(350);
             }
         }
 
@@ -29,7 +28,6 @@ export class AuthHelper {
             const closeBtn = this.page.locator('button:has(.mdi--close)').first();
             if (await closeBtn.count() > 0) {
                 await closeBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
-                await this.page.waitForTimeout(400);
             }
             return;
         }
@@ -52,7 +50,6 @@ export class AuthHelper {
              const closeBtn = this.page.locator('button:has(.mdi--close)').first();
              if (await closeBtn.count() > 0) {
                  await closeBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
-                 await this.page.waitForTimeout(400);
              }
         }
     }
@@ -65,14 +62,12 @@ export class AuthHelper {
             if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
                 await menuBtn.evaluate((el: HTMLElement) => el.click());
                 await backdrop.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-                await this.page.waitForTimeout(350);
             }
         }
         
         const logoutBtn = this.page.getByRole('button', { name: 'Abmelden' }).first();
         if (await logoutBtn.count() > 0) {
             await logoutBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
-            await this.page.waitForTimeout(500); 
         }
         
         await this.page.goto('/');
@@ -81,7 +76,6 @@ export class AuthHelper {
             if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
                 await menuBtn.evaluate((el: HTMLElement) => el.click());
                 await backdrop.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-                await this.page.waitForTimeout(350);
             }
         }
         

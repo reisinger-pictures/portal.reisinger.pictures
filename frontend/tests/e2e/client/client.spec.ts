@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
-import path from 'path';
+import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Client Workflow', () => {
     let auth: AuthHelper;
@@ -25,21 +25,19 @@ test.describe.serial('Client Workflow', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
         await modal.clickButton('Speichern');
         await savePromise;
         await expect(modal.activeModal).toBeHidden({ timeout: 10000 });
-        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
-
-        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
+        // Robustes Klicken: Playwright pollt den Click selbst, bis das Element da und klickbar ist
+        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        await expect(galLink).toBeAttached({ timeout: 20000 });
+        await galLink.scrollIntoViewIfNeeded();
+        await galLink.click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
 
-        const fileInput = page.locator('input[type="file"]');
-        const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
-        await fileInput.setInputFiles(sampleImagePath);
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 20000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
 
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
         
@@ -101,8 +99,9 @@ test.describe.serial('Client Workflow', () => {
         expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // Rate the first image (click 5th star)
+        const ratePromise = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
         await page.locator('input.mask-star-2').nth(4).click();
-        await page.waitForTimeout(500); // give it a brief moment to update state
+        await ratePromise;
 
         // Test Filter: "Neu (Unbewertet)"
         await page.getByRole('button', { name: 'Neu', exact: true }).click();
@@ -117,7 +116,7 @@ test.describe.serial('Client Workflow', () => {
         await page.locator('a.pswp-item').first().click();
         await expect(page.locator('.pswp')).toBeVisible();
         await expect(async () => {
-            await page.locator('button.pswp__button--close').click({ force: true });
+            await page.locator('button.pswp__button--close').click();
             await expect(page.locator('.pswp')).toBeHidden({ timeout: 2000 });
         }).toPass({ timeout: 15000 });
     });
