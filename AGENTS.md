@@ -17,6 +17,7 @@ This repository follows a strict Doc-as-Code approach. **Never guess the archite
 ## 3. Code Output & Script Generation
 * ALWAYS output a single `import_gemini.mjs` Node.js script to apply changes.
 * ONLY ONE migration file (`V001__initial_portal_schema.php`). Update it instead of creating new ones during active early development.
+* **Strict String Replacement Rule (NO REGEX MAGIC):** NEVER use Regex to patch complex files (TS, TSX, PHP). Regex matching is too fragile for code scopes and prone to duplicates. Always use strict substring replacement (`str.split(search).join(replace)`) or overwrite the file completely.
 * **Escaping Rule (CRITICAL):** ONLY double-escape backslashes for PHP namespaces (e.g., `\\App\\Models`). **NEVER** double-escape newlines (`\n`) when injecting code. Using `\\n` writes a literal `\` and `n` into the file, which crashes the Vite/Babel compiler with `Expecting Unicode escape sequence \uXXXX`. Always use a single `\n` for line breaks in strings.
 
 ## 4. Agent Roles & Strict Definition of Done (DoD)
@@ -32,4 +33,4 @@ We enforce a strict separation of concerns. An agent must fulfill its specific D
 
 ### Role 3: Review Agent ("Checker")
 * **Goal:** Quality assurance.
-* **DoD:** Code validated against `/features`. IDOR/Security checks confirmed. Task checked off (`- [x]`) in `AGENTS.todo.md`.
+* **DoD:** Code validated against `/features`. IDOR/Security checks confirmed. Zero tolerance for workarounds (e.g. global state mutations). Strict adherence to SRP (no God-components). No static `sleep()` or `waitForTimeout()` in E2E tests. Task checked off (`- [x]`) in `AGENTS.todo.md`.

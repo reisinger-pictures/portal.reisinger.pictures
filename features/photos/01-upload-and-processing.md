@@ -36,3 +36,8 @@ status: active
 ## 3. Upload Channels
 - **Web Upload:** Direct upload via the frontend.
 - **FTP Inbox:** Photographers can upload files via FTP. The `FtpController` processes the queue.
+
+
+## 4. Metadata Application & Gallery Defaults
+- **Upload Time:** Gallery metadata defaults (e.g., `default_city`) are copied directly to the `Photo` database row during upload if the original image lacks EXIF/IPTC data.
+- **Retroactive Updates (Pending):** If a photographer changes the gallery defaults *after* photos have been uploaded, the system must retroactively update existing `Photo` records (that rely on defaults) and push the updated records to Meilisearch to maintain consistency across the UI, Search, and future Zip-Downloads.

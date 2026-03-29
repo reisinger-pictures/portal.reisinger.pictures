@@ -250,46 +250,6 @@ export default function GalleryModals({
                             </select>
                         </div>
                         
-                        {newGalleryType === 'delivery' && (
-                            <div className="mt-6 pt-6 border-t border-base-300">
-                                <h4 className="font-bold text-lg mb-4">Metadaten & Berechtigungen</h4>
-                                
-                                <div className="form-control mb-4">
-                                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
-                                        <input type="checkbox" checked={allowClientMeta}
-                                               onChange={e => setAllowClientMeta(e.target.checked)}
-                                               className="checkbox checkbox-primary"/>
-                                        <div>
-                                            <span className="label-text font-bold block">Kunden dürfen Metadaten bearbeiten</span>
-                                            <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">
-                                                Erlaubt Kunden mit der Rolle "Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.
-                                            </span>
-                                        </div>
-                                    </label>
-                                </div>
-
-                                <div className="form-control mb-4">
-                                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
-                                        <input type="checkbox" checked={applyMeta}
-                                               onChange={e => setApplyMeta(e.target.checked)}
-                                               className="checkbox checkbox-primary"/>
-                                        <div>
-                                            <span className="label-text font-bold block">Standard-Metadaten beim Upload anwenden</span>
-                                            <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">
-                                                Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten.
-                                            </span>
-                                        </div>
-                                    </label>
-                                </div>
-
-                                {applyMeta && (
-                                    <div className="mb-6">
-                                        <IptcMetadataEditor data={iptcData} onChange={setIptcData} showArtist={false} />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        
                         <div className="modal-action flex justify-between">
                             {editingGroup ? (
                                 <button type="button" className="btn btn-outline btn-error" onClick={async () => {
@@ -433,6 +393,46 @@ export default function GalleryModals({
                             </div>
                         </div>
 
+                        {newGalleryType === 'delivery' && (
+                            <div className="mt-6 pt-6 border-t border-base-300">
+                                <h4 className="font-bold text-lg mb-4">Metadaten & Berechtigungen</h4>
+                                
+                                <div className="form-control mb-4">
+                                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
+                                        <input type="checkbox" checked={allowClientMeta}
+                                               onChange={e => setAllowClientMeta(e.target.checked)}
+                                               className="checkbox checkbox-primary"/>
+                                        <div>
+                                            <span className="label-text font-bold block">Kunden dürfen Metadaten bearbeiten</span>
+                                            <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">
+                                                Erlaubt Kunden mit der Rolle "Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div className="form-control mb-4">
+                                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
+                                        <input type="checkbox" checked={applyMeta}
+                                               onChange={e => setApplyMeta(e.target.checked)}
+                                               className="checkbox checkbox-primary"/>
+                                        <div>
+                                            <span className="label-text font-bold block">Standard-Metadaten beim Upload anwenden</span>
+                                            <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">
+                                                Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten.
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {applyMeta && (
+                                    <div className="mb-6">
+                                        <IptcMetadataEditor data={iptcData} onChange={setIptcData} showArtist={false} />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
                         <div className="modal-action flex justify-between">
                             {editingGallery ? (
                                 <button type="button" className="btn btn-outline btn-error" onClick={async () => {

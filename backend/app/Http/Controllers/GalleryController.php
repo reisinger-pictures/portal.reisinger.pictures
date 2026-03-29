@@ -117,6 +117,16 @@ class GalleryController extends Controller
             'is_live' => 'boolean',
             'password' => 'nullable|string',
             'expires_at' => 'nullable|date',
+            'allow_client_metadata_edit' => 'boolean',
+            'apply_metadata_to_photos' => 'boolean',
+            'default_title' => 'nullable|string',
+            'default_description' => 'nullable|string',
+            'default_keywords' => 'nullable|string',
+            'default_location' => 'nullable|string',
+            'default_city' => 'nullable|string',
+            'default_state' => 'nullable|string',
+            'default_country' => 'nullable|string',
+            'default_iso_country' => 'nullable|string|max:2',
         ]);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
@@ -147,6 +157,16 @@ class GalleryController extends Controller
                 'gallery_group_id' => $request->gallery_group_id,
                 'password_hash' => $request->password ? Hash::make($request->password) : null,
                 'expires_at' => $request->expires_at ? Carbon::parse($request->expires_at)->endOfDay() : null,
+                'allow_client_metadata_edit' => $request->allow_client_metadata_edit ?? false,
+                'apply_metadata_to_photos' => $request->apply_metadata_to_photos ?? false,
+                'default_title' => $request->default_title,
+                'default_description' => $request->default_description,
+                'default_keywords' => $request->default_keywords,
+                'default_location' => $request->default_location,
+                'default_city' => $request->default_city,
+                'default_state' => $request->default_state,
+                'default_country' => $request->default_country,
+                'default_iso_country' => $request->default_iso_country,
             ]);
 
             if ($user && !$user->is_admin && $user->is_photographer) {
@@ -172,6 +192,16 @@ class GalleryController extends Controller
             'is_live' => 'nullable|boolean',
             'is_public' => 'nullable|boolean',
             'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
+            'allow_client_metadata_edit' => 'nullable|boolean',
+            'apply_metadata_to_photos' => 'nullable|boolean',
+            'default_title' => 'nullable|string',
+            'default_description' => 'nullable|string',
+            'default_keywords' => 'nullable|string',
+            'default_location' => 'nullable|string',
+            'default_city' => 'nullable|string',
+            'default_state' => 'nullable|string',
+            'default_country' => 'nullable|string',
+            'default_iso_country' => 'nullable|string|max:2',
         ]);
 
         if (isset($validated['type']) && $validated['type'] === 'selection') {

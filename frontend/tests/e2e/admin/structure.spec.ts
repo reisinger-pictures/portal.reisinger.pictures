@@ -27,7 +27,9 @@ test.describe('Management Structure View (Tree)', () => {
         // 2. Übergeordneten Ordner erstellen
         await page.getByRole('button', { name: 'Neuer Ordner' }).click();
         await modal.fillInputByLabel('Name', groupName);
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
         await modal.clickButton('Speichern');
+        await savePromise;
 
         // Warten bis der Ordner im DOM gerendert ist (Geduldiges Assert)
         const rootGroupNode = page.locator(`summary:has-text("${groupName}")`);
@@ -37,7 +39,9 @@ test.describe('Management Structure View (Tree)', () => {
         await page.getByRole('button', { name: 'Neuer Ordner' }).click();
         await modal.fillInputByLabel('Name', subGroupName);
         await modal.selectByLabel('Übergeordnete Meta-Galerie', groupName);
+        const savePromise2 = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
         await modal.clickButton('Speichern');
+        await savePromise2;
 
         // 4. Verifizieren: "Alle ausklappen" Button testen
         await page.getByRole('button', { name: 'Alle ausklappen' }).click();

@@ -76,5 +76,9 @@ class DatabaseSeeder extends Seeder
             'parent_id' => $wien->id,
             'is_public' => true
         ]);
+
+        // Neu: Trigger den Location Import direkt im Seed
+        $this->command->info('Starte Smart Assistance Import...');
+        \Illuminate\Support\Facades\Artisan::call('app:import-locations', [], $this->command->getOutput());
     }
 }

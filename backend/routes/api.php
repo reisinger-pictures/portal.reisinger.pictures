@@ -19,7 +19,7 @@ use App\Http\Controllers\StatsController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FileDeliveryController;
 
-$throttleLimit = env('AUTH_THROTTLE_LIMIT', 60);
+$throttleLimit = env('AUTH_THROTTLE_LIMIT', 1000);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/auth/register', [AuthController::class, 'register']);
@@ -34,6 +34,7 @@ Route::get('/invites/{token}', [InviteController::class, 'check']);
 Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem']);
 
 Route::get('/search', [SearchController::class, 'search']);
+Route::get('/search/locations', [SearchController::class, 'locations']);
 Route::get('/photos/{id}/context', [SearchController::class, 'photoContext']);
 Route::get('/galleries/{slug}', [GalleryFrontendController::class, 'show']);
 Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])->where('filename', '.*');

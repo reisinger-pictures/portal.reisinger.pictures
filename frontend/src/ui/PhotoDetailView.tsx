@@ -161,7 +161,7 @@ export default function PhotoDetailView() {
                                 <span className="text-sm opacity-70 font-semibold">{data.downloads_count || 0} Downloads</span>
                             </div>
                             {user?.is_admin && (
-                                <button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto">
+                                <button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap">
                                     <span className="iconify mdi--trash-can"></span> Bild löschen
                                 </button>
                             )}

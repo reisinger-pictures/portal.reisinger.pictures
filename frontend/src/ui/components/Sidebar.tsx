@@ -138,13 +138,11 @@ export default function Sidebar(props: SidebarProps) {
                 {isAdminOrPhotog && (
                     <>
                         <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--view-dashboard text-lg"></span> Dashboard</Link></li>
+                        <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--folder-multiple text-lg"></span> Galerien</Link></li>
                         {user.is_admin && (
-                            <>
-                                <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--folder-multiple text-lg"></span> Galerien</Link></li>
-                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--account-group text-lg"></span> Benutzer & Rechte</Link></li>
-                                <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--cog text-lg"></span> Einstellungen</Link></li>
-                            </>
+                            <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--account-group text-lg"></span> Benutzer & Rechte</Link></li>
                         )}
+                        <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--cog text-lg"></span> Einstellungen</Link></li>
                     </>
                 )}
             </ul>

@@ -39,6 +39,9 @@ return [
             \App\Models\Gallery::class => [
                 'filterableAttributes' => ['id'],
             ],
+            \App\Models\Location::class => [
+                'filterableAttributes' => ['type'],
+            ],
         ],
     ],
 ];

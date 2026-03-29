@@ -25,15 +25,19 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
         await modal.clickButton('Speichern');
-        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 20000 });
+        await savePromise;
+        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 20000 });
 
-        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
         const fileInput = page.locator('input[type="file"]');
         const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
         await fileInput.setInputFiles(sampleImagePath);
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 20000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
 
@@ -62,6 +66,8 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         // Bild muss sichtbar sein, was die transienten Rechte bestätigt
         const image = page.locator('a.pswp-item img').first();
         await expect(image).toBeVisible({ timeout: 15000 });
+        await expect(image).toHaveJSProperty('complete', true);
+        expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
     });
 
     test('Logged-in User redeems anonymous invite directly', async ({ page }) => {

@@ -26,9 +26,9 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.clickButton('Speichern');
         await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
-        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
 
-        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
         
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');
@@ -36,6 +36,8 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         await fileInput.setInputFiles(sampleImagePath);
 
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // 3. In die Detailansicht navigieren
         await page.locator('button[title="Details & Metadaten"]').first().click();

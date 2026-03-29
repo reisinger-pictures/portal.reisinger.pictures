@@ -25,17 +25,21 @@ test.describe.serial('Client Workflow', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
         await modal.clickButton('Speichern');
+        await savePromise;
         await expect(modal.activeModal).toBeHidden({ timeout: 10000 });
-        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
 
-        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
 
         const fileInput = page.locator('input[type="file"]');
         const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
         await fileInput.setInputFiles(sampleImagePath);
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 20000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
         
@@ -68,6 +72,8 @@ test.describe.serial('Client Workflow', () => {
         // --- DAU Protection Check (Right-Click & Drag) ---
         const image = page.locator('a.pswp-item img').first();
         await expect(image).toBeVisible({ timeout: 15000 });
+        await expect(image).toHaveJSProperty('complete', true);
+        expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // 1. Prüfen, ob das Kontextmenü blockiert wird
         const isPrevented = await image.evaluate((el) => {
@@ -91,6 +97,8 @@ test.describe.serial('Client Workflow', () => {
         // Wait for image to load
         const image = page.locator('a.pswp-item img').first();
         await expect(image).toBeVisible({ timeout: 15000 });
+        await expect(image).toHaveJSProperty('complete', true);
+        expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // Rate the first image (click 5th star)
         await page.locator('input.mask-star-2').nth(4).click();

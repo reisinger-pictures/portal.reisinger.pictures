@@ -16,12 +16,14 @@ test.describe('Client Notifications Opt-In', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
         await modal.clickButton('Speichern');
+        await savePromise;
         await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
 
         // Galerie öffnen
         await page.goto('/galleries');
-        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
         
         // Kundenansicht simulieren

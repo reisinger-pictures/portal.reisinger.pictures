@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
+import { MailpitHelper } from '../helpers/MailpitHelper';
 import path from 'path';
 
 test.describe.serial('Photographer Core Workflow', () => {
@@ -9,9 +10,50 @@ test.describe.serial('Photographer Core Workflow', () => {
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
 
-    const uniqueId = Date.now();
+    const uniqueId = Date.now() + '-' + Math.round(Math.random() * 10000);
     const galleryName = `Playwright Workflow ${uniqueId}`;
     const editedName = `Playwright Edited ${uniqueId}`;
+
+    let testEmail = '';
+    const testPassword = 'SecurePassword123!';
+
+    
+    test.beforeAll(async ({ request }) => {
+        const mailpit = new MailpitHelper(request);
+        testEmail = `photog-${uniqueId}@example.com`;
+
+        // 1. Admin Login via API (Setzt das Cookie im Request Context)
+        await request.post('/api/auth/login', {
+            data: { email: 'florian@reisinger.pictures', password: 'admin' }
+        });
+
+        // 2. Echten User on-the-fly via API anlegen
+        const createRes = await request.post('/api/management/users', {
+            data: { name: `E2E Photog ${uniqueId}`, email: testEmail }
+        });
+        const createData = await createRes.json();
+        const newUserId = createData.user.id;
+
+        // 3. Fotografen-Rolle zuweisen
+        const rolesRes = await request.get('/api/management/roles');
+        const roles = await rolesRes.json();
+        const photogRole = roles.find((r: any) => r.name === 'photographer');
+
+        await request.put(`/api/management/users/${newUserId}`, {
+            data: { role_ids: [photogRole.id], gallery_group_ids: [], gallery_ids: [], can_edit_metadata: false }
+        });
+
+        // 4. Setup Token aus Mailpit abfangen und Passwort setzen
+        const token = await mailpit.extractLinkForEmail(testEmail, /token=([a-zA-Z0-9]+)/);
+        if (!token) throw new Error("Konnte kein Setup-Token in Mailpit finden");
+
+        await request.post('/api/auth/reset-password', {
+            data: { email: testEmail, token, password: testPassword }
+        });
+
+        // 5. Admin sauber ausloggen
+        await request.post('/api/auth/logout');
+    });
 
     test.beforeEach(async ({ page }) => {
         auth = new AuthHelper(page);
@@ -20,7 +62,7 @@ test.describe.serial('Photographer Core Workflow', () => {
         
         // Da die Tests isoliert sind, loggen wir uns für jeden Teilschritt neu ein.
         // Das sorgt dafür, dass wir immer sauber vom Dashboard starten.
-        await auth.login();
+        await auth.login(testEmail, testPassword);
     });
 
     test('Photographer can create a new delivery gallery', async ({ page }) => {
@@ -35,7 +77,7 @@ test.describe.serial('Photographer Core Workflow', () => {
         const response = await responsePromise;
         expect(response.status()).toBe(200);
 
-        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
     });
 
     test('Photographer can edit an existing gallery', async ({ page }) => {
@@ -65,6 +107,8 @@ test.describe.serial('Photographer Core Workflow', () => {
 
         await expect(page.locator('text=Noch keine Bilder vorhanden')).toBeHidden({ timeout: 15000 });
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 20000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
     });
 
     test('Photographer sees the new gallery and photo in personal feed on dashboard', async ({ page }) => {

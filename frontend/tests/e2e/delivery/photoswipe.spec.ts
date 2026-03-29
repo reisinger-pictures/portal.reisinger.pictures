@@ -24,15 +24,19 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
         // 1. Galerie erstellen
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
         await modal.clickButton('Speichern');
-        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
-        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
+        await savePromise;
+        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
+        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');
         const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
         await fileInput.setInputFiles(sampleImagePath);
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // 3. Metadaten pflegen
         await page.locator('button[title="Details & Metadaten"]').first().click();
@@ -52,10 +56,14 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
         // 4. Zurück zur Galerie
         await page.locator('button.btn-ghost:has(.mdi--arrow-left)').click();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // HARD REFRESH: Wir zwingen die SPA, den Cache zu ignorieren und die frischen DB-Daten zu laden
         await page.reload();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // WARTEN auf DOM: Das Attribut muss nun die neuen Daten aus der DB enthalten
         await expect(page.locator('a.pswp-item').first()).toHaveAttribute('data-title', 'Episches Testbild', { timeout: 15000 });

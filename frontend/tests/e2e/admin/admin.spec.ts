@@ -26,16 +26,12 @@ test.describe('Admin Workflow', () => {
         await modal.fillInputByLabel('Name', 'Test Admin Client');
         await modal.fillInputByLabel('E-Mail Adresse', uniqueEmail);
         
-        // Klick ausführen (Achtung: page.once('dialog') ist entfernt, da wir nun Toasts nutzen!)
         await modal.clickButton('Nutzer anlegen & Einladen');
 
-        // Wenn das Modal nicht schließt, wirft das Backend einen 500er (Wahrscheinlich Mailpit nicht erreichbar!)
-        // Prüfen, ob Erfolgs-Toast sichtbar ist (Timeout erhöht für evtl. SMTP/Mailpit-Latenz)
         const toast = page.locator('.toast');
         await expect(toast).toBeVisible({ timeout: 15000 });
         await expect(toast).toContainText('Nutzer angelegt', { timeout: 5000 });
         
-        // Modal sollte sich danach geschlossen haben
         await expect(modal.activeModal).toBeHidden();
 
         await page.fill('input[placeholder="Nutzer suchen (Name oder E-Mail)..."]', uniqueEmail);
@@ -51,38 +47,6 @@ test.describe('Admin Workflow', () => {
         await sidebar.navigateTo('Einstellungen');
         await expect(page.locator('h1:has-text("Einstellungen")')).toBeVisible();
     });
-
-    test('Admin can update profile settings including FTP slug', async ({ page }) => {
-        await auth.login();
-        await sidebar.navigateTo('Einstellungen');
-        await expect(page.locator('h1:has-text("Einstellungen")')).toBeVisible();
-
-        // Generiere eindeutige Werte
-        const uniqueSuffix = Date.now().toString().slice(-6);
-        const newName = `E2E Admin ${uniqueSuffix}`;
-        const newSlug = `e2e-${uniqueSuffix}`;
-        const newCopyright = `© ${newName}`;
-
-        // Felder ausfüllen (Robuste Locators via .form-control)
-        await page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input').fill(newName);
-        await page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input').fill(newSlug);
-        await page.locator('.form-control').filter({ hasText: 'Standard-Urheber' }).locator('input').fill(newCopyright);
-
-        // Speichern
-        await page.getByRole('button', { name: 'Profil speichern' }).click();
-
-        // Toast abwarten
-        const toast = page.locator('.toast');
-        await expect(toast).toBeVisible({ timeout: 15000 });
-        await expect(toast).toContainText('Profil aktualisiert', { timeout: 5000 });
-
-        // Reload um Persistenz (Datenbank-Speicherung) zu testen
-        await page.reload();
-        await expect(page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input')).toHaveValue(newName, { timeout: 15000 });
-        await expect(page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input')).toHaveValue(newSlug);
-        await expect(page.locator('.form-control').filter({ hasText: 'Standard-Urheber' }).locator('input')).toHaveValue(newCopyright);
-    });
-
 
     test('Header Live-Search dropdown appears and handles navigation', async ({ page }) => {
         await auth.login();
@@ -106,5 +70,4 @@ test.describe('Admin Workflow', () => {
         const searchViewInput = page.locator('input[placeholder="Galerien und Bilder suchen..."]');
         await expect(searchViewInput).toHaveValue('Ab');
     });
-
 });

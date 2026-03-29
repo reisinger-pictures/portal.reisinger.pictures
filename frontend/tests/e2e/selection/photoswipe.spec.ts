@@ -26,17 +26,21 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
         await modal.clickButton('Speichern');
+        await savePromise;
         await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
-        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
 
-        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');
         const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
         await fileInput.setInputFiles(sampleImagePath);
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // 3. Invite Link für Gast generieren
         await page.getByRole('button', { name: 'Einladungslink...' }).click();

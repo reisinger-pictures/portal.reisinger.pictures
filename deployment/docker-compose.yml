@@ -59,6 +59,7 @@ services:
       - MEILISEARCH_HOST=http://search:7700
       - MEILISEARCH_KEY=${MEILI_MASTER_KEY}
       - GALLERY_CLEANUP_GRACE_MONTHS=3
+      - AUTH_THROTTLE_LIMIT=10
       # NEU: Expliziter Pfad für den FTP-Ordner im Container
       - FTP_STORAGE_PATH=/var/www/ftp
     command: >

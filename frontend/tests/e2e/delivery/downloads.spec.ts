@@ -26,10 +26,12 @@ test.describe.serial('Download Triggers UI', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.selectByLabel('Sichtbarkeit', 'Öffentlich (Für alle sichtbar)');
+        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method())).catch(() => {});
         await modal.clickButton('Speichern');
-        await expect(page.locator('main').locator(`a:has-text("${galleryName}")`).first()).toBeVisible({ timeout: 15000 });
+        await savePromise;
+        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
         
-        await page.locator('main').locator(`a:has-text("${galleryName}")`).first().click();
+        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
         // 2. Bild hochladen
         const fileInput = page.locator('input[type="file"]');
@@ -38,6 +40,8 @@ test.describe.serial('Download Triggers UI', () => {
         
         // Warten, bis das Bild im DOM gerendert wurde
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // URL der Galerie merken
         const galleryUrl = page.url();
@@ -49,6 +53,8 @@ test.describe.serial('Download Triggers UI', () => {
         // 4. Als anonymer Gast die öffentliche Galerie aufrufen
         await page.goto(galleryUrl);
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // 5. Test: Einzel-Download
         // Wir fangen das Download-Event ab, bevor wir klicken

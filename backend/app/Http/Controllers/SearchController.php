@@ -159,4 +159,26 @@ class SearchController extends Controller
             'downloads_count' => \App\Models\DownloadLog::where('gallery_id', $photo->gallery_id)->where('item_type', 'single_image')->where('item_identifier', $photo->filename)->count()
         ]);
     }
+
+    public function locations(Request $request)
+    {
+        $q = $request->input('q', '');
+        $type = $request->input('type');
+
+        if (strlen($q) < 2 || !in_array($type, ['city', 'country'])) {
+            return response()->json([]);
+        }
+
+        try {
+            $locations = \App\Models\Location::search($q)
+                ->where('type', $type)
+                ->take(10)
+                ->get();
+        } catch (\Exception $e) {
+            Log::warning("Meilisearch Location error: " . $e->getMessage());
+            $locations = collect();
+        }
+
+        return response()->json($locations);
+    }
 }

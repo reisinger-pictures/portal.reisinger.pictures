@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocations, LocationResult } from '../../logic/useLocations';
 
 export interface IptcData {
     title?: string;
     description?: string;
     artist?: string;
     headline?: string;
-        keywords?: string;
+    keywords?: string;
     location?: string;
     city?: string;
     state?: string;
@@ -21,6 +22,76 @@ interface Props {
     children?: React.ReactNode;
 }
 
+// Interne Komponente für das Smart Assistance Dropdown
+const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disabled, label, className }: {
+    value: string, onChange: (val: string) => void, onSelect: (loc: LocationResult) => void, type: 'city' | 'country', placeholder?: string, disabled?: boolean, label: string, className?: string
+}) => {
+    const [query, setQuery] = useState(value || '');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Update internal state if external value changes (e.g. initial load or parent override)
+    useEffect(() => { setQuery(value || ''); }, [value]);
+
+    // Debounce the fetch query
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedQuery(query), 300);
+        return () => clearTimeout(timer);
+    }, [query]);
+
+    const { locations, isLoading } = useLocations(debouncedQuery, type);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative flex-1 w-full form-control" ref={wrapperRef}>
+            <label className="label"><span className="label-text font-bold">{label}</span></label>
+            <input
+                type="text"
+                value={query}
+                onChange={e => {
+                    setQuery(e.target.value);
+                    onChange(e.target.value);
+                    setIsOpen(true);
+                }}
+                onFocus={() => setIsOpen(true)}
+                disabled={disabled}
+                placeholder={placeholder}
+                className={className || "input input-sm input-bordered w-full"}
+            />
+            {isOpen && !disabled && locations.length > 0 && (
+                <ul className="absolute z-50 top-full left-0 w-full mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
+                    {locations.map(loc => (
+                        <li
+                            key={loc.id}
+                            className="px-4 py-2 hover:bg-base-200 cursor-pointer flex flex-col border-b border-base-200/50 last:border-0"
+                            onClick={() => {
+                                onSelect(loc);
+                                setIsOpen(false);
+                            }}
+                        >
+                            <span className="font-bold text-sm text-primary">{loc.name}</span>
+                            {loc.state && <span className="text-xs opacity-70">{loc.state}, {loc.country}</span>}
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {isOpen && isLoading && debouncedQuery.length >= 2 && locations.length === 0 && (
+                <div className="absolute z-50 top-full left-0 w-full mt-1 bg-base-100 shadow-xl rounded-box border border-base-300 p-2 text-center text-xs opacity-50">Sucht...</div>
+            )}
+        </div>
+    );
+};
+
 export default function IptcMetadataEditor({ data, onChange, showArtist = true, disabled = false, children }: Props) {
     const [keywordInput, setKeywordInput] = useState('');
 
@@ -28,11 +99,14 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
         onChange({ ...data, [field]: value });
     };
 
+    const handleMultiChange = (updates: Partial<IptcData>) => {
+        onChange({ ...data, ...updates });
+    };
+
     const keywordsArray = (data.keywords || '').split(',').map(k => k.trim()).filter(k => k.length > 0);
 
     const addKeywords = (text: string) => {
         if (disabled) return;
-        // Robustes Parsing ohne Syntax-Fehler
         const newKeywords = text.split(/[,;\s\n]+/).map(k => k.trim()).filter(k => k.length > 0);
         
         const uniqueKeywords = new Set(keywordsArray);
@@ -56,7 +130,6 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
             addKeywords(keywordInput);
             setKeywordInput('');
         } else if (e.key === 'Backspace' && keywordInput === '' && keywordsArray.length > 0) {
-            // Löscht das letzte Tag, wenn man Backspace im leeren Feld drückt
             removeKeyword(keywordsArray[keywordsArray.length - 1]);
         }
     };
@@ -168,19 +241,42 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
                     <label className="label"><span className="label-text font-bold">Ort</span></label>
                     <input type="text" value={data.location || ''} onChange={e => handleChange('location', e.target.value)} className="input input-sm input-bordered" />
                 </div>
-                <div className="form-control">
-                    <label className="label"><span className="label-text font-bold">Stadt</span></label>
-                    <input type="text" value={data.city || ''} onChange={e => handleChange('city', e.target.value)} className="input input-sm input-bordered" />
-                </div>
+                
+                {/* SMART ASSISTANCE: City Autocomplete */}
+                <AutocompleteInput
+                    label="Stadt"
+                    type="city"
+                    value={data.city || ''}
+                    onChange={(val) => handleChange('city', val)}
+                    onSelect={(loc) => handleMultiChange({
+                        city: loc.name,
+                        state: loc.state || data.state,
+                        country: loc.country || data.country,
+                        iso_country: loc.iso_country || data.iso_country
+                    })}
+                    disabled={disabled}
+                />
+
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Bundesland</span></label>
                     <input type="text" value={data.state || ''} onChange={e => handleChange('state', e.target.value)} className="input input-sm input-bordered" />
                 </div>
+                
                 <div className="form-control flex-row gap-2">
-                    <div className="flex-1">
-                        <label className="label"><span className="label-text font-bold">Land</span></label>
-                        <input type="text" value={data.country || ''} onChange={e => handleChange('country', e.target.value)} className="input input-sm input-bordered w-full" />
-                    </div>
+                    {/* SMART ASSISTANCE: Country Autocomplete */}
+                    <AutocompleteInput
+                        label="Land"
+                        type="country"
+                        value={data.country || ''}
+                        onChange={(val) => handleChange('country', val)}
+                        onSelect={(loc) => handleMultiChange({
+                            country: loc.name,
+                            iso_country: loc.iso_country || data.iso_country
+                        })}
+                        disabled={disabled}
+                        className="input input-sm input-bordered w-full"
+                    />
+                    
                     <div className="w-24">
                         <label className="label"><span className="label-text font-bold">ISO</span></label>
                         <input type="text" maxLength={2} placeholder="DE" value={data.iso_country || ''} onChange={e => handleChange('iso_country', e.target.value.toUpperCase())} className="input input-sm input-bordered w-full" />
