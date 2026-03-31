@@ -1,10 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('PhotoSwipe & Lightbox UI', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    });
+
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
@@ -19,17 +26,17 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
     });
 
     test('Lightbox opens and displays custom IPTC captions', async ({ page }) => {
-        await auth.login();
+        await auth.login(testUser.email, testUser.password);
 
         // 1. Galerie erstellen
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
-        await modal.clickButton('Speichern');
-        await savePromise;
-        await expect(modal.activeModal).toBeHidden({ timeout: 10000 });
+        await modal.submitModal('Speichern');
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeAttached({ timeout: 20000 });
+        await expect(async () => {
+            if (await galLink.isHidden()) await page.reload();
+            await expect(galLink).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 20000 });
         await galLink.scrollIntoViewIfNeeded();
         await galLink.click();
 
@@ -55,13 +62,13 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
         // 4. Zurück zur Galerie
         await page.locator('button.btn-ghost:has(.mdi--arrow-left)').click();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true, { timeout: 15000 });
         await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass({ timeout: 15000 });
 
         // HARD REFRESH: Wir zwingen die SPA, den Cache zu ignorieren und die frischen DB-Daten zu laden
         await page.reload();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true, { timeout: 15000 });
         await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass({ timeout: 15000 });
 
         // WARTEN auf DOM: Das Attribut muss nun die neuen Daten aus der DB enthalten

@@ -1,4 +1,4 @@
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import {apiMutate, fetcher} from '../api';
 import {useAuth} from './useAuth';
 
@@ -73,6 +73,7 @@ export function useProtectedGalleries() {
                 parent_id: parentId
             });
             await mutate();
+        globalMutate('/api/auth/me');
         } catch (e) {
             throw new Error('Gruppe konnte nicht erstellt werden.', {cause: e});
         }
@@ -92,6 +93,7 @@ export function useProtectedGalleries() {
                 ...metadataOpts
             });
             await mutate();
+        globalMutate('/api/auth/me');
         } catch (e) {
             throw new Error('Galerie konnte nicht erstellt werden.', {cause: e});
         }
@@ -101,6 +103,7 @@ export function useProtectedGalleries() {
         try {
             await apiMutate(`/api/management/galleries/${id}`, 'DELETE');
             await mutate();
+        globalMutate('/api/auth/me');
         } catch (e) {
             throw new Error('Galerie konnte nicht gelöscht werden.', {cause: e});
         }
@@ -110,16 +113,19 @@ export function useProtectedGalleries() {
     const updateGroup = async (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => {
         await apiMutate('/api/management/gallery-groups/' + id, 'PUT', { name, slug, is_public: isPublic, parent_id: parentId });
         await mutate();
+        globalMutate('/api/auth/me');
     };
 
     const deleteGroup = async (id: string) => {
         await apiMutate('/api/management/gallery-groups/' + id, 'DELETE');
         await mutate();
+        globalMutate('/api/auth/me');
     };
 
     const updateGallery = async (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: any) => {
         await apiMutate('/api/management/galleries/' + id, 'PUT', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts });
         await mutate();
+        globalMutate('/api/auth/me');
     };
 
     return {

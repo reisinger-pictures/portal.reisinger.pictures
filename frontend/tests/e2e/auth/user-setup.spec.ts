@@ -1,10 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 
 test.describe.serial('User Setup via Mailpit Workflow', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'admin');
+    });
+
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
@@ -14,12 +21,7 @@ test.describe.serial('User Setup via Mailpit Workflow', () => {
     const newUserEmail = `e2e-user-${uniqueId}@example.com`;
     let setupLink = '';
 
-    test.beforeAll(async ({ request }) => {
-        mailpit = new MailpitHelper(request);
-        await mailpit.deleteAllMessages(); // Postfach leeren vor dem Test
-    });
-
-    test.beforeEach(async ({ page, request }) => {
+        test.beforeEach(async ({ page, request }) => {
         auth = new AuthHelper(page);
         sidebar = new SidebarHelper(page);
         modal = new ModalHelper(page);
@@ -27,7 +29,7 @@ test.describe.serial('User Setup via Mailpit Workflow', () => {
     });
 
     test('Admin invites a new user via UI', async ({ page }) => {
-        await auth.login();
+        await auth.login(testUser.email, testUser.password);
         await sidebar.navigateTo('Benutzer & Rechte');
         
         await page.getByRole('button', { name: '+ Neuen Nutzer anlegen' }).click();

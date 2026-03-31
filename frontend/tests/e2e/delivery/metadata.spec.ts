@@ -1,10 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Metadata & Detail View Workflow', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    });
+
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
@@ -16,14 +23,13 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         auth = new AuthHelper(page);
         sidebar = new SidebarHelper(page);
         modal = new ModalHelper(page);
-        await auth.login();
+        await auth.login(testUser.email, testUser.password);
     });
 
     test('Photographer can view and edit metadata in detail view', async ({ page }) => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
-        await modal.clickButton('Speichern');
-        await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
+        await modal.submitModal('Speichern');
         
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
         await expect(galLink).toBeVisible({ timeout: 15000 });

@@ -23,14 +23,15 @@ interface Props {
     onOpenGroupModal: () => void;
     availableGroups: FlatGroup[];
     editingGallery?: Gallery | null;
+    defaultGroupId?: string | null;
     onCreate: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
     onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
 
-const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '');
 
-export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, onCreate, onUpdate, onDelete }: Props) {
+export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
 
     const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting, isDirty } } = useForm<GalleryFormValues>({
@@ -48,7 +49,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 type: editingGallery?.type || 'delivery',
                 is_public: editingGallery?.is_public || false,
                 is_live: editingGallery?.is_live || false,
-                gallery_group_id: editingGallery?.gallery_group_id || '',
+                gallery_group_id: editingGallery?.gallery_group_id || defaultGroupId || '',
                 password: '',
                 expires_at: editingGallery?.expires_at ? editingGallery.expires_at.split('T')[0] : ''
             });

@@ -4,13 +4,13 @@ import { Gallery, GalleryGroup, GalleryTreeResponse } from '../../logic/useGalle
 
 interface Props {
     tree?: GalleryTreeResponse | null;
-    onOpenGroupModal: () => void;
-    onOpenGalleryModal: () => void;
+    onOpenGroupModal: (groupId?: string) => void;
+    onOpenGalleryModal: (groupId?: string) => void;
     onEditGroup: (g: GalleryGroup) => void;
     onEditGallery: (g: Gallery) => void;
 }
 
-const TreeNode = ({ node, isGallery, onEdit, expandSignal }: { node: any, isGallery: boolean, onEdit: any, expandSignal: number }) => {
+const TreeNode = ({ node, isGallery, onEditGroup, onEditGallery, onOpenGroupModal, onOpenGalleryModal, expandSignal }: { node: any, isGallery: boolean, onEditGroup: any, onEditGallery: any, onOpenGroupModal: any, onOpenGalleryModal: any, expandSignal: number }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [localSignal, setLocalSignal] = useState(0);
     const effectiveSignal = expandSignal + localSignal;
@@ -31,7 +31,7 @@ const TreeNode = ({ node, isGallery, onEdit, expandSignal }: { node: any, isGall
                     <span className="font-medium">{node.name}</span>
                     <span className="badge badge-sm badge-ghost">{node.type === 'selection' ? 'Auswahl' : 'Delivery'}</span>
                 </Link>
-                <button onClick={() => onEdit(node)} className="btn btn-ghost btn-sm btn-circle tooltip" data-tip="Bearbeiten"><span className="iconify mdi--pencil text-lg"></span></button>
+                <button onClick={() => onEditGallery(node)} className="btn btn-ghost btn-sm btn-circle tooltip" data-tip="Bearbeiten"><span className="iconify mdi--pencil text-lg"></span></button>
             </div>
         );
     }
@@ -47,6 +47,8 @@ const TreeNode = ({ node, isGallery, onEdit, expandSignal }: { node: any, isGall
                     <span className="font-bold text-lg">{node.name}</span>
                 </div>
                 <div className="flex items-center gap-1">
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenGalleryModal(node.id); }} className="btn btn-ghost btn-xs tooltip" data-tip="Galerie hier erstellen"><span className="iconify mdi--image-plus text-base text-primary"></span></button>
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenGroupModal(node.id); }} className="btn btn-ghost btn-xs tooltip" data-tip="Unterordner hier erstellen"><span className="iconify mdi--folder-plus text-base text-secondary"></span></button>
                     {hasInhalt && (
                         <div className="join mr-4">
                             <button 
@@ -65,14 +67,14 @@ const TreeNode = ({ node, isGallery, onEdit, expandSignal }: { node: any, isGall
                             </button>
                         </div>
                     )}
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(node); }} className="btn btn-ghost btn-sm btn-circle tooltip" data-tip="Ordner bearbeiten">
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditGroup(node); }} className="btn btn-ghost btn-sm btn-circle tooltip" data-tip="Ordner bearbeiten">
                         <span className="iconify mdi--pencil text-lg"></span>
                     </button>
                 </div>
             </summary>
             <div className="p-2 pl-4 md:pl-8 border-t border-base-300 bg-base-100/50">
-                {node.children?.map((c: any) => <TreeNode key={'g-'+c.id} node={c} isGallery={false} onEdit={onEdit} expandSignal={effectiveSignal} />)}
-                {node.galleries?.map((g: any) => <TreeNode key={'gal-'+g.id} node={g} isGallery={true} onEdit={onEdit} expandSignal={effectiveSignal} />)}
+                {node.children?.map((c: any) => <TreeNode key={'g-'+c.id} node={c} isGallery={false} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} />)}
+                {node.galleries?.map((g: any) => <TreeNode key={'gal-'+g.id} node={g} isGallery={true} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} />)}
                 {(!node.children?.length && !node.galleries?.length) && <div className="p-4 text-sm opacity-50 italic">Ordner ist leer.</div>}
             </div>
         </details>
@@ -92,8 +94,8 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
                     <p className="opacity-70 text-lg">Verwalte deine Ordner und Galerien.</p>
                 </div>
                 <div className="join shadow-sm">
-                    <button onClick={onOpenGalleryModal} className="btn btn-primary join-item"><span className="iconify mdi--image-plus"></span> Neue Galerie</button>
-                    <button onClick={onOpenGroupModal} className="btn btn-outline join-item"><span className="iconify mdi--folder-plus"></span> Neuer Ordner</button>
+                    <button onClick={() => onOpenGalleryModal()} className="btn btn-primary join-item"><span className="iconify mdi--image-plus"></span> Neue Galerie</button>
+                    <button onClick={() => onOpenGroupModal()} className="btn btn-outline join-item"><span className="iconify mdi--folder-plus"></span> Neuer Ordner</button>
                 </div>
             </div>
 
@@ -103,12 +105,12 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
             </div>
 
             <div className="space-y-2">
-                {safeGroups.map(g => <TreeNode key={'grp-'+g.id} node={g} isGallery={false} onEdit={onEditGroup} expandSignal={expandSignal} />)}
+                {safeGroups.map(g => <TreeNode key={'grp-'+g.id} node={g} isGallery={false} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={expandSignal} />)}
                 {safeRootGalleries.length > 0 && (
                     <div className="border border-base-300 bg-base-100 rounded-box shadow-sm mt-6">
                         <div className="bg-base-200/50 py-2 px-4 font-bold border-b border-base-300 opacity-70">Hauptverzeichnis (Ohne Ordner)</div>
                         <div className="p-2">
-                            {safeRootGalleries.map(g => <TreeNode key={'rgal-'+g.id} node={g} isGallery={true} onEdit={onEditGallery} expandSignal={expandSignal} />)}
+                            {safeRootGalleries.map(g => <TreeNode key={'rgal-'+g.id} node={g} isGallery={true} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={expandSignal} />)}
                         </div>
                     </div>
                 )}

@@ -31,7 +31,7 @@ class GalleryController extends Controller
         $filterType = $request->query('filter_type');
         $treeArray = json_decode(json_encode($tree), true);
 
-        if (!$user->is_admin && $user->is_photographer) {
+        if (true) { // Filter für alle anwenden (auch Admins sehen nur ihre Galerien)
             $allowedGalleryIds = $user->getAllowedGalleryIds();
             
             $filterNode = function($groups) use (&$filterNode, $allowedGalleryIds) {
@@ -169,7 +169,7 @@ class GalleryController extends Controller
                 'default_iso_country' => $request->default_iso_country,
             ]);
 
-            if ($user && !$user->is_admin && $user->is_photographer) {
+            if ($user && $user->is_photographer) { // WICHTIG: Ersteller immer zuweisen, auch wenn er Admin ist
                 $user->galleries()->syncWithoutDetaching([$gallery->id]);
             }
 

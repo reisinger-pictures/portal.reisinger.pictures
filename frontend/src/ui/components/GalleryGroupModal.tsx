@@ -18,14 +18,15 @@ interface Props {
     onClose: () => void;
     availableGroups: FlatGroup[];
     editingGroup?: GalleryGroup | null;
+    defaultParentId?: string | null;
     onCreate: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => Promise<void>;
     onUpdate: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
 
-const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '');
 
-export default function GalleryGroupModal({ isOpen, onClose, availableGroups, editingGroup, onCreate, onUpdate, onDelete }: Props) {
+export default function GalleryGroupModal({ isOpen, onClose, availableGroups, editingGroup, defaultParentId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
 
     const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting, isDirty } } = useForm<GroupFormValues>({
@@ -39,7 +40,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                 name: editingGroup?.name || '',
                 slug: editingGroup?.slug || '',
                 is_public: editingGroup?.is_public === null || editingGroup?.is_public === undefined ? 'null' : (editingGroup.is_public ? 'true' : 'false'),
-                parent_id: editingGroup?.parent_id || ''
+                parent_id: editingGroup?.parent_id || defaultParentId || ''
             });
         }
     }, [isOpen, editingGroup, reset]);

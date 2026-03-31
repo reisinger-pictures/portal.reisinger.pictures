@@ -14,15 +14,21 @@ class AuthorizationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_has_access_to_all_galleries()
+    public function test_admin_does_not_have_implicit_access_to_galleries()
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
         
-        Gallery::factory()->count(3)->create();
+        $gallery = Gallery::factory()->create();
         
-        $this->assertCount(3, $admin->getAllowedGalleryIds());
-        $this->assertTrue($admin->canAccessGallery(Gallery::first()->id));
+        // Admins haben keinen globalen, impliziten Zugriff mehr
+        $this->assertCount(0, $admin->getAllowedGalleryIds());
+        $this->assertFalse($admin->canAccessGallery($gallery->id));
+        
+        // Zugriff funktioniert erst nach expliziter Zuweisung
+        $admin->galleries()->attach($gallery);
+        $this->assertCount(1, $admin->fresh()->getAllowedGalleryIds());
+        $this->assertTrue($admin->fresh()->canAccessGallery($gallery->id));
     }
 
     public function test_user_inherits_access_via_gallery_group()

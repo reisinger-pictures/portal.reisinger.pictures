@@ -92,9 +92,7 @@ class User extends Authenticatable implements JWTSubject
             return $this->transient_galleries ?? [];
         }
 
-        if ($this->is_admin) {
-            return Gallery::pluck('id')->toArray();
-        }
+        // Admins haben keinen globalen Zugriff mehr auf private Galerien
 
         // 1. Direct assignments
         $galleryIds = $this->galleries()->pluck('galleries.id')->toArray();
@@ -131,7 +129,7 @@ class User extends Authenticatable implements JWTSubject
 
     public function canAccessGallery($galleryId): bool
     {
-        if ($this->is_admin) return true;
+        // Admins müssen wie alle anderen explizite Rechte besitzen
         return in_array($galleryId, $this->getAllowedGalleryIds());
     }
 }

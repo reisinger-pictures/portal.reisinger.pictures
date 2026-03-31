@@ -11,6 +11,7 @@ interface GalleryModalsProps {
 
     editingGroup?: GalleryGroup | null;
     editingGallery?: Gallery | null;
+    defaultGroupId?: string | null;
 
     onCreateGroup: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => Promise<void>;
     onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
@@ -27,6 +28,7 @@ export default function GalleryModals(props: GalleryModalsProps) {
                 isOpen={props.isGroupModalOpen}
                 onClose={() => props.setGroupModalOpen(false)}
                 availableGroups={props.availableGroups}
+                defaultParentId={props.defaultGroupId}
                 editingGroup={props.editingGroup}
                 onCreate={props.onCreateGroup}
                 onUpdate={props.onUpdateGroup}
@@ -36,6 +38,7 @@ export default function GalleryModals(props: GalleryModalsProps) {
                 isOpen={props.isGalleryModalOpen}
                 onClose={() => props.setGalleryModalOpen(false)}
                 onOpenGroupModal={() => { props.setGalleryModalOpen(false); props.setGroupModalOpen(true); }}
+                defaultGroupId={props.defaultGroupId}
                 availableGroups={props.availableGroups}
                 editingGallery={props.editingGallery}
                 onCreate={props.onCreateGallery}

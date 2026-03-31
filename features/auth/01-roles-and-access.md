@@ -13,7 +13,7 @@ status: active
 
 ## 2. Role System
 Roles are strictly separated.
-- **Admin (`is_admin`):** Broad management access. Manages users, roles, and global settings (watermark). Can view statistics for ALL galleries across the system.
+- **Admin (`is_admin`):** Broad management access. Manages users, roles, and global settings (watermark). Can view statistics for ALL galleries across the system. Does **not** have implicit super-user access to private galleries or files.
 - **Photographer (`is_photographer`):** Operational user. Can create/edit/delete galleries, upload photos, manage metadata, send invites, and view statistics ONLY for their *own* galleries or when they are added to a specific gallery.
 - **Client (`is_client`):** Standard registered user. Has explicit access to specific galleries. 
   - In *Selection Galleries*: Can view, rate, and comment.

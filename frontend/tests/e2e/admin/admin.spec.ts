@@ -1,9 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 
 test.describe('Admin Workflow', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'admin');
+    });
+
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
@@ -15,7 +22,7 @@ test.describe('Admin Workflow', () => {
     });
 
     test('Admin can manage users and roles', async ({ page }) => {
-        await auth.login();
+        await auth.login(testUser.email, testUser.password);
 
         await sidebar.navigateTo('Benutzer & Rechte');
         await expect(page.locator('h1:has-text("Benutzer & Rechte")')).toBeVisible();
@@ -43,14 +50,15 @@ test.describe('Admin Workflow', () => {
     });
 
     test('Admin can access settings', async ({ page }) => {
-        await auth.login();
+        await auth.login(testUser.email, testUser.password);
         await sidebar.navigateTo('Einstellungen');
         await expect(page.locator('h1:has-text("Einstellungen")')).toBeVisible();
     });
 
     test('Header Live-Search dropdown appears and handles navigation', async ({ page }) => {
-        await auth.login();
+        await auth.login(testUser.email, testUser.password);
 
+        await page.goto('/');
         const headerSearchInput = page.locator('header input[placeholder="Suche in allen Galerien..."]');
         await expect(headerSearchInput).toBeVisible();
 

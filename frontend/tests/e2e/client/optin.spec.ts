@@ -1,25 +1,29 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 
 test.describe('Client Notifications Opt-In', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    });
+
     test('Client can toggle email notifications in gallery view', async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
         const galleryName = 'OptIn Test ' + Date.now();
 
-        await auth.login(); 
+        await auth.login(testUser.email, testUser.password); 
         
         // Eigene Galerie erstellen für Isolierung
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
-        await modal.clickButton('Speichern');
-        await savePromise;
-        await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
+        await modal.submitModal('Speichern');
 
         // Galerie öffnen
         const galleryLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();

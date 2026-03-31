@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSettings } from '../../../logic/useSettings';
 import { useAuth } from '../../../logic/useAuth';
 import { useUI } from '../../components/UIContext';
@@ -15,6 +15,7 @@ const watermarkSchema = z.object({
 type WatermarkFormValues = z.infer<typeof watermarkSchema>;
 
 export default function WatermarkSettingsCard() {
+    const [cacheBuster, setCacheBuster] = useState(Date.now());
     const { watermark, updateWatermark } = useSettings();
     const { user } = useAuth();
     const { showToast } = useUI();
@@ -50,6 +51,8 @@ export default function WatermarkSettingsCard() {
             await updateWatermark(fd);
             showToast('success', 'Wasserzeichen gespeichert');
             watermarkForm.setValue('svg', undefined);
+            setCacheBuster(Date.now());
+            setCacheBuster(Date.now());
         } catch {
             showToast('error', 'Fehler beim Speichern des Wasserzeichens');
         }
@@ -69,9 +72,17 @@ export default function WatermarkSettingsCard() {
                     </div>
                 )}
                 {watermark?.has_svg && (
-                    <div className="alert alert-success shadow-sm mb-6">
-                        <span className="iconify mdi--check-circle text-xl"></span>
-                        <span>SVG Wasserzeichen ist aktiv.</span>
+                    <div className="flex flex-col md:flex-row gap-6 mb-8 p-4 bg-base-100 rounded-box border border-base-300 shadow-sm items-center">
+                        <div className="w-32 h-32 shrink-0 rounded bg-base-300 border border-base-300 overflow-hidden flex items-center justify-center relative shadow-inner" style={{ backgroundImage: 'repeating-conic-gradient(oklch(var(--b3)) 0% 25%, transparent 0% 50%)', backgroundSize: '16px 16px' }}>
+                            <img src={`/api/management/settings/watermark/image?t=${cacheBuster}`} alt="Watermark Preview" className="max-w-[6rem] max-h-[6rem] object-contain drop-shadow-md" onError={(e) => e.currentTarget.style.display = 'none'} />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-success flex items-center gap-2 mb-1">
+                                <span className="iconify mdi--check-circle text-xl"></span>
+                                SVG Wasserzeichen ist aktiv
+                            </h3>
+                            <p className="text-sm opacity-70">Das aktuell hinterlegte Wasserzeichen wird für Gäste gerendert. Es wird automatisch basierend auf der längsten Bildseite skaliert.</p>
+                        </div>
                     </div>
                 )}
 

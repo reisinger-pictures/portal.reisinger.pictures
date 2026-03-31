@@ -27,6 +27,7 @@ export default function PageLayout({children, currentView}: {
     const [isGalleryModalOpen, setGalleryModalOpen] = useState(false);
     const [editingGroup, setEditingGroup] = useState<GalleryGroup | null>(null);
     const [editingGallery, setEditingGallery] = useState<Gallery | null>(null);
+    const [prefillGroupId, setPrefillGroupId] = useState<string | null>(null);
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
 
     return (
@@ -44,12 +45,14 @@ export default function PageLayout({children, currentView}: {
                         tree={tree} isLoading={isLoading} isError={isError}
                         currentView={currentView}
                         onCloseMobile={() => setIsSidebarOpen(false)}
-                        onOpenGalleryModal={() => {
+                        onOpenGalleryModal={(groupId?: string) => {
                             setEditingGallery(null);
+                            setPrefillGroupId(groupId || null);
                             setGalleryModalOpen(true);
                         }}
-                        onOpenGroupModal={() => {
+                        onOpenGroupModal={(groupId?: string) => {
                             setEditingGroup(null);
+                            setPrefillGroupId(groupId || null);
                             setGroupModalOpen(true);
                         }}
                         onEditGroup={(g) => {
@@ -72,6 +75,7 @@ export default function PageLayout({children, currentView}: {
                     isGroupModalOpen={isGroupModalOpen} setGroupModalOpen={setGroupModalOpen}
                     isGalleryModalOpen={isGalleryModalOpen} setGalleryModalOpen={setGalleryModalOpen}
                     editingGroup={editingGroup} editingGallery={editingGallery}
+                    defaultGroupId={prefillGroupId}
                     onCreateGroup={createGroup} onCreateGallery={createGallery}
                     onUpdateGroup={updateGroup} onUpdateGallery={updateGallery}
                     onDeleteGroup={deleteGroup} onDeleteGallery={deleteGallery}

@@ -87,6 +87,8 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::delete('/management/domain-mappings/{id}', [DomainMappingController::class, 'destroy']);
 
     Route::get('/management/settings/watermark', [SettingsController::class, 'getWatermark']);
+    Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
+    Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
     Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark']);
 
     Route::get('/management/ftp/status', [FtpController::class, 'status']);

@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 
 export class ModalHelper {
     constructor(private page: Page) {}
@@ -24,5 +24,15 @@ export class ModalHelper {
     
     async closeModal() {
         await this.activeModal.locator('button').filter({ hasText: '✕' }).click();
+    }
+
+    async submitModal(buttonText: string = 'Speichern') {
+        const savePromise = this.page.waitForResponse(res =>
+            res.url().includes('/api/management/') &&
+            ['POST', 'PUT'].includes(res.request().method())
+        );
+        await this.clickButton(buttonText);
+        await savePromise;
+        await expect(this.activeModal).toBeHidden({ timeout: 15000 });
     }
 }

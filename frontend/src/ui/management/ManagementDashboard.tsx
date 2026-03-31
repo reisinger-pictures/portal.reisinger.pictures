@@ -39,6 +39,7 @@ export default function ManagementDashboard() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isGroupModalOpen, setGroupModalOpen] = useState(false);
     const [isGalleryModalOpen, setGalleryModalOpen] = useState(false);
+    const [prefillGroupId, setPrefillGroupId] = useState<string | null>(null);
 
     // Neu: State für das aktuell zu bearbeitende Element
     const [editingGroup, setEditingGroup] = useState<GalleryGroup | null>(null);
@@ -70,12 +71,14 @@ export default function ManagementDashboard() {
                             Sidebar.</div>}>
                         <Sidebar
                             tree={tree} isLoading={isLoading} isError={isError}
-                            onOpenGalleryModal={() => {
+                            onOpenGalleryModal={(groupId?: string) => {
                                 setEditingGallery(null);
+                                setPrefillGroupId(groupId || null);
                                 setGalleryModalOpen(true);
                             }}
-                            onOpenGroupModal={() => {
+                            onOpenGroupModal={(groupId?: string) => {
                                 setEditingGroup(null);
+                                setPrefillGroupId(groupId || null);
                                 setGroupModalOpen(true);
                             }}
                             onEditGroup={(g) => {
@@ -151,7 +154,7 @@ export default function ManagementDashboard() {
                     </header>
 
                     <ErrorBoundary>
-                        {currentView === 'galleries' && <ManagementStructureView tree={tree} onOpenGroupModal={() => setGroupModalOpen(true)} onOpenGalleryModal={() => setGalleryModalOpen(true)} onEditGroup={g => {setEditingGroup(g); setGroupModalOpen(true);}} onEditGallery={g => {setEditingGallery(g); setGalleryModalOpen(true);}} />}
+                        {currentView === 'galleries' && <ManagementStructureView tree={tree} onOpenGroupModal={(id) => {setPrefillGroupId(id || null); setEditingGroup(null); setGroupModalOpen(true);}} onOpenGalleryModal={(id) => {setPrefillGroupId(id || null); setEditingGallery(null); setGalleryModalOpen(true);}} onEditGroup={g => {setEditingGroup(g); setGroupModalOpen(true);}} onEditGallery={g => {setEditingGallery(g); setGalleryModalOpen(true);}} />}
                         {currentView === 'users' && <ManagementUserView/>}
                         {currentView === 'settings' && <ManagementSettingsView/>}
                         {currentView === 'stats' && <ManagementStatsView/>}
@@ -212,6 +215,7 @@ export default function ManagementDashboard() {
                         isGroupModalOpen={isGroupModalOpen} setGroupModalOpen={setGroupModalOpen}
                         isGalleryModalOpen={isGalleryModalOpen} setGalleryModalOpen={setGalleryModalOpen}
                         editingGroup={editingGroup} editingGallery={editingGallery}
+                        defaultGroupId={prefillGroupId}
                         onCreateGroup={createGroup} onCreateGallery={createGallery}
                         onUpdateGroup={updateGroup} onUpdateGallery={updateGallery}
                         onDeleteGroup={deleteGroup} onDeleteGallery={deleteGallery}

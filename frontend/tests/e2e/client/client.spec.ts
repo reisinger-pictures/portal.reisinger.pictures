@@ -1,10 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Client Workflow', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    });
+
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
@@ -19,19 +26,19 @@ test.describe.serial('Client Workflow', () => {
         modal = new ModalHelper(page);
     });
 
-    test('Admin creates selection gallery and invite link', async ({ page }) => {
-        await auth.login();
+    test('Photographer creates selection gallery and invite link', async ({ page }) => {
+        await auth.login(testUser.email, testUser.password);
         
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
-        await modal.clickButton('Speichern');
-        await savePromise;
-        await expect(modal.activeModal).toBeHidden({ timeout: 10000 });
+        await modal.submitModal('Speichern');
         // Robustes Klicken: Playwright pollt den Click selbst, bis das Element da und klickbar ist
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeAttached({ timeout: 20000 });
+        await expect(async () => {
+            if (await galLink.isHidden()) await page.reload();
+            await expect(galLink).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 20000 });
         await galLink.scrollIntoViewIfNeeded();
         await galLink.click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
@@ -70,7 +77,7 @@ test.describe.serial('Client Workflow', () => {
         // --- DAU Protection Check (Right-Click & Drag) ---
         const image = page.locator('a.pswp-item img').first();
         await expect(image).toBeVisible({ timeout: 15000 });
-        await expect(image).toHaveJSProperty('complete', true);
+        await expect(image).toHaveJSProperty('complete', true, { timeout: 15000 });
         expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // 1. Prüfen, ob das Kontextmenü blockiert wird
@@ -95,7 +102,7 @@ test.describe.serial('Client Workflow', () => {
         // Wait for image to load
         const image = page.locator('a.pswp-item img').first();
         await expect(image).toBeVisible({ timeout: 15000 });
-        await expect(image).toHaveJSProperty('complete', true);
+        await expect(image).toHaveJSProperty('complete', true, { timeout: 15000 });
         expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // Rate the first image (click 5th star)

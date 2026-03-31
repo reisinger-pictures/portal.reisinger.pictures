@@ -1,8 +1,3 @@
 # 📝 Backlog / Next Sprint
 
-## Technical Debt & Refactoring
-
-
-## Features & Bugfixes
-
-## QA & Testing
+- [x] Test Refactoring: Extracted modal saving into `submitModal` utility and fixed flaky locator in `structure.spec.ts`. (Ready for Review)

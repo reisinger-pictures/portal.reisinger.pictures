@@ -14,7 +14,7 @@ class PhotoController extends Controller
     {
         if (!$user) return ['allowed' => false, 'is_client' => false];
         
-        $isPhotographerOrAdmin = $user->is_admin || ($user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists());
+        $isPhotographerOrAdmin = $user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
         
         if ($isPhotographerOrAdmin) {
             return ['allowed' => true, 'is_client' => false];
@@ -88,7 +88,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        $isPhotographerOrAdmin = $user->is_admin || ($user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists());
+        $isPhotographerOrAdmin = $user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
         
         if (!$isPhotographerOrAdmin) {
             return response()->json(['error' => 'Keine Berechtigung. Nur für Fotografen/Admins.'], 403);
@@ -103,7 +103,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        $isPhotographerOrAdmin = $user->is_admin || ($user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists());
+        $isPhotographerOrAdmin = $user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
         
         if (!$isPhotographerOrAdmin) {
             return response()->json(['error' => 'Keine Berechtigung für Revert. Nur für Fotografen/Admins.'], 403);
@@ -131,7 +131,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        if (!$user->is_admin && !$user->galleries()->where('galleries.id', $photo->gallery_id)->exists()) {
+        if (!$user->is_photographer || !$user->galleries()->where('galleries.id', $photo->gallery_id)->exists()) {
             return response()->json(['error' => 'Keine Löschberechtigung.'], 403);
         }
 

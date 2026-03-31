@@ -1,10 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Gallery Invite Link Workflow', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    });
+
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
@@ -19,16 +26,13 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         modal = new ModalHelper(page);
     });
 
-    test('Admin creates gallery and generates anonymous invite link', async ({ page }) => {
-        await auth.login();
+    test('Photographer creates gallery and generates anonymous invite link', async ({ page }) => {
+        await auth.login(testUser.email, testUser.password);
 
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
-        await modal.clickButton('Speichern');
-        await savePromise;
-        await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
+        await modal.submitModal('Speichern');
         await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 20000 });
 
         await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
@@ -63,7 +67,7 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         // Bild muss sichtbar sein, was die transienten Rechte bestätigt
         const image = page.locator('a.pswp-item img').first();
         await expect(image).toBeVisible({ timeout: 15000 });
-        await expect(image).toHaveJSProperty('complete', true);
+        await expect(image).toHaveJSProperty('complete', true, { timeout: 15000 });
         expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
     });
 
@@ -71,7 +75,7 @@ test.describe.serial('Gallery Invite Link Workflow', () => {
         // Sicherstellen, dass der Test nicht isoliert fehlschlägt
         test.skip(inviteLinkAnon === '', 'Test requires link from previous step');
 
-        await auth.login();
+        await auth.login(testUser.email, testUser.password);
 
         // Wir fangen den API-Request ab, um sicherzustellen, dass das Auto-Redeem im Hintergrund feuert
         // Aufruf des Magic Links

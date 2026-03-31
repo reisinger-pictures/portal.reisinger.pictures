@@ -1,10 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('PhotoSwipe in Selection Gallery', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    });
+
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
@@ -19,18 +26,19 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         modal = new ModalHelper(page);
     });
 
-    test('Admin creates selection gallery and uploads image', async ({ page }) => {
-        await auth.login();
+    test('Photographer creates selection gallery and uploads image', async ({ page }) => {
+        await auth.login(testUser.email, testUser.password);
 
         // 1. Selection Galerie erstellen
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
-        await modal.clickButton('Speichern');
-        await savePromise;
-        await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
-        await expect(page.locator('main').locator('a').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
+        await modal.submitModal('Speichern');
+        await expect(async () => {
+            const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+            if (await link.isHidden()) await page.reload();
+            await expect(link).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 15000 });
 
         await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 

@@ -7,8 +7,8 @@ interface SidebarProps {
     tree?: GalleryTreeResponse | null;
     isLoading?: boolean;
     isError?: unknown;
-    onOpenGalleryModal?: () => void;
-    onOpenGroupModal?: () => void;
+    onOpenGalleryModal?: (groupId?: string) => void;
+    onOpenGroupModal?: (groupId?: string) => void;
     onEditGroup?: (group: GalleryGroup) => void;
     onEditGallery?: (gallery: Gallery) => void;
     currentView?: string;
@@ -111,7 +111,7 @@ export default function Sidebar(props: SidebarProps) {
                 {isAdminOrPhotog && (
                     <>
                         <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--view-dashboard text-lg"></span> Dashboard</Link></li>
-                        <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--folder-multiple text-lg"></span> Galerien</Link></li>
+                        {user?.is_photographer && (<li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--folder-multiple text-lg"></span> Galerien</Link></li>)}
                         {user.is_admin && (
                             <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--account-group text-lg"></span> Benutzer & Rechte</Link></li>
                         )}

@@ -7,6 +7,14 @@ use App\Models\Setting;
 
 class SettingsController extends Controller
 {
+
+    public function getWatermarkImage()
+    {
+        $path = storage_path('app/private/watermark.svg');
+        if (!file_exists($path)) abort(404);
+        return response()->file($path, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'no-cache, no-store, must-revalidate']);
+    }
+
     public function getWatermark()
     {
         $hasSvg = file_exists(storage_path('app/private/watermark.svg'));
@@ -23,7 +31,7 @@ class SettingsController extends Controller
         if ($request->hasFile('svg')) {
             $request->validate(['svg' => 'file|mimes:svg']);
             $file = $request->file('svg');
-            
+
             // Fail Fast: Ist es wirklich ein valides SVG?
             $content = file_get_contents($file->getRealPath());
             if (!str_contains($content, '<svg') || @simplexml_load_string($content) === false) {
@@ -31,7 +39,7 @@ class SettingsController extends Controller
             }
 
             $file->move(storage_path('app/private'), 'watermark.svg');
-            
+
             // Alte gecachte Master-PNGs aufräumen
             $oldCaches = glob(storage_path('app/private/watermark_master_*.png'));
             if ($oldCaches) array_map('unlink', $oldCaches);

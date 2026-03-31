@@ -29,6 +29,7 @@ class MailDeliveryTest extends TestCase
         $gallery = Gallery::factory()->create(['name' => 'Sommerfest']);
         $admin = User::factory()->create();
         $admin->roles()->attach(\App\Models\Role::firstOrCreate(['name' => 'admin']));
+        $admin->galleries()->attach($gallery);
         
         $token = auth('api')->login($admin);
 

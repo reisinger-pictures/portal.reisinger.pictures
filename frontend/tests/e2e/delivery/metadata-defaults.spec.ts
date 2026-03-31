@@ -1,10 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
+import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
+    let testUser = { email: '', password: '' };
+
+    test.beforeAll(async ({ request }) => {
+        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    });
+
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
@@ -16,7 +23,7 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
         auth = new AuthHelper(page);
         sidebar = new SidebarHelper(page);
         modal = new ModalHelper(page);
-        await auth.login();
+        await auth.login(testUser.email, testUser.password);
     });
 
     test('Gallery defaults behavior: Graz (auto-fill) and Linz (stay empty on ambiguity)', async ({ page }) => {
@@ -25,10 +32,7 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         
-        const savePromise = page.waitForResponse(res => res.url().includes('/api/management/galler') && ['POST', 'PUT'].includes(res.request().method()));
-        await modal.clickButton('Speichern');
-        await savePromise;
-        await expect(modal.activeModal).toBeHidden({ timeout: 15000 });
+        await modal.submitModal('Speichern');
 
         // 2. Galerie öffnen und Vorgaben-Modal aufrufen
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();

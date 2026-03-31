@@ -52,7 +52,7 @@ class GalleryFrontendController extends Controller
         $breadcrumbs = [];
         $groupId = $gallery->gallery_group_id;
         while ($groupId) {
-            $group = AppModelsGalleryGroup::find($groupId);
+            $group = \App\Models\GalleryGroup::find($groupId);
             if ($group) {
                 array_unshift($breadcrumbs, ['name' => $group->name, 'full_path' => 'meta/' . $group->id, 'type' => 'group']);
                 $groupId = $group->parent_id;
