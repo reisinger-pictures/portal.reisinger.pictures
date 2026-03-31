@@ -17,6 +17,7 @@ class User extends Authenticatable implements JWTSubject
 
     public $guest_id = null;
     public $transient_galleries = [];
+    public $transient_meta_galleries = [];
 
     protected $visible = [
         'id', 'name', 'email', 'metadata_copyright', 'can_edit_metadata', 

@@ -29,7 +29,7 @@ const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace
 export default function GalleryGroupModal({ isOpen, onClose, availableGroups, editingGroup, defaultParentId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
 
-    const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting, isDirty } } = useForm<GroupFormValues>({
+    const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting, dirtyFields } } = useForm<GroupFormValues>({
         resolver: zodResolver(groupSchema),
         defaultValues: { name: '', slug: '', is_public: 'null', parent_id: '' }
     });
@@ -43,36 +43,56 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                 parent_id: editingGroup?.parent_id || defaultParentId || ''
             });
         }
-    }, [isOpen, editingGroup, reset]);
+    }, [isOpen, editingGroup, reset, defaultParentId]);
 
     const watchName = watch('name');
+
+    // ✨ FIX: Slug folgt dem Namen nur, wenn das Slug-Feld noch nicht manuell editiert wurde
     useEffect(() => {
-        if (!editingGroup && !isDirty && watchName) {
+        if (!editingGroup && !dirtyFields.slug && watchName) {
             setValue('slug', toSlug(watchName));
         }
-    }, [watchName, editingGroup, isDirty, setValue]);
+    }, [watchName, editingGroup, dirtyFields.slug, setValue]);
 
     const onSubmit = async (data: GroupFormValues) => {
         const isPub = data.is_public === 'null' ? null : data.is_public === 'true';
         const pId = data.parent_id === '' ? null : data.parent_id;
-        
+
         try {
-            if (editingGroup) await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId);
-            else await onCreate(data.name, data.slug, isPub, pId);
+            if (editingGroup) {
+                await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId);
+                showToast('success', 'Ordner erfolgreich aktualisiert.');
+            } else {
+                await onCreate(data.name, data.slug, isPub, pId);
+                showToast('success', 'Ordner erfolgreich erstellt.');
+            }
             onClose();
-        } catch {
-            showToast('error', 'Fehler beim Speichern');
+        } catch (e: any) {
+            showToast('error', e.message || 'Fehler beim Speichern');
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!editingGroup) return;
+        if (await confirm({ title: 'Meta-Galerie löschen?', message: 'ACHTUNG: Alle Unterordner werden dabei in die Root-Ebene verschoben!', confirmText: 'Löschen', confirmColor: 'error' })) {
+            try {
+                await onDelete(editingGroup.id);
+                showToast('success', 'Ordner erfolgreich gelöscht.');
+                onClose();
+            } catch (e: any) {
+                showToast('error', e.message || 'Fehler beim Löschen');
+            }
         }
     };
 
     if (!isOpen) return null;
 
     return (
-        <dialog className="modal modal-open">
+        <dialog className="modal modal-open z-[60]">
             <div className="modal-box relative">
                 <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-lg mb-4">{editingGroup ? 'Meta-Galerie bearbeiten' : 'Neue Meta-Galerie erstellen'}</h3>
-                
+
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <div className="flex flex-col md:flex-row gap-4 mb-4">
                         <div className="form-control w-full md:w-1/2">
@@ -81,7 +101,10 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                         </div>
                         <div className="form-control w-full md:w-1/2">
                             <label className="label"><span className="label-text font-bold">URL Slug</span></label>
-                            <input type="text" {...register('slug')} onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true})} className="input input-bordered w-full text-sm font-mono" />
+                            <input type="text" {...register('slug')}
+                                   onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true})}
+                                   className="input input-bordered w-full text-sm font-mono"
+                            />
                         </div>
                     </div>
 
@@ -101,15 +124,10 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                             {availableGroups.filter(g => g.id !== editingGroup?.id).map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
                         </select>
                     </div>
-                    
+
                     <div className="modal-action flex justify-between">
                         {editingGroup ? (
-                            <button type="button" className="btn btn-outline btn-error" onClick={async () => {
-                                if (await confirm({ title: 'Meta-Galerie löschen?', message: 'ACHTUNG: Alle Unterordner werden dabei in die Root-Ebene verschoben!', confirmText: 'Löschen', confirmColor: 'error' })) {
-                                    await onDelete(editingGroup.id);
-                                    onClose();
-                                }
-                            }}>Löschen</button>
+                            <button type="button" className="btn btn-outline btn-error" onClick={handleDelete}>Löschen</button>
                         ) : <div></div>}
                         <div>
                             <button type="button" className="btn btn-ghost mr-2" onClick={onClose}>Abbrechen</button>

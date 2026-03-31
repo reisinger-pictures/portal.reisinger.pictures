@@ -16,6 +16,13 @@ class DownloadController extends Controller
     private function authorizeGalleryAccess($gallery)
     {
         $user = auth('api')->user();
+        $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
+        $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($gallery->id)));
+
+        if ($isExpired && !$canManage) {
+            abort(403, 'Galerie abgelaufen.');
+        }
+
         if (!$gallery->is_public) {
             if (!$user)
                 abort(401, 'Unauthorized access to this gallery.');

@@ -1,4 +1,5 @@
 import ResponsiveImage from '../components/ResponsiveImage';
+import ErrorMessage from '../components/ErrorMessage';
 import {useRef, useState} from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams} from 'react-router-dom';
@@ -34,7 +35,7 @@ export default function ManagementMetaGalleryView() {
         <div className="flex h-full items-center justify-center"><span className="loading loading-spinner"></span></div>
     </PageLayout>;
     if (isError || !group) return <PageLayout>
-        <div className="p-8 text-center text-error">Meta-Galerie nicht gefunden.</div>
+        <div className="p-8"><ErrorMessage message="Meta-Galerie nicht gefunden." /></div>
     </PageLayout>;
 
     return (

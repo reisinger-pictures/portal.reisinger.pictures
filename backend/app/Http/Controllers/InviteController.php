@@ -20,7 +20,8 @@ class InviteController extends Controller
         if (!$user->canAccessGallery($galleryId)) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         $request->validate([
-            'name' => 'nullable|string|max:255'
+            'name' => 'nullable|string|max:255',
+            'can_edit_metadata' => 'boolean'
         ]);
 
         $gallery = Gallery::findOrFail($galleryId);
@@ -29,7 +30,8 @@ class InviteController extends Controller
         GalleryInvite::create([
             'gallery_id' => $gallery->id,
             'token' => $token,
-            'name' => $request->name
+            'name' => $request->name,
+            'can_edit_metadata' => $request->can_edit_metadata ?? false
         ]);
 
         return response()->json([
@@ -102,6 +104,7 @@ class InviteController extends Controller
         }
 
         $transientGalleries = [$gallery->id];
+        $transientMetaGalleries = $invite->can_edit_metadata ? [$gallery->id] : [];
 
         if ($currentUser) {
             $payload = $guard->payload();
@@ -111,7 +114,11 @@ class InviteController extends Controller
             }
             $merged = array_values(array_unique(array_merge($existing, $transientGalleries)));
             
-            $token = $guard->claims(['transient_galleries' => $merged])->login($currentUser);
+            $existingMeta = $payload->get('transient_meta_galleries');
+            if (!is_array($existingMeta)) { $existingMeta = []; }
+            $mergedMeta = array_values(array_unique(array_merge($existingMeta, $transientMetaGalleries)));
+            
+            $token = $guard->claims(['transient_galleries' => $merged, 'transient_meta_galleries' => $mergedMeta])->login($currentUser);
             return $this->respondWithToken($token, ['full_path' => $gallery->full_path]);
         }
 
@@ -132,7 +139,8 @@ class InviteController extends Controller
             'sub' => 'guest_' . $guestId,
             'guest_id' => $guestId,
             'guest_name' => $guestName,
-            'transient_galleries' => $transientGalleries
+            'transient_galleries' => $transientGalleries,
+            'transient_meta_galleries' => $transientMetaGalleries
         ])->make();
         $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
 

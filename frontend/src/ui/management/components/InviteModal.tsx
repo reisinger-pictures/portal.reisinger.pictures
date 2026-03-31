@@ -3,8 +3,9 @@ import useSWR from 'swr';
 import {apiMutate, fetcher} from '../../../api';
 import { useUI } from '../../components/UIContext';
 
-export default function InviteModal({galleryId, onClose}: { galleryId: string, onClose: () => void }) {
+export default function InviteModal({galleryId, galleryType, onClose}: { galleryId: string, galleryType: string, onClose: () => void }) {
     const [name, setName] = useState('');
+    const [canEditMeta, setCanEditMeta] = useState(false);
     const [loading, setLoading] = useState(false);
     const [newLink, setNewLink] = useState('');
     const [linkType, setLinkType] = useState<'mass' | 'personal'>('mass');
@@ -22,7 +23,7 @@ export default function InviteModal({galleryId, onClose}: { galleryId: string, o
             const data = await apiMutate<{
                 success: boolean,
                 link: string
-            }>(`/api/management/galleries/${galleryId}/invites`, 'POST', {name});
+            }>(`/api/management/galleries/${galleryId}/invites`, 'POST', {name, can_edit_metadata: canEditMeta});
             if (data.success) {
                 setNewLink(data.link);
                 setName('');
@@ -85,6 +86,18 @@ export default function InviteModal({galleryId, onClose}: { galleryId: string, o
                             <div className="form-control pl-8 border-l-2 border-primary ml-2 mb-2">
                                 <label className="label py-1"><span className="label-text font-bold">Name des Gastes</span></label>
                                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="z.B. Oma Erna" className="input input-sm input-bordered w-full" />
+                            </div>
+                        )}
+
+                        {galleryType === 'delivery' && (
+                            <div className="form-control mb-3">
+                                <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300">
+                                    <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" checked={canEditMeta} onChange={e => setCanEditMeta(e.target.checked)} />
+                                    <div>
+                                        <span className="label-text font-bold block">Gast darf Metadaten bearbeiten</span>
+                                        <span className="label-text-alt opacity-70 block mt-1">Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen.</span>
+                                    </div>
+                                </label>
                             </div>
                         )}
 

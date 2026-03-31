@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ErrorMessage from './components/ErrorMessage';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSWRConfig } from 'swr';
 import { apiMutate } from '../api';
@@ -66,7 +67,7 @@ export default function ResetPassword() {
                     <h2 className="card-title text-2xl font-bold mb-2 text-primary">Account Setup</h2>
                     <p className="text-sm opacity-70 mb-4">Setze ein neues Passwort für den Account <strong>{email}</strong>.</p>
 
-                    {globalError && <div className="alert alert-error text-sm py-2 mb-4 shadow-sm">{globalError}</div>}
+                    {globalError && <ErrorMessage message={globalError} className="mb-4" />}
 
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div className="form-control">

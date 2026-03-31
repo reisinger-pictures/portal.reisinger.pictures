@@ -55,30 +55,14 @@ export class AuthHelper {
     }
 
     async logout() {
-        const menuBtn = this.page.locator('header button.btn-square').filter({ has: this.page.locator('.mdi--menu') }).first();
-        const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
-
-        if (await menuBtn.isVisible()) {
-            if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
-                await menuBtn.evaluate((el: HTMLElement) => el.click());
-                await backdrop.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-            }
-        }
+        // Architektur-Fix: Rollenunabhängiger, robuster Logout.
+        // Wir verlassen uns nicht auf UI-Buttons, die je nach Rolle fehlen könnten.
+        await this.page.context().clearCookies();
         
-        const logoutBtn = this.page.getByRole('button', { name: 'Abmelden' }).first();
-        if (await logoutBtn.count() > 0) {
-            await logoutBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
-        }
-        
+        // Hard-Reload der Root-URL, um den React/SWR Cache hart zu leeren
         await this.page.goto('/');
         
-        if (await menuBtn.isVisible()) {
-            if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
-                await menuBtn.evaluate((el: HTMLElement) => el.click());
-                await backdrop.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-            }
-        }
-        
+        // Assertion: Wenn das Login-Feld da ist, war der Logout garantiert erfolgreich
         await expect(this.page.getByPlaceholder('E-Mail Adresse').first()).toBeVisible({ timeout: 15000 });
     }
 }

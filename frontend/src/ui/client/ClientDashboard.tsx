@@ -4,6 +4,7 @@ import {useAuth} from '../../logic/useAuth';
 import {useSearch} from '../../logic/useSearch';
 import {Gallery} from '../../logic/useGalleries';
 import Sidebar from '../components/Sidebar';
+import HighlightText from '../components/HighlightText';
 
 export default function ClientDashboard() {
     const {user} = useAuth();
@@ -72,11 +73,11 @@ export default function ClientDashboard() {
                                     <div className="divider my-0"></div>
                                     {searchResults.galleries.map(g => (
                                         <li key={g.id}><Link to={'/' + g.full_path}
-                                                             onClick={() => setSearchQuery('')}>📁 {g.name}</Link></li>
+                                                             onClick={() => setSearchQuery('')}>📁 <HighlightText text={g.name} highlight={searchQuery} /></Link></li>
                                     ))}
                                     {searchResults.photos.map(p => (
                                         <li key={p.id}><Link to={'/photos/' + p.id} onClick={() => setSearchQuery('')}>
-                                            <span className="iconify mdi--image-outline opacity-70"></span> {p.filename}
+                                            <span className="iconify mdi--image-outline opacity-70"></span> <HighlightText text={p.filename} highlight={searchQuery} />
                                         </Link></li>
                                     ))}
                                     {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (

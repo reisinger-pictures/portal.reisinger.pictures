@@ -5,7 +5,7 @@ export class ModalHelper {
 
     get activeModal(): Locator {
         // DaisyUI hält Modals oft im DOM, wir fokussieren uns strikt auf das aktuell geöffnete.
-        return this.page.locator('.modal-open');
+        return this.page.locator('.modal-open').last();
     }
 
     async fillInputByLabel(labelText: string, value: string) {
@@ -16,12 +16,33 @@ export class ModalHelper {
         await this.activeModal.locator('.form-control').filter({ hasText: labelText }).locator('select').selectOption({ label: optionLabel });
     }
 
+    // ✨ NEUE UTILITY: Robustes Checkbox-Toggling für DaisyUI
+    async toggleCheckboxByLabel(labelText: string, targetState: boolean = true) {
+        const container = this.activeModal.locator('.form-control, .label').filter({ hasText: labelText }).first();
+        const checkbox = container.locator('input[type="checkbox"]');
+
+        const currentState = await checkbox.isChecked();
+
+        if (currentState !== targetState) {
+            // Bei DaisyUI sind Checkboxen und Toggles sicht- und klickbare Elemente.
+            // Direkter Klick auf den Input ist wesentlich robuster als Klick auf das Label/den Text.
+            await checkbox.click();
+
+            // Kurz warten, bis React den State verarbeitet hat (Anti-Flakiness)
+            if (targetState) {
+                await expect(checkbox).toBeChecked({ timeout: 2000 });
+            } else {
+                await expect(checkbox).not.toBeChecked({ timeout: 2000 });
+            }
+        }
+    }
+
     async clickButton(buttonText: string) {
         const btn = this.activeModal.getByRole('button', { name: buttonText });
         await btn.scrollIntoViewIfNeeded();
         await btn.click();
     }
-    
+
     async closeModal() {
         await this.activeModal.locator('button').filter({ hasText: '✕' }).click();
     }

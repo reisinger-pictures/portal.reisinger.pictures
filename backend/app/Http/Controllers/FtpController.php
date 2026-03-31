@@ -30,7 +30,7 @@ class FtpController extends Controller
         $user->load('currentFtpGallery');
 
         return response()->json([
-            'ftp_folder' => '/ftp/' . ($user->ftp_slug ?? $user->id),
+            'ftp_folder' => '/' . ($user->ftp_slug ?? $user->id),
             'file_count' => $fileCount,
             'current_target_gallery' => $user->currentFtpGallery
         ]);

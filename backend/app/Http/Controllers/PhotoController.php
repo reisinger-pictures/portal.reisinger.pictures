@@ -10,22 +10,23 @@ use Illuminate\Support\Facades\Storage;
 
 class PhotoController extends Controller
 {
-    private function checkMetadataRights($photo, $user)
+        private function checkMetadataRights($photo, $user)
     {
         if (!$user) return ['allowed' => false, 'is_client' => false];
         
-        $isPhotographerOrAdmin = $user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
-        
-        if ($isPhotographerOrAdmin) {
+        $isPhotographer = $user->is_photographer && $user->canAccessGallery($photo->gallery_id);
+        if ($isPhotographer) {
             return ['allowed' => true, 'is_client' => false];
         }
 
-        // Kunden-Prüfung
         $isClientWithRights = $photo->gallery->allow_client_metadata_edit 
             && $user->can_edit_metadata 
-            && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
-        
-        if ($isClientWithRights) {
+            && $user->canAccessGallery($photo->gallery_id);
+            
+        $isGuestWithTransientRights = $photo->gallery->allow_client_metadata_edit 
+            && in_array($photo->gallery_id, $user->transient_meta_galleries ?? []);
+
+        if ($isClientWithRights || $isGuestWithTransientRights) {
             return ['allowed' => true, 'is_client' => true];
         }
 
@@ -88,9 +89,9 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        $isPhotographerOrAdmin = $user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
+        $isPhotographer = $user->is_photographer && $user->canAccessGallery($photo->gallery_id);
         
-        if (!$isPhotographerOrAdmin) {
+        if (!$isPhotographer) {
             return response()->json(['error' => 'Keine Berechtigung. Nur für Fotografen/Admins.'], 403);
         }
 
@@ -131,7 +132,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        if (!$user->is_photographer || !$user->galleries()->where('galleries.id', $photo->gallery_id)->exists()) {
+        if (!$user->is_photographer || !$user->canAccessGallery($photo->gallery_id)) {
             return response()->json(['error' => 'Keine Löschberechtigung.'], 403);
         }
 

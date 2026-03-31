@@ -13,6 +13,7 @@
 - storage/framework/views/**
 - storage/app/public/**
 - storage/app/private/temp/**
+- storage/app/private/watermark*
 - out/**
 - bootstrap/cache/**
 + **

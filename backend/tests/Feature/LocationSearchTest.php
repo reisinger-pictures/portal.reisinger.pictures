@@ -21,8 +21,6 @@ class LocationSearchTest extends TestCase
 
     public function test_location_endpoint_returns_data()
     {
-        // Da Meilisearch in Tests asynchron sein kann, testen wir hier vor allem
-        // dass der Controller nicht crasht und den Request an Scout weitergibt.
         Location::create([
             'type' => 'city',
             'name' => 'Linz',

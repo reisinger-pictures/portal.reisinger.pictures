@@ -11,10 +11,15 @@ class GalleryInvite extends Model
 
     public const UPDATED_AT = null;
     
+        protected $casts = [
+        'can_edit_metadata' => 'boolean'
+    ];
+
     protected $fillable = [
         'gallery_id',
         'token',
         'name',
+        'can_edit_metadata',
         'created_at'
     ];
 

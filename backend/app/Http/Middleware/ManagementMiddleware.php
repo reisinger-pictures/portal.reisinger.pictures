@@ -22,7 +22,7 @@ class ManagementMiddleware
 
         // Fotografen dürfen nur auf bestimmte Bereiche zugreifen
         if ($user->is_photographer && !$user->is_admin) {
-            $allowedPrefixes = ['api/management/galleries', 'api/management/gallery-groups', 'api/management/upload', 'api/management/ftp'];
+            $allowedPrefixes = ['api/management/galleries', 'api/management/gallery-groups', 'api/management/upload', 'api/management/ftp', 'api/management/invites', 'api/management/stats', 'api/management/logs'];
             $path = $request->path();
             $isAllowed = false;
             foreach ($allowedPrefixes as $prefix) {

@@ -13,7 +13,7 @@ const refreshToken = async (): Promise<boolean> => {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 },
-                credentials: 'include' // Sende Cookies (altes Token) mit
+                credentials: 'include'
             });
 
             return res.ok;
@@ -33,10 +33,35 @@ const getHeaders = (): Record<string, string> => ({
     'Accept': 'application/json'
 });
 
+/**
+ * ✨ FIX: Extrahiert fachliche Fehlermeldungen aus JSON oder HTML-Antworten.
+ */
+const handleApiError = async (res: Response) => {
+    let errorMsg = `HTTP Fehler ${res.status}`;
+    const contentType = res.headers.get('content-type');
+
+    if (contentType && contentType.includes('application/json')) {
+        try {
+            const errData = await res.json();
+            errorMsg = errData.error || errData.message || errorMsg;
+        } catch {}
+    } else {
+        try {
+            const text = await res.text();
+            if (text.includes('<title>')) {
+                const match = text.match(/<title>(.*?)<\/title>/i);
+                if (match) errorMsg = match[1];
+            } else if (text) {
+                errorMsg = text.substring(0, 150);
+            }
+        } catch {}
+    }
+    throw new Error(errorMsg);
+};
+
 export const fetcher = async <T>(url: string): Promise<T> => {
     let res = await fetch(url, { headers: getHeaders(), credentials: 'include' });
 
-    // Intercept 401 Unauthorized for silent refresh
     if (res.status === 401 && !url.includes('/api/auth/')) {
         const success = await refreshToken();
         if (success) {
@@ -44,7 +69,10 @@ export const fetcher = async <T>(url: string): Promise<T> => {
         }
     }
 
-    if (!res.ok) throw new Error('API Error');
+    if (!res.ok) {
+        await handleApiError(res);
+    }
+
     return res.json() as Promise<T>;
 };
 
@@ -56,7 +84,6 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE
         body: body ? JSON.stringify(body) : undefined
     });
 
-    // Intercept 401 Unauthorized for silent refresh
     if (res.status === 401 && !url.includes('/api/auth/')) {
         const success = await refreshToken();
         if (success) {
@@ -69,7 +96,10 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE
         }
     }
 
-    if (!res.ok) throw new Error('API Error');
+    if (!res.ok) {
+        await handleApiError(res);
+    }
+
     const text = await res.text();
     return text ? JSON.parse(text) : {} as T;
 };

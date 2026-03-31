@@ -15,15 +15,18 @@ use Carbon\Carbon;
 
 class GalleryController extends Controller
 {
+    /**
+     * Zeigt den gesamten Galerie-Baum für die Verwaltung an.
+     */
     public function indexAdmin(Request $request)
     {
         $user = auth('api')->user();
-        
+
         $tree = Cache::rememberForever('gallery_tree_admin', function () {
             $groups = GalleryGroup::whereNull('parent_id')->with(['children', 'galleries'])->get();
             $rootGalleries = Gallery::whereNull('gallery_group_id')->get();
             return [
-                'groups' => $groups->toArray(), 
+                'groups' => $groups->toArray(),
                 'root_galleries' => $rootGalleries->toArray()
             ];
         });
@@ -31,29 +34,29 @@ class GalleryController extends Controller
         $filterType = $request->query('filter_type');
         $treeArray = json_decode(json_encode($tree), true);
 
-        if (true) { // Filter für alle anwenden (auch Admins sehen nur ihre Galerien)
-            $allowedGalleryIds = $user->getAllowedGalleryIds();
-            
-            $filterNode = function($groups) use (&$filterNode, $allowedGalleryIds) {
-                $result = [];
-                foreach ($groups as $group) {
-                    if (isset($group['galleries'])) {
-                        $group['galleries'] = array_values(array_filter($group['galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
-                    }
-                    if (isset($group['children'])) {
-                        $group['children'] = $filterNode($group['children']);
-                    }
-                    $result[] = $group;
+        // Filter für alle anwenden (Nutzer sehen nur ihre zugewiesenen Galerien)
+        $allowedGalleryIds = $user->getAllowedGalleryIds();
+
+        $filterNode = function($groups) use (&$filterNode, $allowedGalleryIds) {
+            $result = [];
+            foreach ($groups as $group) {
+                if (isset($group['galleries'])) {
+                    $group['galleries'] = array_values(array_filter($group['galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
                 }
-                return $result;
-            };
+                if (isset($group['children'])) {
+                    $group['children'] = $filterNode($group['children']);
+                }
+                $result[] = $group;
+            }
+            return $result;
+        };
 
-            $treeArray['groups'] = $filterNode($treeArray['groups']);
-            $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
-        }
+        $treeArray['groups'] = $filterNode($treeArray['groups']);
+        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
 
+        // Optionaler Filter nach Typ (selection/delivery)
         if ($filterType) {
-            $filterNode = function($groups) use (&$filterNode, $filterType) {
+            $filterByType = function($groups) use (&$filterByType, $filterType) {
                 $result = [];
                 foreach ($groups as $group) {
                     if (isset($group['galleries'])) {
@@ -62,14 +65,14 @@ class GalleryController extends Controller
                         }));
                     }
                     if (isset($group['children'])) {
-                        $group['children'] = $filterNode($group['children']);
+                        $group['children'] = $filterByType($group['children']);
                     }
                     $result[] = $group;
                 }
                 return $result;
             };
 
-            $treeArray['groups'] = $filterNode($treeArray['groups']);
+            $treeArray['groups'] = $filterByType($treeArray['groups']);
             $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], function($g) use ($filterType) {
                 return $g['type'] === $filterType;
             }));
@@ -78,6 +81,9 @@ class GalleryController extends Controller
         return response()->json($treeArray);
     }
 
+    /**
+     * Erstellt eine neue Meta-Galerie (Ordner).
+     */
     public function storeGroup(Request $request)
     {
         $request->validate([
@@ -86,21 +92,64 @@ class GalleryController extends Controller
             'parent_id' => 'nullable|string|exists:gallery_groups,id',
             'is_public' => 'nullable|boolean'
         ]);
-        
+
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
         if (GalleryGroup::where('slug', $slug)->exists()) {
             $slug = $slug . '-' . time();
         }
-        
+
         $group = GalleryGroup::create([
-            'name' => $request->name, 
-            'slug' => $slug, 
+            'name' => $request->name,
+            'slug' => $slug,
             'parent_id' => $request->parent_id,
             'is_public' => $request->is_public
         ]);
         return response()->json(['success' => true, 'group' => $group]);
     }
 
+    /**
+     * Aktualisiert eine Meta-Galerie (Ordner).
+     */
+    public function updateGroup(Request $request, $id)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255',
+            'parent_id' => 'nullable|string|exists:gallery_groups,id',
+            'is_public' => 'nullable|boolean'
+        ]);
+
+        $group = GalleryGroup::findOrFail($id);
+
+        $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
+        if ($slug !== $group->slug && GalleryGroup::where('slug', $slug)->exists()) {
+            $slug = $slug . '-' . time();
+        }
+
+        $group->update([
+            'name' => $request->name,
+            'slug' => $slug,
+            'parent_id' => $request->parent_id,
+            'is_public' => $request->is_public
+        ]);
+
+        return response()->json(['success' => true, 'group' => $group]);
+    }
+
+    /**
+     * Löscht eine Meta-Galerie. Unterordner fallen durch DB-Constraints in die Root-Ebene.
+     */
+    public function deleteGroup($id)
+    {
+        $group = GalleryGroup::findOrFail($id);
+        $group->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Erstellt eine neue Galerie.
+     */
     public function storeGallery(Request $request)
     {
         $user = auth('api')->user();
@@ -133,8 +182,7 @@ class GalleryController extends Controller
         if (Gallery::where('slug', $slug)->exists()) $slug = $slug . '-' . time();
 
         $isPublic = $request->is_public ?? false;
-        
-        // Sichtbarkeit vom Parent erzwingen, falls dort gesetzt
+
         if ($request->gallery_group_id) {
             $group = GalleryGroup::find($request->gallery_group_id);
             if ($group && !is_null($group->is_public)) {
@@ -142,12 +190,11 @@ class GalleryController extends Controller
             }
         }
 
-        // SECURITY FORCEMENT: Selection Galerien MÜSSEN privat sein.
         if ($request->type === 'selection') {
             $isPublic = false;
         }
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $slug, $isPublic, $user) {
+        return DB::transaction(function () use ($request, $slug, $isPublic, $user) {
             $gallery = Gallery::create([
                 'name' => $request->name,
                 'slug' => $slug,
@@ -169,40 +216,17 @@ class GalleryController extends Controller
                 'default_iso_country' => $request->default_iso_country,
             ]);
 
-            if ($user && $user->is_photographer) { // WICHTIG: Ersteller immer zuweisen, auch wenn er Admin ist
+            if ($user && $user->is_photographer) {
                 $user->galleries()->syncWithoutDetaching([$gallery->id]);
             }
 
-            
-        // Retroaktive Synchronisation der Standard-Metadaten
-        if ($gallery->apply_metadata_to_photos) {
-            $updated = false;
-            foreach ($gallery->photos as $photo) {
-                $changed = false;
-                if (empty($photo->title) && $gallery->default_title) { $photo->title = $gallery->default_title; $changed = true; }
-                if (empty($photo->description) && $gallery->default_description) { $photo->description = $gallery->default_description; $changed = true; }
-                if (empty($photo->keywords) && $gallery->default_keywords) { $photo->keywords = $gallery->default_keywords; $changed = true; }
-                if (empty($photo->location) && $gallery->default_location) { $photo->location = $gallery->default_location; $changed = true; }
-                if (empty($photo->city) && $gallery->default_city) { $photo->city = $gallery->default_city; $changed = true; }
-                if (empty($photo->state) && $gallery->default_state) { $photo->state = $gallery->default_state; $changed = true; }
-                if (empty($photo->country) && $gallery->default_country) { $photo->country = $gallery->default_country; $changed = true; }
-                if (empty($photo->iso_country) && $gallery->default_iso_country) { $photo->iso_country = $gallery->default_iso_country; $changed = true; }
-                
-                if ($changed) {
-                    $photo->save();
-                    $updated = true;
-                }
-            }
-            // Suchindex aktualisieren, falls sich etwas geändert hat
-            if ($updated) {
-                $gallery->photos()->searchable();
-            }
-        }
-        
-        return response()->json(['success' => true, 'gallery' => $gallery]);
+            return response()->json(['success' => true, 'gallery' => $gallery]);
         });
     }
 
+    /**
+     * Aktualisiert eine bestehende Galerie.
+     */
     public function updateGallery(Request $request, $id)
     {
         $user = auth('api')->user();
@@ -211,7 +235,7 @@ class GalleryController extends Controller
         }
 
         $gallery = Gallery::findOrFail($id);
-        
+
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
             'type' => 'nullable|in:selection,delivery',
@@ -233,22 +257,11 @@ class GalleryController extends Controller
         if (isset($validated['type']) && $validated['type'] === 'selection') {
             $validated['is_live'] = false;
             $validated['is_public'] = false;
-        } elseif ($gallery->type === 'selection' && !isset($validated['type'])) {
-            $validated['is_public'] = false;
-        }
-
-        // Vererbung prüfen, falls sich die Gruppe ändert oder das Update is_public überschreiben will
-        $groupIdToCheck = array_key_exists('gallery_group_id', $validated) ? $validated['gallery_group_id'] : $gallery->gallery_group_id;
-        if ($groupIdToCheck) {
-            $group = GalleryGroup::find($groupIdToCheck);
-            if ($group && !is_null($group->is_public)) {
-                $validated['is_public'] = $group->is_public;
-            }
         }
 
         $gallery->update($validated);
-        
-        // Retroaktive Synchronisation der Standard-Metadaten
+
+        // Retroaktive Metadaten-Übernahme
         if ($gallery->apply_metadata_to_photos) {
             $updated = false;
             foreach ($gallery->photos as $photo) {
@@ -261,21 +274,17 @@ class GalleryController extends Controller
                 if (empty($photo->state) && $gallery->default_state) { $photo->state = $gallery->default_state; $changed = true; }
                 if (empty($photo->country) && $gallery->default_country) { $photo->country = $gallery->default_country; $changed = true; }
                 if (empty($photo->iso_country) && $gallery->default_iso_country) { $photo->iso_country = $gallery->default_iso_country; $changed = true; }
-                
-                if ($changed) {
-                    $photo->save();
-                    $updated = true;
-                }
+                if ($changed) { $photo->save(); $updated = true; }
             }
-            // Suchindex aktualisieren, falls sich etwas geändert hat
-            if ($updated) {
-                $gallery->photos()->searchable();
-            }
+            if ($updated) { $gallery->photos()->searchable(); }
         }
-        
+
         return response()->json(['success' => true, 'gallery' => $gallery]);
     }
 
+    /**
+     * Löscht eine Galerie und alle zugehörigen Dateien vom Speicher.
+     */
     public function destroyGallery($id)
     {
         $user = auth('api')->user();
@@ -285,12 +294,14 @@ class GalleryController extends Controller
 
         $gallery = Gallery::findOrFail($id);
         \Illuminate\Support\Facades\Storage::disk('photos')->deleteDirectory((string) $gallery->id);
-        
+
         $gallery->delete();
         return response()->json(['success' => true]);
     }
 
-
+    /**
+     * Zeigt den Status der Bewertungen pro Nutzer/Gast für eine Galerie an.
+     */
     public function ratingStatus($id)
     {
         $user = auth('api')->user();
@@ -341,12 +352,12 @@ class GalleryController extends Controller
             ];
         }
 
-        return response()->json([
-            'users' => $status,
-            'total_photos' => $totalPhotos
-        ]);
+        return response()->json(['users' => $status, 'total_photos' => $totalPhotos]);
     }
 
+    /**
+     * Exportiert die Bewertungen einer Galerie für den Lightroom-Abgleich.
+     */
     public function exportRatings($id)
     {
         $user = auth('api')->user();
@@ -366,13 +377,11 @@ class GalleryController extends Controller
                 ->get();
 
             if ($ratings->isEmpty()) continue;
-            $validRatings = $ratings->where('rating', '>', 0);
-            $avg = $validRatings->avg('rating');
 
             $comments = [];
             foreach ($ratings as $r) {
                 $ratingStr = $r->rating > 0 ? $r->rating . ' Sterne' : 'Ignoriert';
-                $displayName = $r->name ?? ($r->guest_name ?? 'Gast (' . substr($r->guest_id, 0, 8) . ')');
+                $displayName = $r->name ?? ($r->guest_name ?? 'Gast');
                 $line = "{$displayName} ({$ratingStr})";
                 if (!empty($r->comment)) $line .= ": {$r->comment}";
                 $comments[] = $line;
@@ -381,9 +390,9 @@ class GalleryController extends Controller
             $export[] = [
                 'id' => $photo->id,
                 'filename' => $photo->filename,
-                'thumb_url' => '/api/media/' . $photo->gallery->slug . '/_thumbs/' . md5($photo->filename . '1024') . '.webp',
+                'thumb_url' => '/api/media/' . $photo->gallery->slug . '/_thumbs/800/' . $photo->id . '.webp',
                 'lr_uuid' => $photo->lr_uuid,
-                'avg_rating' => $avg ? ceil($avg) : 0,
+                'avg_rating' => ceil($ratings->where('rating', '>', 0)->avg('rating') ?? 0),
                 'all_comments' => implode("\n", $comments)
             ];
         }
@@ -391,7 +400,9 @@ class GalleryController extends Controller
         return response()->json($export);
     }
 
-
+    /**
+     * Zeigt die Bilder einer Meta-Galerie (Sammelansicht).
+     */
     public function showGroup($id)
     {
         $group = GalleryGroup::with('children')->findOrFail($id);
@@ -408,12 +419,6 @@ class GalleryController extends Controller
         }
 
         $photos = Photo::whereIn('gallery_id', $galleryIds)->orderBy('id', 'desc')->paginate(50);
-
-        $photos->getCollection()->transform(function ($photo) {
-            $photo->load('gallery');
-            // URL Generierung wurde ins Photo Model ausgelagert
-            return $photo;
-        });
 
         return response()->json([
             'group' => $group,

@@ -14,6 +14,13 @@ class GalleryFrontendController extends Controller
         $gallery = Gallery::where('slug', $slug)->firstOrFail();
         $user = auth('api')->user();
 
+        $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
+        $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($gallery->id)));
+
+        if ($isExpired && !$canManage) {
+            return response()->json(['error' => 'Galerie abgelaufen.'], 403);
+        }
+
         if (!$gallery->is_public) {
             if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
             if (!$user->canAccessGallery($gallery->id)) {
@@ -24,8 +31,6 @@ class GalleryFrontendController extends Controller
         $photos = $gallery->photos()->paginate(50);
 
         $photos->getCollection()->transform(function ($photo) use ($gallery, $user) {
-            // URL Generierung wurde ins Photo Model ausgelagert
-
             if ($user) {
                 $rating = DB::table('ratings')
                     ->where('photo_id', $photo->id)
@@ -38,11 +43,9 @@ class GalleryFrontendController extends Controller
                     })
                     ->first();
                 $photo->rating = $rating ? (int) $rating->rating : null;
-                // NEU: Den Kommentar ebenfalls an das Foto-Objekt anheften!
                 $photo->comment = $rating ? $rating->comment : '';
             } else {
                 $photo->rating = null;
-                // NEU: Fallback für Gäste ohne Rating-Objekt
                 $photo->comment = '';
             }
 
@@ -65,6 +68,8 @@ class GalleryFrontendController extends Controller
             'gallery' => $gallery,
             'breadcrumbs' => $breadcrumbs,
             'downloads_count' => \App\Models\DownloadLog::where('gallery_id', $gallery->id)->count(),
+            // ✨ FIX: Notified Count für den "E-Mail senden" Button im Management
+            'notified_count' => DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('wants_notifications', true)->count(),
             'wants_notifications' => $user ? (bool) DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('user_id', $user->id)->value('wants_notifications') : false,
             'photos' => $photos->items(),
             'current_page' => $photos->currentPage(),
@@ -84,6 +89,13 @@ class GalleryFrontendController extends Controller
         $user = auth('api')->user();
 
         if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
+
+        $isExpired = $photo->gallery->expires_at && \Carbon\Carbon::parse($photo->gallery->expires_at)->isPast();
+        $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($photo->gallery_id)));
+
+        if ($isExpired && !$canManage) {
+            return response()->json(['error' => 'Galerie abgelaufen.'], 403);
+        }
 
         if (!$photo->gallery->is_public) {
             if (!$user->canAccessGallery($photo->gallery_id)) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ErrorMessage from '../../components/ErrorMessage';
 
 interface Props {
     galleryId: string;
@@ -63,7 +64,7 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
                 {isLoading ? (
                     <div className="flex-1 flex items-center justify-center p-10"><span className="loading loading-spinner loading-lg text-primary"></span></div>
                 ) : error ? (
-                    <div className="alert alert-error">Fehler beim Laden der Bewertungen.</div>
+                    <ErrorMessage message="Fehler beim Laden der Bewertungen." />
                 ) : (
                     <div className="flex-1 overflow-y-auto pr-2 space-y-8">
                         <div>

@@ -13,6 +13,7 @@ export interface User {
     is_pending: boolean;
     can_edit_metadata: boolean;
     roles: string[];
+    transient_meta_galleries?: string[];
     my_galleries?: Gallery[];
 }
 

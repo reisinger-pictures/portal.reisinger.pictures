@@ -62,6 +62,8 @@ Route::middleware('auth:api')->group(function () {
 Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/galleries', [GalleryController::class, 'indexAdmin']);
     Route::post('/management/gallery-groups', [GalleryController::class, 'storeGroup']);
+    Route::put('/management/gallery-groups/{id}', [GalleryController::class, 'updateGroup']);
+    Route::delete('/management/gallery-groups/{id}', [GalleryController::class, 'deleteGroup']);
     Route::post('/management/galleries', [GalleryController::class, 'storeGallery']);
     Route::put('/management/galleries/{id}', [GalleryController::class, 'updateGallery']);
     Route::delete('/management/galleries/{id}', [GalleryController::class, 'destroyGallery']);

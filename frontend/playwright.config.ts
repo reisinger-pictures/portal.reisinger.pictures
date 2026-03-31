@@ -16,7 +16,7 @@ export default defineConfig({
         video: 'retain-on-failure',
     },
     projects: [
-        {name: 'Desktop Chrome', use: {...devices['Desktop Chrome'], viewport: {width: 1920, height: 1080},}},
+        {name: 'Desktop Chrome', use: {...devices['Desktop Chrome'], viewport: {width: 1920, height: 950},}},
         {name: 'Mobile Chrome', use: {...devices['Galaxy A55']}},
     ],
 });

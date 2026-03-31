@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import HighlightText from './HighlightText';
 import { useSearch } from '../../logic/useSearch';
 
 export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () => void }) {
@@ -55,11 +56,11 @@ export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () =>
                             </li>
                             <div className="divider my-0"></div>
                             {searchResults.galleries.map(g => (
-                                <li key={g.id}><Link to={'/' + g.full_path} >📁 {g.name}</Link></li>
+                                <li key={g.id}><Link to={'/' + g.full_path} >📁 <HighlightText text={g.name} highlight={searchQuery} /></Link></li>
                             ))}
                             {searchResults.photos.map(p => (
                                 <li key={p.id}><Link to={'/photos/' + p.id} >
-                                    <span className="iconify mdi--image-outline opacity-70"></span> {p.filename}
+                                    <span className="iconify mdi--image-outline opacity-70"></span> <HighlightText text={p.filename} highlight={searchQuery} />
                                 </Link></li>
                             ))}
                             {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (

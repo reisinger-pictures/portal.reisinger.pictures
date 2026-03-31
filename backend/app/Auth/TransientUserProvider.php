@@ -23,6 +23,8 @@ class TransientUserProvider extends EloquentUserProvider
                 $user->guest_id = $payload->get('guest_id');
                 $tg = $payload->get('transient_galleries');
                 $user->transient_galleries = is_array($tg) ? $tg : [];
+                $tmg = $payload->get('transient_meta_galleries');
+                $user->transient_meta_galleries = is_array($tmg) ? $tmg : [];
                 return $user;
             }
             return null;
@@ -33,6 +35,8 @@ class TransientUserProvider extends EloquentUserProvider
         if ($user && $payload) {
             $tg = $payload->get('transient_galleries');
             $user->transient_galleries = is_array($tg) ? $tg : [];
+            $tmg = $payload->get('transient_meta_galleries');
+            $user->transient_meta_galleries = is_array($tmg) ? $tmg : [];
         }
 
         return $user;

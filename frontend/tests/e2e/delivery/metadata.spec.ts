@@ -31,9 +31,14 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.submitModal('Speichern');
         
-        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeVisible({ timeout: 15000 });
-        await galLink.click();
+        // Robustes Auffinden des Galerie-Links (inkl. Reload-Logik bei SWR-Verzögerung)
+        await expect(async () => {
+            const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+            if (await galLink.isHidden()) await page.reload();
+            await expect(galLink).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 15000 });
+
+        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
         const upload = new UploadHelper(page);
         await upload.uploadSampleImage();

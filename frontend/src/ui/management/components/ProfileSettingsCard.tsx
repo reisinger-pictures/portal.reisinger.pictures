@@ -67,7 +67,7 @@ export default function ProfileSettingsCard() {
                                 <span className="label-text-alt opacity-70">Der Ordnername für deine FTP-Uploads. Muss eindeutig sein.</span>
                             </label>
                             <div className="join w-full">
-                                <span className="btn no-animation join-item bg-base-300 border-base-300 font-mono text-sm px-3 opacity-70 cursor-default">/ftp/</span>
+                                <span className="btn no-animation join-item bg-base-300 border-base-300 font-mono text-sm px-3 opacity-70 cursor-default">/</span>
                                 <input 
                                     type="text" 
                                     placeholder="z.B. max" 

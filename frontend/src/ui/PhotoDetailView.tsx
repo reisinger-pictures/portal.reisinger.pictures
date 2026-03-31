@@ -1,4 +1,5 @@
 import {useState, useEffect} from 'react';
+import ErrorMessage from './components/ErrorMessage';
 import {useNavigate, useParams} from 'react-router-dom';
 import useSWR from 'swr';
 import {fetcher} from '../api';
@@ -66,12 +67,12 @@ export default function PhotoDetailView() {
         <div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div>
     </PageLayout>;
     if (error || !data) return <PageLayout>
-        <div className="p-8 text-center text-error">Foto konnte nicht geladen werden oder keine Berechtigung.</div>
+        <div className="p-8"><ErrorMessage message="Foto konnte nicht geladen werden oder keine Berechtigung." /></div>
     </PageLayout>;
 
     const {photo, breadcrumbs} = data;
-    const isPhotogOrAdmin = user?.is_admin || user?.is_photographer;
-    const canEdit = isPhotogOrAdmin || user?.can_edit_metadata;
+    const isPhotographer = user?.is_photographer && data?.photo && user?.my_galleries?.some(g => g.id === data.photo.gallery_id);
+    const canEdit = isPhotographer || ((user?.can_edit_metadata || user?.transient_meta_galleries?.includes(data?.photo?.gallery_id)) && data?.photo?.gallery?.allow_client_metadata_edit);
 
     const handleSaveMeta = async () => {
         setSaving(true);
@@ -137,7 +138,7 @@ export default function PhotoDetailView() {
                                 </button>
                                 <span className="text-sm opacity-70 font-semibold">{data.downloads_count || 0} Downloads</span>
                             </div>
-                            {user?.is_admin && (
+                            {isPhotographer && (
                                 <button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap">
                                     <span className="iconify mdi--trash-can"></span> Bild löschen
                                 </button>
@@ -151,14 +152,14 @@ export default function PhotoDetailView() {
                             data={iptcData}
                             onChange={setIptcData}
                             disabled={!canEdit}
-                            showArtist={isPhotogOrAdmin}
+                            showArtist={isPhotographer}
                         >
                             {canEdit && (
                                 <div className="flex flex-col sm:flex-row gap-2 mt-6 pt-4 border-t border-base-300">
                                     <button onClick={handleSaveMeta} disabled={saving} className="btn btn-primary flex-1 w-full">
                                         {saving ? <span className="loading loading-spinner"></span> : 'Speichern'}
                                     </button>
-                                    {isPhotogOrAdmin && (
+                                    {isPhotographer && (
                                         <button onClick={() => setIsHistoryOpen(true)} className="btn btn-outline w-full sm:w-auto" title="Änderungshistorie anzeigen">
                                             <span className="iconify mdi--history"></span> Historie
                                         </button>

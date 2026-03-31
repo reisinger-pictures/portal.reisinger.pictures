@@ -34,7 +34,7 @@ const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace
 export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
 
-    const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting, isDirty } } = useForm<GalleryFormValues>({
+    const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
         defaultValues: {
             name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: ''
@@ -54,14 +54,14 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 expires_at: editingGallery?.expires_at ? editingGallery.expires_at.split('T')[0] : ''
             });
         }
-    }, [isOpen, editingGallery, reset]);
+    }, [isOpen, editingGallery, reset, defaultGroupId]);
 
     const watchName = watch('name');
     useEffect(() => {
-        if (!editingGallery && !isDirty && watchName) {
+        if (!editingGallery && !dirtyFields.slug && watchName) {
             setValue('slug', toSlug(watchName));
         }
-    }, [watchName, editingGallery, isDirty, setValue]);
+    }, [watchName, editingGallery, dirtyFields.slug, setValue]);
 
     const watchType = watch('type');
     const watchGroupId = watch('gallery_group_id');
@@ -84,24 +84,42 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
     const onSubmit = async (data: GalleryFormValues) => {
         const pId = data.gallery_group_id === '' ? null : data.gallery_group_id;
-        const metaOpts = {}; // Metadaten werden jetzt isoliert in einem anderen Modal gemanaged
+        const metaOpts = {}; // Metadaten werden jetzt isoliert gemanaged
 
         try {
-            if (editingGallery) await onUpdate(editingGallery.id, data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts);
-            else await onCreate(data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts);
+            if (editingGallery) {
+                await onUpdate(editingGallery.id, data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts);
+                showToast('success', 'Galerie erfolgreich aktualisiert.');
+            } else {
+                await onCreate(data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts);
+                showToast('success', 'Galerie erfolgreich erstellt.');
+            }
             onClose();
-        } catch {
-            showToast('error', 'Fehler beim Speichern');
+        } catch (e: any) {
+            showToast('error', e.message || 'Fehler beim Speichern');
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!editingGallery) return;
+        if (await confirm({ title: 'Galerie löschen?', message: 'Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!', confirmText: 'Unwiderruflich löschen', confirmColor: 'error' })) {
+            try {
+                await onDelete(editingGallery.id);
+                showToast('success', 'Galerie erfolgreich gelöscht.');
+                onClose();
+            } catch (e: any) {
+                showToast('error', e.message || 'Fehler beim Löschen');
+            }
         }
     };
 
     if (!isOpen) return null;
 
     return (
-        <dialog className="modal modal-open">
+        <dialog className="modal modal-open z-[60]">
             <div className="modal-box max-w-2xl relative">
                 <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                
+
                 <div className="flex justify-between items-center mb-6 mr-8">
                     <h3 className="font-bold text-xl flex items-center gap-2">
                         <span className="iconify mdi--image-multiple text-primary"></span>
@@ -122,7 +140,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                         </div>
                         <div className="form-control w-full md:w-1/2">
                             <label className="label"><span className="label-text font-bold">URL Slug</span></label>
-                            <input type="text" {...register('slug')} onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty:true})} className="input input-bordered w-full text-sm font-mono opacity-70" />
+                            <input type="text" {...register('slug')} onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true, shouldTouch: true})} className="input input-bordered w-full text-sm font-mono opacity-70" />
                         </div>
                     </div>
 
@@ -180,15 +198,10 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                             <input type="date" {...register('expires_at')} className="input input-bordered w-full" />
                         </div>
                     </div>
-                    
+
                     <div className="modal-action flex justify-between mt-8">
                         {editingGallery ? (
-                            <button type="button" className="btn btn-outline btn-error" onClick={async () => {
-                                if (await confirm({ title: 'Galerie löschen?', message: 'Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!', confirmText: 'Unwiderruflich löschen', confirmColor: 'error' })) {
-                                    await onDelete(editingGallery.id);
-                                    onClose();
-                                }
-                            }}>Löschen</button>
+                            <button type="button" className="btn btn-outline btn-error" onClick={handleDelete}>Löschen</button>
                         ) : <div></div>}
                         <div>
                             <button type="button" className="btn btn-ghost mr-2" onClick={onClose}>Abbrechen</button>

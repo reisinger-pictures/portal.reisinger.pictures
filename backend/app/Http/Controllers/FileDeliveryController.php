@@ -15,6 +15,13 @@ class FileDeliveryController extends Controller
         $gallery = Gallery::where('slug', $slug)->firstOrFail();
         $user = auth('api')->user();
 
+        $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
+        $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($gallery->id)));
+
+        if ($isExpired && !$canManage) {
+            abort(403, 'Forbidden (Expired)');
+        }
+
         if (!$gallery->is_public) {
             if (!$user) abort(401, 'Unauthorized');
             if (!$user->canAccessGallery($gallery->id)) abort(403, 'Forbidden');

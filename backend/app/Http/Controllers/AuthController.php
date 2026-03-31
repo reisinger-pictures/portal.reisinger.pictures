@@ -161,6 +161,7 @@ class AuthController extends Controller
             'is_photographer' => $user->is_photographer,
             'is_pending' => $user->is_pending,
             'roles' => $user->roles->pluck('name'),
+            'transient_meta_galleries' => $user->transient_meta_galleries ?? [],
             'my_galleries' => $user->galleries ?? []
         ]);
     }

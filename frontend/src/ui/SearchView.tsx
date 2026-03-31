@@ -1,9 +1,11 @@
 import ResponsiveImage from './components/ResponsiveImage';
+import ErrorMessage from './components/ErrorMessage';
 import { useEffect, useState } from 'react';
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 import {useSearch} from '../logic/useSearch';
 import Sidebar from './components/Sidebar';
 import AdminWatermarkBanner from './management/components/AdminWatermarkBanner';
+import HighlightText from './components/HighlightText';
 
 export default function SearchView() {
     const [searchParams] = useSearchParams();
@@ -71,7 +73,7 @@ export default function SearchView() {
 
                         {isLoading && <div className="flex justify-center p-10"><span
                             className="loading loading-spinner loading-lg text-primary"></span></div>}
-                        {isError && <div className="alert alert-error">Fehler beim Laden der Ergebnisse.</div>}
+                        {isError && <ErrorMessage message="Fehler beim Laden der Ergebnisse." />}
 
                         {!isLoading && !isError && results && (
                             <div className="space-y-12">
@@ -88,7 +90,7 @@ export default function SearchView() {
                                                      onClick={() => navigate('/' + g.full_path)}>
                                                     <div className="card-body p-4 flex flex-row items-center">
                                                         <div className="text-2xl mr-2"></div>
-                                                        <h3 className="card-title text-base text-primary truncate flex-1">{g.name}</h3>
+                                                        <h3 className="card-title text-base text-primary truncate flex-1"><HighlightText text={g.name} highlight={query} /></h3>
                                                         <span
                                                             className="iconify mdi--chevron-right text-xl opacity-50"></span>
                                                     </div>
@@ -109,7 +111,7 @@ export default function SearchView() {
                                             {results.photos.map(p => (
                                                 <Link key={p.id} to={`/photos/${p.id}`}
                                                       className="block relative aspect-square bg-base-300 rounded overflow-hidden group shadow-md hover:shadow-xl transition-shadow">
-                                                    <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} alt={p.filename} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
+                                                    <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} alt=<HighlightText text={p.filename} highlight={query} /> containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
                                                     <div
                                                         className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-100 text-white text-xs truncate">
                                                         {p.filename}

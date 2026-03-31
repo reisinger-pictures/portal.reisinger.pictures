@@ -1,4 +1,5 @@
 import useSWR from 'swr';
+import ErrorMessage from '../components/ErrorMessage';
 import { fetcher, apiMutate } from '../../api';
 import PageLayout from '../components/PageLayout';
 
@@ -42,7 +43,7 @@ export default function ClientNotificationsView() {
     };
 
     if (isLoading) return <PageLayout><div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div></PageLayout>;
-    if (error || !data) return <PageLayout><div className="p-8 text-center text-error">Daten konnten nicht geladen werden.</div></PageLayout>;
+    if (error || !data) return <PageLayout><div className="p-8"><ErrorMessage message="Daten konnten nicht geladen werden." /></div></PageLayout>;
 
     const hasNoAccess = data.galleries.length === 0 && data.groups.length === 0;
 

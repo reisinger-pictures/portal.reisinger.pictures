@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ErrorMessage from './components/ErrorMessage';
 import { useSWRConfig } from 'swr';
 import {useNavigate, useParams} from 'react-router-dom';
 import PageLayout from './components/PageLayout';
@@ -100,10 +101,7 @@ export default function InviteView() {
     if (error && !galleryName) return (
         <PageLayout>
             <div className="flex h-full items-center justify-center p-4">
-                <div className="alert alert-error shadow-lg max-w-md">
-                    <span className="iconify mdi--alert-circle text-2xl"></span>
-                    <span>{error}</span>
-                </div>
+                <ErrorMessage message={error} className="max-w-md shadow-lg mx-auto" />
             </div>
         </PageLayout>
     );
@@ -116,7 +114,7 @@ export default function InviteView() {
                         <h2 className="card-title text-2xl mb-1">Willkommen zur Fotoauswahl</h2>
                         <p className="text-base-content/70 mb-6">Galerie: <strong>{galleryName}</strong></p>
 
-                        {error && <div className="alert alert-error text-sm py-2 mb-4">{error}</div>}
+                        {error && <ErrorMessage message={error} className="mb-4" />}
 
                         {regSuccess && (
                         <div className="alert alert-success shadow-sm mb-4">

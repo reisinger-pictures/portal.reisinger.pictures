@@ -119,6 +119,6 @@ test.describe.serial('Photographer Core Workflow', () => {
 
         await page.goto('/');
         await expect(page.locator('h2:has-text("FTP Inbox")')).toBeVisible({ timeout: 15000 });
-        await expect(page.locator(`code:has-text("/ftp/${newSlug}")`)).toBeVisible();
+        await expect(page.locator(`code:has-text("/${newSlug}")`)).toBeVisible();
     });
 });

@@ -34,6 +34,7 @@ export interface PaginatedGalleryResponse {
     last_page: number;
     total: number;
     downloads_count: number;
+    notified_count: number;
     wants_notifications: boolean;
     breadcrumbs: {name: string, full_path: string, type: string}[];
 }
@@ -64,6 +65,10 @@ export function useGallery(slug: string | undefined) {
     const wantsNotifications = data?.[0]?.wants_notifications || false;
     const breadcrumbs = data?.[0]?.breadcrumbs || [];
 
+    // ✨ FIX: notified_count aus der API-Antwort extrahieren
+    const notifiedCount = data?.[0]?.notified_count || 0;
+    const downloadsCount = data?.[0]?.downloads_count || 0;
+
     const ratePhoto = async (photoId: string, rating: number, comment: string = '') => {
         if (data) {
             const newData = data.map(page => ({
@@ -78,7 +83,6 @@ export function useGallery(slug: string | undefined) {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                // Authorization handled by HttpOnly cookie
             },
             body: JSON.stringify({rating, comment}),
             credentials: 'include'
@@ -91,18 +95,18 @@ export function useGallery(slug: string | undefined) {
             } else {
                 window.location.href = '/login';
             }
-            mutate(); // Optimistic Update verwerfen
+            mutate();
             return;
         }
 
         mutate();
     };
 
-    const downloadsCount = data?.[0]?.downloads_count || 0;
     return {
         gallery,
         photos,
         downloadsCount,
+        notified_count: notifiedCount, // ✨ FIX: Rückgabe für die UI
         totalPhotos,
         isLoading,
         isError: error,
@@ -112,7 +116,15 @@ export function useGallery(slug: string | undefined) {
         isReachingEnd,
         wantsNotifications,
         breadcrumbs,
-        toggleOptIn: async (id: string, val: boolean) => { await fetch('/api/galleries/'+id+'/opt-in', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({wants_notifications: val})}); mutate(); },
+        toggleOptIn: async (id: string, val: boolean) => {
+            await fetch('/api/galleries/'+id+'/opt-in', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({wants_notifications: val}),
+                credentials: 'include'
+            });
+            mutate();
+        },
         mutate
     };
 }

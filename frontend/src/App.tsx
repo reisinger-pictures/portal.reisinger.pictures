@@ -1,4 +1,5 @@
 import {Navigate, Route, Routes} from 'react-router-dom';
+import ErrorMessage from './ui/components/ErrorMessage';
 import {useAuth} from './logic/useAuth';
 import ResetPassword from './ui/ResetPassword';
 import ProtectedDashboard from './ui/ProtectedDashboard';
@@ -23,7 +24,7 @@ function ProtectedRoute({children}: { children: React.ReactNode }) {
 export default function App() {
     return (
         <ErrorBoundary fallback={<div className="flex h-screen items-center justify-center p-8">
-            <div className="alert alert-error">Kritischer Fehler. Bitte Seite neu laden.</div>
+            <ErrorMessage title="Kritischer Fehler" message="Bitte Seite neu laden." />
         </div>}>
             <UIProvider>
                 <Routes>

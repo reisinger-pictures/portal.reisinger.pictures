@@ -13,6 +13,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env*
 !frontend/.env.example
+**/.last-run.json
 
 # Backend
 backend/vendor/
@@ -39,3 +40,6 @@ frontend/playwright/.cache/
 # IDE & Build Cache
 out/
 *.tsbuildinfo
+
+# AI Test Runner
+run_new_tests.bat

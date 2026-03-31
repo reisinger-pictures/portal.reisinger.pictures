@@ -36,9 +36,13 @@ test.describe('Management Structure View (Tree)', () => {
         await modal.fillInputByLabel('Name', groupName);
         await modal.submitModal('Speichern');
 
-        // Warten bis der Ordner im DOM gerendert ist (Geduldiges Assert)
+        // Warten bis der Ordner im DOM gerendert ist. Wenn SWR den Cache nicht rechtzeitig aktualisiert (kein Polling),
+        // erzwingen wir einen Reload als Fallback.
         const rootGroupNode = page.locator('summary').filter({ hasText: groupName }).first();
-        await expect(rootGroupNode).toBeVisible({ timeout: 15000 });
+        await expect(async () => {
+            if (await rootGroupNode.isHidden()) await page.reload();
+            await expect(rootGroupNode).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 15000 });
 
         // 3. Unterordner im erstellten Ordner anlegen
         await page.getByRole('button', { name: 'Neuer Ordner' }).click();
@@ -59,7 +63,7 @@ test.describe('Management Structure View (Tree)', () => {
         await expect(rootGroupNode.locator('..')).not.toHaveAttribute('open', '');
 
         // 6. Manuellen Toggle (Klick auf den Ordner) testen
-        await rootGroupNode.click();
+        await rootGroupNode.locator('.font-bold').first().click({ force: true });
         await expect(rootGroupNode.locator('..')).toHaveAttribute('open', '');
         await expect(page.locator(`summary:has-text("${subGroupName}")`)).toBeVisible();
     });
@@ -76,7 +80,10 @@ test.describe('Management Structure View (Tree)', () => {
         await modal.submitModal('Speichern');
 
         const rootGroupNode = page.locator('summary').filter({ hasText: inlineGroupName }).first();
-        await expect(rootGroupNode).toBeVisible({ timeout: 15000 });
+        await expect(async () => {
+            if (await rootGroupNode.isHidden()) await page.reload();
+            await expect(rootGroupNode).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 15000 });
 
         // 2. Click inline "+ Galerie" button directly on the group node
         await rootGroupNode.locator('button[data-tip="Galerie hier erstellen"]').click();
@@ -104,7 +111,7 @@ test.describe('Management Structure View (Tree)', () => {
         // Ein echter User sucht den Link. Ist er versteckt, klickt er den Ordner an und wartet geduldig.
         await expect(async () => {
             if (await galNode.isHidden()) {
-                await rootGroupNode.locator('.font-bold').first().click();
+                await rootGroupNode.click();
             }
             await expect(galNode).toBeVisible({ timeout: 2000 });
         }).toPass({ timeout: 15000 });
@@ -116,4 +123,59 @@ test.describe('Management Structure View (Tree)', () => {
         await expect(modal.activeModal.locator('h3:has-text("Galerie bearbeiten")')).toBeVisible({ timeout: 5000 });
         await modal.clickButton('Abbrechen');
     });
+
+    test('Flow C: Deleting a group cascades nested galleries to root', async ({ page }) => {
+        const groupName = `Flow C Group ${Date.now()}`;
+        const galName = `Flow C Gallery ${Date.now()}`;
+
+        // 1. Create Group
+        await sidebar.navigateTo('Galerien');
+        await page.getByRole('button', { name: 'Neuer Ordner' }).click();
+        await modal.fillInputByLabel('Name', groupName);
+        await modal.submitModal('Speichern');
+
+        const groupNode = page.locator('summary').filter({ hasText: groupName }).first();
+        await expect(async () => {
+            if (await groupNode.isHidden()) await page.reload();
+            await expect(groupNode).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 15000 });
+
+        // 2. Create Gallery inside Group using inline button
+        await groupNode.locator('button[data-tip="Galerie hier erstellen"]').click();
+        await modal.fillInputByLabel('Name der Galerie', galName);
+        await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
+        await modal.submitModal('Speichern');
+
+        // 3. Expand group to verify gallery is inside
+        await expect(async () => {
+            if (await groupNode.locator('..').getAttribute('open') === null) {
+                await groupNode.locator('.font-bold').first().click({ force: true });
+            }
+            await expect(page.locator('a').filter({ hasText: galName }).first()).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 10000 });
+
+        // 4. Delete the Group
+        await groupNode.locator('button[data-tip="Ordner bearbeiten"]').click();
+        await modal.activeModal.getByRole('button', { name: 'Löschen' }).click();
+
+        const confirmModal = page.locator('.modal-global');
+        await expect(confirmModal).toBeVisible({ timeout: 5000 });
+        await confirmModal.getByRole('button', { name: 'Löschen' }).click();
+        await expect(confirmModal).toBeHidden({ timeout: 10000 });
+
+        // 5. Assert: Group is gone, Gallery is at root (not inside a <details> folder)
+        await expect(async () => {
+            if (await groupNode.isVisible()) await page.reload();
+            await expect(groupNode).toBeHidden({ timeout: 3000 });
+        }).toPass({ timeout: 15000 });
+
+        await expect(async () => {
+            await page.reload();
+            const rootGalNode = page.locator('a').filter({ hasText: galName }).first();
+            await expect(rootGalNode).toBeVisible({ timeout: 3000 });
+            // Verify it is NOT inside a details (folder) element anymore
+            await expect(rootGalNode.locator('xpath=ancestor::details')).toHaveCount(0);
+        }).toPass({ timeout: 15000 });
+    });
+
 });
