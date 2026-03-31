@@ -18,10 +18,7 @@ export class GalleryHelper {
         await this.modal.submitModal('Speichern');
 
         const galLink = this.page.locator('main').locator('a').filter({ hasText: name }).first();
-        await expect(async () => {
-            if (await galLink.isHidden()) await this.page.reload();
-            await expect(galLink).toBeVisible({ timeout: 3000 });
-        }).toPass({ timeout: 15000 });
+        await expect(galLink).toBeVisible({ timeout: 15000 });
         
         await galLink.click();
         await expect(this.page.locator(`h1:has-text("${name}")`)).toBeVisible({ timeout: 10000 });

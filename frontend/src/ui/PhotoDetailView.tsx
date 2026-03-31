@@ -29,7 +29,6 @@ export default function PhotoDetailView() {
     const {user} = useAuth();
     const {updateMetadata, deletePhoto} = usePhoto();
     const { showToast, confirm } = useUI();
-
     const {data, error, isLoading, mutate} = useSWR<PhotoContextData>(
         id ? '/api/photos/' + id + '/context' : null, fetcher
     );
@@ -78,7 +77,7 @@ export default function PhotoDetailView() {
         setSaving(true);
         try {
             await updateMetadata(photo.id, iptcData);
-            mutate();
+            await mutate();
             showToast('success', 'Metadaten gespeichert');
         } catch {
             showToast('error', 'Fehler beim Speichern');
@@ -95,8 +94,6 @@ export default function PhotoDetailView() {
             showToast('error', 'Fehler beim Löschen');
         }
     };
-
-
 
     return (
         <PageLayout hideMobileHeader>
@@ -167,8 +164,6 @@ export default function PhotoDetailView() {
                                 </div>
                             )}
                         </IptcMetadataEditor>
-
-                        
                     </div>
                 </div>
             </div>

@@ -28,8 +28,12 @@ class GalleryGroup extends Model
 
     protected static function booted()
     {
-        static::saved(function () { Cache::forget('gallery_tree_admin'); });
-        static::deleted(function () { Cache::forget('gallery_tree_admin'); });
+        static::saved(function () { 
+            \Illuminate\Support\Facades\DB::afterCommit(fn() => Cache::forget('gallery_tree_admin')); 
+        });
+        static::deleted(function () { 
+            \Illuminate\Support\Facades\DB::afterCommit(fn() => Cache::forget('gallery_tree_admin')); 
+        });
     }
 
     public function parent()

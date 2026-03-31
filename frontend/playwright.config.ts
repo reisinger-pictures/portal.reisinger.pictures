@@ -9,14 +9,16 @@ export default defineConfig({
     reporter: [
         ['html', {open: 'never'}]
     ],
-    // globalSetup entfernt! Tests laufen nun zerstörungsfrei gegen die Dev-DB.
     use: {
+        userAgent: 'Playwright',
         baseURL: 'http://localhost:4321',
         trace: 'on-first-retry',
-        video: 'retain-on-failure',
+        video: 'off',
     },
     projects: [
-        {name: 'Desktop Chrome', use: {...devices['Desktop Chrome'], viewport: {width: 1920, height: 950},}},
-        {name: 'Mobile Chrome', use: {...devices['Galaxy A55']}},
+        {name: 'Desktop Chrome', use: {
+        userAgent: 'Playwright',...devices['Desktop Chrome'], viewport: {width: 1920, height: 950},}},
+        {name: 'Mobile Chrome', use: {
+        userAgent: 'Playwright',...devices['Galaxy A55']}},
     ],
 });

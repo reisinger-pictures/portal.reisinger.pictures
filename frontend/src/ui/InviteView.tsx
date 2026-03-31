@@ -63,7 +63,6 @@ export default function InviteView() {
 
             // SWR anweisen, die User-Session frisch zu laden
             await mutate(() => true, undefined, { revalidate: true });
-            await mutate('/api/auth/me');
             
             navigate('/' + data.full_path, {replace: true});
         } catch (err: unknown) {
@@ -79,7 +78,7 @@ export default function InviteView() {
             apiMutate<any>('/api/invites/redeem', 'POST', { token })
             .then(resData => {
                 if (resData.full_path) {
-                    mutate('/api/auth/me');
+                    mutate(() => true, undefined, { revalidate: true });
                     navigate('/' + resData.full_path, {replace: true});
                 } else {
                     setAutoRedeeming(false);

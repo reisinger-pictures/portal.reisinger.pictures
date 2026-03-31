@@ -5,6 +5,11 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
+test.afterAll(async ({ request }) => {
+  await E2EUserHelper.cleanupTrackedUsers(request);
+});
+
+
 test.describe.serial('Download Triggers UI', () => {
     let testUser = { email: '', password: '' };
 
@@ -16,8 +21,8 @@ test.describe.serial('Download Triggers UI', () => {
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
 
-    const uniqueId = Date.now();
-    const galleryName = `Download Test ${uniqueId}`;
+    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
+    const galleryName = `Download Test ${uniqueId()}`;
 
     test.beforeEach(async ({ page }) => {
         auth = new AuthHelper(page);
@@ -34,11 +39,8 @@ test.describe.serial('Download Triggers UI', () => {
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.selectByLabel('Sichtbarkeit', 'Öffentlich (Für alle sichtbar)');
         await modal.submitModal('Speichern');
-        await expect(async () => {
-            const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-            if (await link.isHidden()) await page.reload();
-            await expect(link).toBeVisible({ timeout: 3000 });
-        }).toPass({ timeout: 15000 });
+        const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        await expect(link).toBeVisible({ timeout: 15000 });
         
         await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
@@ -55,13 +57,13 @@ test.describe.serial('Download Triggers UI', () => {
 
         // 4. Als anonymer Gast die öffentliche Galerie aufrufen
         await page.goto(galleryUrl);
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true, { timeout: 15000 });
-        await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass({ timeout: 15000 });
+        await expect(page.locator('a.pswp-item img').first()).toBeVisible();
+        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
+        await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass();
 
         // 5. Test: Einzel-Download
         // Wir fangen das Download-Event ab, bevor wir klicken
-        const singleDownloadPromise = page.waitForEvent('download', { timeout: 15000 });
+        const singleDownloadPromise = page.waitForEvent('download');
         await page.getByRole('button', { name: 'Einzel-Download' }).first().click();
         const singleDownload = await singleDownloadPromise;
         
@@ -69,7 +71,7 @@ test.describe.serial('Download Triggers UI', () => {
         expect(singleDownload.suggestedFilename().toLowerCase()).toMatch(/\.jpe?g$/);
 
         // 6. Test: ZIP-Download
-        const zipDownloadPromise = page.waitForEvent('download', { timeout: 15000 });
+        const zipDownloadPromise = page.waitForEvent('download');
         await page.getByRole('button', { name: 'Alle herunterladen (.zip)' }).click();
         const zipDownload = await zipDownloadPromise;
         

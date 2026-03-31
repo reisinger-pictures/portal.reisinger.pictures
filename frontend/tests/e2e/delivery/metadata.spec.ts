@@ -5,6 +5,11 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
+test.afterAll(async ({ request }) => {
+  await E2EUserHelper.cleanupTrackedUsers(request);
+});
+
+
 test.describe.serial('Metadata & Detail View Workflow', () => {
     let testUser = { email: '', password: '' };
 
@@ -16,8 +21,8 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
 
-    const uniqueId = Date.now();
-    const galleryName = `Metadata Test ${uniqueId}`;
+    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
+    const galleryName = `Metadata Test ${uniqueId()}`;
 
     test.beforeEach(async ({ page }) => {
         auth = new AuthHelper(page);
@@ -32,11 +37,8 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         await modal.submitModal('Speichern');
         
         // Robustes Auffinden des Galerie-Links (inkl. Reload-Logik bei SWR-Verzögerung)
-        await expect(async () => {
-            const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-            if (await galLink.isHidden()) await page.reload();
-            await expect(galLink).toBeVisible({ timeout: 3000 });
-        }).toPass({ timeout: 15000 });
+        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        await expect(galLink).toBeVisible({ timeout: 15000 });
 
         await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
@@ -54,11 +56,11 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         await cityInput.pressSequentially('Salzburg', { delay: 100 });
 
         const dropdownItem = page.locator('li').filter({ hasText: 'Salzburg' }).first();
-        await expect(dropdownItem).toBeVisible({ timeout: 15000 });
+        await expect(dropdownItem).toBeVisible();
         await dropdownItem.click();
 
         await expect(page.locator('div.form-control').filter({ hasText: 'Bundesland' }).locator('input[type="text"]')).toHaveValue('Salzburg');
         await page.getByRole('button', { name: 'Speichern' }).click();
-        await expect(page.getByRole('button', { name: 'Speichern' })).toBeEnabled({ timeout: 5000 });
+        await expect(page.getByRole('button', { name: 'Speichern' })).toBeEnabled();
     });
 });

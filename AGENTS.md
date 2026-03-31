@@ -17,5 +17,7 @@
   * Never use `page.waitForResponse()` or network status codes to verify UI updates. E2E tests must only care about what the user sees.
   * Use `expect(locator).toBeVisible({ timeout: 15000 })` for simple updates.
   * Use `await expect(async () => { ... }).toPass()` for complex SWR/React state transitions where multiple re-renders occur.
-* **No Forced Reloads:** Die Verwendung von `page.reload()` zur Status-Synchronisation ist untersagt. Nutze stattdessen `await expect(locator).toBeVisible({ timeout: 15000 })` oder komplexe Polling-Logiken innerhalb von `toPass()`, ohne den Browser-Cache durch einen harten Reload zu umgehen.
+* **STRICT Anti-Reload Policy (Genuine User Reactivity):** Die Verwendung von `page.reload()` zur Status-Synchronisation in E2E-Tests ist **strikt untersagt**. 
+  * **Begründung:** Ein Reload maskiert fehlerhaftes State-Management (z.B. fehlende SWR `mutate()` Aufrufe). Wenn eine Entität (wie eine Galerie) erstellt wird, *muss* sich das UI im Hintergrund automatisch aktualisieren.
+  * **Lösung:** Wenn ein Test auf ein UI-Update wartet, nutze ausschließlich geduldige Asserts (z.B. `await expect(locator).toBeVisible({ timeout: 20000 })`). Schlägt dies fehl, liegt ein Bug in der Applikation vor (State/Cache Update fehlt), nicht im Test.
 * **Test-Runner:** Use `run_new_tests.bat` strictly for running tests (idempotent).

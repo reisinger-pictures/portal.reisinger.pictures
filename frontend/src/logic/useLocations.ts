@@ -19,9 +19,5 @@ export function useLocations(query: string, type: 'city' | 'country') {
         { keepPreviousData: true }
     );
 
-    return {
-        locations: data || [],
-        isLoading,
-        isError: error
-    };
+    return { locations: data || [], isLoading, isError: error };
 }

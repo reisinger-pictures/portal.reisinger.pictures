@@ -9,7 +9,6 @@ export interface SearchResults {
 }
 
 export function useSearch(query: string, personal: boolean = false, skipEmpty: boolean = false) {
-    // SWR Key: Wenn skipEmpty true ist und die Query leer, geben wir null zurück -> SWR blockiert den Request.
     const shouldFetch = !(skipEmpty && query.trim() === '');
     const key = shouldFetch ? `/api/search?q=${encodeURIComponent(query)}${personal ? '&personal=true' : ''}` : null;
 
@@ -17,14 +16,10 @@ export function useSearch(query: string, personal: boolean = false, skipEmpty: b
         key,
         fetcher,
         {
-            revalidateOnFocus: false, // Verhindert ständiges Neuladen bei Tab-Wechsel
-            keepPreviousData: true    // Flackerfreies Rendern beim Tippen
+            revalidateOnFocus: false,
+            keepPreviousData: true
         }
     );
 
-    return {
-        results: data,
-        isLoading,
-        isError: error
-    };
+    return { results: data, isLoading, isError: error };
 }

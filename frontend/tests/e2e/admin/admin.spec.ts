@@ -4,7 +4,12 @@ import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 
-test.describe('Admin Workflow', () => {
+test.afterAll(async ({ request }) => {
+  await E2EUserHelper.cleanupTrackedUsers(request);
+});
+
+
+test.describe.serial('Admin Workflow', () => {
     let testUser = { email: '', password: '' };
 
     test.beforeAll(async ({ request }) => {
@@ -33,11 +38,17 @@ test.describe('Admin Workflow', () => {
         await modal.fillInputByLabel('Name', 'Test Admin Client');
         await modal.fillInputByLabel('E-Mail Adresse', uniqueEmail);
         
+        // Warte auf den SWR-Refetch nach dem Anlegen
+        const usersRefetchPromise = page.waitForResponse(res => 
+            res.url().includes('/api/management/users') && res.request().method() === 'GET'
+        );
+
         await modal.clickButton('Nutzer anlegen & Einladen');
+        await usersRefetchPromise;
 
         const toast = page.locator('.toast');
-        await expect(toast).toBeVisible({ timeout: 15000 });
-        await expect(toast).toContainText('Nutzer angelegt', { timeout: 5000 });
+        await expect(toast).toBeVisible();
+        await expect(toast).toContainText('Nutzer angelegt');
         
         await expect(modal.activeModal).toBeHidden();
 
@@ -62,18 +73,14 @@ test.describe('Admin Workflow', () => {
         const headerSearchInput = page.locator('header input[placeholder="Suche in allen Galerien..."]');
         await expect(headerSearchInput).toBeVisible();
 
-        // 1. Eingabe von 1 Zeichen -> Dropdown bleibt geschlossen
         await headerSearchInput.fill('A');
         await expect(page.locator('text=Suche nach "A"')).toBeHidden();
 
-        // 2. Eingabe von 2+ Zeichen -> Dropdown öffnet sich
         await headerSearchInput.fill('Ab');
-        await expect(page.locator('text=Suche nach "Ab"')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('text=Suche nach "Ab"')).toBeVisible();
 
-        // 3. Klick auf den Link
         await page.locator('text=Suche nach "Ab"').click();
         
-        // 4. Verifikation: Navigation zu SearchView und Input enthält den Wert aus der URL
         await expect(page).toHaveURL(/.*\/search\?q=Ab/);
         const searchViewInput = page.locator('input[placeholder="Galerien und Bilder suchen..."]');
         await expect(searchViewInput).toHaveValue('Ab');

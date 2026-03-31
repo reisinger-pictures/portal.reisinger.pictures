@@ -5,6 +5,11 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
+test.afterAll(async ({ request }) => {
+  await E2EUserHelper.cleanupTrackedUsers(request);
+});
+
+
 test.describe.serial('Client Workflow', () => {
     let testUser = { email: '', password: '' };
 
@@ -16,8 +21,8 @@ test.describe.serial('Client Workflow', () => {
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
 
-    const uniqueId = Date.now();
-    const galleryName = `E2E Selection ${uniqueId}`;
+    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
+    const galleryName = `E2E Selection ${uniqueId()}`;
     let inviteLink = '';
 
     test.beforeEach(async ({ page }) => {
@@ -35,13 +40,10 @@ test.describe.serial('Client Workflow', () => {
         await modal.submitModal('Speichern');
         // Robustes Klicken: Playwright pollt den Click selbst, bis das Element da und klickbar ist
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(async () => {
-            if (await galLink.isHidden()) await page.reload();
-            await expect(galLink).toBeVisible({ timeout: 3000 });
-        }).toPass({ timeout: 20000 });
+        await expect(galLink).toBeVisible({ timeout: 15000 });
         await galLink.scrollIntoViewIfNeeded();
         await galLink.click();
-        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
 
         const upload = new UploadHelper(page);
         await upload.uploadSampleImage();
@@ -70,14 +72,14 @@ test.describe.serial('Client Workflow', () => {
         await page.getByRole('button', { name: 'Weiter als Test Client' }).click();
         
 
-        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
         await expect(page.locator('p:has-text("Wähle deine Favoriten aus.")')).toBeVisible();
         await expect(page.getByRole('button', { name: 'Auswahl abschließen' })).toBeVisible();
 
         // --- DAU Protection Check (Right-Click & Drag) ---
         const image = page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible({ timeout: 15000 });
-        await expect(image).toHaveJSProperty('complete', true, { timeout: 15000 });
+        await expect(image).toBeVisible();
+        await expect(image).toHaveJSProperty('complete', true);
         expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // 1. Prüfen, ob das Kontextmenü blockiert wird
@@ -97,12 +99,12 @@ test.describe.serial('Client Workflow', () => {
         expect(inviteLink).not.toBe('');
         await page.goto(inviteLink);
         await page.getByRole('button', { name: 'Weiter als Test Client' }).click();
-        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
 
         // Wait for image to load
         const image = page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible({ timeout: 15000 });
-        await expect(image).toHaveJSProperty('complete', true, { timeout: 15000 });
+        await expect(image).toBeVisible();
+        await expect(image).toHaveJSProperty('complete', true);
         expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
         // Rate the first image (click 5th star)
@@ -124,7 +126,7 @@ test.describe.serial('Client Workflow', () => {
         await expect(page.locator('.pswp')).toBeVisible();
         await expect(async () => {
             await page.locator('button.pswp__button--close').click();
-            await expect(page.locator('.pswp')).toBeHidden({ timeout: 2000 });
-        }).toPass({ timeout: 15000 });
+            await expect(page.locator('.pswp')).toBeHidden();
+        }).toPass();
     });
 });

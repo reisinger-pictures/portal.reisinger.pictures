@@ -16,7 +16,7 @@ import ClientNotificationsView from './ui/client/ClientNotificationsView';
 function ProtectedRoute({children}: { children: React.ReactNode }) {
     const {user, isLoading, isError} = useAuth();
     if (isLoading) return <div className="flex h-screen items-center justify-center"><span
-        className="loading loading-spinner loading-lg text-primary"></span></div>;
+        data-testid="app-loader" className="loading loading-spinner loading-lg text-primary"></span></div>;
     if (isError || !user) return <Navigate to="/" replace/>;
     return <>{children}</>;
 }

@@ -4,7 +4,12 @@ import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 
-test.describe('Client Notifications Opt-In', () => {
+test.afterAll(async ({ request }) => {
+  await E2EUserHelper.cleanupTrackedUsers(request);
+});
+
+
+test.describe.serial('Client Notifications Opt-In', () => {
     let testUser = { email: '', password: '' };
 
     test.beforeAll(async ({ request }) => {
@@ -29,14 +34,14 @@ test.describe('Client Notifications Opt-In', () => {
         const galleryLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
         await expect(galleryLink).toBeVisible({ timeout: 15000 });
         await galleryLink.click();
-        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
         
         // Kundenansicht simulieren
         await page.locator('button[role="tab"]').filter({ hasText: 'Kundenansicht' }).click();
         
         // Toggle finden und klicken
         const toggle = page.locator('input[type="checkbox"].toggle-primary');
-        await expect(toggle).toBeVisible({ timeout: 15000 });
+        await expect(toggle).toBeVisible();
         
         const isCheckedInitial = await toggle.isChecked();
         
@@ -48,7 +53,7 @@ test.describe('Client Notifications Opt-In', () => {
         // Neuladen um Persistenz zu verifizieren
         await page.reload();
         const toggleAfterReload = page.locator('input[type="checkbox"].toggle-primary');
-        await expect(toggleAfterReload).toBeVisible({ timeout: 15000 });
+        await expect(toggleAfterReload).toBeVisible();
         expect(await toggleAfterReload.isChecked()).not.toBe(isCheckedInitial);
     });
 });

@@ -47,7 +47,7 @@ export default function ResetPassword() {
             await apiMutate('/api/auth/reset-password', 'POST', { email, token, password: data.password });
             
             // Durch das mutieren der SWR Route weiß die App, dass sie nun eingeloggt ist.
-            await mutate('/api/auth/me');
+            await mutate(() => true, undefined, { revalidate: true });
             
             // Redirect ins Dashboard
             navigate('/', { replace: true });

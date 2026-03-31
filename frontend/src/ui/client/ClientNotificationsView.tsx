@@ -25,20 +25,20 @@ export default function ClientNotificationsView() {
         // Optimistic UI Update
         const newData = { ...data } as PreferencesData;
         if (type === 'gallery') {
-            const idx = newData.galleries.findIndex(g => g.id === id);
+            const idx = newData.galleries.findIndex((g: PrefItem) => g.id === id);
             if(idx > -1) newData.galleries[idx].wants_notifications = !currentValue;
         } else {
-            const idx = newData.groups.findIndex(g => g.id === id);
+            const idx = newData.groups.findIndex((g: PrefItem) => g.id === id);
             if(idx > -1) newData.groups[idx].wants_notifications = !currentValue;
         }
         mutate(newData, false);
 
         try {
             await apiMutate(endpoint, 'POST', { wants_notifications: !currentValue });
-            mutate(); // Real re-fetch
+            mutate();
         } catch (e) {
             alert('Fehler beim Speichern der Einstellung.');
-            mutate(); // Rollback on error
+            mutate();
         }
     };
 
@@ -62,7 +62,6 @@ export default function ClientNotificationsView() {
                     </div>
                 ) : (
                     <div className="space-y-8">
-                        {/* Meta-Galerien (Gruppen) */}
                         {data.groups.length > 0 && (
                             <div>
                                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-base-300 pb-2">
@@ -82,7 +81,6 @@ export default function ClientNotificationsView() {
                             </div>
                         )}
 
-                        {/* Einzel-Galerien */}
                         {data.galleries.length > 0 && (
                             <div>
                                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-base-300 pb-2">

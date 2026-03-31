@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Guest Workflow', () => {
+test.describe.serial('Guest Workflow', () => {
     test('Guest can access discovery search and perform a query', async ({ page }) => {
         await page.goto('/');
 

@@ -1,4 +1,4 @@
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import {fetcher} from '../api';
 import {Gallery} from './useGalleries';
 
@@ -18,10 +18,9 @@ export interface User {
 }
 
 export function useAuth() {
-    const {data: user, error, mutate} = useSWR<User>('/api/auth/me', fetcher, {
+    const { data: user, error, isLoading, mutate } = useSWR<User>('/api/auth/me', fetcher, {
         shouldRetryOnError: false,
     });
-
 
     const login = async (email: string, password: string): Promise<void> => {
         const response = await fetch('/api/auth/login', {
@@ -31,7 +30,7 @@ export function useAuth() {
             body: JSON.stringify({email, password})
         });
         if (!response.ok) throw new Error('Login fehlgeschlagen');
-        await mutate();
+        await globalMutate(() => true, undefined, { revalidate: true });
     };
 
     const register = async (name: string, email: string): Promise<string> => {
@@ -56,9 +55,8 @@ export function useAuth() {
         } catch (e) {
             console.error('Logout Fehler', e);
         }
-        // WICHTIG: Komplettes Revalidate erzwingen, damit SWR in den Error-State (401) wechselt
-        await mutate(); 
+        await globalMutate(() => true, undefined, { revalidate: true });
     };
 
-    return {user, isLoading: !error && user === undefined, isError: error, login, register, logout, mutate};
+    return {user, isLoading: isLoading || (!user && !error), isError: error, login, register, logout, mutate};
 }

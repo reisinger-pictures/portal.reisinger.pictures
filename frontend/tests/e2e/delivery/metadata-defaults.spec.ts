@@ -5,6 +5,11 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
+test.afterAll(async ({ request }) => {
+  await E2EUserHelper.cleanupTrackedUsers(request);
+});
+
+
 test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
     let testUser = { email: '', password: '' };
 
@@ -16,8 +21,8 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
 
-    const uniqueId = Date.now();
-    const galleryName = `Smart Default Test ${uniqueId}`;
+    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
+    const galleryName = `Smart Default Test ${uniqueId()}`;
 
     test.beforeEach(async ({ page }) => {
         auth = new AuthHelper(page);
@@ -36,7 +41,7 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
 
         // 2. Galerie öffnen und Vorgaben-Modal aufrufen
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeVisible({ timeout: 15000 });
+        await expect(galLink).toBeVisible();
         await galLink.click();
 
         await page.getByRole('button', { name: 'Vorgaben...' }).click();
@@ -53,7 +58,7 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
         await cityInput.pressSequentially('Graz', { delay: 100 });
 
         const dropdownGraz = page.locator('li').filter({ hasText: 'Graz' }).first();
-        await expect(dropdownGraz).toBeVisible({ timeout: 15000 });
+        await expect(dropdownGraz).toBeVisible();
         await dropdownGraz.click();
 
         await expect(stateInput).toHaveValue('Steiermark');
@@ -64,7 +69,7 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
         await cityInput.pressSequentially('Linz', { delay: 100 });
 
         const dropdownLinzOOE = page.locator('li').filter({ hasText: 'Oberösterreich' }).first();
-        await expect(dropdownLinzOOE).toBeVisible({ timeout: 15000 });
+        await expect(dropdownLinzOOE).toBeVisible();
         await dropdownLinzOOE.click();
 
         await expect(stateInput).toHaveValue('Oberösterreich');

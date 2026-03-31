@@ -10,7 +10,6 @@ export default function InviteModal({galleryId, galleryType, onClose}: { gallery
     const [newLink, setNewLink] = useState('');
     const [linkType, setLinkType] = useState<'mass' | 'personal'>('mass');
     const { showToast, confirm } = useUI();
-
     const {data: invites, mutate} = useSWR<{
         id: string,
         name: string,

@@ -33,9 +33,6 @@ const getHeaders = (): Record<string, string> => ({
     'Accept': 'application/json'
 });
 
-/**
- * ✨ FIX: Extrahiert fachliche Fehlermeldungen aus JSON oder HTML-Antworten.
- */
 const handleApiError = async (res: Response) => {
     let errorMsg = `HTTP Fehler ${res.status}`;
     const contentType = res.headers.get('content-type');

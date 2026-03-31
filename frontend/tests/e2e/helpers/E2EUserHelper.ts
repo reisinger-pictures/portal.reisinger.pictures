@@ -2,6 +2,14 @@ import { APIRequestContext } from '@playwright/test';
 import { MailpitHelper } from './MailpitHelper';
 
 export class E2EUserHelper {
+  private static usersToCleanup: string[] = [];
+
+  static trackForCleanup(identifier: string) {
+    if (identifier && !this.usersToCleanup.includes(identifier)) {
+      this.usersToCleanup.push(identifier);
+    }
+  }
+
     static async createIsolatedUser(
         request: APIRequestContext,
         roleName: 'admin' | 'photographer' | 'client',
@@ -62,4 +70,17 @@ export class E2EUserHelper {
 
         return { email, password, id: newUserId };
     }
+
+  static async cleanupTrackedUsers(request: any) {
+    if (this.usersToCleanup.length === 0) return;
+    console.log(`🧹 Cleanup: Lösche ${this.usersToCleanup.length} Test-Nutzer...`);
+    for (const idOrEmail of this.usersToCleanup) {
+      try {
+        await request.delete(`/api/users/${idOrEmail}`);
+      } catch (e) {
+        console.error(`❌ Fehler beim Löschen von ${idOrEmail}`, e);
+      }
+    }
+    this.usersToCleanup = [];
+  }
 }

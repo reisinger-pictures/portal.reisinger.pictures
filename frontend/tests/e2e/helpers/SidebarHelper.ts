@@ -4,6 +4,8 @@ export class SidebarHelper {
     constructor(private page: Page) {}
 
     async navigateTo(menuText: string) {
+        // Anti-Flakiness: Sicherstellen, dass keine Fade-Out Animationen von Modals den Klick blockieren
+        await expect(this.page.locator('.modal-open')).toHaveCount(0, { timeout: 5000 });
         const menuBtn = this.page.locator('header button.btn-square').filter({ has: this.page.locator('.mdi--menu') }).first();
         const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
         

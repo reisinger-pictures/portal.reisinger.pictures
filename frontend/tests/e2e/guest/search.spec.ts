@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { AuthHelper } from '../helpers/AuthHelper';
 
-test.describe('Global Search Workflow', () => {
+test.describe.serial('Global Search Workflow', () => {
     let sidebar: SidebarHelper;
 
     test.beforeEach(async ({ page }) => {
@@ -24,6 +24,6 @@ test.describe('Global Search Workflow', () => {
 
         // Architektur-Regel: Geduldiges Assert
         await expect(page).toHaveURL(new RegExp(`/search\\?q=${searchTerm}`));
-        await expect(page.locator(`h1:has-text("${searchTerm}")`)).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`h1:has-text("${searchTerm}")`)).toBeVisible();
     });
 });

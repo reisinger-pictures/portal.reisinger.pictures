@@ -65,7 +65,6 @@ export function useGallery(slug: string | undefined) {
     const wantsNotifications = data?.[0]?.wants_notifications || false;
     const breadcrumbs = data?.[0]?.breadcrumbs || [];
 
-    // ✨ FIX: notified_count aus der API-Antwort extrahieren
     const notifiedCount = data?.[0]?.notified_count || 0;
     const downloadsCount = data?.[0]?.downloads_count || 0;
 
@@ -89,33 +88,16 @@ export function useGallery(slug: string | undefined) {
         });
 
         if (res.status === 401) {
-            const modal = document.getElementById('login_modal') as HTMLDialogElement;
-            if (modal) {
-                modal.showModal();
-            } else {
-                window.location.href = '/login';
-            }
-            mutate();
+            window.location.href = '/login';
             return;
         }
 
-        mutate();
-    };
+        };
+
 
     return {
-        gallery,
-        photos,
-        downloadsCount,
-        notified_count: notifiedCount, // ✨ FIX: Rückgabe für die UI
-        totalPhotos,
-        isLoading,
-        isError: error,
-        ratePhoto,
-        size,
-        setSize,
-        isReachingEnd,
-        wantsNotifications,
-        breadcrumbs,
+        gallery, photos, downloadsCount, notified_count: notifiedCount, totalPhotos, isLoading, isError: error,
+        ratePhoto, size, setSize, isReachingEnd, wantsNotifications, breadcrumbs,
         toggleOptIn: async (id: string, val: boolean) => {
             await fetch('/api/galleries/'+id+'/opt-in', {
                 method: 'POST',
@@ -123,7 +105,7 @@ export function useGallery(slug: string | undefined) {
                 body: JSON.stringify({wants_notifications: val}),
                 credentials: 'include'
             });
-            mutate();
+           await mutate()
         },
         mutate
     };

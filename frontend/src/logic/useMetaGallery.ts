@@ -19,14 +19,14 @@ export function useMetaGallery(id: string | undefined) {
         return "/api/management/gallery-groups/" + id + "?page=" + (pageIndex + 1);
     };
 
-    const {data, error, isLoading, size, setSize, mutate} = useSWRInfinite<PaginatedMetaGalleryResponse>(
+    const {data, error, isLoading, mutate, size, setSize} = useSWRInfinite<PaginatedMetaGalleryResponse>(
         getKey, fetcher
     );
 
     const photos = data ? data.flatMap(page => page.photos) : [];
     const group = data?.[0]?.group;
     const isReachingEnd = data && data[data.length - 1]?.current_page >= data[data.length - 1]?.last_page;
-
     const downloadsCount = data?.[0]?.downloads_count || 0;
+
     return {group, photos, downloadsCount, isLoading, isError: error, size, setSize, isReachingEnd, mutate};
 }

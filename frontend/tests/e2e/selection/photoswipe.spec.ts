@@ -5,6 +5,10 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
+test.afterAll(async ({ request }) => {
+    await E2EUserHelper.cleanupTrackedUsers(request);
+});
+
 test.describe.serial('PhotoSwipe in Selection Gallery', () => {
     let testUser = { email: '', password: '' };
 
@@ -16,8 +20,8 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
 
-    const uniqueId = Date.now();
-    const galleryName = `Selection Lightbox ${uniqueId}`;
+    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
+    const galleryName = `Selection Lightbox ${uniqueId()}`;
     let inviteLink = '';
 
     test.beforeEach(async ({ page }) => {
@@ -34,13 +38,12 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
         await modal.submitModal('Speichern');
-        await expect(async () => {
-            const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-            if (await link.isHidden()) await page.reload();
-            await expect(link).toBeVisible({ timeout: 3000 });
-        }).toPass({ timeout: 15000 });
 
-        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
+        // Wir warten geduldig, bis SWR die Liste aktualisiert hat
+        const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        await expect(link).toBeVisible({ timeout: 15000 });
+
+        await link.click();
 
         // 2. Bild hochladen
         const upload = new UploadHelper(page);
@@ -58,72 +61,72 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
     });
 
     test('Client can interact with PhotoSwipe rating UI and use keyboard shortcuts', async ({ page }) => {
-        expect(inviteLink).not.toBe('');
+        // Sicherstellen, dass der Link aus dem vorherigen Test vorhanden ist (wichtig für --last-failed)
+        test.skip(inviteLink === '', 'Test requires link from previous step');
 
         // 1. Als Gast die Galerie öffnen
         await page.goto(inviteLink);
         await page.getByRole('button', { name: 'Weiter als Lightbox Tester' }).click();
-        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
 
         // 2. Lightbox öffnen
         await page.locator('a.pswp-item').first().click();
 
-        // 3. Assert: Lightbox sichtbar
+        // 3. Assert: Lightbox sichtbar und Portal-Anker vorhanden
         const lightbox = page.locator('.pswp');
         await expect(lightbox).toBeVisible();
-        await expect(page.locator('#rating-portal-anchor')).toBeVisible({ timeout: 15000 }); // Beweis, dass Slide interaktiv ist
+        await expect(page.locator('#rating-portal-anchor')).toBeVisible();
 
         // 4. Rating via Button & Comment Input
         const ratingBar = page.locator('#rating-portal-anchor .rating');
         await expect(ratingBar).toBeVisible();
 
-        // Kommentar schreiben (MUSS vor dem Rating passieren, da das Rating zum nächsten Bild blättert!)
         const commentInput = page.locator('#rating-portal-anchor input[type="text"]');
         await commentInput.fill('Episches Bild im Fullscreen!');
-        
-        // Race-Condition Fix: Wir bestätigen den Kommentar erst mit Enter und warten auf die API.
-        // Das verhindert, dass der OnBlur-Event (beim Klicken des Sterns) das neue Rating mit 0 überschreibt.
+
+        // Kommentar mit Enter bestätigen und auf API warten
         const commentResp = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
         await commentInput.press('Enter');
         await commentResp;
-        
-        // 5 Sterne vergeben (speichert Kommentar und blättert automatisch weiter)
+
+        // Mobile Fix: Kurz warten, bis die Bildschirmtastatur eingefahren und das Layout stabil ist
+        await page.waitForTimeout(500);
+
+        // 5 Sterne vergeben (triggert automatischen Wechsel zum nächsten Bild)
+        const star5 = ratingBar.locator('input.mask-star-2').nth(4);
+        await expect(star5).toBeVisible();
         const rateResponse = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
-        await ratingBar.locator('input.mask-star-2').nth(4).click();
+        await star5.click();
         await rateResponse;
 
         // 5. Lightbox schließen
         await expect(async () => {
             await page.locator('button.pswp__button--close').click();
-            await expect(lightbox).toBeHidden({ timeout: 2000 });
-        }).toPass({ timeout: 15000 });
+            await expect(lightbox).toBeHidden();
+        }).toPass();
 
-        // 6. Verify im Grid (Kartenansicht)
+        // 6. Verify im Grid
         await page.waitForTimeout(1000);
-        // Stern 5 sollte checked sein (index 4 in daisyUI rating)
-        const star5 = page.locator('.card-body input.mask-star-2').nth(4);
-        await expect(star5).toBeChecked({ timeout: 5000 });
-        
+        const star5Grid = page.locator('.card-body input.mask-star-2').nth(4);
+        await expect(star5Grid).toBeChecked();
+
         const gridComment = page.locator('input[placeholder="Kommentar..."]').first();
         await expect(gridComment).toHaveValue('Episches Bild im Fullscreen!');
 
         // 7. Rating via Keyboard Shortcut
         await page.locator('a.pswp-item').first().click();
         await expect(lightbox).toBeVisible();
-        await expect(page.locator('#rating-portal-anchor')).toBeVisible({ timeout: 15000 }); // Beweis, dass Slide interaktiv ist
-        
-        // Drücke '3' auf der Tastatur
+        await expect(page.locator('#rating-portal-anchor')).toBeVisible();
+
         const rateResponse2 = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
         await page.keyboard.press('3');
         await rateResponse2;
 
-        // Lightbox wieder schließen
         await expect(async () => {
             await page.locator('button.pswp__button--close').click();
-            await expect(lightbox).toBeHidden({ timeout: 2000 });
-        }).toPass({ timeout: 15000 });
+            await expect(lightbox).toBeHidden();
+        }).toPass();
 
-        // Stern 3 sollte checked sein (index 2)
         const star3 = page.locator('.card-body input.mask-star-2').nth(2);
         await expect(star3).toBeChecked();
     });

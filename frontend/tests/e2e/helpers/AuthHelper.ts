@@ -5,64 +5,67 @@ export class AuthHelper {
 
     async login(email = 'florian@reisinger.pictures', password = 'admin') {
         await this.page.goto('/');
-        
-        const spinner = this.page.locator('.loading-spinner.loading-lg').first();
-        if (await spinner.isVisible()) {
-            await expect(spinner).toBeHidden({ timeout: 15000 });
-        }
+
+        await expect(this.page.getByTestId('app-loader').first()).toBeHidden({ timeout: 5000 });
+        await expect(this.page.locator('main').first()).toBeVisible({ timeout: 5000 });
 
         const menuBtn = this.page.locator('header button.btn-square').filter({ has: this.page.locator('.mdi--menu') }).first();
         const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
 
-        // Auf Mobile das Menü öffnen, um Login-Felder zu sehen
         if (await menuBtn.isVisible()) {
             if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
-                await menuBtn.evaluate((el: HTMLElement) => el.click());
-                await backdrop.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+                await menuBtn.click();
+                await expect(backdrop).toBeVisible({ timeout: 5000 });
             }
         }
 
         const emailInput = this.page.locator('input[placeholder="E-Mail Adresse"]').first();
-        if (!(await emailInput.isVisible())) {
-            // Schon eingeloggt -> Sidebar wieder schließen (mit nativem JS-Click)
+
+        if (await emailInput.isHidden()) {
             const closeBtn = this.page.locator('button:has(.mdi--close)').first();
-            if (await closeBtn.count() > 0) {
-                await closeBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
+            if (await closeBtn.isVisible()) {
+                await closeBtn.click();
             }
             return;
         }
 
         await emailInput.fill(email);
         await this.page.fill('input[placeholder="Passwort"]', password);
-        
+
         const loginPromise = this.page.waitForResponse(res => res.url().includes('/api/auth/login') && res.request().method() === 'POST');
         const mePromise = this.page.waitForResponse(res => res.url().includes('/api/auth/me') && res.request().method() === 'GET');
-        
-        await this.page.getByRole('button', { name: 'Login' }).first().evaluate((el: HTMLElement) => el.click());
-        
+
+        await this.page.getByRole('button', { name: 'Login' }).first().click();
         await loginPromise;
         await mePromise;
-        
-        await expect(emailInput).toBeHidden({ timeout: 15000 });
-        
-        // Nach dem Login Sidebar auf Mobile schließen (nativer Klick)
+
+        await expect(emailInput).toBeHidden({ timeout: 5000 });
+
+        // CLEANUP FIX: Resilienter Sidebar-Close für Mobile
         if (await menuBtn.isVisible()) {
-             const closeBtn = this.page.locator('button:has(.mdi--close)').first();
-             if (await closeBtn.count() > 0) {
-                 await closeBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
-             }
+            const closeBtn = this.page.locator('button:has(.mdi--close)').first();
+            if (await closeBtn.isVisible()) {
+                try {
+                    await closeBtn.click({ timeout: 2000 });
+                } catch (e) {
+                    // Ignorieren: Sidebar wurde evtl. bereits durch Navigation unmounted
+                }
+            }
         }
     }
 
     async logout() {
-        // Architektur-Fix: Rollenunabhängiger, robuster Logout.
-        // Wir verlassen uns nicht auf UI-Buttons, die je nach Rolle fehlen könnten.
         await this.page.context().clearCookies();
-        
-        // Hard-Reload der Root-URL, um den React/SWR Cache hart zu leeren
         await this.page.goto('/');
-        
-        // Assertion: Wenn das Login-Feld da ist, war der Logout garantiert erfolgreich
-        await expect(this.page.getByPlaceholder('E-Mail Adresse').first()).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('.loading-spinner.loading-lg').first()).toBeHidden({ timeout: 5000 });
+
+        const emailInput = this.page.getByPlaceholder('E-Mail Adresse').first();
+        await expect(async () => {
+            const menuBtn = this.page.locator('header button.btn-square').filter({ has: this.page.locator('.mdi--menu') }).first();
+            if (await menuBtn.isVisible() && await emailInput.isHidden()) {
+                await menuBtn.click();
+            }
+            await expect(emailInput).toBeVisible({ timeout: 2000 });
+        }).toPass({ timeout: 5000 });
     }
 }

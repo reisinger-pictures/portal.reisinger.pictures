@@ -54,6 +54,6 @@ export class ModalHelper {
         );
         await this.clickButton(buttonText);
         await savePromise;
-        await expect(this.activeModal).toBeHidden({ timeout: 15000 });
+        await expect(this.activeModal).toBeHidden({ timeout: 5000 });
     }
 }

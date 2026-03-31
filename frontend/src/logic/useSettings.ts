@@ -11,7 +11,6 @@ export interface WatermarkSettings {
 
 export function useSettings() {
     const {user} = useAuth();
-    // Nur Admins dürfen die Settings abrufen, verhindert 403 Fehler für Fotografen/Kunden
     const canFetch = user?.is_admin;
 
     const {data: watermark, mutate} = useSWR<WatermarkSettings>(
@@ -26,7 +25,7 @@ export function useSettings() {
             credentials: 'include',
             body: formData
         });
-        mutate();
+        await mutate();
     };
 
     return {watermark, updateWatermark};

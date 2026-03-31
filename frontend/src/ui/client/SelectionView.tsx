@@ -55,7 +55,7 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
 
     usePhotoSwipe({
         galleryRef,
-        dependencies: [filteredPhotos.length, user],
+        dependencies: [filteredPhotos.length, user?.id],
         onInit: (lightbox) => {
             lightbox.on('uiRegister', function () {
                 if (user) {

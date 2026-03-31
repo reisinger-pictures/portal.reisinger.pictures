@@ -111,7 +111,7 @@ export default function SearchView() {
                                             {results.photos.map(p => (
                                                 <Link key={p.id} to={`/photos/${p.id}`}
                                                       className="block relative aspect-square bg-base-300 rounded overflow-hidden group shadow-md hover:shadow-xl transition-shadow">
-                                                    <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} alt=<HighlightText text={p.filename} highlight={query} /> containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
+                                                    <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} alt={p.filename} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
                                                     <div
                                                         className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-100 text-white text-xs truncate">
                                                         {p.filename}
