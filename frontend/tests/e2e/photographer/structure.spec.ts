@@ -37,10 +37,7 @@ test.describe.serial('Management Structure View (Tree)', () => {
         await modal.submitModal('Speichern');
 
         const rootGroupNode = page.locator('summary').filter({ hasText: groupName }).first();
-        await expect(async () => {
-            if (await rootGroupNode.isHidden()) await page.reload();
-            await expect(rootGroupNode).toBeVisible();
-        }).toPass();
+        await expect(rootGroupNode).toBeVisible({ timeout: 15000 });
 
         await page.getByRole('button', { name: 'Neuer Ordner' }).click();
         await modal.fillInputByLabel('Name', subGroupName);
@@ -53,9 +50,9 @@ test.describe.serial('Management Structure View (Tree)', () => {
         await page.getByRole('button', { name: 'Alle einklappen' }).click();
         await expect(page.locator(`summary:has-text("${subGroupName}")`)).toBeHidden({ timeout: 10000 });
 
-        await rootGroupNode.locator('.font-bold').first().click({ force: true });
+        // Removed force: true and clicked the summary node directly for natural interaction
+        await rootGroupNode.click();
         await expect(page.locator(`summary:has-text("${subGroupName}")`)).toBeVisible({ timeout: 10000 });
-        await expect(page.locator(`summary:has-text("${subGroupName}")`)).toBeVisible();
     });
 
     test('Photographer can use inline add buttons, edit nested galleries, and type trailing dashes in slug', async ({ page }) => {
@@ -64,27 +61,24 @@ test.describe.serial('Management Structure View (Tree)', () => {
         const inlineGroupName = `Inline Test Group ${Math.random().toString(36).substring(2, 10)}`;
         const dashGalName = `Dash Test ${Math.random().toString(36).substring(2, 10)}`;
         const dashGalSlug = `dash-test-${Math.random().toString(36).substring(2, 10)}-`;
-        
+
         await sidebar.navigateTo('Galerien');
         await page.getByRole('button', { name: 'Neuer Ordner' }).click();
         await modal.fillInputByLabel('Name', inlineGroupName);
         await modal.submitModal('Speichern');
 
         const rootGroupNode = page.locator('summary').filter({ hasText: inlineGroupName }).first();
-        await expect(async () => {
-            if (await rootGroupNode.isHidden()) await page.reload();
-            await expect(rootGroupNode).toBeVisible();
-        }).toPass();
+        await expect(rootGroupNode).toBeVisible({ timeout: 15000 });
 
         await rootGroupNode.locator('button[data-tip="Galerie hier erstellen"]').click();
         await expect(modal.activeModal.locator('h3:has-text("Neue Galerie")')).toBeVisible();
-        
+
         const dropdown = modal.activeModal.locator('.form-control').filter({ hasText: 'Ordner' }).locator('select');
         await expect(dropdown).not.toHaveValue('');
-        
+
         const nameInput = modal.activeModal.locator('.form-control').filter({ hasText: 'Name der Galerie' }).locator('input');
         const slugInput = modal.activeModal.locator('.form-control').filter({ hasText: 'URL Slug' }).locator('input');
-        
+
         await nameInput.fill(dashGalName);
         await slugInput.fill(dashGalSlug);
         await expect(slugInput).toHaveValue(dashGalSlug);
@@ -94,7 +88,9 @@ test.describe.serial('Management Structure View (Tree)', () => {
 
         const galNode = page.locator('a').filter({ hasText: dashGalName });
         await expect(async () => {
-            if (await galNode.isHidden()) { await rootGroupNode.click(); }
+            if (await galNode.isHidden()) {
+                await rootGroupNode.click();
+            }
             await expect(galNode).toBeVisible();
         }).toPass();
 
@@ -115,10 +111,7 @@ test.describe.serial('Management Structure View (Tree)', () => {
         await modal.submitModal('Speichern');
 
         const groupNode = page.locator('summary').filter({ hasText: flowCGroupName }).first();
-        await expect(async () => {
-            if (await groupNode.isHidden()) await page.reload();
-            await expect(groupNode).toBeVisible();
-        }).toPass();
+        await expect(groupNode).toBeVisible({ timeout: 15000 });
 
         await groupNode.locator('button[data-tip="Galerie hier erstellen"]').click();
         await modal.fillInputByLabel('Name der Galerie', flowCGalName);
@@ -127,7 +120,8 @@ test.describe.serial('Management Structure View (Tree)', () => {
 
         await expect(async () => {
             if (await groupNode.locator('..').getAttribute('open') === null) {
-                await groupNode.locator('.font-bold').first().click({ force: true });
+                // Removed force: true and clicked the summary node directly
+                await groupNode.click();
             }
             await expect(page.locator('a').filter({ hasText: flowCGalName }).first()).toBeVisible();
         }).toPass();
@@ -138,18 +132,12 @@ test.describe.serial('Management Structure View (Tree)', () => {
         const confirmModal = page.locator('.modal-global');
         await expect(confirmModal).toBeVisible();
         await confirmModal.getByRole('button', { name: 'Löschen' }).click();
-        
-        // Assert: Group is gone, Gallery is at root
-        await expect(async () => {
-            if (await groupNode.isVisible()) await page.reload();
-            await expect(groupNode).toBeHidden();
-        }).toPass();
 
-        await expect(async () => {
-            await page.reload();
-            const rootGalNode = page.locator('a').filter({ hasText: flowCGalName }).first();
-            await expect(rootGalNode).toBeVisible();
-            await expect(rootGalNode.locator('xpath=ancestor::details')).toHaveCount(0);
-        }).toPass();
+        // Assert: Group is gone, Gallery is at root
+        await expect(groupNode).toBeHidden({ timeout: 15000 });
+
+        const rootGalNode = page.locator('a').filter({ hasText: flowCGalName }).first();
+        await expect(rootGalNode).toBeVisible({ timeout: 15000 });
+        await expect(rootGalNode.locator('xpath=ancestor::details')).toHaveCount(0);
     });
 });

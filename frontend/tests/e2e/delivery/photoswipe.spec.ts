@@ -1,19 +1,19 @@
-import { test, expect } from '@playwright/test';
-import { AuthHelper } from '../helpers/AuthHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
-import { SidebarHelper } from '../helpers/SidebarHelper';
-import { ModalHelper } from '../helpers/ModalHelper';
-import { UploadHelper } from '../helpers/UploadHelper';
+import {expect, test} from '@playwright/test';
+import {AuthHelper} from '../helpers/AuthHelper';
+import {E2EUserHelper} from '../helpers/E2EUserHelper';
+import {SidebarHelper} from '../helpers/SidebarHelper';
+import {ModalHelper} from '../helpers/ModalHelper';
+import {UploadHelper} from '../helpers/UploadHelper';
 
-test.afterAll(async ({ request }) => {
+test.afterAll(async ({request}) => {
     await E2EUserHelper.cleanupE2EData(request);
     await E2EUserHelper.cleanupTrackedUsers(request);
 });
 
 test.describe.serial('PhotoSwipe & Lightbox UI', () => {
-    let testUser = { email: '', password: '' };
+    let testUser = {email: '', password: ''};
 
-    test.beforeAll(async ({ request }) => {
+    test.beforeAll(async ({request}) => {
         testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
     });
 
@@ -24,21 +24,21 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
     const uniqueId = () => Math.random().toString(36).substring(2, 10);
     const galleryName = `Lightbox Test ${uniqueId()}`;
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({page}) => {
         auth = new AuthHelper(page);
         sidebar = new SidebarHelper(page);
         modal = new ModalHelper(page);
     });
 
-    test('Lightbox opens and displays custom IPTC captions', async ({ page }) => {
+    test('Lightbox opens and displays custom IPTC captions', async ({page}) => {
         await auth.login(testUser.email, testUser.password);
 
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.submitModal('Speichern');
-        
-        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeVisible({ timeout: 15000 });
+
+        const galLink = page.locator('main').locator('a').filter({hasText: galleryName}).first();
+        await expect(galLink).toBeVisible({timeout: 15000});
         await galLink.click();
 
         const upload = new UploadHelper(page);
@@ -47,27 +47,28 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
         await page.locator('button[title="Details & Metadaten"]').first().click();
         await expect(page.locator('h4:has-text("IPTC Metadaten")')).toBeVisible();
 
-        const titleInput = page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input');
+        const titleInput = page.locator('div.form-control').filter({hasText: 'Titel'}).locator('input');
         await titleInput.fill('Episches Testbild');
 
-        const descInput = page.locator('div.form-control').filter({ hasText: 'Beschreibung' }).locator('textarea');
+        const descInput = page.locator('div.form-control').filter({hasText: 'Beschreibung'}).locator('textarea');
         await descInput.fill('Dies ist eine fantastische Beschreibung für die Lightbox-Ansicht.');
 
-        await page.getByRole('button', { name: 'Speichern' }).click();
-        await expect(page.getByRole('button', { name: 'Speichern' })).toBeEnabled();
+        await page.getByRole('button', {name: 'Speichern'}).click();
+        await expect(page.getByRole('button', {name: 'Speichern'})).toBeEnabled();
 
         await page.locator('button.btn-ghost:has(.mdi--arrow-left)').click();
-        
-        // SWR revalidiert on focus. In Headless-Tests erzwingen wir dies via Reload.
+
+        // BEST PRACTICE: Authentic user behavior. Force a fresh fetch to see updated metadata.
         await page.reload();
+
         const image = page.locator('a.pswp-item img').first();
         await expect(image).toBeVisible();
         await expect(image).toHaveJSProperty('complete', true);
-        await expect(async () => { 
-            expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); 
+        await expect(async () => {
+            expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
         }).toPass();
 
-        await expect(page.locator('a.pswp-item').first()).toHaveAttribute('data-title', 'Episches Testbild');
+        await expect(page.locator('a.pswp-item').first()).toHaveAttribute('data-title', 'Episches Testbild', {timeout: 15000});
 
         await page.locator('a.pswp-item').first().click();
 

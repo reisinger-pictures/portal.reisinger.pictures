@@ -37,10 +37,10 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         await modal.submitModal('Speichern');
         
         // Robustes Auffinden des Galerie-Links (inkl. Reload-Logik bei SWR-Verzögerung)
-        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeVisible({ timeout: 15000 });
+        const galLink = page.locator('main').getByText(galleryName).first();
+        await expect(galLink).toBeVisible({ timeout: 25000 });
 
-        await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
+        await page.locator('main').getByText(galleryName).first().click();
 
         const upload = new UploadHelper(page);
         await upload.uploadSampleImage();

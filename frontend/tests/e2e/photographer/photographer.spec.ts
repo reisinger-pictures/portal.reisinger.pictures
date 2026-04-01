@@ -55,8 +55,8 @@ test.describe.serial('Photographer Core Workflow', () => {
         await modal.submitModal('Speichern');
 
         await sidebar.navigateTo('Galerien');
-        const newLink = page.locator('main').locator('a').filter({ hasText: editedName }).first();
-        await expect(newLink).toBeVisible();
+        const newLink = page.locator('main').getByText(editedName).first();
+        await expect(newLink).toBeVisible({ timeout: 25000 });
     });
 
     test('Photographer can upload an image and sees it in personal feed', async ({ page }) => {

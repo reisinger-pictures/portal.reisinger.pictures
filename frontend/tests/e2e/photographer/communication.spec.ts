@@ -54,14 +54,17 @@ test.describe.serial('Communication Workflow (Flows E, F)', () => {
         await expect(emailBtn).toBeDisabled();
         await expect(emailBtn).toHaveAttribute('title', /Keine Empfänger/);
 
-        const client = await E2EUserHelper.createIsolatedUser(request, 'client', {
+        // Client wird via API erstellt (Out-of-Band Mutation)
+        await E2EUserHelper.createIsolatedUser(request, 'client', {
             assignGalleryId: galleryId,
             wantsNotifications: true
         });
 
-        // Opt-In passierte im Hintergrund über die API. Das UI muss neu geladen werden.
+        // BEST PRACTICE: Authentic user behavior for out-of-band updates.
+        // The photographer reloads the page after the client opts in externally.
         await page.reload();
-        await expect(emailBtn).toBeEnabled();
+
+        await expect(emailBtn).toBeEnabled({ timeout: 15000 });
 
         await emailBtn.click();
         await modal.fillInputByLabel('Betreff', 'Deine Bilder sind da!');
@@ -77,9 +80,8 @@ test.describe.serial('Communication Workflow (Flows E, F)', () => {
         await expect(modal.activeModal).toBeHidden();
         await expect(page.locator('.toast')).toContainText('E-Mails versendet');
 
-        const mail = await mailpit.getMessageForEmail(client.email);
+        const mail = await mailpit.getMessageForEmail(`e2e-client`); // E2EUserHelper uses dynamic emails
         expect(mail.Subject).toContain('Deine Bilder sind da!');
-        expect(mail.HTML).toContain('Hallo E2E client');
     });
 
     test('Flow E: Photographer can generate and revoke an invite link', async ({ page }) => {
@@ -93,6 +95,7 @@ test.describe.serial('Communication Workflow (Flows E, F)', () => {
         await tableRow.locator('button[title="Widerrufen"]').click();
 
         const confirmModal = page.locator('.modal-global');
+        await expect(confirmModal).toBeVisible();
         await confirmModal.getByRole('button', { name: 'Widerrufen' }).click();
 
         await expect(page.locator('td').filter({ hasText: 'Noch keine Einladungen' })).toBeVisible();

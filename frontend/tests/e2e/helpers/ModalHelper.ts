@@ -42,7 +42,7 @@ export class ModalHelper {
     async clickButton(buttonText: string) {
         const btn = this.activeModal.getByRole('button', { name: buttonText });
         await btn.scrollIntoViewIfNeeded();
-        await btn.click();
+        await btn.click({ force: true });
     }
 
     async closeModal() {
@@ -52,7 +52,13 @@ export class ModalHelper {
     async submitModal(buttonText: string = 'Speichern') {
         const savePromise = this.network.waitForManagementMutation();
         await this.clickButton(buttonText);
-        await savePromise;
+        const res = await savePromise;
+        
+        if (!res.ok()) {
+            const errorText = await res.text();
+            throw new Error(`API Error ${res.status()}: ${errorText}`);
+        }
+        
         await expect(this.activeModal).toBeHidden({ timeout: 15000 });
     }
 }

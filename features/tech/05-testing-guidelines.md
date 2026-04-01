@@ -10,10 +10,8 @@ status: active
 - **No `force: true` in Playwright:** Bypassing actionability checks defeats the purpose of E2E tests. If Playwright cannot click an element naturally, a human probably can't either. Always wait for elements to become stable and uncovered (e.g., wait for animations to finish or modals to close via `toBeHidden()`) instead of forcing clicks.
 - **No Try-Catch Anti-Pattern:** Never mask failing tests by wrapping production code or assertions in `try-catch` blocks purely to pass a test. Exceptions must bubble up and fail the test clearly.
 - **Patient Asserts (Auto-Retries):** Never use static `sleep()` or `waitForLoadState('networkidle')` in E2E tests. Always use asynchronous assertions with sufficient timeouts (e.g., `await expect(locator).toBeVisible({ timeout: 15000 })`).
-- **Real-User Behavior (No Manual Sync):**
-  - E2E tests MUST NOT use `page.reload()` to synchronize UI state with the server-side cache (e.g., SWR).
-  - A real user does not manually refresh the page to check if an action succeeded.
-  - Tests must instead wait patiently for element visibility (`toBeVisible`) to validate the application's natural reactivity.
+- **Contextual Reload Policy (Authentic User Behavior):** - **FORBIDDEN (In-App State):** Die Verwendung von `page.reload()` zur Status-Synchronisation von Aktionen, die *innerhalb derselben Browser-Session* ausgeführt wurden (z.B. Bild löschen), ist strikt untersagt. Ein Reload maskiert hier fehlerhaftes lokales State-Management (fehlende `mutate()` Aufrufe).
+  - **ALLOWED (Out-of-Band State):** Wenn Daten über eine externe API oder eine andere Browser-Session modifiziert werden (z.B. API-Aufrufe im Test Setup oder Aktionen eines simulierten Zweitnutzers), ist `page.reload()` **ausdrücklich erlaubt und gefordert**. Dies entspricht dem authentischen Nutzerverhalten (F5 drücken). Vermeide in diesen Fällen zwingend unnatürliche UI-Gymnastik (wie das Hin- und Hernavigieren in Menüs), um Caches auszutricksen.
 - **Anti-Flakiness (Network vs. UI):** Do NOT use `page.waitForResponse()` when waiting for UI updates (like debounced search results). Network interception is highly prone to race conditions. Always trigger the action and wait patiently for the resulting UI element.
 - **Single Reason to Fail (SRP):** Tests (PHPUnit & Playwright) MUST focus on a single behavior. Avoid monolithic 20-step tests.
 
@@ -34,7 +32,7 @@ status: active
 - **On-the-fly Creation:** E2E tests MUST create their own isolated users on-the-fly via the API in `test.beforeAll()`. Use the `E2EUserHelper.createIsolatedUser()` utility to generate a fresh user with the required role.
 
 ## 5. Helper Classes & DRY (Don't Repeat Yourself)
-- **SRP in Helpers:** E2E Helpers müssen strikt nach Domänen getrennt sein. Vermeide God-Objects. 
+- **SRP in Helpers:** E2E Helpers müssen strikt nach Domänen getrennt sein. Vermeide God-Objects.
 - **Aktuelle Helper-Struktur:**
   - `AuthHelper`: Login, Logout, Session Handling.
   - `E2EUserHelper`: API-basiertes Erstellen von isolierten Test-Usern.
