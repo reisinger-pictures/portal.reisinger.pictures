@@ -15,7 +15,7 @@ export class E2EUserHelper {
         roleName: 'admin' | 'photographer' | 'client',
         options?: { assignGalleryId?: string, wantsNotifications?: boolean }
     ) {
-        const uniqueId = Date.now() + '-' + Math.round(Math.random() * 10000);
+        const uniqueId = Math.random().toString(36).substring(2, 10);
         const email = `e2e-${roleName}-${uniqueId}@example.com`;
         const password = 'SecurePassword123!';
         const headers = { 'Accept': 'application/json' };
@@ -73,7 +73,6 @@ export class E2EUserHelper {
 
   static async cleanupTrackedUsers(request: any) {
     if (this.usersToCleanup.length === 0) return;
-    console.log(`🧹 Cleanup: Lösche ${this.usersToCleanup.length} Test-Nutzer...`);
     for (const idOrEmail of this.usersToCleanup) {
       try {
         await request.delete(`/api/users/${idOrEmail}`);
@@ -82,5 +81,40 @@ export class E2EUserHelper {
       }
     }
     this.usersToCleanup = [];
+  }
+
+  static async cleanupE2EData(request: APIRequestContext) {
+    const loginRes = await request.post('/api/auth/login', {
+        data: { email: 'florian@reisinger.pictures', password: 'admin' },
+        headers: { 'Accept': 'application/json' }
+    });
+    
+    const cookies = loginRes.headers()['set-cookie'];
+    if (!cookies) return;
+    
+    const authHeaders = { 'Accept': 'application/json', 'Cookie': cookies };
+    const treeRes = await request.get('/api/management/galleries', { headers: authHeaders });
+    
+    if (treeRes.ok()) {
+        const tree = await treeRes.json();
+        
+        const deleteGallery = async (id: string) => request.delete(`/api/management/galleries/${id}`, { headers: authHeaders });
+        const deleteGroup = async (g: any) => {
+            if (g.galleries) for (const gal of g.galleries) await deleteGallery(gal.id);
+            if (g.children) for (const c of g.children) await deleteGroup(c);
+            await request.delete(`/api/management/gallery-groups/${g.id}`, { headers: authHeaders });
+        };
+
+        // Typische Prefixe unserer E2E Tests abfangen
+        const e2ePrefixes = ['Tree Group', 'Sub Group', 'Inline Test', 'Dash Test', 'Flow C', 'Create Test', 'To Edit', 'Edited', 'Upload Test', 'Toggle Test', 'E2E Selection', 'OptIn Test', 'Download Test', 'Lightbox Test', 'Metadata Test', 'Selection Lightbox', 'Playwright', 'Comm Test', 'Smart Default Test'];
+        const isE2E = (name: string) => e2ePrefixes.some(prefix => name.includes(prefix));
+
+        for (const g of (tree.root_galleries || [])) {
+            if (isE2E(g.name)) await deleteGallery(g.id);
+        }
+        for (const grp of (tree.groups || [])) {
+            if (isE2E(grp.name)) await deleteGroup(grp);
+        }
+    }
   }
 }

@@ -3,11 +3,12 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
+import {NetworkHelper} from "../helpers/NetworkHelper";
 
 test.afterAll(async ({ request }) => {
-  await E2EUserHelper.cleanupTrackedUsers(request);
+    await E2EUserHelper.cleanupE2EData(request);
+    await E2EUserHelper.cleanupTrackedUsers(request);
 });
-
 
 test.describe.serial('Client Notifications Opt-In', () => {
     let testUser = { email: '', password: '' };
@@ -20,7 +21,7 @@ test.describe.serial('Client Notifications Opt-In', () => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
-        const galleryName = 'OptIn Test ' + Date.now();
+        const galleryName = 'OptIn Test ' + Math.random().toString(36).substring(2, 10);
 
         await auth.login(testUser.email, testUser.password); 
         
@@ -46,7 +47,8 @@ test.describe.serial('Client Notifications Opt-In', () => {
         const isCheckedInitial = await toggle.isChecked();
         
         // Auf API warten
-        const optInResponse = page.waitForResponse(res => res.url().includes('/opt-in') && res.request().method() === 'POST');
+        const network = new NetworkHelper(page);
+        const optInResponse = network.waitForOptIn();
         await toggle.click();
         await optInResponse;
         

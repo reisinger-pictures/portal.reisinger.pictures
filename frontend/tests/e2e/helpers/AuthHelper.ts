@@ -1,7 +1,12 @@
 import { Page, expect } from '@playwright/test';
+import { NetworkHelper } from './NetworkHelper';
 
 export class AuthHelper {
-    constructor(private page: Page) {}
+    private network: NetworkHelper;
+
+    constructor(private page: Page) {
+        this.network = new NetworkHelper(page);
+    }
 
     async login(email = 'florian@reisinger.pictures', password = 'admin') {
         await this.page.goto('/');
@@ -32,8 +37,9 @@ export class AuthHelper {
         await emailInput.fill(email);
         await this.page.fill('input[placeholder="Passwort"]', password);
 
-        const loginPromise = this.page.waitForResponse(res => res.url().includes('/api/auth/login') && res.request().method() === 'POST');
-        const mePromise = this.page.waitForResponse(res => res.url().includes('/api/auth/me') && res.request().method() === 'GET');
+        // Nutzt den neuen NetworkHelper
+        const loginPromise = this.network.waitForLogin();
+        const mePromise = this.network.waitForMe();
 
         await this.page.getByRole('button', { name: 'Login' }).first().click();
         await loginPromise;
@@ -41,15 +47,12 @@ export class AuthHelper {
 
         await expect(emailInput).toBeHidden({ timeout: 5000 });
 
-        // CLEANUP FIX: Resilienter Sidebar-Close für Mobile
         if (await menuBtn.isVisible()) {
             const closeBtn = this.page.locator('button:has(.mdi--close)').first();
             if (await closeBtn.isVisible()) {
                 try {
                     await closeBtn.click({ timeout: 2000 });
-                } catch (e) {
-                    // Ignorieren: Sidebar wurde evtl. bereits durch Navigation unmounted
-                }
+                } catch (e) {}
             }
         }
     }

@@ -17,10 +17,11 @@ export class GalleryHelper {
         await this.modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await this.modal.submitModal('Speichern');
 
-        const galLink = this.page.locator('main').locator('a').filter({ hasText: name }).first();
+        const galLink = this.page.locator('main').getByText(name, { exact: true });
         await expect(galLink).toBeVisible({ timeout: 15000 });
-        
+
         await galLink.click();
-        await expect(this.page.locator(`h1:has-text("${name}")`)).toBeVisible({ timeout: 10000 });
+
+        await expect(this.page.getByRole('heading', { name })).toBeVisible({ timeout: 10000 });
     }
 }

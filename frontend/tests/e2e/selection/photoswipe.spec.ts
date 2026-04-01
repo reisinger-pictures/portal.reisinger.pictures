@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { NetworkHelper } from '../helpers/NetworkHelper';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
@@ -6,6 +7,7 @@ import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.afterAll(async ({ request }) => {
+    await E2EUserHelper.cleanupE2EData(request);
     await E2EUserHelper.cleanupTrackedUsers(request);
 });
 
@@ -19,8 +21,9 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
     let auth: AuthHelper;
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
+    let network: NetworkHelper;
 
-    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
+    const uniqueId = () => Math.random().toString(36).substring(2, 10);
     const galleryName = `Selection Lightbox ${uniqueId()}`;
     let inviteLink = '';
 
@@ -28,6 +31,7 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         auth = new AuthHelper(page);
         sidebar = new SidebarHelper(page);
         modal = new ModalHelper(page);
+        network = new NetworkHelper(page);
     });
 
     test('Photographer creates selection gallery and uploads image', async ({ page }) => {
@@ -85,7 +89,7 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await commentInput.fill('Episches Bild im Fullscreen!');
 
         // Kommentar mit Enter bestätigen und auf API warten
-        const commentResp = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
+        const commentResp = network.waitForRating();
         await commentInput.press('Enter');
         await commentResp;
 
@@ -95,7 +99,7 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         // 5 Sterne vergeben (triggert automatischen Wechsel zum nächsten Bild)
         const star5 = ratingBar.locator('input.mask-star-2').nth(4);
         await expect(star5).toBeVisible();
-        const rateResponse = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
+        const rateResponse = network.waitForRating();
         await star5.click();
         await rateResponse;
 
@@ -118,7 +122,7 @@ test.describe.serial('PhotoSwipe in Selection Gallery', () => {
         await expect(lightbox).toBeVisible();
         await expect(page.locator('#rating-portal-anchor')).toBeVisible();
 
-        const rateResponse2 = page.waitForResponse(res => res.url().includes('/rate') && res.request().method() === 'POST');
+        const rateResponse2 = network.waitForRating();
         await page.keyboard.press('3');
         await rateResponse2;
 

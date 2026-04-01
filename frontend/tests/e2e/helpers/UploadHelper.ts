@@ -1,17 +1,20 @@
 import { Page, expect } from '@playwright/test';
 import path from 'path';
+import { NetworkHelper } from './NetworkHelper';
 
 export class UploadHelper {
-    constructor(private page: Page) {}
+    private network: NetworkHelper;
+
+    constructor(private page: Page) {
+        this.network = new NetworkHelper(page);
+    }
 
     async uploadSampleImage() {
         const fileInput = this.page.locator('input[type="file"]');
         const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
         
-        // Fange den API-Call ab, um sicherzustellen, dass das Backend fertig ist
-        const uploadPromise = this.page.waitForResponse(res => 
-            res.url().includes('/api/management/upload') && res.request().method() === 'POST'
-        );
+        // Nutzt den neuen NetworkHelper
+        const uploadPromise = this.network.waitForUpload();
         
         await fileInput.setInputFiles(sampleImagePath);
         await uploadPromise;

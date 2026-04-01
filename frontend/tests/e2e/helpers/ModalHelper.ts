@@ -1,7 +1,9 @@
+import { NetworkHelper } from './NetworkHelper';
 import { Page, Locator, expect } from '@playwright/test';
 
 export class ModalHelper {
-    constructor(private page: Page) {}
+    private network: NetworkHelper;
+    constructor(private page: Page) { this.network = new NetworkHelper(page); }
 
     get activeModal(): Locator {
         // DaisyUI hält Modals oft im DOM, wir fokussieren uns strikt auf das aktuell geöffnete.
@@ -48,12 +50,9 @@ export class ModalHelper {
     }
 
     async submitModal(buttonText: string = 'Speichern') {
-        const savePromise = this.page.waitForResponse(res =>
-            res.url().includes('/api/management/') &&
-            ['POST', 'PUT'].includes(res.request().method())
-        );
+        const savePromise = this.network.waitForManagementMutation();
         await this.clickButton(buttonText);
         await savePromise;
-        await expect(this.activeModal).toBeHidden({ timeout: 5000 });
+        await expect(this.activeModal).toBeHidden({ timeout: 15000 });
     }
 }

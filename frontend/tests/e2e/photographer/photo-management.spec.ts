@@ -7,9 +7,9 @@ import { UploadHelper } from '../helpers/UploadHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 
 test.afterAll(async ({ request }) => {
-  await E2EUserHelper.cleanupTrackedUsers(request);
+    await E2EUserHelper.cleanupE2EData(request);
+    await E2EUserHelper.cleanupTrackedUsers(request);
 });
-
 
 test.describe.serial('Photo Management Workflow (Flows A, B, K, L, M)', () => {
     let adminUser = { email: '', password: '' };
@@ -22,7 +22,7 @@ test.describe.serial('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         clientUser = await E2EUserHelper.createIsolatedUser(request, 'client');
     });
 
-    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
+    const uniqueId = () => Math.random().toString(36).substring(2, 10);
     const galleryNameB = `Flow B Test ${uniqueId()}`;
     const galleryNameA = `Flow A Test ${uniqueId()}`;
     const galleryNameK = `Flow K Expired ${uniqueId()}`;

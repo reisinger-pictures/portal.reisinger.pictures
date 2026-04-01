@@ -6,9 +6,9 @@ import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.afterAll(async ({ request }) => {
-  await E2EUserHelper.cleanupTrackedUsers(request);
+    await E2EUserHelper.cleanupE2EData(request);
+    await E2EUserHelper.cleanupTrackedUsers(request);
 });
-
 
 test.describe.serial('PhotoSwipe & Lightbox UI', () => {
     let testUser = { email: '', password: '' };
@@ -21,7 +21,7 @@ test.describe.serial('PhotoSwipe & Lightbox UI', () => {
     let sidebar: SidebarHelper;
     let modal: ModalHelper;
 
-    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
+    const uniqueId = () => Math.random().toString(36).substring(2, 10);
     const galleryName = `Lightbox Test ${uniqueId()}`;
 
     test.beforeEach(async ({ page }) => {

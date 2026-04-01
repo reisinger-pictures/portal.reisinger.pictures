@@ -7,7 +7,7 @@ test.describe.serial('Guest Workflow', () => {
         await expect(page.getByRole('heading', { name: 'Neueste Entdeckungen' })).toBeVisible();
 
         // Suche ausführen (nach etwas, das voraussichtlich nicht da ist, um Error-States zu vermeiden)
-        const randomSearchTerm = `Search-${Date.now()}`;
+        const randomSearchTerm = `Search-${Math.random().toString(36).substring(2, 10)}`;
         await page.fill('input[placeholder="Galerien und Bilder suchen..."]', randomSearchTerm);
         await page.getByRole('button', { name: 'Suchen' }).click();
 

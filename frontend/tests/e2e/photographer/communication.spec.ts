@@ -6,13 +6,13 @@ import { ModalHelper } from '../helpers/ModalHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 
 test.afterAll(async ({ request }) => {
-  await E2EUserHelper.cleanupTrackedUsers(request);
+    await E2EUserHelper.cleanupE2EData(request);
+    await E2EUserHelper.cleanupTrackedUsers(request);
 });
-
 
 test.describe.serial('Communication Workflow (Flows E, F)', () => {
     let photogUser = { email: '', password: '' };
-    const galleryName = `Comm Test ${Date.now()}`;
+    const galleryName = `Comm Test ${Math.random().toString(36).substring(2, 10)}`;
     let galleryId = '';
 
     test.beforeAll(async ({ request }) => {

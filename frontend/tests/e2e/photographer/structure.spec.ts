@@ -4,10 +4,11 @@ import { E2EUserHelper } from '../helpers/E2EUserHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 
+// 🧹 Clean-Up Hook: Räumt alle Galerien und Gruppen auf, bevor der E2E-User gelöscht wird.
 test.afterAll(async ({ request }) => {
-  await E2EUserHelper.cleanupTrackedUsers(request);
+    await E2EUserHelper.cleanupE2EData(request);
+    await E2EUserHelper.cleanupTrackedUsers(request);
 });
-
 
 test.describe.serial('Management Structure View (Tree)', () => {
     let testUser = { email: '', password: '' };
@@ -16,22 +17,18 @@ test.describe.serial('Management Structure View (Tree)', () => {
         testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
     });
 
-    let auth: AuthHelper;
-    let sidebar: SidebarHelper;
-    let modal: ModalHelper;
-
-    const uniqueId = () => Date.now() + Math.floor(Math.random() * 1000);
-    const groupName = `Tree Group ${uniqueId()}`;
-    const subGroupName = `Sub Group ${uniqueId()}`;
-
     test.beforeEach(async ({ page }) => {
-        auth = new AuthHelper(page);
-        sidebar = new SidebarHelper(page);
-        modal = new ModalHelper(page);
+        const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
     });
 
     test('Photographer can create nested groups and toggle tree nodes', async ({ page }) => {
+        const sidebar = new SidebarHelper(page);
+        const modal = new ModalHelper(page);
+        const uniqueId = Math.random().toString(36).substring(2, 10);
+        const groupName = `Tree Group ${uniqueId}`;
+        const subGroupName = `Sub Group ${uniqueId}`;
+
         await sidebar.navigateTo('Galerien');
         await expect(page.locator('h1:has-text("Galerien")')).toBeVisible();
 
@@ -54,17 +51,19 @@ test.describe.serial('Management Structure View (Tree)', () => {
         await expect(page.locator(`summary:has-text("${subGroupName}")`)).toBeVisible();
 
         await page.getByRole('button', { name: 'Alle einklappen' }).click();
-        await expect(rootGroupNode.locator('..')).not.toHaveAttribute('open', '');
+        await expect(page.locator(`summary:has-text("${subGroupName}")`)).toBeHidden({ timeout: 10000 });
 
         await rootGroupNode.locator('.font-bold').first().click({ force: true });
-        await expect(rootGroupNode.locator('..')).toHaveAttribute('open', '');
+        await expect(page.locator(`summary:has-text("${subGroupName}")`)).toBeVisible({ timeout: 10000 });
         await expect(page.locator(`summary:has-text("${subGroupName}")`)).toBeVisible();
     });
 
     test('Photographer can use inline add buttons, edit nested galleries, and type trailing dashes in slug', async ({ page }) => {
-        const inlineGroupName = `Inline Test Group ${Date.now()}`;
-        const dashGalName = `Dash Test ${Date.now()}`;
-        const dashGalSlug = `dash-test-${Date.now()}-`;
+        const sidebar = new SidebarHelper(page);
+        const modal = new ModalHelper(page);
+        const inlineGroupName = `Inline Test Group ${Math.random().toString(36).substring(2, 10)}`;
+        const dashGalName = `Dash Test ${Math.random().toString(36).substring(2, 10)}`;
+        const dashGalSlug = `dash-test-${Math.random().toString(36).substring(2, 10)}-`;
         
         await sidebar.navigateTo('Galerien');
         await page.getByRole('button', { name: 'Neuer Ordner' }).click();
@@ -105,8 +104,10 @@ test.describe.serial('Management Structure View (Tree)', () => {
     });
 
     test('Flow C: Deleting a group cascades nested galleries to root', async ({ page }) => {
-        const flowCGroupName = `Flow C Group ${Date.now()}`;
-        const flowCGalName = `Flow C Gallery ${Date.now()}`;
+        const sidebar = new SidebarHelper(page);
+        const modal = new ModalHelper(page);
+        const flowCGroupName = `Flow C Group ${Math.random().toString(36).substring(2, 10)}`;
+        const flowCGalName = `Flow C Gallery ${Math.random().toString(36).substring(2, 10)}`;
 
         await sidebar.navigateTo('Galerien');
         await page.getByRole('button', { name: 'Neuer Ordner' }).click();

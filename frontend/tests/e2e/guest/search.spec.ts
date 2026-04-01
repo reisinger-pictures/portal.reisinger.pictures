@@ -18,7 +18,7 @@ test.describe.serial('Global Search Workflow', () => {
         const searchInput = page.locator('input[placeholder="Galerien und Bilder suchen..."]');
         await expect(searchInput).toBeVisible();
 
-        const searchTerm = `GlobalSearch${Date.now()}`;
+        const searchTerm = `GlobalSearch${Math.random().toString(36).substring(2, 10)}`;
         await searchInput.fill(searchTerm);
         await searchInput.press('Enter');
 
