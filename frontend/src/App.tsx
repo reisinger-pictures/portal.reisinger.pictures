@@ -1,17 +1,18 @@
 import {Navigate, Route, Routes} from 'react-router-dom';
 import ErrorMessage from './ui/components/ErrorMessage';
 import {useAuth} from './logic/useAuth';
-import ResetPassword from './ui/ResetPassword';
-import ProtectedDashboard from './ui/ProtectedDashboard';
-import GalleryView from './ui/GalleryView';
-import InviteView from './ui/InviteView';
-import PhotoDetailView from './ui/PhotoDetailView';
-import ManagementMetaGalleryView from './ui/management/ManagementMetaGalleryView';
-import SearchView from './ui/SearchView';
 import ErrorBoundary from './ui/components/ErrorBoundary';
 import { UIProvider } from './ui/components/UIContext';
-import Privacy from './ui/Privacy';
-import ClientNotificationsView from './ui/client/ClientNotificationsView';
+import { lazy, Suspense } from 'react';
+const ResetPassword = lazy(() => import('./ui/ResetPassword'));
+const ProtectedDashboard = lazy(() => import('./ui/ProtectedDashboard'));
+const GalleryView = lazy(() => import('./ui/GalleryView'));
+const InviteView = lazy(() => import('./ui/InviteView'));
+const PhotoDetailView = lazy(() => import('./ui/PhotoDetailView'));
+const ManagementMetaGalleryView = lazy(() => import('./ui/management/ManagementMetaGalleryView'));
+const SearchView = lazy(() => import('./ui/SearchView'));
+const Privacy = lazy(() => import('./ui/Privacy'));
+const ClientNotificationsView = lazy(() => import('./ui/client/ClientNotificationsView'));
 
 function ProtectedRoute({children}: { children: React.ReactNode }) {
     const {user, isLoading, isError} = useAuth();
@@ -21,12 +22,15 @@ function ProtectedRoute({children}: { children: React.ReactNode }) {
     return <>{children}</>;
 }
 
+const SuspenseFallback = () => <div className="flex h-screen items-center justify-center"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
+
 export default function App() {
     return (
         <ErrorBoundary fallback={<div className="flex h-screen items-center justify-center p-8">
             <ErrorMessage title="Kritischer Fehler" message="Bitte Seite neu laden." />
         </div>}>
             <UIProvider>
+                <Suspense fallback={<SuspenseFallback />}>
                 <Routes>
                 <Route path="/reset-password" element={<ResetPassword/>}/>
 
@@ -52,6 +56,7 @@ export default function App() {
                 <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
                 <Route path="*" element={<Navigate to="/" replace/>}/>
             </Routes>
+                </Suspense>
             </UIProvider>
         </ErrorBoundary>
     );
