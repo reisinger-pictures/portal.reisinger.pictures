@@ -8,7 +8,7 @@ status: active
 
 ## 1. Core Stack
 - React SPA, Vite, TypeScript, TailwindCSS v4, DaisyUI.
-- **Data Fetching:** Strict use of `SWR` for data fetching, caching, and mutation.
+- **Data Fetching:** Strict use of `SWR` for data fetching, caching, and mutation. *(Architekturentscheidung: Eine Migration zu React Query wurde offiziell verworfen. SWR bleibt der feste Standard. Keine Umbauten einplanen!)*
 
 ## 2. Component Philosophy
 - **Dumb Components:** UI components in `src/ui` should remain stateless. Logic lives in `src/logic/use*.ts`.

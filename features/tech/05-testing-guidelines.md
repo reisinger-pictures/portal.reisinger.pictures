@@ -6,14 +6,19 @@ status: active
 
 # Technical Concept: Testing Guidelines
 
-## 1. Philosophy & Robustness
-- **No `force: true` in Playwright:** Bypassing actionability checks defeats the purpose of E2E tests. If Playwright cannot click an element naturally, a human probably can't either. Always wait for elements to become stable and uncovered (e.g., wait for animations to finish or modals to close via `toBeHidden()`) instead of forcing clicks.
-- **No Try-Catch Anti-Pattern:** Never mask failing tests by wrapping production code or assertions in `try-catch` blocks purely to pass a test. Exceptions must bubble up and fail the test clearly.
-- **Patient Asserts (Auto-Retries):** Never use static `sleep()` or `waitForLoadState('networkidle')` in E2E tests. Always use asynchronous assertions with sufficient timeouts (e.g., `await expect(locator).toBeVisible({ timeout: 15000 })`).
-- **Contextual Reload Policy (Authentic User Behavior):** - **FORBIDDEN (In-App State):** Die Verwendung von `page.reload()` zur Status-Synchronisation von Aktionen, die *innerhalb derselben Browser-Session* ausgeführt wurden (z.B. Bild löschen), ist strikt untersagt. Ein Reload maskiert hier fehlerhaftes lokales State-Management (fehlende `mutate()` Aufrufe).
-  - **ALLOWED (Out-of-Band State):** Wenn Daten über eine externe API oder eine andere Browser-Session modifiziert werden (z.B. API-Aufrufe im Test Setup oder Aktionen eines simulierten Zweitnutzers), ist `page.reload()` **ausdrücklich erlaubt und gefordert**. Dies entspricht dem authentischen Nutzerverhalten (F5 drücken). Vermeide in diesen Fällen zwingend unnatürliche UI-Gymnastik (wie das Hin- und Hernavigieren in Menüs), um Caches auszutricksen.
-- **Anti-Flakiness (Network vs. UI):** Do NOT use `page.waitForResponse()` when waiting for UI updates (like debounced search results). Network interception is highly prone to race conditions. Always trigger the action and wait patiently for the resulting UI element.
-- **Single Reason to Fail (SRP):** Tests (PHPUnit & Playwright) MUST focus on a single behavior. Avoid monolithic 20-step tests.
+## 1. Testing Rules (UI-FIRST) & Philosophy
+* **UI-First Synchronization (MANDATORY):**
+  * Never use `page.waitForResponse()` or network status codes to verify UI updates. E2E tests must only care about what the user sees.
+  * Use `expect(locator).toBeVisible({ timeout: 15000 })` for simple updates.
+  * Use `await expect(async () => { ... }).toPass()` for complex SWR/React state transitions where multiple re-renders occur.
+* **STRICT Anti-Reload Policy (Genuine User Reactivity):** Die Verwendung von `page.reload()` zur Status-Synchronisation in E2E-Tests ist **strikt untersagt**. 
+  * **Begründung:** Ein Reload maskiert fehlerhaftes State-Management. Wenn eine Entität erstellt wird, *muss* sich das UI im Hintergrund automatisch aktualisieren.
+  * **Lösung:** Nutze ausschließlich geduldige Asserts. Schlägt dies fehl, liegt ein Bug in der Applikation vor.
+* **Fail-Fast:** Der Testlauf wird nach 2 fehlgeschlagenen Tests (z.B. `maxFailures: 2` in Playwright) sofort abgebrochen.
+* **Test-Runner:** Use `run_new_tests.bat` strictly for running tests (idempotent).
+* **No `force: true` in Playwright:** Bypassing actionability checks defeats the purpose of E2E tests. If Playwright cannot click an element naturally, a human probably can't either. Always wait for elements to become stable and uncovered (e.g., wait for animations to finish or modals to close via `toBeHidden()`) instead of forcing clicks.
+* **No Try-Catch Anti-Pattern:** Never mask failing tests by wrapping production code or assertions in `try-catch` blocks purely to pass a test. Exceptions must bubble up and fail the test clearly.
+* **Single Reason to Fail (SRP):** Tests (PHPUnit & Playwright) MUST focus on a single behavior. Avoid monolithic 20-step tests.
 
 ## 2. E2E Tests (Playwright)
 - **Test Isolation (No DB Reset):** E2E tests run directly against the local dev environment (`portal_db`). They MUST be non-destructive. Always use highly dynamic names/identifiers (e.g., `Date.now()`).

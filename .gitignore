@@ -9,7 +9,7 @@ repomix-*.md
 import_gemini.mjs
 
 # Frontend
-frontend/node_modules/
+**/node_modules/
 frontend/dist/
 frontend/.env*
 !frontend/.env.example
@@ -17,7 +17,6 @@ frontend/.env*
 
 # Backend
 backend/vendor/
-backend/node_modules/
 backend/public/build/
 backend/storage/*.key
 backend/.env

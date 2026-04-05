@@ -20,9 +20,9 @@
         "react-dom": "^18.2.0",
         "react-helmet-async": "^2.0.4",
         "react-hook-form": "^7.50.0",
-        "swr": "^2.2.4",
         "react-router-dom": "^6.22.0",
         "recharts": "^3.8.0",
+        "swr": "^2.2.4",
         "zod": "^3.22.4"
     },
     "devDependencies": {
