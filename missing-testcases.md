@@ -1,31 +1,37 @@
-# Fehlende Testfälle & User Flows (Coverage Gap Analysis)
+# Spezifikation fehlender Testfälle (QA Gap Analysis)
 
-Basierend auf der Analyse der UI-Komponenten und bestehenden Tests wurden folgende User Flows identifiziert, die aktuell nicht oder nur unzureichend durch E2E- (Playwright) oder Backend-Tests (PHPUnit) abgedeckt sind.
-
-Ziel ist es, den "Soll-Zustand" zu testen: Wie sollte sich die App verhalten, wenn ein User diese Aktionen durchführt? (Kein Mocking, nur echte System-Interaktionen).
-
-## 1. Bildverwaltung: Löschen & Metadaten-Historie (Fotograf/Admin)
+## 1. Bildverwaltung & Historie (Fotograf/Admin)
 * **Flow A (Historie via Magic Link):** Fotograf gewährt Gast Metadaten-Rechte, Gast editiert, Fotograf stellt Historie wieder her.
-* **Flow B (Bild löschen):** Fotograf öffnet Bild-Detailansicht, löscht Bild, Navigation zurück ins Grid.
 
-## 2. Struktur-Management & Deaktivierung (Fotograf/Admin)
+## 2. Struktur & Lifecycle
 * **Flow C (Gruppe/Galerie löschen):** Fotograf löscht Gruppe, darin liegende Galerien wandern in Root.
-* **Flow K (Ablauf & Deaktivierung):** Galerie abgelaufen -> durchgestrichen in Sidebar -> Gast erhält 403.
 
-## 3. Einladungen, Edge Cases & Kommunikation (Fotograf/User)
-* **Flow L (Invalider Magic Link als eingeloggter User):** Aufruf falschen Links zeigt Fehler, aber zerstört nicht die aktive Sitzung.
+## 3. Einladungen & E-Mail
 * **Flow E (Links widerrufen):** Link im Modal generieren, widerrufen, Link verschwindet.
-* **Flow F (Custom Email Composer):** E-Mail Modal füllen (fixer Text + Variablen wie `{user_name}`), HTML Vorschau prüfen.
+* **Flow F (Custom Email Composer):** E-Mail Modal füllen (fixer Text + Variablen wie {user_name}), HTML Vorschau prüfen.
+* **Flow AE (Mandanten-Einladung):** E2E: Manager lädt per E-Mail in Tenant ein -> Mailpit Check -> Gast registriert sich -> User ist Tenant zugeordnet.
 
-## 4. Admin-spezifische Features & Restriktionen
-* **Flow M (Admin Management Block):** Login als reiner Admin -> Sidebar "Galerien" fehlt -> Management Buttons fehlen auf Galerie-Ansicht.
-* **Flow G (Domain Mapping Lifecycle):** Admin legt Mapping an -> Prüft in Tabelle -> Löscht Mapping.
-* **Flow H (Wasserzeichen Settings):** Admin ändert Slider (Skalierung/Deckkraft) -> Speichert -> Reload hält Werte.
+## 4. E-Commerce & Buchhaltung
+* **Flow P (Checkout Bypass):** User mit Flatrate öffnet Lizenz-Modal -> Sofort-Download Button erscheint.
+* **Flow Q (Full Checkout):** Power-User bestellt kostenpflichtiges Upgrade -> Formular-Validierung -> PDF Rechnung Erzeugung.
+* **Flow AB (Manuelle Sammelrechnung):** Tenant-Dashboard -> Klick auf "Sammelrechnung erstellen" -> Zähler offene Lieferscheine sinkt auf 0, Toast erscheint.
+* **Flow AC (Automatisierte Sammelrechnung):** PHPUnit: Trigger Command `app:process-collective-invoices` simuliert Monatsende -> Prüft Rechnungsversand.
 
-## 5. FTP & Status-Monitoring (Fotograf)
-* **Flow I (Rating Status Modal):** "Bewertungen..." Modal zeigt Gäste und Fortschrittsbalken korrekt an.
-* **Flow J (FTP Real File Processing):** Echte .jpg in FTP-Ordner via Node.js `fs` ablegen -> Widget zeigt File an -> "Importieren" verschiebt Datei.
+## 5. Security & Multi-Tenancy (KRITISCH)
+* **Flow S (Customer Manager Scope):** CM loggt sich ein -> Sieht NUR Nutzer seines Mandanten -> Versuch fremde ID zu laden wirft 403.
+* **Flow U (Tenant Isolation):** PHPUnit: Sicherstellen, dass Galerien eines Tenants für Nutzer eines anderen Tenants unsichtbar bleiben (IDOR Protection).
+* **Flow W (Pessimistic Locking):** PHPUnit Stress-Test: Parallele Checkouts dürfen niemals dieselbe Rechnungsnummer generieren.
+* **Flow AI (Zero Trust Boundary):** PHPUnit: `customer_manager` versucht, `UserController@update` oder `UserController@destroy` für eine `user_id` eines fremden Mandanten aufzurufen -> System muss strikt 403 Forbidden werfen.
 
-## 6. PHPUnit / Backend API-Tests (Neu)
-* **Flow N (GalleryGroup Update):** `GalleryController@updateGroup` - Testet die Aktualisierung von Ordner-Metadaten inkl. Slug-Kollisionsvermeidung. Unbefugter Zugriff wirft 403.
-* **Flow O (GalleryGroup Delete & Cascade):** `GalleryController@deleteGroup` - Testet das Löschen einer Meta-Galerie. Da in der Datenbank `ON DELETE SET NULL` konfiguriert ist, muss zwingend getestet werden, ob verschachtelte Unterordner und Galerien sicher in der Root-Ebene landen.
+## 6. Bildschutz (Watermark)
+* **Flow H (Einstellungs-Sync):** Admin ändert Deckkraft -> Prüft WebP Derivative Cleanup -> Neues Tile-Image wird generiert.
+* **Flow AD (Tile Cache Validation):** Prüfung ob `watermark_master_tile_{hash}.png` im Dateisystem existiert und bei SVG-Wechsel aktualisiert wird.
+
+## 7. E-Commerce Upselling & Cart
+* **Flow AG (Cart Modification):** User öffnet Warenkorb, ändert die Lizenz eines Bildes (z.B. Original/Kommerziell) -> Preis wird dynamisch aktualisiert -> Checkout leitet zu /orders weiter.
+* **Flow AH (Order ZIP Download):** User navigiert zu "Meine Einkäufe & Lizenzen" -> Klickt auf "Bilder ZIP" -> Download startet und Dateiname endet auf .zip.
+* **Flow AJ (Delta-Pricing Lifecycle):** Power-User legt Bild in Warenkorb -> Upgrade gewählt (Delta-Preis) -> Checkout -> Admin sieht Order im Dashboard.
+
+
+## 8. Testing Framework & Teardown
+* **Flow AK (E2E Teardown Integrity):** E2ESessionHelper führt teardown() aus -> API-Prüfung beweist, dass der E2E-User (via UserController@destroy) restlos aus dem System entfernt wurde.

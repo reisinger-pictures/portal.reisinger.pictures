@@ -194,4 +194,122 @@ class ImageProcessor
         $args[] = 'png32:' . $outPath;
         return $this->runMagick($args);
     }
+
+    public function scaleImage($sourcePath, $destPath, $maxWidth)
+    {
+        if (!$maxWidth) {
+            copy($sourcePath, $destPath);
+            return true;
+        }
+
+        if (class_exists('Imagick')) {
+            try {
+                \Imagick::setResourceLimit(\Imagick::RESOURCETYPE_THREAD, 1);
+                $im = new \Imagick($sourcePath);
+                $im->autoOrient();
+                if ($im->getImageWidth() > $maxWidth) {
+                    $im->resizeImage($maxWidth, 0, \Imagick::FILTER_LANCZOS, 1);
+                }
+                $im->setImageCompressionQuality(90); // Hohe Qualität für Downloads
+                $im->writeImage($destPath);
+                $im->clear(); 
+                $im->destroy();
+                return true;
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("Imagick PHP Scale Error: " . $e->getMessage());
+            }
+        }
+
+        return $this->runMagick([$sourcePath, '-auto-orient', '-resize', $maxWidth . 'x>', '-quality', '90', $destPath]);
+    }
+
+    public function generateTiledWatermark($sourcePath, $destPath, $svgPath, $text, $opacity, $maxWidth = null)
+    {
+        $dimensions = @getimagesize($sourcePath);
+        if (!$dimensions) { copy($sourcePath, $destPath); return false; }
+        
+        $imgWidth = $dimensions[0];
+        $imgHeight = $dimensions[1];
+
+        if ($maxWidth && $imgWidth > $maxWidth) {
+            $ratio = $maxWidth / $imgWidth;
+            $imgWidth = $maxWidth;
+            $imgHeight = $imgHeight * $ratio;
+        }
+
+        $configHash = md5(($svgPath ? filemtime($svgPath) : 'nosvg') . $text . $opacity);
+        $masterPngPath = storage_path("app/private/watermark_master_tile_{$configHash}.png");
+
+        if (!file_exists($masterPngPath)) {
+            $this->generateTile($svgPath, $text, $opacity, $masterPngPath);
+        }
+
+        if (class_exists('Imagick')) {
+            try {
+                \Imagick::setResourceLimit(\Imagick::RESOURCETYPE_THREAD, 1);
+                $im = new \Imagick($sourcePath);
+                $im->autoOrient();
+                if ($maxWidth && $im->getImageWidth() > $maxWidth) {
+                    $im->resizeImage($maxWidth, 0, \Imagick::FILTER_LANCZOS, 1);
+                }
+
+                $tile = new \Imagick($masterPngPath);
+                $im->textureImage($tile);
+                $im->setImageCompressionQuality(80);
+                $im->writeImage($destPath);
+
+                $tile->clear(); $tile->destroy();
+                $im->clear(); $im->destroy();
+                return true;
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("Imagick PHP Tiling Error: " . $e->getMessage());
+            }
+        }
+        
+        return $this->runMagick([
+            $sourcePath, '-auto-orient', 
+            '-resize', $maxWidth ? $maxWidth.'x>' : '10000x>', 
+            $masterPngPath, '-compose', 'over', '-tile-offset', '+0+0', '-composite',
+            '-quality', '80', $destPath
+        ]);
+    }
+
+    private function generateTile($svgPath, $text, $opacity, $outPath) {
+        if (class_exists('Imagick')) {
+            try {
+                \Imagick::setResourceLimit(\Imagick::RESOURCETYPE_THREAD, 1);
+                $tile = new \Imagick();
+                $tile->newImage(800, 800, new \ImagickPixel('transparent'));
+                $tile->setImageFormat('png32');
+
+                $draw = new \ImagickDraw();
+                $draw->setFillColor(new \ImagickPixel('white'));
+                $draw->setFontSize(40);
+                $draw->setGravity(\Imagick::GRAVITY_CENTER);
+                $tile->annotateImage($draw, 0, 0, -45, $text);
+
+                if ($svgPath && file_exists($svgPath)) {
+                    $svg = new \Imagick();
+                    $svg->setBackgroundColor(new \ImagickPixel('transparent'));
+                    $svg->readImage($svgPath);
+                    $svg->resizeImage(200, 200, \Imagick::FILTER_LANCZOS, 1);
+                    $tile->compositeImage($svg, \Imagick::COMPOSITE_OVER, 300, 200);
+                    $svg->clear(); $svg->destroy();
+                }
+
+                if ($opacity < 1.0) {
+                    $tile->evaluateImage(\Imagick::EVALUATE_MULTIPLY, $opacity, \Imagick::CHANNEL_ALPHA);
+                }
+
+                $tile->writeImage($outPath);
+                $tile->clear(); $tile->destroy();
+                return true;
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("Imagick PHP Tile Gen Error: " . $e->getMessage());
+            }
+        }
+        copy($svgPath ?? base_path('public/favicon.ico'), $outPath);
+        return true;
+    }
+
 }

@@ -4,18 +4,26 @@ import {useAuth} from './logic/useAuth';
 import ErrorBoundary from './ui/components/ErrorBoundary';
 import { UIProvider } from './ui/components/UIProvider';
 import { useUI } from './ui/components/UIContext';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { SWRConfig } from 'swr';
+import { CartProvider } from './logic/CartContext';
+import { setGlobalErrorCallback } from './api';
 
 const ResetPassword = lazy(() => import('./ui/ResetPassword'));
 const ProtectedDashboard = lazy(() => import('./ui/ProtectedDashboard'));
 const GalleryView = lazy(() => import('./ui/GalleryView'));
 const InviteView = lazy(() => import('./ui/InviteView'));
+const TenantInviteView = lazy(() => import('./ui/TenantInviteView'));
 const PhotoDetailView = lazy(() => import('./ui/PhotoDetailView'));
 const ManagementMetaGalleryView = lazy(() => import('./ui/management/ManagementMetaGalleryView'));
 const SearchView = lazy(() => import('./ui/SearchView'));
+const ManagementTenantsView = lazy(() => import('./ui/management/ManagementTenantsView'));
+const ManagementTenantDetailView = lazy(() => import('./ui/management/ManagementTenantDetailView'));
+const UserProfileView = lazy(() => import('./ui/UserProfileView'));
 const Privacy = lazy(() => import('./ui/Privacy'));
 const ClientNotificationsView = lazy(() => import('./ui/client/ClientNotificationsView'));
+const ClientCartView = lazy(() => import('./ui/client/ClientCartView'));
+const ClientOrdersView = lazy(() => import('./ui/client/ClientOrdersView'));
 
 function ProtectedRoute({children}: { children: React.ReactNode }) {
     const {user, isLoading, isError} = useAuth();
@@ -29,6 +37,13 @@ const SuspenseFallback = () => <div className="flex h-screen items-center justif
 
 const GlobalSWRConfig = ({ children }: { children: React.ReactNode }) => {
     const { showToast } = useUI();
+
+    useEffect(() => {
+        setGlobalErrorCallback((status, message) => {
+            showToast('error', message || 'Ein unerwarteter Serverfehler ist aufgetreten.');
+        });
+    }, [showToast]);
+
     return (
         <SWRConfig value={{ 
             onError: (error) => {
@@ -49,6 +64,7 @@ export default function App() {
             <ErrorMessage title="Kritischer Fehler" message="Bitte Seite neu laden." />
         </div>}>
             <UIProvider>
+                <CartProvider>
                 <GlobalSWRConfig>
                     <Suspense fallback={<SuspenseFallback />}>
                         <Routes>
@@ -60,6 +76,7 @@ export default function App() {
                             <Route path="/galleries/*" element={<ErrorBoundary><GalleryView/></ErrorBoundary>}/>
                             <Route path="/photos/:id" element={<ErrorBoundary><PhotoDetailView/></ErrorBoundary>}/>
                             <Route path="/invite/:token" element={<ErrorBoundary><InviteView/></ErrorBoundary>}/>
+                            <Route path="/tenant-invite/:token" element={<ErrorBoundary><TenantInviteView/></ErrorBoundary>}/>
 
                             <Route path="/search" element={<ErrorBoundary><SearchView/></ErrorBoundary>}/>
 
@@ -68,16 +85,23 @@ export default function App() {
 
                             <Route path="/users"
                                 element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/profile" element={<ProtectedRoute><ErrorBoundary><UserProfileView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/settings"
                                 element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/stats"
                                 element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                                             <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
                             <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/cart" element={<ProtectedRoute><ErrorBoundary><ClientCartView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/orders" element={<ProtectedRoute><ErrorBoundary><ClientOrdersView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/tenants" element={<ProtectedRoute><ErrorBoundary><ManagementTenantsView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/tenants/:id" element={<ProtectedRoute><ErrorBoundary><ManagementTenantDetailView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-orders" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="*" element={<Navigate to="/" replace/>}/>
                         </Routes>
                     </Suspense>
                 </GlobalSWRConfig>
+                </CartProvider>
             </UIProvider>
         </ErrorBoundary>
     );

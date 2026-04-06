@@ -17,6 +17,7 @@ class DownloadLog extends Model
         'gallery_id',
         'gallery_name_snapshot',
         'item_type', // 'single_image', 'full_zip'
+        'resolution_tier',
         'item_identifier',
         'user_agent'
     ];

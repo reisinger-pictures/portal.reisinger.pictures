@@ -16,7 +16,12 @@ class DatabaseSeeder extends Seeder
             ['email' => env('ADMIN_EMAIL', 'florian@reisinger.pictures')],
             ['name' => 'Florian Reisinger', 'password' => \Illuminate\Support\Facades\Hash::make(env('ADMIN_PASSWORD', 'admin'))]
         );
-        // IDs aus der initialen Migration (1=admin, 2=photographer, 3=client)
+        $roles = ['admin', 'photographer', 'client', 'customer_manager', 'power_user'];
+        foreach ($roles as $roleName) {
+            \App\Models\Role::firstOrCreate(['name' => $roleName]);
+        }
+
+        // Admin-User erhält alle verfügbaren Rollen
         $adminUser->roles()->sync(\App\Models\Role::pluck('id')->toArray());
 
         // 1. Root-Gruppe "Privat" (strikt privat)

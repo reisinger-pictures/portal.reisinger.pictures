@@ -13,6 +13,8 @@ class UserResource extends JsonResource {
             'is_photographer' => $this->is_photographer,
             'is_pending' => $this->is_pending,
             'can_edit_metadata' => $this->can_edit_metadata,
+            'flatrate_level' => $this->flatrate_level,
+            
             'roles' => $this->whenLoaded('roles', function() { 
                 return $this->roles->map(function($r) { 
                     return ['id' => $r->id, 'name' => $r->name]; 

@@ -2,6 +2,7 @@ import {Link, useNavigate} from 'react-router-dom';
 import SidebarLoginForm from './SidebarLoginForm';
 import {useAuth} from '../../logic/useAuth';
 import {Gallery, GalleryGroup, GalleryTreeResponse} from '../../logic/useGalleries';
+import { useCart } from '../../logic/CartContext';
 
 interface SidebarProps {
     tree?: GalleryTreeResponse | null;
@@ -18,6 +19,7 @@ interface SidebarProps {
 export default function Sidebar(props: SidebarProps) {
     const {user, logout} = useAuth();
     const navigate = useNavigate();
+    const { itemCount } = useCart();
 
     const handleLogout = async () => {
         await logout();
@@ -38,7 +40,7 @@ export default function Sidebar(props: SidebarProps) {
                 </div>
                 {/* Mobile Close Button */}
                 <button className="btn btn-sm btn-square btn-ghost md:hidden absolute top-4 right-4" onClick={props.onCloseMobile}>
-                    <span className="iconify mdi--close text-xl"></span>
+                    <span className="mdi--close text-xl"></span>
                 </button>
             </div>
 
@@ -49,14 +51,43 @@ export default function Sidebar(props: SidebarProps) {
             <ul className="menu bg-base-200 w-full p-2 border-b border-base-300 shrink-0">
                 {isAdminOrPhotog && (
                     <>
-                        <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--view-dashboard text-lg"></span> Dashboard</Link></li>
-                        {user?.is_photographer && (<li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--folder-multiple text-lg"></span> Galerien</Link></li>)}
-                        {user.is_admin && (
-                            <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--account-group text-lg"></span> Benutzer & Rechte</Link></li>
+                        <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-dashboard text-lg"></span> Dashboard</Link></li>
+                        
+                        {user?.is_photographer && (
+                            <>
+                                <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--folder-multiple text-lg"></span> Galerien</Link></li>
+                                {!user.is_admin && !user.is_customer_manager && <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> Auswertungen</Link></li>}
+                            </>
                         )}
-                        <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="iconify mdi--cog text-lg"></span> Einstellungen</Link></li>
+                        
+                        {(user.is_admin || user.is_customer_manager) && (
+                            <>
+                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Mandanten</Link></li>
+                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {user.is_customer_manager && !user.is_admin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
+                                <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> Auswertungen</Link></li>
+                            </>
+                        )}
+                        
+                        {user.is_admin && (
+                            <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> Einstellungen</Link></li>
+                        )}
                     </>
                 )}
+                
+                {user && (
+                    <>
+                        {isAdminOrPhotog && <div className="divider my-1 text-xs opacity-50">Dein Account</div>}
+                        <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> Mein Profil</Link></li>
+                        <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> Einkäufe & Lizenzen</Link></li>
+                    </>
+                )}
+                
+                <li>
+                    <a onClick={() => { props.onCloseMobile?.(); navigate('/cart'); }} className="flex justify-between items-center">
+                        <div className="flex items-center gap-2"><span className="mdi--cart text-lg"></span> Warenkorb</div>
+                        {itemCount > 0 && <span className="badge badge-primary badge-sm">{itemCount}</span>}
+                    </a>
+                </li>
             </ul>
 
             {/* Spacer, um den Logout-Button nach unten zu drücken */}

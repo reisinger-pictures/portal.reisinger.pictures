@@ -11,8 +11,8 @@ import ManagementSettingsView from './ManagementSettingsView';
 import ManagementStructureView from './ManagementStructureView';
 import ManagementFtpInbox from './ManagementFtpInbox';
 import ManagementStatsView from './ManagementStatsView';
+import ManagementOrdersView from './ManagementOrdersView';
 import ErrorBoundary from '../components/ErrorBoundary';
-import AdminWatermarkBanner from './components/AdminWatermarkBanner';
 
 export default function ManagementDashboard() {
     const navigate = useNavigate();
@@ -57,8 +57,7 @@ export default function ManagementDashboard() {
 
     return (
         <div className="flex flex-col h-screen">
-            <AdminWatermarkBanner/>
-            <div className="flex flex-1 bg-base-100 overflow-hidden relative">
+                        <div className="flex flex-1 bg-base-100 overflow-hidden relative">
                 {isSidebarOpen && (
                     <div className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
                          onClick={() => setIsSidebarOpen(false)}></div>
@@ -158,6 +157,7 @@ export default function ManagementDashboard() {
                         {currentView === 'users' && <ManagementUserView/>}
                         {currentView === 'settings' && <ManagementSettingsView/>}
                         {currentView === 'stats' && <ManagementStatsView/>}
+                        {currentView === 'admin-orders' && <ManagementOrdersView/>}
                                                 {currentView === 'structure' && (
                             <div className="p-6 md:p-10">
                                 {user?.is_photographer && <ManagementFtpInbox/>}

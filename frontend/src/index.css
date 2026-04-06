@@ -14,17 +14,16 @@
     name: "reisinger-light";
     default: true;
     prefersdark: false;
-    
-    /* Sehr helles Grau mit minimalem Grünstich (Hue 170, extrem niedrige Chroma) */
+
+    /* Sauberes, neutrales Grau mit extrem subtilem, kühlem Blau-Einschlag (Hue 250) -> KEIN Grün mehr! */
     --color-base-100: oklch(100% 0 0);
-    --color-base-200: oklch(98% 0.005 170);
-    --color-base-300: oklch(95% 0.008 170);
-    --color-base-400: oklch(90% 0.01 170);
+    --color-base-200: oklch(98% 0.002 250);
+    --color-base-300: oklch(95% 0.004 250);
+    --color-base-400: oklch(90% 0.006 250);
     --color-base-content: oklch(21% 0.006 285.885);
-    
+
     --color-primary: #2A9D8F;
     --color-primary-content: oklch(100% 0 0);
-    /* Edles Slate-Navy passend zum Chart-Theme */
     --color-secondary: #264653;
     --color-secondary-content: #ffffff;
 
@@ -56,17 +55,16 @@
 @plugin "daisyui/theme" {
     name: "reisinger-dark";
     prefersdark: true;
-    
-    /* Entsprechend angepasster Dark-Mode mit minimalem Grünstich */
-    --color-base-100: oklch(20% 0.01 170);
-    --color-base-200: oklch(25% 0.01 170);
-    --color-base-300: oklch(30% 0.01 170);
-    --color-base-400: oklch(35% 0.01 170);
+
+    /* Sauberes, dunkles Schiefergrau für den Dark-Mode */
+    --color-base-100: oklch(20% 0.006 250);
+    --color-base-200: oklch(25% 0.006 250);
+    --color-base-300: oklch(30% 0.006 250);
+    --color-base-400: oklch(35% 0.006 250);
     --color-base-content: oklch(95% 0.006 285.885);
-    
+
     --color-primary: #2A9D8F;
     --color-primary-content: oklch(100% 0 0);
-    /* Warmes Goldgelb als Kontrast zum dunklen Base */
     --color-secondary: #E9C46A;
     --color-secondary-content: #264653;
 
@@ -122,10 +120,4 @@
         content: " *";
         @apply text-primary font-bold;
     }
-}
-
-@layer components {
-    /* UI-Fix: Globale Modals und Toasts zwingend über alle anderen Layer legen */
-    .modal-global { @apply z-[9999]; }
-    .toast-global { @apply z-[10000]; }
 }

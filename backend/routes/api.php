@@ -10,7 +10,6 @@ use App\Http\Controllers\InviteController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\MailController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\DomainMappingController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\FtpController;
@@ -18,6 +17,8 @@ use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FileDeliveryController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\TenantController;
 
 $throttleLimit = env('AUTH_THROTTLE_LIMIT', 9999);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
@@ -38,7 +39,9 @@ Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries']);
 Route::get('/sitemap-images.xml', [SitemapController::class, 'images']);
 
 Route::get('/invites/{token}', [InviteController::class, 'check']);
+Route::get('/tenant-invites/{token}', [\App\Http\Controllers\TenantInviteController::class, 'check']);
 Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem']);
+Route::middleware("throttle:$throttleLimit,1")->post('/tenant-invites/redeem', [\App\Http\Controllers\TenantInviteController::class, 'redeem']);
 
 Route::get('/search', [SearchController::class, 'search']);
 Route::get('/search/locations', [SearchController::class, 'locations']);
@@ -63,6 +66,10 @@ Route::middleware('auth:api')->group(function () {
     Route::put('/photos/{id}/meta', [PhotoController::class, 'updateMetadata']);
     Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions']);
     Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata']);
+    Route::post('/orders/checkout', [OrderController::class, 'checkout']);
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{id}/invoice', [OrderController::class, 'downloadInvoice']);
+    Route::get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip']);
     Route::delete('/photos/{id}', [PhotoController::class, 'destroy']);
 });
 
@@ -90,10 +97,8 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/users', [UserController::class, 'index']);
     Route::post('/management/users', [UserController::class, 'store']);
     Route::put('/management/users/{id}', [UserController::class, 'update']);
+    Route::delete('/management/users/{id}', [UserController::class, 'destroy']);
     
-    Route::get('/management/domain-mappings', [DomainMappingController::class, 'index']);
-    Route::post('/management/domain-mappings', [DomainMappingController::class, 'store']);
-    Route::delete('/management/domain-mappings/{id}', [DomainMappingController::class, 'destroy']);
 
     Route::get('/management/settings/watermark', [SettingsController::class, 'getWatermark']);
     Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
@@ -104,6 +109,19 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/ftp/target', [FtpController::class, 'setTarget']);
     Route::post('/management/ftp/process', [FtpController::class, 'process']);
 
+    
+    Route::get('/management/tenants', [TenantController::class, 'index']);
+    Route::post('/management/tenants', [TenantController::class, 'store']);
+    Route::get('/management/tenants/{id}', [TenantController::class, 'show']);
+    Route::post('/management/tenants/{id}/invites', [\App\Http\Controllers\TenantInviteController::class, 'invite']);
+    Route::put('/management/tenants/{id}', [TenantController::class, 'update']);
+    Route::delete('/management/tenants/{id}', [TenantController::class, 'destroy']);
+    Route::post('/management/tenants/{id}/collective-invoice', [TenantController::class, 'generateCollectiveInvoice']);
+    Route::put('/management/tenants/{id}/users', [TenantController::class, 'syncUsers']);
+    Route::put('/management/tenants/{id}/groups', [TenantController::class, 'syncGroups']);
+
+    Route::get('/management/orders', [OrderController::class, 'indexAdmin']);
+    Route::put('/management/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::get('/management/stats', [StatsController::class, 'index']);
     Route::get('/management/logs', [StatsController::class, 'logs']);
 

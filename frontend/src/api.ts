@@ -1,6 +1,11 @@
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 
+export type GlobalErrorCallback = (status: number, message: string) => void;
+let globalErrorCallback: GlobalErrorCallback | null = null;
+export const setGlobalErrorCallback = (cb: GlobalErrorCallback) => { globalErrorCallback = cb; };
+
+
 const refreshToken = async (): Promise<boolean> => {
     if (isRefreshing && refreshPromise) return refreshPromise;
 
@@ -59,6 +64,11 @@ const handleApiError = async (res: Response) => {
     const error = new Error(errorMsg) as Error & { info?: unknown; status?: number };
     error.info = errorInfo;
     error.status = res.status;
+
+    if (globalErrorCallback && (res.status >= 500 || res.status === 0)) {
+        globalErrorCallback(res.status, errorMsg);
+    }
+
     throw error;
 };
 
@@ -69,6 +79,7 @@ export const fetcher = async <T>(url: string): Promise<T> => {
     } catch {
         const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as Error & { status?: number };
         error.status = 0;
+        if (globalErrorCallback) globalErrorCallback(0, error.message);
         throw error;
     }
 
@@ -98,6 +109,7 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE
     } catch {
         const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as Error & { status?: number };
         error.status = 0;
+        if (globalErrorCallback) globalErrorCallback(0, error.message);
         throw error;
     }
 

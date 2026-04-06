@@ -1,30 +1,32 @@
-# 📝 Backlog / Next Sprint
+# 📝 Projekt-Master-Backlog (Kumulativ)
 
-## UI/UX Bugs & Refactoring
-- [ ] **Global Error Handling:** `api.ts` mit Interceptor erweitern, der bei 500er Fehlern oder Netzwerkverlust globale Toasts via `UIContext` auslöst.
+## 🚀 Offene Tasks & Technische Deep-Dives
 
-## Portal Logic & Features (Single-Tenant)
-- [ ] **Pricing Matrix & Delta-Pricing:** DB-Tabelle für Preisfaktoren erstellen. Logik: Neuer Preis - Bezahlter Preis = Delta. Checkout-Bypass bei Delta <= 0.
-- [ ] **Accounting Data Models & Documents:** Append-only `invoice_snapshots` Tabelle erstellen. Pessimistic Locking für `P-YYYY-NNNN` Sequenzer. Blade-Templates (AT 2025 Standard).
-- [ ] **Email Queues:** Umstellung des Mail-Versands auf Laravel Queues inkl. BCC-Logik für die Buchhaltung.
+### 🛠️ E2E Test Fixes (Prio 1 - BLOCKER)
+- [ ] **Fix DeliveryView:** Hinzufügen von `useState` in React-Imports in `DeliveryView.tsx`.
+- [ ] **Fix Photographer Spec:** Navigation im Test von "Einstellungen" auf "Mein Profil" ändern.
 
-## Technical Refactoring & Tooling
-- [ ] **Lightroom Plugin Validation:** Ensure the plugin uploads strictly master files (leaving scaling to the server) and correctly passes `is_editorial_only` and `is_hidden` boolean flags in the API payload.
+### 🎁 NEU: Kostenlose Downloads (Galerie-/Gruppen-Ebene)
+- [ ] **Backend (Auth):** `DownloadController` und `FileDeliveryController` erweitern: Bypass der Lizenzprüfung/Wasserzeichen bei `effective_is_free_download = true`.
+- [ ] **Frontend (Admin):** Checkbox "Kostenloser Download" in `GalleryModal.tsx` und `GalleryGroupModal.tsx` hinzufügen.
+- [ ] **Frontend (Client):** `DeliveryView.tsx` anpassen: Sofort-Download Button anzeigen, wenn `is_free_download` aktiv.
+- [ ] **Testing:** PHPUnit Test hinzufügen: Gast lädt aus "Free Download" Galerie ohne Lizenz.
 
-## UI Test-Abdeckung & Qualität
-- [ ] **E2E-Tests: Meta-Galerie Opt-In:** Test schreiben für die Ansicht `/notifications`, in der Nutzer Meta-Galerien (Ordner) abonnieren können.
-- [ ] **E2E-Tests: Struktur-Management (Flow D):** Löschen von Galerien implementieren.
-- [ ] **E2E-Tests: Admin-Features (Flow G & H):** Domain-Mapping Lifecycle und Wasserzeichen-Slider testen.
-- [ ] **E2E-Tests: Monitoring (Flow I & J):** RatingStatusModal und FTP-Zielzuweisung testen.
+### 🛡️ Security & Backend Tests (PHPUnit)
+- [ ] **Flow S:** Customer Manager Scoping (Zero Trust).
+- [ ] **Flow U:** Tenant Isolation (IDOR Schutz zwischen Mandanten).
+- [ ] **Flow W:** Pessimistic Locking (InvoiceSequence).
+- [ ] **Flow AC:** CRON-Job Validierung für Sammelrechnungen.
+- [ ] **Flow AD:** Watermark Tile Cache Validation (Hash-Prüfung).
+- [ ] **Flow AI (Zero Trust Boundary):** PHPUnit: `customer_manager` versucht, `UserController@update` oder `UserController@destroy` für eine `user_id` eines fremden Mandanten aufzurufen -> System muss strikt 403 Forbidden werfen.
 
-## PHPUnit Test-Abdeckung (Backend)
-- [ ] **PHPUnit: Meta-Galerie Opt-In:** `NotificationOptInTest.php` erweitern, um `toggleGroupOptIn` und das korrekte Auflösen der Ordner-Hierarchie beim Mail-Versand zu verifizieren.
-- [ ] **PHPUnit: Flow B (Bildlöschung):** Test für `PhotoController@destroy` (DB & Filesystem-Cleanup).
-- [ ] **PHPUnit: Flow E (Invite Lifecycle):** Tests für `InviteController` inkl. IDOR-Prüfung.
-- [ ] **PHPUnit: Flow G (Domain Mapping):** Integrationstest für `DomainMappingController`.
-- [ ] **PHPUnit: Flow H (Watermark):** Test für `SettingsController@updateWatermark` (Validierung & Cache-Purge).
-- [ ] **PHPUnit: Ordner-Management (Flow N & O):** Tests für `updateGroup` (Slug-Check) und `deleteGroup` (Cascade-to-Root).
 
-## Architektur & Refactoring Tasks
-- [ ] **Phase 2: Heavy Component Extraction:** Management- vs. Client-Logik in getrennte Chunks aufteilen (Vite Code-Splitting).
-- [ ] **Phase 4: Verification:** Build-Size Analyse vor und nach dem Splitting durchführen.
+### 🧪 E2E Tests (Playwright)
+- [ ] **Flow AE:** Mandanten-Einladung & Registrierung.
+- [ ] **Flow P:** Flatrate-Bypass (Sofort-Download).
+- [ ] **Flow Q:** Warenkorb & Checkout-Formular (Austria MVP).
+- [ ] **Flow AB:** Manuelle Sammelrechnung im Tenant-Dashboard.
+- [ ] **Flow AG (Upselling):** Lizenzen im Warenkorb anpassen und Preis-Updates validieren.
+- [ ] **Flow AH (Order ZIP):** Komplette Bestellung als ZIP herunterladen.
+- [ ] **Flow AJ (Delta-Pricing Lifecycle):** E2E: Bild-Upgrade mit Delta-Pricing -> Checkout -> Order im Admin-Dashboard prüfen.
+- [ ] **Flow AK (E2E Teardown Integrity):** E2E: Sicherstellen, dass `UserController@destroy` beim Teardown den Test-User restlos entfernt.

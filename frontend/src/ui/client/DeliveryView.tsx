@@ -1,16 +1,19 @@
 import ResponsiveImage from '../components/ResponsiveImage';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import { useAuth } from '../../logic/useAuth';
+import LicenseSelectorModal from './components/LicenseSelectorModal';
 
-import { useGallery } from '../../logic/useGallery';
+import { useGallery, Photo } from '../../logic/useGallery';
+import { usePricing } from '../../logic/usePricing';
 export default function DeliveryView({ galleryData }: { galleryData: ReturnType<typeof useGallery> }) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
+    const [selectedPhotoForDownload, setSelectedPhotoForDownload] = useState<Photo | null>(null);
 
     /* moved early return */
     const galleryRef = useRef<HTMLDivElement>(null);
@@ -41,7 +44,7 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                             </label>
                         )}
                         {totalPhotos > 0 && (
-                            <button onClick={() => window.open('/api/galleries/' + gallery.id + '/download-zip', '_self')} className="btn btn-primary">
+                            <button onClick={() => setSelectedPhotoForDownload(photo)} className="btn btn-primary">
                                 <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> Alle herunterladen (.zip)
                             </button>
                         )}
@@ -86,11 +89,26 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                                 </button>
                             </div>
 
-                            <div className="card-body p-4 bg-base-100 flex flex-col gap-3">
-                                <button onClick={() => window.open('/api/photos/' + photo.id + '/download', '_self')} className="btn btn-secondary btn-sm">
-                                    Einzel-Download
-                                </button>
-                            </div>
+                            {(() => {
+                                const { isCovered } = usePricing();
+                                const canDirectDownload = isCovered(user?.flatrate_level, 'web', 'editorial', '1_year');
+                                return (
+                                    <div className="card-body p-4 bg-base-100 flex flex-col gap-3">
+                                        {canDirectDownload ? (
+                                            <button 
+                                                onClick={() => window.open('/api/photos/' + photo.id + '/download?tier=web', '_self')} 
+                                                className="btn btn-success btn-sm text-white"
+                                            >
+                                                <span className="iconify mdi--download mr-1"></span> Download
+                                            </button>
+                                        ) : (
+                                            <button onClick={() => setSelectedPhotoForDownload(photo)} className="btn btn-secondary btn-sm">
+                                                <span className="iconify mdi--license mr-1"></span> Lizenz wählen...
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     ))}
                 </div>
@@ -101,6 +119,7 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                     </div>
                 )}
             </div>
+            <LicenseSelectorModal photo={selectedPhotoForDownload} onClose={() => setSelectedPhotoForDownload(null)} />
         </PageLayout>
     );
 }

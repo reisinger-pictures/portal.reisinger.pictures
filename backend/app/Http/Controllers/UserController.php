@@ -14,20 +14,49 @@ class UserController extends Controller
 {
     public function index()
     {
-        return \App\Http\Resources\UserResource::collection(User::with(['roles', 'galleryGroups', 'galleries'])->get());
+        $user = auth('api')->user();
+        $query = User::with(['roles', 'galleryGroups', 'galleries']);
+        
+        if (!$user->is_admin) {
+            if (!$user->is_customer_manager) {
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
+            // Domain-basiertes Clustering: Customer Manager sehen nur User ihrer Domain
+            $tenantIds = $user->tenants()->pluck('tenants.id')->toArray();
+            if (empty($tenantIds)) {
+                return response()->json(['data' => []]);
+            }
+            $query->whereHas('tenants', function($q) use ($tenantIds) {
+                $q->whereIn('tenants.id', $tenantIds);
+            });
+        }
+        
+        return \App\Http\Resources\UserResource::collection($query->get());
     }
 
     public function roles()
     {
+        // Ein Customer Manager darf ggf. nur bestimmte Rollen zuweisen, aber für die Anzeige laden wir alle.
         return Role::all();
     }
 
     public function store(Request $request)
     {
+        $currentUser = auth('api')->user();
+        
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email'
         ]);
+
+        if (!$currentUser->is_admin) {
+            if (!$currentUser->is_customer_manager) {
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
+            // Note: A Customer Manager currently cannot create standalone users via the UI.
+            // If they do, they must be assigned to the Manager's tenant immediately.
+            return response()->json(['error' => 'Not implemented for Customer Managers yet.'], 403);
+        }
 
         return \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
             $user = User::create([
@@ -61,14 +90,29 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
+        $currentUser = auth('api')->user();
+        $user = User::findOrFail($id);
+
+        if (!$currentUser->is_admin) {
+            if (!$currentUser->is_customer_manager) {
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
+            $managerTenantIds = $currentUser->tenants()->pluck('tenants.id')->toArray();
+            $targetUserTenantIds = $user->tenants()->pluck('tenants.id')->toArray();
+            
+            if (empty(array_intersect($managerTenantIds, $targetUserTenantIds))) {
+                return response()->json(['error' => 'Forbidden (Tenant Isolation)'], 403);
+            }
+        }
+
         $request->validate([
             'role_ids' => 'array',
             'gallery_group_ids' => 'array',
             'gallery_ids' => 'array',
-            'can_edit_metadata' => 'boolean'
+            'can_edit_metadata' => 'boolean',
+            'flatrate_level' => 'nullable|string|in:none,web,print,original'
         ]);
 
-        $user = User::findOrFail($id);
         $user->roles()->sync($request->role_ids ?? []);
         $user->galleryGroups()->sync($request->gallery_group_ids ?? []);
         $user->galleries()->sync($request->gallery_ids ?? []);
@@ -76,7 +120,24 @@ class UserController extends Controller
         if ($request->has('can_edit_metadata')) {
             $user->update(['can_edit_metadata' => $request->can_edit_metadata]);
         }
+        if ($request->has('flatrate_level')) {
+            $user->update(['flatrate_level' => $request->flatrate_level]);
+        }
 
         return response()->json(['success' => true]);
     }
+
+    public function destroy($id)
+    {
+        $currentUser = auth('api')->user();
+        if (!$currentUser->is_admin) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
+
+        $user = User::findOrFail($id);
+        $user->delete();
+
+        return response()->json(['success' => true]);
+    }
+
 }

@@ -6,20 +6,20 @@ use App\Models\Setting;
 
 class WatermarkService
 {
-    public function applyWatermark($sourcePath, $destPath, $maxWidth = null)
+    public function applyWatermark($sourcePath, $destPath, $maxWidth = null, $galleryType = 'delivery')
     {
         $svgPath = storage_path('app/private/watermark.svg');
-        
-        if (!file_exists($svgPath)) {
-            copy($sourcePath, $destPath);
-            return true;
+        $text = Setting::where('key', 'watermark_text')->value('value') ?? 'reisinger.pictures';
+        $opacity = (float) (Setting::where('key', 'watermark_opacity')->value('value') ?? 0.15);
+
+        // Subtilerer Schutz bei reinen Auswahl-Galerien (30% der normalen Deckkraft)
+        if ($galleryType === 'selection') {
+            $opacity = $opacity * 0.3;
         }
 
-        $scale = (float) (Setting::where('key', 'watermark_scale')->value('value') ?? 0.10);
-        $opacity = (float) (Setting::where('key', 'watermark_opacity')->value('value') ?? 0.6);
-        $position = Setting::where('key', 'watermark_position')->value('value') ?? 'bottom-right';
+        $svgFile = file_exists($svgPath) ? $svgPath : null;
 
         $processor = app(ImageProcessor::class);
-        return $processor->generateWatermarkedImage($sourcePath, $destPath, $svgPath, $scale, $opacity, $position, $maxWidth);
+        return $processor->generateTiledWatermark($sourcePath, $destPath, $svgFile, $text, $opacity, $maxWidth);
     }
 }

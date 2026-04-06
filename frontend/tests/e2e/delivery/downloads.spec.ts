@@ -67,7 +67,10 @@ test.describe('Download Triggers UI', () => {
         // 5. Test: Einzel-Download
         // Wir fangen das Download-Event ab, bevor wir klicken
         const singleDownloadPromise = page.waitForEvent('download');
-        await page.getByRole('button', { name: 'Einzel-Download' }).first().click();
+        // Gast-Workflow: Muss über das Lizenz-Modal gehen
+        await page.getByRole('button', { name: 'Lizenz wählen...' }).first().click();
+        await expect(page.locator('h3:has-text("Lizenz wählen")')).toBeVisible();
+        await page.getByRole('button', { name: 'Sofort Download' }).first().click();
         const singleDownload = await singleDownloadPromise;
         
         // Prüfen, ob die Datei eine JPG-Endung hat (oder JPEG)

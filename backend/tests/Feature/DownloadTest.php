@@ -23,7 +23,7 @@ class DownloadTest extends TestCase
 
     public function test_authorized_user_can_download_single_image_and_metadata_is_injected()
     {
-        $user = User::factory()->create(['name' => 'Max Mustermann']);
+        $user = User::factory()->create(['name' => 'Max Mustermann', 'flatrate_level' => 'original']);
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         
@@ -49,6 +49,7 @@ class DownloadTest extends TestCase
         $this->assertDatabaseHas('download_logs', [
             'user_id' => $user->id,
             'item_type' => 'single_image',
+            'resolution_tier' => 'original',
             'item_identifier' => 'download_test.jpg'
         ]);
 
@@ -87,6 +88,11 @@ class DownloadTest extends TestCase
         $content = file_get_contents($fixturePath);
         Storage::disk('photos')->put($gallery->id . '/pic1.jpg', $content);
         Storage::disk('photos')->put($gallery->id . '/pic2.jpg', $content);
+        
+        // Mock watermarked files to avoid dependency on ImageMagick during tests
+        Storage::disk('photos')->makeDirectory($gallery->id . '/_watermarked');
+        Storage::disk('photos')->put($gallery->id . '/_watermarked/pic1.jpg', $content);
+        Storage::disk('photos')->put($gallery->id . '/_watermarked/pic2.jpg', $content);
 
         // Aufruf ohne Authentifizierung
         $response = $this->get('/api/galleries/' . $gallery->id . '/download-zip');

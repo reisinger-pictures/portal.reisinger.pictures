@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 import {useSearch} from '../logic/useSearch';
 import Sidebar from './components/Sidebar';
-import AdminWatermarkBanner from './management/components/AdminWatermarkBanner';
 import HighlightText from './components/HighlightText';
 
 export default function SearchView() {
@@ -26,8 +25,7 @@ export default function SearchView() {
 
     return (
         <div className="flex flex-col h-screen">
-            <AdminWatermarkBanner/>
-            <div className="flex flex-1 bg-base-100 overflow-hidden relative">
+                        <div className="flex flex-1 bg-base-100 overflow-hidden relative">
                 {isSidebarOpen && (
                     <div className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
                          onClick={() => setIsSidebarOpen(false)}></div>

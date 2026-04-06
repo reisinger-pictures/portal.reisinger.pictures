@@ -28,8 +28,17 @@ class FileDeliveryController extends Controller
         }
 
         $needsWatermark = true;
-        if ($user && ($user->canAccessGallery($gallery->id))) {
+        if ($gallery->effective_is_free_download) {
             $needsWatermark = false;
+        } elseif ($user && ($user->is_admin || $user->is_photographer)) {
+            $needsWatermark = false;
+        } elseif ($user && $user->canAccessGallery($gallery->id)) {
+            $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
+            $userRank = $ranks[$user->flatrate_level ?? 'none'] ?? 0;
+            // Wenn der User mindestens die Web-Flatrate hat, blenden wir Wasserzeichen im UI aus
+            if ($userRank >= 1) {
+                $needsWatermark = false;
+            }
         }
         
         $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/');
@@ -69,7 +78,7 @@ class FileDeliveryController extends Controller
                 $xAccelPath = '/protected-photos/' . $gallery->id . '/_thumbs/_watermarked/' . $size . '/' . $photo->id . '.webp';
                 if (!file_exists($path) && file_exists($sourcePath)) {
                     if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
-                    $watermarkService->applyWatermark($sourcePath, $path);
+                    $watermarkService->applyWatermark($sourcePath, $path, null, $gallery->type);
                 }
             }
         } 
@@ -91,7 +100,7 @@ class FileDeliveryController extends Controller
                 $xAccelPath = '/protected-photos/' . $gallery->id . '/_watermarked/' . $photo->filename;
                 if (!file_exists($path) && file_exists($sourcePath)) {
                     if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
-                    $watermarkService->applyWatermark($sourcePath, $path, 2000);
+                    $watermarkService->applyWatermark($sourcePath, $path, 2000, $gallery->type);
                 }
             }
         }

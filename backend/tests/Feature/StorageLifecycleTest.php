@@ -23,7 +23,8 @@ class StorageLifecycleTest extends TestCase
 
     public function test_image_delivery_updates_last_accessed_at_and_caches_hit()
     {
-        $user = User::factory()->create();
+        // Require flatrate_level to bypass watermark generation (which would 404 without ImageMagick)
+        $user = User::factory()->create(['flatrate_level' => 'original']);
         $user->roles()->attach(Role::firstOrCreate(['name' => 'client']));
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true]);
         $user->galleries()->attach($gallery);

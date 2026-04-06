@@ -20,9 +20,14 @@ class User extends Authenticatable implements JWTSubject
     public $transient_meta_galleries = [];
 
     protected $visible = [
-        'id', 'name', 'email', 'metadata_copyright', 'can_edit_metadata', 
-        'current_ftp_gallery_id', 'ftp_slug', 'created_at', 'is_admin', 'is_photographer', 
-        'is_pending', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
+        'id', 'name', 'email', 'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',  
+        'current_ftp_gallery_id', 'ftp_slug',
+        'billing_name',
+        'billing_company',
+        'billing_street',
+        'billing_zip',
+        'billing_city', 'created_at', 'is_admin', 'is_photographer', 
+        'is_pending', 'is_customer_manager', 'is_power_user', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
     ];
 
     protected $fillable = [
@@ -31,6 +36,8 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'metadata_copyright',
         'can_edit_metadata',
+        'flatrate_level',
+        'can_purchase_upgrades',
         'current_ftp_gallery_id',
         'ftp_slug'
     ];
@@ -52,7 +59,8 @@ class User extends Authenticatable implements JWTSubject
     }
 
     protected $casts = [
-        'can_edit_metadata' => 'boolean'
+        'can_edit_metadata' => 'boolean',
+        
     ];
 
     public function getJWTIdentifier() { return $this->getKey(); }
@@ -64,6 +72,7 @@ class User extends Authenticatable implements JWTSubject
     
     public function currentFtpGallery() { return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id'); }
     public function photos() { return $this->hasMany(Photo::class); }
+    public function tenants() { return $this->belongsToMany(Tenant::class); }
 
     public function getIsPendingAttribute(): bool {
         if ($this->guest_id) return false;
@@ -76,6 +85,14 @@ class User extends Authenticatable implements JWTSubject
 
     public function getIsAdminAttribute(): bool {
         return $this->roles()->where('name', 'admin')->exists();
+    }
+
+    public function getIsCustomerManagerAttribute(): bool {
+        return $this->roles()->where('name', 'customer_manager')->exists();
+    }
+
+    public function getIsPowerUserAttribute(): bool {
+        return $this->roles()->where('name', 'power_user')->exists();
     }
 
     private function getSubGroupIds($parentIds) {
@@ -108,12 +125,12 @@ class User extends Authenticatable implements JWTSubject
         }
 
         // 3. Domain Mapping (Only applies to Delivery galleries!)
-        if ($this->email) {
-            $domain = substr(strrchr($this->email, "@"), 1);
-            $mapping = DomainMapping::where('domain', $domain)->first();
+        // 3. Tenant Integration (Only applies to Delivery galleries!)
+        foreach ($this->tenants as $tenant) {
+            $tenantGroupIds = $tenant->galleryGroups()->pluck('gallery_groups.id')->toArray();
+            $domainGroupIds = $this->getSubGroupIds($tenantGroupIds);
             
-            if ($mapping && $mapping->gallery_group_id) {
-                $domainGroupIds = $this->getSubGroupIds([$mapping->gallery_group_id]);
+            if (!empty($domainGroupIds)) {
                 $domainGalleryIds = Gallery::whereIn('gallery_group_id', $domainGroupIds)
                                            ->where('type', 'delivery')
                                            ->pluck('id')->toArray();
@@ -132,5 +149,26 @@ class User extends Authenticatable implements JWTSubject
     {
         // Admins müssen wie alle anderen explizite Rechte besitzen
         return in_array($galleryId, $this->getAllowedGalleryIds());
+    }
+
+    public function hasPurchasedPhoto($photoId, $requestedTier): bool
+    {
+        $orders = \App\Models\Order::where('user_id', $this->id)->with('invoiceSnapshot')->get();
+        $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
+        $reqRank = $ranks[$requestedTier] ?? 3;
+
+        foreach ($orders as $order) {
+            $snapshot = $order->invoiceSnapshot;
+            if (!$snapshot) continue;
+            
+            $items = $snapshot->customer_details['items'] ?? [];
+            foreach ($items as $item) {
+                if (($item['photoId'] ?? '') === $photoId) {
+                    $itemRank = $ranks[$item['tier'] ?? 'none'] ?? 0;
+                    if ($itemRank >= $reqRank) return true;
+                }
+            }
+        }
+        return false;
     }
 }

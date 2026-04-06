@@ -43,7 +43,7 @@ export default function ManagementFtpInbox() {
                 <div className="flex gap-4 items-center bg-base-100 p-4 rounded-box mt-2">
                     <div className="flex-1">
                         <p className="text-sm opacity-70">Dein Upload-Ordner</p>
-                        <code className="font-bold">{status.ftp_folder}</code>
+                        <code className="font-bold font-mono text-xl">{status.ftp_folder}</code>
                     </div>
                     <div className="text-right">
                         <p className="text-sm opacity-70">Bilder in der Warteschlange</p>

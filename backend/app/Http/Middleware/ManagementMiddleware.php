@@ -20,24 +20,34 @@ class ManagementMiddleware
 
         $user = auth()->user();
 
-        // Fotografen dürfen nur auf bestimmte Bereiche zugreifen
-        if ($user->is_photographer && !$user->is_admin) {
+        if ($user->is_admin) {
+            return $next($request);
+        }
+
+        $isAllowed = false;
+        $path = $request->path();
+
+        if ($user->is_photographer) {
             $allowedPrefixes = ['api/management/galleries', 'api/management/gallery-groups', 'api/management/upload', 'api/management/ftp', 'api/management/invites', 'api/management/stats', 'api/management/logs'];
-            $path = $request->path();
-            $isAllowed = false;
             foreach ($allowedPrefixes as $prefix) {
                 if (str_starts_with($path, $prefix)) {
                     $isAllowed = true; break;
                 }
             }
-            if (!$isAllowed) {
-                 return response()->json(['error' => 'Zutritt verweigert. Nur für Administratoren.'], 403);
-            }
-            return $next($request);
         }
 
-        if (!$user->is_admin) {
-            return response()->json(['error' => 'Zutritt verweigert. Admin-Rechte erforderlich.'], 403);
+        if ($user->is_customer_manager) {
+            // Customer Manager dürfen nur die User-Verwaltung und rudimentäre Analytics sehen
+            $allowedPrefixes = ['api/management/users', 'api/management/roles', 'api/management/stats', 'api/management/logs'];
+            foreach ($allowedPrefixes as $prefix) {
+                if (str_starts_with($path, $prefix)) {
+                    $isAllowed = true; break;
+                }
+            }
+        }
+
+        if (!$isAllowed) {
+            return response()->json(['error' => 'Zutritt verweigert. Keine ausreichenden Berechtigungen.'], 403);
         }
 
         return $next($request);

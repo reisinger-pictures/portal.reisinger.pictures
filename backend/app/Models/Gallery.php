@@ -21,7 +21,7 @@ class Gallery extends Model
         'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos', 
         'default_title', 'default_description', 'default_keywords', 
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
-        'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'photos', 'galleryGroup'
+        'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'effective_is_free_download', 'photos', 'galleryGroup'
     ];
 
     protected $fillable = [
@@ -62,6 +62,20 @@ class Gallery extends Model
     {
         if ($this->is_editorial_only !== null) return (bool) $this->is_editorial_only;
         if ($this->galleryGroup) return $this->galleryGroup->effective_is_editorial_only;
+        return false;
+    }
+
+    public function getEffectiveIsFreeDownloadAttribute(): bool
+    {
+        if ($this->is_free_download !== null) return (bool) $this->is_free_download;
+        if ($this->galleryGroup) return $this->galleryGroup->effective_is_free_download;
+        return false;
+    }
+
+    public function getEffectiveIsFreeDownloadAttribute(): bool
+    {
+        if ($this->is_free_download !== null) return (bool) $this->is_free_download;
+        if ($this->galleryGroup) return $this->galleryGroup->effective_is_free_download;
         return false;
     }
 

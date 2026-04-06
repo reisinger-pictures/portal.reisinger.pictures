@@ -7,48 +7,47 @@ use App\Models\Setting;
 
 class SettingsController extends Controller
 {
-
-    public function getWatermarkImage()
-    {
-        $path = storage_path('app/private/watermark.svg');
-        if (!file_exists($path)) abort(404);
-        return response()->file($path, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'no-cache, no-store, must-revalidate']);
-    }
-
     public function getWatermark()
     {
-        $hasSvg = file_exists(storage_path('app/private/watermark.svg'));
         return response()->json([
-            'has_svg' => $hasSvg,
-            'scale' => Setting::where('key', 'watermark_scale')->value('value') ?? 0.10,
-            'opacity' => Setting::where('key', 'watermark_opacity')->value('value') ?? 0.6,
-            'position' => Setting::where('key', 'watermark_position')->value('value') ?? 'bottom-right',
+            'has_svg' => file_exists(storage_path('app/private/watermark.svg')),
+            'text' => Setting::where('key', 'watermark_text')->value('value') ?? 'reisinger.pictures',
+            'opacity' => (float) (Setting::where('key', 'watermark_opacity')->value('value') ?? 0.15)
         ]);
     }
 
     public function updateWatermark(Request $request)
     {
+        $request->validate([
+            'text' => 'nullable|string|max:100',
+            'opacity' => 'nullable|numeric|min:0.05|max:1.0',
+            'svg' => 'nullable|file|mimes:svg'
+        ]);
+
         if ($request->hasFile('svg')) {
-            $request->validate(['svg' => 'file|mimes:svg']);
-            $file = $request->file('svg');
-
-            // Fail Fast: Ist es wirklich ein valides SVG?
-            $content = file_get_contents($file->getRealPath());
-            if (!str_contains($content, '<svg') || @simplexml_load_string($content) === false) {
-                return response()->json(['error' => 'Ungültige oder korrupte SVG-Datei.'], 422);
-            }
-
-            $file->move(storage_path('app/private'), 'watermark.svg');
-
-            // Alte gecachte Master-PNGs aufräumen
-            $oldCaches = glob(storage_path('app/private/watermark_master_*.png'));
-            if ($oldCaches) array_map('unlink', $oldCaches);
+            $request->file('svg')->move(storage_path('app/private'), 'watermark.svg');
         }
 
-        if ($request->has('scale')) Setting::updateOrCreate(['key' => 'watermark_scale'], ['value' => $request->scale]);
+        Setting::updateOrCreate(['key' => 'watermark_text'], ['value' => $request->text ?? '']);
         if ($request->has('opacity')) Setting::updateOrCreate(['key' => 'watermark_opacity'], ['value' => $request->opacity]);
-        if ($request->has('position')) Setting::updateOrCreate(['key' => 'watermark_position'], ['value' => $request->position]);
+
+        // Alte Cache Master PNGs löschen, da sich das Kacheldesign geändert hat
+        $oldCaches = glob(storage_path('app/private/watermark_master_*.png'));
+        if ($oldCaches) array_map('unlink', $oldCaches);
 
         return response()->json(['success' => true]);
+    }
+
+    public function getLicenseTerms()
+    {
+        return response()->json([
+            'editorial' => Setting::where('key', 'term_editorial')->value('value') ?? 'Nur für redaktionelle Berichterstattung zugelassen. Jegliche kommerzielle Nutzung (Werbung, Advertorials, Social Media Ads) ist untersagt.',
+            'commercial' => Setting::where('key', 'term_commercial')->value('value') ?? 'Uneingeschränkte kommerzielle Nutzung (Werbung, Flyer, Social Media Kampagnen) ist gestattet. Weiterverkauf der Rohdaten ist untersagt.',
+            '1_year' => Setting::where('key', 'term_1_year')->value('value') ?? 'Nutzungsrecht befristet auf 1 Jahr ab Rechnungsdatum.',
+            'unlimited' => Setting::where('key', 'term_unlimited')->value('value') ?? 'Zeitlich unbegrenztes Nutzungsrecht.',
+            'web' => Setting::where('key', 'term_web')->value('value') ?? 'Auflösung optimiert für Web & Social Media (max. 2560px).',
+            'print' => Setting::where('key', 'term_print')->value('value') ?? 'Hohe Auflösung für den Druck (bis A4, max. 4000px).',
+            'original' => Setting::where('key', 'term_original')->value('value') ?? 'Maximale Originalauflösung.'
+        ]);
     }
 }

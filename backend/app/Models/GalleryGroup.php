@@ -36,12 +36,26 @@ class GalleryGroup extends Model
         });
     }
 
-    protected $appends = ['effective_is_editorial_only', 'effective_is_hidden'];
+    protected $appends = ['effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download'];
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
         if ($this->is_editorial_only !== null) return (bool) $this->is_editorial_only;
         if ($this->parent) return $this->parent->effective_is_editorial_only;
+        return false;
+    }
+
+    public function getEffectiveIsFreeDownloadAttribute(): bool
+    {
+        if ($this->is_free_download !== null) return (bool) $this->is_free_download;
+        if ($this->parent) return $this->parent->effective_is_free_download;
+        return false;
+    }
+
+    public function getEffectiveIsFreeDownloadAttribute(): bool
+    {
+        if ($this->is_free_download !== null) return (bool) $this->is_free_download;
+        if ($this->parent) return $this->parent->effective_is_free_download;
         return false;
     }
 
@@ -65,5 +79,10 @@ class GalleryGroup extends Model
     public function galleries()
     {
         return $this->hasMany(Gallery::class);
+    }
+
+    public function tenants()
+    {
+        return $this->belongsToMany(Tenant::class);
     }
 }

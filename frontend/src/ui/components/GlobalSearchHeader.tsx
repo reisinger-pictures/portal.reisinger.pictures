@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import HighlightText from './HighlightText';
 import { useSearch } from '../../logic/useSearch';
+import { useCart } from '../../logic/CartContext';
 
 export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () => void }) {
     const [searchParams] = useSearchParams();
     const qParam = searchParams.get('q') || '';
     const [searchQuery, setSearchQuery] = useState(qParam);
     const [prevQParam, setPrevQParam] = useState(qParam);
+    
+    const { itemCount } = useCart();
 
     if (qParam !== prevQParam) {
         setPrevQParam(qParam);
@@ -35,6 +38,7 @@ export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () =>
                 <img src="/android-chrome-192x192.png" alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
                 <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">Reisinger Portal</span>
             </Link>
+            
             <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full md:max-w-4xl">
                 <div className="join w-full shadow-sm">
                     <input
@@ -74,6 +78,17 @@ export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () =>
                     </div>
                 )}
             </form>
+
+            <button 
+                className="btn btn-ghost btn-circle relative ml-auto shrink-0" 
+                onClick={() => navigate('/cart')}
+                title="Warenkorb öffnen"
+            >
+                <span className="iconify mdi--cart text-2xl"></span>
+                {itemCount > 0 && (
+                    <div className="badge badge-primary badge-sm absolute top-1 right-0 border-base-100 border-2">{itemCount}</div>
+                )}
+            </button>
         </header>
     );
 }

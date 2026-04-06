@@ -3,10 +3,8 @@ import {fetcher} from '../api';
 import {useAuth} from './useAuth';
 
 export interface WatermarkSettings {
-    has_svg: boolean;
-    scale: number;
+    text: string;
     opacity: number;
-    position: string;
 }
 
 export function useSettings() {

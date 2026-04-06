@@ -3,7 +3,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams} from 'react-router-dom';
 import {useGallery} from '../../logic/useGallery';
-import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries'; // ✨ FIX: flattenGroups importiert
+import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import EmailComposerModal from './components/EmailComposerModal';
 import InviteModal from './components/InviteModal';
@@ -13,6 +13,7 @@ import UploadDropzone from './components/UploadDropzone';
 import RatingStatusModal from './components/RatingStatusModal';
 import GalleryMetadataDefaultsModal from './components/GalleryMetadataDefaultsModal';
 import GalleryModals from '../components/GalleryModals';
+import ManagementGalleryActions from './components/ManagementGalleryActions';
 
 export default function ManagementGalleryView() {
     const params = useParams();
@@ -20,29 +21,11 @@ export default function ManagementGalleryView() {
     const slug = splat ? splat.split('/').pop() : '';
 
     const navigate = useNavigate();
-    const {
-        gallery,
-        photos,
-        downloadsCount,
-        notified_count,
-        isLoading,
-        isError,
-        size,
-        setSize,
-        isReachingEnd,
-        mutate,
-        breadcrumbs
-    } = useGallery(slug);
-
+    const { gallery, photos, downloadsCount, notified_count, isLoading, isError, size, setSize, isReachingEnd, mutate, breadcrumbs } = useGallery(slug);
     const {tree, updateGallery, deleteGallery} = useProtectedGalleries();
     const {user} = useAuth();
 
-    const canSendMail = (notified_count || 0) > 0;
-
     const [isGalleryEditModalOpen, setGalleryEditModalOpen] = useState(false);
-
-    // ✨ FIX: safeGroups entfernt, Logik direkt in den Modal-Aufruf integriert oder hier sauber deklariert falls nötig.
-    // Wir nutzen den tree aus useProtectedGalleries, um die verfügbaren Ordner zu berechnen.
     const availableGroups = tree ? flattenGroups(tree.groups) : [];
 
     const galleryRef = useRef<HTMLDivElement>(null);
@@ -70,34 +53,17 @@ export default function ManagementGalleryView() {
                             </button>
                         )}
                     </h1>
-                    <div className="flex flex-wrap gap-4 items-center">
-                        {gallery.type === 'delivery' && <span className="badge badge-ghost font-normal">{downloadsCount || 0} Downloads</span>}
-                        {user?.is_photographer && (
-                            <div className="flex gap-2">
-                                {gallery.type === 'selection' && (
-                                    <button onClick={() => setShowRatingsModal(true)} className="btn btn-secondary btn-sm">
-                                        <span className="iconify mdi--star-outline"></span> Bewertungen...
-                                    </button>
-                                )}
-                                {gallery.type === 'delivery' && (
-                                    <button onClick={() => setIsMetadataModalOpen(true)} className="btn btn-secondary btn-sm">
-                                        <span className="iconify mdi--tag-multiple"></span> Vorgaben...
-                                    </button>
-                                )}
-                                <button onClick={() => setIsInviteModalOpen(true)} className="btn btn-outline btn-sm">
-                                    <span className="iconify mdi--link"></span> Einladungslink...
-                                </button>
-                                <button
-                                    onClick={() => setIsMailModalOpen(true)}
-                                    className="btn btn-primary btn-sm"
-                                    disabled={!canSendMail}
-                                    title={!canSendMail ? "Keine Empfänger mit Opt-In vorhanden" : ""}
-                                >
-                                    <span className="iconify mdi--email-fast"></span> E-Mail senden...
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                    
+                    <ManagementGalleryActions
+                        gallery={gallery}
+                        canSendMail={(notified_count || 0) > 0}
+                        downloadsCount={downloadsCount || 0}
+                        isPhotographer={user?.is_photographer || false}
+                        onOpenRatings={() => setShowRatingsModal(true)}
+                        onOpenMetadata={() => setIsMetadataModalOpen(true)}
+                        onOpenInvite={() => setIsInviteModalOpen(true)}
+                        onOpenMail={() => setIsMailModalOpen(true)}
+                    />
                 </div>
 
                 {user?.is_photographer && (
@@ -123,7 +89,7 @@ export default function ManagementGalleryView() {
                     {photos.map(photo => (
                         <div key={photo.id} className="relative group">
                             <a href={photo.url} data-pswp-width={photo.width || 2000} data-pswp-height={photo.height || 1333} data-title={photo.title} data-desc={photo.description} data-artist={photo.artist} data-photo-id={photo.id} className="pswp-item block relative aspect-square">
-                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded" loading="lazy" alt={photo.filename}/>
+                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded hover:scale-105 transition-transform duration-500" loading="lazy" alt={photo.filename}/>
                             </a>
                             {gallery.type === 'delivery' && (
                                 <div className="absolute top-2 right-2 opacity-100 z-10">
@@ -148,7 +114,7 @@ export default function ManagementGalleryView() {
                 <GalleryMetadataDefaultsModal isOpen={isMetadataModalOpen} onClose={() => setIsMetadataModalOpen(false)} gallery={gallery} onUpdate={async (...args) => { await updateGallery(...args); mutate(); }} />
 
                 <GalleryModals
-                    availableGroups={availableGroups} // ✨ FIX: Nutzt jetzt die echten Daten
+                    availableGroups={availableGroups}
                     isGroupModalOpen={false} setGroupModalOpen={() => {}}
                     isGalleryModalOpen={isGalleryEditModalOpen} setGalleryModalOpen={setGalleryEditModalOpen}
                     editingGallery={gallery}

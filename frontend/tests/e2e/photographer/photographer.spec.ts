@@ -115,8 +115,8 @@ test.describe('Photographer Core Workflow', () => {
         const newSlug = `ftp-${uniqueSuffix}`;
         const newCopyright = `© ${newName}`;
 
-        await sidebar.navigateTo('Einstellungen');
-        await expect(page.locator('h1:has-text("Einstellungen")')).toBeVisible();
+        await sidebar.navigateTo('Mein Profil');
+        await expect(page.locator('h1:has-text("Mein Profil")')).toBeVisible();
 
         await page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input').fill(newName);
         await page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input').fill(newSlug);

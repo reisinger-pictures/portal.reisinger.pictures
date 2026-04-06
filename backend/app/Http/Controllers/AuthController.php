@@ -61,11 +61,16 @@ class AuthController extends Controller
             ]);
 
             $domain = substr(strrchr($validated['email'], "@"), 1);
-            $mapping = DomainMapping::where('domain', $domain)->first();
+            $tenant = \App\Models\Tenant::where('domain', $domain)->first();
 
-            if ($mapping) {
-                if ($mapping->role_id) $user->roles()->syncWithoutDetaching([$mapping->role_id]);
-                if ($mapping->gallery_group_id) $user->galleryGroups()->syncWithoutDetaching([$mapping->gallery_group_id]);
+            if ($tenant) {
+                // Auto-Join the user to the matching Tenant
+                $user->tenants()->attach($tenant->id);
+                // Assign Standard-Client Role by default to protect billing
+                $clientRole = \App\Models\Role::where('name', 'client')->first();
+                if ($clientRole) {
+                    $user->roles()->attach($clientRole->id);
+                }
             }
 
             $token = Str::random(64);
@@ -158,8 +163,12 @@ class AuthController extends Controller
             'email' => $user->email,
             'metadata_copyright' => $user->metadata_copyright,
             'ftp_slug' => $user->ftp_slug,
+            'flatrate_level' => $user->flatrate_level,
+            
             'is_admin' => $user->is_admin,
             'is_photographer' => $user->is_photographer,
+            'is_customer_manager' => $user->is_customer_manager,
+            'is_power_user' => $user->is_power_user,
             'is_pending' => $user->is_pending,
             'roles' => $user->roles->pluck('name'),
             'transient_meta_galleries' => $user->transient_meta_galleries ?? [],

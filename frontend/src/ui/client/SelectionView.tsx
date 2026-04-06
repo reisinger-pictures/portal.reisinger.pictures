@@ -10,15 +10,14 @@ import { apiMutate } from '../../api';
 import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import { useUI } from '../components/UIContext';
-
-
+import SelectionFilterBar from './components/SelectionFilterBar';
 
 export default function SelectionView({ galleryData }: { galleryData: ReturnType<typeof useGallery> }) {
-    // const navigate = useNavigate();
     const { gallery, photos, isLoading, ratePhoto, size, setSize, isReachingEnd } = galleryData;
     const { user } = useAuth();
-
-    /* moved early return */
+    const { showToast, confirm } = useUI();
+    const galleryRef = useRef<HTMLDivElement>(null);
+    const [finishing, setFinishing] = useState(false);
 
     const [ratingFilter, setRatingFilter] = useState<string>('all');
     const filteredPhotos = photos.filter((p: Photo) => {
@@ -33,16 +32,11 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
         return true;
     });
 
-    const { showToast, confirm } = useUI();
-    const galleryRef = useRef<HTMLDivElement>(null);
-    const [finishing, setFinishing] = useState(false);
-
     const latestDataRef = useRef({ photos: filteredPhotos, ratePhoto });
     useEffect(() => {
         latestDataRef.current = { photos: filteredPhotos, ratePhoto };
     }, [filteredPhotos, ratePhoto]);
 
-    // Anstatt des ganzen Objekts speichern wir nur die ID, um Bug-freies Live-Update zu garantieren
     const [currentPhotoId, setCurrentPhotoId] = useState<string | null>(null);
     const currentPhotoInLightbox = currentPhotoId ? filteredPhotos.find((p: Photo) => p.id === currentPhotoId) : null;
 
@@ -82,9 +76,7 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
                 setCurrentPhotoId(currPhotoId ? currPhotoId : null);
             });
 
-            lightbox.on('destroy', () => {
-                setCurrentPhotoId(null);
-            });
+            lightbox.on('destroy', () => setCurrentPhotoId(null));
 
             const handleKeyDown = (e: KeyboardEvent) => {
                 if (!lightbox?.pswp?.isOpen) return;
@@ -100,13 +92,9 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
                     }
                 }
             };
-            lightbox.on('beforeOpen', () => {
-                document.addEventListener('keydown', handleKeyDown);
-            });
-
-            lightbox.on('destroy', () => {
-                document.removeEventListener('keydown', handleKeyDown);
-            });
+            
+            lightbox.on('beforeOpen', () => document.addEventListener('keydown', handleKeyDown));
+            lightbox.on('destroy', () => document.removeEventListener('keydown', handleKeyDown));
         }
     });
 
@@ -132,7 +120,6 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
                     <div>
                         <h1 className="text-3xl font-bold mb-2">{gallery.name}</h1>
                         <p className="opacity-70">Wähle deine Favoriten aus.</p> 
-                
                     </div>
 
                     <div className="flex flex-wrap items-center justify-end gap-3 md:gap-4">
@@ -155,19 +142,7 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
                 </div>
 
                 {user && photos.length > 0 && (
-                    <div className="flex justify-center md:justify-start mb-6 overflow-x-auto pb-2">
-                        <div className="join">
-                            <button className={`btn join-item btn-sm ${ratingFilter === 'all' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('all')}>Alle Bilder</button>
-                            <button className={`btn join-item btn-sm ${ratingFilter === 'unrated' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('unrated')}>Neu</button>
-                            <button className={`btn join-item btn-sm ${ratingFilter === 'rated' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('rated')}>Favoriten</button>
-                            <button className={`btn join-item btn-sm ${ratingFilter === '5' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('5')}>5 <span className="iconify mdi--star text-primary ml-0.5 text-base"></span></button>
-                            <button className={`btn join-item btn-sm ${ratingFilter === '4' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('4')}>4 <span className="iconify mdi--star text-primary ml-0.5 text-base"></span></button>
-                            <button className={`btn join-item btn-sm ${ratingFilter === '3' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('3')}>3 <span className="iconify mdi--star text-primary ml-0.5 text-base"></span></button>
-                            <button className={`btn join-item btn-sm ${ratingFilter === '2' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('2')}>2 <span className="iconify mdi--star text-primary ml-0.5 text-base"></span></button>
-                            <button className={`btn join-item btn-sm ${ratingFilter === '1' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('1')}>1 <span className="iconify mdi--star text-primary ml-0.5 text-base"></span></button>
-                            <button className={`btn join-item btn-sm ${ratingFilter === '0' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('0')}>Ignoriert</button>
-                        </div>
-                    </div>
+                    <SelectionFilterBar ratingFilter={ratingFilter} setRatingFilter={setRatingFilter} />
                 )}
 
                 {!isLoading && photos.length === 0 && (
@@ -180,7 +155,7 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6" ref={galleryRef}>
                     {filteredPhotos.map((photo: Photo) => (
-                        <div key={photo.id} className="card bg-base-200 shadow-xl overflow-hidden relative group">
+                        <div key={photo.id} className="card bg-base-200 shadow-xl overflow-hidden relative group border border-base-300">
                             <a href={photo.url}
                                data-pswp-width={photo.width || 2000}
                                data-pswp-height={photo.height || 1333}
@@ -189,9 +164,8 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none" draggable={false} />
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none hover:scale-105 transition-transform duration-500" draggable={false} />
                             </a>
-
                             {user ? <GridPhotoActions photo={photo} ratePhoto={ratePhoto} /> : <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3"></div>}
                         </div>
                     ))}
@@ -204,7 +178,6 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
                 )}
             </div>
 
-            {/* REACT PORTAL FÜR PHOTOSWIPE */}
             {currentPhotoInLightbox && document.getElementById('rating-portal-anchor') && (
                 createPortal(
                     <DaisyUIRatingBridge photo={currentPhotoInLightbox} ratePhoto={galleryData.ratePhoto} />,

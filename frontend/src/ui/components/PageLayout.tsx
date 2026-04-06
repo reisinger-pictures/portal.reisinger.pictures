@@ -2,7 +2,6 @@ import { useState } from 'react';
 import Sidebar from './Sidebar';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import GalleryModals from './GalleryModals';
-import AdminWatermarkBanner from '../management/components/AdminWatermarkBanner';
 import GlobalSearchHeader from './GlobalSearchHeader';
 
 export default function PageLayout({children, currentView}: {
@@ -32,8 +31,7 @@ export default function PageLayout({children, currentView}: {
 
     return (
         <div className="flex flex-col h-screen">
-            <AdminWatermarkBanner/>
-            <div className="flex flex-1 bg-base-100 overflow-hidden relative">
+                        <div className="flex flex-1 bg-base-100 overflow-hidden relative">
                 {isSidebarOpen && (
                     <div className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
                          onClick={() => setIsSidebarOpen(false)}></div>
