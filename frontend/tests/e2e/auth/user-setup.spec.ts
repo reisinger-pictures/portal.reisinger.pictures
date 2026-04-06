@@ -1,20 +1,23 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
+import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 
-test.afterAll(async ({ request }) => {
-    await E2EUserHelper.cleanupE2EData(request);
-    await E2EUserHelper.cleanupTrackedUsers(request);
-});
 
-test.describe.serial('User Setup via Mailpit Workflow', () => {
+
+test.describe('User Setup via Mailpit Workflow', () => {
+    let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
-    test.beforeAll(async ({ request }) => {
-        testUser = await E2EUserHelper.createIsolatedUser(request, 'admin');
+    test.beforeEach(async ({ request }) => {
+        helper = new E2ESessionHelper(request);
+        testUser = await helper.createIsolatedUser( 'admin');
+    });
+
+    test.afterEach(async () => {
+        if (helper) await helper.teardown();
     });
 
     let auth: AuthHelper;
@@ -40,9 +43,13 @@ test.describe.serial('User Setup via Mailpit Workflow', () => {
         await page.getByRole('button', { name: '+ Neuen Nutzer anlegen' }).click();
         await modal.fillInputByLabel('Name', 'Test Mailpit User');
         await modal.fillInputByLabel('E-Mail Adresse', newUserEmail);
-        await modal.clickButton('Nutzer anlegen & Einladen');
+        const createUserPromise = page.waitForResponse(res => res.url().includes('/api/management/users') && res.request().method() === 'POST');
+        await modal.submitModal('Nutzer anlegen & Einladen');
+        const res = await createUserPromise;
+        const data = await res.json();
+        helper.trackUser(data.user.id);
 
-        await expect(page.locator('.toast')).toContainText('Nutzer angelegt', { timeout: 15000 });
+        await expect(page.locator('.toast')).toContainText('Nutzer angelegt');
 
         // --- Phase 2: User setzt Passwort ---
         const regex = /token=([a-zA-Z0-9]+)/;

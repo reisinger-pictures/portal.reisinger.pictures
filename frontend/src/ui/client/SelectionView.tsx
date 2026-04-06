@@ -1,3 +1,4 @@
+import { useGallery, Photo } from '../../logic/useGallery';
 import ResponsiveImage from '../components/ResponsiveImage';
 import { useEffect, useRef, useState } from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
@@ -12,13 +13,15 @@ import { useUI } from '../components/UIContext';
 
 
 
-export default function SelectionView({ galleryData }: { galleryData: any }) {
+export default function SelectionView({ galleryData }: { galleryData: ReturnType<typeof useGallery> }) {
     // const navigate = useNavigate();
     const { gallery, photos, isLoading, ratePhoto, size, setSize, isReachingEnd } = galleryData;
     const { user } = useAuth();
 
+    /* moved early return */
+
     const [ratingFilter, setRatingFilter] = useState<string>('all');
-    const filteredPhotos = photos.filter((p: any) => {
+    const filteredPhotos = photos.filter((p: Photo) => {
         if (ratingFilter === 'rated') return p.rating && Number(p.rating) > 0;
         if (ratingFilter === 'unrated') return p.rating === null || p.rating === undefined;
         if (ratingFilter === '0') return Number(p.rating) === 0;
@@ -41,7 +44,7 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
 
     // Anstatt des ganzen Objekts speichern wir nur die ID, um Bug-freies Live-Update zu garantieren
     const [currentPhotoId, setCurrentPhotoId] = useState<string | null>(null);
-    const currentPhotoInLightbox = currentPhotoId ? filteredPhotos.find((p: any) => p.id === currentPhotoId) : null;
+    const currentPhotoInLightbox = currentPhotoId ? filteredPhotos.find((p: Photo) => p.id === currentPhotoId) : null;
 
     useEffect(() => {
         const handleContextMenu = (e: MouseEvent) => {
@@ -55,7 +58,7 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
 
     usePhotoSwipe({
         galleryRef,
-        dependencies: [filteredPhotos.length, user?.id],
+        trigger: `${filteredPhotos.length}-${user?.id}`,
         onInit: (lightbox) => {
             lightbox.on('uiRegister', function () {
                 if (user) {
@@ -91,8 +94,8 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
                 if (key >= 0 && key <= 5) {
                     const currPhotoId = lightbox.pswp!.currSlide?.data?.element?.dataset.photoId;
                     if (currPhotoId) {
-                        const photo = latestDataRef.current.photos.find((p: any) => p.id === currPhotoId);
-                        latestDataRef.current.ratePhoto(currPhotoId, key, photo?.comment || '');
+                        const photo = latestDataRef.current.photos.find((p: Photo) => p.id === currPhotoId);
+                        ratePhoto(currPhotoId, key, photo?.comment || '');
                         lightbox.pswp!.next();
                     }
                 }
@@ -106,6 +109,8 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
             });
         }
     });
+
+    if (!gallery) return null;
 
     const handleFinishRating = async () => {
         if (!(await confirm({ title: 'Auswahl abschließen?', message: 'Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird benachrichtigt.', confirmText: 'Abschließen', confirmColor: 'success' }))) return;
@@ -174,7 +179,7 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6" ref={galleryRef}>
-                    {filteredPhotos.map((photo: any) => (
+                    {filteredPhotos.map((photo: Photo) => (
                         <div key={photo.id} className="card bg-base-200 shadow-xl overflow-hidden relative group">
                             <a href={photo.url}
                                data-pswp-width={photo.width || 2000}
@@ -202,7 +207,7 @@ export default function SelectionView({ galleryData }: { galleryData: any }) {
             {/* REACT PORTAL FÜR PHOTOSWIPE */}
             {currentPhotoInLightbox && document.getElementById('rating-portal-anchor') && (
                 createPortal(
-                    <DaisyUIRatingBridge photo={currentPhotoInLightbox} ratePhoto={latestDataRef.current.ratePhoto} />,
+                    <DaisyUIRatingBridge photo={currentPhotoInLightbox} ratePhoto={galleryData.ratePhoto} />,
                     document.getElementById('rating-portal-anchor')!
                 )
             )}

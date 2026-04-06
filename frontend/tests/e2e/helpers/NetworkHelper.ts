@@ -10,7 +10,7 @@ export class NetworkHelper {
     async waitForApi(urlIncludes: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE'): Promise<Response> {
         return this.page.waitForResponse(res => 
             res.url().includes(urlIncludes) && res.request().method() === method
-        );
+        , { timeout: 5000 });
     }
 
     // --- Spezifische Endpunkte für das Reisinger Portal ---

@@ -2,19 +2,19 @@ import { useEffect } from 'react';
 import { Gallery } from '../../../logic/useGalleries';
 import IptcMetadataEditor, { IptcData } from '../../components/IptcMetadataEditor';
 import { useUI } from '../../components/UIContext';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
     gallery: Gallery;
-    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
+    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: Record<string, unknown>) => Promise<void>;
 }
 
 export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery, onUpdate }: Props) {
     const { showToast } = useUI();
 
-    const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting } } = useForm({
+    const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting } } = useForm({
         defaultValues: {
             allow_client_metadata_edit: false, apply_metadata_to_photos: false,
             title: '', description: '', keywords: '', location: '', city: '', state: '', country: '', iso_country: ''
@@ -38,9 +38,9 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
         }
     }, [isOpen, gallery, reset]);
 
-    const watchApplyMeta = watch('apply_metadata_to_photos');
+    const watchApplyMeta = useWatch({ control, name: 'apply_metadata_to_photos' });
 
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: { allow_client_metadata_edit: boolean; apply_metadata_to_photos: boolean; title: string; description: string; keywords: string; location: string; city: string; state: string; country: string; iso_country: string; }) => {
         const metaOpts = {
             allow_client_metadata_edit: data.allow_client_metadata_edit,
             apply_metadata_to_photos: data.apply_metadata_to_photos,
@@ -62,14 +62,15 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
         }
     };
 
+    const formValues = useWatch({ control }) as IptcData;
     const currentIptc: IptcData = {
-        title: watch('title'), description: watch('description'), keywords: watch('keywords'),
-        location: watch('location'), city: watch('city'), state: watch('state'),
-        country: watch('country'), iso_country: watch('iso_country')
+        title: formValues.title, description: formValues.description, keywords: formValues.keywords,
+        location: formValues.location, city: formValues.city, state: formValues.state,
+        country: formValues.country, iso_country: formValues.iso_country
     };
     
     const handleIptcChange = (newData: IptcData) => {
-        Object.entries(newData).forEach(([key, val]) => setValue(key as any, val));
+        Object.entries(newData).forEach(([key, val]) => setValue(key as Parameters<typeof setValue>[0], val));
     };
 
     if (!isOpen) return null;

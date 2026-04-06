@@ -1,1 +1,0 @@
-// Obsolet: In Sidebar integriert

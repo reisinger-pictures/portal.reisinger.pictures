@@ -12,11 +12,11 @@ export interface DomainMapping {
 }
 
 export function useUsers() {
-    const {data: response, mutate: mutateUsers} = useSWR<any>('/api/management/users', fetcher);
+    const {data: response, mutate: mutateUsers} = useSWR<{data: UserDetailed[]} | UserDetailed[]>('/api/management/users', fetcher);
     const {data: roles} = useSWR<Role[]>('/api/management/roles', fetcher);
     const {data: mappings, mutate: mutateMappings} = useSWR<DomainMapping[]>('/api/management/domain-mappings', fetcher);
 
-    const users: UserDetailed[] | undefined = response?.data ? response.data : response;
+    const users: UserDetailed[] | undefined = response ? (Array.isArray(response) ? response : response.data) : undefined;
 
     const createUser = async (name: string, email: string) => {
         await apiMutate('/api/management/users', 'POST', {name, email});

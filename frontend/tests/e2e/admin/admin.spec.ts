@@ -1,20 +1,23 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
+import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { NetworkHelper } from '../helpers/NetworkHelper';
 
-test.afterAll(async ({ request }) => {
-    await E2EUserHelper.cleanupE2EData(request);
-    await E2EUserHelper.cleanupTrackedUsers(request);
-});
 
-test.describe.serial('Admin Workflow', () => {
+
+test.describe('Admin Workflow', () => {
+    let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
-    test.beforeAll(async ({ request }) => {
-        testUser = await E2EUserHelper.createIsolatedUser(request, 'admin');
+    test.beforeEach(async ({ request }) => {
+        helper = new E2ESessionHelper(request);
+        testUser = await helper.createIsolatedUser( 'admin');
+    });
+
+    test.afterEach(async () => {
+        if (helper) await helper.teardown();
     });
 
     let auth: AuthHelper;
@@ -43,7 +46,11 @@ test.describe.serial('Admin Workflow', () => {
         const network = new NetworkHelper(page);
         const usersRefetchPromise = network.waitForUsersRefetch();
 
+        const createUserPromise = page.waitForResponse(res => res.url().includes('/api/management/users') && res.request().method() === 'POST');
         await modal.clickButton('Nutzer anlegen & Einladen');
+        const res = await createUserPromise;
+        const data = await res.json();
+        helper.trackUser(data.user.id);
         await usersRefetchPromise;
 
         const toast = page.locator('.toast');

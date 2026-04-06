@@ -45,14 +45,15 @@ class UserController extends Controller
             $frontendUrl = rtrim(config('app.frontend_url'), '/');
             $link = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
             
-            Mail::send('emails.activate', [
-                'userName' => $user->name,
-                'introText' => 'Es wurde ein Account für dich angelegt. Klicke hier, um ein Passwort zu vergeben:',
-                'actionUrl' => $link,
-                'actionText' => 'Account aktivieren'
-            ], function($msg) use ($user) {
-                $msg->to($user->email)->subject('Dein neuer Account');
-            });
+            \Illuminate\Support\Facades\Mail::to($user->email)->send(
+                new \App\Mail\ActivateAccountMail(
+                    $user->name,
+                    'Es wurde ein Account für dich angelegt. Klicke hier, um ein Passwort zu vergeben:',
+                    $link,
+                    'Account aktivieren',
+                    'Dein neuer Account'
+                )
+            );
 
             return response()->json(['success' => true, 'user' => new \App\Http\Resources\UserResource($user)]);
         });

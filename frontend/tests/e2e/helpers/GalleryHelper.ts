@@ -22,6 +22,6 @@ export class GalleryHelper {
 
         await galLink.click();
 
-        await expect(this.page.getByRole('heading', { name })).toBeVisible({ timeout: 10000 });
+        await expect(this.page.getByRole('heading', { name })).toBeVisible();
     }
 }

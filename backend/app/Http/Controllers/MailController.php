@@ -8,6 +8,8 @@ use App\Models\GalleryGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\CustomMail;
+use App\Mail\NotificationMail;
 
 class MailController extends Controller
 {
@@ -42,9 +44,7 @@ class MailController extends Controller
             $subject = str_replace(['{user_name}', '{gallery_name}'], [$user->name, $gallery->name], $request->subject);
             $body = str_replace(['{user_name}', '{gallery_name}', '{link}'], [$user->name, $gallery->name, $link], $request->body);
 
-            Mail::send('emails.custom', ['subject' => $subject, 'customBody' => $body], function ($message) use ($user, $subject) {
-                $message->to($user->email)->subject($subject);
-            });
+            Mail::to($user->email)->send(new CustomMail($subject, $body));
             $count++;
         }
 
@@ -69,12 +69,10 @@ class MailController extends Controller
         ->get();
         
         foreach($notifiedUsers as $notifiedUser) {
-            Mail::send('emails.notification', [
-                'userName' => $notifiedUser->name,
-                'messageBody' => "<p>Der Kunde <b>{$user->name}</b> ({$user->email}) hat die Auswahl in der Galerie <b>{$gallery->name}</b> soeben abgeschlossen.</p>"
-            ], function($msg) use ($notifiedUser, $gallery) {
-                $msg->to($notifiedUser->email)->subject("Auswahl abgeschlossen: {$gallery->name}");
-            });
+            $messageBody = "<p>Der Kunde <b>{$user->name}</b> ({$user->email}) hat die Auswahl in der Galerie <b>{$gallery->name}</b> soeben abgeschlossen.</p>";
+            $mailSubject = "Auswahl abgeschlossen: {$gallery->name}";
+            
+            Mail::to($notifiedUser->email)->send(new NotificationMail($notifiedUser->name, $messageBody, $mailSubject));
         }
 
         return response()->json(['success' => true]);

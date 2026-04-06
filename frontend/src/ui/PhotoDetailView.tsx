@@ -1,4 +1,4 @@
-import {useState, useEffect} from 'react';
+import {useState} from 'react';
 import ErrorMessage from './components/ErrorMessage';
 import {useNavigate, useParams} from 'react-router-dom';
 import useSWR from 'swr';
@@ -37,30 +37,23 @@ export default function PhotoDetailView() {
     const [saving, setSaving] = useState(false);
 
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [prevPhotoId, setPrevPhotoId] = useState<string | undefined>(undefined);
 
-    // SWR Dependency Fix: Formular nur aktualisieren, wenn sich die DB-Werte WIRKLICH ändern
-    const photoHash = data?.photo ? JSON.stringify([
-        data.photo.title, data.photo.description, data.photo.artist,
-        data.photo.headline, data.photo.keywords, data.photo.location,
-        data.photo.city, data.photo.state, data.photo.country, data.photo.iso_country
-    ]) : '';
-
-    useEffect(() => {
-        if (data?.photo) {
-            setIptcData({
-                title: data.photo.title || '',
-                description: data.photo.description || '',
-                artist: data.photo.artist || '',
-                headline: data.photo.headline || '',
-                keywords: data.photo.keywords || '',
-                location: data.photo.location || '',
-                city: data.photo.city || '',
-                state: data.photo.state || '',
-                country: data.photo.country || '',
-                iso_country: data.photo.iso_country || ''
-            });
-        }
-    }, [photoHash]);
+    if (data?.photo && data.photo.id !== prevPhotoId) {
+        setPrevPhotoId(data.photo.id);
+        setIptcData({
+            title: data.photo.title || '',
+            description: data.photo.description || '',
+            artist: data.photo.artist || '',
+            headline: data.photo.headline || '',
+            keywords: data.photo.keywords || '',
+            location: data.photo.location || '',
+            city: data.photo.city || '',
+            state: data.photo.state || '',
+            country: data.photo.country || '',
+            iso_country: data.photo.iso_country || ''
+        });
+    }
 
     if (isLoading) return <PageLayout>
         <div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div>
@@ -119,10 +112,10 @@ export default function PhotoDetailView() {
                     </div>
                 </div>
 
-                {/* Content Area (Bild links, Formular rechts ab XL) */}
+                {/* Content Area */}
                 <div className="flex flex-col xl:flex-row gap-8 items-start">
 
-                    {/* Linke Spalte: Bild, Datei-Info & Löschen */}
+                    {/* Linke Spalte */}
                     <div className="flex-1 w-full flex flex-col gap-4">
                         <div className="bg-base-200 rounded-box flex items-center justify-center p-4 min-h-[40vh]">
                             <img src={photo.url} alt={photo.filename} className="max-w-full h-auto max-h-[70vh] object-contain rounded drop-shadow-xl"/>
@@ -168,7 +161,23 @@ export default function PhotoDetailView() {
                 </div>
             </div>
 
-            <PhotoHistoryModal photoId={photo.id} isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} onReverted={() => mutate()} />
+            <PhotoHistoryModal photoId={photo.id} isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} onReverted={async () => {
+            const newData = await mutate();
+            if (newData?.photo) {
+                setIptcData({
+                    title: newData.photo.title || '',
+                    description: newData.photo.description || '',
+                    artist: newData.photo.artist || '',
+                    headline: newData.photo.headline || '',
+                    keywords: newData.photo.keywords || '',
+                    location: newData.photo.location || '',
+                    city: newData.photo.city || '',
+                    state: newData.photo.state || '',
+                    country: newData.photo.country || '',
+                    iso_country: newData.photo.iso_country || ''
+                });
+            }
+        }} />
         </PageLayout>
     );
 }

@@ -23,9 +23,19 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
-      // We set these to warn for now so it doesn't immediately break your build
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': 'warn'
+    },
+  },
+  {
+    // QA Enforcement: Playwright Tests
+    files: ['tests/e2e/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Property[key.name="force"][value.value=true]',
+          message: 'Strict QA Enforcement: Do not use { force: true } in Playwright E2E tests. Fix the UI instead.'
+        }
+      ]
     },
   }
 );

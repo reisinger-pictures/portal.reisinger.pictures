@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Photo } from '../../../logic/useGallery';
 
-export default function DaisyUIRatingBridge({ photo, ratePhoto }: { photo: any, ratePhoto: any }) {
+export default function DaisyUIRatingBridge({ photo, ratePhoto }: { photo: Photo, ratePhoto: (id: string, rating: number, comment: string) => void }) {
     const [comment, setComment] = useState(photo?.comment || '');
+    const [prevPhotoId, setPrevPhotoId] = useState(photo?.id);
+    const [prevPhotoComment, setPrevPhotoComment] = useState(photo?.comment || '');
 
-    useEffect(() => {
+    if (photo?.id !== prevPhotoId || (photo?.comment || '') !== prevPhotoComment) {
+        setPrevPhotoId(photo?.id);
+        setPrevPhotoComment(photo?.comment || '');
         setComment(photo?.comment || '');
-    }, [photo.id, photo.comment]);
+    }
 
-    const stopProp = (e: any) => e.stopPropagation();
+    const stopProp = (e: React.SyntheticEvent) => e.stopPropagation();
 
     const currentRating = Number(photo.rating) || 0;
 

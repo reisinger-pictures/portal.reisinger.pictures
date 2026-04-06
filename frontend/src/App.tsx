@@ -2,8 +2,11 @@ import {Navigate, Route, Routes} from 'react-router-dom';
 import ErrorMessage from './ui/components/ErrorMessage';
 import {useAuth} from './logic/useAuth';
 import ErrorBoundary from './ui/components/ErrorBoundary';
-import { UIProvider } from './ui/components/UIContext';
+import { UIProvider } from './ui/components/UIProvider';
+import { useUI } from './ui/components/UIContext';
 import { lazy, Suspense } from 'react';
+import { SWRConfig } from 'swr';
+
 const ResetPassword = lazy(() => import('./ui/ResetPassword'));
 const ProtectedDashboard = lazy(() => import('./ui/ProtectedDashboard'));
 const GalleryView = lazy(() => import('./ui/GalleryView'));
@@ -24,39 +27,57 @@ function ProtectedRoute({children}: { children: React.ReactNode }) {
 
 const SuspenseFallback = () => <div className="flex h-screen items-center justify-center"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
 
+const GlobalSWRConfig = ({ children }: { children: React.ReactNode }) => {
+    const { showToast } = useUI();
+    return (
+        <SWRConfig value={{ 
+            onError: (error) => {
+                // Fange 500er Serverfehler und Status 0 (Offline/Netzwerk) global ab
+                if (error.status >= 500 || error.status === 0) {
+                    showToast('error', error.message || 'Ein unerwarteter Serverfehler ist aufgetreten.');
+                }
+            }
+        }}>
+            {children}
+        </SWRConfig>
+    );
+};
+
 export default function App() {
     return (
         <ErrorBoundary fallback={<div className="flex h-screen items-center justify-center p-8">
             <ErrorMessage title="Kritischer Fehler" message="Bitte Seite neu laden." />
         </div>}>
             <UIProvider>
-                <Suspense fallback={<SuspenseFallback />}>
-                <Routes>
-                <Route path="/reset-password" element={<ResetPassword/>}/>
+                <GlobalSWRConfig>
+                    <Suspense fallback={<SuspenseFallback />}>
+                        <Routes>
+                            <Route path="/reset-password" element={<ResetPassword/>}/>
 
-                <Route path="/meta/:id" element={
-                    <ProtectedRoute><ErrorBoundary><ManagementMetaGalleryView/></ErrorBoundary></ProtectedRoute>}/>
-                <Route path="/galleries" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                <Route path="/galleries/*" element={<ErrorBoundary><GalleryView/></ErrorBoundary>}/>
-                <Route path="/photos/:id" element={<ErrorBoundary><PhotoDetailView/></ErrorBoundary>}/>
-                <Route path="/invite/:token" element={<ErrorBoundary><InviteView/></ErrorBoundary>}/>
+                            <Route path="/meta/:id" element={
+                                <ProtectedRoute><ErrorBoundary><ManagementMetaGalleryView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/galleries" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/galleries/*" element={<ErrorBoundary><GalleryView/></ErrorBoundary>}/>
+                            <Route path="/photos/:id" element={<ErrorBoundary><PhotoDetailView/></ErrorBoundary>}/>
+                            <Route path="/invite/:token" element={<ErrorBoundary><InviteView/></ErrorBoundary>}/>
 
-                <Route path="/search" element={<ErrorBoundary><SearchView/></ErrorBoundary>}/>
+                            <Route path="/search" element={<ErrorBoundary><SearchView/></ErrorBoundary>}/>
 
-                {/* Dashboard-Weiche (ProtectedDashboard) für alle Root- und App-Views */}
-                <Route path="/" element={<ErrorBoundary><ProtectedDashboard/></ErrorBoundary>}/>
+                            {/* Dashboard-Weiche (ProtectedDashboard) für alle Root- und App-Views */}
+                            <Route path="/" element={<ErrorBoundary><ProtectedDashboard/></ErrorBoundary>}/>
 
-                <Route path="/users"
-                       element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                <Route path="/settings"
-                       element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                <Route path="/stats"
-                       element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                                <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
-                <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
-                <Route path="*" element={<Navigate to="/" replace/>}/>
-            </Routes>
-                </Suspense>
+                            <Route path="/users"
+                                element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/settings"
+                                element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/stats"
+                                element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                                            <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
+                            <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="*" element={<Navigate to="/" replace/>}/>
+                        </Routes>
+                    </Suspense>
+                </GlobalSWRConfig>
             </UIProvider>
         </ErrorBoundary>
     );

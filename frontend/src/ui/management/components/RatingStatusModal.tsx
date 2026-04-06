@@ -8,8 +8,8 @@ interface Props {
 }
 
 export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props) {
-    const [ratingsData, setRatingsData] = useState<any[]>([]);
-    const [ratingStatusData, setRatingStatusData] = useState<any[]>([]);
+    const [ratingsData, setRatingsData] = useState<Array<{lr_uuid?: string; filename?: string; avg_rating?: number; all_comments?: string; thumb_url?: string; user_id?: string; name?: string; email?: string; rated_count?: number}>>([]);
+    const [ratingStatusData, setRatingStatusData] = useState<Array<{lr_uuid?: string; filename?: string; avg_rating?: number; all_comments?: string; thumb_url?: string; user_id?: string; name?: string; email?: string; rated_count?: number}>>([]);
     const [totalGalleryPhotos, setTotalGalleryPhotos] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(false);
@@ -40,7 +40,7 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
                     setTotalGalleryPhotos(dataStatus.total_photos);
                     setIsLoading(false);
                 }
-            } catch (e) {
+            } catch {
                 if (isMounted) {
                     setError(true);
                     setIsLoading(false);
@@ -121,7 +121,7 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
                                             <tr key={r.lr_uuid}>
                                                 <td><img src={r.thumb_url} className="w-12 h-12 object-cover rounded shadow-sm" alt={r.filename}/></td>
                                                 <td className="font-mono text-xs">{r.filename}</td>
-                                                <td className="whitespace-nowrap">{r.avg_rating > 0 ? '⭐'.repeat(r.avg_rating) : <span className="opacity-50">-</span>}</td>
+                                                <td className="whitespace-nowrap">{r.avg_rating && r.avg_rating > 0 ? '⭐'.repeat(r.avg_rating) : <span className="opacity-50">-</span>}</td>
                                                 <td className="whitespace-pre-wrap text-sm">{r.all_comments || <span className="opacity-50">-</span>}</td>
                                             </tr>
                                         ))}

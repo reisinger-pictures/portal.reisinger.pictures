@@ -30,7 +30,7 @@ export class SidebarHelper {
     async openNewGalleryModal() {
         await this.navigateTo('Galerien');
         const btn = this.page.getByRole('button', { name: 'Neue Galerie' });
-        await expect(btn).toBeVisible({ timeout: 10000 });
+        await expect(btn).toBeVisible();
         await btn.click();
     }
 

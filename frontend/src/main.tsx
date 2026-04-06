@@ -8,9 +8,7 @@ import './index.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
         <SWRConfig value={{
-            revalidateOnFocus: false, // Verhindert Flakiness in Tests durch Tab-Fokus
-            shouldRetryOnError: false,
-            dedupingInterval: navigator.userAgent.includes('Playwright') ? 0 : 5000,
+            shouldRetryOnError: false
         }}>
             <BrowserRouter>
                 <App/>

@@ -1,22 +1,25 @@
 import { test, expect } from '@playwright/test';
 import { NetworkHelper } from '../helpers/NetworkHelper';
 import { AuthHelper } from '../helpers/AuthHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
+import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 // 🧹 Clean-Up Hook: Räumt alle isoliert erstellten Galerien auf, bevor der E2E-User gelöscht wird.
-test.afterAll(async ({ request }) => {
-    await E2EUserHelper.cleanupE2EData(request);
-    await E2EUserHelper.cleanupTrackedUsers(request);
-});
 
-test.describe.serial('Client Selection Workflow', () => {
+
+test.describe('Client Selection Workflow', () => {
+    let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
-    test.beforeAll(async ({ request }) => {
-        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    test.beforeEach(async ({ request }) => {
+        helper = new E2ESessionHelper(request);
+        testUser = await helper.createIsolatedUser( 'photographer');
+    });
+
+    test.afterEach(async () => {
+        if (helper) await helper.teardown();
     });
 
     test('End-to-End Selection Flow: Create, Invite, Redeem, DAU-Protect, Rate and Filter', async ({ page }) => {
@@ -38,7 +41,7 @@ test.describe.serial('Client Selection Workflow', () => {
         await modal.submitModal('Speichern');
         
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeVisible({ timeout: 15000 });
+        await expect(galLink).toBeVisible();
         await galLink.scrollIntoViewIfNeeded();
         await galLink.click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
@@ -99,8 +102,9 @@ test.describe.serial('Client Selection Workflow', () => {
         await expect(page.locator('.pswp')).toBeVisible();
         
         await expect(async () => {
+            await page.waitForTimeout(500);
             await page.locator('button.pswp__button--close').click();
-            await expect(page.locator('.pswp')).toBeHidden();
-        }).toPass();
+            await expect(page.locator('.pswp')).toBeHidden({ timeout: 10000 });
+        }).toPass({ timeout: 15000 });
     });
 });

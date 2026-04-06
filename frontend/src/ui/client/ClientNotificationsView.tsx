@@ -36,7 +36,7 @@ export default function ClientNotificationsView() {
         try {
             await apiMutate(endpoint, 'POST', { wants_notifications: !currentValue });
             mutate();
-        } catch (e) {
+        } catch {
             alert('Fehler beim Speichern der Einstellung.');
             mutate();
         }

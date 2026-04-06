@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Gallery, FlatGroup } from '../../logic/useGalleries';
 import { useUI } from './UIContext';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
@@ -24,8 +24,8 @@ interface Props {
     availableGroups: FlatGroup[];
     editingGallery?: Gallery | null;
     defaultGroupId?: string | null;
-    onCreate: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
-    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: any) => Promise<void>;
+    onCreate: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: Record<string, unknown>) => Promise<void>;
+    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: Record<string, unknown>) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
 
@@ -34,7 +34,7 @@ const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace
 export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
 
-    const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
+    const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
         defaultValues: {
             name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: ''
@@ -56,15 +56,16 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);
 
-    const watchName = watch('name');
+    const watchName = useWatch({ control, name: 'name' });
     useEffect(() => {
         if (!editingGallery && !dirtyFields.slug && watchName) {
             setValue('slug', toSlug(watchName));
         }
     }, [watchName, editingGallery, dirtyFields.slug, setValue]);
 
-    const watchType = watch('type');
-    const watchGroupId = watch('gallery_group_id');
+    const watchType = useWatch({ control, name: 'type' });
+    const watchGroupId = useWatch({ control, name: 'gallery_group_id' });
+    const watchIsPublic = useWatch({ control, name: 'is_public' });
 
     useEffect(() => {
         if (watchType === 'selection') {
@@ -95,8 +96,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 showToast('success', 'Galerie erfolgreich erstellt.');
             }
             onClose();
-        } catch (e: any) {
-            showToast('error', e.message || 'Fehler beim Speichern');
+        } catch (e: unknown) {
+            showToast('error', (e as Error).message || 'Fehler beim Speichern');
         }
     };
 
@@ -107,8 +108,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 await onDelete(editingGallery.id);
                 showToast('success', 'Galerie erfolgreich gelöscht.');
                 onClose();
-            } catch (e: any) {
-                showToast('error', e.message || 'Fehler beim Löschen');
+            } catch (e: unknown) {
+                showToast('error', (e as Error).message || 'Fehler beim Löschen');
             }
         }
     };
@@ -154,7 +155,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                         </div>
                         <div className="form-control w-full md:w-1/2">
                             <label className="label"><span className="label-text font-bold">Sichtbarkeit</span></label>
-                            <select disabled={isVisibilityForced} value={isVisibilityForced ? (forcedVisibility ? 'true' : 'false') : (watch('is_public') ? 'true' : 'false')} onChange={e => setValue('is_public', e.target.value === 'true')} className="select select-bordered w-full">
+                            <select disabled={isVisibilityForced} value={isVisibilityForced ? (forcedVisibility ? 'true' : 'false') : (watchIsPublic ? 'true' : 'false')} onChange={e => setValue('is_public', e.target.value === 'true')} className="select select-bordered w-full">
                                 <option value="false">Privat (Nur mit Link / Passwort)</option>
                                 <option value="true">Öffentlich (Für alle sichtbar)</option>
                             </select>

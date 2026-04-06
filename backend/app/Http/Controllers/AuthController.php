@@ -77,14 +77,15 @@ class AuthController extends Controller
             $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
             $link = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
             
-            Mail::send('emails.activate', [
-                'userName' => $user->name,
-                'introText' => 'Willkommen! Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:',
-                'actionUrl' => $link,
-                'actionText' => 'Account aktivieren'
-            ], function($msg) use ($user) {
-                $msg->to($user->email)->subject('Account aktivieren');
-            });
+            \Illuminate\Support\Facades\Mail::to($user->email)->send(
+                new \App\Mail\ActivateAccountMail(
+                    $user->name,
+                    'Willkommen! Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:',
+                    $link,
+                    'Account aktivieren',
+                    'Account aktivieren'
+                )
+            );
 
             return response()->json(['success' => true, 'message' => 'Registrierung erfolgreich. Bitte prüfe deine E-Mails.']);
         });

@@ -1,20 +1,23 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
+import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import {NetworkHelper} from "../helpers/NetworkHelper";
 
-test.afterAll(async ({ request }) => {
-    await E2EUserHelper.cleanupE2EData(request);
-    await E2EUserHelper.cleanupTrackedUsers(request);
-});
 
-test.describe.serial('Client Notifications Opt-In', () => {
+
+test.describe('Client Notifications Opt-In', () => {
+    let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
-    test.beforeAll(async ({ request }) => {
-        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    test.beforeEach(async ({ request }) => {
+        helper = new E2ESessionHelper(request);
+        testUser = await helper.createIsolatedUser( 'photographer');
+    });
+
+    test.afterEach(async () => {
+        if (helper) await helper.teardown();
     });
 
     test('Client can toggle email notifications in gallery view', async ({ page }) => {
@@ -33,7 +36,7 @@ test.describe.serial('Client Notifications Opt-In', () => {
 
         // Galerie öffnen
         const galleryLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galleryLink).toBeVisible({ timeout: 15000 });
+        await expect(galleryLink).toBeVisible();
         await galleryLink.click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
         

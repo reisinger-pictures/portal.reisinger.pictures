@@ -10,7 +10,6 @@ use Laravel\Scout\Searchable;
 class Photo extends Model
 {
     use HasFactory, HasUuids;
-
     use Searchable;
 
     public const UPDATED_AT = null;
@@ -19,7 +18,8 @@ class Photo extends Model
         'id', 'gallery_id', 'filename', 'lr_uuid', 'width', 'height', 
         'title', 'description', 'artist', 'keywords', 'location', 
         'city', 'state', 'country', 'iso_country', 'created_at', 'url', 'thumb_url', 
-        'rating', 'comment', 'gallery', 'artist'
+        'rating', 'comment', 'gallery', 'artist',
+        'effective_is_editorial_only', 'effective_is_hidden', 'last_accessed_at', 'is_downscaled'
     ];
 
     protected $fillable = [
@@ -36,7 +36,11 @@ class Photo extends Model
         'city',
         'state',
         'country',
-        'iso_country'
+        'iso_country',
+        'is_editorial_only',
+        'is_hidden',
+        'last_accessed_at',
+        'is_downscaled'
     ];
 
     public function gallery()
@@ -44,7 +48,11 @@ class Photo extends Model
         return $this->belongsTo(Gallery::class);
     }
 
-    protected $appends = ['artist', 'url', 'thumb_url', 'srcset'];
+    protected $appends = [
+        'artist', 'url', 'thumb_url', 'srcset', 
+        'effective_is_editorial_only', 'effective_is_hidden'
+    ];
+    
     protected $with = ['gallery'];
 
     public function user()
@@ -58,7 +66,20 @@ class Photo extends Model
         return $this->user->metadata_copyright ?: $this->user->name;
     }
 
-    
+    public function getEffectiveIsEditorialOnlyAttribute(): bool
+    {
+        if ($this->is_editorial_only !== null) return (bool) $this->is_editorial_only;
+        if ($this->gallery) return $this->gallery->effective_is_editorial_only;
+        return false;
+    }
+
+    public function getEffectiveIsHiddenAttribute(): bool
+    {
+        if ($this->is_hidden !== null) return (bool) $this->is_hidden;
+        if ($this->gallery) return $this->gallery->effective_is_hidden;
+        return false;
+    }
+
     public function getUrlAttribute() {
         if (!$this->gallery) return null;
         return '/api/media/' . $this->gallery->slug . '/_thumbs/2000/' . $this->id . '.webp';
@@ -84,7 +105,6 @@ class Photo extends Model
 
     public function shouldBeSearchable()
     {
-        // Bilder aus Selection-Galerien komplett vom Suchindex ausschließen
         return $this->gallery && $this->gallery->type !== 'selection';
     }
 

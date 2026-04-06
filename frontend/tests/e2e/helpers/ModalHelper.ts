@@ -42,7 +42,9 @@ export class ModalHelper {
     async clickButton(buttonText: string) {
         const btn = this.activeModal.getByRole('button', { name: buttonText });
         await btn.scrollIntoViewIfNeeded();
-        await btn.click({ force: true });
+        // Anti-Flakiness: Dem React Hook Form kurz Zeit geben, den State (z.B. nach Dropdown-Selects) zu syncen
+        await this.page.waitForTimeout(200);
+        await btn.click();
     }
 
     async closeModal() {

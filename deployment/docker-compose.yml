@@ -104,6 +104,31 @@ services:
       webnet:
         ipv4_address: 172.18.0.31
 
+  backend-worker:
+    image: ghcr.io/reisi007/php-apache-mod2rewrite-imagick-exiftool-maria-pdo:8.5
+    container_name: portal_backend_worker
+    restart: unless-stopped
+    depends_on:
+      backend-init:
+        condition: service_completed_successfully
+    volumes:
+      - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:Z
+      - /home/webadmin/websites/photos:/var/www/photos:Z
+    environment: *backend_env
+    command: >
+      sh -c "
+      echo 'Starte Laravel Queue Worker...';
+      php artisan queue:work --tries=3 &
+      
+      echo 'Starte Laravel Scheduler (Cron)...';
+      while true; do
+        php artisan schedule:run >> /dev/null 2>&1;
+        sleep 60;
+      done
+      "
+    networks:
+      - portal_internal
+
   frontend:
     image: nginx:alpine
     container_name: portal_frontend

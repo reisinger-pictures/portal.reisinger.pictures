@@ -36,6 +36,22 @@ class GalleryGroup extends Model
         });
     }
 
+    protected $appends = ['effective_is_editorial_only', 'effective_is_hidden'];
+
+    public function getEffectiveIsEditorialOnlyAttribute(): bool
+    {
+        if ($this->is_editorial_only !== null) return (bool) $this->is_editorial_only;
+        if ($this->parent) return $this->parent->effective_is_editorial_only;
+        return false;
+    }
+
+    public function getEffectiveIsHiddenAttribute(): bool
+    {
+        if ($this->is_hidden !== null) return (bool) $this->is_hidden;
+        if ($this->parent) return $this->parent->effective_is_hidden;
+        return false;
+    }
+
     public function parent()
     {
         return $this->belongsTo(GalleryGroup::class, 'parent_id');

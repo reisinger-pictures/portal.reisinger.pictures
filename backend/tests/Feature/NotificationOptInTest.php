@@ -29,10 +29,16 @@ class NotificationOptInTest extends TestCase {
         
         try { \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages'); } catch (\Exception $e) {}
 
-        $this->withHeaders(['Authorization' => "Bearer $adminToken"])
+        $adminResponse = $this->withHeaders(['Authorization' => "Bearer $adminToken"])
              ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [
                  'subject' => 'OptIn Update', 'body' => 'Hello'
              ]);
+        
+        $adminResponse->assertStatus(200);
+        $this->assertEquals(1, $adminResponse->json('notified_count'));
+
+        // WORKER STARTEN: Leert die asynchrone Warteschlange für den Test
+        \Illuminate\Support\Facades\Artisan::call('queue:work', ['--stop-when-empty' => true]);
 
         $mailpitResponse = \Illuminate\Support\Facades\Http::get('http://127.0.0.1:8026/api/v1/messages');
         $messages = $mailpitResponse->json('messages');

@@ -29,7 +29,7 @@ export default function ManagementMetaGalleryView() {
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
     const galleryRef = useRef<HTMLDivElement>(null);
 
-    usePhotoSwipe({ galleryRef, dependencies: [photos.length] });
+    usePhotoSwipe({ galleryRef, trigger: photos.length });
 
     if (isLoading && photos.length === 0) return <PageLayout>
         <div className="flex h-full items-center justify-center"><span className="loading loading-spinner"></span></div>

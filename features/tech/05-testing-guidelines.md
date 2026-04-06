@@ -7,20 +7,29 @@ status: active
 # Technical Concept: Testing Guidelines
 
 ## 1. Testing Rules (UI-FIRST) & Philosophy
+* **No Test-Environment Checks in Production (STRICT):** Production code must never alter its behavior based on test environments (e.g., checking `navigator.userAgent.includes('Playwright')`). Tests must validate the genuine application behavior. If tests flake due to realistic features (like `revalidateOnFocus`), fix the test assertions, do not cripple the application UX.
+* **No Shared State / No Serial Execution (STRICT):** The use of `test.describe.serial` is strictly forbidden. Tests must be 100% isolated. Do not share variables (like URLs or IDs) across `test()` blocks. If steps depend on each other, combine them into a single, cohesive End-to-End `test()` block.
 * **UI-First Synchronization (MANDATORY):**
   * Never use `page.waitForResponse()` or network status codes to verify UI updates. E2E tests must only care about what the user sees.
   * Use `expect(locator).toBeVisible({ timeout: 15000 })` for simple updates.
   * Use `await expect(async () => { ... }).toPass()` for complex SWR/React state transitions where multiple re-renders occur.
-* **STRICT Anti-Reload Policy (Genuine User Reactivity):** Die Verwendung von `page.reload()` zur Status-Synchronisation in E2E-Tests ist **strikt untersagt**. 
-  * **Begründung:** Ein Reload maskiert fehlerhaftes State-Management. Wenn eine Entität erstellt wird, *muss* sich das UI im Hintergrund automatisch aktualisieren.
-  * **Lösung:** Nutze ausschließlich geduldige Asserts. Schlägt dies fehl, liegt ein Bug in der Applikation vor.
+* **Pragmatische Reload Policy (Asynchronous Processes):** Generell sollte `page.reload()` vermieden werden, um direktes UI-State-Management (z.B. SWR Mutations nach dem Erstellen einer Entität) zu testen.
+  * **Ausnahme:** Bei unabhängigen, zeitversetzten oder entkoppelten serverseitigen Prozessen (z. B. das Aktualisieren eines "E-Mail senden"-Buttons, weil ein anderer Nutzer sich im Hintergrund in die Empfängerliste eingetragen hat) ist `page.reload()` oder erneutes Hin-Navigieren ausdrücklich **erlaubt**. In solchen Fällen spiegelt das Neuladen das natürliche Nutzerverhalten wider.
 * **Fail-Fast:** Der Testlauf wird nach 2 fehlgeschlagenen Tests (z.B. `maxFailures: 2` in Playwright) sofort abgebrochen.
-* **Test-Runner:** Use `run_new_tests.bat` strictly for running tests (idempotent).
 * **No `force: true` in Playwright:** Bypassing actionability checks defeats the purpose of E2E tests. If Playwright cannot click an element naturally, a human probably can't either. Always wait for elements to become stable and uncovered (e.g., wait for animations to finish or modals to close via `toBeHidden()`) instead of forcing clicks.
 * **No Try-Catch Anti-Pattern:** Never mask failing tests by wrapping production code or assertions in `try-catch` blocks purely to pass a test. Exceptions must bubble up and fail the test clearly.
 * **Single Reason to Fail (SRP):** Tests (PHPUnit & Playwright) MUST focus on a single behavior. Avoid monolithic 20-step tests.
+* **User-Facing Locators (REQUIRED):**
+  * Avoid technical selectors (CSS class, ID) if possible.
+  * Use role-based locators: `page.getByRole('button', { name: 'Login' })`.
+  * Use text-based locators: `page.getByText('Success')`.
+  * This ensures tests remain stable against layout changes and verify accessibility.
+* **Web-First Assertions:**
+  * Use `expect(locator).toBeVisible()` or `expect(locator).toHaveText()` instead of generic `expect(await locator.isVisible()).toBe(true)`.
+  * Web-first assertions automatically retry until the condition is met or a timeout occurs.
 
 ## 2. E2E Tests (Playwright)
+- **Trace Viewer & Debugging:** Always analyze the Playwright trace (`playwright show-report`) to understand failures. Traces provide a full execution timeline, snapshots, and network logs.
 - **Test Isolation (No DB Reset):** E2E tests run directly against the local dev environment (`portal_db`). They MUST be non-destructive. Always use highly dynamic names/identifiers (e.g., `Date.now()`).
 - **Page Object Model (POM):** Do not duplicate Playwright logic. Use provided helper classes (e.g., `ModalHelper`, `SidebarHelper`).
 - **Mobile-First Validation:** E2E tests must be explicitly executed against mobile viewports to verify touch targets and z-index issues.
@@ -32,9 +41,18 @@ status: active
   - Mocking emails is forbidden. Tests must query the local Mailpit API.
   - Tests MUST parse the HTML body of the email, extract generated action links (e.g., Magic Links), and confirm that navigating to these links resolves successfully (HTTP 200).
 
-## 4. User Management in Tests (CRITICAL)
+## 4. Resource Tracking & Isolation (CRITICAL)
+- **No Global Cleanups:** Never use global admin scripts to wipe all E2E data. This breaks parallelism.
+- **Instance-based Tracking:** Every test file must instantiate a fresh `E2EUserHelper`.
+- **Automatic Teardown:** Resources (Users, Galleries, Groups) created during a test must be registered in the helper instance and cleaned up in `test.afterEach()`.
+- **Usage Pattern:**
+  ```typescript
+  let helper: E2ESessionHelper;
+  test.beforeEach(({ request }) => { helper = new E2ESessionHelper(request); });
+  test.afterEach(async () => { await helper.teardown(); });
+  ```
 - **No Static Seeders for Tests:** Never rely on static test users generated by `DatabaseSeeder.php` (except the initial `florian@reisinger.pictures` super-admin used for bootstrapping).
-- **On-the-fly Creation:** E2E tests MUST create their own isolated users on-the-fly via the API in `test.beforeAll()`. Use the `E2EUserHelper.createIsolatedUser()` utility to generate a fresh user with the required role.
+- **On-the-fly Creation:** E2E tests MUST create their own isolated users on-the-fly via the API in `test.beforeAll()`. Use the `E2ESessionHelper.createIsolatedUser()` utility to generate a fresh user with the required role.
 
 ## 5. Helper Classes & DRY (Don't Repeat Yourself)
 - **SRP in Helpers:** E2E Helpers müssen strikt nach Domänen getrennt sein. Vermeide God-Objects.

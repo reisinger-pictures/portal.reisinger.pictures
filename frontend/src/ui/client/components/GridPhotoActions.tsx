@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Photo } from '../../../logic/useGallery';
 
-export default function GridPhotoActions({ photo, ratePhoto }: { photo: any, ratePhoto: any }) {
+export default function GridPhotoActions({ photo, ratePhoto }: { photo: Photo, ratePhoto: (id: string, rating: number, comment: string) => void }) {
     const [comment, setComment] = useState(photo.comment || '');
+    const [prevPhotoId, setPrevPhotoId] = useState(photo.id);
+    const [prevPhotoComment, setPrevPhotoComment] = useState(photo.comment || '');
 
-    useEffect(() => {
+    if (photo.id !== prevPhotoId || (photo.comment || '') !== prevPhotoComment) {
+        setPrevPhotoId(photo.id);
+        setPrevPhotoComment(photo.comment || '');
         setComment(photo.comment || '');
-    }, [photo.comment]);
+    }
 
     return (
         <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3">

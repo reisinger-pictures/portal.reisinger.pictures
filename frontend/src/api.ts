@@ -17,7 +17,7 @@ const refreshToken = async (): Promise<boolean> => {
             });
 
             return res.ok;
-        } catch (e) {
+        } catch {
             return false;
         } finally {
             isRefreshing = false;
@@ -35,13 +35,14 @@ const getHeaders = (): Record<string, string> => ({
 
 const handleApiError = async (res: Response) => {
     let errorMsg = `HTTP Fehler ${res.status}`;
+    let errorInfo = null;
     const contentType = res.headers.get('content-type');
 
     if (contentType && contentType.includes('application/json')) {
         try {
-            const errData = await res.json();
-            errorMsg = errData.error || errData.message || errorMsg;
-        } catch {}
+            errorInfo = await res.json();
+            errorMsg = errorInfo.error || errorInfo.message || errorMsg;
+        } catch { /* ignore */ }
     } else {
         try {
             const text = await res.text();
@@ -51,13 +52,25 @@ const handleApiError = async (res: Response) => {
             } else if (text) {
                 errorMsg = text.substring(0, 150);
             }
-        } catch {}
+            errorInfo = { text };
+        } catch { /* ignore */ }
     }
-    throw new Error(errorMsg);
+    
+    const error = new Error(errorMsg) as Error & { info?: unknown; status?: number };
+    error.info = errorInfo;
+    error.status = res.status;
+    throw error;
 };
 
 export const fetcher = async <T>(url: string): Promise<T> => {
-    let res = await fetch(url, { headers: getHeaders(), credentials: 'include' });
+    let res: Response;
+    try {
+        res = await fetch(url, { headers: getHeaders(), credentials: 'include' });
+    } catch {
+        const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as Error & { status?: number };
+        error.status = 0;
+        throw error;
+    }
 
     if (res.status === 401 && !url.includes('/api/auth/')) {
         const success = await refreshToken();
@@ -74,12 +87,19 @@ export const fetcher = async <T>(url: string): Promise<T> => {
 };
 
 export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> => {
-    let res = await fetch(url, {
-        method,
-        headers: getHeaders(),
-        credentials: 'include',
-        body: body ? JSON.stringify(body) : undefined
-    });
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            method,
+            headers: getHeaders(),
+            credentials: 'include',
+            body: body ? JSON.stringify(body) : undefined
+        });
+    } catch {
+        const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as Error & { status?: number };
+        error.status = 0;
+        throw error;
+    }
 
     if (res.status === 401 && !url.includes('/api/auth/')) {
         const success = await refreshToken();

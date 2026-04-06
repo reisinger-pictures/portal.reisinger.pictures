@@ -31,8 +31,12 @@ const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disab
     const [isOpen, setIsOpen] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    // Update internal state if external value changes (e.g. initial load or parent override)
-    useEffect(() => { setQuery(value || ''); }, [value]);
+    const [prevValue, setPrevValue] = useState(value || '');
+
+    if ((value || '') !== prevValue) {
+        setPrevValue(value || '');
+        setQuery(value || '');
+    }
 
     // Debounce the fetch query
     useEffect(() => {
@@ -91,6 +95,13 @@ const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disab
         </div>
     );
 };
+
+const ReadOnlyField = ({ label, value }: { label: string, value?: string }) => (
+    <div className="mb-4">
+        <span className="text-xs font-bold opacity-70 block mb-1">{label}</span>
+        <div className="text-sm">{value || <span className="opacity-40 italic">Keine Angabe</span>}</div>
+    </div>
+);
 
 export default function IptcMetadataEditor({ data, onChange, showArtist = true, disabled = false, children }: Props) {
     const [keywordInput, setKeywordInput] = useState('');
@@ -151,13 +162,6 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
         if (disabled) return;
         handleChange('keywords', '');
     };
-
-    const ReadOnlyField = ({ label, value }: { label: string, value?: string }) => (
-        <div className="mb-4">
-            <span className="text-xs font-bold opacity-70 block mb-1">{label}</span>
-            <div className="text-sm">{value || <span className="opacity-40 italic">Keine Angabe</span>}</div>
-        </div>
-    );
 
     if (disabled) {
         return (

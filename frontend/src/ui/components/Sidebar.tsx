@@ -24,68 +24,7 @@ export default function Sidebar(props: SidebarProps) {
         navigate('/');
     };
 
-    const renderGroup = (group: GalleryGroup) => {
-        const safeChildren = Array.isArray(group.children) ? [...group.children].sort((a, b) => a.name.localeCompare(b.name)) : [];
-        const safeGalleries = Array.isArray(group.galleries) ? [...group.galleries].sort((a, b) => a.name.localeCompare(b.name)) : [];
-        return (
-            <li key={"group-" + group.id}>
-                <details open>
-                    <summary className="flex justify-between items-center pr-2 w-full whitespace-nowrap">
-                        <span className="font-semibold text-base-content/80 flex-1">📁 {group.name}</span>
-                        <div className="flex gap-1 ml-2 items-center shrink-0">
-                            {props.onEditGroup && (
-                                <div className="tooltip tooltip-left" data-tip="Meta-Galerie bearbeiten">
-                                    <button onClick={(e) => {
-                                        e.preventDefault();
-                                        props.onEditGroup!(group);
-                                    }} className="btn btn-ghost btn-xs text-base-content opacity-70 hover:opacity-100">
-                                        <span className="iconify mdi--pencil text-base"></span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </summary>
-                    <ul>
-                        {safeChildren.map(renderGroup)}
-                        {safeGalleries.map(renderGallery)}
-                    </ul>
-                </details>
-            </li>
-        );
-    };
-
-    const renderGallery = (gallery: Gallery) => {
-        const isExpired = gallery.expires_at && new Date(gallery.expires_at) < new Date();
-        return (
-            <li key={"gal-" + gallery.id} className="group">
-                <div className="flex justify-between items-center w-full pr-2 whitespace-nowrap">
-                    <Link
-                        to={'/' + gallery.full_path}
-                        className={`flex-1 flex items-center gap-2 ${isExpired ? 'line-through opacity-50' : ''}`}
-                        title={gallery.name}
-                        onClick={props.onCloseMobile}
-                    >
-                        <span className="iconify mdi--image-multiple-outline text-lg opacity-70 shrink-0"></span>
-                        <span>{gallery.name}</span>
-                    </Link>
-                    <div className="flex gap-1 ml-2 items-center mr-[14px] shrink-0">
-                        {props.onEditGallery && (
-                            <div className="tooltip tooltip-left" data-tip="Galerie bearbeiten">
-                                <button onClick={(e) => {
-                                    e.preventDefault();
-                                    props.onEditGallery!(gallery);
-                                }} className="btn btn-ghost btn-xs text-base-content opacity-70 hover:opacity-100">
-                                    <span className="iconify mdi--pencil text-base"></span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </li>
-        );
-    };
-
-            const isAdminOrPhotog = user?.is_admin || user?.is_photographer;
+    const isAdminOrPhotog = user?.is_admin || user?.is_photographer;
     const isGuest = !user;
 
     return (
@@ -120,12 +59,8 @@ export default function Sidebar(props: SidebarProps) {
                 )}
             </ul>
 
-            
-
-            {/* Hier ist der Container mit overflow-auto für vertikales UND horizontales Scrollen */}
-            <div className="flex-1 overflow-auto p-4">
-                
-            </div>
+            {/* Spacer, um den Logout-Button nach unten zu drücken */}
+            <div className="flex-1"></div>
 
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">
                 {user && user.roles && user.roles.length > 0 && (

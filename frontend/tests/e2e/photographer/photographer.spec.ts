@@ -3,20 +3,23 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
+import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 
 // 🧹 Clean-Up Hook: Räumt alle isoliert erstellten Galerien auf, bevor der E2E-User gelöscht wird.
-test.afterAll(async ({ request }) => {
-    await E2EUserHelper.cleanupE2EData(request);
-    await E2EUserHelper.cleanupTrackedUsers(request);
-});
 
-test.describe.serial('Photographer Core Workflow', () => {
+
+test.describe('Photographer Core Workflow', () => {
+    let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
-    test.beforeAll(async ({ request }) => {
-        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    test.beforeEach(async ({ request }) => {
+        helper = new E2ESessionHelper(request);
+        testUser = await helper.createIsolatedUser( 'photographer');
+    });
+
+    test.afterEach(async () => {
+        if (helper) await helper.teardown();
     });
 
     test.beforeEach(async ({ page }) => {
@@ -51,12 +54,15 @@ test.describe.serial('Photographer Core Workflow', () => {
         await galleryHelper.createAndOpenDeliveryGallery(galleryName);
 
         await page.locator('button[data-tip="Galerie bearbeiten"]').click();
-        await modal.fillInputByLabel('Name der Galerie', editedName);
+        // Warten, bis React Hook Form den State gesetzt hat (verhindert Überschreiben des Inputs durch React)
+        const nameInput = modal.activeModal.locator('.form-control').filter({ hasText: 'Name der Galerie' }).locator('input');
+        await expect(nameInput).toHaveValue(galleryName);
+        await nameInput.fill(editedName);
         await modal.submitModal('Speichern');
 
         await sidebar.navigateTo('Galerien');
         const newLink = page.locator('main').getByText(editedName).first();
-        await expect(newLink).toBeVisible({ timeout: 25000 });
+        await expect(newLink).toBeVisible({ timeout: 15000 });
     });
 
     test('Photographer can upload an image and sees it in personal feed', async ({ page }) => {

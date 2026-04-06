@@ -75,7 +75,7 @@ export default function InviteView() {
         // Auto-Redeem nur wenn: Nicht am Laden, User eingeloggt, Galerie bekannt, kein PW nötig
         if (!loading && !authLoading && user && galleryName && !requiresPassword && !error && !autoRedeeming) {
             setAutoRedeeming(true);
-            apiMutate<any>('/api/invites/redeem', 'POST', { token })
+            apiMutate<{ full_path: string }>('/api/invites/redeem', 'POST', { token })
             .then(resData => {
                 if (resData.full_path) {
                     mutate(() => true, undefined, { revalidate: true });

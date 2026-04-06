@@ -52,7 +52,7 @@ export class AuthHelper {
             if (await closeBtn.isVisible()) {
                 try {
                     await closeBtn.click({ timeout: 2000 });
-                } catch (e) {}
+                } catch { /* ignore */ }
             }
         }
     }

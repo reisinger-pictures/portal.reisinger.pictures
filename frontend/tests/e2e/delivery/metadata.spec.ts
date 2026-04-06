@@ -1,20 +1,23 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
+import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
-test.afterAll(async ({ request }) => {
-    await E2EUserHelper.cleanupE2EData(request);
-    await E2EUserHelper.cleanupTrackedUsers(request);
-});
 
-test.describe.serial('Metadata & Detail View Workflow', () => {
+
+test.describe('Metadata & Detail View Workflow', () => {
+    let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
-    test.beforeAll(async ({ request }) => {
-        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    test.beforeEach(async ({ request }) => {
+        helper = new E2ESessionHelper(request);
+        testUser = await helper.createIsolatedUser( 'photographer');
+    });
+
+    test.afterEach(async () => {
+        if (helper) await helper.teardown();
     });
 
     let auth: AuthHelper;
@@ -38,7 +41,7 @@ test.describe.serial('Metadata & Detail View Workflow', () => {
         
         // Robustes Auffinden des Galerie-Links (inkl. Reload-Logik bei SWR-Verzögerung)
         const galLink = page.locator('main').getByText(galleryName).first();
-        await expect(galLink).toBeVisible({ timeout: 25000 });
+        await expect(galLink).toBeVisible();
 
         await page.locator('main').getByText(galleryName).first().click();
 

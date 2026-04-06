@@ -21,9 +21,9 @@ export class UploadHelper {
 
         // Warten, bis das Bild im DOM gerendert wurde (geduldige Asserts)
         const image = this.page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible({ timeout: 15000 });
+        await expect(image).toBeVisible();
         await expect(async () => {
             expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-        }).toPass({ timeout: 15000 });
+        }).toPass();
     }
 }

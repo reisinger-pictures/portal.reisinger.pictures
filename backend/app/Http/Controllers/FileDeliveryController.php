@@ -98,6 +98,13 @@ class FileDeliveryController extends Controller
 
         if (!file_exists($path)) abort(404, 'File not found');
 
+        // Hit-Registry (Drosselung auf max. 1 Datenbank-Update pro 24 Stunden pro Asset)
+        $cacheKey = 'photo_hit_' . $photo->id;
+        if (!Cache::has($cacheKey)) {
+            $photo->update(['last_accessed_at' => now()]);
+            Cache::put($cacheKey, true, now()->addHours(24));
+        }
+
         $mime = mime_content_type($path);
         $proxyHeader = env('PROXY_DELIVERY_HEADER', false);
 

@@ -21,7 +21,7 @@ class Gallery extends Model
         'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos', 
         'default_title', 'default_description', 'default_keywords', 
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
-        'expires_at', 'created_at', 'full_path', 'photos', 'galleryGroup'
+        'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'photos', 'galleryGroup'
     ];
 
     protected $fillable = [
@@ -56,7 +56,21 @@ class Gallery extends Model
     ];
 
     // Dieses Attribut wird bei JSON-Responses automatisch angehängt
-    protected $appends = ['full_path'];
+    protected $appends = ['full_path', 'effective_is_editorial_only', 'effective_is_hidden'];
+
+    public function getEffectiveIsEditorialOnlyAttribute(): bool
+    {
+        if ($this->is_editorial_only !== null) return (bool) $this->is_editorial_only;
+        if ($this->galleryGroup) return $this->galleryGroup->effective_is_editorial_only;
+        return false;
+    }
+
+    public function getEffectiveIsHiddenAttribute(): bool
+    {
+        if ($this->is_hidden !== null) return (bool) $this->is_hidden;
+        if ($this->galleryGroup) return $this->galleryGroup->effective_is_hidden;
+        return false;
+    }
 
     public function getFullPathAttribute()
     {

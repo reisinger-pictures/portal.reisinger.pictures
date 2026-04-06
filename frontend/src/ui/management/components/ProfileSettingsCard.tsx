@@ -34,7 +34,7 @@ export default function ProfileSettingsCard() {
 
     const onSubmit = async (data: ProfileFormValues) => {
         try {
-            const payload: any = { name: data.name, metadata_copyright: data.metadata_copyright };
+            const payload: Record<string, unknown> = { name: data.name, metadata_copyright: data.metadata_copyright };
             if (user?.is_photographer) payload.ftp_slug = data.ftp_slug;
             
             await apiMutate('/api/auth/profile', 'PUT', payload);

@@ -1,18 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import HighlightText from './HighlightText';
 import { useSearch } from '../../logic/useSearch';
 
 export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () => void }) {
     const [searchParams] = useSearchParams();
-    const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+    const qParam = searchParams.get('q') || '';
+    const [searchQuery, setSearchQuery] = useState(qParam);
+    const [prevQParam, setPrevQParam] = useState(qParam);
+
+    if (qParam !== prevQParam) {
+        setPrevQParam(qParam);
+        setSearchQuery(qParam);
+    }
+
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const { results: searchResults } = useSearch(searchQuery, false, true);
     const navigate = useNavigate();
-
-    useEffect(() => {
-        setSearchQuery(searchParams.get('q') || '');
-    }, [searchParams]);
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();

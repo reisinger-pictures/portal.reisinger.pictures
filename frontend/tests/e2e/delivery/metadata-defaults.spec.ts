@@ -1,20 +1,23 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
+import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
-test.afterAll(async ({ request }) => {
-    await E2EUserHelper.cleanupE2EData(request);
-    await E2EUserHelper.cleanupTrackedUsers(request);
-});
 
-test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
+
+test.describe('Smart Assistance & Metadata Defaults Workflow', () => {
+    let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
-    test.beforeAll(async ({ request }) => {
-        testUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
+    test.beforeEach(async ({ request }) => {
+        helper = new E2ESessionHelper(request);
+        testUser = await helper.createIsolatedUser( 'photographer');
+    });
+
+    test.afterEach(async () => {
+        if (helper) await helper.teardown();
     });
 
     let auth: AuthHelper;
@@ -55,7 +58,9 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
 
         // --- FALL 1: Graz (Eindeutiger Fall) ---
         await cityInput.click();
+        const searchGrazPromise = page.waitForResponse(res => res.url().includes('/api/search/locations'));
         await cityInput.pressSequentially('Graz', { delay: 100 });
+        await searchGrazPromise;
 
         const dropdownGraz = page.locator('li').filter({ hasText: 'Graz' }).first();
         await expect(dropdownGraz).toBeVisible();
@@ -66,7 +71,9 @@ test.describe.serial('Smart Assistance & Metadata Defaults Workflow', () => {
         // --- FALL 2: Linz (Mehrdeutigkeit) ---
         await cityInput.click();
         await cityInput.clear();
+        const searchLinzPromise = page.waitForResponse(res => res.url().includes('/api/search/locations'));
         await cityInput.pressSequentially('Linz', { delay: 100 });
+        await searchLinzPromise;
 
         const dropdownLinzOOE = page.locator('li').filter({ hasText: 'Oberösterreich' }).first();
         await expect(dropdownLinzOOE).toBeVisible();

@@ -51,7 +51,7 @@ export default function ManagementGalleryView() {
     const [showRatingsModal, setShowRatingsModal] = useState(false);
     const [isMetadataModalOpen, setIsMetadataModalOpen] = useState(false);
 
-    usePhotoSwipe({ galleryRef, dependencies: [photos.length] });
+    usePhotoSwipe({ galleryRef, trigger: photos.length });
 
     if (isLoading && photos.length === 0) return <PageLayout><div className="flex h-full items-center justify-center"><span className="loading loading-spinner"></span></div></PageLayout>;
     if (isError || !gallery) return <PageLayout><div className="p-8"><ErrorMessage message="Galerie nicht gefunden." /></div></PageLayout>;

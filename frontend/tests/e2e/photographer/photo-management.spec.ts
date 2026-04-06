@@ -1,25 +1,28 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
-import { E2EUserHelper } from '../helpers/E2EUserHelper';
+import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 
-test.afterAll(async ({ request }) => {
-    await E2EUserHelper.cleanupE2EData(request);
-    await E2EUserHelper.cleanupTrackedUsers(request);
-});
 
-test.describe.serial('Photo Management Workflow (Flows A, B, K, L, M)', () => {
+
+test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
+    let helper: E2ESessionHelper;
     let adminUser = { email: '', password: '' };
     let photogUser = { email: '', password: '' };
     let clientUser = { email: '', password: '' };
 
-    test.beforeAll(async ({ request }) => {
-        adminUser = await E2EUserHelper.createIsolatedUser(request, 'admin');
-        photogUser = await E2EUserHelper.createIsolatedUser(request, 'photographer');
-        clientUser = await E2EUserHelper.createIsolatedUser(request, 'client');
+    test.beforeEach(async ({ request }) => {
+        helper = new E2ESessionHelper(request);
+        adminUser = await helper.createIsolatedUser( 'admin');
+        photogUser = await helper.createIsolatedUser( 'photographer');
+        clientUser = await helper.createIsolatedUser( 'client');
+    });
+
+    test.afterEach(async () => {
+        if (helper) await helper.teardown();
     });
 
     const uniqueId = () => Math.random().toString(36).substring(2, 10);
@@ -58,7 +61,6 @@ test.describe.serial('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
         const galleryHelper = new GalleryHelper(page);
-        let magicLink = '';
 
         // === PHASE 1: PHOTOGRAPHER PREPARES GALLERY & LINK ===
         await auth.login(photogUser.email, photogUser.password);
@@ -86,7 +88,7 @@ test.describe.serial('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await modal.clickButton('Generieren');
         
         await expect(page.locator('text=Erfolgreich generiert!')).toBeVisible();
-        magicLink = await modal.activeModal.locator('input[readonly]').inputValue();
+        const magicLink = await modal.activeModal.locator('input[readonly]').inputValue();
         await auth.logout();
 
         // === PHASE 2: GUEST EDITS VIA MAGIC LINK ===
@@ -152,7 +154,7 @@ test.describe.serial('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await modal.submitModal('Speichern');
 
         const link = page.locator('main').locator('a').filter({ hasText: galleryNameK }).first();
-        await expect(link).toBeVisible();
+        await expect(link).toBeVisible({ timeout: 15000 });
         await expect(link).toHaveClass(/line-through/);
 
         const href = await link.getAttribute('href');

@@ -14,18 +14,25 @@ export default function PhotoHistoryModal({ photoId, isOpen, onClose, onReverted
     const [loadingHistory, setLoadingHistory] = useState(false);
     const { getVersions, revertMetadata } = usePhoto();
     const { showToast, confirm } = useUI();
+    const [prevIsOpen, setPrevIsOpen] = useState(false);
+
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
+        if (isOpen && photoId) {
+            setLoadingHistory(true);
+        }
+    }
 
     useEffect(() => {
         let isMounted = true;
         if (isOpen && photoId) {
-            setLoadingHistory(true);
             getVersions(photoId)
                 .then(data => { if(isMounted) setHistory(data); })
                 .catch(() => { if(isMounted) showToast('error', 'Historie konnte nicht geladen werden.'); })
                 .finally(() => { if(isMounted) setLoadingHistory(false); });
         }
         return () => { isMounted = false; };
-    }, [isOpen, photoId]);
+    }, [isOpen, photoId, getVersions, showToast]);
 
     const handleRevert = async (versionId: string) => {
         if (!(await confirm({ title: 'Version wiederherstellen?', message: 'Möchtest du diese Metadaten-Version wirklich wiederherstellen? Dies überschreibt den aktuellen Stand.', confirmText: 'Wiederherstellen', confirmColor: 'warning' }))) return;

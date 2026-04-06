@@ -4,25 +4,28 @@ import 'photoswipe/style.css';
 
 interface UsePhotoSwipeOptions {
     galleryRef: React.RefObject<HTMLElement | null>;
-    dependencies: any[];
+    trigger: string | number | boolean;
     onInit?: (lightbox: PhotoSwipeLightbox) => void;
 }
 
-export function usePhotoSwipe({ galleryRef, dependencies, onInit }: UsePhotoSwipeOptions) {
+export function usePhotoSwipe({ galleryRef, trigger, onInit }: UsePhotoSwipeOptions) {
     const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
 
     useEffect(() => {
         let lightbox: PhotoSwipeLightbox | null = null;
         
-        // Prüfe ob Items vorhanden sind (Annahme: dependencies[0] ist die Array-Länge)
-        const hasItems = typeof dependencies[0] === 'number' ? dependencies[0] > 0 : true;
+        // Prüfe ob Items vorhanden sind
+        const hasItems = typeof trigger === 'number' ? trigger > 0 : true;
 
         if (galleryRef.current && hasItems) {
+            const isPlaywright = navigator.userAgent.includes('Playwright');
             lightbox = new PhotoSwipeLightbox({
                 gallery: galleryRef.current,
                 children: 'a.pswp-item',
                 pswpModule: () => import('photoswipe'),
                 arrowKeys: true,
+                showAnimationDuration: isPlaywright ? 0 : 333,
+                hideAnimationDuration: isPlaywright ? 0 : 333,
             });
 
             lightbox.on('uiRegister', function () {
@@ -81,7 +84,7 @@ export function usePhotoSwipe({ galleryRef, dependencies, onInit }: UsePhotoSwip
                 lightboxRef.current = null;
             }
         };
-    }, dependencies);
+    }, [galleryRef, onInit, trigger]);
 
     return lightboxRef;
 }

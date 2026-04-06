@@ -6,13 +6,18 @@ import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import { useAuth } from '../../logic/useAuth';
 
-export default function DeliveryView({ galleryData }: { galleryData: any }) {
+import { useGallery } from '../../logic/useGallery';
+export default function DeliveryView({ galleryData }: { galleryData: ReturnType<typeof useGallery> }) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
+
+    /* moved early return */
     const galleryRef = useRef<HTMLDivElement>(null);
 
-    usePhotoSwipe({ galleryRef, dependencies: [photos.length] });
+    usePhotoSwipe({ galleryRef, trigger: photos.length });
+
+    if (!gallery) return null;
 
     return (
         <PageLayout>
@@ -59,7 +64,7 @@ export default function DeliveryView({ galleryData }: { galleryData: any }) {
                 )}
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6" ref={galleryRef}>
-                    {photos.map((photo: any) => (
+                    {photos.map((photo) => (
                         <div key={photo.id} className="card bg-base-200 shadow-xl overflow-hidden relative group">
                             <a href={photo.url}
                                data-pswp-width={photo.width || 2000}

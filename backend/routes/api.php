@@ -19,13 +19,20 @@ use App\Http\Controllers\StatsController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FileDeliveryController;
 
-$throttleLimit = env('AUTH_THROTTLE_LIMIT', 1000);
+$throttleLimit = env('AUTH_THROTTLE_LIMIT', 9999);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 });
 Route::get('/ping', function() { return response()->json(['message' => 'API OK']); });
+
+Route::post('/test/flush-queue', function() {
+    if (app()->environment('local', 'testing')) {
+        \Illuminate\Support\Facades\Artisan::call('queue:work', ['--stop-when-empty' => true]);
+    }
+    return response()->json(['success' => true]);
+});
 
 Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries']);
 Route::get('/sitemap-images.xml', [SitemapController::class, 'images']);

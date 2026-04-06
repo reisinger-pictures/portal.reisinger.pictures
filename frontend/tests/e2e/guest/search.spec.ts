@@ -1,14 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { SidebarHelper } from '../helpers/SidebarHelper';
-import { AuthHelper } from '../helpers/AuthHelper';
 
-test.describe.serial('Global Search Workflow', () => {
-    let sidebar: SidebarHelper;
-
-    test.beforeEach(async ({ page }) => {
-        sidebar = new SidebarHelper(page);
-    });
-
+test.describe('Global Search Workflow', () => {
     test('Guest can use global sidebar search to find content', async ({ page }) => {
         await page.goto('/');
 

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { GalleryGroup, FlatGroup } from '../../logic/useGalleries';
 import { useUI } from './UIContext';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
@@ -29,7 +29,7 @@ const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace
 export default function GalleryGroupModal({ isOpen, onClose, availableGroups, editingGroup, defaultParentId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
 
-    const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting, dirtyFields } } = useForm<GroupFormValues>({
+    const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GroupFormValues>({
         resolver: zodResolver(groupSchema),
         defaultValues: { name: '', slug: '', is_public: 'null', parent_id: '' }
     });
@@ -45,7 +45,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         }
     }, [isOpen, editingGroup, reset, defaultParentId]);
 
-    const watchName = watch('name');
+    const watchName = useWatch({ control, name: 'name' });
 
     // ✨ FIX: Slug folgt dem Namen nur, wenn das Slug-Feld noch nicht manuell editiert wurde
     useEffect(() => {
@@ -67,8 +67,8 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                 showToast('success', 'Ordner erfolgreich erstellt.');
             }
             onClose();
-        } catch (e: any) {
-            showToast('error', e.message || 'Fehler beim Speichern');
+        } catch (e: unknown) {
+            showToast('error', (e as Error).message || 'Fehler beim Speichern');
         }
     };
 
@@ -79,8 +79,8 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                 await onDelete(editingGroup.id);
                 showToast('success', 'Ordner erfolgreich gelöscht.');
                 onClose();
-            } catch (e: any) {
-                showToast('error', e.message || 'Fehler beim Löschen');
+            } catch (e: unknown) {
+                showToast('error', (e as Error).message || 'Fehler beim Löschen');
             }
         }
     };

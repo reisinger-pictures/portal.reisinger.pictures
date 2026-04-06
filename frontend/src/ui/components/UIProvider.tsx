@@ -1,31 +1,5 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-
-interface Toast {
-    id: number;
-    type: 'success' | 'error' | 'info';
-    text: string;
-}
-
-interface ConfirmOptions {
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    confirmColor?: 'primary' | 'error' | 'warning' | 'info' | 'success';
-}
-
-interface UIContextType {
-    showToast: (type: 'success' | 'error' | 'info', text: string) => void;
-    confirm: (options: ConfirmOptions) => Promise<boolean>;
-}
-
-const UIContext = createContext<UIContextType | undefined>(undefined);
-
-export const useUI = () => {
-    const context = useContext(UIContext);
-    if (!context) throw new Error('useUI must be used within UIProvider');
-    return context;
-};
+import { useState, ReactNode, useCallback } from 'react';
+import { UIContext, Toast, ConfirmOptions } from './UIContext';
 
 let toastIdCounter = 0;
 
