@@ -7,7 +7,6 @@ export interface StatsData {
     guest_downloads: number;
     domain_stats: { domain: string; count: number }[];
     top_galleries: { name: string; count: number }[];
-    top_photos: { name: string; count: number }[];
 }
 
 export interface LogEntry {
@@ -17,6 +16,9 @@ export interface LogEntry {
     item_type: 'single_image' | 'full_zip';
     item_identifier: string;
     created_at: string;
+    thumb_url?: string;
+    resolution_tier?: string;
+    payload?: { photo_count?: number };
 }
 
 export interface PaginatedLogs {
@@ -25,9 +27,16 @@ export interface PaginatedLogs {
     last_page: number;
 }
 
-export function useStats(page = 1) {
-    const {data: stats, isLoading: statsLoading} = useSWR<StatsData>('/api/management/stats', fetcher);
-    const {data: logs, isLoading: logsLoading} = useSWR<PaginatedLogs>(`/api/management/logs?page=${page}`, fetcher);
+export function useStats(page = 1, tier: string | null = null) {
+    const queryParams = new URLSearchParams();
+    if (tier) queryParams.set('tier', tier);
+    const qsStats = queryParams.toString() ? '?' + queryParams.toString() : '';
+    
+    queryParams.set('page', page.toString());
+    const qsLogs = '?' + queryParams.toString();
+
+    const {data: stats, isLoading: statsLoading} = useSWR<StatsData>('/api/management/stats' + qsStats, fetcher);
+    const {data: logs, isLoading: logsLoading} = useSWR<PaginatedLogs>('/api/management/logs' + qsLogs, fetcher);
 
     return {stats, logs, isLoading: statsLoading || logsLoading};
 }

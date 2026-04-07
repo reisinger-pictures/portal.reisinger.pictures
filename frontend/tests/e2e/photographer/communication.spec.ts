@@ -27,7 +27,7 @@ test.describe('Communication Workflow (Flows E, F)', () => {
     test('Flow F: Email button is disabled without subscribers, enabled with opt-in and supports preview', async ({ page, request }) => {
         const modal = new ModalHelper(page);
         const mailpit = new MailpitHelper(request);
-        const galleryHelper = new GalleryHelper(page);
+        const galleryHelper = new GalleryHelper(page, helper);
         
         const galleryName = `Comm F ${Math.random().toString(36).substring(2, 10)}`;
         await galleryHelper.createAndOpenDeliveryGallery(galleryName);
@@ -48,7 +48,7 @@ test.describe('Communication Workflow (Flows E, F)', () => {
 
     test('Flow E: Photographer can generate and revoke an invite link', async ({ page }) => {
         const modal = new ModalHelper(page);
-        const galleryHelper = new GalleryHelper(page);
+        const galleryHelper = new GalleryHelper(page, helper);
         
         const galleryName = `Comm E ${Math.random().toString(36).substring(2, 10)}`;
         await galleryHelper.createAndOpenDeliveryGallery(galleryName);

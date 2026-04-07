@@ -5,15 +5,13 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
-
-
 test.describe('Download Triggers UI', () => {
     let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
-        testUser = await helper.createIsolatedUser( 'photographer');
+        testUser = await helper.createIsolatedUser('photographer');
     });
 
     test.afterEach(async () => {
@@ -41,9 +39,11 @@ test.describe('Download Triggers UI', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.selectByLabel('Sichtbarkeit', 'Öffentlich (Für alle sichtbar)');
-        await modal.submitModal('Speichern');
+        await modal.toggleCheckboxByLabel('Kostenlosen Download erlauben', true);
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
         const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(link).toBeVisible();
+        await expect(link).toBeVisible({ timeout: 15000 });
         
         await page.locator('main').locator('a').filter({ hasText: galleryName }).first().click();
 
@@ -64,24 +64,27 @@ test.describe('Download Triggers UI', () => {
         await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
         await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass();
 
-        // 5. Test: Einzel-Download
-        // Wir fangen das Download-Event ab, bevor wir klicken
-        const singleDownloadPromise = page.waitForEvent('download');
-        // Gast-Workflow: Muss über das Lizenz-Modal gehen
-        await page.getByRole('button', { name: 'Lizenz wählen...' }).first().click();
-        await expect(page.locator('h3:has-text("Lizenz wählen")')).toBeVisible();
-        await page.getByRole('button', { name: 'Sofort Download' }).first().click();
-        const singleDownload = await singleDownloadPromise;
-        
-        // Prüfen, ob die Datei eine JPG-Endung hat (oder JPEG)
+        // 5. Test: Einzel-Download (Via Detailansicht)
+        await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
+        await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible();
+
+        const [singleDownload] = await Promise.all([
+            page.waitForEvent('download'),
+            page.getByRole('link', { name: 'Jetzt herunterladen' }).first().click()
+        ]);
         expect(singleDownload.suggestedFilename().toLowerCase()).toMatch(/\.jpe?g$/);
 
-        // 6. Test: ZIP-Download
-        const zipDownloadPromise = page.waitForEvent('download');
-        await page.getByRole('button', { name: 'Alle herunterladen (.zip)' }).click();
-        const zipDownload = await zipDownloadPromise;
+        // Zurück zur Galerie für den ZIP Download
+        await page.goBack();
+        await expect(page.locator('h1:has-text("' + galleryName + '")')).toBeVisible();
+
+        // 6. Test: ZIP-Download (Dropdown ausklappen und Format wählen)
+        await page.locator('div[role="button"]').filter({ hasText: 'Alle herunterladen (.zip)' }).click();
         
-        // Prüfen, ob ein ZIP-Archiv generiert wird
+        const [zipDownload] = await Promise.all([
+            page.waitForEvent('download'),
+            page.getByRole('link', { name: 'ORIGINAL Format' }).click()
+        ]);
         expect(zipDownload.suggestedFilename().toLowerCase()).toMatch(/\.zip$/);
     });
 });

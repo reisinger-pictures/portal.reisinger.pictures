@@ -27,10 +27,11 @@ class AuthController extends Controller
                     ['email' => $adminEmail],
                     ['name' => 'Florian Reisinger']
                 );
+                $superAdminRole = Role::firstOrCreate(['name' => 'super_admin']);
                 $adminRole = Role::firstOrCreate(['name' => 'admin']);
                 $photoRole = Role::firstOrCreate(['name' => 'photographer']);
                 $clientRole = Role::firstOrCreate(['name' => 'client']);
-                $user->roles()->syncWithoutDetaching([$adminRole->id, $photoRole->id, $clientRole->id]);
+                $user->roles()->syncWithoutDetaching([$superAdminRole->id, $adminRole->id, $photoRole->id, $clientRole->id]);
 
                 $token = Auth::guard('api')->login($user);
                 return $this->respondWithToken($token);
@@ -165,6 +166,7 @@ class AuthController extends Controller
             'ftp_slug' => $user->ftp_slug,
             'flatrate_level' => $user->flatrate_level,
             
+            'is_super_admin' => $user->is_super_admin,
             'is_admin' => $user->is_admin,
             'is_photographer' => $user->is_photographer,
             'is_customer_manager' => $user->is_customer_manager,

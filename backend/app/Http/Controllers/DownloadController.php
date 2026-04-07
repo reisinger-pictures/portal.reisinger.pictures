@@ -42,7 +42,6 @@ class DownloadController extends Controller
         $tempPath = $tempDir . '/' . uniqid('dl_') . '.jpg';
         copy($sourcePath, $tempPath);
 
-        // FIX: Korrekter String für den Trim-Befehl ohne Syntax-Fehler
         $artist = trim($photo->artist ?? config('app.name', 'Reisinger Foto Portal'), "\"\'");
         $copyright = 'Copyright ' . date('Y') . ' ' . $artist;
         $instructions = 'Licensed to / Downloaded by: ' . $userName;
@@ -101,7 +100,6 @@ class DownloadController extends Controller
         $gallery = $photo->gallery;
         $user = $this->authorizeGalleryAccess($gallery);
 
-        // 1. Rechte prüfen
         $tier = $request->query('tier', 'original');
         $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
         $userRank = $user && $user->flatrate_level ? ($ranks[$user->flatrate_level] ?? 0) : 0;
@@ -112,7 +110,7 @@ class DownloadController extends Controller
         $hasPurchased = $user && $user->hasPurchasedPhoto($photo->id, $tier);
 
         if (!$hasFullAccess && !$isCoveredByFlatrate && !$hasPurchased && !$gallery->effective_is_free_download) {
-             abort(403, 'Sie besitzen keine gültige Lizenz für diese Bildauflösung ('.$tier.').');
+            abort(403, 'Sie besitzen keine gültige Lizenz für diese Bildauflösung ('.$tier.').');
         }
 
         $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/');
@@ -129,31 +127,23 @@ class DownloadController extends Controller
             'gallery_name_snapshot' => $gallery->name,
             'item_type' => 'single_image',
             'resolution_tier' => $tier,
-            'item_identifier' => $photo->filename,
             'user_agent' => $request->userAgent()
         ]);
 
-        // 2. Skalieren & Wasserzeichen-Prüfung
         $processor = app(\App\Services\ImageProcessor::class);
         $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
-        
+
         $tempDir = storage_path('app/private/temp');
         if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
-        
+
         $workingPath = $tempDir . '/' . uniqid('scale_') . '.jpg';
 
-        // Wenn nicht Full-Access und nicht bezahlt/in Flatrate, gäbe es ein Wasserzeichen.
-        // Da wir den Zugang oben aber blockieren, falls nicht lizenziert, müssen wir hier 
-        // kein Wasserzeichen mehr rendern - der Download ist ja legal!
         $processor->scaleImage($sourcePath, $workingPath, $maxWidth);
-
-        // 3. Metadaten Injizieren
         $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
-        
-        // Cleanup des temporären Skalierungs-Files, falls Injektion ein neues erstellt hat
+
         if ($workingPath !== $processedPath && file_exists($workingPath)) @unlink($workingPath);
 
-        $downloadName = pathinfo($photo->filename, PATHINFO_FILENAME) . '_' . $tier . '.jpg';
+        $downloadName = $photo->id . '_' . $tier . '.jpg';
         return response()->download($processedPath, $downloadName)->deleteFileAfterSend(true);
     }
 
@@ -162,8 +152,21 @@ class DownloadController extends Controller
         $gallery = Gallery::with('photos')->findOrFail($galleryId);
         $user = $this->authorizeGalleryAccess($gallery);
 
+        $tier = $request->query('tier', 'original');
+        $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
+        $userRank = $user && $user->flatrate_level ? ($ranks[$user->flatrate_level] ?? 0) : 0;
+        $reqRank = $ranks[$tier] ?? 3;
+
+        $hasFullAccess = $user && ($user->is_admin || $user->is_photographer);
+        $isCoveredByFlatrate = $userRank >= $reqRank;
+
+        if (!$hasFullAccess && !$isCoveredByFlatrate && !$gallery->effective_is_free_download) {
+            abort(403, 'Sie besitzen keine gültige Lizenz für diese Bildauflösung ('.$tier.') im ZIP-Download.');
+        }
+
         $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/');
         $userName = $user ? $user->name : 'Gast';
+        $photoCount = $gallery->photos()->count();
 
         DownloadLog::create([
             'user_id' => $user ? $user->id : null,
@@ -171,22 +174,26 @@ class DownloadController extends Controller
             'gallery_id' => $gallery->id,
             'gallery_name_snapshot' => $gallery->name,
             'item_type' => 'full_zip',
-            'item_identifier' => $gallery->slug . '.zip',
-            'user_agent' => $request->userAgent()
+            'resolution_tier' => $tier,
+            'user_agent' => $request->userAgent(),
+            'payload' => ['photo_count' => $photoCount]
         ]);
 
-        return response()->streamDownload(function () use ($gallery, $baseStoragePath, $userName, $user) {
+        return response()->streamDownload(function () use ($gallery, $baseStoragePath, $userName, $user, $tier, $hasFullAccess) {
             $zip = new ZipStream(sendHttpHeaders: false);
             $watermarkService = app(WatermarkService::class);
+            $processor = app(\App\Services\ImageProcessor::class);
+            $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
+
+            $tempDir = storage_path('app/private/temp');
+            if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
 
             foreach ($gallery->photos as $photo) {
                 $sourcePath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
                 if (!file_exists($sourcePath))
                     continue;
-
-                $hasFullAccess = $user && ($user->is_admin || $user->canAccessGallery($gallery->id));
-        if (!$hasFullAccess) {
-            $wmPath = $baseStoragePath . '/' . $gallery->id . '/_watermarked/' . $photo->filename;
+                if (!$hasFullAccess && !$gallery->effective_is_free_download) {
+                    $wmPath = $baseStoragePath . '/' . $gallery->id . '/_watermarked/' . $photo->filename;
                     if (!file_exists($wmPath)) {
                         if (!is_dir(dirname($wmPath)))
                             mkdir(dirname($wmPath), 0755, true);
@@ -195,16 +202,20 @@ class DownloadController extends Controller
                     $sourcePath = $wmPath;
                 }
 
-                $processedPath = $this->injectMetadata($sourcePath, $photo, $userName);
-                $zip->addFileFromPath($photo->filename, $processedPath);
+                $workingPath = $tempDir . '/' . uniqid('scale_') . '.jpg';
+                $processor->scaleImage($sourcePath, $workingPath, $maxWidth);
 
-                if ($processedPath !== $sourcePath) {
-                    @unlink($processedPath);
-                }
+                $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
+                $downloadName = $photo->id . '_' . strtoupper($tier) . '.jpg';
+                
+                $zip->addFileFromPath($downloadName, $processedPath);
+
+                if ($processedPath !== $sourcePath && file_exists($processedPath)) @unlink($processedPath);
+                if ($workingPath !== $sourcePath && file_exists($workingPath)) @unlink($workingPath);
             }
 
             $zip->finish();
-        }, $gallery->slug . '.zip');
+        }, $gallery->slug . '_' . $tier . '.zip');
     }
 
 
@@ -231,8 +242,8 @@ class DownloadController extends Controller
             'gallery_id' => null,
             'gallery_name_snapshot' => 'Order ' . $snapshot->invoice_number,
             'item_type' => 'full_zip',
-            'item_identifier' => 'order_' . $snapshot->invoice_number . '.zip',
-            'user_agent' => $request->userAgent()
+            'user_agent' => $request->userAgent(),
+            'payload' => ['photo_count' => count($snapshot->customer_details['items'])]
         ]);
 
         return response()->streamDownload(function () use ($snapshot, $baseStoragePath, $userName, $processor) {
@@ -255,15 +266,10 @@ class DownloadController extends Controller
                 $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
                 $workingPath = $tempDir . '/' . uniqid('scale_') . '.jpg';
 
-                // Bild auf gekaufte Lizenz-Größe herunterskalieren (Ohne Wasserzeichen, da lizenziert)
                 $processor->scaleImage($sourcePath, $workingPath, $maxWidth);
-                
-                // Metadaten injizieren
                 $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
 
-                // Suffix für eindeutige Identifikation anhängen
-                $nameInfo = pathinfo($photo->filename);
-                $downloadName = $nameInfo['filename'] . '_' . strtoupper($tier) . '.jpg';
+                $downloadName = $photo->id . '_' . strtoupper($tier) . '.jpg';
 
                 $zip->addFileFromPath($downloadName, $processedPath);
 

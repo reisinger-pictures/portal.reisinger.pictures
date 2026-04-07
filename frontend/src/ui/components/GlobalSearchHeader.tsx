@@ -54,7 +54,7 @@ export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () =>
                         <span className="iconify mdi--magnify text-xl"></span>
                     </button>
                 </div>
-                {isSearchFocused && searchQuery.length >= 2 && searchResults && (
+                {isSearchFocused && searchQuery.length >= 2 && (
                     <div className="absolute top-14 left-0 w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-50 max-h-[60vh] overflow-y-auto">
                         <ul className="menu p-2">
                             <li>
@@ -63,16 +63,22 @@ export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () =>
                                 </Link>
                             </li>
                             <div className="divider my-0"></div>
-                            {searchResults.galleries.map(g => (
-                                <li key={g.id}><Link to={'/' + g.full_path} >📁 <HighlightText text={g.name} highlight={searchQuery} /></Link></li>
-                            ))}
-                            {searchResults.photos.map(p => (
-                                <li key={p.id}><Link to={'/photos/' + p.id} >
-                                    <span className="iconify mdi--image-outline opacity-70"></span> <HighlightText text={p.filename} highlight={searchQuery} />
-                                </Link></li>
-                            ))}
-                            {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (
-                                <li className="disabled"><span className="opacity-50">Keine direkten Treffer</span></li>
+                            {searchResults ? (
+                                <>
+                                    {searchResults.galleries.map(g => (
+                                        <li key={g.id}><Link to={'/' + g.full_path} >📁 <HighlightText text={g.name} highlight={searchQuery} /></Link></li>
+                                    ))}
+                                    {searchResults.photos.map(p => (
+                                        <li key={p.id}><Link to={'/photos/' + p.id} >
+                                            <span className="iconify mdi--image-outline opacity-70"></span> <HighlightText text={p.title || 'Foto'} highlight={searchQuery} />
+                                        </Link></li>
+                                    ))}
+                                    {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (
+                                        <li className="disabled"><span className="opacity-50">Keine direkten Treffer</span></li>
+                                    )}
+                                </>
+                            ) : (
+                                <li className="disabled"><span className="opacity-50">Sucht...</span></li>
                             )}
                         </ul>
                     </div>

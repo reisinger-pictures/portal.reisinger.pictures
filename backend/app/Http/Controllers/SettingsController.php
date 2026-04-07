@@ -47,7 +47,28 @@ class SettingsController extends Controller
             'unlimited' => Setting::where('key', 'term_unlimited')->value('value') ?? 'Zeitlich unbegrenztes Nutzungsrecht.',
             'web' => Setting::where('key', 'term_web')->value('value') ?? 'Auflösung optimiert für Web & Social Media (max. 2560px).',
             'print' => Setting::where('key', 'term_print')->value('value') ?? 'Hohe Auflösung für den Druck (bis A4, max. 4000px).',
-            'original' => Setting::where('key', 'term_original')->value('value') ?? 'Maximale Originalauflösung.'
+            'original' => Setting::where('key', 'term_original')->value('value') ?? 'Maximale Originalauflösung.',
+            'base_price' => Setting::where('key', 'base_price')->value('value') ?? '35.00'
         ]);
+    }
+
+    public function updateLicenseTerms(Request $request)
+    {
+        $validated = $request->validate([
+            'base_price' => 'required|numeric|min:5',
+            'term_editorial' => 'required|string',
+            'term_commercial' => 'required|string',
+            'term_1_year' => 'required|string',
+            'term_unlimited' => 'required|string',
+            'term_web' => 'required|string',
+            'term_print' => 'required|string',
+            'term_original' => 'required|string',
+        ]);
+
+        foreach ($validated as $key => $value) {
+            Setting::updateOrCreate(['key' => $key], ['value' => $value]);
+        }
+
+        return response()->json(['success' => true]);
     }
 }

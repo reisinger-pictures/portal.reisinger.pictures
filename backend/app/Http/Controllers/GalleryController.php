@@ -34,25 +34,27 @@ class GalleryController extends Controller
         $filterType = $request->query('filter_type');
         $treeArray = json_decode(json_encode($tree), true);
 
-        // Filter für alle anwenden (Nutzer sehen nur ihre zugewiesenen Galerien)
-        $allowedGalleryIds = $user->getAllowedGalleryIds();
+        // Filter anwenden (Admins sehen alles, normale Nutzer nur ihre zugewiesenen Galerien)
+        if (!$user->is_admin) {
+            $allowedGalleryIds = $user->getAllowedGalleryIds();
 
-        $filterNode = function($groups) use (&$filterNode, $allowedGalleryIds) {
-            $result = [];
-            foreach ($groups as $group) {
-                if (isset($group['galleries'])) {
-                    $group['galleries'] = array_values(array_filter($group['galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
+            $filterNode = function($groups) use (&$filterNode, $allowedGalleryIds) {
+                $result = [];
+                foreach ($groups as $group) {
+                    if (isset($group['galleries'])) {
+                        $group['galleries'] = array_values(array_filter($group['galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
+                    }
+                    if (isset($group['children'])) {
+                        $group['children'] = $filterNode($group['children']);
+                    }
+                    $result[] = $group;
                 }
-                if (isset($group['children'])) {
-                    $group['children'] = $filterNode($group['children']);
-                }
-                $result[] = $group;
-            }
-            return $result;
-        };
+                return $result;
+            };
 
-        $treeArray['groups'] = $filterNode($treeArray['groups']);
-        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
+            $treeArray['groups'] = $filterNode($treeArray['groups']);
+            $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
+        }
 
         // Optionaler Filter nach Typ (selection/delivery)
         if ($filterType) {
@@ -90,7 +92,8 @@ class GalleryController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'parent_id' => 'nullable|string|exists:gallery_groups,id',
-            'is_public' => 'nullable|boolean'
+            'is_public' => 'nullable|boolean',
+            'is_free_download' => 'nullable|boolean'
         ]);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
@@ -102,7 +105,8 @@ class GalleryController extends Controller
             'name' => $request->name,
             'slug' => $slug,
             'parent_id' => $request->parent_id,
-            'is_public' => $request->is_public
+            'is_public' => $request->is_public,
+            'is_free_download' => $request->is_free_download
         ]);
         return response()->json(['success' => true, 'group' => $group]);
     }
@@ -116,7 +120,8 @@ class GalleryController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'parent_id' => 'nullable|string|exists:gallery_groups,id',
-            'is_public' => 'nullable|boolean'
+            'is_public' => 'nullable|boolean',
+            'is_free_download' => 'nullable|boolean'
         ]);
 
         $group = GalleryGroup::findOrFail($id);
@@ -130,7 +135,8 @@ class GalleryController extends Controller
             'name' => $request->name,
             'slug' => $slug,
             'parent_id' => $request->parent_id,
-            'is_public' => $request->is_public
+            'is_public' => $request->is_public,
+            'is_free_download' => $request->is_free_download
         ]);
 
         return response()->json(['success' => true, 'group' => $group]);
@@ -164,6 +170,7 @@ class GalleryController extends Controller
             'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
             'is_public' => 'boolean',
             'is_live' => 'boolean',
+            'is_free_download' => 'nullable|boolean',
             'password' => 'nullable|string',
             'expires_at' => 'nullable|date',
             'allow_client_metadata_edit' => 'boolean',
@@ -201,6 +208,7 @@ class GalleryController extends Controller
                 'type' => $request->type,
                 'is_live' => $request->type === 'selection' ? false : ($request->is_live ?? false),
                 'is_public' => $isPublic,
+                'is_free_download' => $request->is_free_download ?? null,
                 'gallery_group_id' => $request->gallery_group_id,
                 'password_hash' => $request->password ? Hash::make($request->password) : null,
                 'expires_at' => $request->expires_at ? Carbon::parse($request->expires_at)->endOfDay() : null,
@@ -241,6 +249,7 @@ class GalleryController extends Controller
             'type' => 'nullable|in:selection,delivery',
             'is_live' => 'nullable|boolean',
             'is_public' => 'nullable|boolean',
+            'is_free_download' => 'nullable|boolean',
             'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
             'allow_client_metadata_edit' => 'nullable|boolean',
             'apply_metadata_to_photos' => 'nullable|boolean',
@@ -288,8 +297,8 @@ class GalleryController extends Controller
     public function destroyGallery($id)
     {
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($id)) {
-            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$user->is_super_admin && !($user->is_photographer && $user->canAccessGallery($id))) {
+            return response()->json(['error' => 'Nur Super-Admins oder der besitzende Fotograf dürfen diese Galerie löschen.'], 403);
         }
 
         $gallery = Gallery::findOrFail($id);

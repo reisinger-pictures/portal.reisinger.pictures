@@ -16,10 +16,11 @@ console.log('Oder paste einen spezifischen Befehl von der KI (z.B.: tests/e2e/cl
 
 rl.question('\n👉 Welche Tests sollen ausgeführt werden? ', (answer) => {
     rl.close();
-    
-    let cmd = 'npx playwright test --reporter=list --workers=8';
+
+    const params = `--reporter=list --workers=8`;
+    let cmd = `npx playwright test ${params}`;
     if (answer.trim() !== '') {
-        cmd = `npx playwright test ${answer.trim()} --reporter=list`;
+        cmd = `npx playwright test ${answer.trim().replaceAll("\\","/")} ${params}`;
     }
 
     console.log(`\n🚀 Führe aus: ${cmd}\n`);

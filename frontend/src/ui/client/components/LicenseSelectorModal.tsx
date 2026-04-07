@@ -17,8 +17,8 @@ export default function LicenseSelectorModal({ photo, onClose }: Props) {
     const { terms } = useLicenseTerms();
     const { user } = useAuth();
     const { showToast } = useUI();
-    const { isCovered, calculateUpgradePrice } = usePricing(15.00);
-    const { addToCart } = useCart(); // 15€ Basispreis vorerst statisch
+    const { isCovered, calculateUpgradePrice } = usePricing(parseFloat(terms?.base_price || '35.00'));
+    const { addToCart } = useCart(); // Dynamischer Preis
 
     if (!photo) return null;
 
@@ -56,7 +56,7 @@ export default function LicenseSelectorModal({ photo, onClose }: Props) {
                 <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
                     <span className="iconify mdi--license text-primary"></span> Lizenz wählen
                 </h3>
-                <p className="opacity-70 text-sm mb-6">Wähle die gewünschte Auflösung für das Bild <strong>{photo.filename}</strong>.</p>
+                <p className="opacity-70 text-sm mb-6">Wähle die gewünschte Auflösung für das Bild <strong>{photo.title || 'Foto'}</strong>.</p>
 
                 <div className="flex flex-col gap-6 mb-6 bg-base-200 p-5 rounded-box border border-base-300">
                     
@@ -105,7 +105,7 @@ export default function LicenseSelectorModal({ photo, onClose }: Props) {
                 </div>
                 <div className="space-y-4">
                     {tiers.map(tier => {
-                        const covered = isCovered(user?.flatrate_level, tier.id, usage, duration);
+                        const covered = isCovered(user?.flatrate_level, tier.id, usage, duration) || photo?.gallery?.effective_is_free_download;
                         const upgradePrice = calculateUpgradePrice(user?.flatrate_level, tier.id, usage, duration);
                         const canBuy = user?.can_purchase_upgrades;
 

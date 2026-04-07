@@ -32,7 +32,8 @@ test.describe('Client Notifications Opt-In', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
-        await modal.submitModal('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         // Galerie öffnen
         const galleryLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();

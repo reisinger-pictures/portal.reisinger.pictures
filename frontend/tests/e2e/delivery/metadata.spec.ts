@@ -37,7 +37,8 @@ test.describe('Metadata & Detail View Workflow', () => {
     test('Photographer can view and edit metadata in detail view', async ({ page }) => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
-        await modal.submitModal('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
         
         // Robustes Auffinden des Galerie-Links (inkl. Reload-Logik bei SWR-Verzögerung)
         const galLink = page.locator('main').getByText(galleryName).first();
@@ -56,10 +57,12 @@ test.describe('Metadata & Detail View Workflow', () => {
 
         const cityInput = page.locator('.form-control').filter({ hasText: 'Stadt' }).locator('input[type="text"]');
         await cityInput.click();
+        const searchSalzburgPromise = page.waitForResponse(res => res.url().includes('/api/search/locations'));
         await cityInput.pressSequentially('Salzburg', { delay: 100 });
+        await searchSalzburgPromise;
 
         const dropdownItem = page.locator('li').filter({ hasText: 'Salzburg' }).first();
-        await expect(dropdownItem).toBeVisible();
+        await expect(dropdownItem).toBeVisible({ timeout: 15000 });
         await dropdownItem.click();
 
         await expect(page.locator('div.form-control').filter({ hasText: 'Bundesland' }).locator('input[type="text"]')).toHaveValue('Salzburg');

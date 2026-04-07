@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { usePricing, ResolutionTier, UsageTier, DurationTier } from '../../logic/usePricing';
+import { useLicenseTerms } from '../../logic/useLicenseTerms';
 import PageLayout from '../components/PageLayout';
 
 const checkoutSchema = z.object({
@@ -27,7 +28,7 @@ export default function ClientCartView() {
     const { showToast } = useUI();
     const { user, mutate: mutateUser } = useAuth();
     const navigate = useNavigate();
-    const { calculateUpgradePrice } = usePricing(15.00);
+    const { calculateUpgradePrice } = usePricing(parseFloat(useLicenseTerms().terms?.base_price || '35.00'));
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CheckoutFormValues>({
         resolver: zodResolver(checkoutSchema),
@@ -58,7 +59,8 @@ export default function ClientCartView() {
             user?.flatrate_level,
             updatedItem.tier as ResolutionTier,
             updatedItem.usage as UsageTier,
-            updatedItem.duration as DurationTier
+            updatedItem.duration as DurationTier,
+            updatedItem.frequency as any || 'einmalig'
         );
         addToCart({ ...updatedItem, price: newPrice });
     };
@@ -137,6 +139,14 @@ export default function ClientCartView() {
                                                 >
                                                     <option value="1_year">1 Jahr</option>
                                                     <option value="unlimited">Unbegrenzt</option>
+                                                </select>
+                                                <select 
+                                                    className="select select-sm select-bordered bg-base-200 text-xs font-normal"
+                                                    value={item.frequency || 'einmalig'}
+                                                    onChange={(e) => handleUpdateItem(item, 'frequency', e.target.value)}
+                                                >
+                                                    <option value="einmalig">Einmalig</option>
+                                                    <option value="mehrmalig">Mehrmalig</option>
                                                 </select>
                                             </div>
                                         </div>

@@ -28,7 +28,8 @@ export class ModalHelper {
         if (currentState !== targetState) {
             // Bei DaisyUI sind Checkboxen und Toggles sicht- und klickbare Elemente.
             // Direkter Klick auf den Input ist wesentlich robuster als Klick auf das Label/den Text.
-            await checkbox.click();
+            // Klick über das Label (Container) für stabiles DaisyUI Verhalten
+            await container.click();
 
             // Kurz warten, bis React den State verarbeitet hat (Anti-Flakiness)
             if (targetState) {
@@ -62,5 +63,6 @@ export class ModalHelper {
         }
         
         await expect(this.activeModal).toBeHidden({ timeout: 15000 });
+        return await res.json().catch(() => ({}));
     }
 }

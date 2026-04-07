@@ -47,7 +47,7 @@ const handleApiError = async (res: Response) => {
         try {
             errorInfo = await res.json();
             errorMsg = errorInfo.error || errorInfo.message || errorMsg;
-        } catch { /* ignore */ }
+        } catch (e) { console.debug('Failed to parse error', e); }
     } else {
         try {
             const text = await res.text();
@@ -58,7 +58,7 @@ const handleApiError = async (res: Response) => {
                 errorMsg = text.substring(0, 150);
             }
             errorInfo = { text };
-        } catch { /* ignore */ }
+        } catch (e) { console.debug('Failed to parse error', e); }
     }
     
     const error = new Error(errorMsg) as Error & { info?: unknown; status?: number };

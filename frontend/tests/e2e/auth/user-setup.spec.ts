@@ -66,6 +66,6 @@ test.describe('User Setup via Mailpit Workflow', () => {
         await page.getByRole('button', { name: 'Passwort speichern & Anmelden' }).click();
 
         await expect(page.locator('.loading-spinner')).toBeHidden();
-        await expect(page.locator('text=Aktuell sind keine Galerien für dich freigeschaltet').first()).toBeVisible();
+        await expect(page.locator('text=Aktuell sind keine privaten Galerien für dich freigeschaltet').first()).toBeVisible();
     });
 });

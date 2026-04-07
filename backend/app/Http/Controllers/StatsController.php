@@ -25,91 +25,101 @@ class StatsController extends Controller
         return array_slice($domainStats, 0, 10);
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $user = auth('api')->user();
+        $tier = $request->query('tier');
+
+        $tierFilter = function($query) use ($tier) {
+            if ($tier) $query->where('resolution_tier', $tier);
+        };
+
+        $tierFilterDb = function($query) use ($tier) {
+            if ($tier) $query->where('download_logs.resolution_tier', $tier);
+        };
 
         if ($user->is_admin) {
-            // Admins sehen alles
             $galleriesCount = Gallery::count();
-            $totalDownloads = DownloadLog::count();
-            $guestDownloads = DownloadLog::whereNull('user_id')->count();
-            
+
+            $totalDownloads = DownloadLog::where('item_type', 'single_image')->where($tierFilter)->count();
+            foreach(DownloadLog::where('item_type', 'full_zip')->where($tierFilter)->get() as $zip) {
+                $payload = is_string($zip->payload) ? json_decode($zip->payload, true) : $zip->payload;
+                $totalDownloads += $payload['photo_count'] ?? 1;
+            }
+
+            $guestDownloads = DownloadLog::whereNull('user_id')->where($tierFilter)->count();
+
             $rawDomainStats = DB::table('download_logs')
                 ->join('users', 'download_logs.user_id', '=', 'users.id')
+                ->where($tierFilterDb)
                 ->selectRaw('SUBSTRING_INDEX(users.email, "@", -1) as domain, COUNT(*) as count')
                 ->groupBy('domain')
                 ->get();
-                
+
             $domainStats = $this->processDomainStats($rawDomainStats);
 
             $topGalleries = DB::table('download_logs')
                 ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
                 ->whereNotNull('gallery_name_snapshot')
+                ->where($tierFilterDb)
                 ->groupBy('gallery_name_snapshot')
                 ->orderByDesc('count')->limit(5)->get();
 
-            $topPhotos = DB::table('download_logs')
-                ->select('item_identifier as name', DB::raw('COUNT(*) as count'))
-                ->where('item_type', 'single_image')
-                ->groupBy('item_identifier')
-                ->orderByDesc('count')->limit(5)->get();
-                
+
         } elseif ($user->is_customer_manager) {
-            // Customer Manager: Sehen Analytics für ihre E-Mail-Domain
             $domain = substr(strrchr($user->email, "@"), 1);
             $tenantUserIds = User::where('email', 'like', '%@' . $domain)->pluck('id')->toArray();
-            
-            // Sie sehen nur Downloads, die von ihren Mitarbeitern getätigt wurden
-            $totalDownloads = DownloadLog::whereIn('user_id', $tenantUserIds)->count();
-            $guestDownloads = 0; // Mandanten-Downloads sind immer authentifiziert
-            $galleriesCount = 0; // Nicht wirklich relevant für den Mandanten-Scope
+
+            $totalDownloads = DownloadLog::whereIn('user_id', $tenantUserIds)->where('item_type', 'single_image')->where($tierFilter)->count();
+            foreach(DownloadLog::whereIn('user_id', $tenantUserIds)->where('item_type', 'full_zip')->where($tierFilter)->get() as $zip) {
+                $payload = is_string($zip->payload) ? json_decode($zip->payload, true) : $zip->payload;
+                $totalDownloads += $payload['photo_count'] ?? 1;
+            }
+
+            $guestDownloads = 0;
+            $galleriesCount = 0;
             $domainStats = [['domain' => $domain, 'count' => $totalDownloads]];
 
             $topGalleries = DB::table('download_logs')
                 ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
                 ->whereIn('user_id', $tenantUserIds)
                 ->whereNotNull('gallery_name_snapshot')
+                ->where($tierFilterDb)
                 ->groupBy('gallery_name_snapshot')
                 ->orderByDesc('count')->limit(5)->get();
 
-            $topPhotos = DB::table('download_logs')
-                ->select('item_identifier as name', DB::raw('COUNT(*) as count'))
-                ->where('item_type', 'single_image')
-                ->whereIn('user_id', $tenantUserIds)
-                ->groupBy('item_identifier')
-                ->orderByDesc('count')->limit(5)->get();
 
         } else {
-            // Fotografen sehen Statistiken zu ihren EIGENEN Galerien
             $galleryIds = $user->galleries()->pluck('galleries.id')->toArray();
-            
+
             $galleriesCount = count($galleryIds);
-            $totalDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)->count();
-            $guestDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)->whereNull('user_id')->count();
-            
+
+            $totalDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)->where('item_type', 'single_image')->where($tierFilter)->count();
+            foreach(DownloadLog::whereIn('gallery_id', $galleryIds)->where('item_type', 'full_zip')->where($tierFilter)->get() as $zip) {
+                $payload = is_string($zip->payload) ? json_decode($zip->payload, true) : $zip->payload;
+                $totalDownloads += $payload['photo_count'] ?? 1;
+            }
+
+            $guestDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)->whereNull('user_id')->where($tierFilter)->count();
+
             $rawDomainStats = DB::table('download_logs')
                 ->join('users', 'download_logs.user_id', '=', 'users.id')
                 ->whereIn('download_logs.gallery_id', $galleryIds)
+                ->where($tierFilterDb)
                 ->selectRaw('SUBSTRING_INDEX(users.email, "@", -1) as domain, COUNT(*) as count')
                 ->groupBy('domain')
                 ->get();
-                
+
             $domainStats = $this->processDomainStats($rawDomainStats);
 
             $topGalleries = DB::table('download_logs')
                 ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
                 ->whereIn('gallery_id', $galleryIds)
                 ->whereNotNull('gallery_name_snapshot')
+                ->where($tierFilterDb)
                 ->groupBy('gallery_name_snapshot')
                 ->orderByDesc('count')->limit(5)->get();
 
-            $topPhotos = DB::table('download_logs')
-                ->select('item_identifier as name', DB::raw('COUNT(*) as count'))
-                ->where('item_type', 'single_image')
-                ->whereIn('gallery_id', $galleryIds)
-                ->groupBy('item_identifier')
-                ->orderByDesc('count')->limit(5)->get();
         }
 
         return response()->json([
@@ -117,27 +127,42 @@ class StatsController extends Controller
             'total_downloads' => $totalDownloads,
             'domain_stats' => $domainStats,
             'guest_downloads' => $guestDownloads,
-            'top_galleries' => $topGalleries,
-            'top_photos' => $topPhotos
+            'top_galleries' => $topGalleries
         ]);
     }
 
     public function logs(Request $request)
     {
         $user = auth('api')->user();
+        $tier = $request->query('tier');
         $query = DownloadLog::orderBy('id', 'desc');
 
+        if ($tier) {
+            $query->where('resolution_tier', $tier);
+        }
+
         if ($user->is_customer_manager && !$user->is_admin) {
-            // Customer Manager dürfen nur Logs ihrer eigenen Domain-Nutzer sehen
             $domain = substr(strrchr($user->email, "@"), 1);
             $tenantUserIds = User::where('email', 'like', '%@' . $domain)->pluck('id')->toArray();
             $query->whereIn('user_id', $tenantUserIds);
         } elseif (!$user->is_admin) {
-            // Fotografen sehen nur Downloads aus ihren Galerien
             $galleryIds = $user->galleries()->pluck('galleries.id')->toArray();
             $query->whereIn('gallery_id', $galleryIds);
         }
 
-        return response()->json($query->paginate(50));
+        $paginated = $query->paginate(50);
+
+        // Append thumb_url for single images and zips
+        $paginated->getCollection()->transform(function ($log) {
+            if ($log->gallery_id) {
+                $photo = \App\Models\Photo::where('gallery_id', $log->gallery_id)->orderBy('id', 'desc')->first();
+                if ($photo) {
+                    $log->thumb_url = $photo->thumb_url;
+                }
+            }
+            return $log;
+        });
+
+        return response()->json($paginated);
     }
 }

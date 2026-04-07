@@ -27,6 +27,15 @@ Route::middleware("throttle:$throttleLimit,1")->group(function () {
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 });
 Route::get('/ping', function() { return response()->json(['message' => 'API OK']); });
+Route::get('/settings/license-terms', [\App\Http\Controllers\SettingsController::class, 'getLicenseTerms']);
+
+if (app()->environment('local', 'testing')) {
+    Route::delete('/test/cleanup-user/{id}', function($id) {
+        \App\Models\DownloadLog::where('user_id', $id)->delete();
+        \App\Models\User::find($id)?->delete();
+        return response()->json(['success' => true]);
+    });
+}
 
 Route::post('/test/flush-queue', function() {
     if (app()->environment('local', 'testing')) {
@@ -104,6 +113,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
     Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
     Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark']);
+    Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms']);
 
     Route::get('/management/ftp/status', [FtpController::class, 'status']);
     Route::post('/management/ftp/target', [FtpController::class, 'setTarget']);

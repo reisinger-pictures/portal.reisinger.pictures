@@ -32,7 +32,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
     test('Flow B: Photographer can delete a photo from detail view', async ({ page }) => {
         const auth = new AuthHelper(page);
-        const galleryHelper = new GalleryHelper(page);
+        const galleryHelper = new GalleryHelper(page, helper);
 
         await auth.login(photogUser.email, photogUser.password);
         await galleryHelper.createAndOpenDeliveryGallery(galleryNameB);
@@ -60,7 +60,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
-        const galleryHelper = new GalleryHelper(page);
+        const galleryHelper = new GalleryHelper(page, helper);
 
         // === PHASE 1: PHOTOGRAPHER PREPARES GALLERY & LINK ===
         await auth.login(photogUser.email, photogUser.password);

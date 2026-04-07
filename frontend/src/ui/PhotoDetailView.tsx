@@ -10,7 +10,7 @@ import PageLayout from './components/PageLayout';
 import IptcMetadataEditor, { IptcData } from './components/IptcMetadataEditor';
 import PhotoHistoryModal from './components/PhotoHistoryModal';
 import { useUI } from './components/UIContext';
-import LicenseSelectorModal from './client/components/LicenseSelectorModal';
+import LicenseSelectorCard from './client/components/LicenseSelectorCard';
 
 interface Breadcrumb {
     name: string;
@@ -39,7 +39,7 @@ export default function PhotoDetailView() {
 
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [prevPhotoId, setPrevPhotoId] = useState<string | undefined>(undefined);
-    const [selectedPhotoForDownload, setSelectedPhotoForDownload] = useState<Photo | null>(null);
+
 
     if (data?.photo && data.photo.id !== prevPhotoId) {
         setPrevPhotoId(data.photo.id);
@@ -59,7 +59,7 @@ export default function PhotoDetailView() {
 
     if (isLoading) return <PageLayout>
         <div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div>
-        <LicenseSelectorModal photo={selectedPhotoForDownload} onClose={() => setSelectedPhotoForDownload(null)} />
+
         </PageLayout>;
     if (error || !data) return <PageLayout>
         <div className="p-8"><ErrorMessage message="Foto konnte nicht geladen werden oder keine Berechtigung." /></div>
@@ -126,8 +126,8 @@ export default function PhotoDetailView() {
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-between items-center w-full bg-base-100 p-4 rounded-box border border-base-300 shadow-sm mt-2">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => setSelectedPhotoForDownload(photo)} className="btn btn-primary shadow-sm"><span className="iconify mdi--license text-lg"></span> Lizenz wählen</button>
-                                <span className="text-sm opacity-70 font-semibold">{data.downloads_count || 0} Downloads</span>
+
+                                
                             </div>
                             {isPhotographer && (
                                 <button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap">
@@ -138,7 +138,10 @@ export default function PhotoDetailView() {
                     </div>
 
                     {/* Rechte Spalte: Formular */}
-                    <div className="w-full xl:w-[500px] shrink-0 flex flex-col gap-6">
+                    <div className="w-full lg:w-[450px] xl:w-[600px] 2xl:w-[700px] shrink-0 flex flex-col gap-6">
+                        {data.photo.gallery?.type === 'delivery' && (
+                            <LicenseSelectorCard photo={data.photo} />
+                        )}
                         <IptcMetadataEditor
                             data={iptcData}
                             onChange={setIptcData}

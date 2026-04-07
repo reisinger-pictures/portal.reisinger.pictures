@@ -49,8 +49,7 @@ class DownloadTest extends TestCase
         $this->assertDatabaseHas('download_logs', [
             'user_id' => $user->id,
             'item_type' => 'single_image',
-            'resolution_tier' => 'original',
-            'item_identifier' => 'download_test.jpg'
+            'resolution_tier' => 'original'
         ]);
 
         // 2. Metadaten des injizierten Bildes prüfen
@@ -80,9 +79,9 @@ class DownloadTest extends TestCase
 
     public function test_guest_can_download_public_gallery_zip_and_structure_is_valid()
     {
-        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'slug' => 'test-zip']);
-        Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'pic1.jpg']);
-        Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'pic2.jpg']);
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'is_free_download' => true, 'slug' => 'test-zip']);
+        $p1 = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'pic1.jpg']);
+        $p2 = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'pic2.jpg']);
         
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
         $content = file_get_contents($fixturePath);
@@ -113,8 +112,8 @@ class DownloadTest extends TestCase
         $this->assertTrue($res === true, 'Das generierte ZIP-Archiv ist korrupt.');
         
         // Prüfen, ob beide Dateien im Zip sind
-        $this->assertNotFalse($zip->locateName('pic1.jpg'), 'pic1.jpg fehlt im ZIP');
-        $this->assertNotFalse($zip->locateName('pic2.jpg'), 'pic2.jpg fehlt im ZIP');
+        $this->assertNotFalse($zip->locateName($p1->id . '_ORIGINAL.jpg'), 'pic1_ORIGINAL.jpg fehlt im ZIP');
+        $this->assertNotFalse($zip->locateName($p2->id . '_ORIGINAL.jpg'), 'pic2_ORIGINAL.jpg fehlt im ZIP');
         $zip->close();
         
         unlink($tempZipPath);

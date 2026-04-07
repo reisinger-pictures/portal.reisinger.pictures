@@ -32,7 +32,8 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
-        await modal.submitModal('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
         await expect(link).toBeVisible();

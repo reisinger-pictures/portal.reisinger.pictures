@@ -9,7 +9,8 @@ const groupSchema = z.object({
     name: z.string().min(1, 'Name ist erforderlich'),
     slug: z.string(),
     is_public: z.enum(['null', 'true', 'false']),
-    parent_id: z.string()
+    parent_id: z.string(),
+    is_free_download: z.boolean().optional()
 });
 type GroupFormValues = z.infer<typeof groupSchema>;
 
@@ -19,8 +20,8 @@ interface Props {
     availableGroups: FlatGroup[];
     editingGroup?: GalleryGroup | null;
     defaultParentId?: string | null;
-    onCreate: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => Promise<void>;
-    onUpdate: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => Promise<void>;
+    onCreate: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: Record<string, unknown>) => Promise<void>;
+    onUpdate: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: Record<string, unknown>) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
 
@@ -39,6 +40,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
             reset({
                 name: editingGroup?.name || '',
                 slug: editingGroup?.slug || '',
+                is_free_download: editingGroup?.is_free_download || false,
                 is_public: editingGroup?.is_public === null || editingGroup?.is_public === undefined ? 'null' : (editingGroup.is_public ? 'true' : 'false'),
                 parent_id: editingGroup?.parent_id || defaultParentId || ''
             });
@@ -60,10 +62,10 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
 
         try {
             if (editingGroup) {
-                await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId);
+                await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download });
                 showToast('success', 'Ordner erfolgreich aktualisiert.');
             } else {
-                await onCreate(data.name, data.slug, isPub, pId);
+                await onCreate(data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download });
                 showToast('success', 'Ordner erfolgreich erstellt.');
             }
             onClose();
@@ -115,6 +117,16 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                             <option value="false">Privat erzwingen (Nur mit Link / Passwort)</option>
                             <option value="true">Öffentlich erzwingen (Für alle sichtbar)</option>
                         </select>
+                    </div>
+
+                    <div className="form-control mb-4">
+                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
+                            <input type="checkbox" {...register('is_free_download')} className="checkbox checkbox-primary" />
+                            <div>
+                                <span className="label-text font-bold block">Kostenlosen Download erlauben</span>
+                                <span className="label-text-alt opacity-70 block mt-1">Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterladen.</span>
+                            </div>
+                        </label>
                     </div>
 
                     <div className="form-control w-full mb-6">

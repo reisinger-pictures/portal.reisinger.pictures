@@ -31,6 +31,7 @@ class Gallery extends Model
         'type',
         'is_live',
         'is_public',
+        'is_free_download',
         'password_hash',
         'allow_client_metadata_edit',
         'apply_metadata_to_photos',
@@ -56,7 +57,7 @@ class Gallery extends Model
     ];
 
     // Dieses Attribut wird bei JSON-Responses automatisch angehängt
-    protected $appends = ['full_path', 'effective_is_editorial_only', 'effective_is_hidden'];
+    protected $appends = ['full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download'];
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
@@ -65,12 +66,9 @@ class Gallery extends Model
         return false;
     }
 
-    public function getEffectiveIsFreeDownloadAttribute(): bool
-    {
-        if ($this->is_free_download !== null) return (bool) $this->is_free_download;
-        if ($this->galleryGroup) return $this->galleryGroup->effective_is_free_download;
-        return false;
-    }
+    
+
+    
 
     public function getEffectiveIsFreeDownloadAttribute(): bool
     {

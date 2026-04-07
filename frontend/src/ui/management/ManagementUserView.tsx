@@ -21,9 +21,11 @@ export default function ManagementUserView() {
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
     const flatGalleries = tree ? [...(tree.groups.flatMap(g => g.galleries || [])), ...(tree.root_galleries || [])] : [];
 
-    const allowedRoles = currentUser?.is_admin 
+    const allowedRoles = currentUser?.is_super_admin 
         ? roles 
-        : roles?.filter(r => ['power_user', 'client', 'customer_manager'].includes(r.name));
+        : (currentUser?.is_admin 
+            ? roles?.filter(r => r.name !== 'super_admin') 
+            : roles?.filter(r => ['power_user', 'client', 'customer_manager'].includes(r.name)));
 
     const handleSaveUser = async (id: string, selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean, flatrateLevel: string) => {
         try {

@@ -13,6 +13,7 @@ export interface User {
     billing_city?: string | null;
     metadata_copyright?: string | null;
     ftp_slug?: string | null;
+    is_super_admin: boolean;
     is_admin: boolean;
     is_photographer: boolean;
     is_pending: boolean;

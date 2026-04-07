@@ -15,45 +15,32 @@ export class AuthHelper {
         await expect(this.page.locator('main').first()).toBeVisible({ timeout: 5000 });
 
         const menuBtn = this.page.locator('header button.btn-square').filter({ has: this.page.locator('.mdi--menu') }).first();
+        const emailInput = this.page.locator('input[placeholder="E-Mail Adresse"]').first();
         const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
 
-        if (await menuBtn.isVisible()) {
-            if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
-                await menuBtn.click();
-                await expect(backdrop).toBeVisible({ timeout: 5000 });
-            }
+        if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
+            await menuBtn.click();
+            await backdrop.waitFor({ state: 'visible', timeout: 5000 });
+            await this.page.waitForTimeout(400);
         }
 
-        const emailInput = this.page.locator('input[placeholder="E-Mail Adresse"]').first();
+        if (await emailInput.isVisible()) {
+            await emailInput.fill(email);
+            await this.page.fill('input[placeholder="Passwort"]', password);
 
-        if (await emailInput.isHidden()) {
-            const closeBtn = this.page.locator('button:has(.mdi--close)').first();
-            if (await closeBtn.isVisible()) {
-                await closeBtn.click();
-            }
-            return;
+            const loginPromise = this.network.waitForLogin();
+            const mePromise = this.network.waitForMe();
+
+            await this.page.getByRole('button', { name: 'Login' }).first().click();
+            await loginPromise;
+            await mePromise;
+
+            await expect(emailInput).toBeHidden({ timeout: 15000 });
         }
 
-        await emailInput.fill(email);
-        await this.page.fill('input[placeholder="Passwort"]', password);
-
-        // Nutzt den neuen NetworkHelper
-        const loginPromise = this.network.waitForLogin();
-        const mePromise = this.network.waitForMe();
-
-        await this.page.getByRole('button', { name: 'Login' }).first().click();
-        await loginPromise;
-        await mePromise;
-
-        await expect(emailInput).toBeHidden({ timeout: 5000 });
-
-        if (await menuBtn.isVisible()) {
-            const closeBtn = this.page.locator('button:has(.mdi--close)').first();
-            if (await closeBtn.isVisible()) {
-                try {
-                    await closeBtn.click({ timeout: 2000 });
-                } catch { /* ignore */ }
-            }
+        if (await backdrop.isVisible()) {
+            await backdrop.click();
+            await expect(backdrop).toBeHidden({ timeout: 5000 });
         }
     }
 
@@ -65,8 +52,12 @@ export class AuthHelper {
         const emailInput = this.page.getByPlaceholder('E-Mail Adresse').first();
         await expect(async () => {
             const menuBtn = this.page.locator('header button.btn-square').filter({ has: this.page.locator('.mdi--menu') }).first();
-            if (await menuBtn.isVisible() && await emailInput.isHidden()) {
+            const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
+            
+            if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
                 await menuBtn.click();
+                await backdrop.waitFor({ state: 'visible', timeout: 2000 });
+                await this.page.waitForTimeout(400);
             }
             await expect(emailInput).toBeVisible({ timeout: 2000 });
         }).toPass({ timeout: 5000 });

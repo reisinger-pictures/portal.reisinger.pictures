@@ -77,6 +77,7 @@ export default function Sidebar(props: SidebarProps) {
                 {user && (
                     <>
                         {isAdminOrPhotog && <div className="divider my-1 text-xs opacity-50">Dein Account</div>}
+                        <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
                         <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> Mein Profil</Link></li>
                         <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> Einkäufe & Lizenzen</Link></li>
                     </>

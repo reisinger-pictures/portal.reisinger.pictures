@@ -7,6 +7,8 @@ export interface CartItem {
     tier: ResolutionTier;
     usage: UsageTier;
     duration: DurationTier;
+    frequency?: 'einmalig' | 'mehrmalig';
+    isQuote?: boolean;
     price: number;
 }
 
@@ -26,7 +28,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         try {
             const saved = localStorage.getItem('rp_cart');
             return saved ? JSON.parse(saved) : [];
-        } catch { return []; }
+        } catch (e) { console.error('Cart parse error', e); return []; }
     });
     
         useEffect(() => {

@@ -38,7 +38,8 @@ test.describe('Client Selection Workflow', () => {
         await sidebar.openNewGalleryModal();
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
-        await modal.submitModal('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
         
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
         await expect(galLink).toBeVisible();

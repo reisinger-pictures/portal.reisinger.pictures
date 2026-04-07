@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
             ['email' => env('ADMIN_EMAIL', 'florian@reisinger.pictures')],
             ['name' => 'Florian Reisinger', 'password' => \Illuminate\Support\Facades\Hash::make(env('ADMIN_PASSWORD', 'admin'))]
         );
-        $roles = ['admin', 'photographer', 'client', 'customer_manager', 'power_user'];
+        $roles = ['super_admin', 'admin', 'photographer', 'client', 'customer_manager', 'power_user'];
         foreach ($roles as $roleName) {
             \App\Models\Role::firstOrCreate(['name' => $roleName]);
         }

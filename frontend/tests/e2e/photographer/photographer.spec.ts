@@ -43,7 +43,7 @@ test.describe('Photographer Core Workflow', () => {
     });
 
     test('Photographer can edit an existing gallery', async ({ page }) => {
-        const galleryHelper = new GalleryHelper(page);
+        const galleryHelper = new GalleryHelper(page, helper);
         const modal = new ModalHelper(page);
         const sidebar = new SidebarHelper(page);
         
@@ -66,7 +66,7 @@ test.describe('Photographer Core Workflow', () => {
     });
 
     test('Photographer can upload an image and sees it in personal feed', async ({ page }) => {
-        const galleryHelper = new GalleryHelper(page);
+        const galleryHelper = new GalleryHelper(page, helper);
         const upload = new UploadHelper(page);
         const galleryName = `Upload Test ${Math.random().toString(36).substring(2, 10)}`;
 
@@ -84,7 +84,7 @@ test.describe('Photographer Core Workflow', () => {
     });
 
     test('Photographer can toggle between management and client view', async ({ page }) => {
-        const galleryHelper = new GalleryHelper(page);
+        const galleryHelper = new GalleryHelper(page, helper);
         const galleryName = `Toggle Test ${Math.random().toString(36).substring(2, 10)}`;
 
         // Precondition

@@ -10,6 +10,8 @@ export interface Gallery {
     type: 'selection' | 'delivery';
     is_live: boolean;
     is_public: boolean;
+    is_free_download?: boolean | null;
+    effective_is_free_download?: boolean;
     allow_client_metadata_edit?: boolean;
     apply_metadata_to_photos?: boolean;
     default_title?: string;
@@ -30,6 +32,8 @@ export interface GalleryGroup {
     parent_id: string | null;
     slug?: string;
     is_public?: boolean | null;
+    is_free_download?: boolean | null;
+    effective_is_free_download?: boolean;
     children?: GalleryGroup[];
     galleries?: Gallery[];
 }

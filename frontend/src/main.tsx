@@ -10,7 +10,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <SWRConfig value={{
             shouldRetryOnError: false
         }}>
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <App/>
             </BrowserRouter>
         </SWRConfig>

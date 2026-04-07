@@ -23,6 +23,7 @@ export class SidebarHelper {
         // ist der Link auch wirklich im DOM. Wir nutzen einen sauberen, nativen Klick!
         const link = this.page.locator('ul.menu').getByText(menuText).first();
         await link.waitFor({ state: 'visible', timeout: 5000 });
+        await link.scrollIntoViewIfNeeded();
         await link.click();
         
     }

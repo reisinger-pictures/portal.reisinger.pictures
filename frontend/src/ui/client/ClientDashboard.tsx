@@ -12,6 +12,7 @@ export default function ClientDashboard() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const {results: searchResults} = useSearch(searchQuery, false, true); // Leere Query überspringen
+    const {results: discoveryFeed} = useSearch(''); // Öffentliche Galerien laden
 
     if (!user) return null;
 
@@ -77,7 +78,7 @@ export default function ClientDashboard() {
                                     ))}
                                     {searchResults.photos.map(p => (
                                         <li key={p.id}><Link to={'/photos/' + p.id} onClick={() => setSearchQuery('')}>
-                                            <span className="iconify mdi--image-outline opacity-70"></span> <HighlightText text={p.filename} highlight={searchQuery} />
+                                            <span className="iconify mdi--image-outline opacity-70"></span> <HighlightText text={p.title || 'Foto'} highlight={searchQuery} />
                                         </Link></li>
                                     ))}
                                     {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (
@@ -109,7 +110,28 @@ export default function ClientDashboard() {
                         </div>
                     ) : (
                         <div className="alert shadow-lg bg-base-100 border border-base-300">
-                            <span>Aktuell sind keine Galerien für dich freigeschaltet.</span>
+                            <span>Aktuell sind keine privaten Galerien für dich freigeschaltet.</span>
+                        </div>
+                    )}
+
+                    {/* --- NEU: Öffentliche Galerien anzeigen --- */}
+                    {discoveryFeed?.galleries && discoveryFeed.galleries.length > 0 && (
+                        <div className="mt-12 border-t border-base-300 pt-8">
+                            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                                <span className="iconify mdi--earth text-primary"></span> Öffentliche Entdeckungen
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {discoveryFeed.galleries.map(g => (
+                                    <div key={g.id} className="card bg-base-100 shadow-xl cursor-pointer hover:shadow-2xl transition-shadow border border-base-300" onClick={() => navigate('/' + g.full_path)}>
+                                        <div className="card-body">
+                                            <h2 className="card-title text-primary">{g.name}</h2>
+                                            <div className="card-actions justify-end mt-4">
+                                                <button className="btn btn-outline btn-sm">Ansehen</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

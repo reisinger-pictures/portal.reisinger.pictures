@@ -5,15 +5,15 @@ import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import { useAuth } from '../../logic/useAuth';
-import LicenseSelectorModal from './components/LicenseSelectorModal';
+
 
 import { useGallery, Photo } from '../../logic/useGallery';
-import { usePricing } from '../../logic/usePricing';
+import { usePricing, ResolutionTier } from '../../logic/usePricing';
 export default function DeliveryView({ galleryData }: { galleryData: ReturnType<typeof useGallery> }) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
-    const [selectedPhotoForDownload, setSelectedPhotoForDownload] = useState<Photo | null>(null);
+
 
     /* moved early return */
     const galleryRef = useRef<HTMLDivElement>(null);
@@ -43,11 +43,42 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                                 <input type="checkbox" className="toggle toggle-primary toggle-sm md:toggle-md" checked={galleryData.wantsNotifications} onChange={(e) => galleryData.toggleOptIn(gallery.id, e.target.checked)} />
                             </label>
                         )}
-                        {totalPhotos > 0 && (
-                            <button onClick={() => setSelectedPhotoForDownload(photo)} className="btn btn-primary">
-                                <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> Alle herunterladen (.zip)
-                            </button>
-                        )}
+                        {totalPhotos > 0 && (() => {
+                            const { isCovered } = usePricing();
+                            const allowedTiers = [
+                                { id: 'web', label: 'Web & Social' },
+                                { id: 'print', label: 'Print (A4)' },
+                                { id: 'original', label: 'Original' }
+                            ].filter(t => isCovered(user?.flatrate_level, t.id as ResolutionTier, 'editorial', '1_year') || gallery?.effective_is_free_download || user?.is_admin || user?.is_photographer);
+
+                            if (allowedTiers.length === 0) return null;
+
+                            if (allowedTiers.length === 1) {
+                                return (
+                                    <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + allowedTiers[0].id} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                                        <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> Alle herunterladen (.zip)
+                                    </a>
+                                );
+                            }
+
+                            return (
+                                <div className="dropdown dropdown-end">
+                                    <div tabIndex={0} role="button" className="btn btn-primary">
+                                        <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> Alle herunterladen (.zip) <span className="iconify mdi--chevron-down"></span>
+                                    </div>
+                                    <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 border border-base-300 rounded-box w-52">
+                                        <li className="menu-title px-4 py-2 text-xs opacity-70 uppercase tracking-wider">Qualität wählen</li>
+                                        {allowedTiers.map(t => (
+                                            <li key={t.id}>
+                                                <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + t.id} target="_blank" rel="noopener noreferrer" className="font-bold">
+                                                    <span className="uppercase">{t.id}</span> Format
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
 
@@ -89,26 +120,11 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                                 </button>
                             </div>
 
-                            {(() => {
-                                const { isCovered } = usePricing();
-                                const canDirectDownload = isCovered(user?.flatrate_level, 'web', 'editorial', '1_year');
-                                return (
-                                    <div className="card-body p-4 bg-base-100 flex flex-col gap-3">
-                                        {canDirectDownload ? (
-                                            <button 
-                                                onClick={() => window.open('/api/photos/' + photo.id + '/download?tier=web', '_self')} 
-                                                className="btn btn-success btn-sm text-white"
-                                            >
-                                                <span className="iconify mdi--download mr-1"></span> Download
-                                            </button>
-                                        ) : (
-                                            <button onClick={() => setSelectedPhotoForDownload(photo)} className="btn btn-secondary btn-sm">
-                                                <span className="iconify mdi--license mr-1"></span> Lizenz wählen...
-                                            </button>
-                                        )}
-                                    </div>
-                                );
-                            })()}
+                            <div className="card-body p-4 bg-base-100 flex flex-col gap-3">
+                                <button onClick={(e) => { e.preventDefault(); navigate('/photos/' + photo.id); }} className="btn btn-secondary btn-sm w-full">
+                                    <span className="iconify mdi--open-in-new mr-1"></span> Bild öffnen
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -119,7 +135,7 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                     </div>
                 )}
             </div>
-            <LicenseSelectorModal photo={selectedPhotoForDownload} onClose={() => setSelectedPhotoForDownload(null)} />
+
         </PageLayout>
     );
 }

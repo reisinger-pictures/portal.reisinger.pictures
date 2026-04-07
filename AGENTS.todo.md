@@ -20,7 +20,6 @@
 - [ ] **Flow AD:** Watermark Tile Cache Validation (Hash-Prüfung).
 - [ ] **Flow AI (Zero Trust Boundary):** PHPUnit: `customer_manager` versucht, `UserController@update` oder `UserController@destroy` für eine `user_id` eines fremden Mandanten aufzurufen -> System muss strikt 403 Forbidden werfen.
 
-
 ### 🧪 E2E Tests (Playwright)
 - [ ] **Flow AE:** Mandanten-Einladung & Registrierung.
 - [ ] **Flow P:** Flatrate-Bypass (Sofort-Download).

@@ -1,5 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="🧪 [Test] Frontend: AI Test Runner" type="NodeJSConfigurationType" path-to-js-file="ai_test_runner.mjs" working-dir="$PROJECT_DIR$/frontend">
-    <method v="2" />
-  </configuration>
-</component>

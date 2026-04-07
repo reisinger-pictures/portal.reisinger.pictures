@@ -6,7 +6,7 @@ export class GalleryHelper {
     private sidebar: SidebarHelper;
     private modal: ModalHelper;
 
-    constructor(private page: Page) {
+    constructor(private page: Page, private sessionHelper?: any) {
         this.sidebar = new SidebarHelper(page);
         this.modal = new ModalHelper(page);
     }
@@ -15,7 +15,10 @@ export class GalleryHelper {
         await this.sidebar.openNewGalleryModal();
         await this.modal.fillInputByLabel('Name der Galerie', name);
         await this.modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
-        await this.modal.submitModal('Speichern');
+        const res = await this.modal.submitModal('Speichern');
+        if (res?.gallery?.id && this.sessionHelper) {
+            this.sessionHelper.trackGallery(res.gallery.id);
+        }
 
         const galLink = this.page.locator('main').getByText(name, { exact: true });
         await expect(galLink).toBeVisible({ timeout: 15000 });

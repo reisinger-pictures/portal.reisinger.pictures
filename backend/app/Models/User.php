@@ -19,6 +19,10 @@ class User extends Authenticatable implements JWTSubject
     public $transient_galleries = [];
     public $transient_meta_galleries = [];
 
+    public function getIsSuperAdminAttribute(): bool {
+        return $this->roles()->where('name', 'super_admin')->exists();
+    }
+
     protected $visible = [
         'id', 'name', 'email', 'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',  
         'current_ftp_gallery_id', 'ftp_slug',
@@ -27,7 +31,7 @@ class User extends Authenticatable implements JWTSubject
         'billing_street',
         'billing_zip',
         'billing_city', 'created_at', 'is_admin', 'is_photographer', 
-        'is_pending', 'is_customer_manager', 'is_power_user', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
+        'is_pending', 'is_customer_manager', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
     ];
 
     protected $fillable = [
@@ -147,7 +151,9 @@ class User extends Authenticatable implements JWTSubject
 
     public function canAccessGallery($galleryId): bool
     {
-        // Admins müssen wie alle anderen explizite Rechte besitzen
+        if ($this->is_super_admin) return true; // 🌟 GOD MODE
+        
+        // Normale Admins müssen wie alle anderen explizite Rechte besitzen
         return in_array($galleryId, $this->getAllowedGalleryIds());
     }
 

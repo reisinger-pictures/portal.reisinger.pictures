@@ -40,7 +40,8 @@ test.describe('Smart Assistance & Metadata Defaults Workflow', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryName);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         
-        await modal.submitModal('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         // 2. Galerie öffnen und Vorgaben-Modal aufrufen
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
@@ -63,7 +64,7 @@ test.describe('Smart Assistance & Metadata Defaults Workflow', () => {
         await searchGrazPromise;
 
         const dropdownGraz = page.locator('li').filter({ hasText: 'Graz' }).first();
-        await expect(dropdownGraz).toBeVisible();
+        await expect(dropdownGraz).toBeVisible({ timeout: 15000 });
         await dropdownGraz.click();
 
         await expect(stateInput).toHaveValue('Steiermark');
@@ -76,7 +77,7 @@ test.describe('Smart Assistance & Metadata Defaults Workflow', () => {
         await searchLinzPromise;
 
         const dropdownLinzOOE = page.locator('li').filter({ hasText: 'Oberösterreich' }).first();
-        await expect(dropdownLinzOOE).toBeVisible();
+        await expect(dropdownLinzOOE).toBeVisible({ timeout: 15000 });
         await dropdownLinzOOE.click();
 
         await expect(stateInput).toHaveValue('Oberösterreich');

@@ -74,15 +74,15 @@ export class E2ESessionHelper {
 
         // Lösche Galerien (von unten nach oben)
         for (const id of this.createdGalleryIds) {
-            await this.request.delete(`/api/management/galleries/${id}`, { headers }).catch(() => {});
+            await this.request.delete(`/api/management/galleries/${id}`, { headers }).catch((e) => console.error('Cleanup Gallery error', e));
         }
         // Lösche Gruppen
         for (const id of this.createdGroupIds) {
-            await this.request.delete(`/api/management/gallery-groups/${id}`, { headers }).catch(() => {});
+            await this.request.delete(`/api/management/gallery-groups/${id}`, { headers }).catch((e) => console.error('Cleanup Group error', e));
         }
         // Lösche User
         for (const id of this.createdUserIds) {
-            await this.request.delete(`/api/management/users/${id}`, { headers }).catch(() => {});
+            await this.request.delete(`/api/test/cleanup-user/${id}`, { headers }).catch((e) => console.error('Cleanup User error', e));
         }
     }
 }

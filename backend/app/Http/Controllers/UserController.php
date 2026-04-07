@@ -16,12 +16,11 @@ class UserController extends Controller
     {
         $user = auth('api')->user();
         $query = User::with(['roles', 'galleryGroups', 'galleries']);
-        
+
         if (!$user->is_admin) {
             if (!$user->is_customer_manager) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
-            // Domain-basiertes Clustering: Customer Manager sehen nur User ihrer Domain
             $tenantIds = $user->tenants()->pluck('tenants.id')->toArray();
             if (empty($tenantIds)) {
                 return response()->json(['data' => []]);
@@ -30,20 +29,24 @@ class UserController extends Controller
                 $q->whereIn('tenants.id', $tenantIds);
             });
         }
-        
+
         return \App\Http\Resources\UserResource::collection($query->get());
     }
 
     public function roles()
     {
-        // Ein Customer Manager darf ggf. nur bestimmte Rollen zuweisen, aber für die Anzeige laden wir alle.
-        return Role::all();
+        $user = auth('api')->user();
+        $query = Role::query();
+        if (!$user || !$user->is_super_admin) {
+            $query->where('name', '!=', 'super_admin');
+        }
+        return $query->get();
     }
 
     public function store(Request $request)
     {
         $currentUser = auth('api')->user();
-        
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email'
@@ -53,8 +56,6 @@ class UserController extends Controller
             if (!$currentUser->is_customer_manager) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
-            // Note: A Customer Manager currently cannot create standalone users via the UI.
-            // If they do, they must be assigned to the Manager's tenant immediately.
             return response()->json(['error' => 'Not implemented for Customer Managers yet.'], 403);
         }
 
@@ -73,7 +74,7 @@ class UserController extends Controller
 
             $frontendUrl = rtrim(config('app.frontend_url'), '/');
             $link = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
-            
+
             \Illuminate\Support\Facades\Mail::to($user->email)->send(
                 new \App\Mail\ActivateAccountMail(
                     $user->name,
@@ -99,10 +100,17 @@ class UserController extends Controller
             }
             $managerTenantIds = $currentUser->tenants()->pluck('tenants.id')->toArray();
             $targetUserTenantIds = $user->tenants()->pluck('tenants.id')->toArray();
-            
+
             if (empty(array_intersect($managerTenantIds, $targetUserTenantIds))) {
                 return response()->json(['error' => 'Forbidden (Tenant Isolation)'], 403);
             }
+        }
+
+        $superAdminRole = Role::where('name', 'super_admin')->first();
+        $wantsSuperAdmin = $superAdminRole && in_array($superAdminRole->id, $request->role_ids ?? []);
+
+        if ($wantsSuperAdmin !== $user->is_super_admin && !$currentUser->is_super_admin) {
+            return response()->json(['error' => 'Nur Super Admins können die Super Admin Rolle verwalten.'], 403);
         }
 
         $request->validate([
@@ -139,5 +147,4 @@ class UserController extends Controller
 
         return response()->json(['success' => true]);
     }
-
 }

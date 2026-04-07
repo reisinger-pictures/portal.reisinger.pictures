@@ -33,5 +33,23 @@
 * **Flow AJ (Delta-Pricing Lifecycle):** Power-User legt Bild in Warenkorb -> Upgrade gewählt (Delta-Preis) -> Checkout -> Admin sieht Order im Dashboard.
 
 
+
+## 9. Multi-Tenancy & B2B (Backend & E2E)
+* **Flow AL (Tenant CRUD & Scope):** PHPUnit: Admin erstellt Tenant. Customer Manager sieht nur eigene Tenants. Zuweisung von Gruppen/Nutzern.
+* **Flow AM (Tenant Invites):** E2E/PHPUnit: Einladung generieren, Token prüfen, Redeem als neuer Nutzer inkl. Auto-Zuweisung zum Mandanten.
+
+## 10. E-Commerce & Checkout Logic (Backend)
+* **Flow AN (Delta Pricing & Validation):** PHPUnit: `OrderController@checkout` prüft korrekte Delta-Berechnung (z.B. User hat `print` Flatrate, kauft `original` -> berechnet nur Differenz).
+* **Flow AO (Invoice PDF & Status):** PHPUnit: Sofort-Rechnung (Status `invoice_created`) vs Lieferschein (Status `delivery_note`) basierend auf der `invoice_frequency` des Tenants. Testen des PDF Downloads.
+* **Flow AP (Custom Quotes):** UI/E2E: Angebot anfordern, falls Galerie `allow_custom_quotes` aktiv hat.
+
+## 11. File Delivery & Watermark Restrictions
+* **Flow AQ (Flatrate Watermark Bypass):** PHPUnit: `FileDeliveryController` liefert für User mit `flatrate_level >= web` das Original-Thumb ohne Wasserzeichen aus.
+* **Flow AR (Free Download Bypass):** PHPUnit: Galerie mit `is_free_download` umgeht Lizenzprüfung im `DownloadController` komplett.
+
+## 12. Lifecycle Cron Jobs
+* **Flow AS (Downscale Editorial):** PHPUnit: `app:downscale-editorial` verkleinert alte redaktionelle Bilder auf 2560px und setzt DB-Flag.
+* **Flow AT (Cleanup Derivatives):** PHPUnit: `app:cleanup-derivatives` löscht verwaiste WebP Thumbs nach 14 Tagen inaktiver Nutzung.
+
 ## 8. Testing Framework & Teardown
 * **Flow AK (E2E Teardown Integrity):** E2ESessionHelper führt teardown() aus -> API-Prüfung beweist, dass der E2E-User (via UserController@destroy) restlos aus dem System entfernt wurde.

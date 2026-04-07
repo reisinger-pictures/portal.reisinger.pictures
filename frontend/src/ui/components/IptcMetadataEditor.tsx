@@ -29,6 +29,7 @@ const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disab
     const [query, setQuery] = useState(value || '');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     const [prevValue, setPrevValue] = useState(value || '');
@@ -45,6 +46,29 @@ const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disab
     }, [query]);
 
     const { locations, isLoading } = useLocations(debouncedQuery, type);
+
+    useEffect(() => {
+        setActiveIndex(-1);
+    }, [locations]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!isOpen || locations.length === 0) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveIndex(prev => (prev < locations.length - 1 ? prev + 1 : prev));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIndex(prev => (prev > 0 ? prev - 1 : 0));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeIndex >= 0 && activeIndex < locations.length) {
+                onSelect(locations[activeIndex]);
+                setIsOpen(false);
+            }
+        } else if (e.key === 'Escape') {
+            setIsOpen(false);
+        }
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -68,20 +92,22 @@ const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disab
                     setIsOpen(true);
                 }}
                 onFocus={() => setIsOpen(true)}
+                onKeyDown={handleKeyDown}
                 disabled={disabled}
                 placeholder={placeholder}
                 className={className || "input input-sm input-bordered w-full"}
             />
             {isOpen && !disabled && locations.length > 0 && (
                 <ul className="absolute z-50 top-full left-0 w-full mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
-                    {locations.map(loc => (
+                    {locations.map((loc, idx) => (
                         <li
                             key={loc.id}
-                            className="px-4 py-2 hover:bg-base-200 cursor-pointer flex flex-col border-b border-base-200/50 last:border-0"
+                            className={`px-4 py-2 cursor-pointer flex flex-col border-b border-base-200/50 last:border-0 ${activeIndex === idx ? 'bg-base-200' : 'hover:bg-base-200'}`}
                             onClick={() => {
                                 onSelect(loc);
                                 setIsOpen(false);
                             }}
+                            onMouseEnter={() => setActiveIndex(idx)}
                         >
                             <span className="font-bold text-sm text-primary">{loc.name}</span>
                             {loc.state && <span className="text-xs opacity-70">{loc.state}, {loc.country}</span>}
@@ -119,10 +145,10 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
     const addKeywords = (text: string) => {
         if (disabled) return;
         const newKeywords = text.split(/[,;\s\n]+/).map(k => k.trim()).filter(k => k.length > 0);
-        
+
         const uniqueKeywords = new Set(keywordsArray);
         let added = false;
-        
+
         newKeywords.forEach(kw => {
             if (!uniqueKeywords.has(kw)) {
                 uniqueKeywords.add(kw);
@@ -201,7 +227,7 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
             <h4 className="font-bold text-lg mb-2 flex items-center gap-2">
                 <span className="iconify mdi--tag-multiple text-primary"></span> IPTC Metadaten
             </h4>
-            
+
             <div className="form-control w-full">
                 <label className="label"><span className="label-text font-bold">Titel</span></label>
                 <input type="text" value={data.title || ''} onChange={e => handleChange('title', e.target.value)} className="input input-sm input-bordered w-full" />
@@ -223,14 +249,14 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
                             <button type="button" onClick={() => removeKeyword(kw)} className="btn btn-ghost btn-xs btn-circle h-4 w-4 min-h-0 opacity-70 hover:opacity-100 hover:bg-base-300/50">✕</button>
                         </div>
                     ))}
-                    <input 
-                        type="text" 
-                        value={keywordInput} 
-                        onChange={e => setKeywordInput(e.target.value)} 
+                    <input
+                        type="text"
+                        value={keywordInput}
+                        onChange={e => setKeywordInput(e.target.value)}
                         onKeyDown={handleKeywordKeyDown}
                         onPaste={handlePasteKeywords}
                         placeholder={keywordsArray.length === 0 ? "Schlagworte eingeben (Komma/Enter)..." : ""}
-                        className="input input-ghost input-xs focus:outline-none flex-1 min-w-[60px] h-7 px-1" 
+                        className="input input-ghost input-xs focus:outline-none flex-1 min-w-[60px] h-7 px-1"
                     />
                     {keywordsArray.length > 0 && (
                         <button type="button" onClick={clearAllKeywords} className="btn btn-ghost btn-xs btn-circle absolute right-2 opacity-40 hover:opacity-100 text-error bg-base-200 hover:bg-error hover:text-white transition-colors" title="Alle löschen">
@@ -245,8 +271,7 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
                     <label className="label"><span className="label-text font-bold">Ort</span></label>
                     <input type="text" value={data.location || ''} onChange={e => handleChange('location', e.target.value)} className="input input-sm input-bordered" />
                 </div>
-                
-                {/* SMART ASSISTANCE: City Autocomplete */}
+
                 <AutocompleteInput
                     label="Stadt"
                     type="city"
@@ -265,9 +290,8 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
                     <label className="label"><span className="label-text font-bold">Bundesland</span></label>
                     <input type="text" value={data.state || ''} onChange={e => handleChange('state', e.target.value)} className="input input-sm input-bordered" />
                 </div>
-                
+
                 <div className="form-control flex-row gap-2">
-                    {/* SMART ASSISTANCE: Country Autocomplete */}
                     <AutocompleteInput
                         label="Land"
                         type="country"
@@ -280,7 +304,7 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
                         disabled={disabled}
                         className="input input-sm input-bordered w-full"
                     />
-                    
+
                     <div className="w-24">
                         <label className="label"><span className="label-text font-bold">ISO</span></label>
                         <input type="text" maxLength={2} placeholder="DE" value={data.iso_country || ''} onChange={e => handleChange('iso_country', e.target.value.toUpperCase())} className="input input-sm input-bordered w-full" />

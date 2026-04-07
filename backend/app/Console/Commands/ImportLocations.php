@@ -41,6 +41,9 @@ class ImportLocations extends Command
             return 1;
         }
 
+        $this->info('Leere Meilisearch-Index (verhindert Ghost-Records)...');
+        $this->call('scout:flush', ['model' => Location::class]);
+
         $this->info('Leere bestehende Location-Tabelle...');
         DB::table('locations')->truncate();
 

@@ -1,8 +1,8 @@
 <?php
 
-namespace AppServices;
+namespace App\Services;
 
-use AppModelsPricingFactor;
+use App\Models\PricingFactor;
 
 class PricingService
 {

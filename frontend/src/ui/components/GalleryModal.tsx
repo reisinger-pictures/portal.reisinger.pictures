@@ -13,7 +13,8 @@ const gallerySchema = z.object({
     is_live: z.boolean(),
     gallery_group_id: z.string(),
     password: z.string().optional(),
-    expires_at: z.string().optional()
+    expires_at: z.string().optional(),
+    is_free_download: z.boolean().optional()
 });
 type GalleryFormValues = z.infer<typeof gallerySchema>;
 
@@ -51,7 +52,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 is_live: editingGallery?.is_live || false,
                 gallery_group_id: editingGallery?.gallery_group_id || defaultGroupId || '',
                 password: '',
-                expires_at: editingGallery?.expires_at ? editingGallery.expires_at.split('T')[0] : ''
+                expires_at: editingGallery?.expires_at ? editingGallery.expires_at.split('T')[0] : '',
+                is_free_download: editingGallery?.is_free_download || false
             });
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);
@@ -85,7 +87,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
     const onSubmit = async (data: GalleryFormValues) => {
         const pId = data.gallery_group_id === '' ? null : data.gallery_group_id;
-        const metaOpts = {}; // Metadaten werden jetzt isoliert gemanaged
+        const metaOpts = { is_free_download: data.is_free_download };
 
         try {
             if (editingGallery) {
@@ -178,6 +180,16 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                     </div>
 
                     {watchType === 'delivery' && (
+                        <>
+                        <div className="form-control w-full mb-4">
+                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-primary/20">
+                                <input type="checkbox" {...register('is_free_download')} className="checkbox checkbox-primary" />
+                                <div>
+                                    <span className="label-text font-bold block">Kostenlosen Download erlauben</span>
+                                    <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">Deaktiviert Wasserzeichen und Lizenzprüfung. Gäste können direkt herunterladen.</span>
+                                </div>
+                            </label>
+                        </div>
                         <div className="form-control w-full mb-4">
                             <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
                                 <input type="checkbox" {...register('is_live')} className="checkbox checkbox-primary" />
@@ -187,6 +199,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                                 </div>
                             </label>
                         </div>
+                        </>
                     )}
 
                     <div className="flex flex-col md:flex-row gap-4 mb-6 pt-4 border-t border-base-300">

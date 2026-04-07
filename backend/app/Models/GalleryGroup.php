@@ -18,6 +18,7 @@ class GalleryGroup extends Model
         'name',
         'slug',
         'is_public',
+        'is_free_download',
         'deleted_at'
     ];
 
@@ -45,12 +46,9 @@ class GalleryGroup extends Model
         return false;
     }
 
-    public function getEffectiveIsFreeDownloadAttribute(): bool
-    {
-        if ($this->is_free_download !== null) return (bool) $this->is_free_download;
-        if ($this->parent) return $this->parent->effective_is_free_download;
-        return false;
-    }
+    
+
+    
 
     public function getEffectiveIsFreeDownloadAttribute(): bool
     {
