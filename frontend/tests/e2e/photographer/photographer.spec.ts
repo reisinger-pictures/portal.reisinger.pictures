@@ -5,6 +5,7 @@ import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
+import { FormHelper } from '../helpers/FormHelper';
 
 // 🧹 Clean-Up Hook: Räumt alle isoliert erstellten Galerien auf, bevor der E2E-User gelöscht wird.
 
@@ -34,8 +35,8 @@ test.describe('Photographer Core Workflow', () => {
         const galleryName = `Create Test ${Math.random().toString(36).substring(2, 10)}`;
 
         await sidebar.openNewGalleryModal();
-        await modal.fillInputByLabel('Name der Galerie', galleryName);
-        await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
+        const form = new FormHelper(page, modal);
+        await form.fillGalleryModal({ name: galleryName, type: 'Delivery (Downloads)' });
         await modal.submitModal('Speichern');
 
         const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
@@ -118,9 +119,9 @@ test.describe('Photographer Core Workflow', () => {
         await sidebar.navigateTo('Mein Profil');
         await expect(page.locator('h1:has-text("Mein Profil")')).toBeVisible();
 
-        await page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input').fill(newName);
-        await page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input').fill(newSlug);
-        await page.locator('.form-control').filter({ hasText: 'Standard-Urheber' }).locator('input').fill(newCopyright);
+        const modal = new ModalHelper(page);
+        const form = new FormHelper(page, modal);
+        await form.fillProfileForm({ name: newName, ftpSlug: newSlug, copyright: newCopyright });
 
         await page.getByRole('button', { name: 'Profil speichern' }).click();
         await expect(page.locator('.toast')).toContainText('Profil aktualisiert');

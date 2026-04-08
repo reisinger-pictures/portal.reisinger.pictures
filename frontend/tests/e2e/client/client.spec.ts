@@ -5,6 +5,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
+import { FormHelper } from '../helpers/FormHelper';
 
 // 🧹 Clean-Up Hook: Räumt alle isoliert erstellten Galerien auf, bevor der E2E-User gelöscht wird.
 
@@ -36,8 +37,8 @@ test.describe('Client Selection Workflow', () => {
         await auth.login(testUser.email, testUser.password);
         
         await sidebar.openNewGalleryModal();
-        await modal.fillInputByLabel('Name der Galerie', galleryName);
-        await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
+        const form = new FormHelper(page, modal);
+        await form.fillGalleryModal({ name: galleryName, type: 'Auswahl (Ratings)' });
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
         
@@ -50,8 +51,7 @@ test.describe('Client Selection Workflow', () => {
         await upload.uploadSampleImage();
 
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
-        await page.locator('text=Persönlicher Link (Einzelperson)').click();
-        await modal.fillInputByLabel('Name des Gastes', 'Test Client');
+        await form.fillInviteModal({ type: 'personal', name: 'Test Client' });
         await modal.clickButton('Generieren');
 
         await expect(page.locator('text=Erfolgreich generiert!')).toBeVisible();

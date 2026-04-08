@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
+import { FormHelper } from '../helpers/FormHelper';
 
 
 
@@ -37,8 +38,8 @@ test.describe('Smart Assistance & Metadata Defaults Workflow', () => {
     test('Gallery defaults behavior: Graz (auto-fill) and Linz (stay empty on ambiguity)', async ({ page }) => {
         // 1. Neue Delivery Galerie erstellen
         await sidebar.openNewGalleryModal();
-        await modal.fillInputByLabel('Name der Galerie', galleryName);
-        await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
+        const form = new FormHelper(page, modal);
+        await form.fillGalleryModal({ name: galleryName, type: 'Delivery (Downloads)' });
         
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);

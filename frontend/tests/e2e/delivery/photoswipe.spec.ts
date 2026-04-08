@@ -4,6 +4,7 @@ import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
+import {FormHelper} from '../helpers/FormHelper';
 
 
 
@@ -37,7 +38,8 @@ test.describe('PhotoSwipe & Lightbox UI', () => {
         await auth.login(testUser.email, testUser.password);
 
         await sidebar.openNewGalleryModal();
-        await modal.fillInputByLabel('Name der Galerie', galleryName);
+        const form = new FormHelper(page, modal);
+        await form.fillGalleryModal({ name: galleryName });
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 

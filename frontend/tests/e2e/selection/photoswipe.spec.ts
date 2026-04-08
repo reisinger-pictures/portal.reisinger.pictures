@@ -5,6 +5,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
+import { FormHelper } from '../helpers/FormHelper';
 
 test.describe('PhotoSwipe in Selection Gallery', () => {
     let helper: E2ESessionHelper;
@@ -30,8 +31,8 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
         // 1. Setup by Photographer
         await auth.login(testUser.email, testUser.password);
         await sidebar.openNewGalleryModal();
-        await modal.fillInputByLabel('Name der Galerie', galleryName);
-        await modal.selectByLabel('Galerie-Typ', 'Auswahl (Ratings)');
+        const form = new FormHelper(page, modal);
+        await form.fillGalleryModal({ name: galleryName, type: 'Auswahl (Ratings)' });
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
@@ -43,8 +44,7 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
         await upload.uploadSampleImage();
 
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
-        await page.locator('text=Persönlicher Link (Einzelperson)').click();
-        await modal.fillInputByLabel('Name des Gastes', 'Lightbox Tester');
+        await form.fillInviteModal({ type: 'personal', name: 'Lightbox Tester' });
         await modal.clickButton('Generieren');
 
         await expect(page.locator('text=Erfolgreich generiert!')).toBeVisible();

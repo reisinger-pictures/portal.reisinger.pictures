@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
+import { FormHelper } from '../helpers/FormHelper';
 
 
 
@@ -41,8 +42,8 @@ test.describe('User Setup via Mailpit Workflow', () => {
         await sidebar.navigateTo('Benutzer & Rechte');
 
         await page.getByRole('button', { name: '+ Neuen Nutzer anlegen' }).click();
-        await modal.fillInputByLabel('Name', 'Test Mailpit User');
-        await modal.fillInputByLabel('E-Mail Adresse', newUserEmail);
+        const form = new FormHelper(page, modal);
+        await form.fillUserModal({ name: 'Test Mailpit User', email: newUserEmail });
         const createUserPromise = page.waitForResponse(res => res.url().includes('/api/management/users') && res.request().method() === 'POST');
         await modal.submitModal('Nutzer anlegen & Einladen');
         const res = await createUserPromise;
@@ -52,8 +53,7 @@ test.describe('User Setup via Mailpit Workflow', () => {
         await expect(page.locator('.toast')).toContainText('Nutzer angelegt');
 
         // --- Phase 2: User setzt Passwort ---
-        const regex = /token=([a-zA-Z0-9]+)/;
-        const token = await mailpit.extractLinkForEmail(newUserEmail, regex);
+        const token = await mailpit.extractPasswordResetToken(newUserEmail);
 
         expect(token).toBeTruthy();
         const setupLink = `http://localhost:4321/reset-password?token=${token}&email=${encodeURIComponent(newUserEmail)}`;

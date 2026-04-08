@@ -3,6 +3,7 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
+import { FormHelper } from '../helpers/FormHelper';
 
 test.describe('Management Structure View (Tree)', () => {
     let helper: E2ESessionHelper;
@@ -26,7 +27,8 @@ test.describe('Management Structure View (Tree)', () => {
 
         await sidebar.navigateTo('Galerien');
         await page.getByRole('button', { name: 'Neuer Ordner' }).click();
-        await modal.fillInputByLabel('Name', groupName);
+        const form = new FormHelper(page, modal);
+        await form.fillGroupModal({ name: groupName });
 
         const responsePromise = page.waitForResponse(r => r.url().includes('/gallery-groups') && r.request().method() === 'POST');
         await modal.clickButton('Speichern');

@@ -50,7 +50,7 @@ export class E2ESessionHelper {
         });
 
         const mailpit = new MailpitHelper(this.request);
-        const token = await mailpit.extractLinkForEmail(email, /token=([a-zA-Z0-9]+)/);
+        const token = await mailpit.extractPasswordResetToken(email);
         const resetRes = await this.request.post('/api/auth/reset-password', { data: { email, token, password }, headers });
         const userCookies = resetRes.headers()['set-cookie'];
 

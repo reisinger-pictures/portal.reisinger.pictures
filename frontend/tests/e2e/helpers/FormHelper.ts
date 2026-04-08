@@ -1,0 +1,55 @@
+import { Page } from '@playwright/test';
+import { ModalHelper } from './ModalHelper';
+
+export class FormHelper {
+    constructor(private page: Page, private modal: ModalHelper) {}
+
+    async fillGalleryModal(params: { name?: string; type?: string; visibility?: string; freeDownload?: boolean; expiresAt?: string }) {
+        if (params.name) await this.modal.fillInputByLabel('Name der Galerie', params.name);
+        if (params.type) await this.modal.selectByLabel('Galerie-Typ', params.type);
+        if (params.visibility) await this.modal.selectByLabel('Sichtbarkeit', params.visibility);
+        if (params.freeDownload !== undefined) await this.modal.toggleCheckboxByLabel('Kostenlosen Download erlauben', params.freeDownload);
+        if (params.expiresAt) await this.modal.fillInputByLabel('Ablaufdatum', params.expiresAt);
+    }
+
+    async fillGroupModal(params: { name?: string; visibility?: string }) {
+        if (params.name) await this.modal.fillInputByLabel('Name', params.name);
+        if (params.visibility) await this.modal.selectByLabel('Sichtbarkeits-Vorgabe', params.visibility);
+    }
+
+    async fillUserModal(params: { name?: string; email?: string }) {
+        if (params.name) await this.modal.fillInputByLabel('Name', params.name);
+        if (params.email) await this.modal.fillInputByLabel('E-Mail Adresse', params.email);
+    }
+
+    async fillTenantModal(params: { name?: string }) {
+        if (params.name) await this.modal.fillInputByLabel('Name (z.B. Firma XYZ)', params.name);
+    }
+
+    async fillInviteModal(params: { type: 'mass' | 'personal'; name?: string; canEditMeta?: boolean }) {
+        if (params.type === 'mass') {
+            await this.page.locator('.form-control').filter({ hasText: 'Massen-Link' }).locator('input[type="radio"]').check();
+        } else {
+            await this.page.locator('.form-control').filter({ hasText: 'Persönlicher Link' }).locator('input[type="radio"]').check();
+            if (params.name) await this.modal.fillInputByLabel('Name des Gastes', params.name);
+        }
+        if (params.canEditMeta !== undefined) {
+            await this.modal.toggleCheckboxByLabel('Gast darf Metadaten bearbeiten', params.canEditMeta);
+        }
+    }
+
+    async fillCheckoutForm(params: { name?: string; street?: string; zip?: string; city?: string; acceptAgb?: boolean; waiveWithdrawal?: boolean }) {
+        if (params.name) await this.page.fill('input[name="billing_name"]', params.name);
+        if (params.street) await this.page.fill('input[name="billing_street"]', params.street);
+        if (params.zip) await this.page.fill('input[name="billing_zip"]', params.zip);
+        if (params.city) await this.page.fill('input[name="billing_city"]', params.city);
+        if (params.acceptAgb) await this.page.locator('input[name="agb_accepted"]').check();
+        if (params.waiveWithdrawal) await this.page.locator('input[name="withdrawal_waived"]').check();
+    }
+
+    async fillProfileForm(params: { name?: string; ftpSlug?: string; copyright?: string }) {
+        if (params.name) await this.page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input').fill(params.name);
+        if (params.ftpSlug) await this.page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input').fill(params.ftpSlug);
+        if (params.copyright) await this.page.locator('.form-control').filter({ hasText: 'Standard-Urheber' }).locator('input').fill(params.copyright);
+    }
+}

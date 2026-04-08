@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { NetworkHelper } from '../helpers/NetworkHelper';
+import { FormHelper } from '../helpers/FormHelper';
 
 
 
@@ -39,8 +40,8 @@ test.describe('Admin Workflow', () => {
         const uniqueEmail = `e2e-client-${Math.random().toString(36).substring(2, 10)}@example.com`;
 
         await page.getByRole('button', { name: '+ Neuen Nutzer anlegen' }).click();
-        await modal.fillInputByLabel('Name', 'Test Admin Client');
-        await modal.fillInputByLabel('E-Mail Adresse', uniqueEmail);
+        const form = new FormHelper(page, modal);
+        await form.fillUserModal({ name: 'Test Admin Client', email: uniqueEmail });
         
         // Warte auf den SWR-Refetch nach dem Anlegen
         const network = new NetworkHelper(page);

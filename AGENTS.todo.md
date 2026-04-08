@@ -2,30 +2,13 @@
 
 ## 🚀 Offene Tasks & Technische Deep-Dives
 
-### 🛠️ E2E Test Fixes (Prio 1 - BLOCKER)
-- [ ] **Fix DeliveryView:** Hinzufügen von `useState` in React-Imports in `DeliveryView.tsx`.
-- [ ] **Fix Photographer Spec:** Navigation im Test von "Einstellungen" auf "Mein Profil" ändern.
-
-### 🎁 NEU: Kostenlose Downloads (Galerie-/Gruppen-Ebene)
-- [ ] **Backend (Auth):** `DownloadController` und `FileDeliveryController` erweitern: Bypass der Lizenzprüfung/Wasserzeichen bei `effective_is_free_download = true`.
-- [ ] **Frontend (Admin):** Checkbox "Kostenloser Download" in `GalleryModal.tsx` und `GalleryGroupModal.tsx` hinzufügen.
-- [ ] **Frontend (Client):** `DeliveryView.tsx` anpassen: Sofort-Download Button anzeigen, wenn `is_free_download` aktiv.
-- [ ] **Testing:** PHPUnit Test hinzufügen: Gast lädt aus "Free Download" Galerie ohne Lizenz.
-
-### 🛡️ Security & Backend Tests (PHPUnit)
-- [ ] **Flow S:** Customer Manager Scoping (Zero Trust).
-- [ ] **Flow U:** Tenant Isolation (IDOR Schutz zwischen Mandanten).
-- [ ] **Flow W:** Pessimistic Locking (InvoiceSequence).
-- [ ] **Flow AC:** CRON-Job Validierung für Sammelrechnungen.
-- [ ] **Flow AD:** Watermark Tile Cache Validation (Hash-Prüfung).
-- [ ] **Flow AI (Zero Trust Boundary):** PHPUnit: `customer_manager` versucht, `UserController@update` oder `UserController@destroy` für eine `user_id` eines fremden Mandanten aufzurufen -> System muss strikt 403 Forbidden werfen.
-
-### 🧪 E2E Tests (Playwright)
-- [ ] **Flow AE:** Mandanten-Einladung & Registrierung.
-- [ ] **Flow P:** Flatrate-Bypass (Sofort-Download).
-- [ ] **Flow Q:** Warenkorb & Checkout-Formular (Austria MVP).
-- [ ] **Flow AB:** Manuelle Sammelrechnung im Tenant-Dashboard.
-- [ ] **Flow AG (Upselling):** Lizenzen im Warenkorb anpassen und Preis-Updates validieren.
-- [ ] **Flow AH (Order ZIP):** Komplette Bestellung als ZIP herunterladen.
-- [ ] **Flow AJ (Delta-Pricing Lifecycle):** E2E: Bild-Upgrade mit Delta-Pricing -> Checkout -> Order im Admin-Dashboard prüfen.
-- [ ] **Flow AK (E2E Teardown Integrity):** E2E: Sicherstellen, dass `UserController@destroy` beim Teardown den Test-User restlos entfernt.
+### 🧪 Fehlende Testabdeckungen (Aus QA Gap-Analysis überführt)
+- [ ] **Flow C (Gruppe/Galerie löschen):** Fotograf löscht Gruppe, darin liegende Galerien wandern in Root.
+- [ ] **Flow H (Einstellungs-Sync):** Admin ändert Deckkraft -> Prüft WebP Derivative Cleanup -> Neues Tile-Image wird generiert.
+- [ ] **Flow AL (Tenant CRUD & Scope):** PHPUnit: Admin erstellt Tenant. Customer Manager sieht nur eigene Tenants. Zuweisung von Gruppen/Nutzern.
+- [ ] **Flow AN (Delta Pricing & Validation):** PHPUnit: `OrderController@checkout` prüft korrekte Delta-Berechnung (z.B. User hat `print` Flatrate, kauft `original` -> berechnet nur Differenz).
+- [ ] **Flow AO (Invoice PDF & Status):** PHPUnit: Sofort-Rechnung (Status `invoice_created`) vs Lieferschein (Status `delivery_note`) basierend auf der `invoice_frequency` des Tenants. Testen des PDF Downloads.
+- [ ] **Flow AP (Custom Quotes):** UI/E2E: Angebot anfordern, falls Galerie `allow_custom_quotes` aktiv hat.
+- [ ] **Flow AQ (Flatrate Watermark Bypass):** PHPUnit: `FileDeliveryController` liefert für User mit `flatrate_level >= web` das Original-Thumb ohne Wasserzeichen aus.
+- [ ] **Flow AS (Downscale Editorial):** PHPUnit: `app:downscale-editorial` verkleinert alte redaktionelle Bilder auf 2560px und setzt DB-Flag.
+- [ ] **Flow AT (Cleanup Derivatives):** PHPUnit: `app:cleanup-derivatives` löscht verwaiste WebP Thumbs nach 14 Tagen inaktiver Nutzung.

@@ -41,7 +41,7 @@ class OrderController extends Controller
             'billing_city' => 'required|string|max:255',
         ]);
 
-        if (!$user->can_purchase_upgrades) {
+        if (!$user->is_power_user && !$user->is_admin) {
             return response()->json(['error' => 'Keine Berechtigung für kostenpflichtige Upgrades.'], 403);
         }
 
@@ -106,7 +106,6 @@ class OrderController extends Controller
             $invoiceNumber = InvoiceSequence::getNextInvoiceNumber($prefix);
 
             // Immutability: Kompletten Zustand einfrieren
-            $snapshot = 
             $allTerms = [
                 'editorial' => \App\Models\Setting::where('key', 'term_editorial')->value('value') ?? 'Nur für redaktionelle Berichterstattung zugelassen. Jegliche kommerzielle Nutzung ist untersagt.',
                 'commercial' => \App\Models\Setting::where('key', 'term_commercial')->value('value') ?? 'Uneingeschränkte kommerzielle Nutzung ist gestattet.',
@@ -124,12 +123,17 @@ class OrderController extends Controller
                 $usedTerms[$li['tier']] = $allTerms[$li['tier']];
             }
 
-            InvoiceSnapshot::create([
+            $snapshot = InvoiceSnapshot::create([
                 'order_id' => $order->id,
                 'invoice_number' => $invoiceNumber,
                 'customer_details' => [
-                    'name' => $user->name,
+                    'name' => $request->billing_name,
                     'email' => $user->email,
+                    'company' => $request->billing_company,
+                    'street' => $request->billing_street,
+                    'zip' => $request->billing_zip,
+                    'city' => $request->billing_city,
+                    'country' => 'Österreich',
                     'items' => $lineItems,
                     'terms' => $usedTerms // Gefrorene Bestellpositionen
                 ],

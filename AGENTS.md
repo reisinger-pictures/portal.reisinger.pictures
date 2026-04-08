@@ -5,9 +5,12 @@
 ## 1. AI Workflow & TODO Management
 * **Planning Phase:** Always start your response with a clear "**Planungsphase**" and review `AGENTS.todo.md`.
 * **Language Policy:** Code & Docs: English. UI: German.
+* **Documentation:** The single source of truth for all technical concepts is the `features/` directory. See the [Features Directory Index](features/README.md).
 
 ## 2. AI Operating Rules (STRICT)
 * **ESLint & TypeScript:** The use of `eslint-disable`, `@ts-ignore`, or `any` is **strictly forbidden**. All typing issues must be resolved structurally using exact interfaces, `unknown`, or generic type constraints.
+* **Testing Execution Output:** Whenever you create or modify E2E or PHPUnit tests, you MUST output the exact command to run them (and the input string for the `ai_test_runner.mjs`) in a separate code block at the end of your response.
+* **Test Debugging Transparency:** When analyzing test failure reports, you must explicitly document your debugging progress and thought process in the "Planungsphase" before proposing a fix. Explain what failed, why it failed based on the logs/DOM snapshots, and how the fix addresses the root cause.
 
 ## 3. AI Agent Roles & Responsibilities
 The system and workflow are managed via three strictly separated agent roles:

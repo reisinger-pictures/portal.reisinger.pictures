@@ -16,7 +16,7 @@ class InvoiceSequence extends Model
 
     public static function getNextInvoiceNumber($prefix = 'P-'): string
     {
-        return DB::transaction(function () {
+        return DB::transaction(function () use ($prefix) {
             $year = (int) date('Y');
             
             $sequence = self::lockForUpdate()->firstOrCreate(

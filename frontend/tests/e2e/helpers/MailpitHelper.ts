@@ -29,4 +29,12 @@ export class MailpitHelper {
         const match = msg.HTML.match(regexPattern);
         return match ? match[1] : null;
     }
+
+    async extractPasswordResetToken(email: string): Promise<string | null> {
+        return this.extractLinkForEmail(email, /token=([a-zA-Z0-9]+)/);
+    }
+
+    async extractTenantInviteToken(email: string): Promise<string | null> {
+        return this.extractLinkForEmail(email, /tenant-invite\/([a-zA-Z0-9]+)/);
+    }
 }
