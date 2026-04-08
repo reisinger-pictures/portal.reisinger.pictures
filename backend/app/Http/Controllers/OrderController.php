@@ -47,7 +47,7 @@ class OrderController extends Controller
 
         return DB::transaction(function () use ($request, $user) {
             $totalNet = 0.00;
-            $basePrice = 15.00; 
+            $basePrice = (float) (\App\Models\Setting::where('key', 'base_price')->value('value') ?? 35.00); 
             $lineItems = [];
 
             foreach ($request->items as $item) {

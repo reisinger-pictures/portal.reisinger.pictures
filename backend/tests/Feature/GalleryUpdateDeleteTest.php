@@ -59,4 +59,25 @@ class GalleryUpdateDeleteTest extends TestCase {
              ->deleteJson("/api/management/galleries/{$gallery->id}")
              ->assertStatus(403);
     }
+
+    public function test_deleting_group_moves_galleries_to_root() {
+        $photog = User::factory()->create();
+        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $token = auth('api')->login($photog);
+
+        $group = \App\Models\GalleryGroup::factory()->create();
+        $gallery = Gallery::factory()->create(['gallery_group_id' => $group->id]);
+        $photog->galleries()->attach($gallery);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
+                         ->deleteJson("/api/management/gallery-groups/{$group->id}");
+
+        $response->assertStatus(200);
+        $this->assertDatabaseMissing('gallery_groups', ['id' => $group->id]);
+        $this->assertDatabaseHas('galleries', [
+            'id' => $gallery->id,
+            'gallery_group_id' => null
+        ]);
+    }
+
 }

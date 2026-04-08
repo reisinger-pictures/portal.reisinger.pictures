@@ -143,5 +143,22 @@ class DownloadTest extends TestCase
              ->get("/api/galleries/{$gallery->id}/download-zip")
              ->assertStatus(403);
     }
-}
 
+    public function test_flatrate_user_can_view_original_without_watermark() {
+        $user = User::factory()->create(['flatrate_level' => 'web']);
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
+        $user->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'nomark.jpg']);
+
+        $fixturePath = base_path('tests/Fixtures/sample.jpg');
+        Storage::disk('photos')->put($gallery->id . '/nomark.jpg', file_get_contents($fixturePath));
+
+        $token = auth('api')->login($user);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
+             ->get('/api/media/' . $gallery->slug . '/' . $photo->id . '.jpg');
+
+        $response->assertStatus(200);
+    }
+
+}

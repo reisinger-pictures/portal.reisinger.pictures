@@ -38,7 +38,7 @@ class ManagementMiddleware
 
         if ($user->is_customer_manager) {
             // Customer Manager dürfen nur die User-Verwaltung und rudimentäre Analytics sehen
-            $allowedPrefixes = ['api/management/users', 'api/management/roles', 'api/management/stats', 'api/management/logs'];
+            $allowedPrefixes = ['api/management/users', 'api/management/roles', 'api/management/stats', 'api/management/logs', 'api/management/tenants'];
             foreach ($allowedPrefixes as $prefix) {
                 if (str_starts_with($path, $prefix)) {
                     $isAllowed = true; break;

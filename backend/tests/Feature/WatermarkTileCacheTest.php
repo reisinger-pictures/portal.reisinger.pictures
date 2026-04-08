@@ -41,4 +41,26 @@ class WatermarkTileCacheTest extends TestCase
         @unlink($destPath);
         foreach ($newCaches as $c) @unlink($c);
     }
+
+    public function test_updating_watermark_opacity_clears_old_caches() {
+        $admin = \App\Models\User::factory()->create();
+        $admin->roles()->attach(\App\Models\Role::firstOrCreate(['name' => 'admin']));
+        $token = auth('api')->login($admin);
+
+        $dummyCache = storage_path('app/private/watermark_master_dummy123.png');
+        if (!is_dir(dirname($dummyCache))) mkdir(dirname($dummyCache), 0755, true);
+        file_put_contents($dummyCache, 'dummy content');
+
+        $this->assertTrue(file_exists($dummyCache));
+
+        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
+                         ->postJson("/api/management/settings/watermark", [
+                             'text' => 'new.watermark',
+                             'opacity' => 0.4
+                         ]);
+
+        $response->assertStatus(200);
+        $this->assertFalse(file_exists($dummyCache));
+    }
+
 }

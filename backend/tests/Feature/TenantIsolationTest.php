@@ -51,4 +51,26 @@ class TenantIsolationTest extends TestCase
         $usersReturned = collect($res->json('data'));
         $this->assertEmpty($usersReturned->where('id', $userB->id));
     }
+
+    public function test_customer_manager_can_only_see_own_tenants() {
+        $roleManager = Role::firstOrCreate(['name' => 'customer_manager']);
+        
+        $tenantA = Tenant::create(['name' => 'Tenant A', 'invoice_frequency' => 'immediate']);
+        $tenantB = Tenant::create(['name' => 'Tenant B', 'invoice_frequency' => 'immediate']);
+
+        $managerA = User::factory()->create();
+        $managerA->roles()->attach($roleManager);
+        $managerA->tenants()->attach($tenantA);
+
+        $token = auth('api')->login($managerA);
+
+        $res = $this->withHeaders(['Authorization' => "Bearer " . $token])
+             ->getJson("/api/management/tenants");
+             
+        $res->assertStatus(200);
+        $tenantsReturned = collect($res->json());
+        $this->assertNotEmpty($tenantsReturned->where('id', $tenantA->id));
+        $this->assertEmpty($tenantsReturned->where('id', $tenantB->id));
+    }
+
 }
