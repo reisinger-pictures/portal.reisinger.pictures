@@ -2,12 +2,13 @@ import { Page, expect } from '@playwright/test';
 import { SidebarHelper } from './SidebarHelper';
 import { ModalHelper } from './ModalHelper';
 import { FormHelper } from './FormHelper';
+import { E2ESessionHelper } from './E2ESessionHelper';
 
 export class GalleryHelper {
     private sidebar: SidebarHelper;
     private modal: ModalHelper;
 
-    constructor(private page: Page, private sessionHelper?: any) {
+    constructor(private page: Page, private sessionHelper?: E2ESessionHelper) {
         this.sidebar = new SidebarHelper(page);
         this.modal = new ModalHelper(page);
     }

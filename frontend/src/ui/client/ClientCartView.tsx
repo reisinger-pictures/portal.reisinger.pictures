@@ -1,4 +1,4 @@
-import { useCart } from '../../logic/CartContext';
+import { useCart, CartItem } from '../../logic/CartContext';
 import { useUI } from '../components/UIContext';
 import { apiMutate } from '../../api';
 import { useAuth } from '../../logic/useAuth';
@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { usePricing, ResolutionTier, UsageTier, DurationTier } from '../../logic/usePricing';
+import { usePricing, ResolutionTier, UsageTier, DurationTier, FrequencyTier } from '../../logic/usePricing';
 import { useLicenseTerms } from '../../logic/useLicenseTerms';
 import PageLayout from '../components/PageLayout';
 
@@ -53,14 +53,14 @@ export default function ClientCartView() {
         }
     }, [user, reset]);
 
-    const handleUpdateItem = (item: any, field: string, value: string) => {
+    const handleUpdateItem = (item: CartItem, field: string, value: string) => {
         const updatedItem = { ...item, [field]: value };
         const newPrice = calculateUpgradePrice(
             user?.flatrate_level,
             updatedItem.tier as ResolutionTier,
             updatedItem.usage as UsageTier,
             updatedItem.duration as DurationTier,
-            updatedItem.frequency as any || 'einmalig'
+            updatedItem.frequency as FrequencyTier || 'einmalig'
         );
         addToCart({ ...updatedItem, price: newPrice });
     };
@@ -84,8 +84,8 @@ export default function ClientCartView() {
                 await mutateUser();
                 navigate('/orders');
             }
-        } catch (error: any) {
-            showToast('error', error.message || 'Fehler beim Checkout.');
+        } catch (error: unknown) {
+            showToast('error', error instanceof Error ? error.message : 'Fehler beim Checkout.');
         }
     };
 

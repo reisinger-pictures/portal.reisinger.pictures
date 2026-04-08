@@ -14,6 +14,7 @@ export interface Gallery {
     effective_is_free_download?: boolean;
     allow_client_metadata_edit?: boolean;
     apply_metadata_to_photos?: boolean;
+    allow_custom_quotes?: boolean;
     default_title?: string;
     default_description?: string;
     default_keywords?: string;

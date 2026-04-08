@@ -1,5 +1,5 @@
 import ResponsiveImage from '../components/ResponsiveImage';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
@@ -7,12 +7,13 @@ import GalleryHeader from '../components/GalleryHeader';
 import { useAuth } from '../../logic/useAuth';
 
 
-import { useGallery, Photo } from '../../logic/useGallery';
+import { useGallery } from '../../logic/useGallery';
 import { usePricing, ResolutionTier } from '../../logic/usePricing';
 export default function DeliveryView({ galleryData }: { galleryData: ReturnType<typeof useGallery> }) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
+    const { isCovered } = usePricing();
 
 
     /* moved early return */
@@ -44,7 +45,6 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                             </label>
                         )}
                         {totalPhotos > 0 && (() => {
-                            const { isCovered } = usePricing();
                             const allowedTiers = [
                                 { id: 'web', label: 'Web & Social' },
                                 { id: 'print', label: 'Print (A4)' },

@@ -33,7 +33,7 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
             {children}
 
             {/* Global Toasts */}
-            <div className="toast toast-top toast-center toast-global mt-12 md:mt-4 transition-all pointer-events-none">
+            <div className="toast toast-top toast-center toast-global mt-12 md:mt-4 transition-all pointer-events-none z-[100]">
                 {toasts.map(toast => (
                     <div key={toast.id} className={`alert alert-${toast.type} shadow-xl pointer-events-auto`}>
                         <span className={`iconify ${toast.type === 'error' ? 'mdi--alert-circle' : toast.type === 'success' ? 'mdi--check-circle' : 'mdi--information'} text-xl`}></span>

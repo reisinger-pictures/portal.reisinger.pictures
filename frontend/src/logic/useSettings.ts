@@ -5,6 +5,7 @@ import {useAuth} from './useAuth';
 export interface WatermarkSettings {
     text: string;
     opacity: number;
+    has_svg?: boolean;
 }
 
 export function useSettings() {

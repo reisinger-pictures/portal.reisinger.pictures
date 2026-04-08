@@ -114,8 +114,8 @@ export default function ManagementMetaGalleryView() {
                     onCreateGroup={async () => {
                     }} onCreateGallery={async () => {
                 }}
-                    onUpdateGroup={async (...args) => {
-                        await updateGroup(...args);
+                    onUpdateGroup={async (id, name, slug, isPub, parentId) => {
+                        await updateGroup(id, name, slug, isPub, parentId);
                         mutate();
                     }}
                     onUpdateGallery={async () => {

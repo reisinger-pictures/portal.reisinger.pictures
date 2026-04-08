@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTenants } from '../../logic/useTenants';
 import { useUI } from '../components/UIContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
 
 export default function ManagementTenantsView() {
@@ -23,8 +23,8 @@ export default function ManagementTenantsView() {
             setCreateOpen(false);
             setNewName('');
             setNewDomain('');
-        } catch (err: any) {
-            showToast('error', err.message || 'Fehler beim Erstellen');
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : 'Fehler beim Erstellen');
         } finally {
             setIsCreating(false);
         }

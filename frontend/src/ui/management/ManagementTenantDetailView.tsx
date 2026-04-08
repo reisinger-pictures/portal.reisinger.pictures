@@ -41,8 +41,8 @@ export default function ManagementTenantDetailView() {
         try {
             await updateTenant(id!, { name, domain: domain || null, invoice_frequency: freq });
             showToast('success', 'Mandant aktualisiert.');
-        } catch (err: any) {
-            showToast('error', err.message);
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : String(err));
         }
     };
 
@@ -51,8 +51,8 @@ export default function ManagementTenantDetailView() {
             await syncUsers(id!, selUsers);
             await syncGroups(id!, selGroups);
             showToast('success', 'Zuweisungen gespeichert.');
-        } catch (err: any) {
-            showToast('error', err.message);
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : String(err));
         }
     };
 
@@ -65,8 +65,8 @@ export default function ManagementTenantDetailView() {
             showToast('success', 'Einladung erfolgreich versendet.');
             setInviteModalOpen(false);
             setInviteEmail('');
-        } catch (err: any) {
-            showToast('error', err.message || 'Fehler beim Versenden der Einladung.');
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : String(err) || 'Fehler beim Versenden der Einladung.');
         } finally {
             setIsInviting(false);
         }
@@ -88,8 +88,8 @@ export default function ManagementTenantDetailView() {
             try {
                 const res = await generateCollectiveInvoice(id!);
                 showToast('success', `Sammelrechnung ${res.invoice_number} mit ${res.processed_orders} Positionen erfolgreich erstellt.`);
-            } catch (err: any) {
-                showToast('error', err.message || 'Fehler bei der Erstellung.');
+            } catch (err: unknown) {
+                showToast('error', err instanceof Error ? err.message : String(err) || 'Fehler bei der Erstellung.');
             } finally {
                 setIsGenerating(false);
             }
@@ -132,7 +132,7 @@ export default function ManagementTenantDetailView() {
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Rechnungs-Rhythmus</span></label>
-                            <select value={freq} onChange={e => setFreq(e.target.value as any)} className="select select-sm select-bordered">
+                            <select value={freq} onChange={e => setFreq(e.target.value as 'immediate'|'monthly'|'quarterly')} className="select select-sm select-bordered">
                                 <option value="immediate">Sofort (Einzelrechnung)</option>
                                 <option value="monthly">Monatlich (Sammelrechnung)</option>
                                 <option value="quarterly">Quartal (Sammelrechnung)</option>

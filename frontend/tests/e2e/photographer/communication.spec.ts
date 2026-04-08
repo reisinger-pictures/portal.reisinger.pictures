@@ -1,10 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
-import { SidebarHelper } from '../helpers/SidebarHelper';
-import { ModalHelper } from '../helpers/ModalHelper';
-import { MailpitHelper } from '../helpers/MailpitHelper';
+
 import { GalleryHelper } from '../helpers/GalleryHelper';
+import {ModalHelper} from "../helpers/ModalHelper";
 
 test.describe('Communication Workflow (Flows E, F)', () => {
     let helper: E2ESessionHelper;
@@ -24,9 +23,7 @@ test.describe('Communication Workflow (Flows E, F)', () => {
         await auth.login(photogUser.email, photogUser.password);
     });
 
-    test('Flow F: Email button is disabled without subscribers, enabled with opt-in and supports preview', async ({ page, request }) => {
-        const modal = new ModalHelper(page);
-        const mailpit = new MailpitHelper(request);
+    test('Flow F: Email button is disabled without subscribers, enabled with opt-in and supports preview', async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         
         const galleryName = `Comm F ${Math.random().toString(36).substring(2, 10)}`;

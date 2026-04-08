@@ -37,7 +37,7 @@ export class E2ESessionHelper {
 
         const rolesRes = await this.request.get('/api/management/roles', { headers });
         const roles = await rolesRes.json();
-        const roleId = roles.find((r: any) => r.name === roleName).id;
+        const roleId = roles.find((r: { name: string; id: string }) => r.name === roleName).id;
 
         await this.request.put(`/api/management/users/${userId}`, {
             data: {

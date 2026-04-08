@@ -6,7 +6,7 @@ import { UIProvider } from './ui/components/UIProvider';
 import { useUI } from './ui/components/UIContext';
 import { lazy, Suspense, useEffect } from 'react';
 import { SWRConfig } from 'swr';
-import { CartProvider } from './logic/CartContext';
+import { CartProvider } from './logic/CartProvider';
 import { setGlobalErrorCallback } from './api';
 
 const ResetPassword = lazy(() => import('./ui/ResetPassword'));
@@ -39,7 +39,7 @@ const GlobalSWRConfig = ({ children }: { children: React.ReactNode }) => {
     const { showToast } = useUI();
 
     useEffect(() => {
-        setGlobalErrorCallback((status, message) => {
+        setGlobalErrorCallback((_status, message) => {
             showToast('error', message || 'Ein unerwarteter Serverfehler ist aufgetreten.');
         });
     }, [showToast]);

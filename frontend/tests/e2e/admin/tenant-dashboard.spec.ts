@@ -8,7 +8,7 @@ import { FormHelper } from '../helpers/FormHelper';
 
 test.describe('Tenant Management & Invoicing Workflow', () => {
     let helper: E2ESessionHelper;
-    let adminUser: any;
+    let adminUser: { email: string; password: string; id: string };
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);

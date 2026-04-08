@@ -5,13 +5,14 @@ import { useUI } from '../../components/UIContext';
 import { useForm, useWatch } from 'react-hook-form';
 
 export default function WatermarkSettingsCard() {
-    const [cacheBuster, setCacheBuster] = useState(0);
+    const [cacheBuster, setCacheBuster] = useState(Date.now());
     const { watermark, updateWatermark } = useSettings();
     const { user } = useAuth();
     const { showToast } = useUI();
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     const { register, handleSubmit, reset, control, formState, setValue } = useForm({
-        defaultValues: { text: 'reisinger.pictures', opacity: 0.15, svg: undefined }
+        defaultValues: { text: 'reisinger.pictures', opacity: 0.15, svg: undefined as FileList | undefined }
     });
 
     useEffect(() => {
@@ -25,8 +26,23 @@ export default function WatermarkSettingsCard() {
     }, [watermark, reset]);
 
     const watchOpacity = useWatch({ control, name: 'opacity', defaultValue: 0.15 });
+    const watchText = useWatch({ control, name: 'text', defaultValue: 'reisinger.pictures' });
+    const watchSvg = useWatch({ control, name: 'svg' });
 
-    const onSubmit = async (data: any) => {
+    // Live Vorschau: Entweder neues SVG vom Datei-Input, oder bestehendes aus der DB laden
+    useEffect(() => {
+        if (watchSvg && watchSvg.length > 0) {
+            const objectUrl = URL.createObjectURL(watchSvg[0]);
+            setPreviewUrl(objectUrl);
+            return () => URL.revokeObjectURL(objectUrl);
+        } else if (watermark?.has_svg) {
+            setPreviewUrl(`/api/management/settings/watermark/image?t=${cacheBuster}`);
+        } else {
+            setPreviewUrl(null);
+        }
+    }, [watchSvg, watermark, cacheBuster]);
+
+    const onSubmit = async (data: { text: string; opacity: number; svg?: FileList }) => {
         const fd = new FormData();
         if (data.svg && data.svg.length > 0) {
             fd.append('svg', data.svg[0]);
@@ -38,7 +54,7 @@ export default function WatermarkSettingsCard() {
             await updateWatermark(fd);
             showToast('success', 'Wasserzeichen gespeichert');
             setValue('svg', undefined);
-            setCacheBuster(prev => prev + 1);
+            setCacheBuster(Date.now());
         } catch {
             showToast('error', 'Fehler beim Speichern');
         }
@@ -70,8 +86,25 @@ export default function WatermarkSettingsCard() {
 
                     <div className="form-control w-full max-w-xl">
                         <label className="label"><span className="label-text font-bold">Basis-Deckkraft (Delivery-Galerien)</span></label>
-                        <input type="range" min="0.05" max="0.5" step="0.05" {...register('opacity')} className="range range-primary" />
+                        <input type="range" min="0.05" max="0.6" step="0.05" {...register('opacity')} className="range range-primary" />
                         <div className="text-sm mt-2 opacity-70 font-mono">{Math.round(watchOpacity * 100)} %</div>
+                    </div>
+
+                    <div className="mt-8 border border-base-300 rounded-box overflow-hidden relative h-48 bg-base-300 flex items-center justify-center">
+                        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,_var(--color-base-content)_1px,_transparent_1px)] [background-size:20px_20px]"></div>
+                        
+                        <div className="absolute flex flex-col items-center justify-center -rotate-12 select-none pointer-events-none" style={{ opacity: watchOpacity }}>
+                            {previewUrl && (
+                                <img src={previewUrl} alt="Watermark SVG" className="w-24 h-24 md:w-32 md:h-32 object-contain mb-2 drop-shadow-md" />
+                            )}
+                            {watchText && (
+                                <div className="text-3xl md:text-5xl font-bold text-base-content whitespace-nowrap drop-shadow-md">
+                                    {watchText}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <span className="absolute bottom-2 left-2 text-xs font-bold opacity-50 bg-base-100 px-2 py-1 rounded shadow">Vorschau (Live)</span>
                     </div>
 
                     <div className="mt-6 border-t border-base-300 pt-6">

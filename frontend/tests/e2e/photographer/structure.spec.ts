@@ -7,7 +7,7 @@ import { FormHelper } from '../helpers/FormHelper';
 
 test.describe('Management Structure View (Tree)', () => {
     let helper: E2ESessionHelper;
-    let photogUser: any;
+    let photogUser: { email: string; password: string; id: string };
 
     test.beforeEach(async ({ page, request }) => {
         helper = new E2ESessionHelper(request);

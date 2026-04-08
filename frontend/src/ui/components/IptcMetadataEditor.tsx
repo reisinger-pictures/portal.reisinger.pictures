@@ -47,9 +47,7 @@ const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disab
 
     const { locations, isLoading } = useLocations(debouncedQuery, type);
 
-    useEffect(() => {
-        setActiveIndex(-1);
-    }, [locations]);
+    // Removed local effect to prevent cascading render. ActiveIndex is reset on typing.
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (!isOpen || locations.length === 0) return;
@@ -90,6 +88,7 @@ const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disab
                     setQuery(e.target.value);
                     onChange(e.target.value);
                     setIsOpen(true);
+                    setActiveIndex(-1);
                 }}
                 onFocus={() => setIsOpen(true)}
                 onKeyDown={handleKeyDown}

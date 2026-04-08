@@ -21,9 +21,9 @@ export default function LicenseSettingsCard() {
         if (terms) {
             reset({
                 base_price: parseFloat(terms.base_price || '35.00'),
-                term_editorial: terms.term_editorial || '', term_commercial: terms.term_commercial || '',
-                term_1_year: terms.term_1_year || '', term_unlimited: terms.term_unlimited || '',
-                term_web: terms.term_web || '', term_print: terms.term_print || '', term_original: terms.term_original || ''
+                term_editorial: terms.editorial || '', term_commercial: terms.commercial || '',
+                term_1_year: terms['1_year'] || '', term_unlimited: terms.unlimited || '',
+                term_web: terms.web || '', term_print: terms.print || '', term_original: terms.original || ''
             });
         }
     }, [terms, reset]);
@@ -31,7 +31,7 @@ export default function LicenseSettingsCard() {
     const watchBasePrice = useWatch({ control, name: 'base_price', defaultValue: 35.00 });
     const { calculateUpgradePrice } = usePricing(watchBasePrice || 0);
 
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: Record<string, string | number>) => {
         try {
             await updateTerms(data);
             showToast('success', 'Lizenzbedingungen gespeichert');

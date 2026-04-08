@@ -49,8 +49,8 @@ export default function TenantInviteView() {
             
             // Zurück zum Dashboard
             navigate('/', { replace: true });
-        } catch (err: any) {
-            setError(err.message || 'Fehler beim Aktivieren des Accounts.');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Fehler beim Aktivieren des Accounts.');
             setIsSubmitting(false);
         }
     };

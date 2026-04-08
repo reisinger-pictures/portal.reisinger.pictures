@@ -114,6 +114,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
     Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark']);
     Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms']);
+    Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo']);
 
     Route::get('/management/ftp/status', [FtpController::class, 'status']);
     Route::post('/management/ftp/target', [FtpController::class, 'setTarget']);

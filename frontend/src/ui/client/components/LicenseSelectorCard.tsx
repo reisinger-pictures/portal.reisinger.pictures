@@ -59,7 +59,7 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
             tier: 'original', usage: 'commercial', duration: 'unlimited', frequency: 'mehrmalig',
             price: 0,
             isQuote: true
-        } as any);
+        });
         showToast('info', 'Angebot zur Liste hinzugefügt');
     };
 

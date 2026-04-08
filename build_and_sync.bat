@@ -1,9 +1,11 @@
 @echo off
+set FORCE_COLOR=0
+set NO_COLOR=1
 echo ===================================================
 echo 🧪 Starte Backend Tests...
 echo ===================================================
 cd backend
-call php artisan test
+call php artisan test --no-ansi
 if %errorlevel% neq 0 (
     echo ❌ Backend Tests fehlgeschlagen! Deployment abgebrochen.
     cd ..

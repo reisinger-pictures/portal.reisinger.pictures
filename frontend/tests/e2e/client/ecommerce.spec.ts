@@ -8,10 +8,10 @@ import { FormHelper } from '../helpers/FormHelper';
 
 test.describe('E-Commerce & Checkout Workflow', () => {
     let helper: E2ESessionHelper;
-    let adminUser: any;
-    let photogUser: any;
-    let powerUser: any;
-    let flatrateUser: any;
+    let adminUser: { email: string; password: string; id: string };
+    let photogUser: { email: string; password: string; id: string };
+    let powerUser: { email: string; password: string; id: string };
+    let flatrateUser: { email: string; password: string; id: string };
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);

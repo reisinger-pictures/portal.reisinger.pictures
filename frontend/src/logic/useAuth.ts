@@ -21,6 +21,7 @@ export interface User {
     flatrate_level?: 'none' | 'web' | 'print' | 'original';
     can_purchase_upgrades?: boolean;
     is_customer_manager?: boolean;
+    is_power_user?: boolean;
     roles: string[];
     transient_meta_galleries?: string[];
     my_galleries?: Gallery[];

@@ -4,9 +4,56 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Setting;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Cache;
 
 class SettingsController extends Controller
 {
+    public function getSystemInfo()
+    {
+        // Sucht nach der zuletzt geänderten Datei im Backend und speichert den Wert ab, 
+        // bis der Cache durch ein Deployment (optimize:clear) wieder geleert wird.
+        $timestamp = Cache::rememberForever('laravel_build_time', function () {
+            $directories = [
+                app_path(),
+                base_path('routes'),
+                base_path('config'),
+                base_path('resources/views')
+            ];
+            
+            $maxTime = 0;
+            foreach ($directories as $dir) {
+                if (!is_dir($dir)) continue;
+                $files = File::allFiles($dir);
+                foreach ($files as $file) {
+                    $time = $file->getMTime();
+                    if ($time > $maxTime) {
+                        $maxTime = $time;
+                    }
+                }
+            }
+            return $maxTime ?: time();
+        });
+
+        return response()->json([
+            'laravel_build_time' => date('c', $timestamp),
+            'php_version' => phpversion(),
+            'laravel_version' => app()->version()
+        ]);
+    }
+
+    public function getWatermarkImage()
+    {
+        $path = storage_path('app/private/watermark.svg');
+        if (!file_exists($path)) {
+            abort(404);
+        }
+        return response()->file($path, [
+            'Content-Type' => 'image/svg+xml',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate'
+        ]);
+    }
+
     public function getWatermark()
     {
         return response()->json([
@@ -45,7 +92,7 @@ class SettingsController extends Controller
             'commercial' => Setting::where('key', 'term_commercial')->value('value') ?? 'Uneingeschränkte kommerzielle Nutzung (Werbung, Flyer, Social Media Kampagnen) ist gestattet. Weiterverkauf der Rohdaten ist untersagt.',
             '1_year' => Setting::where('key', 'term_1_year')->value('value') ?? 'Nutzungsrecht befristet auf 1 Jahr ab Rechnungsdatum.',
             'unlimited' => Setting::where('key', 'term_unlimited')->value('value') ?? 'Zeitlich unbegrenztes Nutzungsrecht.',
-            'web' => Setting::where('key', 'term_web')->value('value') ?? 'Auflösung optimiert für Web & Social Media (max. 2560px).',
+            'web' => Setting::where('key', 'term_web')->value('value') ?? 'Auflösung optimiert für Web & Social Media (max. 2560px Kantenlänge, 72dpi).',
             'print' => Setting::where('key', 'term_print')->value('value') ?? 'Hohe Auflösung für den Druck (bis A4, max. 4000px).',
             'original' => Setting::where('key', 'term_original')->value('value') ?? 'Maximale Originalauflösung.',
             'base_price' => Setting::where('key', 'base_price')->value('value') ?? '35.00'
