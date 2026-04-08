@@ -71,7 +71,7 @@ test.describe('Admin Workflow', () => {
     test('Admin can access settings', async ({ page }) => {
         await auth.login(testUser.email, testUser.password);
         await sidebar.navigateTo('Einstellungen');
-        await expect(page.locator('h1:has-text("Einstellungen")')).toBeVisible();
+        await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
     });
 
     test('Header Live-Search dropdown appears and handles navigation', async ({ page }) => {

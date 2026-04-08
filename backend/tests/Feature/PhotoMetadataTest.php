@@ -119,7 +119,7 @@ class PhotoMetadataTest extends TestCase {
         $photog2 = User::factory()->create();
         $photog2->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
 
-        $gallery1 = Gallery::factory()->create();
+        $gallery1 = Gallery::factory()->create(['restricted_photographers' => true]);
         $photog1->galleries()->attach($gallery1);
         
         $photo1 = Photo::factory()->create(['gallery_id' => $gallery1->id]);

@@ -13,6 +13,8 @@ export interface UserDetailed {
     roles: Role[]; 
     gallery_groups: GalleryGroup[]; 
     galleries: Gallery[];
+    photographer_galleries?: Gallery[];
+    photographer_gallery_groups?: GalleryGroup[];
 }
 
 export function useUsers() {

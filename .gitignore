@@ -20,8 +20,7 @@ backend/vendor/
 backend/public/build/
 backend/storage/*.key
 backend/.env
-# Erlaube .env.local für das Team-Setup
-!backend/.env.local
+backend/.env.local
 
 # Data
 /db_data/

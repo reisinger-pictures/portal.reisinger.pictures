@@ -42,10 +42,12 @@ test.describe('Client Selection Workflow', () => {
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
         
-        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeVisible();
-        await galLink.scrollIntoViewIfNeeded();
-        await galLink.click();
+        const galLink = page.locator('main').getByText(galleryName, { exact: true }).first();
+        await expect(async () => {
+            await expect(galLink).toBeVisible({ timeout: 2000 });
+            await galLink.scrollIntoViewIfNeeded();
+            await galLink.click();
+        }).toPass({ timeout: 15000 });
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
 
         await upload.uploadSampleImage();

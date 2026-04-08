@@ -69,6 +69,7 @@ test.describe('Photographer Core Workflow', () => {
     test('Photographer can upload an image and sees it in personal feed', async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         const upload = new UploadHelper(page);
+        const sidebar = new SidebarHelper(page);
         const galleryName = `Upload Test ${Math.random().toString(36).substring(2, 10)}`;
 
         // Precondition
@@ -78,7 +79,7 @@ test.describe('Photographer Core Workflow', () => {
         await upload.uploadSampleImage();
 
         // Feed prüfen
-        await page.goto('/');
+        await sidebar.navigateTo('Dashboard');
         const feedHeader = page.locator('h2:has-text("Deine neuesten Uploads & Galerien")');
         await expect(feedHeader).toBeVisible();
         await expect(page.locator('.space-y-8').first()).toBeVisible();
@@ -126,7 +127,8 @@ test.describe('Photographer Core Workflow', () => {
         await page.getByRole('button', { name: 'Profil speichern' }).click();
         await expect(page.locator('.toast')).toContainText('Profil aktualisiert');
 
-        await page.goto('/');
+        await sidebar.navigateTo('Dashboard');
+        await page.reload();
         await expect(page.locator('h2:has-text("FTP Inbox")')).toBeVisible();
         await expect(page.locator(`code:has-text("/${newSlug}")`)).toBeVisible();
     });

@@ -16,6 +16,7 @@ This directory serves as the single source of truth for all technical concepts, 
 ### 🛒 E-Commerce
 * [01-licensing-and-cart.md](ecommerce/01-licensing-and-cart.md) - Dynamic pricing, upgrades, and delta-pricing.
 * [02-licensing-and-downloads.md](ecommerce/02-licensing-and-downloads.md) - ZIP downloads and UI refactoring.
+* [03-custom-quotes-and-stripe.md](ecommerce/03-custom-quotes-and-stripe.md) - Custom Quote Links and Stripe Payments.
 
 ### 🖼️ Gallery Management
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.

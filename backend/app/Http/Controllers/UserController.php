@@ -15,7 +15,7 @@ class UserController extends Controller
     public function index()
     {
         $user = auth('api')->user();
-        $query = User::with(['roles', 'galleryGroups', 'galleries']);
+        $query = User::with(['roles', 'galleryGroups', 'galleries', 'photographerGalleries', 'photographerGalleryGroups']);
 
         if (!$user->is_admin) {
             if (!$user->is_customer_manager) {

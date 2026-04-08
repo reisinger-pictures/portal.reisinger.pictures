@@ -6,7 +6,7 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
     workers: process.env.CI ? 1 : 8,
-    maxFailures: 3,
+    maxFailures: 773,
     reporter: [
         ['html', {open: 'never'}]
     ],

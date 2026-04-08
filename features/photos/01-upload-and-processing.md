@@ -6,11 +6,13 @@ status: active
 
 # Technical Concept: Image Upload & Processing
 
-## 1. Identification (`lr_uuid`)
-- Images can be identified by their Lightroom UUID (`lr_uuid`). 
-- This UUID is ONLY available via Lightroom uploads (not via web upload).
-- **Purpose:** Used to sync rating/comment data back to Lightroom (for Selection galleries) and to seamlessly *replace* existing photos instead of duplicating them.
-- **Constraint:** An image can belong to exactly ONE Delivery gallery and ONE Selection gallery (max once per gallery type).
+## 1. Identification & Uniqueness (`lr_uuid` & Filename)
+- Images can be identified by their Lightroom UUID (`lr_uuid`).
+- The strict database-level unique constraint on `['gallery_id', 'lr_uuid']` has been relaxed. 
+- **Replacement Logic:** A photo is only updated/replaced if:
+  1. The `lr_uuid` is explicitly provided and originates from Lightroom (not a `web-` or `ftp-` placeholder).
+  2. An explicit `replace=true` flag is passed during upload, which falls back to matching by `filename`.
+- Otherwise, a new photo record is created.
 
 ## 2. Processing Pipeline
 - **Metadata Extraction:** Executed synchronously via `exiftool` CLI. Skipped for 'selection' galleries to improve performance.

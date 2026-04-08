@@ -14,7 +14,7 @@ class PhotoController extends Controller
     {
         if (!$user) return ['allowed' => false, 'is_client' => false];
         
-        $isPhotographer = $user->is_photographer && $user->canAccessGallery($photo->gallery_id);
+        $isPhotographer = $user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id));
         if ($isPhotographer) {
             return ['allowed' => true, 'is_client' => false];
         }
@@ -89,7 +89,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        $isPhotographer = $user->is_photographer && $user->canAccessGallery($photo->gallery_id);
+        $isPhotographer = $user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id));
         
         if (!$isPhotographer) {
             return response()->json(['error' => 'Keine Berechtigung. Nur für Fotografen/Admins.'], 403);
@@ -104,7 +104,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        $isPhotographerOrAdmin = $user->is_photographer && $user->galleries()->where('galleries.id', $photo->gallery_id)->exists();
+        $isPhotographerOrAdmin = $user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id));
         
         if (!$isPhotographerOrAdmin) {
             return response()->json(['error' => 'Keine Berechtigung für Revert. Nur für Fotografen/Admins.'], 403);
@@ -132,7 +132,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        if (!$user->is_photographer || !$user->canAccessGallery($photo->gallery_id)) {
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id))) {
             return response()->json(['error' => 'Keine Löschberechtigung.'], 403);
         }
 

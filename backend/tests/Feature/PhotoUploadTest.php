@@ -86,4 +86,30 @@ class PhotoUploadTest extends TestCase
             'lr_uuid' => 'uuid-selection',
             ]);
     }
+
+    public function test_photographer_cannot_upload_to_unassigned_gallery()
+    {
+        $photogA = User::factory()->create();
+        $photogA->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+
+        $photogB = User::factory()->create();
+        $photogB->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'restricted_photographers' => true]);
+        $photogA->galleries()->attach($gallery);
+
+        // Upload als Fotograf B (kein Zugriff)
+        $token = auth('api')->login($photogB);
+        $file = UploadedFile::fake()->image('hacked.jpg');
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+            ->postJson('/api/management/upload', [
+                'gallery_id' => $gallery->id,
+                'lr_uuid' => 'uuid-hacked',
+                'file' => $file
+            ]);
+
+        $response->assertStatus(403)
+                 ->assertJson(['error' => 'Keine Berechtigung für diese Galerie.']);
+    }
 }

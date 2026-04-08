@@ -227,6 +227,7 @@ class DownloadController extends Controller
             ->with('invoiceSnapshot')
             ->firstOrFail();
 
+        if ($order->is_quote_request && $order->status === 'pending') abort(403, 'Angebot noch nicht abgerechnet.');
         $snapshot = $order->invoiceSnapshot;
         if (!$snapshot || empty($snapshot->customer_details['items'])) {
             abort(404, 'Keine Bilder in dieser Bestellung gefunden.');

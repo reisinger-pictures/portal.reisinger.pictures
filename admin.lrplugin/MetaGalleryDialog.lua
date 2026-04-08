@@ -16,6 +16,9 @@ return function(editingGroup, treeData, jwt, onSuccess)
         props.slugEdited = editingGroup and true or false
         props.gPublic = editingGroup and (editingGroup.is_public == nil and "null" or (editingGroup.is_public and "true" or "false")) or "null"
         props.gParent = editingGroup and (editingGroup.parent_id or "") or ""
+        props.gFreeDownload = editingGroup and (editingGroup.is_free_download == true) or false
+        props.gEditorialOnly = editingGroup and (editingGroup.is_editorial_only == true) or false
+        props.gHidden = editingGroup and (editingGroup.is_hidden == true) or false
 
         local isAutoUpdating = false
         props:addObserver("gName", function()
@@ -47,6 +50,18 @@ return function(editingGroup, treeData, jwt, onSuccess)
             f:edit_field { value = LrView.bind{key="gSlug", bind_to_object=props}, fill_horizontal = 1, width_in_chars = 40 }
         })
         table.insert(rows, f:row {
+            f:spacer { width = 120 },
+            f:checkbox { title = "Kostenlosen Download erlauben", value = LrView.bind{key="gFreeDownload", bind_to_object=props} }
+        })
+        table.insert(rows, f:row {
+            f:spacer { width = 120 },
+            f:checkbox { title = "Nur redaktionelle Nutzung (Shop)", value = LrView.bind{key="gEditorialOnly", bind_to_object=props} }
+        })
+        table.insert(rows, f:row {
+            f:spacer { width = 120 },
+            f:checkbox { title = "Im Frontend verstecken", value = LrView.bind{key="gHidden", bind_to_object=props} }
+        })
+        table.insert(rows, f:row {
             f:static_text { title = "Sichtbarkeit:", width = 120 },
             f:popup_menu {
                 items = { {title="Keine Vorgabe (Unterordner entscheiden)", value="null"}, {title="Privat erzwingen", value="false"}, {title="Öffentlich erzwingen", value="true"} },
@@ -73,7 +88,10 @@ return function(editingGroup, treeData, jwt, onSuccess)
                     name = props.gName,
                     slug = props.gSlug,
                     is_public = isPub,
-                    parent_id = props.gParent == "" and nil or props.gParent
+                    parent_id = props.gParent == "" and nil or props.gParent,
+                    is_free_download = props.gFreeDownload,
+                    is_editorial_only = props.gEditorialOnly,
+                    is_hidden = props.gHidden
                 }
                 
                 local endpoint = editingGroup and ("/api/management/gallery-groups/" .. editingGroup.id) or "/api/management/gallery-groups"

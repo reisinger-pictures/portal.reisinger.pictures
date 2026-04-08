@@ -31,29 +31,24 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         await auth.login(adminUser.email, adminUser.password);
         await sidebar.navigateTo('Mandanten');
 
-        // Mandanten erstellen
         await page.getByRole('button', { name: '+ Neuer Mandant' }).click();
         const form = new FormHelper(page, modal);
         await form.fillTenantModal({ name: tenantName });
         await modal.submitModal('Speichern');
 
-        // Mandanten Detail-Dashboard öffnen
         await page.locator('.card-title', { hasText: tenantName }).click();
         await expect(page.locator(`h1:has-text("${tenantName}")`)).toBeVisible();
 
-        // Flow AE: User per E-Mail einladen
         await page.getByRole('button', { name: '+ Einladen' }).click();
         await modal.activeModal.locator('input[type="email"]').fill(guestEmail);
         await modal.submitModal('Einladung Senden');
         await expect(page.locator('.toast')).toContainText('Einladung erfolgreich versendet');
         
-        // Invite Link aus Mailpit extrahieren
         const token = await mailpit.extractTenantInviteToken(guestEmail);
         expect(token).toBeTruthy();
         
         await auth.logout();
 
-        // Gast löst Tenant-Invite ein
         const inviteLink = `/tenant-invite/${token}`;
         await page.goto(inviteLink);
         await expect(page.locator('h2:has-text("Unternehmens-Account")')).toBeVisible();
@@ -64,13 +59,18 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         await expect(page.locator('h1:has-text("Willkommen zurück")')).toBeVisible({ timeout: 15000 });
         await auth.logout();
 
-        // Flow AB: Admin checkt Sammelrechnungs-Status im Tenant-Dashboard
         await auth.login(adminUser.email, adminUser.password);
         await sidebar.navigateTo('Mandanten');
         await page.locator('.card-title', { hasText: tenantName }).click();
         
-        // Button "Sammelrechnung erstellen" muss in der UI vorhanden sein
         const invBtn = page.getByRole('button', { name: 'Sammelrechnung erstellen' });
         await expect(invBtn).toBeVisible();
+
+        const usersRes = await request.get('/api/management/users', { headers: { 'Cookie': helper.getAdminToken() } });
+        const usersData = await usersRes.json();
+        const guestUser = usersData.data?.find((u: any) => u.email === guestEmail);
+        if (guestUser) {
+            await request.delete(`/api/test/cleanup-user/${guestUser.id}`, { headers: { 'Cookie': helper.getAdminToken() } });
+        }
     });
 });

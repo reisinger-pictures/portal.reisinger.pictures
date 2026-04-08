@@ -11,6 +11,10 @@ export interface Gallery {
     is_live: boolean;
     is_public: boolean;
     is_free_download?: boolean | null;
+    is_editorial_only?: boolean | null;
+    is_hidden?: boolean | null;
+    restricted_photographers?: boolean | null;
+    effective_restricted_photographers?: boolean;
     effective_is_free_download?: boolean;
     allow_client_metadata_edit?: boolean;
     apply_metadata_to_photos?: boolean;
@@ -34,6 +38,10 @@ export interface GalleryGroup {
     slug?: string;
     is_public?: boolean | null;
     is_free_download?: boolean | null;
+    is_editorial_only?: boolean | null;
+    is_hidden?: boolean | null;
+    restricted_photographers?: boolean | null;
+    effective_restricted_photographers?: boolean;
     effective_is_free_download?: boolean;
     children?: GalleryGroup[];
     galleries?: Gallery[];

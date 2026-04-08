@@ -35,4 +35,18 @@ class GalleryFrontendTest extends TestCase {
         $this->assertCount(1, $response->json('breadcrumbs'));
         $this->assertEquals('Parent Group', $response->json('breadcrumbs.0.name'));
     }
+
+    public function test_user_cannot_rate_in_delivery_gallery() {
+        $user = \App\Models\User::factory()->create();
+        $gallery = \App\Models\Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
+        $user->galleries()->attach($gallery);
+        $photo = \App\Models\Photo::factory()->create(['gallery_id' => $gallery->id]);
+
+        $token = auth('api')->login($user);
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+                         ->postJson("/api/photos/{$photo->id}/rate", ['rating' => 5]);
+
+        $response->assertStatus(422)
+                 ->assertJson(['error' => 'Bewertungen sind nur in Auswahl-Galerien erlaubt.']);
+    }
 }

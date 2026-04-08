@@ -73,6 +73,8 @@ class User extends Authenticatable implements JWTSubject
     public function roles() { return $this->belongsToMany(Role::class, 'user_roles'); }
     public function galleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups')->withPivot('wants_notifications'); }
     public function galleries() { return $this->belongsToMany(Gallery::class, 'user_galleries')->withPivot('wants_notifications'); }
+    public function photographerGalleries() { return $this->belongsToMany(Gallery::class, 'photographer_galleries'); }
+    public function photographerGalleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'photographer_gallery_groups'); }
     
     public function currentFtpGallery() { return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id'); }
     public function photos() { return $this->hasMany(Photo::class); }
@@ -146,20 +148,70 @@ class User extends Authenticatable implements JWTSubject
             $galleryIds = array_unique(array_merge($galleryIds, $this->transient_galleries));
         }
 
+        
+        if ($this->is_photographer) {
+            $unrestrictedIds = \Illuminate\Support\Facades\Cache::rememberForever('unrestricted_photographer_gallery_ids', function() {
+                $allGalleries = Gallery::with('galleryGroup')->get();
+                return $allGalleries->filter(fn($g) => !$g->effective_restricted_photographers)->pluck('id')->toArray();
+            });
+            $galleryIds = array_merge($galleryIds, $unrestrictedIds);
+
+            $photogGalleryIds = $this->photographerGalleries()->pluck('galleries.id')->toArray();
+            $galleryIds = array_merge($galleryIds, $photogGalleryIds);
+
+            $photogGroupIds = $this->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
+            $allPhotogGroupIds = $this->getSubGroupIds($photogGroupIds);
+            if (!empty($allPhotogGroupIds)) {
+                $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allPhotogGroupIds)->pluck('id')->toArray();
+                $galleryIds = array_merge($galleryIds, $groupGalleryIds);
+            }
+        }
+
+        $galleryIds = array_values(array_unique($galleryIds));
         return $galleryIds;
     }
 
-    public function canAccessGallery($galleryId): bool
+        public function canPhotographerAccessGallery($galleryId): bool
+    {
+        if ($this->is_super_admin) return true;
+        if (!$this->is_photographer) return false;
+
+        $gallery = Gallery::find($galleryId);
+        if (!$gallery) return false;
+
+        if (!$gallery->effective_restricted_photographers) return true;
+
+        if ($this->photographerGalleries()->where('galleries.id', $galleryId)->exists()) return true;
+
+        $groupIds = $this->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
+        if (!empty($groupIds)) {
+            $allGroupIds = $this->getSubGroupIds($groupIds);
+            if (in_array($gallery->gallery_group_id, $allGroupIds)) return true;
+        }
+
+        return false;
+    }
+
+public function canAccessGallery($galleryId): bool
     {
         if ($this->is_super_admin) return true; // 🌟 GOD MODE
         
         // Normale Admins müssen wie alle anderen explizite Rechte besitzen
-        return in_array($galleryId, $this->getAllowedGalleryIds());
+        
+        if ($this->is_photographer && $this->canPhotographerAccessGallery($galleryId)) {
+            return true;
+        }
+        
+return in_array($galleryId, $this->getAllowedGalleryIds());
     }
 
     public function hasPurchasedPhoto($photoId, $requestedTier): bool
     {
-        $orders = \App\Models\Order::where('user_id', $this->id)->with('invoiceSnapshot')->get();
+        $orders = \App\Models\Order::where('user_id', $this->id)
+            ->where(function($q) {
+                $q->where('is_quote_request', false)
+                  ->orWhere('status', '!=', 'pending');
+            })->with('invoiceSnapshot')->get();
         $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
         $reqRank = $ranks[$requestedTier] ?? 3;
 

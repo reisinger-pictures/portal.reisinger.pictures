@@ -34,7 +34,8 @@ class OrderCheckoutTest extends TestCase
                              'billing_name' => 'Test Name',
                              'billing_street' => 'Street 1',
                              'billing_zip' => '1234',
-                             'billing_city' => 'City'
+                             'billing_city' => 'City',
+                             'withdrawal_waived' => true
                          ]);
 
         $response->assertStatus(200);
@@ -42,7 +43,7 @@ class OrderCheckoutTest extends TestCase
         $this->assertDatabaseHas('orders', [
             'id' => $orderId,
             'total_amount' => 70.00, // 35 * 4 (original) - 35 * 2 (print)
-            'status' => 'invoice_created'
+            'status' => 'pending_payment'
         ]);
     }
 
@@ -68,7 +69,8 @@ class OrderCheckoutTest extends TestCase
                              'billing_name' => 'Test Name',
                              'billing_street' => 'Street 1',
                              'billing_zip' => '1234',
-                             'billing_city' => 'City'
+                             'billing_city' => 'City',
+                             'withdrawal_waived' => true
                          ]);
 
         $response->assertStatus(200);

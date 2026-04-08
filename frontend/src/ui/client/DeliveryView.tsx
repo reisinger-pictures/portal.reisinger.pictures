@@ -26,7 +26,7 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
     return (
         <PageLayout>
             <div className="container mx-auto p-4 md:p-8 relative">
-                <GalleryHeader gallery={gallery} breadcrumbs={galleryData.breadcrumbs} />
+                <GalleryHeader gallery={gallery} breadcrumbs={galleryData.breadcrumbs} canManage={galleryData.canManage} />
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-bold mb-2">{gallery.name}</h1>

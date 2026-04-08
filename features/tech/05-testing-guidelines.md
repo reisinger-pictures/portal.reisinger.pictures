@@ -6,6 +6,9 @@ status: active
 
 # Technical Concept: Testing Guidelines
 
+* **Mocking-Verbot in E2E-Tests (STRIKT):** Das Mocking von internen API-Endpunkten (z.B. via `page.route`) in Playwright-Tests ist untersagt. E2E-Tests müssen die echte System-Integration validieren.
+* **Golden Rule (Features First):** Der `features/`-Ordner ist die primäre Wissensbasis. Jede neue Logik muss dort im Soll-Zustand dokumentiert werden, bevor sie implementiert wird. Der Ordner ist bei jeder Änderung aktuell zu halten.
+
 ## 1. Testing Rules (UI-FIRST) & Philosophy
 * **No Test-Environment Checks in Production (STRICT):** Production code must never alter its behavior based on test environments (e.g., checking `navigator.userAgent.includes('Playwright')`). Tests must validate the genuine application behavior. If tests flake due to realistic features (like `revalidateOnFocus`), fix the test assertions, do not cripple the application UX.
 * **No Shared State / No Serial Execution (STRICT):** The use of `test.describe.serial` is strictly forbidden. Tests must be 100% isolated. Do not share variables (like URLs or IDs) across `test()` blocks. If steps depend on each other, combine them into a single, cohesive End-to-End `test()` block.

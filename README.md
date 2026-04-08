@@ -35,3 +35,6 @@ Falls du das Projekt neu eingerichtet hast oder sich die Datenbankstruktur geän
 ### Login-Daten (Lokal)
 - **Dashboard:** `florian@reisinger.pictures` / `admin`
 - **Datenbank:** user: `portal_user` / pass: `admin`
+
+### Stripe Webhooks (Lokal Testen)
+Führe `stripe listen --forward-to localhost:8000/api/webhooks/stripe` aus und trage das ausgegebene `STRIPE_WEBHOOK_SECRET` in die `.env` Datei im Backend ein.

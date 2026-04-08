@@ -18,6 +18,9 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
         props.gPublic = editingGallery and (editingGallery.is_public and "true" or "false") or "false"
         props.gGroup = editingGallery and (editingGallery.gallery_group_id or "") or ""
         props.gLive = (editingGallery and editingGallery.is_live) == true
+        props.gFreeDownload = editingGallery and (editingGallery.is_free_download == true) or false
+        props.gEditorialOnly = editingGallery and (editingGallery.is_editorial_only == true) or false
+        props.gHidden = editingGallery and (editingGallery.is_hidden == true) or false
         props.gPassword = ""
         props.gExpiresAt = ""
         
@@ -107,6 +110,19 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
 
             table.insert(rows, f:row {
                 f:spacer { width = 120 },
+                f:checkbox { title = "Kostenlosen Download erlauben", value = LrView.bind{key="gFreeDownload", bind_to_object=props} }
+            })
+            table.insert(rows, f:row {
+                f:spacer { width = 120 },
+                f:checkbox { title = "Nur für redaktionelle Nutzung (Shop)", value = LrView.bind{key="gEditorialOnly", bind_to_object=props} }
+            })
+            table.insert(rows, f:row {
+                f:spacer { width = 120 },
+                f:checkbox { title = "Im Frontend verstecken", value = LrView.bind{key="gHidden", bind_to_object=props} }
+            })
+
+            table.insert(rows, f:row {
+                f:spacer { width = 120 },
                 f:checkbox { title = "Kunden dürfen Metadaten bearbeiten", value = LrView.bind{key="allowClientMeta", bind_to_object=props} }
             })
 
@@ -160,6 +176,9 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
 
                 -- Metadaten-Settings integrieren (Laravel konvertiert leere Strings in Datenbank-NULLs)
                 if mode == "delivery" then
+                    payload.is_free_download = props.gFreeDownload
+                    payload.is_editorial_only = props.gEditorialOnly
+                    payload.is_hidden = props.gHidden
                     payload.allow_client_metadata_edit = props.allowClientMeta
                     payload.apply_metadata_to_photos = props.applyMeta
                     payload.default_title = props.defTitle

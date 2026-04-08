@@ -14,11 +14,13 @@ class InvoiceMail extends Mailable implements ShouldQueue
 
     public $order;
     public $snapshot;
+    public $additionalDocuments;
 
-    public function __construct($order, $snapshot)
+    public function __construct($order, $snapshot, $additionalDocuments = [])
     {
         $this->order = $order;
         $this->snapshot = $snapshot;
+        $this->additionalDocuments = $additionalDocuments;
     }
 
     public function build()
@@ -27,10 +29,13 @@ class InvoiceMail extends Mailable implements ShouldQueue
         $pdf = Pdf::loadView('pdf.invoice', [
             'order' => $this->order,
             'snapshot' => $this->snapshot,
-            'items' => $this->snapshot->customer_details['items'] ?? []
+            'items' => $this->snapshot->customer_details['items'] ?? [],
+            'bankHolder' => \App\Models\Setting::where('key', 'bank_holder')->value('value'),
+            'bankIban' => \App\Models\Setting::where('key', 'bank_iban')->value('value'),
+            'bankBic' => \App\Models\Setting::where('key', 'bank_bic')->value('value')
         ]);
 
-        return $this->subject('Ihre Rechnung ' . $this->snapshot->invoice_number)
+        $mail = $this->subject('Ihre Rechnung ' . $this->snapshot->invoice_number)
                     ->bcc(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
                     ->view('emails.custom') // Wir nutzen das bestehende Custom-Template
                     ->with([
@@ -40,5 +45,10 @@ class InvoiceMail extends Mailable implements ShouldQueue
                     ->attachData($pdf->output(), $this->snapshot->invoice_number . '.pdf', [
                         'mime' => 'application/pdf',
                     ]);
+
+        foreach ($this->additionalDocuments as $filename => $pdfData) {
+            $mail->attachData($pdfData, $filename, ['mime' => 'application/pdf']);
+        }
+        return $mail;
     }
 }

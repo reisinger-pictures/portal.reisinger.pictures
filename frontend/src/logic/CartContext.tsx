@@ -3,12 +3,14 @@ import { ResolutionTier, UsageTier, DurationTier } from './usePricing';
 
 export interface CartItem {
     photoId: string;
-    filename: string;
+    filename?: string;
+    thumb_url?: string;
     tier: ResolutionTier;
     usage: UsageTier;
     duration: DurationTier;
     frequency?: 'einmalig' | 'mehrmalig';
     isQuote?: boolean;
+    notes?: string;
     price: number;
 }
 
@@ -19,7 +21,7 @@ export interface CartContextType {
     clearCart: () => void;
     totalAmount: number;
     itemCount: number;
-    }
+}
 
 export const CartContext = createContext<CartContextType | undefined>(undefined);
 

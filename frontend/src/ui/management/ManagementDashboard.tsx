@@ -13,6 +13,7 @@ import ManagementFtpInbox from './ManagementFtpInbox';
 import ManagementStatsView from './ManagementStatsView';
 import ManagementOrdersView from './ManagementOrdersView';
 import ErrorBoundary from '../components/ErrorBoundary';
+import PhotographerTeamModal from './components/PhotographerTeamModal';
 
 export default function ManagementDashboard() {
     const navigate = useNavigate();
@@ -44,6 +45,7 @@ export default function ManagementDashboard() {
     // Neu: State für das aktuell zu bearbeitende Element
     const [editingGroup, setEditingGroup] = useState<GalleryGroup | null>(null);
     const [editingGallery, setEditingGallery] = useState<Gallery | null>(null);
+    const [teamModalNode, setTeamModalNode] = useState<Gallery | GalleryGroup | null>(null);
 
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
 
@@ -153,7 +155,7 @@ export default function ManagementDashboard() {
                     </header>
 
                     <ErrorBoundary>
-                        {currentView === 'galleries' && <ManagementStructureView tree={tree} onOpenGroupModal={(id) => {setPrefillGroupId(id || null); setEditingGroup(null); setGroupModalOpen(true);}} onOpenGalleryModal={(id) => {setPrefillGroupId(id || null); setEditingGallery(null); setGalleryModalOpen(true);}} onEditGroup={g => {setEditingGroup(g); setGroupModalOpen(true);}} onEditGallery={g => {setEditingGallery(g); setGalleryModalOpen(true);}} />}
+                        {currentView === 'galleries' && <ManagementStructureView tree={tree} onOpenPhotographerTeam={(node) => setTeamModalNode(node)} onOpenGroupModal={(id) => {setPrefillGroupId(id || null); setEditingGroup(null); setGroupModalOpen(true);}} onOpenGalleryModal={(id) => {setPrefillGroupId(id || null); setEditingGallery(null); setGalleryModalOpen(true);}} onEditGroup={g => {setEditingGroup(g); setGroupModalOpen(true);}} onEditGallery={g => {setEditingGallery(g); setGalleryModalOpen(true);}} />}
                         {currentView === 'users' && <ManagementUserView/>}
                         {currentView === 'settings' && <ManagementSettingsView/>}
                         {currentView === 'stats' && <ManagementStatsView/>}
@@ -207,6 +209,7 @@ export default function ManagementDashboard() {
                             </div>
                         )}
                     </ErrorBoundary>
+                    <PhotographerTeamModal isOpen={!!teamModalNode} onClose={() => setTeamModalNode(null)} item={teamModalNode} isGroup={teamModalNode && !('type' in teamModalNode) ? true : false} onUpdateState={() => { setTeamModalNode(null); mutate(); }} />
                 </main>
 
                 <ErrorBoundary>

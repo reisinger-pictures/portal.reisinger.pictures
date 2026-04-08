@@ -66,7 +66,7 @@ export default function PhotoDetailView() {
     </PageLayout>;
 
     const {photo, breadcrumbs} = data;
-    const isPhotographer = user?.is_photographer && data?.photo && user?.my_galleries?.some(g => g.id === data.photo.gallery_id);
+    const isPhotographer = user?.is_super_admin || user?.is_admin || (user?.is_photographer && data?.photo && (user?.my_galleries?.some(g => g.id === data.photo.gallery_id) || user?.photographer_galleries?.some(g => g.id === data.photo.gallery_id)));
     const canEdit = isPhotographer || ((user?.can_edit_metadata || user?.transient_meta_galleries?.includes(data?.photo?.gallery_id)) && data?.photo?.gallery?.allow_client_metadata_edit);
 
     const handleSaveMeta = async () => {
@@ -124,17 +124,7 @@ export default function PhotoDetailView() {
                             <img src={photo.url} alt={photo.filename} className="max-w-full h-auto max-h-[70vh] object-contain rounded drop-shadow-xl"/>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center w-full bg-base-100 p-4 rounded-box border border-base-300 shadow-sm mt-2">
-                            <div className="flex items-center gap-4">
-
-                                
-                            </div>
-                            {isPhotographer && (
-                                <button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap">
-                                    <span className="iconify mdi--trash-can"></span> Bild löschen
-                                </button>
-                            )}
-                        </div>
+                        {isPhotographer && (<div className="flex justify-end w-full bg-base-100 p-4 rounded-box border border-base-300 shadow-sm mt-2"><button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap"><span className="iconify mdi--trash-can"></span> Bild löschen</button></div>)}
                     </div>
 
                     {/* Rechte Spalte: Formular */}

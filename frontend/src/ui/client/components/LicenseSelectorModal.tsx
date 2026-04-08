@@ -40,6 +40,7 @@ export default function LicenseSelectorModal({ photo, onClose }: Props) {
         addToCart({
             photoId: photo.id,
             filename: photo.filename,
+            thumb_url: photo.thumb_url,
             tier,
             usage,
             duration,
@@ -107,7 +108,7 @@ export default function LicenseSelectorModal({ photo, onClose }: Props) {
                     {tiers.map(tier => {
                         const covered = isCovered(user?.flatrate_level, tier.id, usage, duration) || photo?.gallery?.effective_is_free_download;
                         const upgradePrice = calculateUpgradePrice(user?.flatrate_level, tier.id, usage, duration);
-                        const canBuy = user?.can_purchase_upgrades;
+                        const canBuy = true; // Stripe-Käufe sind für jeden angemeldeten User erlaubt
 
                         return (
                             <div key={tier.id} className={`p-4 rounded-box border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-colors ${covered ? 'border-success bg-success/5' : 'border-base-300 bg-base-100'}`}>

@@ -14,11 +14,13 @@ class Order extends Model
     protected $fillable = [
         'user_id',
         'status',
-        'total_amount'
+        'total_amount',
+        'is_quote_request'
     ];
 
     protected $casts = [
         'total_amount' => 'decimal:2',
+        'is_quote_request' => 'boolean',
     ];
 
     public function user()

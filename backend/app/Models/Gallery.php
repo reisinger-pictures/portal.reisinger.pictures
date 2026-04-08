@@ -32,6 +32,9 @@ class Gallery extends Model
         'is_live',
         'is_public',
         'is_free_download',
+        'is_editorial_only',
+        'is_hidden',
+        'restricted_photographers',
         'password_hash',
         'allow_client_metadata_edit',
         'apply_metadata_to_photos',
@@ -77,6 +80,13 @@ class Gallery extends Model
         return false;
     }
 
+    public function getEffectiveRestrictedPhotographersAttribute(): bool
+    {
+        if ($this->restricted_photographers !== null) return (bool) $this->restricted_photographers;
+        if ($this->galleryGroup) return $this->galleryGroup->effective_restricted_photographers;
+        return false;
+    }
+
     public function getEffectiveIsHiddenAttribute(): bool
     {
         if ($this->is_hidden !== null) return (bool) $this->is_hidden;
@@ -100,10 +110,16 @@ class Gallery extends Model
     protected static function booted()
     {
         static::saved(function () { 
-            \Illuminate\Support\Facades\DB::afterCommit(fn() => Cache::forget('gallery_tree_admin')); 
+            \Illuminate\Support\Facades\DB::afterCommit(function() {
+            Cache::forget('gallery_tree_admin');
+            Cache::forget('unrestricted_photographer_gallery_ids');
+        }); 
         });
         static::deleted(function () { 
-            \Illuminate\Support\Facades\DB::afterCommit(fn() => Cache::forget('gallery_tree_admin')); 
+            \Illuminate\Support\Facades\DB::afterCommit(function() {
+            Cache::forget('gallery_tree_admin');
+            Cache::forget('unrestricted_photographer_gallery_ids');
+        }); 
         });
     }
 

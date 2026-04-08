@@ -69,7 +69,7 @@ test.describe('Download Triggers UI', () => {
 
         const [singleDownload] = await Promise.all([
             page.waitForEvent('download'),
-            page.getByRole('link', { name: 'Jetzt herunterladen' }).first().click()
+            page.getByRole('link', { name: 'Download' }).first().click()
         ]);
         expect(singleDownload.suggestedFilename().toLowerCase()).toMatch(/\.jpe?g$/);
 

@@ -93,7 +93,10 @@ class GalleryController extends Controller
             'slug' => 'nullable|string|max:255',
             'parent_id' => 'nullable|string|exists:gallery_groups,id',
             'is_public' => 'nullable|boolean',
-            'is_free_download' => 'nullable|boolean'
+            'is_free_download' => 'nullable|boolean',
+            'is_editorial_only' => 'nullable|boolean',
+            'is_hidden' => 'nullable|boolean',
+            'restricted_photographers' => 'nullable|boolean'
         ]);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
@@ -106,7 +109,10 @@ class GalleryController extends Controller
             'slug' => $slug,
             'parent_id' => $request->parent_id,
             'is_public' => $request->is_public,
-            'is_free_download' => $request->is_free_download
+            'is_free_download' => $request->is_free_download,
+            'is_editorial_only' => $request->is_editorial_only,
+            'is_hidden' => $request->is_hidden,
+            'restricted_photographers' => $request->restricted_photographers
         ]);
         return response()->json(['success' => true, 'group' => $group]);
     }
@@ -121,7 +127,10 @@ class GalleryController extends Controller
             'slug' => 'nullable|string|max:255',
             'parent_id' => 'nullable|string|exists:gallery_groups,id',
             'is_public' => 'nullable|boolean',
-            'is_free_download' => 'nullable|boolean'
+            'is_free_download' => 'nullable|boolean',
+            'is_editorial_only' => 'nullable|boolean',
+            'is_hidden' => 'nullable|boolean',
+            'restricted_photographers' => 'nullable|boolean'
         ]);
 
         $group = GalleryGroup::findOrFail($id);
@@ -136,7 +145,10 @@ class GalleryController extends Controller
             'slug' => $slug,
             'parent_id' => $request->parent_id,
             'is_public' => $request->is_public,
-            'is_free_download' => $request->is_free_download
+            'is_free_download' => $request->is_free_download,
+            'is_editorial_only' => $request->is_editorial_only,
+            'is_hidden' => $request->is_hidden,
+            'restricted_photographers' => $request->restricted_photographers
         ]);
 
         return response()->json(['success' => true, 'group' => $group]);
@@ -171,6 +183,9 @@ class GalleryController extends Controller
             'is_public' => 'boolean',
             'is_live' => 'boolean',
             'is_free_download' => 'nullable|boolean',
+            'is_editorial_only' => 'nullable|boolean',
+            'is_hidden' => 'nullable|boolean',
+            'restricted_photographers' => 'nullable|boolean',
             'password' => 'nullable|string',
             'expires_at' => 'nullable|date',
             'allow_client_metadata_edit' => 'boolean',
@@ -209,6 +224,9 @@ class GalleryController extends Controller
                 'is_live' => $request->type === 'selection' ? false : ($request->is_live ?? false),
                 'is_public' => $isPublic,
                 'is_free_download' => $request->is_free_download ?? null,
+                'is_editorial_only' => $request->is_editorial_only ?? null,
+                'is_hidden' => $request->is_hidden ?? null,
+                'restricted_photographers' => $request->restricted_photographers ?? null,
                 'gallery_group_id' => $request->gallery_group_id,
                 'password_hash' => $request->password ? Hash::make($request->password) : null,
                 'expires_at' => $request->expires_at ? Carbon::parse($request->expires_at)->endOfDay() : null,
@@ -225,7 +243,7 @@ class GalleryController extends Controller
             ]);
 
             if ($user && $user->is_photographer) {
-                $user->galleries()->syncWithoutDetaching([$gallery->id]);
+                $user->photographerGalleries()->syncWithoutDetaching([$gallery->id]);
             }
 
             return response()->json(['success' => true, 'gallery' => $gallery]);
@@ -238,7 +256,7 @@ class GalleryController extends Controller
     public function updateGallery(Request $request, $id)
     {
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($id)) {
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($id))) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
@@ -250,6 +268,9 @@ class GalleryController extends Controller
             'is_live' => 'nullable|boolean',
             'is_public' => 'nullable|boolean',
             'is_free_download' => 'nullable|boolean',
+            'is_editorial_only' => 'nullable|boolean',
+            'is_hidden' => 'nullable|boolean',
+            'restricted_photographers' => 'nullable|boolean',
             'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
             'allow_client_metadata_edit' => 'nullable|boolean',
             'apply_metadata_to_photos' => 'nullable|boolean',
@@ -297,7 +318,7 @@ class GalleryController extends Controller
     public function destroyGallery($id)
     {
         $user = auth('api')->user();
-        if (!$user->is_super_admin && !($user->is_photographer && $user->canAccessGallery($id))) {
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($id))) {
             return response()->json(['error' => 'Nur Super-Admins oder der besitzende Fotograf dürfen diese Galerie löschen.'], 403);
         }
 
@@ -314,7 +335,7 @@ class GalleryController extends Controller
     public function ratingStatus($id)
     {
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($id)) {
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($id))) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
@@ -370,7 +391,7 @@ class GalleryController extends Controller
     public function exportRatings($id)
     {
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($id)) {
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($id))) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
@@ -447,5 +468,46 @@ class GalleryController extends Controller
             $ids = array_merge($ids, $this->getAllSubgroupIDs($child));
         }
         return $ids;
+    }
+
+    public function syncAccess(Request $request, $id) {
+        $user = auth('api')->user();
+        if (!$user->is_admin) return response()->json(['error' => 'Nur Admins können Zugriffe direkt verwalten'], 403);
+        
+        $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
+        $targetUser = \App\Models\User::findOrFail($request->user_id);
+        
+        if ($request->action === 'attach') {
+            $targetUser->galleries()->syncWithoutDetaching([$id]);
+        } else {
+            $targetUser->galleries()->detach($id);
+        }
+        return response()->json(['success' => true]);
+    }
+
+    public function syncPhotographers(Request $request, $id) {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
+        $targetUser = \App\Models\User::findOrFail($request->user_id);
+        if ($request->action === 'attach') {
+            $targetUser->photographerGalleries()->syncWithoutDetaching([$id]);
+        } else {
+            $targetUser->photographerGalleries()->detach($id);
+        }
+        return response()->json(['success' => true]);
+    }
+
+    public function syncGroupPhotographers(Request $request, $id) {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
+        $targetUser = \App\Models\User::findOrFail($request->user_id);
+        if ($request->action === 'attach') {
+            $targetUser->photographerGalleryGroups()->syncWithoutDetaching([$id]);
+        } else {
+            $targetUser->photographerGalleryGroups()->detach($id);
+        }
+        return response()->json(['success' => true]);
     }
 }

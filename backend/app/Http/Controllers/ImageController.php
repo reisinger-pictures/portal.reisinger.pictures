@@ -17,7 +17,7 @@ class ImageController extends Controller
         $request->validate([
             'gallery_id' => 'required|string',
             'lr_uuid' => 'required|string',
-            'file' => 'required|image|max:20480',
+            'file' => 'required|image|mimes:jpeg,jpg|max:20480',
         ]);
 
         $gallery = Gallery::find($request->gallery_id);
@@ -29,7 +29,7 @@ class ImageController extends Controller
             return response()->json(['error' => 'Nur Fotografen dürfen Bilder hochladen.'], 403);
         }
         
-        if (!$user->canAccessGallery($gallery->id)) {
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($gallery->id))) {
             return response()->json(['error' => 'Keine Berechtigung für diese Galerie.'], 403);
         }
 
@@ -55,11 +55,36 @@ class ImageController extends Controller
         $photoService = app(PhotoProcessingService::class);
         $meta = $photoService->processImage($targetPath, $thumbPath, $gallery);
 
-        $photo = Photo::updateOrCreate(
-            ['gallery_id' => $gallery->id, 'lr_uuid' => $request->lr_uuid],
-            array_merge(['filename' => $filename, 'user_id' => $user->id], $meta)
-        );
+        $isLrUpload = $request->lr_uuid && !\Illuminate\Support\Str::startsWith($request->lr_uuid, ['web-', 'ftp-']);
+        
+        $query = Photo::where('gallery_id', $gallery->id);
+        
+        if ($isLrUpload) {
+            $query->where('lr_uuid', $request->lr_uuid);
+        } elseif ($request->boolean('replace')) {
+            $query->where('filename', $filename);
+        } else {
+            $query->where('id', 'invalid-id-to-force-create');
+        }
 
-        return response()->json(['success' => true, 'photo_id' => $photo->id, 'filename' => $filename]);
+        $existingPhoto = $query->first();
+
+        if ($existingPhoto) {
+            $existingPhoto->update(array_merge([
+                'filename' => $filename, 
+                'user_id' => $user->id,
+                'lr_uuid' => $request->lr_uuid ?? $existingPhoto->lr_uuid
+            ], $meta));
+            $photo = $existingPhoto;
+        } else {
+            $photo = Photo::create(array_merge([
+                'gallery_id' => $gallery->id, 
+                'lr_uuid' => $request->lr_uuid ?? \Illuminate\Support\Str::uuid()->toString(), 
+                'filename' => $filename, 
+                'user_id' => $user->id
+            ], $meta));
+        }
+
+        return response()->json(['success' => true, 'photo_id' => $photo->id]);
     }
 }

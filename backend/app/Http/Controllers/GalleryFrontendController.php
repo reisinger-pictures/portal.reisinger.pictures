@@ -15,7 +15,14 @@ class GalleryFrontendController extends Controller
         $user = auth('api')->user();
 
         $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
-        $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($gallery->id)));
+        $canManage = false;
+        if ($user) {
+            if ($user->is_super_admin || $user->is_admin) {
+                $canManage = true;
+            } elseif ($user->is_photographer && $user->canPhotographerAccessGallery($gallery->id)) {
+                $canManage = true;
+            }
+        }
 
         if ($isExpired && !$canManage) {
             return response()->json(['error' => 'Galerie abgelaufen.'], 403);
@@ -66,6 +73,7 @@ class GalleryFrontendController extends Controller
 
         return response()->json([
             'gallery' => $gallery,
+            'can_manage' => $canManage,
             'breadcrumbs' => $breadcrumbs,
             'downloads_count' => \App\Models\DownloadLog::where('gallery_id', $gallery->id)->count(),
             // ✨ FIX: Notified Count für den "E-Mail senden" Button im Management
@@ -88,6 +96,10 @@ class GalleryFrontendController extends Controller
         $photo = Photo::with('gallery')->findOrFail($photoId);
         $user = auth('api')->user();
 
+
+        if ($photo->gallery->type !== 'selection') {
+            return response()->json(['error' => 'Bewertungen sind nur in Auswahl-Galerien erlaubt.'], 422);
+        }
         if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
 
         $isExpired = $photo->gallery->expires_at && \Carbon\Carbon::parse($photo->gallery->expires_at)->isPast();

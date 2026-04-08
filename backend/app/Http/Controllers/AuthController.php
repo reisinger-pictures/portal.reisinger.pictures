@@ -155,7 +155,7 @@ class AuthController extends Controller
         $user = Auth::guard('api')->user();
         
         // Immer Galerien laden, da auch Admins und Fotografen spezifische Zuweisungen haben können
-        $user->load(['galleries', 'roles', 'galleryGroups']);
+        $user->load(['galleries', 'roles', 'galleryGroups', 'photographerGalleries', 'photographerGalleryGroups']);
         $user->load('roles');
 
         return response()->json([
@@ -174,7 +174,11 @@ class AuthController extends Controller
             'is_pending' => $user->is_pending,
             'roles' => $user->roles->pluck('name'),
             'transient_meta_galleries' => $user->transient_meta_galleries ?? [],
-            'my_galleries' => $user->galleries ?? []
+            'my_galleries' => $user->galleries ?? [],
+            'photographer_galleries' => $user->photographerGalleries ?? [],
+            'photographer_gallery_groups' => $user->photographerGalleryGroups ?? [],
+            'photographer_galleries' => $user->photographerGalleries ?? [],
+            'photographer_gallery_groups' => $user->photographerGalleryGroups ?? []
         ]);
     }
 

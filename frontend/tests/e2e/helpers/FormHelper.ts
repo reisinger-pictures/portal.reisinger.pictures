@@ -1,4 +1,5 @@
-import { Page } from '@playwright/test';
+import { Page, FrameLocator } from '@playwright/test';
+import { CreditCard } from './CreditCardHelper';
 import { ModalHelper } from './ModalHelper';
 
 export class FormHelper {
@@ -51,5 +52,19 @@ export class FormHelper {
         if (params.name) await this.page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input').fill(params.name);
         if (params.ftpSlug) await this.page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input').fill(params.ftpSlug);
         if (params.copyright) await this.page.locator('.form-control').filter({ hasText: 'Standard-Urheber' }).locator('input').fill(params.copyright);
+    }
+
+    async fillStripeForm(frame: FrameLocator, card: CreditCard) {
+        // Der sicherste Weg, um Stripe-Felder sprachunabhängig zu finden: Autocomplete-Attribute
+        const cardNumberInput = frame.locator('input[autocomplete="cc-number"]');
+        const expDateInput = frame.locator('input[autocomplete="cc-exp"]');
+        const cvcInput = frame.locator('input[autocomplete="cc-csc"]');
+
+        await cardNumberInput.clear();
+        await cardNumberInput.fill(card.number);
+        await expDateInput.clear();
+        await expDateInput.fill(card.exp);
+        await cvcInput.clear();
+        await cvcInput.fill(card.cvc);
     }
 }

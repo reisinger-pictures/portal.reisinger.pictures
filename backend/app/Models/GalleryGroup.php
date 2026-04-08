@@ -19,6 +19,9 @@ class GalleryGroup extends Model
         'slug',
         'is_public',
         'is_free_download',
+        'is_editorial_only',
+        'is_hidden',
+        'restricted_photographers',
         'deleted_at'
     ];
 
@@ -30,14 +33,20 @@ class GalleryGroup extends Model
     protected static function booted()
     {
         static::saved(function () { 
-            \Illuminate\Support\Facades\DB::afterCommit(fn() => Cache::forget('gallery_tree_admin')); 
+            \Illuminate\Support\Facades\DB::afterCommit(function() {
+            Cache::forget('gallery_tree_admin');
+            Cache::forget('unrestricted_photographer_gallery_ids');
+        }); 
         });
         static::deleted(function () { 
-            \Illuminate\Support\Facades\DB::afterCommit(fn() => Cache::forget('gallery_tree_admin')); 
+            \Illuminate\Support\Facades\DB::afterCommit(function() {
+            Cache::forget('gallery_tree_admin');
+            Cache::forget('unrestricted_photographer_gallery_ids');
+        }); 
         });
     }
 
-    protected $appends = ['effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download'];
+    protected $appends = ['effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'effective_restricted_photographers'];
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
@@ -54,6 +63,13 @@ class GalleryGroup extends Model
     {
         if ($this->is_free_download !== null) return (bool) $this->is_free_download;
         if ($this->parent) return $this->parent->effective_is_free_download;
+        return false;
+    }
+
+    public function getEffectiveRestrictedPhotographersAttribute(): bool
+    {
+        if ($this->restricted_photographers !== null) return (bool) $this->restricted_photographers;
+        if ($this->parent) return $this->parent->effective_restricted_photographers;
         return false;
     }
 

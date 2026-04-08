@@ -44,7 +44,7 @@ class GalleryUpdateDeleteTest extends TestCase {
         $photog2 = User::factory()->create();
         $photog2->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
 
-        $gallery = Gallery::factory()->create();
+        $gallery = Gallery::factory()->create(['restricted_photographers' => true]);
         $photog1->galleries()->attach($gallery);
 
         $token2 = auth('api')->login($photog2);

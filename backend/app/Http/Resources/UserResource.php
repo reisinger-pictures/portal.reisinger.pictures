@@ -22,6 +22,8 @@ class UserResource extends JsonResource {
             }),
             'gallery_groups' => $this->whenLoaded('galleryGroups'),
             'galleries' => GalleryResource::collection($this->whenLoaded('galleries')),
+            'photographer_galleries' => GalleryResource::collection($this->whenLoaded('photographerGalleries')),
+            'photographer_gallery_groups' => $this->whenLoaded('photographerGalleryGroups'),
         ];
     }
 }

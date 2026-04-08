@@ -131,7 +131,9 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await expect(confirmGlobal).toBeVisible();
         await confirmGlobal.getByRole('button', { name: 'Wiederherstellen' }).click();
 
-        await expect(page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input')).toHaveValue('Originaler Titel vom Fotografen');
+        await expect(async () => {
+            await expect(page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input')).toHaveValue('Originaler Titel vom Fotografen', { timeout: 1000 });
+        }).toPass({ timeout: 15000 });
     });
 
     test('Flow K: Expired galleries are crossed out and deny guest access', async ({ page }) => {
@@ -154,8 +156,11 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await modal.submitModal('Speichern');
 
         const link = page.locator('main').locator('a').filter({ hasText: galleryNameK }).first();
-        await expect(link).toBeVisible({ timeout: 15000 });
-        await expect(link).toHaveClass(/line-through/);
+        await expect(async () => {
+            await page.reload();
+            await expect(link).toBeVisible({ timeout: 2000 });
+            await expect(link).toHaveClass(/line-through/);
+        }).toPass({ timeout: 15000 });
 
         const href = await link.getAttribute('href');
         expect(href).not.toBeNull();

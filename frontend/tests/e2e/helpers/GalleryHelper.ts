@@ -24,14 +24,30 @@ export class GalleryHelper {
 
         const galLink = this.page.locator('main').getByText(name, { exact: true }).first();
         
-        // SWR Cache & DOM Race-Condition Protection (besonders für Mobile/Parallel Execution)
         await expect(async () => {
             await expect(galLink).toBeVisible({ timeout: 2000 });
             await galLink.scrollIntoViewIfNeeded();
-            // Wenn der Klick fehlschlägt, weil das Element detached wurde (SWR Update), wirft es einen Fehler und der Block wird von toPass() neu versucht.
             await galLink.click();
         }).toPass({ timeout: 15000 });
 
         await expect(this.page.getByRole('heading', { name })).toBeVisible();
+    }
+
+    async setPhotographerTeamAccess(status: 'Erben' | 'Offen' | 'Restriktiv') {
+        const btn = this.page.getByRole('button', { name: 'Fotografen...' });
+        await expect(btn).toBeVisible();
+        await btn.click();
+        
+        const teamModal = this.page.locator('.modal-open').filter({ hasText: 'Fotografen-Team' });
+        await expect(teamModal).toBeVisible();
+        
+        const select = teamModal.locator('select');
+        const valueMap = { 'Erben': 'null', 'Offen': 'false', 'Restriktiv': 'true' };
+        await select.selectOption(valueMap[status]);
+        
+        await expect(this.page.locator('.toast')).toContainText('Status gespeichert');
+        
+        await teamModal.locator('button').filter({ hasText: '✕' }).click();
+        await expect(teamModal).toBeHidden();
     }
 }

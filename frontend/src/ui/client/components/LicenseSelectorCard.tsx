@@ -10,6 +10,7 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
     const [usage, setUsage] = useState<UsageTier>('editorial');
     const [duration, setDuration] = useState<DurationTier>('1_year');
     const [frequency, setFrequency] = useState<FrequencyTier>('einmalig');
+    const [quoteNote, setQuoteNote] = useState('');
     
     const { terms } = useLicenseTerms();
     const { user } = useAuth();
@@ -47,6 +48,7 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
         addToCart({
             photoId: photo.id,
             filename: photo.filename,
+            thumb_url: photo.thumb_url,
             tier, usage, duration, frequency, price
         });
         showToast('success', 'In den Warenkorb gelegt');
@@ -56,17 +58,19 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
         addToCart({
             photoId: photo.id,
             filename: photo.filename,
+            thumb_url: photo.thumb_url,
             tier: 'original', usage: 'commercial', duration: 'unlimited', frequency: 'mehrmalig',
             price: 0,
-            isQuote: true
+            isQuote: true,
+            notes: quoteNote
         });
-        showToast('info', 'Angebot zur Liste hinzugefügt');
+        showToast('info', 'Angebot zum Warenkorb hinzugefügt');
+        setQuoteNote('');
     };
 
     const availableTiers = tiers.filter(tier => {
         const covered = hasFullAccess || isCovered(user?.flatrate_level, tier.id, usage, duration, frequency) || photo?.gallery?.effective_is_free_download;
-        const canBuy = user?.is_power_user || hasFullAccess;
-        return covered || canBuy;
+        return covered || true; // JEDER DARF KAUFEN
     });
 
     return (
@@ -75,36 +79,34 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
                 <span className="iconify mdi--license text-primary"></span> Lizenz wählen
             </h4>
             
-            {/* Kompakte 3-Spalten Auswahl */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 <div className="form-control w-full">
-                    <label className="label-text font-bold mb-1.5 text-xs opacity-70">1. Nutzungsart</label>
-                    <div className="join w-full shadow-inner border border-base-300 rounded-lg">
-                        <button className={`btn join-item btn-xs h-8 flex-1 ${usage === 'editorial' ? 'btn-primary' : 'btn-ghost bg-base-100'}`} onClick={() => setUsage('editorial')}>Redaktionell</button>
-                        <button className={`btn join-item btn-xs h-8 flex-1 ${usage === 'commercial' ? 'btn-primary' : 'btn-ghost bg-base-100'}`} onClick={() => setUsage('commercial')}>Kommerziell</button>
+                    <label className="label-text font-bold mb-2 text-xs opacity-70 uppercase tracking-wide">1. Nutzungsart</label>
+                    <div className="flex flex-wrap gap-2">
+                        <button className={`btn btn-sm shrink-0 ${usage === 'editorial' ? 'btn-primary' : 'btn-outline bg-base-100 border-base-300'}`} onClick={() => setUsage('editorial')}>Redaktionell</button>
+                        <button className={`btn btn-sm shrink-0 ${usage === 'commercial' ? 'btn-primary' : 'btn-outline bg-base-100 border-base-300'}`} onClick={() => setUsage('commercial')}>Kommerziell</button>
                     </div>
                 </div>
 
                 <div className="form-control w-full">
-                    <label className="label-text font-bold mb-1.5 text-xs opacity-70">2. Nutzungsdauer</label>
-                    <div className="join w-full shadow-inner border border-base-300 rounded-lg">
-                        <button className={`btn join-item btn-xs h-8 flex-1 ${duration === '1_year' ? 'btn-primary' : 'btn-ghost bg-base-100'}`} onClick={() => setDuration('1_year')}>1 Jahr</button>
-                        <button className={`btn join-item btn-xs h-8 flex-1 ${duration === 'unlimited' ? 'btn-primary' : 'btn-ghost bg-base-100'}`} onClick={() => setDuration('unlimited')}>Unbegrenzt</button>
+                    <label className="label-text font-bold mb-2 text-xs opacity-70 uppercase tracking-wide">2. Nutzungsdauer</label>
+                    <div className="flex flex-wrap gap-2">
+                        <button className={`btn btn-sm shrink-0 ${duration === '1_year' ? 'btn-primary' : 'btn-outline bg-base-100 border-base-300'}`} onClick={() => setDuration('1_year')}>1 Jahr</button>
+                        <button className={`btn btn-sm shrink-0 ${duration === 'unlimited' ? 'btn-primary' : 'btn-outline bg-base-100 border-base-300'}`} onClick={() => setDuration('unlimited')}>Unbegrenzt</button>
                     </div>
                 </div>
 
                 <div className="form-control w-full">
-                    <label className="label-text font-bold mb-1.5 text-xs opacity-70">3. Häufigkeit</label>
-                    <div className="join w-full shadow-inner border border-base-300 rounded-lg">
-                        <button className={`btn join-item btn-xs h-8 flex-1 ${frequency === 'einmalig' ? 'btn-primary' : 'btn-ghost bg-base-100'}`} onClick={() => setFrequency('einmalig')}>Einmalig</button>
-                        <button className={`btn join-item btn-xs h-8 flex-1 ${frequency === 'mehrmalig' ? 'btn-primary' : 'btn-ghost bg-base-100'}`} onClick={() => setFrequency('mehrmalig')}>Mehrmalig</button>
+                    <label className="label-text font-bold mb-2 text-xs opacity-70 uppercase tracking-wide">3. Häufigkeit</label>
+                    <div className="flex flex-wrap gap-2">
+                        <button className={`btn btn-sm shrink-0 ${frequency === 'einmalig' ? 'btn-primary' : 'btn-outline bg-base-100 border-base-300'}`} onClick={() => setFrequency('einmalig')}>Einmalig</button>
+                        <button className={`btn btn-sm shrink-0 ${frequency === 'mehrmalig' ? 'btn-primary' : 'btn-outline bg-base-100 border-base-300'}`} onClick={() => setFrequency('mehrmalig')}>Mehrmalig</button>
                     </div>
                 </div>
             </div>
 
-            {/* Auflösungen */}
-            <div className="space-y-2.5 mt-2">
-                <label className="label-text font-bold text-sm opacity-80 block mb-1">4. Auflösung & Preis</label>
+            <div className="space-y-3 mt-4 pt-4 border-t border-base-300">
+                <label className="label-text font-bold text-xs opacity-70 block mb-2 uppercase tracking-wide">4. Auflösung & Preis</label>
                 
                 {availableTiers.map(tier => {
                     const covered = hasFullAccess || isCovered(user?.flatrate_level, tier.id, usage, duration, frequency) || photo?.gallery?.effective_is_free_download;
@@ -112,11 +114,11 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
                     const sizeInfo = getSizeInfo(tier.maxEdge);
 
                     return (
-                        <div key={tier.id} className={`p-3.5 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-colors ${covered ? 'border-success/60 bg-base-100' : 'border-base-300 bg-base-100 hover:border-primary/50'}`}>
+                        <div key={tier.id} className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-colors ${covered ? 'border-success/60 bg-success/5' : 'border-base-300 bg-base-200/50 hover:bg-base-200'}`}>
                             <div className="flex-1">
-                                <div className="font-extrabold text-base flex items-center gap-2.5">
+                                <div className="font-bold text-base md:text-lg flex flex-wrap items-center gap-2">
                                     {tier.label}
-                                    {covered && <span className="badge badge-success badge-sm text-white font-bold px-3 py-2">Inklusive</span>}
+                                    {covered && <span className="badge badge-success badge-sm text-white font-bold">Inklusive</span>}
                                 </div>
                                 {sizeInfo && <div className="text-xs opacity-70 font-mono mt-1">{sizeInfo}</div>}
                             </div>
@@ -125,37 +127,34 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
                                     <a 
                                         href={`/api/photos/${photo.id}/download?tier=${photo?.gallery?.effective_is_free_download ? 'original' : tier.id}`}
                                         target="_blank" rel="noopener noreferrer"
-                                        className="btn btn-success btn-md text-white w-full font-bold shadow-sm"
+                                        className="btn btn-success btn-md text-white w-full shadow-sm"
                                     >
-                                        <span className="iconify mdi--download text-lg"></span> Jetzt herunterladen
+                                        <span className="iconify mdi--download text-lg"></span> Download
                                     </a>
                                 ) : (
-                                    <button onClick={() => handleAddToCart(tier.id, upgradePrice)} className="btn btn-primary btn-md w-full font-bold shadow-sm">
+                                    <button onClick={() => handleAddToCart(tier.id, upgradePrice)} className="btn btn-primary btn-md w-full shadow-sm">
                                         <span className="iconify mdi--cart-plus text-lg"></span> 
-                                        <span className="text-lg tabular-nums">{upgradePrice.toFixed(2)} €</span>
+                                        <span className="font-bold tabular-nums">{upgradePrice.toFixed(2)} €</span>
                                     </button>
                                 )}
                             </div>
                         </div>
                     );
                 })}
-
-                {availableTiers.length === 0 && (
-                    <div className="p-5 text-center text-sm opacity-70 bg-base-200 rounded-xl border border-base-300 italic">
-                        Diese Nutzungskombination ist mit deinem aktuellen Tarif nicht verfügbar.
-                    </div>
-                )}
             </div>
 
-            {/* Custom Quote */}
-            {photo.gallery?.allow_custom_quotes && (
-                <div className="mt-2 pt-4 border-t border-base-300 text-center">
-                    <p className="text-xs opacity-60 mb-2.5">Besondere Anforderungen? (Exklusivität, Weltweite Rechte)</p>
-                    <button onClick={handleCustomQuote} className="btn btn-outline btn-sm w-full">
-                        <span className="iconify mdi--file-document-edit-outline"></span> Individuelles Angebot anfragen
-                    </button>
-                </div>
-            )}
+            <div className="mt-4 pt-4 border-t border-base-300">
+                <p className="text-xs font-bold opacity-70 mb-2 uppercase tracking-wide">Sonderanfrage (Angebot)</p>
+                <textarea 
+                    className="textarea textarea-bordered w-full h-16 text-sm resize-none mb-3" 
+                    placeholder="Besondere Anforderungen (z.B. Exklusivität, Weltweite Rechte)..."
+                    value={quoteNote}
+                    onChange={(e) => setQuoteNote(e.target.value)}
+                ></textarea>
+                <button onClick={handleCustomQuote} className="btn btn-outline btn-sm w-full">
+                    <span className="iconify mdi--cart-plus"></span> Als Angebot in den Warenkorb
+                </button>
+            </div>
         </div>
     );
 }

@@ -73,4 +73,24 @@ class TenantIsolationTest extends TestCase
         $this->assertEmpty($tenantsReturned->where('id', $tenantB->id));
     }
 
+
+    public function test_customer_manager_cannot_view_other_tenant_details()
+    {
+        $roleManager = Role::firstOrCreate(['name' => 'customer_manager']);
+        
+        $tenantA = Tenant::create(['name' => 'Tenant A', 'invoice_frequency' => 'immediate']);
+        $tenantB = Tenant::create(['name' => 'Tenant B', 'invoice_frequency' => 'immediate']);
+
+        $managerA = User::factory()->create();
+        $managerA->roles()->attach($roleManager);
+        $managerA->tenants()->attach($tenantA);
+
+        $token = auth('api')->login($managerA);
+
+        // Versuch, Tenant B abzurufen
+        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
+             ->getJson("/api/management/tenants/{$tenantB->id}");
+             
+        $response->assertStatus(403);
+    }
 }

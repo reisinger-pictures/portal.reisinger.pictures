@@ -1,4 +1,8 @@
 # 🛑 Lokale Caches, Logs, Tests und Vendor nicht synchronisieren
+- .env
+- .env.testing
+- .env.backup
+- .env.local
 - vendor/**
 - node_modules/**
 - tests/**

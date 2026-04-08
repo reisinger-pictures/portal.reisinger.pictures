@@ -29,6 +29,7 @@ export interface Photo {
 
 export interface PaginatedGalleryResponse {
     gallery: Gallery;
+    can_manage: boolean;
     photos: Photo[];
     current_page: number;
     last_page: number;
@@ -59,6 +60,7 @@ export function useGallery(slug: string | undefined) {
 
     const photos = data ? data.flatMap(page => page.photos) : [];
     const gallery = data?.[0]?.gallery;
+    const canManage = data?.[0]?.can_manage || false;
 
     const isReachingEnd = data && data[data.length - 1]?.current_page >= data[data.length - 1]?.last_page;
     const totalPhotos = data?.[0]?.total || 0;
@@ -96,7 +98,7 @@ export function useGallery(slug: string | undefined) {
 
 
     return {
-        gallery, photos, downloadsCount, notified_count: notifiedCount, totalPhotos, isLoading, isError: error,
+        gallery, canManage, photos, downloadsCount, notified_count: notifiedCount, totalPhotos, isLoading, isError: error,
         ratePhoto, size, setSize, isReachingEnd, wantsNotifications, breadcrumbs,
         toggleOptIn: async (id: string, val: boolean) => {
             await fetch('/api/galleries/'+id+'/opt-in', {

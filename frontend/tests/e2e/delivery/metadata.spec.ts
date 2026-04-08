@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
+import { GalleryHelper } from '../helpers/GalleryHelper';
 
 
 
@@ -35,16 +36,8 @@ test.describe('Metadata & Detail View Workflow', () => {
     });
 
     test('Photographer can view and edit metadata in detail view', async ({ page }) => {
-        await sidebar.openNewGalleryModal();
-        await modal.fillInputByLabel('Name der Galerie', galleryName);
-        const resData = await modal.submitModal('Speichern');
-        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
-        
-        // Robustes Auffinden des Galerie-Links (inkl. Reload-Logik bei SWR-Verzögerung)
-        const galLink = page.locator('main').getByText(galleryName).first();
-        await expect(galLink).toBeVisible();
-
-        await page.locator('main').getByText(galleryName).first().click();
+        const galleryHelper = new GalleryHelper(page, helper);
+        await galleryHelper.createAndOpenDeliveryGallery(galleryName);
 
         const upload = new UploadHelper(page);
         await upload.uploadSampleImage();

@@ -69,7 +69,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
         // Da er "Print" als Flatrate hat, muss der "Jetzt herunterladen" Button für "Print" sichtbar sein, ohne Cart-Prozess!
-        await expect(page.locator('.border-success\\/60').filter({ hasText: 'Print (bis A4)' }).getByRole('link', { name: 'Jetzt herunterladen' })).toBeVisible();
+        await expect(page.locator('.border-success\\/60').filter({ hasText: 'Print (bis A4)' }).getByRole('link', { name: 'Download' })).toBeVisible();
         await auth.logout();
 
         // 4. Flow Q, AG, AJ: Power User Cart, Upselling und Checkout
@@ -82,7 +82,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
 
         // Zum Warenkorb gehen
-        await page.locator('header button[title="Warenkorb öffnen"]').click();
+        await sidebar.navigateTo('Warenkorb');
         await expect(page).toHaveURL(/.*\/cart/);
 
         // Flow AG: Upselling im Warenkorb (Lizenz ändern -> Preis steigt)
@@ -102,6 +102,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
             waiveWithdrawal: true
         });
         
+        await page.locator('input[name="payment_method"][value="invoice"]').click();
         await page.getByRole('button', { name: 'Zahlungspflichtig bestellen' }).click();
         await expect(page.locator('.toast')).toContainText('Bestellung erfolgreich!');
         await expect(page).toHaveURL(/.*\/orders/);
@@ -116,10 +117,16 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         // Flow AJ: Admin prüft Order im Dashboard
         await auth.logout();
         await auth.login(adminUser.email, adminUser.password);
-        await sidebar.navigateTo('Dashboard');
-        await page.goto('/admin-orders'); // Direkt zum Routing
-        await expect(page.locator('h1:has-text("Bestellungen & Rechnungen")')).toBeVisible();
+        await sidebar.navigateTo('Bestellungen & Anfragen');
+        await expect(page.locator('h1:has-text("Bestellungen & Anfragen")')).toBeVisible();
         await expect(page.locator('td', { hasText: powerUser.email }).first()).toBeVisible();
+
+        // Flow: Client prüft die Übersichtsseite und Bankdaten
+        await auth.logout();
+        await auth.login(powerUser.email, powerUser.password);
+        await sidebar.navigateTo('Einkäufe & Anfragen');
+        await expect(page.locator('h1:has-text("Meine Einkäufe & Lizenzen")')).toBeVisible();
+        await expect(page.locator('.bg-warning\\/10').filter({ hasText: 'Zahlung ausständig (Kauf auf Rechnung)' })).toBeVisible();
     });
 
     test('Flow AP: Custom Quotes UI triggers UI notification', async ({ page }) => {

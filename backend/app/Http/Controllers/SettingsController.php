@@ -95,7 +95,10 @@ class SettingsController extends Controller
             'web' => Setting::where('key', 'term_web')->value('value') ?? 'Auflösung optimiert für Web & Social Media (max. 2560px Kantenlänge, 72dpi).',
             'print' => Setting::where('key', 'term_print')->value('value') ?? 'Hohe Auflösung für den Druck (bis A4, max. 4000px).',
             'original' => Setting::where('key', 'term_original')->value('value') ?? 'Maximale Originalauflösung.',
-            'base_price' => Setting::where('key', 'base_price')->value('value') ?? '35.00'
+            'base_price' => Setting::where('key', 'base_price')->value('value') ?? '35.00',
+            'bank_iban' => Setting::where('key', 'bank_iban')->value('value') ?? '',
+            'bank_bic' => Setting::where('key', 'bank_bic')->value('value') ?? '',
+            'bank_holder' => Setting::where('key', 'bank_holder')->value('value') ?? ''
         ]);
     }
 

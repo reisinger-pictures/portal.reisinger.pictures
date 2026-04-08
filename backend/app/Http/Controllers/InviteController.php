@@ -17,7 +17,7 @@ class InviteController extends Controller
     public function generate(Request $request, $galleryId)
     {
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($galleryId)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($galleryId))) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         $request->validate([
             'name' => 'nullable|string|max:255',
@@ -43,7 +43,7 @@ class InviteController extends Controller
     public function sendEmail(Request $request, $galleryId)
     {
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($galleryId)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($galleryId))) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         $request->validate([
             'email' => 'required|email',
@@ -150,7 +150,7 @@ class InviteController extends Controller
     public function index($galleryId)
     {
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($galleryId)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($galleryId))) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         return response()->json(\App\Models\GalleryInvite::where('gallery_id', $galleryId)->orderBy('id', 'desc')->get());
     }
@@ -159,7 +159,7 @@ class InviteController extends Controller
     {
         $invite = \App\Models\GalleryInvite::findOrFail($id);
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($invite->gallery_id)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($invite->gallery_id))) return response()->json(['error' => 'Keine Berechtigung'], 403);
         $request->validate(['name' => 'nullable|string|max:255']);
         $invite->update(['name' => $request->name]);
         return response()->json(['success' => true]);
@@ -169,7 +169,7 @@ class InviteController extends Controller
     {
         $invite = \App\Models\GalleryInvite::findOrFail($id);
         $user = auth('api')->user();
-        if (!$user->canAccessGallery($invite->gallery_id)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($invite->gallery_id))) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         \App\Models\GalleryInvite::destroy($id);
         return response()->json(['success' => true]);

@@ -13,19 +13,22 @@ interface Props {
     onOpenGalleryModal: (groupId?: string) => void;
     onEditGroup: (g: GalleryGroup) => void;
     onEditGallery: (g: Gallery) => void;
+    onOpenPhotographerTeam: (node: Gallery | GalleryGroup) => void;
 }
 
 const TreeNode = ({
                       node,
                       onEditGroup,
                       onEditGallery,
-                      onOpenGroupModal,
+    onOpenPhotographerTeam,
+    onOpenGroupModal,
                       onOpenGalleryModal,
                       expandSignal
                   }: {
     node: Gallery | GalleryGroup,
     onEditGroup: (g: GalleryGroup) => void,
     onEditGallery: (g: Gallery) => void,
+    onOpenPhotographerTeam: (node: Gallery | GalleryGroup) => void,
     onOpenGroupModal: (id: string) => void,
     onOpenGalleryModal: (id: string) => void,
     expandSignal: number
@@ -101,10 +104,10 @@ const TreeNode = ({
             </summary>
             <div className="p-2 pl-4 md:pl-8 border-t border-base-300 bg-base-100/50">
                 {node.children?.map((c: GalleryGroup) => (
-                    <TreeNode key={'g-'+c.id} node={c} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} />
+                    <TreeNode key={'g-'+c.id} node={c} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} onOpenPhotographerTeam={onOpenPhotographerTeam} />
                 ))}
                 {node.galleries?.map((g: Gallery) => (
-                    <TreeNode key={'gal-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} />
+                    <TreeNode key={'gal-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} onOpenPhotographerTeam={onOpenPhotographerTeam} />
                 ))}
                 {(!node.children?.length && !node.galleries?.length) && <div className="p-4 text-sm opacity-50 italic">Ordner ist leer.</div>}
             </div>
@@ -112,7 +115,7 @@ const TreeNode = ({
     );
 };
 
-export default function ManagementStructureView({ tree, onOpenGroupModal, onOpenGalleryModal, onEditGroup, onEditGallery }: Props) {
+export default function ManagementStructureView({ tree, onOpenGroupModal, onOpenGalleryModal, onEditGroup, onEditGallery, onOpenPhotographerTeam }: Props) {
     const [expandSignal, setExpandSignal] = useState(0);
     const safeGroups = Array.isArray(tree?.groups) ? [...tree.groups].sort((a,b)=>a.name.localeCompare(b.name)) : [];
     const safeRootGalleries = Array.isArray(tree?.root_galleries) ? [...tree.root_galleries].sort((a,b)=>a.name.localeCompare(b.name)) : [];
@@ -137,14 +140,14 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
 
             <div className="space-y-2">
                 {safeGroups.map((g: GalleryGroup) => (
-                    <TreeNode key={'grp-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={expandSignal} />
+                    <TreeNode key={'grp-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={expandSignal} />
                 ))}
                 {safeRootGalleries.length > 0 && (
                     <div className="border border-base-300 bg-base-100 rounded-box shadow-sm mt-6">
                         <div className="bg-base-200/50 py-2 px-4 font-bold border-b border-base-300 opacity-70">Hauptverzeichnis (Ohne Ordner)</div>
                         <div className="p-2">
                             {safeRootGalleries.map((g: Gallery) => (
-                                <TreeNode key={'rgal-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={expandSignal} />
+                                <TreeNode key={'rgal-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={expandSignal} />
                             ))}
                         </div>
                     </div>

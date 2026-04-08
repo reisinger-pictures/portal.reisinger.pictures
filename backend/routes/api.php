@@ -44,6 +44,8 @@ Route::post('/test/flush-queue', function() {
     return response()->json(['success' => true]);
 });
 
+Route::post('/webhooks/stripe', [\App\Http\Controllers\WebhookController::class, 'handleStripe']);
+
 Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries']);
 Route::get('/sitemap-images.xml', [SitemapController::class, 'images']);
 
@@ -59,6 +61,7 @@ Route::get('/galleries/{slug}', [GalleryFrontendController::class, 'show']);
 Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])->where('filename', '.*');
 
 Route::get('/photos/{photoId}/download', [DownloadController::class, 'downloadSingle']);
+Route::get('/orders/quote-decode', [OrderController::class, 'decodeQuoteLink']);
 Route::get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip']);
 
 Route::middleware('auth:api')->group(function () {
@@ -88,6 +91,9 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::put('/management/gallery-groups/{id}', [GalleryController::class, 'updateGroup']);
     Route::delete('/management/gallery-groups/{id}', [GalleryController::class, 'deleteGroup']);
     Route::post('/management/galleries', [GalleryController::class, 'storeGallery']);
+    Route::post('/management/galleries/{id}/sync-access', [GalleryController::class, 'syncAccess']);
+    Route::post('/management/galleries/{id}/sync-photographers', [GalleryController::class, 'syncPhotographers']);
+    Route::post('/management/gallery-groups/{id}/sync-photographers', [GalleryController::class, 'syncGroupPhotographers']);
     Route::put('/management/galleries/{id}', [GalleryController::class, 'updateGallery']);
     Route::delete('/management/galleries/{id}', [GalleryController::class, 'destroyGallery']);
     Route::get('/management/gallery-groups/{id}', [GalleryController::class, 'showGroup']);
@@ -133,6 +139,8 @@ Route::middleware(['auth:api', 'management'])->group(function () {
 
     Route::get('/management/orders', [OrderController::class, 'indexAdmin']);
     Route::put('/management/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    Route::post('/management/orders/quote-link', [OrderController::class, 'generateQuoteLink']);
+    Route::post('/management/orders/{id}/send-quote', [OrderController::class, 'sendQuote']);
     Route::get('/management/stats', [StatsController::class, 'index']);
     Route::get('/management/logs', [StatsController::class, 'logs']);
 

@@ -1,3 +1,4 @@
+import GalleryAccessModal from './components/GalleryAccessModal';
 import {useRef, useState} from 'react';
 import ErrorMessage from '../components/ErrorMessage';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
@@ -14,6 +15,7 @@ import RatingStatusModal from './components/RatingStatusModal';
 import GalleryMetadataDefaultsModal from './components/GalleryMetadataDefaultsModal';
 import GalleryModals from '../components/GalleryModals';
 import ManagementGalleryActions from './components/ManagementGalleryActions';
+import PhotographerTeamModal from './components/PhotographerTeamModal';
 
 export default function ManagementGalleryView() {
     const params = useParams();
@@ -33,6 +35,8 @@ export default function ManagementGalleryView() {
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [showRatingsModal, setShowRatingsModal] = useState(false);
     const [isMetadataModalOpen, setIsMetadataModalOpen] = useState(false);
+    const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+    const [isPhotographerTeamModalOpen, setIsPhotographerTeamModalOpen] = useState(false);
 
     usePhotoSwipe({ galleryRef, trigger: photos.length });
 
@@ -42,7 +46,7 @@ export default function ManagementGalleryView() {
     return (
         <PageLayout>
             <div className="container mx-auto p-4 md:p-8">
-                <GalleryHeader gallery={gallery} breadcrumbs={breadcrumbs} />
+                <GalleryHeader gallery={gallery} breadcrumbs={breadcrumbs} canManage={true} />
 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -62,6 +66,8 @@ export default function ManagementGalleryView() {
                         onOpenRatings={() => setShowRatingsModal(true)}
                         onOpenMetadata={() => setIsMetadataModalOpen(true)}
                         onOpenInvite={() => setIsInviteModalOpen(true)}
+                        onOpenAccess={user?.is_admin ? () => setIsAccessModalOpen(true) : undefined}
+                        onOpenPhotographerTeam={user?.is_admin || user?.is_photographer ? () => setIsPhotographerTeamModalOpen(true) : undefined}
                         onOpenMail={() => setIsMailModalOpen(true)}
                     />
                 </div>
@@ -111,6 +117,8 @@ export default function ManagementGalleryView() {
                 <EmailComposerModal isOpen={isMailModalOpen} onClose={() => setIsMailModalOpen(false)} galleryId={gallery.id} />
                 {isInviteModalOpen && <InviteModal galleryId={gallery.id} galleryType={gallery.type} onClose={() => setIsInviteModalOpen(false)}/>}
                 <RatingStatusModal galleryId={gallery.id} isOpen={showRatingsModal} onClose={() => setShowRatingsModal(false)} />
+                <GalleryAccessModal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} galleryId={gallery.id} galleryName={gallery.name} />
+                <PhotographerTeamModal isOpen={isPhotographerTeamModalOpen} onClose={() => setIsPhotographerTeamModalOpen(false)} item={gallery} isGroup={false} onUpdateState={() => mutate()} />
                 <GalleryMetadataDefaultsModal isOpen={isMetadataModalOpen} onClose={() => setIsMetadataModalOpen(false)} gallery={gallery} onUpdate={async (...args) => { await updateGallery(...args); mutate(); }} />
 
                 <GalleryModals

@@ -93,9 +93,9 @@ class Photo extends Model
     public function getSrcsetAttribute() {
         if (!$this->gallery) return null;
         $baseUrl = '/api/media/' . $this->gallery->slug;
-        return $baseUrl . '/_thumbs/400/' . $this->filename . '.webp 400w, ' . 
-               $baseUrl . '/_thumbs/800/' . $this->filename . '.webp 800w, ' . 
-               $baseUrl . '/_thumbs/1200/' . $this->filename . '.webp 1200w';
+        return $baseUrl . '/_thumbs/400/' . $this->id . '.webp 400w, ' . 
+               $baseUrl . '/_thumbs/800/' . $this->id . '.webp 800w, ' . 
+               $baseUrl . '/_thumbs/1200/' . $this->id . '.webp 1200w';
     }
 
     public function versions()

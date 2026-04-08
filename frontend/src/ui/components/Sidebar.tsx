@@ -69,7 +69,10 @@ export default function Sidebar(props: SidebarProps) {
                         )}
                         
                         {user.is_admin && (
-                            <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> Einstellungen</Link></li>
+                            <>
+                                <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> Bestellungen & Anfragen</Link></li>
+                                <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> Einstellungen</Link></li>
+                            </>
                         )}
                     </>
                 )}
@@ -79,7 +82,7 @@ export default function Sidebar(props: SidebarProps) {
                         {isAdminOrPhotog && <div className="divider my-1 text-xs opacity-50">Dein Account</div>}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
                         <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> Mein Profil</Link></li>
-                        <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> Einkäufe & Lizenzen</Link></li>
+                        <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> Einkäufe & Anfragen</Link></li>
                     </>
                 )}
                 
@@ -95,7 +98,7 @@ export default function Sidebar(props: SidebarProps) {
             <div className="flex-1"></div>
 
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">
-                {user && user.roles && user.roles.length > 0 && (
+                {user && (
                     <div className="p-4">
                         <button onClick={handleLogout} className="btn btn-outline btn-error w-full btn-sm">Abmelden</button>
                     </div>

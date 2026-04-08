@@ -237,11 +237,12 @@ class ImageProcessor
             $imgHeight = $imgHeight * $ratio;
         }
 
-        $configHash = md5(($svgPath ? filemtime($svgPath) : 'nosvg') . $text . $opacity);
+        $tileWidth = max(200, (int)($imgWidth / 4)); // Dynamische Skalierung passend zum Zielbild
+        $configHash = md5(($svgPath ? filemtime($svgPath) : 'nosvg') . $text . $opacity . $tileWidth);
         $masterPngPath = storage_path("app/private/watermark_master_tile_{$configHash}.png");
 
         if (!file_exists($masterPngPath)) {
-            $this->generateTile($svgPath, $text, $opacity, $masterPngPath);
+            $this->generateTile($svgPath, $text, $opacity, $masterPngPath, $tileWidth);
         }
 
         if (class_exists('Imagick')) {
@@ -254,7 +255,32 @@ class ImageProcessor
                 }
 
                 $tile = new \Imagick($masterPngPath);
-                $im->textureImage($tile);
+                
+                // 1. Abstand zwischen den Kacheln (Padding der Kachel-Leinwand)
+                $w = $tile->getImageWidth();
+                $h = $tile->getImageHeight();
+                $padX = (int)($w * 0.5);
+                $padY = (int)($h * 0.5);
+                $tile->extentImage($w + $padX, $h + $padY, -($padX/2), -($padY/2));
+
+                // 2. Overlay-Layer für das Kachelmuster erstellen
+                $overlay = new \Imagick();
+                $overlay->newImage($im->getImageWidth(), $im->getImageHeight(), new \ImagickPixel('transparent'));
+                $overlay->textureImage($tile);
+
+                // 3. Abstand zum Bildrand (5% Randbereich des Overlays transparent maskieren)
+                $margin = (int)(max($im->getImageWidth(), $im->getImageHeight()) * 0.05);
+                $draw = new \ImagickDraw();
+                $draw->setFillColor(new \ImagickPixel('transparent'));
+                $draw->setComposite(\Imagick::COMPOSITE_COPY);
+                $draw->rectangle(0, 0, $im->getImageWidth(), $margin); // Oben
+                $draw->rectangle(0, $im->getImageHeight() - $margin, $im->getImageWidth(), $im->getImageHeight()); // Unten
+                $draw->rectangle(0, 0, $margin, $im->getImageHeight()); // Links
+                $draw->rectangle($im->getImageWidth() - $margin, 0, $im->getImageWidth(), $im->getImageHeight()); // Rechts
+                $overlay->drawImage($draw);
+
+                // 4. Overlay mit Foto verschmelzen
+                $im->compositeImage($overlay, \Imagick::COMPOSITE_OVER, 0, 0);
                 $im->setImageCompressionQuality(80);
                 $im->writeImage($destPath);
 
@@ -274,12 +300,12 @@ class ImageProcessor
         ]);
     }
 
-    private function generateTile($svgPath, $text, $opacity, $outPath) {
+    private function generateTile($svgPath, $text, $opacity, $outPath, $size = 800) {
         if (class_exists('Imagick')) {
             try {
                 \Imagick::setResourceLimit(\Imagick::RESOURCETYPE_THREAD, 1);
                 $tile = new \Imagick();
-                $tile->newImage(800, 800, new \ImagickPixel('transparent'));
+                $tile->newImage($size, $size, new \ImagickPixel('transparent'));
                 $tile->setImageFormat('png32');
 
                 $draw = new \ImagickDraw();
@@ -293,7 +319,7 @@ class ImageProcessor
                     $svg->setBackgroundColor(new \ImagickPixel('transparent'));
                     $svg->readImage($svgPath);
                     $svg->resizeImage(200, 200, \Imagick::FILTER_LANCZOS, 1);
-                    $tile->compositeImage($svg, \Imagick::COMPOSITE_OVER, 300, 200);
+                    $tile->compositeImage($svg, \Imagick::COMPOSITE_OVER, $size * 0.375, $size * 0.25);
                     $svg->clear(); $svg->destroy();
                 }
 

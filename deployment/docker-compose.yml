@@ -60,12 +60,22 @@ services:
       - MEILISEARCH_KEY=${MEILI_MASTER_KEY}
       - GALLERY_CLEANUP_GRACE_MONTHS=3
       - AUTH_THROTTLE_LIMIT=10
-      # NEU: Expliziter Pfad für den FTP-Ordner im Container
       - FTP_STORAGE_PATH=/var/www/ftp
+      - STRIPE_KEY=${STRIPE_KEY}
+      - STRIPE_SECRET=${STRIPE_SECRET}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
     command: >
       sh -c "
       echo 'Warte 15 Sekunden auf den MariaDB First-Boot...';
       sleep 15;
+      if [ "$APP_ENV" = "production" ]; then
+        if [ "$APP_KEY" = "base64:APP_KEY_REDACTED" ] || [ "$JWT_SECRET" = "JWT_SECRET_REDACTED" ]; then
+          echo 'FATAL: Standard-Entwicklungsschluessel in Produktion erkannt. Start abgebrochen!';
+          exit 1;
+        fi;
+      fi;
+      if [ -z "$APP_KEY" ]; then php artisan key:generate --force; fi;
+      if [ -z "$JWT_SECRET" ]; then php artisan jwt:secret --force; fi;
       php artisan optimize:clear;
       php artisan migrate --force;
       php artisan admin:update;
@@ -86,7 +96,6 @@ services:
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:Z
       - /home/webadmin/websites/photos:/var/www/photos:Z
-      # NEU: Der FTP Ordner vom Host wird in den Container gemountet
       - /home/webadmin/websites/ftp:/var/www/ftp:Z
     environment: *backend_env
     command: >
@@ -107,7 +116,6 @@ services:
       portal_internal:
       webnet:
         ipv4_address: 172.18.0.31
-
 
   frontend:
     image: nginx:alpine

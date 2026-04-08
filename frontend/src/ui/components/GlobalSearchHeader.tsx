@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import HighlightText from './HighlightText';
 import { useSearch } from '../../logic/useSearch';
-import { useCart } from '../../logic/CartContext';
 
 export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () => void }) {
     const [searchParams] = useSearchParams();
@@ -10,8 +9,7 @@ export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () =>
     const [searchQuery, setSearchQuery] = useState(qParam);
     const [prevQParam, setPrevQParam] = useState(qParam);
     
-    const { itemCount } = useCart();
-
+    
     if (qParam !== prevQParam) {
         setPrevQParam(qParam);
         setSearchQuery(qParam);
@@ -85,16 +83,7 @@ export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () =>
                 )}
             </form>
 
-            <button 
-                className="btn btn-ghost btn-circle relative ml-auto shrink-0" 
-                onClick={() => navigate('/cart')}
-                title="Warenkorb öffnen"
-            >
-                <span className="iconify mdi--cart text-2xl"></span>
-                {itemCount > 0 && (
-                    <div className="badge badge-primary badge-sm absolute top-1 right-0 border-base-100 border-2">{itemCount}</div>
-                )}
-            </button>
+            
         </header>
     );
 }

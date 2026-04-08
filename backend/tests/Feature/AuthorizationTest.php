@@ -74,4 +74,20 @@ class AuthorizationTest extends TestCase
         $this->assertContains($deliveryGallery->id, $allowedIds);
         $this->assertNotContains($selectionGallery->id, $allowedIds);
     }
+
+    public function test_photographer_team_access_logic()
+    {
+        $photogA = User::factory()->create();
+        $photogA->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photogB = User::factory()->create();
+        $photogB->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+
+        $group = GalleryGroup::factory()->create(['restricted_photographers' => true]);
+        $gallery = Gallery::factory()->create(['gallery_group_id' => $group->id, 'restricted_photographers' => null]);
+
+        $this->assertFalse($photogB->canPhotographerAccessGallery($gallery->id));
+
+        $photogB->photographerGalleryGroups()->attach($group->id);
+        $this->assertTrue($photogB->fresh()->canPhotographerAccessGallery($gallery->id));
+    }
 }

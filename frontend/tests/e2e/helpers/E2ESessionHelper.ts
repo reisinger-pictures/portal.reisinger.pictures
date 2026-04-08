@@ -15,11 +15,17 @@ export class E2ESessionHelper {
             data: { email: 'florian@reisinger.pictures', password: 'admin' },
             headers: { 'Accept': 'application/json' }
         });
+        if (!loginRes.ok()) throw new Error('Admin login failed: ' + await loginRes.text());
         const cookies = loginRes.headers()['set-cookie'];
-        this.adminToken = cookies || '';
+        const match = cookies?.match(/rp_jwt=([^;]+)/);
+        this.adminToken = match ? `rp_jwt=${match[1]}` : (cookies || '');
     }
 
-    async createIsolatedUser(roleName: 'admin' | 'photographer' | 'client', options?: { assignGalleryId?: string, wantsNotifications?: boolean }) {
+    getAdminToken() {
+        return this.adminToken || '';
+    }
+
+    async createIsolatedUser(roleName: 'admin' | 'photographer' | 'client' | 'power_user' | 'customer_manager' | 'super_admin', options?: { assignGalleryId?: string, wantsNotifications?: boolean }) {
         await this.ensureAdminLogin();
         const uniqueId = Math.random().toString(36).substring(2, 10);
         const email = `e2e-${roleName}-${uniqueId}@example.com`;
@@ -31,8 +37,10 @@ export class E2ESessionHelper {
             data: { name: `E2E ${roleName}`, email },
             headers
         });
+        if (!createRes.ok()) throw new Error(`Failed to create user ${email}. Status: ${createRes.status()} Body: ${await createRes.text()}`);
         const createData = await createRes.json();
-        const userId = createData.user.id;
+        const userId = createData.user?.id;
+        if (!userId) throw new Error('User ID missing in response: ' + JSON.stringify(createData));
         this.createdUserIds.push(userId);
 
         const rolesRes = await this.request.get('/api/management/roles', { headers });
@@ -72,17 +80,14 @@ export class E2ESessionHelper {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
 
-        // Lösche Galerien (von unten nach oben)
         for (const id of this.createdGalleryIds) {
-            await this.request.delete(`/api/management/galleries/${id}`, { headers }).catch((e) => console.error('Cleanup Gallery error', e));
+            await this.request.delete(`/api/management/galleries/${id}`, { headers }).catch(() => {});
         }
-        // Lösche Gruppen
         for (const id of this.createdGroupIds) {
-            await this.request.delete(`/api/management/gallery-groups/${id}`, { headers }).catch((e) => console.error('Cleanup Group error', e));
+            await this.request.delete(`/api/management/gallery-groups/${id}`, { headers }).catch(() => {});
         }
-        // Lösche User
         for (const id of this.createdUserIds) {
-            await this.request.delete(`/api/test/cleanup-user/${id}`, { headers }).catch((e) => console.error('Cleanup User error', e));
+            await this.request.delete(`/api/test/cleanup-user/${id}`, { headers }).catch(() => {});
         }
     }
 }

@@ -22,14 +22,7 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="company-info">
-            <strong>{{ env('APP_NAME', 'Reisinger Foto Portal') }}</strong><br>
-            Dein Fotograf<br>
-            Musterstraße 1<br>
-            4020 Linz, Österreich<br>
-            hello@reisinger.pictures
-        </div>
+    @include('pdf.header', ['title' => str_starts_with($snapshot->invoice_number, 'L-') ? 'LIEFERSCHEIN' : 'RECHNUNG', 'bankHolder' => $bankHolder])
         <h1 class="title">@if(str_starts_with($snapshot->invoice_number, 'L-')) LIEFERSCHEIN @else RECHNUNG @endif</h1>
     </div>
 
@@ -65,7 +58,7 @@
             @foreach($items as $item)
             <tr>
                 <td>
-                    <strong>Datei:</strong> {{ $item['filename'] }}<br>
+                    <strong>Datei:</strong> {{ $item['filename'] ?? 'Unbekannt' }}<br>
                     <small style="color: #666;">Auflösung: {{ strtoupper($item['tier']) }} | {{ ($item['usage'] ?? 'editorial') === 'commercial' ? 'Kommerziell' : 'Redaktionell' }} | {{ ($item['duration'] ?? '1_year') === 'unlimited' ? 'Unbegrenzt' : '1 Jahr' }}</small>
                     @if(!empty($snapshot->customer_details['is_collective']))
                         <br><small style="color: #2A9D8F;">Bestellt von: {{ $item['ordered_by'] ?? 'Unbekannt' }}</small>
@@ -102,10 +95,6 @@
         </ul>
     </div>
 
-    <div class="footer">
-        Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung gem. § 6 Abs. 1 Z 27 UStG.<br>
-        Bitte überweisen Sie den Rechnungsbetrag unter Angabe der Rechnungsnummer auf folgendes Konto:<br>
-        IBAN: ATXX XXXX XXXX XXXX XXXX | BIC: XXXXXX
-    </div>
+    @include('pdf.footer', ['bankHolder' => $bankHolder, 'bankIban' => $bankIban, 'bankBic' => $bankBic])
 </body>
 </html>

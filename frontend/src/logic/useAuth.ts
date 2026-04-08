@@ -25,6 +25,7 @@ export interface User {
     roles: string[];
     transient_meta_galleries?: string[];
     my_galleries?: Gallery[];
+    photographer_galleries?: Gallery[];
 }
 
 export function useAuth() {
