@@ -3,8 +3,20 @@ import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
 
+interface GalleryBase {
+    id: string;
+}
+
+interface UserAccess {
+    id: string;
+    name: string;
+    email: string;
+    is_super_admin?: boolean;
+    galleries: GalleryBase[];
+}
+
 export default function GalleryAccessModal({ galleryId, galleryName, isOpen, onClose }: { galleryId: string, galleryName: string, isOpen: boolean, onClose: () => void }) {
-    const { data: users, isLoading, mutate } = useSWR<any[]>('/api/management/users', fetcher);
+    const { data: users, isLoading, mutate } = useSWR<UserAccess[]>('/api/management/users', fetcher);
     const { showToast } = useUI();
     const [search, setSearch] = useState('');
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -25,8 +37,8 @@ export default function GalleryAccessModal({ galleryId, galleryName, isOpen, onC
             });
             showToast('success', hasAccess ? 'Zugriff entzogen' : 'Zugriff erteilt');
             mutate();
-        } catch (e: any) {
-            showToast('error', e.message || 'Fehler beim Speichern');
+        } catch (e: unknown) {
+            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
         } finally {
             setProcessingId(null);
         }
@@ -55,7 +67,7 @@ export default function GalleryAccessModal({ galleryId, galleryName, isOpen, onC
                     ) : (
                         <div className="flex flex-col gap-1">
                             {filteredUsers?.map(u => {
-                                const hasAccess = u.galleries.some((g: any) => g.id === galleryId);
+                                const hasAccess = u.galleries.some(g => g.id === galleryId);
                                 return (
                                     <div key={u.id} className="flex items-center justify-between p-2 hover:bg-base-200 rounded">
                                         <div>

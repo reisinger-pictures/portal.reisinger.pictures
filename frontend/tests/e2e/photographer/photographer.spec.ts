@@ -39,8 +39,11 @@ test.describe('Photographer Core Workflow', () => {
         await form.fillGalleryModal({ name: galleryName, type: 'Delivery (Downloads)' });
         await modal.submitModal('Speichern');
 
-        const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(link).toBeVisible({ timeout: 15000 });
+        await expect(async () => {
+            const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+            if (!(await link.isVisible())) await page.reload();
+            await expect(link).toBeVisible({ timeout: 2000 });
+        }).toPass({ timeout: 15000 });
     });
 
     test('Photographer can edit an existing gallery', async ({ page }) => {

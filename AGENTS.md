@@ -15,7 +15,7 @@
 * **Patching & File Modification (CRITICAL):**
   * Multi-line Regex for search-and-replace in code is STRICTLY FORBIDDEN. It is too brittle.
   * Base64 output for file content is STRICTLY FORBIDDEN.
-  * **Regel-Update (Patching):** Du darfst und sollst primär reguläre Ausdrücke (`.replace(/.../g, '...')`) oder exakte String-Replacements für Dateimanipulationen in `patch.mjs` verwenden. Vermeide komplette Dateineuschreibungen (Rewrites), es sei denn, es handelt sich um stark umstrukturierte Dateien. Base64 bleibt verboten.
+  * **Safe Patching Policy (CRITICAL):** Alle `patch.mjs` Scripts MÜSSEN den Erfolg einer Ersetzung validieren. Prüfe zwingend mit `.includes()` oder `.indexOf()`, ob der Zielstring existiert, *bevor* du `.replace()` aufrufst. Prüfe danach, ob sich der `content` tatsächlich verändert hat. Brich mit einer klaren `console.error` ab, falls der Patch ins Leere läuft. Blinde `.replace()` Aufrufe sind untersagt!
 
 ## 3. AI Agent Roles & Responsibilities
 The system and workflow are managed via three strictly separated agent roles:

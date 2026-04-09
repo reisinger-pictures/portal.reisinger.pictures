@@ -80,7 +80,7 @@ export default function ManagementMetaGalleryView() {
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" />
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" alt={photo.title || 'Bild'} />
                             </a>
                             <div className="absolute top-2 right-2 opacity-100 z-10">
                                 <button onClick={(e) => {

@@ -92,7 +92,7 @@ class OrderController extends Controller
 
                 $lineItems[] = [
                     'photoId' => $photo->id,
-                    'filename' => $photo->filename,
+                    'filename' => $photo->title ?: 'Bild ' . substr($photo->id, 0, 8),
                     'tier' => $item['tier'],
                     'usage' => $item['usage'],
                     'duration' => $item['duration'],

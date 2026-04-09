@@ -40,14 +40,14 @@ const getHeaders = (): Record<string, string> => ({
 
 const handleApiError = async (res: Response) => {
     let errorMsg = `HTTP Fehler ${res.status}`;
-    let errorInfo = null;
+    let errorInfo;
     const contentType = res.headers.get('content-type');
 
     if (contentType && contentType.includes('application/json')) {
         try {
             errorInfo = await res.json();
             errorMsg = errorInfo.error || errorInfo.message || errorMsg;
-        } catch (e) { console.debug('Failed to parse error', e); }
+        } catch (parseError) { errorInfo = { parseError: String(parseError) }; }
     } else {
         try {
             const text = await res.text();
@@ -58,7 +58,7 @@ const handleApiError = async (res: Response) => {
                 errorMsg = text.substring(0, 150);
             }
             errorInfo = { text };
-        } catch (e) { console.debug('Failed to parse error', e); }
+        } catch (parseError) { errorInfo = { parseError: String(parseError) }; }
     }
     
     const error = new Error(errorMsg) as Error & { info?: unknown; status?: number };

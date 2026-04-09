@@ -34,7 +34,8 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         await page.getByRole('button', { name: '+ Neuer Mandant' }).click();
         const form = new FormHelper(page, modal);
         await form.fillTenantModal({ name: tenantName });
-        await modal.submitModal('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.tenant?.id) helper.trackTenant(resData.tenant.id);
 
         await page.locator('.card-title', { hasText: tenantName }).click();
         await expect(page.locator(`h1:has-text("${tenantName}")`)).toBeVisible();
@@ -68,7 +69,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
 
         const usersRes = await request.get('/api/management/users', { headers: { 'Cookie': helper.getAdminToken() } });
         const usersData = await usersRes.json();
-        const guestUser = usersData.data?.find((u: any) => u.email === guestEmail);
+        const guestUser = usersData.data?.find((u: { id: string; email: string }) => u.email === guestEmail);
         if (guestUser) {
             await request.delete(`/api/test/cleanup-user/${guestUser.id}`, { headers: { 'Cookie': helper.getAdminToken() } });
         }

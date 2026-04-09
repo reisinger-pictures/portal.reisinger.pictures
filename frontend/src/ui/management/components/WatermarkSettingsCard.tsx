@@ -5,7 +5,7 @@ import { useUI } from '../../components/UIContext';
 import { useForm, useWatch } from 'react-hook-form';
 
 export default function WatermarkSettingsCard() {
-    const [cacheBuster, setCacheBuster] = useState(Date.now());
+    const [cacheBuster, setCacheBuster] = useState(() => Date.now());
     const { watermark, updateWatermark } = useSettings();
     const { user } = useAuth();
     const { showToast } = useUI();
@@ -31,15 +31,25 @@ export default function WatermarkSettingsCard() {
 
     // Live Vorschau: Entweder neues SVG vom Datei-Input, oder bestehendes aus der DB laden
     useEffect(() => {
-        if (watchSvg && watchSvg.length > 0) {
-            const objectUrl = URL.createObjectURL(watchSvg[0]);
-            setPreviewUrl(objectUrl);
-            return () => URL.revokeObjectURL(objectUrl);
-        } else if (watermark?.has_svg) {
-            setPreviewUrl(`/api/management/settings/watermark/image?t=${cacheBuster}`);
-        } else {
-            setPreviewUrl(null);
-        }
+        let objectUrl: string | null = null;
+        let isActive = true;
+
+        Promise.resolve().then(() => {
+            if (!isActive) return;
+            if (watchSvg && watchSvg.length > 0) {
+                objectUrl = URL.createObjectURL(watchSvg[0]);
+                setPreviewUrl(objectUrl);
+            } else if (watermark?.has_svg) {
+                setPreviewUrl(`/api/management/settings/watermark/image?t=${cacheBuster}`);
+            } else {
+                setPreviewUrl(null);
+            }
+        });
+
+        return () => {
+            isActive = false;
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+        };
     }, [watchSvg, watermark, cacheBuster]);
 
     const onSubmit = async (data: { text: string; opacity: number; svg?: FileList }) => {
@@ -54,7 +64,7 @@ export default function WatermarkSettingsCard() {
             await updateWatermark(fd);
             showToast('success', 'Wasserzeichen gespeichert');
             setValue('svg', undefined);
-            setCacheBuster(Date.now());
+            setCacheBuster(() => Date.now());
         } catch {
             showToast('error', 'Fehler beim Speichern');
         }

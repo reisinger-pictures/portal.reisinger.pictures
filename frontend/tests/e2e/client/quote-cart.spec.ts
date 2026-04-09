@@ -46,7 +46,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         const rolesRes = await page.request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken } });
         const rolesData = await rolesRes.json();
         const roles = Array.isArray(rolesData) ? rolesData : (rolesData.data || []);
-        const clientRoleId = roles.find((r: any) => r.name === 'client')?.id;
+        const clientRoleId = roles.find((r: { id: string; name: string }) => r.name === 'client')?.id;
 
         const galleryUrl = page.url();
         const gallerySlug = galleryUrl.split('/').pop();
@@ -93,7 +93,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         
         await sidebar.navigateTo('Bestellungen & Anfragen');
         
-        const firstRow = page.locator('tbody tr').first();
+        const firstRow = page.locator('tbody tr').filter({ hasText: clientUser.email }).first();
         await expect(firstRow).toContainText('Angebot');
         await expect(firstRow).toContainText('Auf Anfrage');
         
@@ -112,7 +112,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         await auth.logout();
 
         // --- 4. CLIENT: Öffnet Link aus Mail ---
-        const token = await mailpit.extractLinkForEmail(clientUser.email, /quote_token=([a-zA-Z0-9\.\-_]+)/);
+        const token = await mailpit.extractLinkForEmail(clientUser.email, /quote_token=([a-zA-Z0-9.\-_]+)/);
         expect(token).toBeTruthy();
 
         await auth.login(clientUser.email, clientUser.password);

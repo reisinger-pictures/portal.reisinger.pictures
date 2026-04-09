@@ -109,7 +109,7 @@ export default function SearchView() {
                                             {results.photos.map(p => (
                                                 <Link key={p.id} to={`/photos/${p.id}`}
                                                       className="block relative aspect-square bg-base-300 rounded overflow-hidden group shadow-md hover:shadow-xl transition-shadow">
-                                                    <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} alt={p.filename} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
+                                                    <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} alt={p.title || 'Bild'} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
                                                     
                                                 </Link>
                                             ))}

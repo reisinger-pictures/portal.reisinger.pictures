@@ -29,7 +29,11 @@ status: active
 - **Rollen-Ansichten (Views):** Anstatt unterschiedliche URLs für Fotografen und Kunden zu verwenden, wird die selbe Galerie-URL genutzt. Die Steuerung der Ansicht (Management vs. Client) erfolgt dynamisch über die Berechtigungsprüfung im Frontend.
   - Ein erzwungener Wechsel in die Kundenansicht für Fotografen erfolgt über den URL-Parameter `?view=client`.
 
-## 5. Smart Assistance (Metadata Auto-Complete)
+## 5. Error Handling & Exceptions
+- **Keine leeren Catches:** Leere `catch`-Blöcke (Silent Failures / Catch and Ignore) sind extrem gefährlich und strengstens verboten.
+- **Kein "Catch & Log":** Das reine Loggen von Fehlern (z.B. `catch (e) { console.debug(e); }`) ohne weitere Fehlerbehandlung oder Propagierung ist ebenfalls untersagt. Fehler müssen entweder sinnvoll im UI behandelt (z.B. Fallback-State, Toast-Message) oder weitergeworfen werden.
+
+## 6. Smart Assistance (Metadata Auto-Complete)
 - **Concept:** To accelerate the workflow, IPTC location fields provide smart auto-completion.
 - **Behavior:** Selecting a city from a static dataset automatically fills in the `state`, `country` (e.g., Österreich), and `iso_country` (e.g., AT). Manually typing a known country updates the `iso_country` field.
 - **UX Constraint:** All fields **must remain fully editable** (no `readonly`).

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
@@ -19,11 +19,14 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
     const [status, setStatus] = useState<'null' | 'true' | 'false'>('null');
     const [isSaving, setIsSaving] = useState(false);
 
-    useEffect(() => {
-        if (item) {
-            setStatus(item.restricted_photographers === null ? 'null' : (item.restricted_photographers ? 'true' : 'false'));
-        }
-    }, [item]);
+    const [prevItemId, setPrevItemId] = useState<string | null>(null);
+
+    if (item && item.id !== prevItemId) {
+        setPrevItemId(item.id);
+        setStatus(item.restricted_photographers === null ? 'null' : (item.restricted_photographers ? 'true' : 'false'));
+    } else if (!item && prevItemId !== null) {
+        setPrevItemId(null);
+    }
 
     if (!isOpen || !item) return null;
 
@@ -39,8 +42,8 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
             await apiMutate(endpoint, 'PUT', { name: item.name, restricted_photographers: val });
             onUpdateState();
             showToast('success', 'Status gespeichert');
-        } catch (e: any) {
-            showToast('error', e.message || 'Fehler beim Speichern');
+        } catch (e: unknown) {
+            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
         }
         setIsSaving(false);
     };
@@ -51,8 +54,8 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
             await apiMutate(endpoint, 'POST', { user_id: userId, action: hasAccess ? 'detach' : 'attach' });
             mutate();
             showToast('success', hasAccess ? 'Zugriff entfernt' : 'Zugriff erteilt');
-        } catch(e: any) {
-            showToast('error', e.message || 'Fehler beim Speichern');
+        } catch(e: unknown) {
+            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
         }
     };
 
@@ -67,7 +70,7 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
 
                 <div className="form-control w-full mb-6">
                     <label className="label"><span className="label-text font-bold">Zugriffs-Status (Fotografen)</span></label>
-                    <select className="select select-bordered w-full" value={status} onChange={e => handleStatusChange(e.target.value as any)} disabled={isSaving}>
+                    <select className="select select-bordered w-full" value={status} onChange={e => handleStatusChange(e.target.value as 'null' | 'true' | 'false')} disabled={isSaving}>
                         <option value="null">Erben (Aktuell: {item.effective_restricted_photographers ? 'Restriktiv' : 'Offen'})</option>
                         <option value="false">Offen (Jeder Fotograf hat Zugriff)</option>
                         <option value="true">Restriktiv (Nur zugewiesene Fotografen)</option>

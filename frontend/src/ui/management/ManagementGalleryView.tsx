@@ -95,7 +95,7 @@ export default function ManagementGalleryView() {
                     {photos.map(photo => (
                         <div key={photo.id} className="relative group">
                             <a href={photo.url} data-pswp-width={photo.width || 2000} data-pswp-height={photo.height || 1333} data-title={photo.title} data-desc={photo.description} data-artist={photo.artist} data-photo-id={photo.id} className="pswp-item block relative aspect-square">
-                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded hover:scale-105 transition-transform duration-500" loading="lazy" alt={photo.filename}/>
+                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded hover:scale-105 transition-transform duration-500" loading="lazy" alt={photo.title || 'Bild'}/>
                             </a>
                             {gallery.type === 'delivery' && (
                                 <div className="absolute top-2 right-2 opacity-100 z-10">

@@ -13,7 +13,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import PageLayout from '../components/PageLayout';
 
-const stripePublicKey = (import.meta as any).env.VITE_STRIPE_PUBLIC_KEY;
+const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 const stripePromise = loadStripe(stripePublicKey);
 
 function StripeCheckoutForm({ orderId, defaultEmail, defaultName, onSuccess }: { orderId: string, defaultEmail?: string, defaultName?: string, onSuccess: (webhookSuccess: boolean) => void }) {
@@ -52,7 +52,7 @@ function StripeCheckoutForm({ orderId, defaultEmail, defaultName, onSuccess }: {
                         setIsProcessing(false);
                         onSuccess(false);
                     }
-                } catch (err) {
+                } catch {
                     if (attempts >= 5) {
                         clearInterval(pollInterval);
                         setIsProcessing(false);
@@ -89,6 +89,85 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
+interface CartItemListProps {
+    items: CartItem[];
+    handleUpdateItem: (item: CartItem, field: string, value: string) => void;
+    removeFromCart: (photoId: string) => void;
+    hasQuotes: boolean;
+    totalAmount: number;
+}
+
+const CartItemList = ({ items, handleUpdateItem, removeFromCart, hasQuotes, totalAmount }: CartItemListProps) => (
+    <div className="lg:col-span-3">
+        <h2 className="font-bold text-xl mb-4 flex items-center gap-2">
+            <span className="iconify mdi--format-list-checks text-secondary"></span> {hasQuotes ? 'Deine Lizenzen & Anfragen' : 'Deine Lizenzen'}
+        </h2>
+        <div className="space-y-4">
+            {items.map((item: CartItem, idx: number) => (
+                <div key={item.photoId + idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-base-100 p-4 rounded-box border border-base-300 shadow-sm gap-4">
+                    <div className="flex-1 min-w-0 w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
+                        {item.thumb_url && (
+                            <img src={item.thumb_url} className="w-24 h-24 object-cover rounded shadow-sm shrink-0 border border-base-200" alt="Vorschau" />
+                        )}
+                        <div className="w-full">
+                            {item.isQuote ? (
+                                <div className="w-full">
+                                    <div className="font-bold text-sm text-primary mb-2 flex items-center gap-1"><span className="iconify mdi--file-document-edit-outline"></span> Individuelles Angebot</div>
+                                    <textarea 
+                                        className="textarea textarea-bordered w-full h-16 text-sm resize-none"
+                                        placeholder="Beschreibe deine speziellen Nutzungsanforderungen (z.B. Weltweite Rechte, Exklusivität)..."
+                                        value={item.notes || ''}
+                                        onChange={(e) => handleUpdateItem(item, 'notes', e.target.value)}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    <select className="select select-sm select-bordered bg-base-200 text-xs font-normal" value={item.tier} onChange={(e) => handleUpdateItem(item, 'tier', e.target.value)}>
+                                        <option value="web">Web & Social</option>
+                                        <option value="print">Print (A4)</option>
+                                        <option value="original">Original</option>
+                                    </select>
+                                    <select className="select select-sm select-bordered bg-base-200 text-xs font-normal" value={item.usage} onChange={(e) => handleUpdateItem(item, 'usage', e.target.value)}>
+                                        <option value="editorial">Redaktionell</option>
+                                        <option value="commercial">Kommerziell</option>
+                                    </select>
+                                    <select className="select select-sm select-bordered bg-base-200 text-xs font-normal" value={item.duration} onChange={(e) => handleUpdateItem(item, 'duration', e.target.value)}>
+                                        <option value="1_year">1 Jahr</option>
+                                        <option value="unlimited">Unbegrenzt</option>
+                                    </select>
+                                    <select className="select select-sm select-bordered bg-base-200 text-xs font-normal" value={item.frequency || 'einmalig'} onChange={(e) => handleUpdateItem(item, 'frequency', e.target.value)}>
+                                        <option value="einmalig">Einmalig</option>
+                                        <option value="mehrmalig">Mehrmalig</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-0 border-base-300 pt-3 sm:pt-0 mt-3 sm:mt-0">
+                        {item.isQuote ? (
+                            <div className="text-right">
+                                <span className="font-mono font-bold text-lg whitespace-nowrap text-warning">--- €</span>
+                                <span className="text-xs font-sans opacity-70 block">(Preis auf Anfrage)</span>
+                            </div>
+                        ) : (
+                            <span className="font-mono font-bold text-lg whitespace-nowrap">{item.price.toFixed(2)} €</span>
+                        )}
+                        <button onClick={() => removeFromCart(item.photoId)} className="btn btn-ghost btn-sm btn-square text-error" title="Entfernen">
+                            <span className="iconify mdi--trash-can text-lg"></span>
+                        </button>
+                    </div>
+                </div>
+            ))}
+        </div>
+        
+        <div className="mt-6 flex justify-between items-center bg-base-100 p-6 rounded-box border border-primary shadow-sm">
+            <span className="font-bold text-lg">Gesamtsumme</span>
+            <span className="text-3xl font-mono font-bold text-primary">{hasQuotes ? '--- €' : `${totalAmount.toFixed(2)} €`}</span>
+        </div>
+        <p className="text-sm opacity-60 text-right mt-2">Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG.</p>
+    </div>
+);
+
 export default function ClientCartView() {
     const { items, removeFromCart, totalAmount, clearCart, addToCart } = useCart();
     const { showToast } = useUI();
@@ -102,11 +181,11 @@ export default function ClientCartView() {
 
     const hasQuotes = items.some(i => i.isQuote);
 
-        const incomingToken = searchParams.get('quote_token');
+    const incomingToken = searchParams.get('quote_token');
     useEffect(() => {
         if (!incomingToken) return;
         
-        fetch('/api/orders/quote-decode?token=' + incomingToken)
+        fetch('/api/orders/quote-decode?token=' + encodeURIComponent(incomingToken))
             .then(res => res.json())
             .then(data => {
                 if (data.photos && data.price !== undefined) {
@@ -124,7 +203,6 @@ export default function ClientCartView() {
                         });
                     });
                     showToast('info', 'Angebot aus Link wiederhergestellt.');
-                    // URL säubern ohne Re-Trigger
                     const newParams = new URLSearchParams(window.location.search);
                     newParams.delete('quote_token');
                     const cleanPath = window.location.pathname + (newParams.toString() ? '?' + newParams.toString() : '');
@@ -225,90 +303,8 @@ export default function ClientCartView() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                        <div className="lg:col-span-3">
-                            <h2 className="font-bold text-xl mb-4 flex items-center gap-2">
-                                <span className="iconify mdi--format-list-checks text-secondary"></span> {hasQuotes ? 'Deine Lizenzen & Anfragen' : 'Deine Lizenzen'}
-                            </h2>
-                            <div className="space-y-4">
-                                {items.map((item, idx) => (
-                                    <div key={item.photoId + idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-base-100 p-4 rounded-box border border-base-300 shadow-sm gap-4">
-                                        <div className="flex-1 min-w-0 w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
-                                            {item.thumb_url && (
-                                                <img src={item.thumb_url} className="w-24 h-24 object-cover rounded shadow-sm shrink-0 border border-base-200" alt="Vorschau" />
-                                            )}
-                                            <div className="w-full">
-                                                {item.isQuote ? (
-                                                    <div className="w-full">
-                                                        <div className="font-bold text-sm text-primary mb-2 flex items-center gap-1"><span className="iconify mdi--file-document-edit-outline"></span> Individuelles Angebot</div>
-                                                        <textarea 
-                                                            className="textarea textarea-bordered w-full h-16 text-sm resize-none"
-                                                            placeholder="Beschreibe deine speziellen Nutzungsanforderungen (z.B. Weltweite Rechte, Exklusivität)..."
-                                                            value={item.notes || ''}
-                                                            onChange={(e) => handleUpdateItem(item, 'notes', e.target.value)}
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-wrap gap-2">
-                                                        <select 
-                                                            className="select select-sm select-bordered bg-base-200 text-xs font-normal"
-                                                            value={item.tier}
-                                                            onChange={(e) => handleUpdateItem(item, 'tier', e.target.value)}
-                                                        >
-                                                            <option value="web">Web & Social</option>
-                                                            <option value="print">Print (A4)</option>
-                                                            <option value="original">Original</option>
-                                                        </select>
-                                                        <select 
-                                                            className="select select-sm select-bordered bg-base-200 text-xs font-normal"
-                                                            value={item.usage}
-                                                            onChange={(e) => handleUpdateItem(item, 'usage', e.target.value)}
-                                                        >
-                                                            <option value="editorial">Redaktionell</option>
-                                                            <option value="commercial">Kommerziell</option>
-                                                        </select>
-                                                        <select 
-                                                            className="select select-sm select-bordered bg-base-200 text-xs font-normal"
-                                                            value={item.duration}
-                                                            onChange={(e) => handleUpdateItem(item, 'duration', e.target.value)}
-                                                        >
-                                                            <option value="1_year">1 Jahr</option>
-                                                            <option value="unlimited">Unbegrenzt</option>
-                                                        </select>
-                                                        <select 
-                                                            className="select select-sm select-bordered bg-base-200 text-xs font-normal"
-                                                            value={item.frequency || 'einmalig'}
-                                                            onChange={(e) => handleUpdateItem(item, 'frequency', e.target.value)}
-                                                        >
-                                                            <option value="einmalig">Einmalig</option>
-                                                            <option value="mehrmalig">Mehrmalig</option>
-                                                        </select>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-4 shrink-0 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-0 border-base-300 pt-3 sm:pt-0 mt-3 sm:mt-0">
-                                            {item.isQuote ? (
-                                                <div className="text-right">
-                                                    <span className="font-mono font-bold text-lg whitespace-nowrap text-warning">--- €</span>
-                                                    <span className="text-xs font-sans opacity-70 block">(Preis auf Anfrage)</span>
-                                                </div>
-                                            ) : (
-                                                <span className="font-mono font-bold text-lg whitespace-nowrap">{item.price.toFixed(2)} €</span>
-                                            )}
-                                            <button onClick={() => removeFromCart(item.photoId)} className="btn btn-ghost btn-sm btn-square text-error" title="Entfernen">
-                                                <span className="iconify mdi--trash-can text-lg"></span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            
-                            <div className="mt-6 flex justify-between items-center bg-base-100 p-6 rounded-box border border-primary shadow-sm">
-                                <span className="font-bold text-lg">Gesamtsumme</span>
-                                <span className="text-3xl font-mono font-bold text-primary">{hasQuotes ? '--- €' : `${totalAmount.toFixed(2)} €`}</span>
-                            </div>
-                            <p className="text-sm opacity-60 text-right mt-2">Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG.</p>
-                        </div>
+                        
+                        <CartItemList items={items} handleUpdateItem={handleUpdateItem} removeFromCart={removeFromCart} hasQuotes={hasQuotes} totalAmount={totalAmount} />
 
                         <div className="lg:col-span-2">
                             {clientSecret ? (
@@ -316,7 +312,7 @@ export default function ClientCartView() {
                                     <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
                                         <span className="iconify mdi--credit-card text-secondary"></span> Zahlung abschließen
                                     </h2>
-                                    <Elements stripe={stripePromise as any} options={{ clientSecret }}>
+                                    <Elements stripe={stripePromise} options={{ clientSecret }}>
                                         <StripeCheckoutForm orderId={pendingOrderId!} defaultEmail={user?.email} defaultName={user?.billing_name || user?.name} onSuccess={(webhookSuccess) => {
                                             if (webhookSuccess) {
                                                 showToast('success', 'Zahlung erfolgreich! Rechnung wurde versendet.');

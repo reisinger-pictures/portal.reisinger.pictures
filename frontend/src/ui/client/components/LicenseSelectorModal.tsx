@@ -39,7 +39,7 @@ export default function LicenseSelectorModal({ photo, onClose }: Props) {
     const handleAddToCart = (tier: ResolutionTier, price: number) => {
         addToCart({
             photoId: photo.id,
-            filename: photo.filename,
+            filename: photo.title || 'Bild ' + photo.id.substring(0, 8),
             thumb_url: photo.thumb_url,
             tier,
             usage,

@@ -8,6 +8,8 @@ export interface UserDetailed {
     id: string; 
     name: string; 
     email: string; 
+    is_photographer?: boolean;
+    is_super_admin?: boolean;
     can_edit_metadata: boolean;
     flatrate_level: 'none' | 'web' | 'print' | 'original';
     roles: Role[]; 
@@ -32,5 +34,10 @@ export function useUsers() {
         await mutateUsers();
     };
 
-            return {users, roles,  createUser, updateUser, };
+    const deleteUser = async (id: string) => {
+        await apiMutate(`/api/management/users/${id}`, 'DELETE');
+        await mutateUsers();
+    };
+
+    return {users, roles, createUser, updateUser, deleteUser};
 }

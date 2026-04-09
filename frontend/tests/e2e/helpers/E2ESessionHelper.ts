@@ -5,6 +5,7 @@ export class E2ESessionHelper {
     private createdUserIds: string[] = [];
     private createdGalleryIds: string[] = [];
     private createdGroupIds: string[] = [];
+    private createdTenantIds: string[] = [];
     private adminToken: string | null = null;
 
     constructor(private request: APIRequestContext) {}
@@ -75,6 +76,7 @@ export class E2ESessionHelper {
     trackUser(id: string) { if (id) this.createdUserIds.push(id); }
     trackGallery(id: string) { if (id) this.createdGalleryIds.push(id); }
     trackGroup(id: string) { if (id) this.createdGroupIds.push(id); }
+    trackTenant(id: string) { if (id) this.createdTenantIds.push(id); }
 
     async teardown() {
         await this.ensureAdminLogin();
@@ -88,6 +90,9 @@ export class E2ESessionHelper {
         }
         for (const id of this.createdUserIds) {
             await this.request.delete(`/api/test/cleanup-user/${id}`, { headers }).catch(() => {});
+        }
+        for (const id of this.createdTenantIds) {
+            await this.request.delete(`/api/management/tenants/${id}`, { headers }).catch(() => {});
         }
     }
 }

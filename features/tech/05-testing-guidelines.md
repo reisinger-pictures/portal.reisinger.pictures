@@ -30,6 +30,8 @@ status: active
 * **Web-First Assertions:**
   * Use `expect(locator).toBeVisible()` or `expect(locator).toHaveText()` instead of generic `expect(await locator.isVisible()).toBe(true)`.
   * Web-first assertions automatically retry until the condition is met or a timeout occurs.
+* **Lazy Loading & Viewports (Mobile):** Bilder mit `loading="lazy"` werden in E2E-Tests auf mobilen Viewports oft nicht geladen, wenn sie sich außerhalb des initialen Sichtbereichs befinden. Bevor Bildeigenschaften (wie `naturalWidth`) geprüft werden, MUSS das Element zwingend mit `scrollIntoViewIfNeeded()` in den Viewport geholt werden, um den Netzwerk-Download des Browsers zu erzwingen.
+* **Lazy Loading & Viewports (Mobile):** Bilder mit `loading="lazy"` werden in E2E-Tests auf mobilen Viewports oft nicht geladen, wenn sie sich außerhalb des initialen Sichtbereichs befinden. Bevor Bildeigenschaften (wie `naturalWidth`) geprüft werden, MUSS das Element zwingend mit `scrollIntoViewIfNeeded()` in den Viewport geholt werden, um den Netzwerk-Download des Browsers zu erzwingen.
 
 ## 2. E2E Tests (Playwright)
 - **Trace Viewer & Debugging:** Always analyze the Playwright trace (`playwright show-report`) to understand failures. Traces provide a full execution timeline, snapshots, and network logs.

@@ -55,7 +55,7 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
 
                             if (allowedTiers.length === 1) {
                                 return (
-                                    <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + allowedTiers[0].id} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                                    <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + allowedTiers[0].id} target="_self" className="btn btn-primary">
                                         <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> Alle herunterladen (.zip)
                                     </a>
                                 );
@@ -70,7 +70,7 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                                         <li className="menu-title px-4 py-2 text-xs opacity-70 uppercase tracking-wider">Qualität wählen</li>
                                         {allowedTiers.map(t => (
                                             <li key={t.id}>
-                                                <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + t.id} target="_blank" rel="noopener noreferrer" className="font-bold">
+                                                <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + t.id} target="_self" className="font-bold">
                                                     <span className="uppercase">{t.id}</span> Format
                                                 </a>
                                             </li>
@@ -108,7 +108,7 @@ export default function DeliveryView({ galleryData }: { galleryData: ReturnType<
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none" draggable={false} />
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none" draggable={false} alt={photo.title || 'Bild'} />
                             </a>
 
                             <div className="absolute top-2 right-2 opacity-100">

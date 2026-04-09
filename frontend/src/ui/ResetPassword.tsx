@@ -37,7 +37,7 @@ export default function ResetPassword() {
     useEffect(() => {
         // Sicherheitsmaßnahme: Eventuell hängengebliebene Cookies/Sessions serverseitig löschen,
         // bevor das Passwort-Reset-Formular abgeschickt wird.
-        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch((e) => { console.debug('Logout failed', e); });
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch((e: unknown) => { setGlobalError(e instanceof Error ? e.message : 'Session konnte nicht zurückgesetzt werden.'); });
     }, []);
 
     const onSubmit = async (data: ResetFormValues) => {

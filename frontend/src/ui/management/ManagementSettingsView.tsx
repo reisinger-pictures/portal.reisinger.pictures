@@ -8,14 +8,12 @@ declare const __APP_BUILD_TIME__: string;
 
 export default function ManagementSettingsView() {
     const { terms: licenseTerms, updateTerms } = useLicenseTerms();
-    const { data: sysInfo } = useSWR<{laravel_build_time: string, php_version: string, laravel_version: string}>('/api/management/settings/system', fetcher);
+    const { data: sysInfo } = useSWR<{laravel_build_time: string, php_version: string, laravel_version: string, db_version?: string}>('/api/management/settings/system', fetcher);
     
     let reactTime = 'Unbekannt';
-    try {
-        if (typeof __APP_BUILD_TIME__ !== 'undefined') {
-            reactTime = new Date(__APP_BUILD_TIME__).toLocaleString('de-DE');
-        }
-    } catch (e) {}
+    if (typeof __APP_BUILD_TIME__ !== 'undefined') {
+        reactTime = new Date(__APP_BUILD_TIME__).toLocaleString('de-DE');
+    }
 
     return (
         <div className="p-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
@@ -59,6 +57,7 @@ export default function ManagementSettingsView() {
                 <div className="text-sm opacity-60 font-mono bg-base-200 p-4 rounded-box border border-base-300 shadow-sm leading-relaxed">
                     <div className="text-primary font-bold mb-2 text-base">System Info</div>
                     <div className="grid grid-cols-[120px_1fr] gap-2">
+                        <span className="font-semibold text-primary">Portal Version:</span> <span className="font-bold text-primary">{sysInfo ? 'v' + sysInfo.db_version : 'Lädt...'}</span>
                         <span className="font-semibold">React Build:</span> <span>{reactTime}</span>
                         <span className="font-semibold">Laravel Update:</span> <span>{sysInfo ? new Date(sysInfo.laravel_build_time).toLocaleString('de-DE') : 'Lädt...'}</span>
                         {sysInfo && <><span className="font-semibold">Backend:</span> <span>PHP {sysInfo.php_version} / Laravel {sysInfo.laravel_version}</span></>}

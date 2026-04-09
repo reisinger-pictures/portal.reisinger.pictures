@@ -62,7 +62,7 @@ Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])
 
 Route::get('/photos/{photoId}/download', [DownloadController::class, 'downloadSingle']);
 Route::get('/orders/quote-decode', [OrderController::class, 'decodeQuoteLink']);
-Route::get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip']);
+Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip']);
 
 Route::middleware('auth:api')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -81,7 +81,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/orders/checkout', [OrderController::class, 'checkout']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{id}/invoice', [OrderController::class, 'downloadInvoice']);
-    Route::get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip']);
+    Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip']);
     Route::delete('/photos/{id}', [PhotoController::class, 'destroy']);
 });
 

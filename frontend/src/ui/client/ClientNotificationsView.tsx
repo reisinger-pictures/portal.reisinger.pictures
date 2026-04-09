@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import ErrorMessage from '../components/ErrorMessage';
 import { fetcher, apiMutate } from '../../api';
 import PageLayout from '../components/PageLayout';
+import { useUI } from '../components/UIContext';
 
 interface PrefItem {
     id: string;
@@ -18,6 +19,7 @@ interface PreferencesData {
 
 export default function ClientNotificationsView() {
     const { data, error, isLoading, mutate } = useSWR<PreferencesData>('/api/notifications/preferences', fetcher);
+    const { showToast } = useUI();
 
     const toggleOptIn = async (id: string, type: 'gallery' | 'group', currentValue: boolean) => {
         const endpoint = type === 'gallery' ? `/api/galleries/${id}/opt-in` : `/api/gallery-groups/${id}/opt-in`;
@@ -37,7 +39,7 @@ export default function ClientNotificationsView() {
             await apiMutate(endpoint, 'POST', { wants_notifications: !currentValue });
             mutate();
         } catch {
-            alert('Fehler beim Speichern der Einstellung.');
+            showToast('error', 'Fehler beim Speichern der Einstellung.');
             mutate();
         }
     };

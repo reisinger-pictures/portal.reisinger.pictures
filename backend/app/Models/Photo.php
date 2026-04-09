@@ -15,7 +15,7 @@ class Photo extends Model
     public const UPDATED_AT = null;
 
     protected $visible = [
-        'id', 'gallery_id', 'filename', 'lr_uuid', 'width', 'height', 
+        'id', 'gallery_id', 'lr_uuid', 'width', 'height', 
         'title', 'description', 'artist', 'keywords', 'location', 
         'city', 'state', 'country', 'iso_country', 'created_at', 'url', 'thumb_url', 
         'rating', 'comment', 'gallery', 'artist',
@@ -112,8 +112,7 @@ class Photo extends Model
     {
         return [
             'id' => $this->id,
-            'filename' => $this->filename,
-            'title' => $this->title,
+                        'title' => $this->title,
             'description' => $this->description,
             'artist' => $this->artist,
             'keywords' => $this->keywords,

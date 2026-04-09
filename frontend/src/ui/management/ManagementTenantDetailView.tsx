@@ -1,12 +1,123 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useTenants } from '../../logic/useTenants';
+import { useTenants, Tenant } from '../../logic/useTenants';
 import { useUsers } from '../../logic/useUsers';
 import { useProtectedGalleries, flattenGroups } from '../../logic/useGalleries';
 import { apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import PageLayout from '../components/PageLayout';
+
+interface TenantSettingsProps {
+    name: string;
+    setName: (v: string) => void;
+    domain: string;
+    setDomain: (v: string) => void;
+    freq: 'immediate'|'monthly'|'quarterly';
+    setFreq: (v: 'immediate'|'monthly'|'quarterly') => void;
+    handleSaveGeneral: (e: React.FormEvent) => void;
+}
+
+const TenantSettings = ({ name, setName, domain, setDomain, freq, setFreq, handleSaveGeneral }: TenantSettingsProps) => (
+    <form onSubmit={handleSaveGeneral} className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4">
+        <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Einstellungen</h2>
+        <div className="form-control">
+            <label className="label"><span className="label-text font-bold">Mandanten-Name</span></label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} required className="input input-sm input-bordered" />
+        </div>
+        <div className="form-control">
+            <label className="label"><span className="label-text font-bold">Auto-Join Domain</span></label>
+            <input type="text" value={domain} onChange={e => setDomain(e.target.value)} placeholder="firma.de" className="input input-sm input-bordered font-mono" />
+        </div>
+        <div className="form-control">
+            <label className="label"><span className="label-text font-bold">Rechnungs-Rhythmus</span></label>
+            <select value={freq} onChange={e => setFreq(e.target.value as 'immediate'|'monthly'|'quarterly')} className="select select-sm select-bordered">
+                <option value="immediate">Sofort (Einzelrechnung)</option>
+                <option value="monthly">Monatlich (Sammelrechnung)</option>
+                <option value="quarterly">Quartal (Sammelrechnung)</option>
+            </select>
+        </div>
+        <button type="submit" className="btn btn-primary btn-sm w-full mt-4">Speichern</button>
+    </form>
+);
+
+interface TenantInvoicingProps {
+    tenant: Tenant;
+    isGenerating: boolean;
+    handleGenerateInvoice: () => void;
+}
+
+const TenantInvoicing = ({ tenant, isGenerating, handleGenerateInvoice }: TenantInvoicingProps) => (
+    <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4 mt-6">
+        <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4 flex items-center gap-2">
+            <span className="iconify mdi--receipt-text text-primary"></span> Abrechnung
+        </h2>
+        <div className="flex justify-between items-center">
+            <div>
+                <div className="font-bold">Offene Lieferscheine</div>
+                <div className="text-sm opacity-70">Auszustellende Sammelrechnung</div>
+            </div>
+            <div className="text-3xl font-mono font-bold text-warning">{tenant.open_delivery_notes_count || 0}</div>
+        </div>
+        <button 
+            onClick={handleGenerateInvoice} 
+            disabled={!tenant.open_delivery_notes_count || tenant.open_delivery_notes_count === 0 || isGenerating} 
+            className="btn btn-primary btn-sm w-full mt-4"
+        >
+            {isGenerating ? <span className="loading loading-spinner"></span> : 'Sammelrechnung erstellen'}
+        </button>
+    </div>
+);
+
+interface TenantRelationsProps {
+    users?: { id: string, name: string, email: string }[];
+    flatGroups: { id: string, name: string, depth: number }[];
+    selUsers: string[];
+    setSelUsers: React.Dispatch<React.SetStateAction<string[]>>;
+    selGroups: string[];
+    setSelGroups: React.Dispatch<React.SetStateAction<string[]>>;
+    handleSaveRelations: () => void;
+    setInviteModalOpen: (v: boolean) => void;
+    toggleId: (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, toggleId: string) => void;
+}
+
+const TenantRelations = ({ users, flatGroups, selUsers, setSelUsers, selGroups, setSelGroups, handleSaveRelations, setInviteModalOpen, toggleId }: TenantRelationsProps) => (
+    <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm h-full flex flex-col">
+        <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
+            <h2 className="font-bold text-xl">Zuweisungen</h2>
+            <button onClick={handleSaveRelations} className="btn btn-primary btn-sm">Zuweisungen speichern</button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+            <div className="flex flex-col h-full border border-base-300 rounded overflow-hidden">
+                <div className="bg-base-200 p-2 flex justify-between items-center shrink-0 border-b border-base-300"><span className="font-bold text-sm">Zugeordnete Nutzer</span><button className="btn btn-xs btn-primary" onClick={() => setInviteModalOpen(true)}>+ Einladen</button></div>
+                <div className="p-2 overflow-y-auto flex-1 h-64">
+                    {users?.map(u => (
+                        <label key={u.id} className="label cursor-pointer justify-start gap-3 p-1 hover:bg-base-200 rounded">
+                            <input type="checkbox" checked={selUsers.includes(u.id)} onChange={() => toggleId(selUsers, setSelUsers, u.id)} className="checkbox checkbox-sm checkbox-primary shrink-0"/>
+                            <div className="min-w-0">
+                                <span className="label-text block font-bold truncate">{u.name}</span>
+                                <span className="text-xs opacity-70 block truncate">{u.email}</span>
+                            </div>
+                        </label>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex flex-col h-full border border-base-300 rounded overflow-hidden">
+                <div className="bg-base-200 p-2 font-bold text-sm shrink-0 border-b border-base-300">Zugewiesene Meta-Galerien (Ordner)</div>
+                <div className="p-2 overflow-y-auto flex-1 h-64">
+                    {flatGroups.map(g => (
+                        <label key={g.id} className="label cursor-pointer justify-start gap-3 p-1 hover:bg-base-200 rounded">
+                            <input type="checkbox" checked={selGroups.includes(g.id)} onChange={() => toggleId(selGroups, setSelGroups, g.id)} className="checkbox checkbox-sm checkbox-primary shrink-0"/>
+                            <span className="label-text truncate">{'- '.repeat(g.depth)}{g.name}</span>
+                        </label>
+                    ))}
+                </div>
+            </div>
+        </div>
+    </div>
+);
 
 export default function ManagementTenantDetailView() {
     const { id } = useParams<{id: string}>();
@@ -55,7 +166,6 @@ export default function ManagementTenantDetailView() {
             showToast('error', err instanceof Error ? err.message : String(err));
         }
     };
-
     
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -78,7 +188,6 @@ export default function ManagementTenantDetailView() {
             navigate('/tenants');
         }
     };
-
     
     const [isGenerating, setIsGenerating] = useState(false);
 
@@ -118,114 +227,38 @@ export default function ManagementTenantDetailView() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Spalte 1: Allgemeine Einstellungen */}
                 <div className="lg:col-span-1 space-y-6">
-                    <form onSubmit={handleSaveGeneral} className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4">
-                        <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Einstellungen</h2>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Mandanten-Name</span></label>
-                            <input type="text" value={name} onChange={e => setName(e.target.value)} required className="input input-sm input-bordered" />
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Auto-Join Domain</span></label>
-                            <input type="text" value={domain} onChange={e => setDomain(e.target.value)} placeholder="firma.de" className="input input-sm input-bordered font-mono" />
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Rechnungs-Rhythmus</span></label>
-                            <select value={freq} onChange={e => setFreq(e.target.value as 'immediate'|'monthly'|'quarterly')} className="select select-sm select-bordered">
-                                <option value="immediate">Sofort (Einzelrechnung)</option>
-                                <option value="monthly">Monatlich (Sammelrechnung)</option>
-                                <option value="quarterly">Quartal (Sammelrechnung)</option>
-                            </select>
-                        </div>
-                        <button type="submit" className="btn btn-primary btn-sm w-full mt-4">Speichern</button>
-                    </form>
-
-                    <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4 mt-6">
-                        <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4 flex items-center gap-2">
-                            <span className="iconify mdi--receipt-text text-primary"></span> Abrechnung
-                        </h2>
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <div className="font-bold">Offene Lieferscheine</div>
-                                <div className="text-sm opacity-70">Auszustellende Sammelrechnung</div>
-                            </div>
-                            <div className="text-3xl font-mono font-bold text-warning">{tenant.open_delivery_notes_count || 0}</div>
-                        </div>
-                        <button 
-                            onClick={handleGenerateInvoice} 
-                            disabled={!tenant.open_delivery_notes_count || tenant.open_delivery_notes_count === 0 || isGenerating} 
-                            className="btn btn-primary btn-sm w-full mt-4"
-                        >
-                            {isGenerating ? <span className="loading loading-spinner"></span> : 'Sammelrechnung erstellen'}
-                        </button>
-                    </div>
-
+                    <TenantSettings name={name} setName={setName} domain={domain} setDomain={setDomain} freq={freq} setFreq={setFreq} handleSaveGeneral={handleSaveGeneral} />
+                    <TenantInvoicing tenant={tenant} isGenerating={isGenerating} handleGenerateInvoice={handleGenerateInvoice} />
                 </div>
-
-                {/* Spalte 2 & 3: Zuweisungen */}
                 <div className="lg:col-span-2">
-                    <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm h-full flex flex-col">
-                        <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-                            <h2 className="font-bold text-xl">Zuweisungen</h2>
-                            <button onClick={handleSaveRelations} className="btn btn-primary btn-sm">Zuweisungen speichern</button>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
-                            <div className="flex flex-col h-full border border-base-300 rounded overflow-hidden">
-                                <div className="bg-base-200 p-2 flex justify-between items-center shrink-0 border-b border-base-300"><span className="font-bold text-sm">Zugeordnete Nutzer</span><button className="btn btn-xs btn-primary" onClick={() => setInviteModalOpen(true)}>+ Einladen</button></div>
-                                <div className="p-2 overflow-y-auto flex-1 h-64">
-                                    {users?.map(u => (
-                                        <label key={u.id} className="label cursor-pointer justify-start gap-3 p-1 hover:bg-base-200 rounded">
-                                            <input type="checkbox" checked={selUsers.includes(u.id)} onChange={() => toggleId(selUsers, setSelUsers, u.id)} className="checkbox checkbox-sm checkbox-primary shrink-0"/>
-                                            <div className="min-w-0">
-                                                <span className="label-text block font-bold truncate">{u.name}</span>
-                                                <span className="text-xs opacity-70 block truncate">{u.email}</span>
-                                            </div>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col h-full border border-base-300 rounded overflow-hidden">
-                                <div className="bg-base-200 p-2 font-bold text-sm shrink-0 border-b border-base-300">Zugewiesene Meta-Galerien (Ordner)</div>
-                                <div className="p-2 overflow-y-auto flex-1 h-64">
-                                    {flatGroups.map(g => (
-                                        <label key={g.id} className="label cursor-pointer justify-start gap-3 p-1 hover:bg-base-200 rounded">
-                                            <input type="checkbox" checked={selGroups.includes(g.id)} onChange={() => toggleId(selGroups, setSelGroups, g.id)} className="checkbox checkbox-sm checkbox-primary shrink-0"/>
-                                            <span className="label-text truncate">{'- '.repeat(g.depth)}{g.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <TenantRelations users={users} flatGroups={flatGroups} selUsers={selUsers} setSelUsers={setSelUsers} selGroups={selGroups} setSelGroups={setSelGroups} handleSaveRelations={handleSaveRelations} setInviteModalOpen={setInviteModalOpen} toggleId={toggleId} />
                 </div>
             </div>
         </div>
         
-            {isInviteModalOpen && (
-                <div className="modal modal-open z-[60]">
-                    <div className="modal-box relative">
-                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setInviteModalOpen(false)}>✕</button>
-                        <h3 className="font-bold text-lg mb-4">Nutzer in Mandant einladen</h3>
-                        <p className="text-sm opacity-70 mb-4">Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen und wird automatisch diesem Mandanten zugewiesen.</p>
-                        <form onSubmit={handleInvite} className="space-y-4">
-                            <div className="form-control">
-                                <label className="label"><span className="label-text font-bold">E-Mail Adresse</span></label>
-                                <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="input input-bordered w-full" placeholder="kollege@firma.de" />
-                            </div>
-                            <div className="modal-action">
-                                <button type="button" className="btn btn-ghost" onClick={() => setInviteModalOpen(false)}>Abbrechen</button>
-                                <button type="submit" className="btn btn-primary" disabled={isInviting}>
-                                    {isInviting ? <span className="loading loading-spinner"></span> : 'Einladung Senden'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                    <div className="modal-backdrop" onClick={() => setInviteModalOpen(false)}></div>
+        {isInviteModalOpen && (
+            <div className="modal modal-open z-[60]">
+                <div className="modal-box relative">
+                    <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setInviteModalOpen(false)}>✕</button>
+                    <h3 className="font-bold text-lg mb-4">Nutzer in Mandant einladen</h3>
+                    <p className="text-sm opacity-70 mb-4">Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen und wird automatisch diesem Mandanten zugewiesen.</p>
+                    <form onSubmit={handleInvite} className="space-y-4">
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">E-Mail Adresse</span></label>
+                            <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="input input-bordered w-full" placeholder="kollege@firma.de" />
+                        </div>
+                        <div className="modal-action">
+                            <button type="button" className="btn btn-ghost" onClick={() => setInviteModalOpen(false)}>Abbrechen</button>
+                            <button type="submit" className="btn btn-primary" disabled={isInviting}>
+                                {isInviting ? <span className="loading loading-spinner"></span> : 'Einladung Senden'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-            )}
+                <div className="modal-backdrop" onClick={() => setInviteModalOpen(false)}></div>
+            </div>
+        )}
         </PageLayout>
     );
 }

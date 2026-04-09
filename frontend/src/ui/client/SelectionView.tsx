@@ -164,7 +164,7 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none hover:scale-105 transition-transform duration-500" draggable={false} />
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none hover:scale-105 transition-transform duration-500" draggable={false} alt={photo.title || 'Bild'} />
                             </a>
                             {user ? <GridPhotoActions photo={photo} ratePhoto={ratePhoto} /> : <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3"></div>}
                         </div>

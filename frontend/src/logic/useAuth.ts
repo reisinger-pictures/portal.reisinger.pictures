@@ -1,4 +1,4 @@
-import useSWR, { mutate as globalMutate } from 'swr';
+import useSWR, {mutate as globalMutate} from 'swr';
 import {fetcher} from '../api';
 import {Gallery} from './useGalleries';
 
@@ -29,7 +29,7 @@ export interface User {
 }
 
 export function useAuth() {
-    const { data: user, error, isLoading, mutate } = useSWR<User>('/api/auth/me', fetcher, {
+    const {data: user, error, isLoading, mutate} = useSWR<User>('/api/auth/me', fetcher, {
         shouldRetryOnError: false,
     });
 
@@ -41,7 +41,7 @@ export function useAuth() {
             body: JSON.stringify({email, password})
         });
         if (!response.ok) throw new Error('Login fehlgeschlagen');
-        await globalMutate(() => true, undefined, { revalidate: true });
+        await globalMutate(() => true, undefined, {revalidate: true});
     };
 
     const register = async (name: string, email: string): Promise<string> => {
@@ -58,15 +58,15 @@ export function useAuth() {
 
     const logout = async (): Promise<void> => {
         try {
-            await fetch('/api/auth/logout', { 
-                method: 'POST', 
+            await fetch('/api/auth/logout', {
+                method: 'POST',
                 headers: {'Accept': 'application/json'},
-                credentials: 'include' 
+                credentials: 'include'
             });
         } catch (e) {
-            console.error('Logout Fehler', e);
+            throw new Error(e instanceof Error ? e.message : 'Logout fehlgeschlagen', {cause: e});
         }
-        await globalMutate(() => true, undefined, { revalidate: true });
+        await globalMutate(() => true, undefined, {revalidate: true});
     };
 
     return {user, isLoading: isLoading || (!user && !error), isError: error, login, register, logout, mutate};

@@ -27,8 +27,8 @@ test.describe('Stripe Checkout Workflow', () => {
             headers: { 'Cookie': adminToken as string } 
         });
         const roles = await rolesRes.json();
-        const photogRoleId = roles.find((r: any) => r.name === 'photographer').id;
-        const powerRoleId = roles.find((r: any) => r.name === 'power_user').id;
+        const photogRoleId = roles.find((r: { id: string; name: string }) => r.name === 'photographer').id;
+        const powerRoleId = roles.find((r: { id: string; name: string }) => r.name === 'power_user').id;
 
         await request.put(`/api/management/users/${testUser.id}`, {
             data: {
@@ -101,13 +101,13 @@ test.describe('Stripe Checkout Workflow', () => {
 
         await form.fillStripeForm(stripeFrame, CreditCardHelper.genericDecline);
         await page.getByRole('button', { name: 'Jetzt bezahlen' }).click();
-        await expect(page.locator('.toast')).toContainText(/(fehlgeschlagen|declined|invalid)/i, { timeout: 15000 });
+        await expect(page.locator('.toast')).toContainText(/(fehlgeschlagen|declined|invalid|abgelehnt)/i, { timeout: 15000 });
 
         await page.locator('.toast button').click().catch(() => {});
 
         await form.fillStripeForm(stripeFrame, CreditCardHelper.insufficientFunds);
         await page.getByRole('button', { name: 'Jetzt bezahlen' }).click();
-        await expect(page.locator('.toast')).toContainText(/(fehlgeschlagen|declined|invalid)/i, { timeout: 15000 });
+        await expect(page.locator('.toast')).toContainText(/(fehlgeschlagen|declined|invalid|abgelehnt)/i, { timeout: 15000 });
     });
 
     test('Positive Flow: Handles successful payment via Visa', async ({ page }) => {

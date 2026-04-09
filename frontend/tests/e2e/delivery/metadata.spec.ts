@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
-import { SidebarHelper } from '../helpers/SidebarHelper';
-import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 
@@ -22,16 +20,12 @@ test.describe('Metadata & Detail View Workflow', () => {
     });
 
     let auth: AuthHelper;
-    let sidebar: SidebarHelper;
-    let modal: ModalHelper;
 
     const uniqueId = () => Math.random().toString(36).substring(2, 10);
     const galleryName = `Metadata Test ${uniqueId()}`;
 
     test.beforeEach(async ({ page }) => {
         auth = new AuthHelper(page);
-        sidebar = new SidebarHelper(page);
-        modal = new ModalHelper(page);
         await auth.login(testUser.email, testUser.password);
     });
 

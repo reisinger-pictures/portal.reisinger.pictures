@@ -93,8 +93,7 @@ export function useGallery(slug: string | undefined) {
             window.location.href = '/login';
             return;
         }
-
-        };
+    };
 
 
     return {

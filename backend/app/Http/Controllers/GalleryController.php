@@ -419,7 +419,7 @@ class GalleryController extends Controller
 
             $export[] = [
                 'id' => $photo->id,
-                'filename' => $photo->filename,
+                'filename' => $photo->title ?: 'Bild ' . substr($photo->id, 0, 8),
                 'thumb_url' => '/api/media/' . $photo->gallery->slug . '/_thumbs/800/' . $photo->id . '.webp',
                 'lr_uuid' => $photo->lr_uuid,
                 'avg_rating' => ceil($ratings->where('rating', '>', 0)->avg('rating') ?? 0),

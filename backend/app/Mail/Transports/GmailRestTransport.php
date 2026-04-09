@@ -59,7 +59,7 @@ class GmailRestTransport extends AbstractTransport
 
         } catch (Exception $e) {
             Log::error('GmailRestTransport Error: ' . $e->getMessage());
-            $this->triggerMakeWebhook($e->getMessage(), $rawMessage);
+            $this->triggerMakeWebhook($e->getMessage());
             throw $e;
         }
     }
@@ -67,7 +67,7 @@ class GmailRestTransport extends AbstractTransport
     /**
      * Fallback Logik aus dem form2email Projekt
      */
-    private function triggerMakeWebhook($errorMsg, $rawMessage)
+    private function triggerMakeWebhook($errorMsg)
     {
         $webhookUrl = env('MAKE_WEBHOOK_URL');
         $makeApiKey = env('MAKE_API_KEY');
@@ -77,7 +77,7 @@ class GmailRestTransport extends AbstractTransport
                 ->post($webhookUrl, [
                     'error' => 'Laravel Portal: Failed to send Email via Gmail REST API',
                     'details' => $errorMsg,
-                    'raw_email_dump' => $rawMessage // BUGFIX: Komplette Raw-E-Mail für das Make.com Fallback-Parsing
+                    'info' => 'Mail system down. See Laravel logs for details.' // SECURITY FIX: Keine Raw-E-Mail Dumps mehr an externe Webhooks.
                 ]);
         }
     }

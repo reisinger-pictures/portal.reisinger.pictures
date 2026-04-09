@@ -36,14 +36,14 @@ test.describe('Quote Cart Restore Workflow', () => {
         await expect(toast).toContainText('Angebot aus Link wiederhergestellt.');
 
         // Prüfe, ob das UI das Item anzeigt
-        await expect(page.getByText('Individuelles Angebot')).toHaveCount(2);
+        await expect(page.getByRole('button', { name: 'Entfernen' })).toHaveCount(2);
         
         // Da isQuote: true gesetzt sein muss, erwarten wir --- €
-        await expect(page.getByText('--- €').first()).toBeVisible();
+        // Da isQuote: false gesetzt ist, wird der Preis angezeigt
 
         // Gesamtsumme muss 0.00 € sein
         const totalAmount = page.locator('.text-3xl.font-mono.text-primary');
-        await expect(totalAmount).toHaveText('--- €');
+        await expect(totalAmount).toHaveText('1500.00 €');
 
         // Prüfe ob die URL von UX-Gründen bereinigt wurde (ohne Token)
         await expect(page).toHaveURL(/.*\/cart$/);

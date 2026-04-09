@@ -104,10 +104,10 @@ const TreeNode = ({
             </summary>
             <div className="p-2 pl-4 md:pl-8 border-t border-base-300 bg-base-100/50">
                 {node.children?.map((c: GalleryGroup) => (
-                    <TreeNode key={'g-'+c.id} node={c} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} onOpenPhotographerTeam={onOpenPhotographerTeam} />
+                    <TreeNode key={'g-'+c.id} node={c} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} />
                 ))}
                 {node.galleries?.map((g: Gallery) => (
-                    <TreeNode key={'gal-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} onOpenPhotographerTeam={onOpenPhotographerTeam} />
+                    <TreeNode key={'gal-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} />
                 ))}
                 {(!node.children?.length && !node.galleries?.length) && <div className="p-4 text-sm opacity-50 italic">Ordner ist leer.</div>}
             </div>

@@ -38,7 +38,8 @@ class SettingsController extends Controller
         return response()->json([
             'laravel_build_time' => date('c', $timestamp),
             'php_version' => phpversion(),
-            'laravel_version' => app()->version()
+            'laravel_version' => app()->version(),
+            'db_version' => '0.' . \Illuminate\Support\Facades\DB::table('migrations')->count()
         ]);
     }
 

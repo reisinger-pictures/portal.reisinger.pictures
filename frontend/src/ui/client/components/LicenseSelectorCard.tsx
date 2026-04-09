@@ -47,7 +47,7 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
     const handleAddToCart = (tier: ResolutionTier, price: number) => {
         addToCart({
             photoId: photo.id,
-            filename: photo.filename,
+            filename: photo.title || 'Bild ' + photo.id.substring(0, 8),
             thumb_url: photo.thumb_url,
             tier, usage, duration, frequency, price
         });
@@ -57,7 +57,7 @@ export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
     const handleCustomQuote = () => {
         addToCart({
             photoId: photo.id,
-            filename: photo.filename,
+            filename: photo.title || 'Bild ' + photo.id.substring(0, 8),
             thumb_url: photo.thumb_url,
             tier: 'original', usage: 'commercial', duration: 'unlimited', frequency: 'mehrmalig',
             price: 0,

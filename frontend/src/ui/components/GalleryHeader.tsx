@@ -1,6 +1,4 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../../logic/useAuth';
-
 export default function GalleryHeader({ gallery, breadcrumbs, canManage }: { gallery: {id: string, name: string}, breadcrumbs: Array<{name: string, full_path?: string}>, canManage?: boolean }) {
     const navigate = useNavigate();
         const [searchParams, setSearchParams] = useSearchParams();

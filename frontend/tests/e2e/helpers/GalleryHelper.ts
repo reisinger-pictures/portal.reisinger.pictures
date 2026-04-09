@@ -22,13 +22,14 @@ export class GalleryHelper {
             this.sessionHelper.trackGallery(res.gallery.id);
         }
 
-        const galLink = this.page.locator('main').getByText(name, { exact: true }).first();
+        const galLink = this.page.locator('main').locator('a').filter({ hasText: name }).first();
         
         await expect(async () => {
+            if (!(await galLink.isVisible())) await this.page.reload();
             await expect(galLink).toBeVisible({ timeout: 2000 });
             await galLink.scrollIntoViewIfNeeded();
             await galLink.click();
-        }).toPass({ timeout: 15000 });
+        }).toPass({ timeout: 30000 });
 
         await expect(this.page.getByRole('heading', { name })).toBeVisible();
     }

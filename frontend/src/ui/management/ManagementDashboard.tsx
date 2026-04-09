@@ -25,6 +25,7 @@ export default function ManagementDashboard() {
         tree,
         isLoading,
         isError,
+        mutate,
         createGroup,
         createGallery,
         updateGroup,
@@ -141,7 +142,7 @@ export default function ManagementDashboard() {
                                             <li key={p.id}><Link to={'/photos/' + p.id}
                                                                  onClick={() => setSearchQuery('')}>
                                                 <span
-                                                    className="iconify mdi--image-outline opacity-70"></span> {p.filename}
+                                                    className="iconify mdi--image-outline opacity-70"></span> {p.title || 'Bild ' + p.id.substring(0, 8)}
                                             </Link></li>
                                         ))}
                                         {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (
@@ -193,7 +194,7 @@ export default function ManagementDashboard() {
                                                         {personalFeed.photos.slice(0, 20).map(p => (
                                                             <Link key={p.id} to={'/photos/' + p.id}
                                                                   className="block relative aspect-square bg-base-300 rounded overflow-hidden group shadow-sm hover:shadow-md">
-                                                                <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
+                                                                <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" alt={p.title || 'Bild'} />
                                                             </Link>
                                                         ))}
                                                     </div>
