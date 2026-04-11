@@ -74,6 +74,9 @@ export default function Sidebar(props: SidebarProps) {
                                 <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> Einstellungen</Link></li>
                             </>
                         )}
+                        {user.is_super_admin && (
+                            <li><Link to="/admin-manual-invoice" className={props.currentView === 'admin-manual-invoice' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-document-edit-outline text-lg"></span> Manuelle Rechnung</Link></li>
+                        )}
                     </>
                 )}
                 
@@ -98,8 +101,13 @@ export default function Sidebar(props: SidebarProps) {
             <div className="flex-1"></div>
 
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">
+                <div className="p-3 text-center">
+                    <a href="https://reisinger.pictures/impressum/" target="_blank" rel="noopener noreferrer" className="text-xs font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                        <span className="iconify mdi--open-in-new"></span> Impressum & Datenschutz
+                    </a>
+                </div>
                 {user && (
-                    <div className="p-4">
+                    <div className="p-4 pt-0">
                         <button onClick={handleLogout} className="btn btn-outline btn-error w-full btn-sm">Abmelden</button>
                     </div>
                 )}

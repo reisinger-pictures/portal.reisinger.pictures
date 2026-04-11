@@ -175,7 +175,8 @@ export default function ClientCartView() {
     const navigate = useNavigate();
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
-    const { calculateUpgradePrice } = usePricing(parseFloat(useLicenseTerms().terms?.base_price || '35.00'));
+    const { terms, isLoading: termsLoading } = useLicenseTerms();
+    const { calculateUpgradePrice } = usePricing(parseFloat(terms?.base_price || '35.00'));
     const [searchParams] = useSearchParams();
     const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'invoice'>('stripe');
 
@@ -295,6 +296,13 @@ export default function ClientCartView() {
                     <span className="iconify mdi--cart text-primary"></span> Dein Warenkorb
                 </h1>
 
+                {!termsLoading && (!terms?.bank_holder || !terms?.company_street || !terms?.company_zip || !terms?.company_city || !terms?.bank_iban) && (
+                    <div className="alert alert-error shadow-sm mb-8">
+                        <span className="iconify mdi--alert-circle text-xl"></span>
+                        <span>Der Betreiber hat noch keine vollständigen Rechnungsdaten hinterlegt. Ein Kauf ist derzeit aus rechtlichen Gründen nicht möglich.</span>
+                    </div>
+                )}
+
                 {items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 opacity-50 bg-base-100 rounded-box border border-base-300">
                         <span className="iconify mdi--cart-off text-6xl mb-4"></span>
@@ -407,7 +415,7 @@ export default function ClientCartView() {
                                     <button 
                                         type="submit"
                                         className="btn btn-primary w-full btn-lg" 
-                                        disabled={items.length === 0 || isSubmitting} 
+                                        disabled={items.length === 0 || isSubmitting || (!termsLoading && (!terms?.bank_holder || !terms?.company_street || !terms?.company_zip || !terms?.company_city || !terms?.bank_iban))} 
                                     >
                                         {isSubmitting ? <span className="loading loading-spinner"></span> : (hasQuotes ? 'Unverbindlich anfragen' : 'Zahlungspflichtig bestellen')}
                                     </button>

@@ -121,3 +121,9 @@
         @apply text-primary font-bold;
     }
 }
+
+@layer utilities {
+    .input {
+        @apply w-full;
+    }
+}

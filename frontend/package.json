@@ -16,6 +16,10 @@
     },
     "dependencies": {
         "@hookform/resolvers": "^3.3.4",
+        "@stripe/react-stripe-js": "^2.7.0",
+        "@stripe/stripe-js": "^3.3.0",
+        "@tiptap/react": "^3.22.3",
+        "@tiptap/starter-kit": "^3.22.3",
         "photoswipe": "^5.4.4",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
@@ -24,9 +28,7 @@
         "react-router-dom": "^6.22.0",
         "recharts": "^3.8.0",
         "swr": "^2.2.4",
-        "zod": "^3.22.4",
-        "@stripe/react-stripe-js": "^2.7.0",
-        "@stripe/stripe-js": "^3.3.0"
+        "zod": "^3.22.4"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

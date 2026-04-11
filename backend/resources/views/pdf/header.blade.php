@@ -1,11 +1,26 @@
-
-<div class="header">
-    <div class="company-info">
-        <strong>{{ env('APP_NAME', 'Reisinger Foto Portal') }}</strong><br>
-        {{ $bankHolder }}<br>
-        Musterstraße 1<br>
-        4020 Linz, Österreich<br>
-        hello@reisinger.pictures
-    </div>
-    <h1 class="title">{{ $title }}</h1>
+<div style="text-align: center; margin-bottom: 20px;">
+    @php $logoPath = storage_path('app/private/watermark.svg'); @endphp
+    @if(file_exists($logoPath))
+        <img src="data:image/svg+xml;base64,{{ base64_encode(file_get_contents($logoPath)) }}" style="max-height: 96px; max-width: 100%;">
+    @endif
 </div>
+<table width="100%" style="margin-bottom: 30px; border-bottom: 2px solid #2A9D8F; padding-bottom: 10px;">
+    <tr>
+        <td style="vertical-align: bottom;">
+            <h1 style="font-size: 28px; font-weight: bold; color: #2A9D8F; margin: 0;">{{ $title }}</h1>
+        </td>
+        <td style="text-align: right; vertical-align: top; font-size: 12px; color: #666;">
+            @php 
+                $street = \App\Models\Setting::where('key', 'company_street')->value('value');
+                $zip = \App\Models\Setting::where('key', 'company_zip')->value('value');
+                $city = \App\Models\Setting::where('key', 'company_city')->value('value');
+                $country = \App\Models\Setting::where('key', 'company_country')->value('value');
+                $email = \App\Models\Setting::where('key', 'company_email')->value('value');
+            @endphp
+            <strong>{{ $bankHolder }}</strong><br>
+            @if($street){{ $street }}<br>@endif
+            @if($zip || $city){{ trim($zip . ' ' . $city) }}@if($country), {{ $country }}@endif<br>@endif
+            @if($email){{ $email }}@endif
+        </td>
+    </tr>
+</table>

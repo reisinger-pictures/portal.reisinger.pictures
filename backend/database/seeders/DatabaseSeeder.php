@@ -82,6 +82,16 @@ class DatabaseSeeder extends Seeder
             'is_public' => true
         ]);
 
+        // Reale Impressums- und Bankdaten für den Checkout seeden
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_holder'], ['value' => 'Florian Reisinger']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_street'], ['value' => 'Robert-Stolz-Straße 8']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_zip'], ['value' => '4020']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_city'], ['value' => 'Linz']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_country'], ['value' => 'Österreich']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_email'], ['value' => 'florian@reisinger.pictures']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_iban'], ['value' => 'DE96100110012179986174']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_bic'], ['value' => 'NTSBDEB1XXX']);
+
         // Neu: Trigger den Location Import direkt im Seed
         $this->command->info('Starte Smart Assistance Import...');
         \Illuminate\Support\Facades\Artisan::call('app:import-locations', [], $this->command->getOutput());

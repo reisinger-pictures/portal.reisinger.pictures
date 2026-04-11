@@ -97,6 +97,7 @@ export default function App() {
                             <Route path="/tenants" element={<ProtectedRoute><ErrorBoundary><ManagementTenantsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/tenants/:id" element={<ProtectedRoute><ErrorBoundary><ManagementTenantDetailView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-orders" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-manual-invoice" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="*" element={<Navigate to="/" replace/>}/>
                         </Routes>
                     </Suspense>

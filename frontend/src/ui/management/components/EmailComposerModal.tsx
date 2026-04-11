@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import {apiMutate} from '../../../api';
+import { apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
+import WysiwygEditor from '../../components/WysiwygEditor';
 
 interface EmailComposerModalProps {
     isOpen: boolean;
@@ -8,11 +9,10 @@ interface EmailComposerModalProps {
     galleryId: string;
 }
 
-export default function EmailComposerModal({isOpen, onClose, galleryId}: EmailComposerModalProps) {
+export default function EmailComposerModal({ isOpen, onClose, galleryId }: EmailComposerModalProps) {
     const [mailSubject, setMailSubject] = useState('Neuigkeiten in deiner Galerie: {gallery_name}');
     const [mailBody, setMailBody] = useState('<p>Hallo {user_name},</p><p>Es gibt Neuigkeiten in deiner Galerie <strong>{gallery_name}</strong>.</p><p><a href="{link}">Hier geht es zur Galerie</a></p>');
     const [sendingMail, setSendingMail] = useState(false);
-    const [previewMode, setPreviewMode] = useState(false);
     const { showToast } = useUI();
 
     if (!isOpen) return null;
@@ -33,15 +33,8 @@ export default function EmailComposerModal({isOpen, onClose, galleryId}: EmailCo
         setSendingMail(false);
     };
 
-    const getPreviewHtml = () => {
-        return mailBody
-            .replace(/{user_name}/g, 'Max Mustermann')
-            .replace(/{gallery_name}/g, 'Beispiel Galerie')
-            .replace(/{link}/g, '#');
-    };
-
     return (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-50">
             <div className="modal-box max-w-3xl relative">
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-4">Nachricht an Kunden senden</h3>
@@ -53,19 +46,11 @@ export default function EmailComposerModal({isOpen, onClose, galleryId}: EmailCo
 
                 <div className="form-control mb-6">
                     <div className="flex justify-between items-end mb-2">
-                        <label className="label p-0"><span className="label-text font-bold">Nachricht (HTML erlaubt)</span></label>
-                        <label className="cursor-pointer label p-0 gap-2">
-                            <span className="label-text text-xs font-semibold">Vorschau anzeigen</span> 
-                            <input type="checkbox" className="toggle toggle-primary toggle-sm" checked={previewMode} onChange={e => setPreviewMode(e.target.checked)} />
-                        </label>
+                        <label className="label p-0"><span className="label-text font-bold">Nachricht</span></label>
                     </div>
                     <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mb-2">Variablen: {"{user_name}"}, {"{gallery_name}"}, {"{link}"}</span>
                     
-                    {previewMode ? (
-                        <div className="border border-base-300 rounded-box p-4 min-h-[12rem] bg-base-100 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: getPreviewHtml()}}></div>
-                    ) : (
-                        <textarea value={mailBody} onChange={e => setMailBody(e.target.value)} className="textarea textarea-bordered h-48 font-mono text-sm"></textarea>
-                    )}
+                    <WysiwygEditor value={mailBody} onChange={setMailBody} />
                 </div>
 
                 <div className="modal-action">
@@ -75,7 +60,7 @@ export default function EmailComposerModal({isOpen, onClose, galleryId}: EmailCo
                     </button>
                 </div>
             </div>
-            <div className="modal-backdrop"></div>
+            <div className="modal-backdrop" onClick={onClose}></div>
         </div>
     );
 }

@@ -141,6 +141,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::put('/management/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::post('/management/orders/quote-link', [OrderController::class, 'generateQuoteLink']);
     Route::post('/management/orders/{id}/send-quote', [OrderController::class, 'sendQuote']);
+    Route::post('/management/invoices/manual', [OrderController::class, 'generateManualInvoice']);
     Route::get('/management/stats', [StatsController::class, 'index']);
     Route::get('/management/logs', [StatsController::class, 'logs']);
 

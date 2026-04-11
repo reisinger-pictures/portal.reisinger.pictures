@@ -3,11 +3,13 @@ import LicenseSettingsCard from './components/LicenseSettingsCard';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
 import { useLicenseTerms } from '../../logic/useLicenseTerms';
+import { useAuth } from '../../logic/useAuth';
 
 declare const __APP_BUILD_TIME__: string;
 
 export default function ManagementSettingsView() {
-    const { terms: licenseTerms, updateTerms } = useLicenseTerms();
+    const { terms: licenseTerms, updateTerms, isLoading: termsLoading } = useLicenseTerms();
+    const { user } = useAuth();
     const { data: sysInfo } = useSWR<{laravel_build_time: string, php_version: string, laravel_version: string, db_version?: string}>('/api/management/settings/system', fetcher);
     
     let reactTime = 'Unbekannt';
@@ -15,12 +17,24 @@ export default function ManagementSettingsView() {
         reactTime = new Date(__APP_BUILD_TIME__).toLocaleString('de-DE');
     }
 
+    const isImpressumMissing = user?.is_super_admin && !termsLoading && (!licenseTerms?.bank_holder || !licenseTerms?.company_street || !licenseTerms?.company_zip || !licenseTerms?.company_city || !licenseTerms?.bank_iban);
+
     return (
         <div className="p-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
             <div className="border-b border-base-300 pb-4">
                 <h1 className="text-4xl font-bold">System-Einstellungen</h1>
             </div>
             
+            {isImpressumMissing && (
+                <div className="alert alert-error shadow-sm">
+                    <span className="iconify mdi--alert-circle text-xl"></span>
+                    <div>
+                        <h3 className="font-bold">Impressum & Bankdaten unvollständig!</h3>
+                        <p className="text-sm">Bitte fülle alle Pflichtfelder (*) aus, um den Rechnungs- und Bestellprozess zu aktivieren.</p>
+                    </div>
+                </div>
+            )}
+
             <LicenseSettingsCard />
             
             <div className="card bg-base-200 border border-base-300">
@@ -28,17 +42,59 @@ export default function ManagementSettingsView() {
                     <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
                         <span className="iconify mdi--bank text-primary text-3xl"></span> Bankverbindung & Impressum
                     </h2>
-                    <p className="text-sm opacity-70 mb-6">Diese Daten werden im Footer deiner PDF-Rechnungen und Lieferscheine angezeigt.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Kontoinhaber</span></label>
-                            <input type="text" className="input input-bordered" placeholder="Name des Inhabers" 
+                    <p className="text-sm opacity-70 mb-6">Diese Daten werden im Header und Footer deiner PDF-Rechnungen und Lieferscheine angezeigt.</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div className="form-control md:col-span-2">
+                            <label className="label"><span className="label-text font-bold">Firmenname / Kontoinhaber *</span></label>
+                            <input type="text" className={`input input-bordered ${!licenseTerms?.bank_holder ? 'input-error' : ''}`} placeholder="Name des Inhabers" 
                                 value={licenseTerms?.bank_holder || ''} 
                                 onChange={e => updateTerms({ bank_holder: e.target.value })} />
                         </div>
+                        
+                        <div className="form-control md:col-span-2">
+                            <label className="label"><span className="label-text font-bold">Straße & Hausnummer *</span></label>
+                            <input type="text" className={`input input-bordered ${!licenseTerms?.company_street ? 'input-error' : ''}`} placeholder="Musterstraße 1" 
+                                value={licenseTerms?.company_street || ''} 
+                                onChange={e => updateTerms({ company_street: e.target.value })} />
+                        </div>
+                        
+                        <div className="flex gap-4 md:col-span-2 w-full">
+                            <div className="form-control w-1/3">
+                                <label className="label"><span className="label-text font-bold">PLZ *</span></label>
+                                <input type="text" className={`input input-bordered w-full ${!licenseTerms?.company_zip ? 'input-error' : ''}`} placeholder="4020" 
+                                    value={licenseTerms?.company_zip || ''} 
+                                    onChange={e => updateTerms({ company_zip: e.target.value })} />
+                            </div>
+                            <div className="form-control flex-1">
+                                <label className="label"><span className="label-text font-bold">Stadt *</span></label>
+                                <input type="text" className={`input input-bordered w-full ${!licenseTerms?.company_city ? 'input-error' : ''}`} placeholder="Linz" 
+                                    value={licenseTerms?.company_city || ''} 
+                                    onChange={e => updateTerms({ company_city: e.target.value })} />
+                            </div>
+                        </div>
+                        
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">IBAN</span></label>
-                            <input type="text" className="input input-bordered font-mono" placeholder="AT..." 
+                            <label className="label"><span className="label-text font-bold">Land</span></label>
+                            <input type="text" className="input input-bordered" placeholder="Österreich" 
+                                value={licenseTerms?.company_country || ''} 
+                                onChange={e => updateTerms({ company_country: e.target.value })} />
+                        </div>
+
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">E-Mail für Rückfragen</span></label>
+                            <input type="email" className="input input-bordered" placeholder="hello@reisinger.pictures" 
+                                value={licenseTerms?.company_email || ''} 
+                                onChange={e => updateTerms({ company_email: e.target.value })} />
+                        </div>
+                    </div>
+
+                    <div className="divider">Bankdaten</div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">IBAN *</span></label>
+                            <input type="text" className={`input input-bordered font-mono ${!licenseTerms?.bank_iban ? 'input-error' : ''}`} placeholder="AT..." 
                                 value={licenseTerms?.bank_iban || ''} 
                                 onChange={e => updateTerms({ bank_iban: e.target.value })} />
                         </div>

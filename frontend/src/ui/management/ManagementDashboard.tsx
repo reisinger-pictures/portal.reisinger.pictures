@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {Link, useLocation, useNavigate} from 'react-router-dom';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
+import { useLicenseTerms } from '../../logic/useLicenseTerms';
 import {useSearch} from '../../logic/useSearch';
 import Sidebar from '../components/Sidebar';
 import GalleryModals from '../components/GalleryModals';
@@ -12,6 +13,7 @@ import ManagementStructureView from './ManagementStructureView';
 import ManagementFtpInbox from './ManagementFtpInbox';
 import ManagementStatsView from './ManagementStatsView';
 import ManagementOrdersView from './ManagementOrdersView';
+import ManagementManualInvoiceView from './ManagementManualInvoiceView';
 import ErrorBoundary from '../components/ErrorBoundary';
 import PhotographerTeamModal from './components/PhotographerTeamModal';
 
@@ -36,6 +38,8 @@ export default function ManagementDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const {results: searchResults} = useSearch(searchQuery, false, true); // Leere Query überspringen
     const {user} = useAuth();
+    const { terms, isLoading: termsLoading } = useLicenseTerms();
+    const isImpressumMissing = user?.is_super_admin && !termsLoading && (!terms?.bank_holder || !terms?.company_street || !terms?.company_zip || !terms?.company_city || !terms?.bank_iban);
     const {results: personalFeed, isLoading: feedLoading} = useSearch('', true);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -98,6 +102,15 @@ export default function ManagementDashboard() {
                 </div>
 
                 <main className="flex-1 overflow-y-auto flex flex-col w-full relative">
+                    {isImpressumMissing && currentView !== 'settings' && (
+                        <div className="m-4 md:m-6 mb-0 alert alert-error shadow-sm">
+                            <span className="iconify mdi--alert-circle text-xl"></span>
+                            <div>
+                                <h3 className="font-bold">Impressum & Bankdaten unvollständig!</h3>
+                                <p className="text-sm">Bitte hinterlege deine Firmendaten in den <Link to="/settings" className="underline font-bold">Einstellungen</Link>, um den Rechnungs- und Bestellprozess zu aktivieren.</p>
+                            </div>
+                        </div>
+                    )}
                     <header className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
                         <button className="btn btn-square btn-ghost md:hidden shrink-0" onClick={() => setIsSidebarOpen(true)}>
                             <span className="iconify mdi--menu text-2xl"></span>
@@ -161,6 +174,7 @@ export default function ManagementDashboard() {
                         {currentView === 'settings' && <ManagementSettingsView/>}
                         {currentView === 'stats' && <ManagementStatsView/>}
                         {currentView === 'admin-orders' && <ManagementOrdersView/>}
+                        {currentView === 'admin-manual-invoice' && <ManagementManualInvoiceView/>}
                                                 {currentView === 'structure' && (
                             <div className="p-6 md:p-10">
                                 {user?.is_photographer && <ManagementFtpInbox/>}

@@ -28,6 +28,13 @@ class OrderController extends Controller
     {
         $user = auth('api')->user();
 
+        $holder = \App\Models\Setting::where('key', 'bank_holder')->value('value');
+        $iban = \App\Models\Setting::where('key', 'bank_iban')->value('value');
+        $street = \App\Models\Setting::where('key', 'company_street')->value('value');
+        if (empty($holder) || empty($iban) || empty($street)) {
+            return response()->json(['error' => 'Der Betreiber hat noch keine vollständigen Rechnungsdaten (Impressum & Bank) hinterlegt. Kauf derzeit nicht möglich.'], 400);
+        }
+
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.photoId' => 'required|string|exists:photos,id',
@@ -211,20 +218,116 @@ class OrderController extends Controller
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', ['order' => $order, 'snapshot' => $order->invoiceSnapshot, 'items' => $order->invoiceSnapshot->customer_details['items'] ?? []])->download($order->invoiceSnapshot->invoice_number . '.pdf');
     }
 
-    public function sendQuote(Request $request, $id) {
+    
+    
+    public function generateManualInvoice(Request $request)
+    {
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
-        $request->validate(['custom_price' => 'required|numeric', 'message' => 'required|string']);
-        $order = Order::with(['user', 'invoiceSnapshot'])->findOrFail($id);
-        $items = $order->invoiceSnapshot->customer_details['items'] ?? [];
-        $photoIds = array_column($items, 'photoId');
-        $payload = base64_encode(json_encode(['photos' => $photoIds, 'price' => $request->custom_price, 'exp' => now()->addDays(14)->timestamp]));
-        $signature = hash_hmac('sha256', $payload, config('app.key'));
-        $link = rtrim(config('app.frontend_url', config('app.url')), '/') . '/cart?quote_token=' . $payload . '.' . $signature;
-        $mailBody = '<p>Guten Tag ' . ($order->user->name ?? '') . ',</p>';
-        $mailBody .= '<p>' . nl2br(e($request->message)) . '</p>';
-        $mailBody .= '<p><br><a href="' . $link . '" style="background-color: #2A9D8F; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Angebot annehmen & Bezahlen</a></p>';
-        \Illuminate\Support\Facades\Mail::to($order->user->email)->send(new \App\Mail\CustomMail('Ihr individuelles Angebot', $mailBody));
-        return response()->json(['success' => true]);
+        if (!$user || !$user->is_super_admin) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
+        $validated = $request->validate([
+            'invoice_number' => 'required|string',
+            'date' => 'required|date',
+            'due_date' => 'required|string', // Geändert auf String für Freitext
+            'customer_name' => 'nullable|string',
+            'customer_company' => 'nullable|string',
+            'customer_street' => 'nullable|string',
+            'customer_zip' => 'nullable|string',
+            'customer_city' => 'nullable|string',
+            'customer_country' => 'nullable|string',
+            'customer_email' => 'nullable|email',
+            'customer_uid' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.type' => 'required|string|in:item,discount_fixed,discount_percent',
+            'items.*.description' => 'required|string',
+            'items.*.notes' => 'nullable|string',
+            'items.*.price' => 'required|numeric',
+            'items.*.qty' => 'required|numeric|min:0.01',
+            'terms_html' => 'nullable|string'
+        ]);
+
+        $runningTotal = 0;
+        $mappedItems = [];
+
+        foreach ($validated['items'] as $item) {
+            if ($item['type'] === 'item') {
+                $rowTotal = $item['price'] * $item['qty'];
+                $runningTotal += $rowTotal;
+                $mappedItems[] = [
+                    'type' => 'item',
+                    'filename' => $item['description'],
+                    'notes' => $item['notes'] ?? '',
+                    'tier' => 'custom',
+                    'qty' => $item['qty'],
+                    'price' => $item['price'],
+                    'row_total' => $rowTotal
+                ];
+            } elseif ($item['type'] === 'discount_fixed') {
+                $runningTotal -= $item['price'];
+                $mappedItems[] = [
+                    'type' => 'discount_fixed',
+                    'filename' => $item['description'],
+                    'notes' => $item['notes'] ?? '',
+                    'tier' => 'custom',
+                    'qty' => 1,
+                    'price' => $item['price'],
+                    'row_total' => -$item['price']
+                ];
+            } elseif ($item['type'] === 'discount_percent') {
+                $discountAmt = $runningTotal * ($item['price'] / 100);
+                $runningTotal -= $discountAmt;
+                $mappedItems[] = [
+                    'type' => 'discount_percent',
+                    'filename' => $item['description'],
+                    'notes' => $item['notes'] ?? '',
+                    'tier' => 'custom',
+                    'qty' => 1,
+                    'price' => $item['price'], 
+                    'row_total' => -$discountAmt,
+                    'calculated_percentage' => $item['price']
+                ];
+            }
+        }
+
+        $total = max(0, $runningTotal);
+        
+        $customerDetails = [
+            'name' => $validated['customer_name'] ?? '',
+            'company' => $validated['customer_company'] ?? '',
+            'street' => $validated['customer_street'] ?? '',
+            'zip' => $validated['customer_zip'] ?? '',
+            'city' => $validated['customer_city'] ?? '',
+            'country' => $validated['customer_country'] ?? '',
+            'email' => $validated['customer_email'] ?? '',
+            'uid' => $validated['customer_uid'] ?? '',
+            'due_date' => $validated['due_date'], // Übernimmt den Freitext exakt so
+            'is_collective' => false,
+            'custom_html_terms' => $validated['terms_html'] ?? null
+        ];
+
+        $snapshot = new \App\Models\InvoiceSnapshot([
+            'invoice_number' => $validated['invoice_number'],
+            'customer_details' => $customerDetails,
+            'total_net' => $total,
+            'total_gross' => $total,
+            'tax_rate' => 0
+        ]);
+        $snapshot->created_at = $validated['date'];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', [
+            'snapshot' => $snapshot,
+            'items' => $mappedItems,
+            'bankHolder' => \App\Models\Setting::where('key', 'bank_holder')->value('value'),
+            'bankIban' => \App\Models\Setting::where('key', 'bank_iban')->value('value'),
+            'bankBic' => \App\Models\Setting::where('key', 'bank_bic')->value('value')
+        ]);
+
+        return response()->streamDownload(function() use ($pdf) {
+            echo $pdf->output();
+        }, $validated['invoice_number'] . '.pdf', [
+            'Content-Type' => 'application/pdf'
+        ]);
     }
 }
