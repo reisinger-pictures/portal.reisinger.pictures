@@ -1,14 +1,7 @@
 <?php
 
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default Search Engine
-    |--------------------------------------------------------------------------
-    */
     'driver' => env('SCOUT_DRIVER', 'meilisearch'),
-
     'prefix' => env('SCOUT_PREFIX', ''),
     'queue' => env('SCOUT_QUEUE', false),
     'after_commit' => false,
@@ -20,18 +13,10 @@ return [
     'soft_delete' => false,
     'identify' => env('SCOUT_IDENTIFY', false),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Meilisearch Configuration
-    |--------------------------------------------------------------------------
-    */
     'meilisearch' => [
         'host' => env('MEILISEARCH_HOST', 'http://localhost:7700'),
-        // Fallback passend zur docker-compose.local.yml gesetzt:
         'key' => env('MEILISEARCH_KEY', 'local_meili_secret'),
 
-        // WICHTIG: Damit whereIn() in Scout funktioniert, müssen wir Meilisearch mitteilen,
-        // welche Attribute filterbar sind.
         'index-settings' => [
             \App\Models\Photo::class => [
                 'filterableAttributes' => ['gallery_id'],
@@ -40,8 +25,20 @@ return [
                 'filterableAttributes' => ['id'],
             ],
             \App\Models\Location::class => [
+                // Die Suchreihenfolge (WICHTIG! PLZ und Name zuerst, ID wird ignoriert)
+                'searchableAttributes' => ['postal_code', 'name', 'state', 'country'],
                 'filterableAttributes' => ['type'],
-                'sortableAttributes' => ['population'],
+                'sortableAttributes' => ['population', 'postal_code'],
+            ],
+            \App\Models\Customer::class => [
+                'searchableAttributes' => ['name', 'company', 'email', 'zip', 'city', 'street', 'country', 'uid'],
+                'filterableAttributes' => ['id'],
+                'sortableAttributes' => ['created_at'],
+            ],
+            \App\Models\TextSnippet::class => [
+                'searchableAttributes' => ['title', 'shortcut', 'content_html'],
+                'filterableAttributes' => ['id'],
+                'sortableAttributes' => ['created_at'],
             ],
         ],
     ],

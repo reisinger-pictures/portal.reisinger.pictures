@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useLocations, LocationResult } from '../../logic/useLocations';
+import React, { useState } from 'react';
+import AutocompleteInput from './AutocompleteInput';
+import { LocationResult } from '../../logic/useLocations';
 
 export interface IptcData {
     title?: string;
@@ -21,105 +22,6 @@ interface Props {
     disabled?: boolean;
     children?: React.ReactNode;
 }
-
-// Interne Komponente für das Smart Assistance Dropdown
-const AutocompleteInput = ({ value, onChange, onSelect, type, placeholder, disabled, label, className }: {
-    value: string, onChange: (val: string) => void, onSelect: (loc: LocationResult) => void, type: 'city' | 'country', placeholder?: string, disabled?: boolean, label: string, className?: string
-}) => {
-    const [query, setQuery] = useState(value || '');
-    const [debouncedQuery, setDebouncedQuery] = useState('');
-    const [isOpen, setIsOpen] = useState(false);
-    const [activeIndex, setActiveIndex] = useState(-1);
-    const wrapperRef = useRef<HTMLDivElement>(null);
-
-    const [prevValue, setPrevValue] = useState(value || '');
-
-    if ((value || '') !== prevValue) {
-        setPrevValue(value || '');
-        setQuery(value || '');
-    }
-
-    // Debounce the fetch query
-    useEffect(() => {
-        const timer = setTimeout(() => setDebouncedQuery(query), 300);
-        return () => clearTimeout(timer);
-    }, [query]);
-
-    const { locations, isLoading } = useLocations(debouncedQuery, type);
-
-    // Removed local effect to prevent cascading render. ActiveIndex is reset on typing.
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (!isOpen || locations.length === 0) return;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setActiveIndex(prev => (prev < locations.length - 1 ? prev + 1 : prev));
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setActiveIndex(prev => (prev > 0 ? prev - 1 : 0));
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            if (activeIndex >= 0 && activeIndex < locations.length) {
-                onSelect(locations[activeIndex]);
-                setIsOpen(false);
-            }
-        } else if (e.key === 'Escape') {
-            setIsOpen(false);
-        }
-    };
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    return (
-        <div className="relative flex-1 w-full form-control" ref={wrapperRef}>
-            <label className="label"><span className="label-text font-bold">{label}</span></label>
-            <input
-                type="text"
-                value={query}
-                onChange={e => {
-                    setQuery(e.target.value);
-                    onChange(e.target.value);
-                    setIsOpen(true);
-                    setActiveIndex(-1);
-                }}
-                onFocus={() => setIsOpen(true)}
-                onKeyDown={handleKeyDown}
-                disabled={disabled}
-                placeholder={placeholder}
-                className={className || "input input-sm input-bordered w-full"}
-            />
-            {isOpen && !disabled && locations.length > 0 && (
-                <ul className="absolute z-50 top-full left-0 w-full mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
-                    {locations.map((loc, idx) => (
-                        <li
-                            key={loc.id}
-                            className={`px-4 py-2 cursor-pointer flex flex-col border-b border-base-200/50 last:border-0 ${activeIndex === idx ? 'bg-base-200' : 'hover:bg-base-200'}`}
-                            onClick={() => {
-                                onSelect(loc);
-                                setIsOpen(false);
-                            }}
-                            onMouseEnter={() => setActiveIndex(idx)}
-                        >
-                            <span className="font-bold text-sm text-primary">{loc.name}</span>
-                            {loc.state && <span className="text-xs opacity-70">{loc.state}, {loc.country}</span>}
-                        </li>
-                    ))}
-                </ul>
-            )}
-            {isOpen && isLoading && debouncedQuery.length >= 2 && locations.length === 0 && (
-                <div className="absolute z-50 top-full left-0 w-full mt-1 bg-base-100 shadow-xl rounded-box border border-base-300 p-2 text-center text-xs opacity-50">Sucht...</div>
-            )}
-        </div>
-    );
-};
 
 const ReadOnlyField = ({ label, value }: { label: string, value?: string }) => (
     <div className="mb-4">
@@ -144,20 +46,15 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
     const addKeywords = (text: string) => {
         if (disabled) return;
         const newKeywords = text.split(/[,;\s\n]+/).map(k => k.trim()).filter(k => k.length > 0);
-
         const uniqueKeywords = new Set(keywordsArray);
         let added = false;
-
         newKeywords.forEach(kw => {
             if (!uniqueKeywords.has(kw)) {
                 uniqueKeywords.add(kw);
                 added = true;
             }
         });
-
-        if (added) {
-            handleChange('keywords', Array.from(uniqueKeywords).join(', '));
-        }
+        if (added) handleChange('keywords', Array.from(uniqueKeywords).join(', '));
     };
 
     const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -271,11 +168,12 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
                     <input type="text" value={data.location || ''} onChange={e => handleChange('location', e.target.value)} className="input input-sm input-bordered" />
                 </div>
 
-                <AutocompleteInput
-                    label="Stadt"
-                    type="city"
+                <AutocompleteInput<LocationResult>
+                    label="Stadt / Ort"
                     value={data.city || ''}
                     onChange={(val) => handleChange('city', val)}
+                    endpoint="/api/search/locations?type=city&q="
+                    mapResponse={(locations) => locations.map(loc => ({ id: loc.id, title: loc.name, subtitle: `${loc.postal_code ? loc.postal_code + ' ' : ''}${loc.state || loc.country}`, raw: loc }))}
                     onSelect={(loc) => handleMultiChange({
                         city: loc.name,
                         state: loc.state || data.state,
@@ -291,11 +189,12 @@ export default function IptcMetadataEditor({ data, onChange, showArtist = true, 
                 </div>
 
                 <div className="form-control flex-row gap-2">
-                    <AutocompleteInput
+                    <AutocompleteInput<LocationResult>
                         label="Land"
-                        type="country"
                         value={data.country || ''}
                         onChange={(val) => handleChange('country', val)}
+                        endpoint="/api/search/locations?type=country&q="
+                        mapResponse={(locations) => locations.map(loc => ({ id: loc.id, title: loc.name, subtitle: loc.iso_country || '', raw: loc }))}
                         onSelect={(loc) => handleMultiChange({
                             country: loc.name,
                             iso_country: loc.iso_country || data.iso_country

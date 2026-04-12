@@ -91,6 +91,7 @@ class SearchController extends Controller
         $results = Location::search($q)
             ->where('type', $type)
             ->orderBy('population', 'desc')
+            ->orderBy('postal_code', 'asc')
             ->take(10)
             ->get();
 

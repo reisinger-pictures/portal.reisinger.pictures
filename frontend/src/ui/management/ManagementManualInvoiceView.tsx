@@ -4,6 +4,17 @@ import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import WysiwygEditor from '../components/WysiwygEditor';
 import { useLicenseTerms } from '../../logic/useLicenseTerms';
+import AutocompleteInput from '../components/AutocompleteInput';
+import { Customer } from './ManagementCustomersView';
+import { LocationResult } from '../../logic/useLocations';
+
+export interface InvoiceDiscount {
+    type: string;
+    description: string;
+    notes: string;
+    price: number;
+    rowTotal?: number;
+}
 
 export default function ManagementManualInvoiceView() {
     const { user } = useAuth();
@@ -17,7 +28,7 @@ export default function ManagementManualInvoiceView() {
     const [formData, setFormData] = useState({
         invoice_number: 'RE-' + new Date().getFullYear() + '-' + Math.floor(100 + Math.random() * 900),
         date: new Date().toISOString().split('T')[0],
-        due_date: 'Zahlbar sofort nach Erhalt der Rechnung.',
+        due_date: 'Zahlbar sofort netto Kassa.',
         customer_name: '',
         customer_company: '',
         customer_street: '',
@@ -33,7 +44,7 @@ export default function ManagementManualInvoiceView() {
         { type: 'item', description: '', notes: '', qty: 1, price: 0 }
     ]);
     
-    const [discounts, setDiscounts] = useState<any[]>([]);
+    const [discounts, setDiscounts] = useState<Array<{ type: string; description: string; notes?: string; price: number; rowTotal?: number }>>([]);
 
     // Freitext-Logik für Fälligkeit
     useEffect(() => {
@@ -44,9 +55,7 @@ export default function ManagementManualInvoiceView() {
         } else if (dueDateOption === '1m') {
             setFormData(prev => ({ ...prev, due_date: 'Zahlbar innerhalb von 1 Monat nach Rechnungsdatum.' }));
         } else if (dueDateOption === 'custom') {
-            if (formData.due_date.startsWith('Zahlbar')) {
-                setFormData(prev => ({ ...prev, due_date: '' }));
-            }
+            setFormData(prev => prev.due_date.startsWith('Zahlbar') ? { ...prev, due_date: '' } : prev);
         }
     }, [dueDateOption]);
 
@@ -147,8 +156,13 @@ export default function ManagementManualInvoiceView() {
         setIsGenerating(false);
     };
 
+    // Frontend Calculation Preview
     let subtotal = 0;
-    items.forEach(i => subtotal += (Number(i.price) || 0) * (Number(i.qty) || 1));
+    const calculatedItems = items.map(item => {
+        const rowTotal = (Number(item.price) || 0) * (Number(item.qty) || 1);
+        subtotal += rowTotal;
+        return { ...item, rowTotal };
+    });
     
     let runningTotal = subtotal;
     const calculatedDiscounts = discounts.map(d => {
@@ -215,12 +229,29 @@ export default function ManagementManualInvoiceView() {
                 {/* 2. Empfänger */}
                 <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                     <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Rechnungsempfänger</h2>
-                    <p className="text-sm opacity-60 mb-4">Lasse diese Felder leer, um den Block im PDF vollständig auszublenden.</p>
+                    <p className="text-sm opacity-60 mb-4">Lasse diese Felder leer, um den Block im PDF vollständig auszublenden. Du kannst nach bestehenden Kunden (CRM) suchen.</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Name / Ansprechpartner</span></label>
-                            <input type="text" value={formData.customer_name} onChange={e => handleChange('customer_name', e.target.value)} className="input input-sm input-bordered" />
-                        </div>
+                        <AutocompleteInput<Customer>
+                            label="Name / Ansprechpartner"
+                            value={formData.customer_name}
+                            onChange={(val) => handleChange('customer_name', val)}
+                            endpoint="/api/management/customers?q="
+                            mapResponse={(data) => data.map(c => ({ id: c.id, title: c.name || c.company || 'Unbekannt', subtitle: `${c.company ? c.company + ' • ' : ''}${c.email || ''}`, raw: c }))}
+                            onSelect={(c) => {
+                                setFormData(prev => ({
+                                    ...prev,
+                                    customer_name: c.name || '',
+                                    customer_company: c.company || '',
+                                    customer_street: c.street || '',
+                                    customer_zip: c.zip || '',
+                                    customer_city: c.city || '',
+                                    customer_country: c.country || '',
+                                    customer_email: c.email || '',
+                                    customer_uid: c.uid || ''
+                                }));
+                            }}
+                            className="input input-sm input-bordered w-full"
+                        />
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Firma</span></label>
                             <input type="text" value={formData.customer_company} onChange={e => handleChange('customer_company', e.target.value)} className="input input-sm input-bordered" />
@@ -233,17 +264,68 @@ export default function ManagementManualInvoiceView() {
                             <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
                             <input type="text" value={formData.customer_uid} onChange={e => handleChange('customer_uid', e.target.value)} className="input input-sm input-bordered" />
                         </div>
-
                         <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">Adresse</span></label>
-                            <div className="grid  md:grid-cols-5 gap-2">
-                                <input type="text" placeholder="Adreesse" value={formData.customer_street} onChange={e => handleChange('customer_street', e.target.value)} className="input input-bordered md:col-span-2" />
-                                <input type="text" placeholder="PLZ" value={formData.customer_zip} onChange={e => handleChange('customer_zip', e.target.value)} className="input input-bordered" />
-                                <input type="text" placeholder="Stadt" value={formData.customer_city} onChange={e => handleChange('customer_city', e.target.value)} className="input input-bordered " />
-                                <input type="text" value={formData.customer_country} onChange={e => handleChange('customer_country', e.target.value)} className="input input-bordered" placeholder="z.B. Österreich" />
+                            <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
+                            <input type="text" value={formData.customer_street} onChange={e => handleChange('customer_street', e.target.value)} className="input input-sm input-bordered" />
+                        </div>
+                        <div className="form-control md:col-span-2">
+                            <label className="label"><span className="label-text font-bold">PLZ & Stadt</span></label>
+                            <div className="flex gap-2">
+                                <div className="w-1/3 md:w-32">
+                                    <AutocompleteInput<LocationResult>
+                                        value={formData.customer_zip}
+                                        onChange={val => handleChange('customer_zip', val)}
+                                        endpoint="/api/search/locations?type=city&q="
+                                        mapResponse={(data) => data.map(loc => ({ id: loc.id, title: loc.postal_code || loc.name, subtitle: loc.name, raw: loc }))}
+                                        onSelect={(loc) => {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                customer_city: loc.name,
+                                                customer_zip: loc.postal_code || prev.customer_zip,
+                                                customer_country: loc.country || prev.customer_country
+                                            }));
+                                        }}
+                                        placeholder="PLZ"
+                                        className="input input-sm input-bordered w-full"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <AutocompleteInput<LocationResult>
+                                        value={formData.customer_city}
+                                        onChange={val => handleChange('customer_city', val)}
+                                        endpoint="/api/search/locations?type=city&q="
+                                        mapResponse={(data) => data.map(loc => ({ id: loc.id, title: loc.name, subtitle: `${loc.postal_code ? loc.postal_code + ' ' : ''}${loc.state || loc.country}`, raw: loc }))}
+                                        onSelect={(loc) => {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                customer_city: loc.name,
+                                                customer_zip: loc.postal_code || prev.customer_zip,
+                                                customer_country: loc.country || prev.customer_country
+                                            }));
+                                        }}
+                                        placeholder="Stadt"
+                                        className="input input-sm input-bordered w-full"
+                                    />
+                                </div>
                             </div>
                         </div>
-
+                        <div className="form-control">
+                            <AutocompleteInput<LocationResult>
+                                label="Land"
+                                value={formData.customer_country}
+                                onChange={(val) => handleChange('customer_country', val)}
+                                endpoint="/api/search/locations?type=country&q="
+                                mapResponse={(data) => data.map(loc => ({ id: loc.id, title: loc.name, subtitle: loc.iso_country || '', raw: loc }))}
+                                onSelect={(loc) => {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        customer_country: loc.name
+                                    }));
+                                }}
+                                className="input input-sm input-bordered w-full"
+                                placeholder="z.B. Österreich"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -255,9 +337,7 @@ export default function ManagementManualInvoiceView() {
                     </div>
                     
                     <div className="space-y-4">
-                        {items.map((item, idx) => {
-                            const rowTotal = (Number(item.price) || 0) * (Number(item.qty) || 1);
-                            return (
+                        {calculatedItems.map((item, idx) => (
                             <div key={idx} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
                                 <div className="flex flex-col gap-1 self-center shrink-0 mr-2">
                                     <button type="button" onClick={() => moveItemUp(idx)} disabled={idx === 0} className="btn btn-xs btn-ghost btn-square" title="Nach oben"><span className="iconify mdi--arrow-up text-lg opacity-50"></span></button>
@@ -281,11 +361,11 @@ export default function ManagementManualInvoiceView() {
                                 </div>
                                 <div className="form-control w-full md:w-28 shrink-0">
                                     <label className="label py-1"><span className="label-text text-xs font-bold">Gesamt</span></label>
-                                    <div className="text-right font-mono font-bold mt-1 text-base-content">{rowTotal.toFixed(2)} €</div>
+                                    <div className="text-right font-mono font-bold mt-1 text-base-content">{item.rowTotal.toFixed(2)} €</div>
                                 </div>
                                 <button type="button" onClick={() => removeItem(idx)} className="btn btn-sm btn-ghost text-error shrink-0 mt-7" title="Entfernen"><span className="iconify mdi--trash-can text-lg"></span></button>
                             </div>
-                        )})}
+                        ))}
                     </div>
                 </div>
 

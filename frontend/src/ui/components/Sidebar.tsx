@@ -75,7 +75,11 @@ export default function Sidebar(props: SidebarProps) {
                             </>
                         )}
                         {user.is_super_admin && (
-                            <li><Link to="/admin-manual-invoice" className={props.currentView === 'admin-manual-invoice' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-document-edit-outline text-lg"></span> Manuelle Rechnung</Link></li>
+                            <>
+                                <li><Link to="/admin-manual-invoice" className={props.currentView === 'admin-manual-invoice' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-document-edit-outline text-lg"></span> Manuelle Rechnung</Link></li>
+                                <li><Link to="/admin-customers" className={props.currentView === 'admin-customers' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-details text-lg"></span> Kunden (CRM)</Link></li>
+                                <li><Link to="/admin-snippets" className={props.currentView === 'admin-snippets' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--text-box-multiple text-lg"></span> Textbausteine</Link></li>
+                            </>
                         )}
                     </>
                 )}

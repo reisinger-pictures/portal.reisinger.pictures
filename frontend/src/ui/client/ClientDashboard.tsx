@@ -46,7 +46,7 @@ export default function ClientDashboard() {
                         <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">Reisinger Portal</span>
                     </Link>
 
-                    <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full md:max-w-4xl">
+                    <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full">
                         <div className="join w-full shadow-sm">
                             <input
                                 type="text"

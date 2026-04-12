@@ -14,6 +14,8 @@ import ManagementFtpInbox from './ManagementFtpInbox';
 import ManagementStatsView from './ManagementStatsView';
 import ManagementOrdersView from './ManagementOrdersView';
 import ManagementManualInvoiceView from './ManagementManualInvoiceView';
+import ManagementCustomersView from './ManagementCustomersView';
+import ManagementTextSnippetsView from './ManagementTextSnippetsView';
 import ErrorBoundary from '../components/ErrorBoundary';
 import PhotographerTeamModal from './components/PhotographerTeamModal';
 
@@ -120,7 +122,7 @@ export default function ManagementDashboard() {
                             <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">Reisinger Portal</span>
                         </Link>
 
-                        <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full md:max-w-4xl">
+                        <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full">
                             <div className="join w-full shadow-sm">
                                 <input
                                     type="text"
@@ -175,6 +177,8 @@ export default function ManagementDashboard() {
                         {currentView === 'stats' && <ManagementStatsView/>}
                         {currentView === 'admin-orders' && <ManagementOrdersView/>}
                         {currentView === 'admin-manual-invoice' && <ManagementManualInvoiceView/>}
+                        {currentView === 'admin-customers' && <ManagementCustomersView/>}
+                        {currentView === 'admin-snippets' && <ManagementTextSnippetsView/>}
                                                 {currentView === 'structure' && (
                             <div className="p-6 md:p-10">
                                 {user?.is_photographer && <ManagementFtpInbox/>}

@@ -18,6 +18,7 @@ class Location extends Model
         'state',
         'country',
         'iso_country',
+        'postal_code',
         'population'
     ];
 
@@ -29,6 +30,7 @@ class Location extends Model
             'name' => $this->name,
             'state' => $this->state,
             'country' => $this->country,
+            'postal_code' => $this->postal_code,
             'iso_country' => $this->iso_country,
             'population' => (int) $this->population,
         ];

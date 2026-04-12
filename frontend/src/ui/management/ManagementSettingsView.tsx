@@ -113,7 +113,7 @@ export default function ManagementSettingsView() {
                 <div className="text-sm opacity-60 font-mono bg-base-200 p-4 rounded-box border border-base-300 shadow-sm leading-relaxed">
                     <div className="text-primary font-bold mb-2 text-base">System Info</div>
                     <div className="grid grid-cols-[120px_1fr] gap-2">
-                        <span className="font-semibold text-primary">Portal Version:</span> <span className="font-bold text-primary">{sysInfo ? 'v' + sysInfo.db_version : 'Lädt...'}</span>
+                        <span className="font-semibold text-primary">Datenbank Version:</span> <span className="font-bold text-primary">{sysInfo ? 'v' + sysInfo.db_version : 'Lädt...'}</span>
                         <span className="font-semibold">React Build:</span> <span>{reactTime}</span>
                         <span className="font-semibold">Laravel Update:</span> <span>{sysInfo ? new Date(sysInfo.laravel_build_time).toLocaleString('de-DE') : 'Lädt...'}</span>
                         {sysInfo && <><span className="font-semibold">Backend:</span> <span>PHP {sysInfo.php_version} / Laravel {sysInfo.laravel_version}</span></>}

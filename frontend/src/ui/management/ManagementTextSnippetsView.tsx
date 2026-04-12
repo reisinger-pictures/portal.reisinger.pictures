@@ -1,0 +1,65 @@
+import useSWR from 'swr';
+import { fetcher, apiMutate } from '../../api';
+import { useUI } from '../components/UIContext';
+import ErrorMessage from '../components/ErrorMessage';
+
+export interface TextSnippet {
+    id: string;
+    title: string;
+    shortcut?: string | null;
+    content_html: string;
+}
+
+export default function ManagementTextSnippetsView() {
+    const { data: snippets, error, isLoading, mutate } = useSWR<TextSnippet[]>('/api/management/text-snippets', fetcher);
+    const { showToast, confirm } = useUI();
+
+    const handleDelete = async (id: string) => {
+        if (!(await confirm({ title: 'Textbaustein löschen?', message: 'Möchtest du diesen Baustein wirklich löschen?', confirmColor: 'error' }))) return;
+        try {
+            await apiMutate(`/api/management/text-snippets/${id}`, 'DELETE');
+            mutate();
+            showToast('success', 'Baustein gelöscht');
+        } catch {
+            showToast('error', 'Fehler beim Löschen');
+        }
+    };
+
+    if (isLoading) return <div className="p-10 flex justify-center"><span className="loading loading-spinner loading-lg"></span></div>;
+    if (error) return <div className="p-10"><ErrorMessage message="Fehler beim Laden der Textbausteine." /></div>;
+
+    return (
+        <div className="p-6 md:p-10 max-w-5xl mx-auto w-full">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h1 className="text-4xl font-bold mb-2">Textbausteine</h1>
+                    <p className="opacity-70">Verwalte Vorlagen für Verträge und Sonderkonditionen.</p>
+                </div>
+                <button className="btn btn-primary" onClick={() => showToast('info', 'Funktion zum Anlegen folgt in Kürze (CRUD-Modal)')}>+ Neuer Baustein</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {snippets?.map(s => (
+                    <div key={s.id} className="card bg-base-100 border border-base-300 shadow-sm">
+                        <div className="card-body p-5">
+                            <div className="flex justify-between items-start">
+                                <h2 className="card-title text-primary">{s.title}</h2>
+                                <div className="flex gap-1">
+                                    <button className="btn btn-ghost btn-xs btn-square" title="Bearbeiten"><span className="iconify mdi--pencil text-base"></span></button>
+                                    <button className="btn btn-ghost btn-xs btn-square text-error" onClick={() => handleDelete(s.id)} title="Löschen"><span className="iconify mdi--trash-can text-base"></span></button>
+                                </div>
+                            </div>
+                            {s.shortcut && <code className="text-xs bg-base-200 p-1 rounded w-fit mt-1">/{s.shortcut}</code>}
+                            <div className="mt-4 text-sm opacity-70 line-clamp-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: s.content_html }}></div>
+                        </div>
+                    </div>
+                ))}
+                {snippets?.length === 0 && (
+                    <div className="col-span-full py-12 text-center opacity-50 bg-base-200 rounded-box border border-base-300 border-dashed">
+                        Keine Textbausteine vorhanden.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

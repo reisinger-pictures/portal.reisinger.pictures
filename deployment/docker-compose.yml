@@ -27,15 +27,20 @@ services:
     networks:
       - portal_internal
 
-  backend-init:
+  backend:
     image: ghcr.io/reisi007/php-apache-mod2rewrite-imagick-exiftool-maria-pdo:8.5
-    container_name: portal_backend_init
+    container_name: portal_backend
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_started
+      search:
+        condition: service_started
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:Z
-    environment: &backend_env
+      - /home/webadmin/websites/photos:/var/www/photos:Z
+      - /home/webadmin/websites/ftp:/var/www/ftp:Z
+    environment:
       - DB_HOST=db
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
@@ -67,50 +72,35 @@ services:
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
     command: >
       sh -c "
-      echo 'Warte 15 Sekunden auf den MariaDB First-Boot...';
-      sleep 15;
+      echo 'Warte 10 Sekunden auf Services (MariaDB & Meilisearch)...';
+      sleep 10;
+      
       if [ "$APP_ENV" = "production" ]; then
         if [ "$APP_KEY" = "base64:APP_KEY_REDACTED" ] || [ "$JWT_SECRET" = "JWT_SECRET_REDACTED" ]; then
           echo 'FATAL: Standard-Entwicklungsschluessel in Produktion erkannt. Start abgebrochen!';
           exit 1;
         fi;
       fi;
+      
       if [ -z "$APP_KEY" ]; then php artisan key:generate --force; fi;
       if [ -z "$JWT_SECRET" ]; then php artisan jwt:secret --force; fi;
-      php artisan optimize:clear;
-      php artisan migrate --force;
-      php artisan admin:update;
-      echo 'Laravel Initialization complete.';
-      "
-    networks:
-      - portal_internal
-
-  backend:
-    image: ghcr.io/reisi007/php-apache-mod2rewrite-imagick-exiftool-maria-pdo:8.5
-    container_name: portal_backend
-    restart: unless-stopped
-    depends_on:
-      backend-init:
-        condition: service_completed_successfully
-      search:
-        condition: service_started
-    volumes:
-      - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:Z
-      - /home/webadmin/websites/photos:/var/www/photos:Z
-      - /home/webadmin/websites/ftp:/var/www/ftp:Z
-    environment: *backend_env
-    command: >
-      sh -c "
+      
       if ! grep -q '/var/www/html/public' /etc/apache2/sites-available/000-default.conf; then
         sed -ri -e 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/*.conf;
         sed -ri -e 's!/var/www/!/var/www/html/public!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf;
       fi;
+      
       php artisan optimize:clear;
+      php artisan migrate --force;
+      php artisan scout:sync-index-settings;
+      php artisan admin:update;
+      
+      echo 'Starte Hintergrund-Prozesse...';
       php artisan app:import-locations &
-      echo 'Starte Laravel Queue Worker...';
       php artisan queue:work --tries=3 &
-      echo 'Starte Laravel Scheduler (Cron)...';
       (while true; do php artisan schedule:run >> /dev/null 2>&1; sleep 60; done) &
+      
+      echo 'Starte Webserver...';
       apache2-foreground
       "
     networks:

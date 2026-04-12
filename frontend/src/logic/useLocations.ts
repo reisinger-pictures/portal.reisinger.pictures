@@ -8,6 +8,7 @@ export interface LocationResult {
     state: string | null;
     country: string | null;
     iso_country: string | null;
+    postal_code?: string | null;
 }
 
 export function useLocations(query: string, type: 'city' | 'country') {

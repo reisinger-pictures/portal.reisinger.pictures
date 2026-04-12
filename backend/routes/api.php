@@ -19,6 +19,8 @@ use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\TenantController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\TextSnippetController;
 
 $throttleLimit = env('AUTH_THROTTLE_LIMIT', 9999);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
@@ -142,6 +144,16 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/orders/quote-link', [OrderController::class, 'generateQuoteLink']);
     Route::post('/management/orders/{id}/send-quote', [OrderController::class, 'sendQuote']);
     Route::post('/management/invoices/manual', [OrderController::class, 'generateManualInvoice']);
+    Route::get('/management/customers', [CustomerController::class, 'index']);
+    Route::post('/management/customers', [CustomerController::class, 'store']);
+    Route::put('/management/customers/{id}', [CustomerController::class, 'update']);
+    Route::delete('/management/customers/{id}', [CustomerController::class, 'destroy']);
+
+    Route::get('/management/text-snippets', [TextSnippetController::class, 'index']);
+    Route::post('/management/text-snippets', [TextSnippetController::class, 'store']);
+    Route::put('/management/text-snippets/{id}', [TextSnippetController::class, 'update']);
+    Route::delete('/management/text-snippets/{id}', [TextSnippetController::class, 'destroy']);
+
     Route::get('/management/stats', [StatsController::class, 'index']);
     Route::get('/management/logs', [StatsController::class, 'logs']);
 
