@@ -2,7 +2,8 @@
 
 Moderne, zustandslose SaaS-Plattform für Fotografen zur Bildauswahl und Auslieferung mit integriertem E-Commerce und B2B-Mandantenverwaltung.
 
-📖 **[Technische Dokumentation & Konzepte ansehen](features/README.md)**
+ - 🌟 **[Feature-Übersicht (Für Fotografen & Kunden ansehen)](Features.md)**
+ - 📖 **[Technische Dokumentation & Konzepte ansehen (Für Entwickler)](features/README.md)**
 
 ## 🚀 Hybrides Login-Verfahren
 
