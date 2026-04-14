@@ -8,6 +8,7 @@ import {useAuth} from '../logic/useAuth';
 import {usePhoto} from '../logic/usePhoto';
 import PageLayout from './components/PageLayout';
 import IptcMetadataEditor, { IptcData } from './components/IptcMetadataEditor';
+import ResponsiveImage from './components/ResponsiveImage';
 import PhotoHistoryModal from './components/PhotoHistoryModal';
 import { useUI } from './components/UIContext';
 import LicenseSelectorCard from './client/components/LicenseSelectorCard';
@@ -120,8 +121,8 @@ export default function PhotoDetailView() {
 
                     {/* Linke Spalte */}
                     <div className="flex-1 w-full flex flex-col gap-4">
-                        <div className="bg-base-200 rounded-box flex items-center justify-center p-4 min-h-[40vh]">
-                            <img src={photo.url} alt={photo.title || 'Bild'} className="max-w-full h-auto max-h-[70vh] object-contain rounded drop-shadow-xl"/>
+                        <div className="bg-base-200 rounded-box flex items-center justify-center p-4 min-h-[40vh] overflow-hidden">
+                            <ResponsiveImage src={photo.url} alt={photo.title || 'Bild'} containerClassName="flex items-center justify-center w-full h-full min-h-[40vh] bg-transparent" className="max-w-full h-auto max-h-[70vh] object-contain rounded drop-shadow-xl" />
                         </div>
 
                         {isPhotographer && (<div className="flex justify-end w-full bg-base-100 p-4 rounded-box border border-base-300 shadow-sm mt-2"><button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap"><span className="iconify mdi--trash-can"></span> Bild löschen</button></div>)}

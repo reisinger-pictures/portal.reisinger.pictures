@@ -47,6 +47,7 @@ export default function ClientOrdersView() {
                             const date = new Date(snap?.created_at).toLocaleDateString('de-DE');
                             const isQuote = order.is_quote_request;
                             const isPendingQuote = isQuote && order.status === 'pending';
+                            const isBlocked = ['disputed', 'refunded', 'cancelled'].includes(order.status);
                             return (
                                 <div key={order.id} className="card bg-base-100 border border-base-300 shadow-sm overflow-hidden">
                                     <div className="bg-base-200/50 p-4 border-b border-base-300 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -58,7 +59,9 @@ export default function ClientOrdersView() {
                                             <div className="text-right flex-1 sm:flex-none">
                                                 <div className="font-mono font-bold text-lg text-primary">{isQuote ? '--- €' : `${Number(snap?.total_gross).toFixed(2)} €`}</div>
                                             </div>
-                                            {isPendingQuote ? <span className="badge badge-warning font-bold p-3">Angebot ausständig</span> : <><button className="btn btn-primary btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/download-zip', '_self')} title="Lizenzierte Bilder als ZIP herunterladen">
+                                            {isPendingQuote ? <span className="badge badge-warning font-bold p-3">Angebot ausständig</span> : 
+                                            isBlocked ? <span className="badge badge-error font-bold p-3">Zugriff gesperrt ({order.status})</span> :
+                                            <><button className="btn btn-primary btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/download-zip', '_self')} title="Lizenzierte Bilder als ZIP herunterladen">
                                                 <span className="iconify mdi--zip-box"></span> Bilder ZIP
                                             </button>
                                             <button className="btn btn-outline btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/invoice', '_self')} title="Rechnung als PDF herunterladen">

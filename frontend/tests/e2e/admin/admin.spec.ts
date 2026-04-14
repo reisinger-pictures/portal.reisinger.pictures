@@ -3,7 +3,6 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
-import { NetworkHelper } from '../helpers/NetworkHelper';
 import { FormHelper } from '../helpers/FormHelper';
 
 
@@ -43,16 +42,7 @@ test.describe('Admin Workflow', () => {
         const form = new FormHelper(page, modal);
         await form.fillUserModal({ name: 'Test Admin Client', email: uniqueEmail });
         
-        // Warte auf den SWR-Refetch nach dem Anlegen
-        const network = new NetworkHelper(page);
-        const usersRefetchPromise = network.waitForUsersRefetch();
-
-        const createUserPromise = page.waitForResponse(res => res.url().includes('/api/management/users') && res.request().method() === 'POST');
         await modal.clickButton('Nutzer anlegen & Einladen');
-        const res = await createUserPromise;
-        const data = await res.json();
-        helper.trackUser(data.user.id);
-        await usersRefetchPromise;
 
         const toast = page.locator('.toast');
         await expect(toast).toBeVisible();

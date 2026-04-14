@@ -1,17 +1,41 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { CartItem, CartContext } from './CartContext';
+import { useAuth } from './useAuth';
+import { useUI } from '../ui/components/UIContext';
 
 export function CartProvider({ children }: { children: ReactNode }) {
-    const [items, setItems] = useState<CartItem[]>(() => {
-        try {
-            const saved = localStorage.getItem('rp_cart');
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) { console.error('Cart parse error', e); return []; }
-    });
+    const { user } = useAuth();
+    const { showToast } = useUI();
+    const cartKey = `rp_cart_${user?.id || 'guest'}`;
 
+    const [items, setItems] = useState<CartItem[]>([]);
+
+    // Initiale Lade-Logik & Re-Load bei User-Wechsel
     useEffect(() => {
-        localStorage.setItem('rp_cart', JSON.stringify(items));
-    }, [items]);
+        let mounted = true;
+        Promise.resolve().then(() => {
+            if (!mounted) return;
+            try {
+                const saved = localStorage.getItem(cartKey);
+                setItems(saved ? JSON.parse(saved) : []);
+            } catch {
+                showToast('error', 'Warenkorb konnte nicht geladen werden.');
+                setItems([]);
+            }
+        });
+        return () => { mounted = false; };
+    }, [cartKey, showToast]);
+
+    // Speichern bei Änderungen
+    useEffect(() => {
+        try {
+            if (items.length > 0 || localStorage.getItem(cartKey)) {
+                localStorage.setItem(cartKey, JSON.stringify(items));
+            }
+        } catch {
+            showToast('error', 'Warenkorb konnte nicht gespeichert werden.');
+        }
+    }, [items, cartKey, showToast]);
 
     const addToCart = (item: CartItem) => {
         setItems(prev => {

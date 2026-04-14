@@ -8,16 +8,18 @@ interface Props {
 interface State {
     hasError: boolean;
     error: Error | null;
+    retryCount: number;
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
     public state: State = {
         hasError: false,
-        error: null
+        error: null,
+        retryCount: 0
     };
 
     public static getDerivedStateFromError(error: Error): State {
-        return {hasError: true, error};
+        return {hasError: true, error, retryCount: 0};
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -36,12 +38,14 @@ export default class ErrorBoundary extends Component<Props, State> {
                     <p className="text-sm font-mono break-all mb-4 opacity-80">
                         {this.state.error?.message || 'Unbekannter Fehler'}
                     </p>
-                    <button
-                        className="btn btn-sm btn-outline btn-error"
-                        onClick={() => this.setState({hasError: false, error: null})}
-                    >
-                        Erneut versuchen
-                    </button>
+                    {this.state.retryCount < 3 && (
+                        <button
+                            className="btn btn-sm btn-outline btn-error"
+                            onClick={() => this.setState(s => ({hasError: false, error: null, retryCount: s.retryCount + 1}))}
+                        >
+                            Erneut versuchen
+                        </button>
+                    )}
                 </div>
             );
         }

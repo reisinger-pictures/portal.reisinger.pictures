@@ -21,13 +21,11 @@ class GalleryGroup extends Model
         'is_free_download',
         'is_editorial_only',
         'is_hidden',
-        'restricted_photographers',
-        'deleted_at'
+        'restricted_photographers'
     ];
 
     protected $casts = [
         'is_public' => 'boolean',
-        'deleted_at' => 'datetime',
     ];
 
     protected static function booted()

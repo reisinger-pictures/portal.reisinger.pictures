@@ -9,7 +9,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\CustomMail;
-use App\Mail\NotificationMail;
+use App\Mail\RatingFinishedMail;
 
 class MailController extends Controller
 {
@@ -44,7 +44,7 @@ class MailController extends Controller
             $subject = str_replace(['{user_name}', '{gallery_name}'], [$user->name, $gallery->name], $request->subject);
             $body = str_replace(['{user_name}', '{gallery_name}', '{link}'], [$user->name, $gallery->name, $link], $request->body);
 
-            Mail::to($user->email)->send(new CustomMail($subject, $body));
+            Mail::to($user->email)->queue(new CustomMail($subject, $body));
             $count++;
         }
 
@@ -69,10 +69,7 @@ class MailController extends Controller
         ->get();
         
         foreach($notifiedUsers as $notifiedUser) {
-            $messageBody = "<p>Der Kunde <b>{$user->name}</b> ({$user->email}) hat die Auswahl in der Galerie <b>{$gallery->name}</b> soeben abgeschlossen.</p>";
-            $mailSubject = "Auswahl abgeschlossen: {$gallery->name}";
-            
-            Mail::to($notifiedUser->email)->send(new NotificationMail($notifiedUser->name, $messageBody, $mailSubject));
+            Mail::to($notifiedUser->email)->queue(new RatingFinishedMail($notifiedUser->name, $user->name, $user->email, $gallery->name));
         }
 
         return response()->json(['success' => true]);

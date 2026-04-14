@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { Customer } from '../ManagementCustomersView';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import { LocationResult } from '../../../logic/useLocations';
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave }: Props) {
-    const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<Partial<Customer>>();
+    const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting } } = useForm<Partial<Customer>>();
 
     useEffect(() => {
         if (isOpen) {
@@ -29,9 +29,9 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
         }
     }, [isOpen, editingCustomer, reset]);
 
-    const watchZip = watch('zip');
-    const watchCity = watch('city');
-    const watchCountry = watch('country');
+    const watchZip = useWatch({ control, name: 'zip' });
+    const watchCity = useWatch({ control, name: 'city' });
+    const watchCountry = useWatch({ control, name: 'country' });
 
     const onSubmit = async (data: Partial<Customer>) => {
         await onSave(data);

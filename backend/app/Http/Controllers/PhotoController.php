@@ -46,6 +46,7 @@ class PhotoController extends Controller
 
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
+            'headline' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             
             'keywords' => 'nullable|string|max:255',
@@ -63,6 +64,7 @@ class PhotoController extends Controller
                     'photo_id' => $photo->id,
                     'user_id' => $user->id,
                     'title' => $photo->title,
+                    'headline' => $photo->headline,
                     'description' => $photo->description,
                     
                     'keywords' => $photo->keywords,
@@ -114,6 +116,7 @@ class PhotoController extends Controller
 
         $photo->update([
             'title' => $version->title,
+            'headline' => $version->headline,
             'description' => $version->description,
             
             'keywords' => $version->keywords,
@@ -136,13 +139,8 @@ class PhotoController extends Controller
             return response()->json(['error' => 'Keine Löschberechtigung.'], 403);
         }
 
-        $thumbName = md5($photo->filename . '1024') . '.webp';
-        Storage::disk('photos')->delete([
-            $photo->gallery->id . '/' . $photo->filename,
-            $photo->gallery->id . '/_watermarked/' . $photo->filename,
-            $photo->gallery->id . '/_thumbs/' . $thumbName,
-            $photo->gallery->id . '/_thumbs/_watermarked/' . $thumbName
-        ]);
+        // Dispatch Job to delete files asynchronously
+        \App\Jobs\DeletePhotoFilesJob::dispatch((string) $photo->gallery_id, $photo->filename, (string) $photo->id);
 
         $photo->delete();
 

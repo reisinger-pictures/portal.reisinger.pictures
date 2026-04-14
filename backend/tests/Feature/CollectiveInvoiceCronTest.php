@@ -19,11 +19,7 @@ class CollectiveInvoiceCronTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        try {
-            Http::delete('http://127.0.0.1:8026/api/v1/messages');
-        } catch (\Exception $e) {
-            $this->markTestSkipped('Mailpit läuft nicht auf Port 8026.');
-        }
+        Http::delete('http://127.0.0.1:8026/api/v1/messages');
     }
 
     public function test_cron_generates_collective_invoices_at_end_of_month_with_pdf()

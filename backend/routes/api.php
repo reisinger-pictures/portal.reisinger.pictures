@@ -62,7 +62,8 @@ Route::get('/photos/{id}/context', [SearchController::class, 'photoContext']);
 Route::get('/galleries/{slug}', [GalleryFrontendController::class, 'show']);
 Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])->where('filename', '.*');
 
-Route::get('/photos/{photoId}/download', [DownloadController::class, 'downloadSingle']);
+$downloadThrottle = env('DOWNLOAD_THROTTLE', 9999);
+Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{photoId}/download', [DownloadController::class, 'downloadSingle']);
 Route::get('/orders/quote-decode', [OrderController::class, 'decodeQuoteLink']);
 Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip']);
 

@@ -10,10 +10,10 @@ export class MailpitHelper {
     }
 
     async getMessageForEmail(email: string) {
+        for (let i = 0; i < 15; i++) {
             const response = await this.request.get(`${this.baseUrl}/messages`);
             const data = await response.json();
             if (data.messages && data.messages.length > 0) {
-                // Suche explizit nach der Nachricht an DIESE E-Mail-Adresse, um Parallel-Test-Konflikte zu vermeiden
                 const msg = data.messages.find((m: { To: unknown[]; ID: string }) => JSON.stringify(m.To).includes(email));
                 if (msg) {
                     const detailResponse = await this.request.get(`${this.baseUrl}/message/${msg.ID}`);
@@ -21,6 +21,8 @@ export class MailpitHelper {
                 }
             }
             await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        return null;
     }
 
     async extractLinkForEmail(email: string, regexPattern: RegExp): Promise<string | null> {

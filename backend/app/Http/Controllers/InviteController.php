@@ -100,7 +100,9 @@ class InviteController extends Controller
         if (!$currentUser && $request->hasCookie('rp_jwt')) {
             try {
                 $currentUser = $guard->setToken($request->cookie('rp_jwt'))->user();
-            } catch (\Exception $e) { \Illuminate\Support\Facades\Log::debug('Invite redeem JWT error: ' . $e->getMessage()); }
+            } catch (\Exception $e) { 
+                // Ignore invalid/expired token gracefully
+            }
         }
 
         $transientGalleries = [$gallery->id];

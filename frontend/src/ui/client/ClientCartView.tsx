@@ -83,7 +83,7 @@ const checkoutSchema = z.object({
     billing_zip: z.string().min(4, 'PLZ ist erforderlich'),
     billing_city: z.string().min(2, 'Ort ist erforderlich'),
     quote_message: z.string().optional(),
-    agb_accepted: z.literal(true, { errorMap: () => ({ message: 'Zustimmung erforderlich' }) }),
+    agb_accepted: z.literal(true, { message: 'Zustimmung erforderlich' }),
     withdrawal_waived: z.boolean().optional()
 });
 

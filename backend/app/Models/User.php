@@ -102,12 +102,22 @@ class User extends Authenticatable implements JWTSubject
     }
 
     private function getSubGroupIds($parentIds) {
-        $allIds = $parentIds;
-        $children = GalleryGroup::whereIn('parent_id', $parentIds)->pluck('id')->toArray();
-        if (!empty($children)) {
-            $allIds = array_merge($allIds, $this->getSubGroupIds($children));
-        }
-        return array_unique($allIds);
+        if (empty($parentIds)) return [];
+
+        $inIds = implode(',', array_map(function($id) { return "'" . $id . "'"; }, $parentIds));
+        
+        $query = "
+            WITH RECURSIVE cte AS (
+                SELECT id FROM gallery_groups WHERE id IN ($inIds)
+                UNION ALL
+                SELECT g.id FROM gallery_groups g
+                INNER JOIN cte ON g.parent_id = cte.id
+            )
+            SELECT id FROM cte;
+        ";
+
+        $result = \Illuminate\Support\Facades\DB::select($query);
+        return array_values(array_unique(array_column($result, 'id')));
     }
 
     public function getAllowedGalleryIds(): array
@@ -208,6 +218,7 @@ return in_array($galleryId, $this->getAllowedGalleryIds());
     public function hasPurchasedPhoto($photoId, $requestedTier): bool
     {
         $orders = \App\Models\Order::where('user_id', $this->id)
+            ->whereNotIn('status', ['disputed', 'refunded', 'cancelled'])
             ->where(function($q) {
                 $q->where('is_quote_request', false)
                   ->orWhere('status', '!=', 'pending');

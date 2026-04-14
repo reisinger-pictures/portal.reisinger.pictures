@@ -7,7 +7,7 @@ use App\Models\Tenant;
 use App\Models\TenantInvite;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\CustomMail;
+use App\Mail\TenantInviteMail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -37,9 +37,7 @@ class TenantInviteController extends Controller
         ]);
 
         $link = rtrim(config('app.frontend_url'), '/') . '/tenant-invite/' . $token;
-        $body = "<p>Hallo!</p><p>Du wurdest eingeladen, dem Unternehmens-Account <b>{$tenant->name}</b> auf dem Reisinger Foto Portal beizutreten.</p><p><a href='{$link}'>Hier klicken, um den Account zu aktivieren</a></p>";
-
-        Mail::to($request->email)->send(new CustomMail("Einladung zum Portal: {$tenant->name}", $body));
+        Mail::to($request->email)->queue(new TenantInviteMail($tenant->name, $link));
 
         return response()->json(['success' => true]);
     }
@@ -95,6 +93,7 @@ class TenantInviteController extends Controller
             $invite->delete();
 
             // Automatisch einloggen
+            \Illuminate\Support\Facades\Auth::guard('api')->logout();
             $token = \Illuminate\Support\Facades\Auth::guard('api')->login($user);
             // Wir binden Controller.php Funktionalität ein
             $ttl = \Illuminate\Support\Facades\Auth::guard('api')->factory()->getTTL();

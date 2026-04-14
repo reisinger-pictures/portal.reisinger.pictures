@@ -44,12 +44,7 @@ test.describe('User Setup via Mailpit Workflow', () => {
         await page.getByRole('button', { name: '+ Neuen Nutzer anlegen' }).click();
         const form = new FormHelper(page, modal);
         await form.fillUserModal({ name: 'Test Mailpit User', email: newUserEmail });
-        const createUserPromise = page.waitForResponse(res => res.url().includes('/api/management/users') && res.request().method() === 'POST');
         await modal.submitModal('Nutzer anlegen & Einladen');
-        const res = await createUserPromise;
-        const data = await res.json();
-        helper.trackUser(data.user.id);
-
         await expect(page.locator('.toast')).toContainText('Nutzer angelegt');
 
         // --- Phase 2: User setzt Passwort ---

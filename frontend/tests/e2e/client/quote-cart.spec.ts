@@ -72,7 +72,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         await page.getByRole('button', { name: 'Als Angebot in den Warenkorb' }).click();
         await expect(page.locator('.toast')).toContainText('Angebot zum Warenkorb hinzugefügt');
 
-        await page.goto('/cart');
+        await sidebar.navigateTo('Warenkorb');
         await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('--- €');
         
         await form.fillCheckoutForm({
@@ -91,7 +91,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         // --- 3. ADMIN: Kalkuliert & sendet Mail ---
         await auth.login(adminUser.email, adminUser.password);
         
-        await sidebar.navigateTo('Bestellungen & Anfragen');
+        await sidebar.navigateTo('Shop-Bestellungen');
         
         const firstRow = page.locator('tbody tr').filter({ hasText: clientUser.email }).first();
         await expect(firstRow).toContainText('Angebot');

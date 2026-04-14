@@ -19,6 +19,7 @@ This directory serves as the single source of truth for all technical concepts, 
 * [03-custom-quotes-and-stripe.md](ecommerce/03-custom-quotes-and-stripe.md) - Custom Quote Links and Stripe Payments.
 * [04-crm-and-contracts.md](ecommerce/04-crm-and-contracts.md) - CRM, Text Snippets and PDF Contracts.
 * [05-manual-invoices.md](ecommerce/05-manual-invoices.md) - Stateless PDF generation for B2B.
+* [06-legal-evidence-and-disputes.md](ecommerce/06-legal-evidence-and-disputes.md) - Dispute protection and access locking.
 
 ### 🖼️ Gallery Management
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.

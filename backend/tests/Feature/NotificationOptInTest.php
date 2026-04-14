@@ -27,7 +27,7 @@ class NotificationOptInTest extends TestCase {
         $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
         $adminToken = auth('api')->login($admin);
         
-        try { \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages'); } catch (\Exception $e) { \Illuminate\Support\Facades\Log::debug($e->getMessage()); }
+        \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages');
 
         $adminResponse = $this->withHeaders(['Authorization' => "Bearer $adminToken"])
              ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [

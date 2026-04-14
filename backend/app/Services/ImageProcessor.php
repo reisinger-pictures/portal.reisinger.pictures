@@ -27,7 +27,7 @@ class ImageProcessor
     public function generateThumbnail($sourcePath, $destPath, $size, $quality = 80)
     {
         // 1. PHP Extension (Produktion)
-        if (class_exists('Imagick')) {
+        if (class_exists('Imagick') && !config('app.force_image_cli')) {
             try {
                 Imagick::setResourceLimit(Imagick::RESOURCETYPE_THREAD, 1);
                 $im = new Imagick($sourcePath);
@@ -36,6 +36,7 @@ class ImageProcessor
                     $im->thumbnailImage($size, 0, false);
                 }
                 $im->setImageFormat('webp');
+                $im->stripImage(); // Exif-Daten aus Thumbnails entfernen
                 $im->setImageCompressionQuality($quality);
                 $im->writeImage($destPath);
                 $im->clear(); 
@@ -51,6 +52,7 @@ class ImageProcessor
             $sourcePath,
             '-auto-orient',
             '-resize', $size . 'x>',
+            '-strip', // Exif-Daten aus Thumbnails entfernen
             '-quality', (string)$quality,
             'webp:' . $destPath
         ]);
@@ -211,6 +213,7 @@ class ImageProcessor
                     $im->resizeImage($maxWidth, 0, \Imagick::FILTER_LANCZOS, 1);
                 }
                 $im->setImageCompressionQuality(90); // Hohe Qualität für Downloads
+                $im->stripImage();
                 $im->writeImage($destPath);
                 $im->clear(); 
                 $im->destroy();
@@ -220,7 +223,7 @@ class ImageProcessor
             }
         }
 
-        return $this->runMagick([$sourcePath, '-auto-orient', '-resize', $maxWidth . 'x>', '-quality', '90', $destPath]);
+        return $this->runMagick([$sourcePath, '-auto-orient', '-resize', $maxWidth . 'x>', '-strip', '-quality', '90', $destPath]);
     }
 
     public function generateTiledWatermark($sourcePath, $destPath, $svgPath, $text, $opacity, $maxWidth = null)

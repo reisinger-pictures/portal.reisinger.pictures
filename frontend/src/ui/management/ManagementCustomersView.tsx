@@ -34,8 +34,8 @@ export default function ManagementCustomersView() {
                 showToast('success', 'Kunde angelegt');
             }
             mutate();
-        } catch (e: any) {
-            showToast('error', e.message || 'Fehler beim Speichern');
+        } catch (e: unknown) {
+            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
         }
     };
 

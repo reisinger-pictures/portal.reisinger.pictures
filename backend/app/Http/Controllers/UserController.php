@@ -115,6 +115,7 @@ class UserController extends Controller
 
         $request->validate([
             'role_ids' => 'array',
+            'role_ids.*' => 'exists:roles,id',
             'gallery_group_ids' => 'array',
             'gallery_ids' => 'array',
             'can_edit_metadata' => 'boolean',

@@ -1,9 +1,10 @@
 import AutocompleteInput from '../../components/AutocompleteInput';
 import { Customer } from '../ManagementCustomersView';
 import { LocationResult } from '../../../logic/useLocations';
+import { DocumentFormData } from '../ManagementManualInvoiceView';
 
 interface Props {
-    formData: any;
+    formData: DocumentFormData;
     onUpdate: (field: string, value: string) => void;
     onMultiUpdate: (updates: Record<string, string>) => void;
 }

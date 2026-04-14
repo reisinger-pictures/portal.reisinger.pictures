@@ -100,7 +100,7 @@ class PhotoUploadTest extends TestCase
 
         // Upload als Fotograf B (kein Zugriff)
         $token = auth('api')->login($photogB);
-        $file = UploadedFile::fake()->image('hacked.jpg');
+        $file = UploadedFile::fake()->image('hacked.jpg', 600, 600);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
             ->postJson('/api/management/upload', [

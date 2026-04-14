@@ -58,4 +58,20 @@ class LocationSearchTest extends TestCase
         $resZip->assertStatus(200);
         $this->assertCount(1, $resZip->json());
     }
+
+    public function test_city_search_deduplicates_by_name_and_sorts_by_population()
+    {
+        Location::create(['type' => 'city', 'name' => 'Wien', 'postal_code' => '1010', 'state' => 'Wien', 'country' => 'Österreich', 'iso_country' => 'AT', 'population' => 1000000]);
+        Location::create(['type' => 'city', 'name' => 'Wien', 'postal_code' => '1020', 'state' => 'Wien', 'country' => 'Österreich', 'iso_country' => 'AT', 'population' => 900000]);
+
+        $this->waitForSearchIndex();
+
+        $res = $this->getJson('/api/search/locations?q=Wien&type=city');
+        $res->assertStatus(200);
+        
+        // Sollte nur 1 Ergebnis zurückgeben wegen unique('name') im Controller
+        $this->assertCount(1, $res->json());
+        // Das Ergebnis mit der höchsten Population (1010) muss das verbleibende sein
+        $this->assertEquals('1010', $res->json()[0]['postal_code']);
+    }
 }

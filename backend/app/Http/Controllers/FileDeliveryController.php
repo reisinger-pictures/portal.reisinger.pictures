@@ -107,6 +107,12 @@ class FileDeliveryController extends Controller
 
         if (!file_exists($path)) abort(404, 'File not found');
 
+        $realBase = realpath($baseStoragePath);
+        $realPath = realpath($path);
+        if ($realPath && !str_starts_with($realPath, $realBase)) {
+            abort(403, 'Path Traversal Detected');
+        }
+
         // Hit-Registry (Drosselung auf max. 1 Datenbank-Update pro 24 Stunden pro Asset)
         $cacheKey = 'photo_hit_' . $photo->id;
         if (!Cache::has($cacheKey)) {
@@ -114,7 +120,7 @@ class FileDeliveryController extends Controller
             Cache::put($cacheKey, true, now()->addHours(24));
         }
 
-        $mime = mime_content_type($path);
+        $mime = $photo->mime_type ?? mime_content_type($path);
         $proxyHeader = env('PROXY_DELIVERY_HEADER', false);
 
         if ($proxyHeader) {

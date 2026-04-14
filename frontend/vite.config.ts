@@ -6,7 +6,10 @@ export default defineConfig({
     define: {
         __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString())
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [
+        react(), 
+        tailwindcss()
+    ],
     build: {
         chunkSizeWarningLimit: 1024,
         rollupOptions: {

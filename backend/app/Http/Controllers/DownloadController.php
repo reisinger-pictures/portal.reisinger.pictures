@@ -40,7 +40,6 @@ class DownloadController extends Controller
             mkdir($tempDir, 0755, true);
 
         $tempPath = $tempDir . '/' . uniqid('dl_') . '.jpg';
-        copy($sourcePath, $tempPath);
 
         $artist = trim($photo->artist ?? config('app.name', 'Reisinger Foto Portal'), "\"\'");
         $copyright = 'Copyright ' . date('Y') . ' ' . $artist;
@@ -49,7 +48,6 @@ class DownloadController extends Controller
 
         $args = [
             'exiftool',
-            '-overwrite_original',
             '-q',
             '-m',
             '-charset',
@@ -79,7 +77,8 @@ class DownloadController extends Controller
             "-SpecialInstructions={$instructions}",
             "-UsageTerms={$agbUrl}",
             "-Rights={$agbUrl}",
-            $tempPath
+            '-o', $tempPath,
+            $sourcePath
         );
 
         $process = new Process($args);
@@ -87,7 +86,6 @@ class DownloadController extends Controller
 
         if (!$process->isSuccessful()) {
             Log::error("ExifTool failed on {$sourcePath}: " . $process->getErrorOutput());
-            @unlink($tempPath);
             return $sourcePath;
         }
 
@@ -145,11 +143,7 @@ class DownloadController extends Controller
             }
         });
 
-        $workingPath = $tempDir . '/' . uniqid('inject_') . '.jpg';
-        copy($scaledBase, $workingPath);
-        $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
-
-        if ($workingPath !== $processedPath && file_exists($workingPath)) @unlink($workingPath);
+        $processedPath = $this->injectMetadata($scaledBase, $photo, $userName);
 
         $downloadName = $photo->id . '_' . $tier . '.jpg';
         return response()->download($processedPath, $downloadName)->deleteFileAfterSend(true);
@@ -219,16 +213,12 @@ class DownloadController extends Controller
                     }
                 });
 
-                $workingPath = $tempDir . '/' . uniqid('inject_') . '.jpg';
-                copy($scaledBase, $workingPath);
-
-                $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
+                $processedPath = $this->injectMetadata($scaledBase, $photo, $userName);
                 $downloadName = $photo->id . '_' . strtoupper($tier) . '.jpg';
                 
                 $zip->addFileFromPath($downloadName, $processedPath);
 
                 if ($processedPath !== $sourcePath && file_exists($processedPath)) @unlink($processedPath);
-                if ($workingPath !== $sourcePath && file_exists($workingPath)) @unlink($workingPath);
             }
 
             $zip->finish();
@@ -245,6 +235,7 @@ class DownloadController extends Controller
             ->firstOrFail();
 
         if ($order->is_quote_request && $order->status === 'pending') abort(403, 'Angebot noch nicht abgerechnet.');
+        if (in_array($order->status, ['disputed', 'refunded', 'cancelled'])) abort(403, 'Zugriff aufgrund des Bestellstatus gesperrt.');
         $snapshot = $order->invoiceSnapshot;
         if (!$snapshot || empty($snapshot->customer_details['items'])) {
             abort(404, 'Keine Bilder in dieser Bestellung gefunden.');
@@ -291,16 +282,13 @@ class DownloadController extends Controller
                     }
                 });
 
-                $workingPath = $tempDir . '/' . uniqid('inject_') . '.jpg';
-                copy($scaledBase, $workingPath);
-                $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
+                $processedPath = $this->injectMetadata($scaledBase, $photo, $userName);
 
                 $downloadName = $photo->id . '_' . strtoupper($tier) . '.jpg';
 
                 $zip->addFileFromPath($downloadName, $processedPath);
 
                 if ($processedPath !== $sourcePath && file_exists($processedPath)) @unlink($processedPath);
-                if ($workingPath !== $sourcePath && file_exists($workingPath)) @unlink($workingPath);
             }
 
             $zip->finish();

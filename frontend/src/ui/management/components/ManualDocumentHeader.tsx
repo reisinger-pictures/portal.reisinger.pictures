@@ -1,8 +1,8 @@
-import React from 'react';
+import { DocumentFormData } from '../ManagementManualInvoiceView';
 
 interface Props {
     docType: 'invoice' | 'offer';
-    data: any;
+    data: DocumentFormData;
     dueDateOption: string;
     onUpdate: (field: string, value: string) => void;
     onOptionChange: (opt: string) => void;

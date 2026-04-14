@@ -133,7 +133,22 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                         <label className="label"><span className="label-text font-bold">Übergeordnete Meta-Galerie</span></label>
                         <select {...register('parent_id')} className="select select-bordered w-full">
                             <option value="">-- Keine --</option>
-                            {availableGroups.filter(g => g.id !== editingGroup?.id).map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
+                            {(() => {
+                                const result = [];
+                                let skipDepth = -1;
+                                for (const g of availableGroups) {
+                                    if (editingGroup && g.id === editingGroup.id) {
+                                        skipDepth = g.depth;
+                                        continue;
+                                    }
+                                    if (skipDepth !== -1) {
+                                        if (g.depth > skipDepth) continue;
+                                        skipDepth = -1;
+                                    }
+                                    result.push(g);
+                                }
+                                return result.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>);
+                            })()}
                         </select>
                     </div>
 

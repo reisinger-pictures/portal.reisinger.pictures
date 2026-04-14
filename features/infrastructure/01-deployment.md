@@ -8,8 +8,7 @@ status: active
 
 ## 1. Portainer & Docker Stack
 - The project is deployed as a Docker stack via **Portainer**.
-- **Automated Init:** A dependency chain ensures the database is ready before the backend starts. The `backend-init` container automatically runs `php artisan migrate --force` and generates keys (`APP_KEY`, `JWT_SECRET`) if they are missing.
-  - TODO: This is most likely not up to date and has to be updated before deployment of version 1.0. 
+- **Automated Init:** The initialization logic is embedded directly into the `command` block of the `backend` container. It waits for the database to be ready, generates missing application keys (`APP_KEY`, `JWT_SECRET`), and runs `php artisan migrate --force` before starting the background workers and the Apache webserver. 
 
 ## 2. Environment Variables
 - All configuration is managed via Portainer environment variables, overriding the `.env` file.

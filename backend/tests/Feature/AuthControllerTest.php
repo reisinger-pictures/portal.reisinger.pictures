@@ -21,11 +21,7 @@ class AuthControllerTest extends TestCase {
 
 
     public function test_user_can_register_and_mail_is_sent_to_mailpit_and_can_reset_password() {
-        try {
-            \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages');
-        } catch (\Exception $e) {
-            $this->markTestSkipped('Mailpit läuft nicht auf Port 8026.');
-        }
+        \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages');
 
         $response = $this->postJson('/api/auth/register', [
             'name' => 'New User',

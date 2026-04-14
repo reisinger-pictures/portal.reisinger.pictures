@@ -79,7 +79,19 @@ class TenantController extends Controller
     {
         if (!auth('api')->user()->is_admin) return response()->json(['error' => 'Forbidden'], 403);
         
-        $request->validate(['user_ids' => 'array']);
+        $request->validate([
+            'user_ids' => 'array',
+            'user_ids.*' => 'exists:users,id'
+        ]);
+        
+        $superAdmins = \App\Models\User::whereIn('id', $request->user_ids ?? [])
+            ->whereHas('roles', function($q) { $q->where('name', 'super_admin'); })
+            ->exists();
+            
+        if ($superAdmins) {
+            return response()->json(['error' => 'Super-Admins können keinem Mandanten zugewiesen werden.'], 422);
+        }
+
         $tenant = Tenant::findOrFail($id);
         $tenant->users()->sync($request->user_ids ?? []);
         

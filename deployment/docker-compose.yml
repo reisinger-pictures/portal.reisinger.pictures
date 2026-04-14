@@ -5,6 +5,10 @@ services:
     image: mariadb:10.11
     container_name: portal_db
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: portal_db
@@ -19,6 +23,10 @@ services:
     image: getmeili/meilisearch:v1.6
     container_name: portal_search
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
     environment:
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
       MEILI_ENV: production
@@ -36,6 +44,10 @@ services:
         condition: service_started
       search:
         condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:Z
       - /home/webadmin/websites/photos:/var/www/photos:Z
@@ -65,6 +77,7 @@ services:
       - MEILISEARCH_KEY=${MEILI_MASTER_KEY}
       - GALLERY_CLEANUP_GRACE_MONTHS=3
       - AUTH_THROTTLE_LIMIT=10
+      - DOWNLOAD_THROTTLE=120
       - ZIP_DOWNLOAD_THROTTLE=10
       - FTP_STORAGE_PATH=/var/www/ftp
       - STRIPE_KEY=${STRIPE_KEY}
@@ -115,6 +128,10 @@ services:
     depends_on:
       backend:
         condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
     volumes:
       - /home/webadmin/websites/web-portal.reisinger.pictures/dist:/usr/share/nginx/html:ro
       - /home/webadmin/websites/web-portal.reisinger.pictures/config/nginx.conf:/etc/nginx/conf.d/default.conf:ro

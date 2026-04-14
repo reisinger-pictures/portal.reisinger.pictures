@@ -28,13 +28,20 @@ class CrmAndSnippetTest extends TestCase {
         $this->assertDatabaseHas('text_snippets', ['title' => 'Test Snippet']);
     }
 
-    public function test_normal_admin_cannot_access_crm() {
+    public function test_normal_admin_cannot_access_crm_and_snippets() {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
         $token = auth('api')->login($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
              ->getJson('/api/management/customers')
+             ->assertStatus(403);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->postJson('/api/management/text-snippets', [
+                 'title' => 'Hacked', 
+                 'content_html' => '<p>Hacked</p>'
+             ])
              ->assertStatus(403);
     }
 }

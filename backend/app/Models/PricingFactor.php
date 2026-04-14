@@ -3,13 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class PricingFactor extends Model
 {
-    /**
-     * The table associated with the model.
-     * @var string
-     */
+    use HasUuids;
+
     protected $table = 'pricing_factors';
 
     protected $fillable = [

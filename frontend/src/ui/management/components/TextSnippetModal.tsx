@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { TextSnippet } from '../ManagementTextSnippetsView';
 import WysiwygEditor from '../../components/WysiwygEditor';
 
@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSave }: Props) {
-    const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<Partial<TextSnippet>>();
+    const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting } } = useForm<Partial<TextSnippet>>();
 
     useEffect(() => {
         if (isOpen) {
@@ -23,7 +23,7 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
         }
     }, [isOpen, editingSnippet, reset]);
 
-    const watchContentHtml = watch('content_html');
+    const watchContentHtml = useWatch({ control, name: 'content_html' });
 
     const onSubmit = async (data: Partial<TextSnippet>) => {
         await onSave(data);

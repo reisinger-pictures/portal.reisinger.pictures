@@ -27,7 +27,7 @@ class TextSnippetController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'shortcut' => 'nullable|string|max:100|unique:text_snippets,shortcut',
+            'shortcut' => 'nullable|string|min:1|max:100|unique:text_snippets,shortcut',
             'content_html' => 'nullable|string',
         ]);
 
@@ -44,7 +44,7 @@ class TextSnippetController extends Controller
         
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'shortcut' => 'nullable|string|max:100|unique:text_snippets,shortcut,' . $id,
+            'shortcut' => 'nullable|string|min:1|max:100|unique:text_snippets,shortcut,' . $id,
             'content_html' => 'nullable|string',
         ]);
 

@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\DB;
 class InvoiceSequence extends Model
 {
     public $timestamps = false;
+    protected $primaryKey = 'year';
+    public $incrementing = false;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'year',

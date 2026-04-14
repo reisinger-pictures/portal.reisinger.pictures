@@ -13,9 +13,14 @@ class TransientUserProvider extends EloquentUserProvider
         $payload = null;
         try {
             $payload = JWTAuth::parseToken()->getPayload();
-        } catch (\Exception $e) { \Illuminate\Support\Facades\Log::debug('JWT Parse error: ' . $e->getMessage()); }
+        } catch (\Exception $e) { 
+            return null; 
+        }
 
         if (is_string($identifier) && str_starts_with($identifier, 'guest_')) {
+            if (\Illuminate\Support\Facades\Cache::has('blacklisted_' . $identifier)) {
+                return null;
+            }
             if ($payload) {
                 $user = new User();
                 $user->id = null; // Explicitly null for DB-less guest

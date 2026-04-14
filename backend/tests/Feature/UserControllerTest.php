@@ -14,11 +14,7 @@ class UserControllerTest extends TestCase {
         $token = auth('api')->login($admin);
 
         // Vor dem Test die Mailpit API bereinigen
-        try {
-            \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages');
-        } catch (\Exception $e) {
-            $this->markTestSkipped('Mailpit läuft nicht auf Port 8026.');
-        }
+        \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages');
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
                          ->postJson('/api/management/users', ['name' => 'Test User', 'email' => 'test@test.com']);

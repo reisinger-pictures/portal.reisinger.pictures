@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
@@ -95,5 +96,41 @@ test.describe('Manual Documents & CRM Workflow', () => {
         ]);
 
         expect(download.suggestedFilename()).toMatch(/^Angebot-.*\.pdf$/);
+        
+        const downloadPath = await download.path();
+        const buffer = fs.readFileSync(downloadPath!);
+        
+        // Check for PDF Magic Bytes (0x25 0x50 0x44 0x46 -> %PDF)
+        expect(buffer.subarray(0, 4).toString('hex')).toBe('25504446');
+    });
+
+    test('Mobile UI: CRM Autocomplete and Tiptap Shortcuts work on small touch screens', async ({ page }) => {
+        // Setze Viewport explizit auf Mobile (z.B. iPhone 12)
+        await page.setViewportSize({ width: 390, height: 844 });
+        
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        await sidebar.navigateTo('Manuelles Angebot');
+        await expect(page).toHaveURL(/.*\/admin-manual-offer/);
+
+        // 1. Mobile CRM Autocomplete Touch-Test
+        const nameInput = page.locator('.form-control').filter({ hasText: 'Name / Ansprechpartner' }).locator('input');
+        await nameInput.click(); // Touch Simulierung
+        await nameInput.fill(`E2E VIP ${uniqueSuffix}`);
+        const autocompleteDropdown = page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first();
+        await expect(autocompleteDropdown).toBeVisible({ timeout: 15000 });
+        await autocompleteDropdown.click();
+
+        // 2. Mobile Tiptap & Slash Menu Check
+        const editor = page.locator('.ProseMirror').first();
+        await editor.click();
+        await editor.pressSequentially(`/${snippetShortcut}`, { delay: 50 });
+        
+        const slashMenu = page.locator('.menu').filter({ hasText: 'Textbaustein einfügen' });
+        await expect(slashMenu).toBeVisible();
+        await page.keyboard.press('Enter');
+        await expect(editor).toContainText(`Magic${uniqueSuffix}Content`, { timeout: 10000 });
     });
 });

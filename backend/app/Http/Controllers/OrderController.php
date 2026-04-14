@@ -135,12 +135,8 @@ class OrderController extends Controller
                 'is_quote_request' => $isQuoteRequest
             ]);
 
-            $prefix = $isLieferschein ? 'L-' : 'P-';
-            $invoiceNumber = $isQuoteRequest ? 'A-' . strtoupper(\Illuminate\Support\Str::random(8)) : InvoiceSequence::getNextInvoiceNumber($prefix);
-
             $snapshot = InvoiceSnapshot::create([
                 'order_id' => $order->id,
-                'invoice_number' => $invoiceNumber,
                 'customer_details' => [
                     'name' => $request->billing_name,
                     'email' => $user->email,
@@ -159,12 +155,12 @@ class OrderController extends Controller
             ]);
 
             if ($isQuoteRequest) {
-                return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $invoiceNumber]);
+                return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
             }
 
             if ($isLieferschein || $paymentMethod === 'invoice') {
-                Mail::to($user->email)->send(new InvoiceMail($order, $snapshot));
-                return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $invoiceNumber]);
+                Mail::to($user->email)->queue(new InvoiceMail($order, $snapshot));
+                return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
             }
 
             \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
@@ -173,6 +169,13 @@ class OrderController extends Controller
                 'currency' => 'eur',
                 'metadata' => ['order_id' => $order->id],
                 'receipt_email' => $user->email,
+            ], [
+                'idempotency_key' => 'pi_' . $order->id
+            ]);
+
+            $order->update([
+                'ip_address' => $request->ip(),
+                'stripe_payment_intent_id' => $paymentIntent->id
             ]);
 
             return response()->json([
@@ -180,7 +183,7 @@ class OrderController extends Controller
                 'requires_action' => true,
                 'client_secret' => $paymentIntent->client_secret,
                 'order_id' => $order->id,
-                'invoice_number' => $invoiceNumber
+                'invoice_number' => $snapshot->invoice_number
             ]);
         });
     }
@@ -188,11 +191,42 @@ class OrderController extends Controller
     public function indexAdmin() { return response()->json(Order::with(['user', 'invoiceSnapshot'])->orderBy('created_at', 'desc')->get()); }
     
     public function updateStatus(Request $request, $id) {
-        $request->validate(['status' => 'required|string']);
+        $request->validate(['status' => 'required|string|in:pending,invoice_created,pending_payment,paid,overdue,cancelled,disputed,refunded,delivery_note,archived_in_collective']);
         Order::findOrFail($id)->update(['status' => $request->status]);
         return response()->json(['success' => true]);
     }
     
+    public function sendQuote(Request $request, $id) {
+        $user = auth('api')->user();
+        if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        
+        $request->validate([
+            'custom_price' => 'required|numeric',
+            'message' => 'required|string'
+        ]);
+
+        $order = Order::with(['user', 'invoiceSnapshot'])->findOrFail($id);
+        $order->update(['status' => 'cancelled']);
+
+        $items = $order->invoiceSnapshot->customer_details['items'] ?? [];
+        $photoIds = array_column($items, 'photoId');
+
+        $payload = base64_encode(json_encode([
+            'photos' => $photoIds,
+            'price' => $request->custom_price,
+            'exp' => now()->addDays(14)->timestamp
+        ]));
+        $signature = hash_hmac('sha256', $payload, config('app.key'));
+        $link = rtrim(config('app.frontend_url', config('app.url')), '/') . '/cart?quote_token=' . $payload . '.' . $signature;
+
+        $subject = "Individuelles Angebot";
+        $body = "<p>" . nl2br(htmlspecialchars($request->message)) . "</p><br><p><a href=\"{$link}\">Hier geht es zum Angebot und Checkout</a></p>";
+
+        \Illuminate\Support\Facades\Mail::to($order->user->email)->send(new \App\Mail\CustomMail($subject, $body));
+
+        return response()->json(['success' => true]);
+    }
+
     public function generateQuoteLink(Request $request) {
         $user = auth('api')->user();
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
@@ -279,7 +313,7 @@ class OrderController extends Controller
                     'row_total' => -$item['price']
                 ];
             } elseif ($item['type'] === 'discount_percent') {
-                $discountAmt = $runningTotal * ($item['price'] / 100);
+                $discountAmt = ceil($runningTotal * ($item['price'] / 100) * 100) / 100;
                 $runningTotal -= $discountAmt;
                 $mappedItems[] = [
                     'type' => 'discount_percent',

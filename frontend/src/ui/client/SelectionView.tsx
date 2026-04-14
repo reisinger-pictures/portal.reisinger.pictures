@@ -76,6 +76,7 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
                 setCurrentPhotoId(currPhotoId ? currPhotoId : null);
             });
 
+            lightbox.on('close', () => setCurrentPhotoId(null));
             lightbox.on('destroy', () => setCurrentPhotoId(null));
 
             const handleKeyDown = (e: KeyboardEvent) => {
@@ -94,6 +95,7 @@ export default function SelectionView({ galleryData }: { galleryData: ReturnType
             };
             
             lightbox.on('beforeOpen', () => document.addEventListener('keydown', handleKeyDown));
+            lightbox.on('close', () => document.removeEventListener('keydown', handleKeyDown));
             lightbox.on('destroy', () => document.removeEventListener('keydown', handleKeyDown));
         }
     });

@@ -35,7 +35,10 @@ status: active
 
 ## 2. E2E Tests (Playwright)
 - **Trace Viewer & Debugging:** Always analyze the Playwright trace (`playwright show-report`) to understand failures. Traces provide a full execution timeline, snapshots, and network logs.
-- **Test Isolation (No DB Reset):** E2E tests run directly against the local dev environment (`portal_db`). They MUST be non-destructive. Always use highly dynamic names/identifiers (e.g., `Date.now()`).
+- **Test Parallelism & Isolation (CRITICAL):** E2E tests run **in parallel** across multiple workers directly against the local dev environment (`portal_db`). They MUST be 100% isolated and non-destructive.
+  - Never share or hardcode specific user emails, gallery names, or order IDs.
+  - Always use highly dynamic identifiers (e.g., `Math.random().toString(36)`).
+  - Cross-contamination between parallel tests will cause flaky CI pipelines and false positives.
 - **Page Object Model (POM):** Do not duplicate Playwright logic. Use provided helper classes (e.g., `ModalHelper`, `SidebarHelper`).
 - **Mobile-First Validation:** E2E tests must be explicitly executed against mobile viewports to verify touch targets and z-index issues.
 

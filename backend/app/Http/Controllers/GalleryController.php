@@ -282,7 +282,13 @@ class GalleryController extends Controller
             'default_state' => 'nullable|string',
             'default_country' => 'nullable|string',
             'default_iso_country' => 'nullable|string|max:2',
+            'password' => 'nullable|string',
         ]);
+
+        if ($request->filled('password')) {
+            $validated['password_hash'] = IlluminateSupportFacadesHash::make($request->password);
+        }
+        unset($validated['password']);
 
         if (isset($validated['type']) && $validated['type'] === 'selection') {
             $validated['is_live'] = false;
@@ -323,7 +329,9 @@ class GalleryController extends Controller
         }
 
         $gallery = Gallery::findOrFail($id);
-        \Illuminate\Support\Facades\Storage::disk('photos')->deleteDirectory((string) $gallery->id);
+        
+        // Dispatch Job to delete files asynchronously
+        \App\Jobs\DeleteGalleryFolderJob::dispatch((string) $gallery->id);
 
         $gallery->delete();
         return response()->json(['success' => true]);

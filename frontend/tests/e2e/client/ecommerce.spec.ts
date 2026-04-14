@@ -26,6 +26,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
     });
 
     test('Flow P, Q, AG, AJ: Flatrate Bypass, Upselling Cart, Checkout', async ({ page }) => {
+        test.setTimeout(60000); // Erhöhtes Timeout, da dieser Test extrem viele Logins/Logouts durchführt
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
@@ -117,7 +118,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         // Flow AJ: Admin prüft Order im Dashboard
         await auth.logout();
         await auth.login(adminUser.email, adminUser.password);
-        await sidebar.navigateTo('Bestellungen & Anfragen');
+        await sidebar.navigateTo('Shop-Bestellungen');
         await expect(page.locator('h1:has-text("Bestellungen & Anfragen")')).toBeVisible();
         await expect(page.locator('td', { hasText: powerUser.email }).first()).toBeVisible();
 

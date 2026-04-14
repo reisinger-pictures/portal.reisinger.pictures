@@ -24,11 +24,17 @@ class SettingsController extends Controller
             return $maxTime ?: time();
         });
 
+        $latestMigration = \Illuminate\Support\Facades\DB::table('migrations')->orderBy('id', 'desc')->value('migration');
+        $dbVersion = \Illuminate\Support\Facades\DB::table('migrations')->count();
+        if ($latestMigration && preg_match('/V(\d+)__/', $latestMigration, $matches)) {
+            $dbVersion = (int)$matches[1];
+        }
+
         return response()->json([
             'laravel_build_time' => date('c', $timestamp),
             'php_version' => phpversion(),
             'laravel_version' => app()->version(),
-            'db_version' => '0.' . \Illuminate\Support\Facades\DB::table('migrations')->count()
+            'db_version' => $dbVersion
         ]);
     }
 

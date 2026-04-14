@@ -4,11 +4,8 @@ import { Photo } from '../../../logic/useGallery';
 export default function GridPhotoActions({ photo, ratePhoto }: { photo: Photo, ratePhoto: (id: string, rating: number, comment: string) => void }) {
     const [comment, setComment] = useState(photo.comment || '');
     const [prevPhotoId, setPrevPhotoId] = useState(photo.id);
-    const [prevPhotoComment, setPrevPhotoComment] = useState(photo.comment || '');
-
-    if (photo.id !== prevPhotoId || (photo.comment || '') !== prevPhotoComment) {
+    if (photo.id !== prevPhotoId) {
         setPrevPhotoId(photo.id);
-        setPrevPhotoComment(photo.comment || '');
         setComment(photo.comment || '');
     }
 

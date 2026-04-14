@@ -1,4 +1,4 @@
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -27,25 +27,29 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
     const { data: snippets } = useSWR<TextSnippet[]>(user?.is_super_admin ? '/api/management/text-snippets' : null, fetcher);
     const snippetsRef = useRef<TextSnippet[]>([]);
 
-    const [slashState, setSlashState] = useState<{ active: boolean, query: string, range: { from: number, to: number }, rect: DOMRect | null }>({ active: false, query: '', range: { from: 0, to: 0 }, rect: null });
+    const [slashState, setSlashState] = useState<{ active: boolean, query: string, range: { from: number, to: number }, rect: { left: number; right: number; top: number; bottom: number } | null }>({ active: false, query: '', range: { from: 0, to: 0 }, rect: null });
     const [selectedIndex, setSelectedIndex] = useState(0);
 
-    const slashStateRef = useRef(slashState);
-    slashStateRef.current = slashState;
+    const editorRef = useRef<Editor | null>(null);
 
+    const slashStateRef = useRef(slashState);
     const selectedIndexRef = useRef(selectedIndex);
-    selectedIndexRef.current = selectedIndex;
 
     useEffect(() => {
         if (snippets) snippetsRef.current = snippets;
     }, [snippets]);
 
-    const filteredSnippets = (snippetsRef.current || []).filter(s => 
+    const filteredSnippets = (snippets || []).filter(s => 
         s.shortcut && s.shortcut.toLowerCase().startsWith(slashState.query.toLowerCase())
     );
 
     const filteredSnippetsRef = useRef(filteredSnippets);
-    filteredSnippetsRef.current = filteredSnippets;
+
+    useEffect(() => {
+        slashStateRef.current = slashState;
+        selectedIndexRef.current = selectedIndex;
+        filteredSnippetsRef.current = filteredSnippets;
+    });
 
     const closeSlashMenu = useCallback(() => {
         setSlashState(s => ({ ...s, active: false }));
@@ -53,7 +57,8 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
     }, []);
 
     const applySnippet = useCallback((snippet: TextSnippet) => {
-        if (!editor) return;
+        const editorInstance = editorRef.current;
+        if (!editorInstance) return;
         const range = slashStateRef.current.range;
         
         let content = snippet.content_html.trim();
@@ -62,7 +67,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
             content = content.substring(3, content.length - 4);
         }
 
-        editor.chain()
+        editorInstance.chain()
             .focus()
             .deleteRange(range)
             .insertContent(content)
@@ -70,7 +75,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
         closeSlashMenu();
     }, [closeSlashMenu]);
 
-    const updateSlashMenu = useCallback((editorInstance: any) => {
+    const updateSlashMenu = useCallback((editorInstance: Editor) => {
         const { selection } = editorInstance.state;
         const { $from, empty } = selection;
         if (!empty) {
@@ -118,7 +123,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
         editorProps: { 
             attributes: { class: 'prose prose-sm max-w-none focus:outline-none min-h-[12rem] p-4 text-base-content/90' },
             // 🔥 WICHTIG: Tastatur-Events HIER abfangen, bevor Tiptap sie schluckt
-            handleKeyDown: (view, event) => {
+            handleKeyDown: (_view, event) => {
                 if (!slashStateRef.current.active) return false;
                 
                 const currentSnippets = filteredSnippetsRef.current;
@@ -150,6 +155,10 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
                 return false;
             }
         }
+    });
+
+    useEffect(() => {
+        editorRef.current = editor;
     });
 
     useEffect(() => {
@@ -200,6 +209,12 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
             </div>
             
             <EditorContent editor={editor} />
+            
+            <div className="bg-base-200 border-t border-base-300 p-1 flex justify-end items-center rounded-b-box text-xs opacity-60">
+                 <span className={editor.getHTML().length > 90000 ? 'text-error font-bold' : ''}>
+                     {editor.getHTML().length.toLocaleString('de-DE')} / 100.000 Zeichen (HTML)
+                 </span>
+            </div>
 
             {slashState.active && slashState.rect && (
                 <ul 

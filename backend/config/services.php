@@ -37,8 +37,8 @@ return [
 
 
     'stripe' => [
-        'key' => env('STRIPE_KEY', 'pk_test_REDACTED'),
-        'secret' => env('STRIPE_SECRET', 'sk_test_REDACTED'),
+        'key' => env('STRIPE_KEY', env('APP_ENV') === 'production' ? null : 'pk_test_REDACTED'),
+        'secret' => env('STRIPE_SECRET', env('APP_ENV') === 'production' ? null : 'sk_test_REDACTED'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 ];

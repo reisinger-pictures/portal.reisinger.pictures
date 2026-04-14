@@ -17,26 +17,6 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->only('email', 'password');
-        
-        if (app()->environment('local')) {
-            $adminEmail = env('ADMIN_EMAIL', 'florian@reisinger.pictures');
-            $adminPass = env('ADMIN_PASSWORD', 'admin');
-
-            if ($credentials['email'] === $adminEmail && $credentials['password'] === $adminPass) {
-                $user = User::firstOrCreate(
-                    ['email' => $adminEmail],
-                    ['name' => 'Florian Reisinger']
-                );
-                $superAdminRole = Role::firstOrCreate(['name' => 'super_admin']);
-                $adminRole = Role::firstOrCreate(['name' => 'admin']);
-                $photoRole = Role::firstOrCreate(['name' => 'photographer']);
-                $clientRole = Role::firstOrCreate(['name' => 'client']);
-                $user->roles()->syncWithoutDetaching([$superAdminRole->id, $adminRole->id, $photoRole->id, $clientRole->id]);
-
-                $token = Auth::guard('api')->login($user);
-                return $this->respondWithToken($token);
-            }
-        }
 
         $user = User::where('email', $credentials['email'])->first();
         if ($user && $user->password && Hash::check($credentials['password'], $user->password)) {
@@ -99,6 +79,10 @@ class AuthController extends Controller
 
     public function resetPassword(Request $request) 
     {
+        if ($request->email === env('ADMIN_EMAIL', 'florian@reisinger.pictures')) {
+            return response()->json(['error' => 'Passwort-Reset für den System-Admin ist deaktiviert.'], 403);
+        }
+
         $request->validate([
             'email' => 'required|email',
             'token' => 'required|string',

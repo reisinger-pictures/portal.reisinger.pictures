@@ -35,6 +35,7 @@ class Gallery extends Model
         'is_editorial_only',
         'is_hidden',
         'restricted_photographers',
+        'cached_full_path',
         'password_hash',
         'allow_client_metadata_edit',
         'apply_metadata_to_photos',
@@ -46,8 +47,7 @@ class Gallery extends Model
         'default_state',
         'default_country',
         'default_iso_country',
-        'expires_at',
-        'deleted_at'
+        'expires_at'
     ];
 
     protected $casts = [
@@ -56,7 +56,6 @@ class Gallery extends Model
         'allow_client_metadata_edit' => 'boolean',
         'apply_metadata_to_photos' => 'boolean',
         'expires_at' => 'datetime',
-        'deleted_at' => 'datetime',
     ];
 
     // Dieses Attribut wird bei JSON-Responses automatisch angehängt
@@ -139,6 +138,7 @@ class Gallery extends Model
             'id' => $this->id,
             'name' => $this->name,
             'type' => $this->type,
+            'is_hidden' => $this->effective_is_hidden,
         ];
     }
 }

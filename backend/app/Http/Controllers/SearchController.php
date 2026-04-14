@@ -58,6 +58,12 @@ class SearchController extends Controller
 
         $photoQuery = Photo::search($q);
         $galleryQuery = Gallery::search($q);
+        
+        if (!$canSeeExpired) {
+            $photoQuery->where('is_hidden', false);
+            $galleryQuery->where('is_hidden', false);
+        }
+
         $allowedGalleryIds = $user ? $user->getAllowedGalleryIds() : [];
         $publicGalleryIds = Gallery::where('is_public', true)->pluck('id')->toArray();
         

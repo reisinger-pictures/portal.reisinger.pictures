@@ -14,7 +14,9 @@ class PhotoMetadataVersion extends Model
     protected $fillable = [
         'photo_id',
         'user_id',
+        'mime_type',
         'title',
+        'headline',
         'description',
         'keywords',
         'location',

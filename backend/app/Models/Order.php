@@ -15,13 +15,26 @@ class Order extends Model
         'user_id',
         'status',
         'total_amount',
-        'is_quote_request'
+        'is_quote_request',
+        'ip_address',
+        'stripe_payment_intent_id',
+        'quote_status'
     ];
 
     protected $casts = [
         'total_amount' => 'decimal:2',
         'is_quote_request' => 'boolean',
     ];
+
+    protected static function booted()
+    {
+        static::saving(function ($order) {
+            $allowedStatuses = ['pending', 'invoice_created', 'pending_payment', 'paid', 'overdue', 'cancelled', 'disputed', 'refunded', 'delivery_note', 'archived_in_collective'];
+            if (!in_array($order->status, $allowedStatuses)) {
+                throw new \InvalidArgumentException("Ungültiger Bestellstatus: {$order->status}");
+            }
+        });
+    }
 
     public function user()
     {

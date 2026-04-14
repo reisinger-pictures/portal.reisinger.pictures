@@ -19,10 +19,10 @@ return [
 
         'index-settings' => [
             \App\Models\Photo::class => [
-                'filterableAttributes' => ['gallery_id'],
+                'filterableAttributes' => ['gallery_id', 'is_hidden'],
             ],
             \App\Models\Gallery::class => [
-                'filterableAttributes' => ['id'],
+                'filterableAttributes' => ['id', 'is_hidden'],
             ],
             \App\Models\Location::class => [
                 // Die Suchreihenfolge (WICHTIG! PLZ und Name zuerst, ID wird ignoriert)

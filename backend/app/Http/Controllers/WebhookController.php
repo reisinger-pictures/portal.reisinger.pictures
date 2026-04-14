@@ -35,9 +35,25 @@ class WebhookController extends Controller
                 if ($order && $order->status !== 'paid') {
                     $order->update(['status' => 'paid']);
                     if ($order->user) {
-                        Mail::to($order->user->email)->send(new InvoiceMail($order, $order->invoiceSnapshot));
+                        Mail::to($order->user->email)->queue(new InvoiceMail($order, $order->invoiceSnapshot));
                     }
                 }
+            }
+        } elseif ($event->type === 'charge.dispute.created') {
+            $dispute = $event->data->object;
+            $piId = $dispute->payment_intent ?? null;
+            $order = Order::where('stripe_payment_intent_id', $piId)->first();
+            if ($order) {
+                $order->update(['status' => 'disputed']);
+                Mail::to(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
+                    ->send(new \App\Mail\CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$order->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
+            }
+        } elseif ($event->type === 'charge.refunded') {
+            $charge = $event->data->object;
+            $piId = $charge->payment_intent ?? null;
+            $order = Order::where('stripe_payment_intent_id', $piId)->first();
+            if ($order) {
+                $order->update(['status' => 'refunded']);
             }
         }
 

@@ -144,6 +144,61 @@ class DownloadTest extends TestCase
              ->assertStatus(403);
     }
 
+    public function test_disputed_or_refunded_order_blocks_download()
+    {
+        $user = User::factory()->create(['flatrate_level' => 'none']);
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
+        $user->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'dispute.jpg']);
+
+        $fixturePath = base_path('tests/Fixtures/sample.jpg');
+        Storage::disk('photos')->put($gallery->id . '/dispute.jpg', file_get_contents($fixturePath));
+
+        // Erstelle eine Order im Status 'disputed'
+        $order = \App\Models\Order::create([
+            'user_id' => $user->id,
+            'status' => 'disputed',
+            'total_amount' => 35.00
+        ]);
+
+        \App\Models\InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'RE-DISPUTE',
+            'customer_details' => [
+                'name' => 'Test Kunde',
+                'items' => [
+                    ['photoId' => $photo->id, 'tier' => 'original', 'price' => 35.00]
+                ]
+            ],
+            'total_net' => 35.00,
+            'total_gross' => 35.00,
+            'tax_rate' => 0
+        ]);
+
+        $token = auth('api')->login($user);
+
+        // 1. Einzel-Download darf NICHT funktionieren (403)
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->get("/api/photos/{$photo->id}/download?tier=original")
+             ->assertStatus(403);
+
+        // 2. Order-ZIP Download darf NICHT funktionieren (403)
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->get("/api/orders/{$order->id}/download-zip")
+             ->assertStatus(403);
+             
+        // 3. Setze Order auf 'paid' -> Alles sollte wieder klappen (200)
+        $order->update(['status' => 'paid']);
+        
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->get("/api/photos/{$photo->id}/download?tier=original")
+             ->assertStatus(200);
+             
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->get("/api/orders/{$order->id}/download-zip")
+             ->assertStatus(200);
+    }
+
     public function test_flatrate_user_can_view_original_without_watermark() {
         $user = User::factory()->create(['flatrate_level' => 'web']);
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);

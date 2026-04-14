@@ -17,11 +17,7 @@ class MailDeliveryTest extends TestCase
         parent::setUp();
         
         // Mailpit API löschen vor dem Test, damit wir einen sauberen State haben
-        try {
-            Http::delete('http://127.0.0.1:8026/api/v1/messages');
-        } catch (\Exception $e) {
-            $this->markTestSkipped('Mailpit läuft nicht auf Port 8026.');
-        }
+        Http::delete('http://127.0.0.1:8026/api/v1/messages');
     }
 
     public function test_invite_email_is_sent_to_mailpit()

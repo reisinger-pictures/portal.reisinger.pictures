@@ -20,6 +20,7 @@ status: active
 - **State via URL:** Application state (search queries, tabs) MUST be derived from the URL.
 - **Forms:** Strict use of `react-hook-form` and `zod` for form state management and validation. Avoid cascading `useState` hooks for form fields.
 - **Component Granularity (SRP):** Strictly separate concerns. Components should be small and focused. Extract modals, complex forms, and distinct UI sections (like cards or dropzones) into their own sub-components to prevent "God-Components" and minimize unnecessary re-renders.
+- **Strict Typing (No `any`):** Ad-hoc typing like `Record<string, any>` is strictly forbidden. Always define explicit `interface` or `type` contracts for form data and state (e.g., `DocumentFormData`) and import/export them across components. This prevents ESLint violations and brittle union types.
 
 
 ## 4. Routing & URL Patterns

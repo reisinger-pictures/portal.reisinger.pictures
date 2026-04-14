@@ -22,6 +22,10 @@ export class UploadHelper {
         // Warten, bis das Bild im DOM gerendert wurde (geduldige Asserts)
         const image = this.page.locator('a.pswp-item img').first();
 
+        // Geduld: Warten bis das Element überhaupt am DOM angebunden und sichtbar ist, bevor wir scrollen
+        await expect(image).toBeAttached({ timeout: 15000 });
+        await expect(image).toBeVisible({ timeout: 15000 });
+
         // ✨ WICHTIG für Mobile: In den Viewport scrollen, um Lazy Loading zu triggern
         await image.scrollIntoViewIfNeeded();
 

@@ -16,7 +16,8 @@ class Photo extends Model
 
     protected $visible = [
         'id', 'gallery_id', 'lr_uuid', 'width', 'height', 
-        'title', 'description', 'artist', 'keywords', 'location', 
+        'title',
+        'headline', 'description', 'artist', 'keywords', 'location', 
         'city', 'state', 'country', 'iso_country', 'created_at', 'url', 'thumb_url', 
         'rating', 'comment', 'gallery', 'artist',
         'effective_is_editorial_only', 'effective_is_hidden', 'last_accessed_at', 'is_downscaled'
@@ -25,10 +26,12 @@ class Photo extends Model
     protected $fillable = [
         'gallery_id',
         'filename',
+        'mime_type',
         'lr_uuid',
         'width',
         'height',
         'title',
+        'headline',
         'description',
         'user_id',
         'keywords',
@@ -118,6 +121,7 @@ class Photo extends Model
             'keywords' => $this->keywords,
             'location' => $this->location,
             'gallery_id' => $this->gallery_id,
+            'is_hidden' => $this->effective_is_hidden,
         ];
     }
 }

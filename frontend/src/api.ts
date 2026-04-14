@@ -94,7 +94,12 @@ export const fetcher = async <T>(url: string): Promise<T> => {
         await handleApiError(res);
     }
 
-    return res.json() as Promise<T>;
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        return res.json() as Promise<T>;
+    }
+    
+    throw new Error('Server hat kein valides JSON zurückgegeben.');
 };
 
 export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> => {
@@ -129,6 +134,15 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE
         await handleApiError(res);
     }
 
+    const contentType = res.headers.get('content-type');
     const text = await res.text();
-    return text ? JSON.parse(text) : {} as T;
+    if (contentType && contentType.includes('application/json')) {
+        try {
+            return text ? JSON.parse(text) : {} as T;
+        } catch {
+            throw new Error('Server-Antwort konnte nicht als JSON verarbeitet werden.');
+        }
+    }
+    
+    return {} as T;
 };

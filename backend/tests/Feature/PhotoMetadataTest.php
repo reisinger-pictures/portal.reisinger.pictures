@@ -32,6 +32,7 @@ class PhotoMetadataTest extends TestCase {
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
                          ->putJson("/api/photos/{$photo->id}/meta", [
                              'title' => 'New Title by Client',
+                             'headline' => 'Awesome Headline',
                              'description' => 'New Description by Client'
                          ]);
 
@@ -40,7 +41,8 @@ class PhotoMetadataTest extends TestCase {
         // Das Foto muss den neuen Titel haben
         $this->assertDatabaseHas('photos', [
             'id' => $photo->id,
-            'title' => 'New Title by Client'
+            'title' => 'New Title by Client',
+            'headline' => 'Awesome Headline'
         ]);
 
         // Es muss eine Versionierung des ORIGINAL-Zustands existieren

@@ -5,6 +5,26 @@ import ErrorMessage from '../components/ErrorMessage';
 import WysiwygEditor from '../components/WysiwygEditor';
 import RecipientFormSection from './components/RecipientFormSection';
 import ManualDocumentHeader from './components/ManualDocumentHeader';
+
+export interface DocumentFormData {
+    type: string;
+    invoice_number: string;
+    date: string;
+    due_date: string;
+    service_date: string;
+    validity: string;
+    customer_name: string;
+    customer_company: string;
+    customer_street: string;
+    customer_zip: string;
+    customer_city: string;
+    customer_country: string;
+    customer_email: string;
+    customer_uid: string;
+    terms_html: string;
+    [key: string]: string;
+}
+
 export default function ManagementManualInvoiceView({ type = 'invoice' }: { type?: 'invoice' | 'offer' }) {
     const { user } = useAuth();
     const { showToast } = useUI();
@@ -15,7 +35,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
     const [dueDateOption, setDueDateOption] = useState('0');
     const [serviceDateDirty, setServiceDateDirty] = useState(false);
 
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<DocumentFormData>({
         type: docType,
         invoice_number: (isOffer ? 'A-' : 'R-') + new Date().getFullYear() + '-' + Math.floor(100 + Math.random() * 900),
         date: new Date().toISOString().split('T')[0],
@@ -74,7 +94,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
     }, [dueDateOption, isOffer]);
 
     const [items, setItems] = useState([{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
-    const [discounts, setDiscounts] = useState<any[]>([]);
+    const [discounts] = useState<{type: string, price: number}[]>([]);
 
     if (!user?.is_super_admin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung." /></div>;
 
@@ -127,12 +147,12 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
             a.download = (isOffer ? 'Angebot-' : 'Rechnung-') + formData.invoice_number + '.pdf';
             a.click();
             showToast('success', 'Dokument wurde erstellt.');
-        } catch (err: any) { showToast('error', err.message); }
+        } catch (err: unknown) { showToast('error', err instanceof Error ? err.message : 'Fehler'); }
         setIsGenerating(false);
     };
 
-    let subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    let total = discounts.reduce((t, d) => d.type === 'discount_percent' ? t * (1 - d.price/100) : t - d.price, subtotal);
+    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    const total = discounts.reduce((t, d) => d.type === 'discount_percent' ? t * (1 - d.price/100) : t - d.price, subtotal);
 
     return (
         <div className="p-6 md:p-10 max-w-6xl mx-auto w-full">
@@ -190,7 +210,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
                                 </div>
                                 <div className="form-control w-full md:w-28 shrink-0">
                                     <label className="label py-1"><span className="label-text text-xs font-bold">Preis / Stück</span></label>
-                                    <input required type="number" step="0.01" value={item.price} onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered w-full font-mono text-right" />
+                                    <input required type="number" step="any" value={item.price} onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered w-full font-mono text-right" />
                                 </div>
                                 <div className="form-control w-full md:w-28 shrink-0">
                                     <label className="label py-1"><span className="label-text text-xs font-bold">Gesamt</span></label>

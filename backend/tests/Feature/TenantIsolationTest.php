@@ -74,6 +74,27 @@ class TenantIsolationTest extends TestCase
     }
 
 
+    public function test_user_is_auto_joined_to_tenant_based_on_domain()
+    {
+        $tenant = Tenant::create(['name' => 'B2B Corp', 'domain' => 'b2b-corp.com', 'invoice_frequency' => 'monthly']);
+        
+        $res = $this->postJson('/api/auth/register', [
+            'name' => 'John Doe',
+            'email' => 'john.doe@b2b-corp.com'
+        ]);
+
+        $res->assertStatus(200);
+
+        $user = User::where('email', 'john.doe@b2b-corp.com')->first();
+        $this->assertNotNull($user);
+        
+        // Prüfen, ob der User an den Tenant gebunden wurde
+        $this->assertTrue($user->tenants->contains($tenant->id));
+        
+        // Prüfen, ob er die Client-Rolle bekommen hat
+        $this->assertTrue($user->roles->contains('name', 'client'));
+    }
+
     public function test_customer_manager_cannot_view_other_tenant_details()
     {
         $roleManager = Role::firstOrCreate(['name' => 'customer_manager']);

@@ -22,10 +22,12 @@ class AdminUpdate extends Command
             return 1;
         }
 
-        $admin = User::updateOrCreate(
-            ['email' => $email],
-            ['name' => 'Admin', 'password' => Hash::make($password)]
-        );
+        $admin = User::firstOrNew(['email' => $email]);
+        $admin->name = 'Admin';
+        if (!$admin->exists || empty($admin->password)) {
+            $admin->password = Hash::make($password);
+        }
+        $admin->save();
 
         // Weise grundlegende Rollen zu
         $roles = Role::whereIn('name', ['admin', 'photographer', 'client'])->pluck('id');
