@@ -136,9 +136,17 @@ class DownloadController extends Controller
         $tempDir = storage_path('app/private/temp');
         if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
 
-        $workingPath = $tempDir . '/' . uniqid('scale_') . '.jpg';
+        $scaledBase = $tempDir . '/base_scale_' . $photo->id . '_' . $tier . '.jpg';
+        $lockKey = 'scale_' . $photo->id . '_' . $tier;
 
-        $processor->scaleImage($sourcePath, $workingPath, $maxWidth);
+        \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($processor, $sourcePath, $scaledBase, $maxWidth) {
+            if (!file_exists($scaledBase)) {
+                $processor->scaleImage($sourcePath, $scaledBase, $maxWidth);
+            }
+        });
+
+        $workingPath = $tempDir . '/' . uniqid('inject_') . '.jpg';
+        copy($scaledBase, $workingPath);
         $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
 
         if ($workingPath !== $processedPath && file_exists($workingPath)) @unlink($workingPath);
@@ -202,8 +210,17 @@ class DownloadController extends Controller
                     $sourcePath = $wmPath;
                 }
 
-                $workingPath = $tempDir . '/' . uniqid('scale_') . '.jpg';
-                $processor->scaleImage($sourcePath, $workingPath, $maxWidth);
+                $scaledBase = $tempDir . '/base_scale_' . $photo->id . '_' . $tier . '.jpg';
+                $lockKey = 'scale_' . $photo->id . '_' . $tier;
+
+                \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($processor, $sourcePath, $scaledBase, $maxWidth) {
+                    if (!file_exists($scaledBase)) {
+                        $processor->scaleImage($sourcePath, $scaledBase, $maxWidth);
+                    }
+                });
+
+                $workingPath = $tempDir . '/' . uniqid('inject_') . '.jpg';
+                copy($scaledBase, $workingPath);
 
                 $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
                 $downloadName = $photo->id . '_' . strtoupper($tier) . '.jpg';
@@ -265,9 +282,17 @@ class DownloadController extends Controller
                 if (!file_exists($sourcePath)) continue;
 
                 $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
-                $workingPath = $tempDir . '/' . uniqid('scale_') . '.jpg';
+                $scaledBase = $tempDir . '/base_scale_' . $photo->id . '_' . $tier . '.jpg';
+                $lockKey = 'scale_' . $photo->id . '_' . $tier;
 
-                $processor->scaleImage($sourcePath, $workingPath, $maxWidth);
+                \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($processor, $sourcePath, $scaledBase, $maxWidth) {
+                    if (!file_exists($scaledBase)) {
+                        $processor->scaleImage($sourcePath, $scaledBase, $maxWidth);
+                    }
+                });
+
+                $workingPath = $tempDir . '/' . uniqid('inject_') . '.jpg';
+                copy($scaledBase, $workingPath);
                 $processedPath = $this->injectMetadata($workingPath, $photo, $userName);
 
                 $downloadName = $photo->id . '_' . strtoupper($tier) . '.jpg';

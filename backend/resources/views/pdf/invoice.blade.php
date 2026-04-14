@@ -7,6 +7,10 @@
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; font-size: 13px; line-height: 1.5; }
         .invoice-details { margin-bottom: 40px; width: 100%; }
         .invoice-details td { vertical-align: top; padding: 0; border: none; }
+        h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }
+        .editor-content table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .editor-content table td, .editor-content table th { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .editor-content table th { background-color: #f2f2f2; font-weight: bold; }
         table.items { width: 100%; border-collapse: collapse; margin-bottom: 0px; }
         table.items thead { display: table-header-group; }
         table.items th, table.items td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
@@ -83,7 +87,7 @@
                                 <small style="color: #666;">Auflösung: {{ strtoupper($item['tier']) }}</small>
                             @endif
                         </td>
-                        <td class="text-right">{{ str_replace('.00', '', number_format($item['qty'] ?? 1, 2, ',', '.')) }}</td>
+                        <td class="text-right">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
                         <td class="text-right">{{ number_format($item['price'], 2, ',', '.') }} €</td>
                         <td class="text-right">{{ number_format($item['row_total'] ?? ($item['price'] * ($item['qty'] ?? 1)), 2, ',', '.') }} €</td>
                     </tr>
@@ -141,7 +145,7 @@
 
     <div style="margin-top: 20px;">
         @if(!empty($snapshot->customer_details['custom_html_terms']))
-            <div style="font-size: 11px; color: #555; margin-top: 10px;">
+            <div class="editor-content" style="font-size: 11px; color: #555; margin-top: 10px;">
                 {!! $snapshot->customer_details['custom_html_terms'] !!}
             </div>
         @endif

@@ -23,12 +23,7 @@ class WebhookController extends Controller
         } catch(\UnexpectedValueException $e) {
             return response()->json(['error' => 'Invalid payload'], 400);
         } catch(\Stripe\Exception\SignatureVerificationException $e) {
-            if (!$endpoint_secret && app()->environment('local')) {
-                // Fallback nur für lokale Tests ohne CLI Secret
-                $event = json_decode($payload);
-            } else {
-                return response()->json(['error' => 'Invalid signature'], 400);
-            }
+            return response()->json(['error' => 'Invalid signature'], 400);
         }
 
         if ($event->type === 'payment_intent.succeeded') {

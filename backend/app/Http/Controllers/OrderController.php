@@ -230,7 +230,10 @@ class OrderController extends Controller
         $validated = $request->validate([
             'invoice_number' => 'required|string',
             'date' => 'required|date',
-            'due_date' => 'required|string', // Geändert auf String für Freitext
+            'due_date' => 'required|string',
+            'type' => 'nullable|string|in:invoice,offer',
+            'service_date' => 'nullable|string',
+            'validity' => 'nullable|string',
             'customer_name' => 'nullable|string',
             'customer_company' => 'nullable|string',
             'customer_street' => 'nullable|string',
@@ -304,19 +307,28 @@ class OrderController extends Controller
             'uid' => $validated['customer_uid'] ?? '',
             'due_date' => $validated['due_date'], // Übernimmt den Freitext exakt so
             'is_collective' => false,
-            'custom_html_terms' => $validated['terms_html'] ?? null
+            'custom_html_terms' => isset($validated['terms_html']) ? strip_tags($validated['terms_html'], '<h1><h2><h3><h4><h5><h6><b><strong><i><em><u><ul><ol><li><p><br><span><div><a>') : null
         ];
+
+        $isOffer = ($validated['type'] ?? 'invoice') === 'offer';
+        $docTitle = $isOffer ? 'ANGEBOT' : 'RECHNUNG';
+        $filename = $isOffer ? 'Angebot-' . date('Y-m-d') : $validated['invoice_number'];
 
         $snapshot = new \App\Models\InvoiceSnapshot([
             'invoice_number' => $validated['invoice_number'],
-            'customer_details' => $customerDetails,
+            'customer_details' => array_merge($customerDetails, [
+                'service_date' => $validated['service_date'] ?? null,
+                'validity' => $validated['validity'] ?? null
+            ]),
             'total_net' => $total,
             'total_gross' => $total,
             'tax_rate' => 0
         ]);
         $snapshot->created_at = $validated['date'];
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', [
+        $viewName = $isOffer ? 'pdf.manual_offer' : 'pdf.invoice';
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
+            'title' => $docTitle,
             'snapshot' => $snapshot,
             'items' => $mappedItems,
             'bankHolder' => \App\Models\Setting::where('key', 'bank_holder')->value('value'),
@@ -326,7 +338,7 @@ class OrderController extends Controller
 
         return response()->streamDownload(function() use ($pdf) {
             echo $pdf->output();
-        }, $validated['invoice_number'] . '.pdf', [
+        }, $filename . '.pdf', [
             'Content-Type' => 'application/pdf'
         ]);
     }

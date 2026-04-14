@@ -90,7 +90,7 @@ class User extends Authenticatable implements JWTSubject
     }
 
     public function getIsAdminAttribute(): bool {
-        return $this->roles()->where('name', 'admin')->exists();
+        return $this->roles()->whereIn('name', ['admin', 'super_admin'])->exists();
     }
 
     public function getIsCustomerManagerAttribute(): bool {

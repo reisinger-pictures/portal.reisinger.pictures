@@ -3,6 +3,7 @@ import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
+import CustomerModal from './components/CustomerModal';
 
 export interface Customer {
     id: string;
@@ -20,6 +21,28 @@ export default function ManagementCustomersView() {
     const { data: customers, error, isLoading, mutate } = useSWR<Customer[]>('/api/management/customers', fetcher);
     const { showToast, confirm } = useUI();
     const [searchTerm, setSearchTerm] = useState('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+
+    const handleSave = async (data: Partial<Customer>) => {
+        try {
+            if (editingCustomer) {
+                await apiMutate(`/api/management/customers/${editingCustomer.id}`, 'PUT', data);
+                showToast('success', 'Kunde aktualisiert');
+            } else {
+                await apiMutate('/api/management/customers', 'POST', data);
+                showToast('success', 'Kunde angelegt');
+            }
+            mutate();
+        } catch (e: any) {
+            showToast('error', e.message || 'Fehler beim Speichern');
+        }
+    };
+
+    const openEdit = (c: Customer) => {
+        setEditingCustomer(c);
+        setIsModalOpen(true);
+    };
 
     const handleDelete = async (id: string) => {
         if (!(await confirm({ title: 'Kunde löschen?', message: 'Möchtest du diesen Kunden wirklich aus dem CRM entfernen?', confirmColor: 'error' }))) return;
@@ -48,7 +71,7 @@ export default function ManagementCustomersView() {
                     <h1 className="text-4xl font-bold mb-2">Kunden (CRM)</h1>
                     <p className="opacity-70">Verwalte deine B2B-Kontakte für Rechnungen und Angebote.</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => showToast('info', 'Funktion zum Anlegen folgt in Kürze (CRUD-Modal)')}>+ Neuer Kunde</button>
+                <button className="btn btn-primary" onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }}>+ Neuer Kunde</button>
             </div>
 
             <div className="bg-base-100 border border-base-300 rounded-box p-6 shadow-sm">
@@ -81,7 +104,7 @@ export default function ManagementCustomersView() {
                                     <td>{c.zip} {c.city}</td>
                                     <td className="text-right">
                                         <div className="flex justify-end gap-2">
-                                            <button className="btn btn-ghost btn-xs btn-square" title="Bearbeiten"><span className="iconify mdi--pencil text-base"></span></button>
+                                            <button className="btn btn-ghost btn-xs btn-square" title="Bearbeiten" onClick={() => openEdit(c)}><span className="iconify mdi--pencil text-base"></span></button>
                                             <button className="btn btn-ghost btn-xs btn-square text-error" onClick={() => handleDelete(c.id)} title="Löschen"><span className="iconify mdi--trash-can text-base"></span></button>
                                         </div>
                                     </td>
@@ -94,6 +117,7 @@ export default function ManagementCustomersView() {
                     </table>
                 </div>
             </div>
+            <CustomerModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingCustomer={editingCustomer} onSave={handleSave} />
         </div>
     );
 }

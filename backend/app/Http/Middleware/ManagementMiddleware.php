@@ -20,7 +20,7 @@ class ManagementMiddleware
 
         $user = auth()->user();
 
-        if ($user->is_admin) {
+        if ($user->is_admin || $user->is_super_admin) {
             return $next($request);
         }
 

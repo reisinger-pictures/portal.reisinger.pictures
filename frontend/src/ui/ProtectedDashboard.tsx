@@ -13,7 +13,7 @@ export default function ProtectedDashboard() {
     if (!user) return <AnonymousDashboard/>;
 
     // Rollen-Weiche für authentifizierte Nutzer
-    if (user.is_admin || user.is_photographer) {
+    if (user.is_super_admin || user.is_admin || user.is_photographer) {
         return <ManagementDashboard/>;
     }
 

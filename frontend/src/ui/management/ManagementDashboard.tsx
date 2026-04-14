@@ -176,7 +176,8 @@ export default function ManagementDashboard() {
                         {currentView === 'settings' && <ManagementSettingsView/>}
                         {currentView === 'stats' && <ManagementStatsView/>}
                         {currentView === 'admin-orders' && <ManagementOrdersView/>}
-                        {currentView === 'admin-manual-invoice' && <ManagementManualInvoiceView/>}
+                        {currentView === 'admin-manual-invoice' && <ManagementManualInvoiceView type="invoice" />}
+                        {currentView === 'admin-manual-offer' && <ManagementManualInvoiceView type="offer" />}
                         {currentView === 'admin-customers' && <ManagementCustomersView/>}
                         {currentView === 'admin-snippets' && <ManagementTextSnippetsView/>}
                                                 {currentView === 'structure' && (

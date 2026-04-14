@@ -14,6 +14,15 @@ class OrderCheckoutTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Test Holder']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'AT123456789']);
+        \App\Models\Setting::updateOrCreate(['key' => 'company_street'], ['value' => 'Teststreet 1']);
+        \App\Models\Setting::updateOrCreate(['key' => 'base_price'], ['value' => '35.00']);
+    }
+
     public function test_checkout_calculates_delta_pricing()
     {
         $user = User::factory()->create(['flatrate_level' => 'print']);
@@ -23,8 +32,6 @@ class OrderCheckoutTest extends TestCase
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
-
-        \App\Models\Setting::updateOrCreate(['key' => 'base_price'], ['value' => '35.00']);
 
         $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
                          ->postJson("/api/orders/checkout", [

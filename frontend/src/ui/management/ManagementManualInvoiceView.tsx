@@ -3,32 +3,25 @@ import { useAuth } from '../../logic/useAuth';
 import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import WysiwygEditor from '../components/WysiwygEditor';
-import { useLicenseTerms } from '../../logic/useLicenseTerms';
-import AutocompleteInput from '../components/AutocompleteInput';
-import { Customer } from './ManagementCustomersView';
-import { LocationResult } from '../../logic/useLocations';
-
-export interface InvoiceDiscount {
-    type: string;
-    description: string;
-    notes: string;
-    price: number;
-    rowTotal?: number;
-}
-
-export default function ManagementManualInvoiceView() {
+import RecipientFormSection from './components/RecipientFormSection';
+import ManualDocumentHeader from './components/ManualDocumentHeader';
+export default function ManagementManualInvoiceView({ type = 'invoice' }: { type?: 'invoice' | 'offer' }) {
     const { user } = useAuth();
-    const { terms, isLoading: termsLoading } = useLicenseTerms();
     const { showToast } = useUI();
+    const docType = type;
+    const isOffer = docType === 'offer';
+
     const [isGenerating, setIsGenerating] = useState(false);
     const [dueDateOption, setDueDateOption] = useState('0');
-
-    const isMissingInfo = !termsLoading && (!terms?.bank_holder || !terms?.company_street || !terms?.company_zip || !terms?.company_city || !terms?.bank_iban);
+    const [serviceDateDirty, setServiceDateDirty] = useState(false);
 
     const [formData, setFormData] = useState({
-        invoice_number: 'RE-' + new Date().getFullYear() + '-' + Math.floor(100 + Math.random() * 900),
+        type: docType,
+        invoice_number: (isOffer ? 'A-' : 'R-') + new Date().getFullYear() + '-' + Math.floor(100 + Math.random() * 900),
         date: new Date().toISOString().split('T')[0],
-        due_date: 'Zahlbar sofort netto Kassa.',
+        due_date: '', // Wird via useEffect initialisiert
+        service_date: '',
+        validity: '',
         customer_name: '',
         customer_company: '',
         customer_street: '',
@@ -40,39 +33,64 @@ export default function ManagementManualInvoiceView() {
         terms_html: ''
     });
 
-    const [items, setItems] = useState([
-        { type: 'item', description: '', notes: '', qty: 1, price: 0 }
-    ]);
-    
-    const [discounts, setDiscounts] = useState<Array<{ type: string; description: string; notes?: string; price: number; rowTotal?: number }>>([]);
-
-    // Freitext-Logik für Fälligkeit
-    useEffect(() => {
-        if (dueDateOption === '0') {
-            setFormData(prev => ({ ...prev, due_date: 'Zahlbar sofort nach Erhalt der Rechnung.' }));
-        } else if (dueDateOption === '14') {
-            setFormData(prev => ({ ...prev, due_date: 'Zahlbar innerhalb von 14 Tagen nach Rechnungsdatum.' }));
-        } else if (dueDateOption === '1m') {
-            setFormData(prev => ({ ...prev, due_date: 'Zahlbar innerhalb von 1 Monat nach Rechnungsdatum.' }));
-        } else if (dueDateOption === 'custom') {
-            setFormData(prev => prev.due_date.startsWith('Zahlbar') ? { ...prev, due_date: '' } : prev);
-        }
-    }, [dueDateOption]);
-
-    if (!user?.is_super_admin) {
-        return <div className="p-8"><ErrorMessage message="Keine Berechtigung. Diese Funktion ist nur für Super Admins verfügbar." /></div>;
-    }
-
-    const handleChange = (field: string, value: string | number) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+    const formatDateToDE = (iso: string) => {
+        if (!iso) return '';
+        const parts = iso.split('-');
+        if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        return iso;
     };
 
-    // ITEM LOGIC
+    // Reset Form when URL type changes
+    useEffect(() => {
+        setServiceDateDirty(false);
+        setDueDateOption('0');
+        const newDate = new Date().toISOString().split('T')[0];
+        setFormData(prev => ({
+            ...prev,
+            type: docType,
+            invoice_number: (isOffer ? 'A-' : 'R-') + new Date().getFullYear() + '-' + Math.floor(100 + Math.random() * 900),
+            date: newDate,
+            service_date: isOffer ? '' : formatDateToDE(newDate),
+            validity: isOffer ? '14 Tage ab Ausstellungsdatum' : '',
+        }));
+    }, [docType, isOffer]);
+
+    // INTELLIGENTE SYNC LOGIK: Rechnungsdatum -> Leistungsdatum
+    useEffect(() => {
+        if (!isOffer && !serviceDateDirty) {
+            setFormData(prev => ({ ...prev, service_date: formatDateToDE(formData.date) }));
+        }
+    }, [formData.date, isOffer, serviceDateDirty]);
+
+    // FÄLLIGKEITS-LOGIK WIEDERHERGESTELLT
+    useEffect(() => {
+        if (dueDateOption === '0') {
+            handleUpdateField('due_date', isOffer ? 'Wir freuen uns auf Ihre Rückmeldung.' : 'Zahlbar sofort nach Erhalt der Rechnung.');
+        } else if (dueDateOption === '14') {
+            handleUpdateField('due_date', isOffer ? 'Dieses Angebot ist gültig für 14 Tage ab Ausstellungsdatum.' : 'Zahlbar innerhalb von 14 Tagen nach Rechnungsdatum.');
+        } else if (dueDateOption === '1m') {
+            handleUpdateField('due_date', isOffer ? 'Dieses Angebot ist gültig für 1 Monat ab Ausstellungsdatum.' : 'Zahlbar innerhalb von 1 Monat nach Rechnungsdatum.');
+        }
+    }, [dueDateOption, isOffer]);
+
+    const [items, setItems] = useState([{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
+    const [discounts, setDiscounts] = useState<any[]>([]);
+
+    if (!user?.is_super_admin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung." /></div>;
+
+    const handleUpdateField = (field: string, value: string) => setFormData(p => ({ ...p, [field]: value }));
+
+    const handleServiceDateManualChange = (val: string) => {
+        setServiceDateDirty(true);
+        handleUpdateField('service_date', val);
+    };
+
     const handleItemChange = (index: number, field: string, value: string | number) => {
         const newItems = [...items];
         newItems[index] = { ...newItems[index], [field]: value };
         setItems(newItems);
     };
+
     const addItem = () => setItems([...items, { type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
     const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
     const moveItemUp = (index: number) => {
@@ -92,259 +110,74 @@ export default function ManagementManualInvoiceView() {
         setItems(newItems);
     };
 
-    // DISCOUNT LOGIC
-    const handleDiscountChange = (index: number, field: string, value: string | number) => {
-        const newDiscounts = [...discounts];
-        newDiscounts[index] = { ...newDiscounts[index], [field]: value };
-        setDiscounts(newDiscounts);
-    };
-    const addDiscount = () => setDiscounts([...discounts, { type: 'discount_fixed', description: 'Rabatt', notes: '', price: 0 }]);
-    const removeDiscount = (index: number) => setDiscounts(discounts.filter((_, i) => i !== index));
-    const moveDiscountUp = (index: number) => {
-        if (index === 0) return;
-        const newArr = [...discounts];
-        const temp = newArr[index - 1];
-        newArr[index - 1] = newArr[index];
-        newArr[index] = temp;
-        setDiscounts(newArr);
-    };
-    const moveDiscountDown = (index: number) => {
-        if (index === discounts.length - 1) return;
-        const newArr = [...discounts];
-        const temp = newArr[index + 1];
-        newArr[index + 1] = newArr[index];
-        newArr[index] = temp;
-        setDiscounts(newArr);
-    };
-
     const handleDownload = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (items.length === 0) {
-            showToast('error', 'Bitte füge mindestens eine Leistung hinzu.');
-            return;
-        }
-
         setIsGenerating(true);
         try {
-            const payloadItems = [...items.map(i => ({ ...i, type: 'item' })), ...discounts];
-
             const res = await fetch('/api/management/invoices/manual', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/pdf' },
-                body: JSON.stringify({ ...formData, items: payloadItems })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...formData, items: [...items, ...discounts] })
             });
-            
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.error || 'Fehler beim Generieren der Rechnung.');
-            }
-
+            if (!res.ok) throw new Error('Fehler beim Generieren.');
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = formData.invoice_number + '.pdf';
-            document.body.appendChild(a);
+            a.download = (isOffer ? 'Angebot-' : 'Rechnung-') + formData.invoice_number + '.pdf';
             a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            
-            showToast('success', 'Rechnung erfolgreich generiert!');
-        } catch (err: unknown) {
-            showToast('error', err instanceof Error ? err.message : 'Unbekannter Fehler');
-        }
+            showToast('success', 'Dokument wurde erstellt.');
+        } catch (err: any) { showToast('error', err.message); }
         setIsGenerating(false);
     };
 
-    // Frontend Calculation Preview
-    let subtotal = 0;
-    const calculatedItems = items.map(item => {
-        const rowTotal = (Number(item.price) || 0) * (Number(item.qty) || 1);
-        subtotal += rowTotal;
-        return { ...item, rowTotal };
-    });
-    
-    let runningTotal = subtotal;
-    const calculatedDiscounts = discounts.map(d => {
-        let amt = 0;
-        if (d.type === 'discount_fixed') amt = Number(d.price) || 0;
-        else if (d.type === 'discount_percent') amt = runningTotal * ((Number(d.price) || 0) / 100);
-        runningTotal -= amt;
-        return { ...d, rowTotal: -amt };
-    });
-    
-    const total = Math.max(0, runningTotal);
+    let subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    let total = discounts.reduce((t, d) => d.type === 'discount_percent' ? t * (1 - d.price/100) : t - d.price, subtotal);
 
     return (
         <div className="p-6 md:p-10 max-w-6xl mx-auto w-full">
             <div className="mb-8">
                 <h1 className="text-4xl font-bold flex items-center gap-2 mb-2">
-                    <span className="iconify mdi--file-document-edit-outline text-primary"></span> Manuelle Rechnung
+                    <span className={`iconify ${isOffer ? 'mdi--file-chart-outline' : 'mdi--file-document-edit-outline'} text-primary`}></span>
+                    {isOffer ? 'Manuelles Angebot' : 'Manuelle Rechnung'}
                 </h1>
-                <p className="opacity-70">Erstelle freie PDFs für Sondervereinbarungen.</p>
+                <p className="opacity-70">{isOffer ? 'Erstelle ein unverbindliches Angebot für Kunden.' : 'Erstelle eine freie PDF-Rechnung.'}</p>
             </div>
 
-            {isMissingInfo && (
-                <div className="alert alert-error shadow-sm mb-8">
-                    <span className="iconify mdi--alert-circle text-xl"></span>
-                    <div>
-                        <h3 className="font-bold">Fehlende Firmendaten!</h3>
-                        <p className="text-sm">Du musst zuerst deine vollständigen Firmen- und Bankdaten in den <a href="/settings" className="underline font-bold">Einstellungen</a> hinterlegen, bevor du Rechnungen generieren kannst.</p>
-                    </div>
-                </div>
-            )}
-
             <form onSubmit={handleDownload} className="space-y-8">
-                {/* 1. Kopfdaten */}
-                <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-                    <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Rechnungsdetails</h2>
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Rechnungsnummer</span></label>
-                            <input required type="text" value={formData.invoice_number} onChange={e => handleChange('invoice_number', e.target.value)} className="input input-sm input-bordered font-mono" />
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Datum</span></label>
-                            <input required type="date" value={formData.date} onChange={e => handleChange('date', e.target.value)} className="input input-sm input-bordered" />
-                        </div>
-                        <div className="form-control lg:col-span-2">
-                            <label className="label"><span className="label-text font-bold">Fälligkeit (Text im PDF)</span></label>
-                            <div className="flex flex-col sm:flex-row gap-2 w-full">
-                                <select className="select select-sm select-bordered w-full sm:w-1/3" value={dueDateOption} onChange={e => setDueDateOption(e.target.value)}>
-                                    <option value="0">Sofort</option>
-                                    <option value="14">14 Tage</option>
-                                    <option value="1m">1 Monat</option>
-                                    <option value="custom">Freitext...</option>
-                                </select>
-                                {dueDateOption !== 'custom' ? (
-                                    <div className="input input-sm input-bordered flex-1 bg-base-200 opacity-70 text-xs flex items-center overflow-hidden whitespace-nowrap" title={formData.due_date}>{formData.due_date}</div>
-                                ) : (
-                                    <input type="text" required value={formData.due_date} onChange={e => handleChange('due_date', e.target.value)} className="input input-sm input-bordered flex-1" placeholder="z.B. Zahlbar bis zum 25.04.2026" />
-                                )}
-                            </div>
-                        </div>
+                <ManualDocumentHeader 
+                    docType={docType} 
+                    data={formData} 
+                    dueDateOption={dueDateOption}
+                    onUpdate={handleUpdateField} 
+                    onOptionChange={setDueDateOption}
+                    onServiceDateChange={handleServiceDateManualChange}
+                />
+                
+                <RecipientFormSection formData={formData} onUpdate={handleUpdateField} onMultiUpdate={(u) => setFormData(p => ({...p, ...u}))} />
+                
+                {isOffer && (
+                    <div className="bg-base-100 p-6 rounded-box border border-primary/30 shadow-md">
+                        <h2 className="font-bold text-xl mb-4 text-primary">Angebotstext (Einleitung)</h2>
+                        <WysiwygEditor value={formData.terms_html} onChange={v => handleUpdateField('terms_html', v)} />
                     </div>
-                </div>
+                )}
 
-                {/* 2. Empfänger */}
-                <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-                    <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Rechnungsempfänger</h2>
-                    <p className="text-sm opacity-60 mb-4">Lasse diese Felder leer, um den Block im PDF vollständig auszublenden. Du kannst nach bestehenden Kunden (CRM) suchen.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <AutocompleteInput<Customer>
-                            label="Name / Ansprechpartner"
-                            value={formData.customer_name}
-                            onChange={(val) => handleChange('customer_name', val)}
-                            endpoint="/api/management/customers?q="
-                            mapResponse={(data) => data.map(c => ({ id: c.id, title: c.name || c.company || 'Unbekannt', subtitle: `${c.company ? c.company + ' • ' : ''}${c.email || ''}`, raw: c }))}
-                            onSelect={(c) => {
-                                setFormData(prev => ({
-                                    ...prev,
-                                    customer_name: c.name || '',
-                                    customer_company: c.company || '',
-                                    customer_street: c.street || '',
-                                    customer_zip: c.zip || '',
-                                    customer_city: c.city || '',
-                                    customer_country: c.country || '',
-                                    customer_email: c.email || '',
-                                    customer_uid: c.uid || ''
-                                }));
-                            }}
-                            className="input input-sm input-bordered w-full"
-                        />
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Firma</span></label>
-                            <input type="text" value={formData.customer_company} onChange={e => handleChange('customer_company', e.target.value)} className="input input-sm input-bordered" />
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">E-Mail (wird angedruckt)</span></label>
-                            <input type="email" value={formData.customer_email} onChange={e => handleChange('customer_email', e.target.value)} className="input input-sm input-bordered" />
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
-                            <input type="text" value={formData.customer_uid} onChange={e => handleChange('customer_uid', e.target.value)} className="input input-sm input-bordered" />
-                        </div>
-                        <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
-                            <input type="text" value={formData.customer_street} onChange={e => handleChange('customer_street', e.target.value)} className="input input-sm input-bordered" />
-                        </div>
-                        <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">PLZ & Stadt</span></label>
-                            <div className="flex gap-2">
-                                <div className="w-1/3 md:w-32">
-                                    <AutocompleteInput<LocationResult>
-                                        value={formData.customer_zip}
-                                        onChange={val => handleChange('customer_zip', val)}
-                                        endpoint="/api/search/locations?type=city&q="
-                                        mapResponse={(data) => data.map(loc => ({ id: loc.id, title: loc.postal_code || loc.name, subtitle: loc.name, raw: loc }))}
-                                        onSelect={(loc) => {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                customer_city: loc.name,
-                                                customer_zip: loc.postal_code || prev.customer_zip,
-                                                customer_country: loc.country || prev.customer_country
-                                            }));
-                                        }}
-                                        placeholder="PLZ"
-                                        className="input input-sm input-bordered w-full"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <AutocompleteInput<LocationResult>
-                                        value={formData.customer_city}
-                                        onChange={val => handleChange('customer_city', val)}
-                                        endpoint="/api/search/locations?type=city&q="
-                                        mapResponse={(data) => data.map(loc => ({ id: loc.id, title: loc.name, subtitle: `${loc.postal_code ? loc.postal_code + ' ' : ''}${loc.state || loc.country}`, raw: loc }))}
-                                        onSelect={(loc) => {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                customer_city: loc.name,
-                                                customer_zip: loc.postal_code || prev.customer_zip,
-                                                customer_country: loc.country || prev.customer_country
-                                            }));
-                                        }}
-                                        placeholder="Stadt"
-                                        className="input input-sm input-bordered w-full"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="form-control">
-                            <AutocompleteInput<LocationResult>
-                                label="Land"
-                                value={formData.customer_country}
-                                onChange={(val) => handleChange('customer_country', val)}
-                                endpoint="/api/search/locations?type=country&q="
-                                mapResponse={(data) => data.map(loc => ({ id: loc.id, title: loc.name, subtitle: loc.iso_country || '', raw: loc }))}
-                                onSelect={(loc) => {
-                                    setFormData(prev => ({
-                                        ...prev,
-                                        customer_country: loc.name
-                                    }));
-                                }}
-                                className="input input-sm input-bordered w-full"
-                                placeholder="z.B. Österreich"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 3. Leistungen */}
                 <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                     <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-                        <h2 className="font-bold text-xl text-secondary">Leistungen</h2>
+                        <h2 className="font-bold text-xl text-secondary">Leistungen / Positionen</h2>
                         <button type="button" onClick={addItem} className="btn btn-sm btn-outline btn-secondary">+ Leistung hinzufügen</button>
                     </div>
                     
                     <div className="space-y-4">
-                        {calculatedItems.map((item, idx) => (
+                        {items.map((item, idx) => (
                             <div key={idx} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
                                 <div className="flex flex-col gap-1 self-center shrink-0 mr-2">
-                                    <button type="button" onClick={() => moveItemUp(idx)} disabled={idx === 0} className="btn btn-xs btn-ghost btn-square" title="Nach oben"><span className="iconify mdi--arrow-up text-lg opacity-50"></span></button>
-                                    <button type="button" onClick={() => moveItemDown(idx)} disabled={idx === items.length - 1} className="btn btn-xs btn-ghost btn-square" title="Nach unten"><span className="iconify mdi--arrow-down text-lg opacity-50"></span></button>
+                                    <button type="button" onClick={() => moveItemUp(idx)} disabled={idx === 0} className="btn btn-xs btn-ghost btn-square"><span className="iconify mdi--arrow-up text-lg opacity-50"></span></button>
+                                    <button type="button" onClick={() => moveItemDown(idx)} disabled={idx === items.length - 1} className="btn btn-xs btn-ghost btn-square"><span className="iconify mdi--arrow-down text-lg opacity-50"></span></button>
                                 </div>
                                 <div className="form-control flex-1 w-full">
-                                    <label className="label py-1"><span className="label-text text-xs font-bold">Titel / Name *</span></label>
+                                    <label className="label py-1"><span className="label-text text-xs font-bold">Titel / Name</span></label>
                                     <input required type="text" value={item.description} onChange={e => handleItemChange(idx, 'description', e.target.value)} className="input input-sm input-bordered w-full" placeholder="z.B. Fotoshooting" />
                                 </div>
                                 <div className="form-control flex-1 w-full">
@@ -352,96 +185,34 @@ export default function ManagementManualInvoiceView() {
                                     <input type="text" value={item.notes} onChange={e => handleItemChange(idx, 'notes', e.target.value)} className="input input-sm input-bordered w-full" placeholder="Optional" />
                                 </div>
                                 <div className="form-control w-20 shrink-0">
-                                    <label className="label py-1"><span className="label-text text-xs font-bold">Stück *</span></label>
+                                    <label className="label py-1"><span className="label-text text-xs font-bold">Menge</span></label>
                                     <input required type="number" step="0.01" min="0.01" value={item.qty} onChange={e => handleItemChange(idx, 'qty', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered w-full font-mono text-center" />
                                 </div>
                                 <div className="form-control w-full md:w-28 shrink-0">
-                                    <label className="label py-1"><span className="label-text text-xs font-bold">Preis / Stück *</span></label>
+                                    <label className="label py-1"><span className="label-text text-xs font-bold">Preis / Stück</span></label>
                                     <input required type="number" step="0.01" value={item.price} onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered w-full font-mono text-right" />
                                 </div>
                                 <div className="form-control w-full md:w-28 shrink-0">
                                     <label className="label py-1"><span className="label-text text-xs font-bold">Gesamt</span></label>
-                                    <div className="text-right font-mono font-bold mt-1 text-base-content">{item.rowTotal.toFixed(2)} €</div>
+                                    <div className="text-right font-mono font-bold mt-1 text-base-content">{(item.price * item.qty).toFixed(2)} €</div>
                                 </div>
-                                <button type="button" onClick={() => removeItem(idx)} className="btn btn-sm btn-ghost text-error shrink-0 mt-7" title="Entfernen"><span className="iconify mdi--trash-can text-lg"></span></button>
+                                <button type="button" onClick={() => removeItem(idx)} className="btn btn-sm btn-ghost text-error shrink-0 mt-7"><span className="iconify mdi--trash-can text-lg"></span></button>
                             </div>
                         ))}
                     </div>
+                    <div className="text-right text-2xl font-bold mt-6 pt-4 border-t border-base-300">Gesamtbetrag: {total.toFixed(2)} €</div>
                 </div>
 
-                {/* 4. Rabatte */}
-                <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-                    <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-                        <h2 className="font-bold text-xl text-primary">Rabatte & Abzüge</h2>
-                        <button type="button" onClick={addDiscount} className="btn btn-sm btn-outline btn-primary">+ Rabatt hinzufügen</button>
+                {!isOffer && (
+                    <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
+                        <h2 className="font-bold text-xl mb-4">Zusatztexte / Sonderkonditionen</h2>
+                        <WysiwygEditor value={formData.terms_html} onChange={v => handleUpdateField('terms_html', v)} />
                     </div>
-                    
-                    {discounts.length > 0 && (
-                        <div className="space-y-4 mb-6">
-                            {calculatedDiscounts.map((discount, idx) => (
-                                <div key={idx} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-primary/30 shadow-inner">
-                                    <div className="flex flex-col gap-1 self-center shrink-0 mr-2">
-                                        <button type="button" onClick={() => moveDiscountUp(idx)} disabled={idx === 0} className="btn btn-xs btn-ghost btn-square" title="Nach oben"><span className="iconify mdi--arrow-up text-lg opacity-50"></span></button>
-                                        <button type="button" onClick={() => moveDiscountDown(idx)} disabled={idx === discounts.length - 1} className="btn btn-xs btn-ghost btn-square" title="Nach unten"><span className="iconify mdi--arrow-down text-lg opacity-50"></span></button>
-                                    </div>
-                                    <div className="form-control w-full md:w-32 shrink-0">
-                                        <label className="label py-1"><span className="label-text text-xs font-bold text-primary">Typ</span></label>
-                                        <select value={discount.type} onChange={e => handleDiscountChange(idx, 'type', e.target.value)} className="select select-sm select-bordered w-full text-xs text-primary font-bold">
-                                            <option value="discount_fixed">Rabatt (€)</option>
-                                            <option value="discount_percent">Rabatt (%)</option>
-                                        </select>
-                                    </div>
-                                    <div className="form-control flex-1 w-full">
-                                        <label className="label py-1"><span className="label-text text-xs font-bold text-primary">Titel / Grund *</span></label>
-                                        <input required type="text" value={discount.description} onChange={e => handleDiscountChange(idx, 'description', e.target.value)} className="input input-sm input-bordered w-full" placeholder="z.B. Neukundenrabatt" />
-                                    </div>
-                                    <div className="form-control flex-1 w-full">
-                                        <label className="label py-1"><span className="label-text text-xs font-bold text-primary">Zusatz (kleingedruckt)</span></label>
-                                        <input type="text" value={discount.notes} onChange={e => handleDiscountChange(idx, 'notes', e.target.value)} className="input input-sm input-bordered w-full" placeholder="Optional" />
-                                    </div>
-                                    <div className="form-control w-full md:w-28 shrink-0">
-                                        <label className="label py-1"><span className="label-text text-xs font-bold text-primary">{discount.type === 'discount_percent' ? 'Wert (%) *' : 'Wert (€) *'}</span></label>
-                                        <input required type="number" step="0.01" min="0" value={discount.price} onChange={e => handleDiscountChange(idx, 'price', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered w-full font-mono text-right" />
-                                    </div>
-                                    <div className="form-control w-full md:w-28 shrink-0">
-                                        <label className="label py-1"><span className="label-text text-xs font-bold text-primary">Abzug</span></label>
-                                        <div className="text-right font-mono font-bold mt-1 text-primary">{discount.rowTotal.toFixed(2)} €</div>
-                                    </div>
-                                    <button type="button" onClick={() => removeDiscount(idx)} className="btn btn-sm btn-ghost text-error shrink-0 mt-7" title="Entfernen"><span className="iconify mdi--trash-can text-lg"></span></button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    
-                    <div className="flex flex-col items-end gap-2 text-base pt-6 border-t border-base-300">
-                        {discounts.length > 0 && (
-                            <div className="flex justify-between w-64 items-center mb-4">
-                                <span className="opacity-70">Zwischensumme:</span>
-                                <span className="font-mono text-base-content">{subtotal.toFixed(2)} €</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between w-64 items-center text-xl mt-2">
-                            <span className="font-bold">Rechnungsbetrag:</span>
-                            <span className="font-mono text-primary font-bold">{total.toFixed(2)} €</span>
-                        </div>
-                    </div>
-                </div>
+                )}
 
-                {/* 5. Sonderkonditionen (Tiptap Editor) */}
-                <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-                    <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-                        <h2 className="font-bold text-xl">Sonderkonditionen</h2>
-                    </div>
-                    <div className="form-control">
-                        <span className="label-text-alt opacity-70 mb-2">Dieser Text wird am Ende der Rechnung unter den Positionen gedruckt. Nutze den Editor für Listen oder Überschriften.</span>
-                        <WysiwygEditor value={formData.terms_html} onChange={val => handleChange('terms_html', val)} />
-                    </div>
-                </div>
-
-                {/* Submit */}
-                <div className="flex justify-end pt-4 pb-12">
-                    <button type="submit" disabled={isGenerating || items.length === 0 || isMissingInfo} className="btn btn-primary btn-lg w-full md:w-auto shadow-lg">
-                        {isGenerating ? <span className="loading loading-spinner"></span> : <><span className="iconify mdi--file-pdf-box text-xl"></span> PDF Generieren & Herunterladen</>}
+                <div className="flex justify-end pt-4 pb-20">
+                    <button type="submit" disabled={isGenerating} className="btn btn-primary btn-lg shadow-xl w-full md:w-auto">
+                        {isGenerating ? <span className="loading loading-spinner"></span> : 'PDF Generieren'}
                     </button>
                 </div>
             </form>

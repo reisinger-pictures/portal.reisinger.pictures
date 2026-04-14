@@ -26,7 +26,7 @@ export default function Sidebar(props: SidebarProps) {
         navigate('/');
     };
 
-    const isAdminOrPhotog = user?.is_admin || user?.is_photographer;
+    const isAdminOrPhotog = user?.is_super_admin || user?.is_admin || user?.is_photographer;
     const isGuest = !user;
 
     return (
@@ -51,35 +51,40 @@ export default function Sidebar(props: SidebarProps) {
             <ul className="menu bg-base-200 w-full p-2 border-b border-base-300 shrink-0">
                 {isAdminOrPhotog && (
                     <>
+                        <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-2">Übersicht</li>
                         <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-dashboard text-lg"></span> Dashboard</Link></li>
                         
+                        <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Medien</li>
                         {user?.is_photographer && (
-                            <>
-                                <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--folder-multiple text-lg"></span> Galerien</Link></li>
-                                {!user.is_admin && !user.is_customer_manager && <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> Auswertungen</Link></li>}
-                            </>
+                            <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--folder-multiple text-lg"></span> Galerien & Ordner</Link></li>
                         )}
-                        
-                        {(user.is_admin || user.is_customer_manager) && (
-                            <>
-                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Mandanten</Link></li>
-                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {user.is_customer_manager && !user.is_admin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
-                                <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> Auswertungen</Link></li>
-                            </>
-                        )}
-                        
+                        <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
+
                         {user.is_admin && (
                             <>
-                                <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> Bestellungen & Anfragen</Link></li>
-                                <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> Einstellungen</Link></li>
+                                <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Büro & Dokumente</li>
+                                <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> Shop-Bestellungen</Link></li>
+                                {user.is_super_admin && (
+                                    <>
+                                        <li><Link to="/admin-manual-invoice" className={props.currentView === 'admin-manual-invoice' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-document-edit-outline text-lg"></span> Manuelle Rechnung</Link></li>
+                                        <li><Link to="/admin-manual-offer" className={props.currentView === 'admin-manual-offer' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-chart-outline text-lg"></span> Manuelles Angebot</Link></li>
+                                        <li><Link to="/admin-customers" className={props.currentView === 'admin-customers' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-details text-lg"></span> Kunden (CRM)</Link></li>
+                                        <li><Link to="/admin-snippets" className={props.currentView === 'admin-snippets' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--text-box-multiple text-lg"></span> Textbausteine</Link></li>
+                                    </>
+                                )}
                             </>
                         )}
-                        {user.is_super_admin && (
+
+                        <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Verwaltung</li>
+                        {(user.is_admin || user.is_customer_manager) && (
                             <>
-                                <li><Link to="/admin-manual-invoice" className={props.currentView === 'admin-manual-invoice' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-document-edit-outline text-lg"></span> Manuelle Rechnung</Link></li>
-                                <li><Link to="/admin-customers" className={props.currentView === 'admin-customers' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-details text-lg"></span> Kunden (CRM)</Link></li>
-                                <li><Link to="/admin-snippets" className={props.currentView === 'admin-snippets' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--text-box-multiple text-lg"></span> Textbausteine</Link></li>
+                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Mandanten (B2B)</Link></li>
+                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {user.is_customer_manager && !user.is_admin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
                             </>
+                        )}
+                        <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> Auswertungen</Link></li>
+                        {user.is_admin && (
+                            <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> Einstellungen</Link></li>
                         )}
                     </>
                 )}
