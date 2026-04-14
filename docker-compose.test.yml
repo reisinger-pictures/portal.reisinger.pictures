@@ -1,6 +1,6 @@
 services:
   db:
-    image: mariadb:10.11
+    image: mariadb:11.4
     container_name: portal_db_test
     restart: unless-stopped
     ports: ["3307:3306"]
