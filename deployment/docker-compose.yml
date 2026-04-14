@@ -20,7 +20,7 @@ services:
       - portal_internal
 
   search:
-    image: getmeili/meilisearch:v1.6
+    image: getmeili/meilisearch:v1.42
     container_name: portal_search
     restart: unless-stopped
     logging:

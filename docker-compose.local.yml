@@ -12,7 +12,7 @@ services:
     volumes: ["db_data_local:/var/lib/mysql"]
 
   search:
-    image: getmeili/meilisearch:v1.6
+    image: getmeili/meilisearch:v1.42
     container_name: portal_search_local
     restart: unless-stopped
     environment:
