@@ -61,131 +61,14 @@ class OrderController extends Controller
             return response()->json(['error' => 'Kauf auf Rechnung nicht erlaubt.'], 403);
         }
 
-        return DB::transaction(function () use ($request, $user) {
-            $paymentMethod = $request->payment_method ?? 'stripe';
-            $totalNet = 0.00;
-            $basePrice = (float) (\App\Models\Setting::where('key', 'base_price')->value('value') ?? 35.00);
-            $lineItems = [];
-            $isQuoteRequest = false;
-
-            // Fachliche Prüfung: Widerrufsverzicht ist bei digitalen Sofort-Käufen Pflicht
+        
         $hasQuotesOnly = collect($request->items)->every(fn($i) => isset($i['isQuote']) && $i['isQuote']);
         if (!$hasQuotesOnly && !$request->withdrawal_waived) {
             return response()->json(['error' => 'Sie müssen auf Ihr Widerrufsrecht verzichten, um digitale Bilddaten zu kaufen.'], 422);
         }
-
-        foreach ($request->items as $item) {
-                $photo = Photo::with('gallery')->findOrFail($item['photoId']);
-                if (!$photo->gallery->is_public && !$user->canAccessGallery($photo->gallery_id)) abort(403, 'Zugriff verweigert (Nicht öffentlich & keine Rechte)');
-                
-                $isItemQuote = isset($item['isQuote']) && $item['isQuote'];
-                if ($isItemQuote) {
-                    $isQuoteRequest = true;
-                    $delta = 0.00;
-                } else {
-                    $resMult = ['web' => 1.0, 'print' => 2.0, 'original' => 4.0][$item['tier']];
-                    $useMult = ['editorial' => 1.0, 'commercial' => 3.0][$item['usage']];
-                    $durMult = ['1_year' => 1.0, 'unlimited' => 2.0][$item['duration']];
-                    
-                    $requestedPrice = $basePrice * $resMult * $useMult * $durMult;
-                    $userResMult = ['none' => 0.0, 'web' => 1.0, 'print' => 2.0, 'original' => 4.0][$user->flatrate_level ?? 'none'] ?? 0.0;
-                    $userPrice = $basePrice * $userResMult * 1.0 * 1.0;
-                    
-                    $delta = $requestedPrice - $userPrice;
-                    if ($delta < 0) $delta = 0;
-                }
-                
-                $totalNet += $delta;
-
-                $lineItems[] = [
-                    'photoId' => $photo->id,
-                    'filename' => $photo->title ?: 'Bild ' . substr($photo->id, 0, 8),
-                    'tier' => $item['tier'],
-                    'usage' => $item['usage'],
-                    'duration' => $item['duration'],
-                    'price' => $delta,
-                    'isQuote' => $isItemQuote,
-                    'notes' => $item['notes'] ?? null,
-                ];
-            }
-
-            if ($totalNet <= 0 && !$isQuoteRequest) return response()->json(['error' => 'Warenkorb hat keinen Wert.'], 400);
-
-            $user->update([
-                'billing_name' => $request->billing_name,
-                'billing_company' => $request->billing_company,
-                'billing_street' => $request->billing_street,
-                'billing_zip' => $request->billing_zip,
-                'billing_city' => $request->billing_city,
-            ]);
-
-            $tenant = $user->tenants()->first();
-            $isLieferschein = $tenant && $tenant->invoice_frequency !== 'immediate';
-            
-            if ($isQuoteRequest) {
-                $orderStatus = 'pending';
-            } else {
-                $orderStatus = $isLieferschein ? 'delivery_note' : ($paymentMethod === 'invoice' ? 'invoice_created' : 'pending_payment');
-            }
-
-            $order = Order::create([
-                'user_id' => $user->id,
-                'status' => $orderStatus,
-                'total_amount' => $totalNet,
-                'is_quote_request' => $isQuoteRequest
-            ]);
-
-            $snapshot = InvoiceSnapshot::create([
-                'order_id' => $order->id,
-                'customer_details' => [
-                    'name' => $request->billing_name,
-                    'email' => $user->email,
-                    'company' => $request->billing_company,
-                    'street' => $request->billing_street,
-                    'zip' => $request->billing_zip,
-                    'city' => $request->billing_city,
-                    'country' => 'Österreich',
-                    'items' => $lineItems,
-                    'quote_message' => $request->quote_message ?? null,
-                    'terms' => [] 
-                ],
-                'total_net' => $totalNet,
-                'total_gross' => $totalNet,
-                'tax_rate' => 0.00
-            ]);
-
-            if ($isQuoteRequest) {
-                return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
-            }
-
-            if ($isLieferschein || $paymentMethod === 'invoice') {
-                Mail::to($user->email)->queue(new InvoiceMail($order, $snapshot));
-                return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
-            }
-
-            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-            $paymentIntent = \Stripe\PaymentIntent::create([
-                'amount' => (int) round($totalNet * 100),
-                'currency' => 'eur',
-                'metadata' => ['order_id' => $order->id],
-                'receipt_email' => $user->email,
-            ], [
-                'idempotency_key' => 'pi_' . $order->id
-            ]);
-
-            $order->update([
-                'ip_address' => $request->ip(),
-                'stripe_payment_intent_id' => $paymentIntent->id
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'requires_action' => true,
-                'client_secret' => $paymentIntent->client_secret,
-                'order_id' => $order->id,
-                'invoice_number' => $snapshot->invoice_number
-            ]);
-        });
+        $basePrice = (float) (\App\Models\Setting::where('key', 'base_price')->value('value') ?? 35.00);
+        $checkoutService = app(\App\Services\CheckoutService::class);
+        return $checkoutService->processCheckout($request, $user, $basePrice, $paymentMethod);
     }
 
     public function indexAdmin() { return response()->json(Order::with(['user', 'invoiceSnapshot'])->orderBy('created_at', 'desc')->get()); }

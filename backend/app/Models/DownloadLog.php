@@ -20,7 +20,8 @@ class DownloadLog extends Model
         'item_type', // 'single_image', 'full_zip'
         'resolution_tier',
         'user_agent',
-        'payload'
+        'payload',
+        'photo_count'
     ];
 
     protected $casts = [

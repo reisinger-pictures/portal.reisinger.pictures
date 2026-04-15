@@ -9,6 +9,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
     let testUser = { email: '', password: '' };
     let createdCustomerId = '';
     let createdSnippetId = '';
+    let createdProductId = '';
     let uniqueSuffix = '';
     let snippetShortcut = '';
 
@@ -32,11 +33,24 @@ test.describe('Manual Documents & CRM Workflow', () => {
         });
         const snipData = await snipRes.json();
         if (snipData?.snippet?.id) createdSnippetId = snipData.snippet.id;
+
+        // Produkt vorbereiten
+        const prodRes = await request.post('/api/management/products', {
+            data: { name: `E2E Product ${uniqueSuffix}`, description: 'E2E Leistung', price: 150 },
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+        });
+        const prodData = await prodRes.json();
+        if (prodData?.product?.id) createdProductId = prodData.product.id;
     });
 
     test.afterEach(async ({ request }) => {
         if (createdCustomerId) {
             await request.delete(`/api/management/customers/${createdCustomerId}`, {
+                headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+            }).catch(() => {});
+        }
+        if (createdProductId) {
+            await request.delete(`/api/management/products/${createdProductId}`, {
                 headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
             }).catch(() => {});
         }
@@ -57,12 +71,17 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await expect(page).toHaveURL(/.*\/admin-manual-offer/);
         await expect(page.locator('h1:has-text("Manuelles Angebot")')).toBeVisible();
 
-        // 1. Test CRM Autocomplete
+        await page.waitForTimeout(2000); // Allow Meilisearch indexing to finish
+        // 1. Test CRM Autocomplete (mit Retry für Meilisearch Indexing-Delay)
         const nameInput = page.locator('.form-control').filter({ hasText: 'Name / Ansprechpartner' }).locator('input');
-        await nameInput.fill(`E2E VIP ${uniqueSuffix}`);
-        const autocompleteDropdown = page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first();
-        await expect(autocompleteDropdown).toBeVisible({ timeout: 15000 });
-        await autocompleteDropdown.click();
+        await expect(async () => {
+            await nameInput.clear();
+            await page.waitForTimeout(200); // SWR Debounce Reset abwarten
+            await nameInput.fill(`E2E VIP ${uniqueSuffix}`);
+            const dropdown = page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first();
+            await expect(dropdown).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 15000 });
+        await page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first().click();
 
         const zipInput = page.locator('.form-control').filter({ hasText: 'PLZ & Stadt' }).locator('input').nth(0);
         const cityInput = page.locator('.form-control').filter({ hasText: 'PLZ & Stadt' }).locator('input').nth(1);
@@ -84,10 +103,18 @@ test.describe('Manual Documents & CRM Workflow', () => {
         
         await expect(editor).toContainText(`Magic${uniqueSuffix}Content`, { timeout: 10000 });
 
-        // 3. Leistungen befüllen
-        await page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first().fill('E2E Test Position');
+        // 3. Leistungen befüllen (via Autocomplete)
+        const itemInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
+        await itemInput.fill(`E2E Product ${uniqueSuffix}`);
+        
+        const productDropdown = page.locator(`li:has-text("E2E Product ${uniqueSuffix}")`).first();
+        await expect(productDropdown).toBeVisible({ timeout: 15000 });
+        await productDropdown.click();
+
+        // Prüfen ob die Autocomplete-Felder (Preis & Menge) befüllt wurden
+        await expect(page.locator('.form-control').filter({ hasText: 'Preis / Stück' }).locator('input').first()).toHaveValue('150');
+        await expect(page.locator('.form-control').filter({ hasText: 'Zusatz (kleingedruckt)' }).locator('input').first()).toHaveValue('E2E Leistung');
         await page.locator('.form-control').filter({ hasText: 'Menge' }).locator('input').first().fill('2');
-        await page.locator('.form-control').filter({ hasText: 'Preis / Stück' }).locator('input').first().fill('250');
 
         // 4. PDF Generierung & Download Interception
         const [download] = await Promise.all([
@@ -115,13 +142,18 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await sidebar.navigateTo('Manuelles Angebot');
         await expect(page).toHaveURL(/.*\/admin-manual-offer/);
 
+        await page.waitForTimeout(2000); // Allow Meilisearch indexing to finish
         // 1. Mobile CRM Autocomplete Touch-Test
         const nameInput = page.locator('.form-control').filter({ hasText: 'Name / Ansprechpartner' }).locator('input');
         await nameInput.click(); // Touch Simulierung
-        await nameInput.fill(`E2E VIP ${uniqueSuffix}`);
-        const autocompleteDropdown = page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first();
-        await expect(autocompleteDropdown).toBeVisible({ timeout: 15000 });
-        await autocompleteDropdown.click();
+        await expect(async () => {
+            await nameInput.clear();
+            await page.waitForTimeout(200); // SWR Debounce Reset abwarten
+            await nameInput.fill(`E2E VIP ${uniqueSuffix}`);
+            const dropdown = page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first();
+            await expect(dropdown).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 15000 });
+        await page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first().click();
 
         // 2. Mobile Tiptap & Slash Menu Check
         const editor = page.locator('.ProseMirror').first();

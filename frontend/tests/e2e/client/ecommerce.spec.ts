@@ -5,6 +5,7 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { FormHelper } from '../helpers/FormHelper';
+import { GalleryHelper } from '../helpers/GalleryHelper';
 
 test.describe('E-Commerce & Checkout Workflow', () => {
     let helper: E2ESessionHelper;
@@ -30,18 +31,15 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
+        const form = new FormHelper(page, modal);
         
         const galleryName = `Shop Test ${Math.random().toString(36).substring(2, 10)}`;
 
         // 1. Fotograf erstellt die Galerie und lädt Bild hoch
         await auth.login(photogUser.email, photogUser.password);
-        await sidebar.openNewGalleryModal();
-        const form = new FormHelper(page, modal);
-        await form.fillGalleryModal({ name: galleryName, type: 'Delivery (Downloads)' });
-        const resData = await modal.submitModal('Speichern');
-        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
+        const galleryHelper = new GalleryHelper(page, helper);
+        await galleryHelper.createAndOpenDeliveryGallery(galleryName);
 
-        await page.locator('main').getByText(galleryName).first().click();
         const upload = new UploadHelper(page);
         await upload.uploadSampleImage();
         await auth.logout();

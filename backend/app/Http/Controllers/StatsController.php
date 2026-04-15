@@ -41,11 +41,8 @@ class StatsController extends Controller
         if ($user->is_admin) {
             $galleriesCount = Gallery::count();
 
-            $totalDownloads = DownloadLog::where('item_type', 'single_image')->where($tierFilter)->count();
-            foreach(DownloadLog::where('item_type', 'full_zip')->where($tierFilter)->get() as $zip) {
-                $payload = is_string($zip->payload) ? json_decode($zip->payload, true) : $zip->payload;
-                $totalDownloads += $payload['photo_count'] ?? 1;
-            }
+            $totalDownloads = DownloadLog::where('item_type', 'single_image')->where($tierFilterDb)->count();
+            $totalDownloads += DownloadLog::where('item_type', 'full_zip')->where($tierFilterDb)->sum('photo_count');
 
             $guestDownloads = DownloadLog::whereNull('user_id')->where($tierFilter)->count();
 
@@ -70,11 +67,8 @@ class StatsController extends Controller
             $domain = substr(strrchr($user->email, "@"), 1);
             $tenantUserIds = User::where('email', 'like', '%@' . $domain)->pluck('id')->toArray();
 
-            $totalDownloads = DownloadLog::whereIn('user_id', $tenantUserIds)->where('item_type', 'single_image')->where($tierFilter)->count();
-            foreach(DownloadLog::whereIn('user_id', $tenantUserIds)->where('item_type', 'full_zip')->where($tierFilter)->get() as $zip) {
-                $payload = is_string($zip->payload) ? json_decode($zip->payload, true) : $zip->payload;
-                $totalDownloads += $payload['photo_count'] ?? 1;
-            }
+            $totalDownloads = DownloadLog::whereIn('user_id', $tenantUserIds)->where('item_type', 'single_image')->where($tierFilterDb)->count();
+            $totalDownloads += DownloadLog::whereIn('user_id', $tenantUserIds)->where('item_type', 'full_zip')->where($tierFilterDb)->sum('photo_count');
 
             $guestDownloads = 0;
             $galleriesCount = 0;
@@ -94,11 +88,8 @@ class StatsController extends Controller
 
             $galleriesCount = count($galleryIds);
 
-            $totalDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)->where('item_type', 'single_image')->where($tierFilter)->count();
-            foreach(DownloadLog::whereIn('gallery_id', $galleryIds)->where('item_type', 'full_zip')->where($tierFilter)->get() as $zip) {
-                $payload = is_string($zip->payload) ? json_decode($zip->payload, true) : $zip->payload;
-                $totalDownloads += $payload['photo_count'] ?? 1;
-            }
+            $totalDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)->where('item_type', 'single_image')->where($tierFilterDb)->count();
+            $totalDownloads += DownloadLog::whereIn('gallery_id', $galleryIds)->where('item_type', 'full_zip')->where($tierFilterDb)->sum('photo_count');
 
             $guestDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)->whereNull('user_id')->where($tierFilter)->count();
 

@@ -31,6 +31,8 @@ class TextSnippetController extends Controller
             'content_html' => 'nullable|string',
         ]);
 
+        $allowedTags = '<h1><h2><h3><h4><h5><h6><b><strong><i><em><u><ul><ol><li><p><br><span><div><a>';
+        $validated['content_html'] = strip_tags($validated['content_html'] ?? '', $allowedTags);
         $snippet = TextSnippet::create($validated);
         return response()->json(['success' => true, 'snippet' => $snippet]);
     }
@@ -48,6 +50,8 @@ class TextSnippetController extends Controller
             'content_html' => 'nullable|string',
         ]);
 
+        $allowedTags = '<h1><h2><h3><h4><h5><h6><b><strong><i><em><u><ul><ol><li><p><br><span><div><a>';
+        if (isset($validated['content_html'])) { $validated['content_html'] = strip_tags($validated['content_html'], $allowedTags); }
         $snippet->update($validated);
         return response()->json(['success' => true, 'snippet' => $snippet]);
     }

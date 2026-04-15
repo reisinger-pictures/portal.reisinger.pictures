@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 class RateLimitTest extends TestCase {
     public function test_api_throttling_returns_429_status() {
         // Temporäre Route mit striktem Limit definieren (2 Anfragen pro Minute)
+        \Illuminate\Support\Facades\Cache::flush();
         Route::get('/api/test-throttle', function() {
             return response()->json(['success' => true]);
         })->middleware('throttle:2,1');

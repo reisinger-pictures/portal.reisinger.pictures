@@ -178,7 +178,8 @@ class DownloadController extends Controller
             'item_type' => 'full_zip',
             'resolution_tier' => $tier,
             'user_agent' => $request->userAgent(),
-            'payload' => ['photo_count' => $photoCount]
+            'payload' => ['photo_count' => $photoCount],
+            'photo_count' => $photoCount
         ]);
 
         return response()->streamDownload(function () use ($gallery, $baseStoragePath, $userName, $user, $tier, $hasFullAccess) {
@@ -252,7 +253,8 @@ class DownloadController extends Controller
             'gallery_name_snapshot' => 'Order ' . $snapshot->invoice_number,
             'item_type' => 'full_zip',
             'user_agent' => $request->userAgent(),
-            'payload' => ['photo_count' => count($snapshot->customer_details['items'])]
+            'payload' => ['photo_count' => count($snapshot->customer_details['items'])],
+            'photo_count' => count($snapshot->customer_details['items'])
         ]);
 
         return response()->streamDownload(function () use ($snapshot, $baseStoragePath, $userName, $processor) {

@@ -115,20 +115,20 @@ class GalleryFrontendController extends Controller
             }
         }
 
-        $existingRating = DB::table('ratings')->where([
+        $existingRating = \App\Models\Rating::where([
             'photo_id' => $photo->id,
             'user_id' => $user->id,
             'guest_id' => $user->guest_id
         ])->first();
 
         if ($existingRating) {
-            DB::table('ratings')->where('id', $existingRating->id)->update([
+            $existingRating->update([
                 'rating' => $request->rating,
                 'comment' => $request->comment ?? '',
                 'guest_name' => $user->id ? null : $user->name
             ]);
         } else {
-            DB::table('ratings')->insert([
+            \App\Models\Rating::create([
                 'id' => (string) \Illuminate\Support\Str::uuid(),
                 'photo_id' => $photo->id,
                 'user_id' => $user->id,

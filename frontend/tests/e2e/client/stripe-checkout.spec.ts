@@ -40,12 +40,9 @@ test.describe('Stripe Checkout Workflow', () => {
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(async () => {
-            if (!(await galLink.isVisible())) await page.reload();
-            await expect(galLink).toBeVisible({ timeout: 2000 });
-            await galLink.scrollIntoViewIfNeeded();
-            await galLink.click();
-        }).toPass({ timeout: 15000 });
+        await expect(galLink).toBeVisible({ timeout: 15000 });
+        await galLink.scrollIntoViewIfNeeded();
+        await galLink.click();
         await expect(page.getByRole('heading', { name: galleryName })).toBeVisible();
 
         await upload.uploadSampleImage();

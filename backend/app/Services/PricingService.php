@@ -6,6 +6,21 @@ use App\Models\PricingFactor;
 
 class PricingService
 {
+    public function calculateUpgradeDelta(float $basePrice, string $tier, string $usage, string $duration, string $userFlatrate): float
+    {
+        $resMult = ['web' => 1.0, 'print' => 2.0, 'original' => 4.0];
+        $useMult = ['editorial' => 1.0, 'commercial' => 3.0];
+        $durMult = ['1_year' => 1.0, 'unlimited' => 2.0];
+
+        $reqMult = ($resMult[$tier] ?? 1.0) * ($useMult[$usage] ?? 1.0) * ($durMult[$duration] ?? 1.0);
+        $requestedPrice = $basePrice * $reqMult;
+
+        $userResMult = ['none' => 0.0, 'web' => 1.0, 'print' => 2.0, 'original' => 4.0];
+        $userPrice = $basePrice * ($userResMult[$userFlatrate] ?? 0.0);
+
+        $delta = $requestedPrice - $userPrice;
+        return $delta > 0 ? round($delta, 2) : 0.00;
+    }
     /**
      * Calculates the dynamic price based on a base price and a set of selected factor IDs.
      *

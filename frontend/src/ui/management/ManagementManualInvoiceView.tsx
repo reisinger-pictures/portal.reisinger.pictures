@@ -5,6 +5,9 @@ import ErrorMessage from '../components/ErrorMessage';
 import WysiwygEditor from '../components/WysiwygEditor';
 import RecipientFormSection from './components/RecipientFormSection';
 import ManualDocumentHeader from './components/ManualDocumentHeader';
+import AutocompleteInput from '../components/AutocompleteInput';
+
+interface Product { id: string; name: string; description: string; price: number; }
 
 export interface DocumentFormData {
     type: string;
@@ -106,9 +109,11 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
     };
 
     const handleItemChange = (index: number, field: string, value: string | number) => {
-        const newItems = [...items];
-        newItems[index] = { ...newItems[index], [field]: value };
-        setItems(newItems);
+        setItems(prevItems => {
+            const newItems = [...prevItems];
+            newItems[index] = { ...newItems[index], [field]: value };
+            return newItems;
+        });
     };
 
     const addItem = () => setItems([...items, { type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
@@ -198,7 +203,19 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
                                 </div>
                                 <div className="form-control flex-1 w-full">
                                     <label className="label py-1"><span className="label-text text-xs font-bold">Titel / Name</span></label>
-                                    <input required type="text" value={item.description} onChange={e => handleItemChange(idx, 'description', e.target.value)} className="input input-sm input-bordered w-full" placeholder="z.B. Fotoshooting" />
+                                    <AutocompleteInput<Product>
+                                        value={item.description}
+                                        onChange={val => handleItemChange(idx, 'description', val)}
+                                        endpoint="/api/management/products?q="
+                                        mapResponse={(data) => data.map(p => ({ id: p.id, title: p.name, subtitle: `${p.price.toFixed(2)} €`, raw: p }))}
+                                        onSelect={(p) => {
+                                            handleItemChange(idx, 'description', p.name);
+                                            handleItemChange(idx, 'notes', p.description || '');
+                                            handleItemChange(idx, 'price', p.price);
+                                        }}
+                                        placeholder="z.B. Fotoshooting"
+                                        className="input input-sm input-bordered w-full"
+                                    />
                                 </div>
                                 <div className="form-control flex-1 w-full">
                                     <label className="label py-1"><span className="label-text text-xs font-bold">Zusatz (kleingedruckt)</span></label>
