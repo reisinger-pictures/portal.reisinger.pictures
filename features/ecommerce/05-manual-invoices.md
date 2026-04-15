@@ -25,3 +25,13 @@ Dieses Modul ermöglicht es Super-Admins, individuelle PDF-Dokumente für B2B-So
 
 ## 4. WYSIWYG Sonderkonditionen
 - Ein integrierter Tiptap-Editor erlaubt das Verfassen formatierter Texte (Fett, Listen, H1-H3) am Ende des Dokuments.
+
+## 5. Smart Documents (Polyglot PDFs)
+- **Konzept:** Um aus einem gesendeten Angebot später eine Rechnung zu generieren, ohne einen zustandsbehafteten Entwurf in der Datenbank zu speichern, bettet das System die Formulardaten unsichtbar in das PDF ein.
+- **Implementierung:** Beim Generieren eines Angebots wird ein JSON-Payload erstellt (Kunde, Leistungen, Rabatte). Dieser wird Base64-kodiert und mittels `hash_hmac` manipulationssicher mit dem `APP_KEY` signiert. Der String (z.B. `%SMART_DOC:payload.signature%`) wird hinter dem `%%EOF` Marker in das Raw-PDF gestreamt.
+- **Wiederherstellung:** Über die UI kann das Angebots-PDF hochgeladen werden. Der neue Endpoint `extractOffer` liest den Token aus, verifiziert die Signatur und befüllt das Rechnungsformular im Frontend exakt mit dem Zustand des Angebots.
+
+## 6. Frontend-Validierung & Sicherheit
+- **Echtzeit-Sperre:** Der Export-Button ist deaktiviert, solange Titel fehlen, Mengen auf 0 stehen oder der Gesamtbetrag negativ ist.
+- **API-Error-Mapping:** Validierungsfehler des Backends (z.B. fehlende Pflichtfelder bei Rabatten) werden von technischen Keys in nutzerfreundliche Texte transformiert.
+- **Payload-Integrität:** E2E-Tests validieren die physische Präsenz des signierten Payloads am Dateiende (EOF) mittels Byte-Stream-Analyse.

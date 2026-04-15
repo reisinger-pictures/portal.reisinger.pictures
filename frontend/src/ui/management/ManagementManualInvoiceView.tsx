@@ -7,7 +7,7 @@ import RecipientFormSection from './components/RecipientFormSection';
 import ManualDocumentHeader from './components/ManualDocumentHeader';
 import AutocompleteInput from '../components/AutocompleteInput';
 
-interface Product { id: string; name: string; description: string; price: number; }
+interface Product { id: string; name: string; description: string; price: number; type?: string; }
 
 export interface DocumentFormData {
     type: string;
@@ -97,7 +97,8 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
     }, [dueDateOption, isOffer]);
 
     const [items, setItems] = useState([{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
-    const [discounts] = useState<{type: string, price: number}[]>([]);
+    const [discounts, setDiscounts] = useState<{type: string, description: string, notes: string, price: number}[]>([]);
+    const [isDragging, setIsDragging] = useState(false);
 
     if (!user?.is_super_admin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung." /></div>;
 
@@ -108,14 +109,95 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
         handleUpdateField('service_date', val);
     };
 
-    const handleItemChange = (index: number, field: string, value: string | number) => {
-        setItems(prevItems => {
-            const newItems = [...prevItems];
-            newItems[index] = { ...newItems[index], [field]: value };
-            return newItems;
-        });
+    const processPdfFile = async (file: File) => {
+        const fd = new FormData();
+        fd.append('pdf', file);
+        
+        try {
+            const res = await fetch('/api/management/invoices/extract-offer', {
+                method: 'POST',
+                body: fd,
+                headers: { 'Accept': 'application/json' },
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || 'Fehler beim Auslesen.');
+            
+            setFormData(prev => ({
+                ...prev,
+                customer_name: data.customer_name || '',
+                customer_company: data.customer_company || '',
+                customer_street: data.customer_street || '',
+                customer_zip: data.customer_zip || '',
+                customer_city: data.customer_city || '',
+                customer_country: data.customer_country || '',
+                customer_email: data.customer_email || '',
+                customer_uid: data.customer_uid || '',
+                terms_html: data.terms_html || ''
+            }));
+            
+            const loadedItems = data.items?.filter((i: { type: string }) => i.type === 'item') || [];
+            const loadedDiscounts = data.items?.filter((i: { type: string }) => i.type !== 'item') || [];
+            
+            setItems(loadedItems.length > 0 ? loadedItems : [{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
+            setDiscounts(loadedDiscounts);
+            
+            showToast('success', 'Angebotsdaten erfolgreich übernommen!');
+        } catch(err: unknown) {
+            showToast('error', err instanceof Error ? err.message : String(err));
+        }
     };
 
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        await processPdfFile(file);
+        e.target.value = '';
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        if (!isOffer) setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (isOffer) return;
+        
+        const file = e.dataTransfer.files?.[0];
+        if (file && file.type === 'application/pdf') {
+            await processPdfFile(file);
+        } else if (file) {
+            showToast('error', 'Bitte lade eine gültige PDF-Datei hoch.');
+        }
+    };
+
+    const handleItemChange = (index: number, field: string, value: string | number) => {
+        setItems(prev => {
+            const newArr = [...prev];
+            newArr[index] = { ...newArr[index], [field]: value };
+            return newArr;
+        });
+    };
+    
+    const handleDiscountChange = (index: number, field: string, value: string | number) => {
+        setDiscounts(prev => {
+            const newArr = [...prev];
+            newArr[index] = { ...newArr[index], [field]: value };
+            return newArr;
+        });
+    };
+    
+    const addDiscount = () => setDiscounts([...discounts, { type: 'discount_fixed', description: '', notes: '', price: 0 }]);
+    const removeDiscount = (index: number) => setDiscounts(discounts.filter((_, i) => i !== index));
+
+    
     const addItem = () => setItems([...items, { type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
     const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
     const moveItemUp = (index: number) => {
@@ -141,10 +223,20 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
         try {
             const res = await fetch('/api/management/invoices/manual', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...formData, items: [...items, ...discounts] })
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ ...formData, items: [...items, ...discounts.map(d => ({...d, qty: 1}))] })
             });
-            if (!res.ok) throw new Error('Fehler beim Generieren.');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                let niceMsg = errData.message || errData.error || 'Fehler beim Generieren (Bitte Eingaben prüfen).';
+                if (errData.errors) {
+                    const firstErr = Object.values(errData.errors)[0];
+                    if (Array.isArray(firstErr)) niceMsg = firstErr[0];
+                }
+                if (niceMsg.includes('items.') && niceMsg.includes('description')) niceMsg = 'Bitte alle Titel/Namen bei den Leistungen ausfüllen.';
+                throw new Error(niceMsg);
+            }
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -158,15 +250,41 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
 
     const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
     const total = discounts.reduce((t, d) => d.type === 'discount_percent' ? t * (1 - d.price/100) : t - d.price, subtotal);
+    const hasInvalidItems = items.some(i => !i.description.trim() || i.qty <= 0) || discounts.some(d => !d.description.trim());
+    const isFormValid = items.length > 0 && total >= 0 && !hasInvalidItems;
 
     return (
-        <div className="p-6 md:p-10 max-w-6xl mx-auto w-full">
-            <div className="mb-8">
-                <h1 className="text-4xl font-bold flex items-center gap-2 mb-2">
-                    <span className={`iconify ${isOffer ? 'mdi--file-chart-outline' : 'mdi--file-document-edit-outline'} text-primary`}></span>
-                    {isOffer ? 'Manuelles Angebot' : 'Manuelle Rechnung'}
-                </h1>
-                <p className="opacity-70">{isOffer ? 'Erstelle ein unverbindliches Angebot für Kunden.' : 'Erstelle eine freie PDF-Rechnung.'}</p>
+        <div 
+            className={`p-6 md:p-10 max-w-6xl mx-auto w-full relative transition-colors duration-200 ${isDragging ? 'bg-secondary/5 rounded-box border-2 border-dashed border-secondary' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {isDragging && !isOffer && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-box border-4 border-dashed border-secondary m-6 pointer-events-none">
+                    <div className="text-center text-secondary">
+                        <span className="iconify mdi--upload text-6xl mb-2"></span>
+                        <h2 className="text-2xl font-bold">Angebot hier ablegen</h2>
+                        <p>Die Daten werden automatisch in die Rechnung übernommen.</p>
+                    </div>
+                </div>
+            )}
+            <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+                <div>
+                    <h1 className="text-4xl font-bold flex items-center gap-2 mb-2">
+                        <span className={`iconify ${isOffer ? 'mdi--file-chart-outline' : 'mdi--file-document-edit-outline'} text-primary`}></span>
+                        {isOffer ? 'Manuelles Angebot' : 'Manuelle Rechnung'}
+                    </h1>
+                    <p className="opacity-70">{isOffer ? 'Erstelle ein unverbindliches Angebot für Kunden.' : 'Erstelle eine freie PDF-Rechnung.'}</p>
+                </div>
+                {!isOffer && (
+                    <div className="flex-none">
+                        <label className="btn btn-outline btn-secondary shadow-sm cursor-pointer">
+                            <span className="iconify mdi--upload text-xl"></span> Angebot importieren (.pdf)
+                            <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload} />
+                        </label>
+                    </div>
+                )}
             </div>
 
             <form onSubmit={handleDownload} className="space-y-8">
@@ -206,7 +324,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
                                     <AutocompleteInput<Product>
                                         value={item.description}
                                         onChange={val => handleItemChange(idx, 'description', val)}
-                                        endpoint="/api/management/products?q="
+                                        endpoint="/api/management/products?type=item&q="
                                         mapResponse={(data) => data.map(p => ({ id: p.id, title: p.name, subtitle: `${p.price.toFixed(2)} €`, raw: p }))}
                                         onSelect={(p) => {
                                             handleItemChange(idx, 'description', p.name);
@@ -237,7 +355,56 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
                             </div>
                         ))}
                     </div>
-                    <div className="text-right text-2xl font-bold mt-6 pt-4 border-t border-base-300">Gesamtbetrag: {total.toFixed(2)} €</div>
+                    
+                    {/* Discounts Section */}
+                    <div className="mt-6 border-t border-base-300 pt-6">
+                        <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
+                            <h2 className="font-bold text-xl text-secondary">Rabatte & Abzüge</h2>
+                            <button type="button" onClick={addDiscount} className="btn btn-sm btn-outline btn-secondary">+ Rabatt hinzufügen</button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {discounts.map((discount, idx) => (
+                                <div key={idx} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
+                                    <div className="form-control w-full md:w-1/4 shrink-0">
+                                        <label className="label py-1"><span className="label-text text-xs font-bold">Art</span></label>
+                                        <select value={discount.type} onChange={e => handleDiscountChange(idx, 'type', e.target.value)} className="select select-sm select-bordered w-full bg-base-100">
+                                            <option value="discount_fixed">Fixer Betrag (€)</option>
+                                            <option value="discount_percent">Prozentual (%)</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-control flex-1 w-full">
+                                        <label className="label py-1"><span className="label-text text-xs font-bold">Titel / Beschreibung</span></label>
+                                        <AutocompleteInput<Product>
+                                            value={discount.description}
+                                            onChange={val => handleDiscountChange(idx, 'description', val)}
+                                            endpoint="/api/management/products?type=discount_fixed,discount_percent&q="
+                                            mapResponse={(data) => data.map(p => ({ id: p.id, title: p.name, subtitle: `${p.price.toFixed(2)} ${p.type === 'discount_percent' ? '%' : '€'}`, raw: p }))}
+                                            onSelect={(p) => {
+                                                handleDiscountChange(idx, 'type', p.type || 'discount_fixed');
+                                                handleDiscountChange(idx, 'description', p.name);
+                                                handleDiscountChange(idx, 'notes', p.description || '');
+                                                handleDiscountChange(idx, 'price', p.price);
+                                            }}
+                                            placeholder="z.B. Stammkundenrabatt"
+                                            className="input input-sm input-bordered w-full bg-base-100"
+                                        />
+                                    </div>
+                                    <div className="form-control w-full md:w-32 shrink-0">
+                                        <label className="label py-1"><span className="label-text text-xs font-bold">Wert</span></label>
+                                        <div className="join w-full">
+                                            <input required type="number" step="any" min="0" value={discount.price} onChange={e => handleDiscountChange(idx, 'price', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered join-item w-full font-mono text-right bg-base-100" />
+                                            <span className="btn btn-sm btn-disabled join-item">{discount.type === 'discount_percent' ? '%' : '€'}</span>
+                                        </div>
+                                    </div>
+                                    <button type="button" onClick={() => removeDiscount(idx)} className="btn btn-sm btn-ghost text-error shrink-0 mt-7"><span className="iconify mdi--trash-can text-lg"></span></button>
+                                </div>
+                            ))}
+                            {discounts.length === 0 && <p className="text-sm opacity-50 italic px-2">Keine Rabatte angewendet.</p>}
+                        </div>
+                    </div>
+                    
+<div className="text-right text-2xl font-bold mt-6 pt-4 border-t border-base-300">Gesamtbetrag: {total.toFixed(2)} €</div>
                 </div>
 
                 {!isOffer && (
@@ -248,7 +415,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
                 )}
 
                 <div className="flex justify-end pt-4 pb-20">
-                    <button type="submit" disabled={isGenerating} className="btn btn-primary btn-lg shadow-xl w-full md:w-auto">
+                    <button type="submit" disabled={isGenerating || !isFormValid} className="btn btn-primary btn-lg shadow-xl w-full md:w-auto" title={!isFormValid ? "Bitte alle Pflichtfelder ausfüllen (Titel/Menge)." : ""}>
                         {isGenerating ? <span className="loading loading-spinner"></span> : 'PDF Generieren'}
                     </button>
                 </div>

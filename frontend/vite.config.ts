@@ -24,6 +24,9 @@ export default defineConfig({
                         if (id.includes('photoswipe')) {
                             return 'vendor-photoswipe';
                         }
+                        if (id.includes("@tiptap/")){
+                            return "vendor-tiptap"
+                        }
                     }
                 }
             }

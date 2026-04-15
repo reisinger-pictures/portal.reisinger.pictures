@@ -253,10 +253,51 @@ class OrderController extends Controller
             'bankBic' => \App\Models\Setting::where('key', 'bank_bic')->value('value')
         ]);
 
-        return response()->streamDownload(function() use ($pdf) {
-            echo $pdf->output();
+        $output = $pdf->output();
+
+        if ($isOffer) {
+            $smartData = [
+                'customer_name' => $validated['customer_name'] ?? '',
+                'customer_company' => $validated['customer_company'] ?? '',
+                'customer_street' => $validated['customer_street'] ?? '',
+                'customer_zip' => $validated['customer_zip'] ?? '',
+                'customer_city' => $validated['customer_city'] ?? '',
+                'customer_country' => $validated['customer_country'] ?? '',
+                'customer_email' => $validated['customer_email'] ?? '',
+                'customer_uid' => $validated['customer_uid'] ?? '',
+                'items' => $validated['items'] ?? [],
+                'terms_html' => $validated['terms_html'] ?? ''
+            ];
+            $payload = base64_encode(json_encode($smartData));
+            $signature = hash_hmac('sha256', $payload, config('app.key'));
+            $output .= "\n%SMART_DOC:{$payload}.{$signature}%\n";
+        }
+
+        return response()->streamDownload(function() use ($output) {
+            echo $output;
         }, $filename . '.pdf', [
             'Content-Type' => 'application/pdf'
         ]);
+    }
+
+    public function extractOffer(Request $request)
+    {
+        $user = auth('api')->user();
+        if (!$user || !$user->is_super_admin) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
+        $request->validate(['pdf' => 'required|file']); // MIME type check removed, we rely on the HMAC signature instead
+        $content = file_get_contents($request->file('pdf')->getPathname());
+        
+        if (preg_match('/%SMART_DOC:(.*?)\.(.*?)%/', $content, $matches)) {
+            $payload = $matches[1];
+            $signature = $matches[2];
+            if (hash_equals(hash_hmac('sha256', $payload, config('app.key')), $signature)) {
+                return response()->json(json_decode(base64_decode($payload), true));
+            }
+            return response()->json(['error' => 'Signatur ungültig oder manipuliert. Das Angebot wurde eventuell verändert.'], 400);
+        }
+        return response()->json(['error' => 'Kein eingebettetes Angebot in diesem PDF gefunden.'], 404);
     }
 }

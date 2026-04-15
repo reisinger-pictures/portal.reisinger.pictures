@@ -1,3 +1,3 @@
 # 📝 Projekt-Master-Backlog
 
-Aktuelle DB Version: 9
+Aktuelle DB Version: 10

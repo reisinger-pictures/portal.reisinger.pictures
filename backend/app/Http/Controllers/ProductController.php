@@ -12,12 +12,19 @@ class ProductController extends Controller
         $user = auth('api')->user();
         if (!$user || !$user->is_super_admin) return response()->json(['error' => 'Keine Berechtigung'], 403);
         
-        $q = $request->query('q');
-        if ($q && strlen($q) >= 2) {
-            return response()->json(Product::where('name', 'like', '%' . $q . '%')->take(20)->get());
+        $query = Product::query();
+        
+        if ($request->query('type')) {
+            $query->whereIn('type', explode(',', $request->query('type')));
         }
         
-        return response()->json(Product::orderBy('name', 'asc')->get());
+        $q = $request->query('q');
+        if ($q && strlen($q) >= 2) {
+            $query->where('name', 'like', '%' . $q . '%');
+            return response()->json($query->take(20)->get());
+        }
+        
+        return response()->json($query->orderBy('name', 'asc')->get());
     }
 
     public function store(Request $request)
@@ -26,6 +33,7 @@ class ProductController extends Controller
         if (!$user || !$user->is_super_admin) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         $validated = $request->validate([
+            'type' => 'required|string|in:item,discount_fixed,discount_percent',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'price' => 'required|numeric|min:0',
@@ -43,6 +51,7 @@ class ProductController extends Controller
         $product = Product::findOrFail($id);
         
         $validated = $request->validate([
+            'type' => 'required|string|in:item,discount_fixed,discount_percent',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'price' => 'required|numeric|min:0',

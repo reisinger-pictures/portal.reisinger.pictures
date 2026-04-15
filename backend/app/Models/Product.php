@@ -8,6 +8,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class Product extends Model
 {
     use HasUuids;
-    protected $fillable = ['name', 'description', 'price'];
+    protected $fillable = ['type', 'name', 'description', 'price'];
     protected $casts = ['price' => 'float'];
 }

@@ -15,6 +15,7 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
     useEffect(() => {
         if (isOpen) {
             reset({
+                type: editingProduct?.type || 'item',
                 name: editingProduct?.name || '',
                 description: editingProduct?.description || '',
                 price: editingProduct?.price || 0
@@ -35,10 +36,18 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                 <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--package-variant-closed text-primary"></span>
-                    {editingProduct ? 'Produkt bearbeiten' : 'Neues Produkt anlegen'}
+                    {editingProduct ? 'Katalog-Eintrag bearbeiten' : 'Neuen Eintrag anlegen'}
                 </h3>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="form-control">
+                        <label className="label"><span className="label-text font-bold">Typ *</span></label>
+                        <select {...register('type')} className="select select-sm select-bordered">
+                            <option value="item">Leistung / Produkt</option>
+                            <option value="discount_fixed">Rabatt (Fixbetrag in €)</option>
+                            <option value="discount_percent">Rabatt (Prozentual in %)</option>
+                        </select>
+                    </div>
                     <div className="form-control">
                         <label className="label"><span className="label-text font-bold">Titel / Name *</span></label>
                         <input required type="text" {...register('name')} className="input input-sm input-bordered" />
@@ -48,7 +57,7 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                         <input type="text" {...register('description')} className="input input-sm input-bordered" />
                     </div>
                     <div className="form-control w-1/2">
-                        <label className="label"><span className="label-text font-bold">Standard-Preis (Netto) *</span></label>
+                        <label className="label"><span className="label-text font-bold">Standard-Wert (Netto oder %) *</span></label>
                         <input required type="number" step="any" min="0" {...register('price', { valueAsNumber: true })} className="input input-sm input-bordered font-mono" />
                     </div>
 

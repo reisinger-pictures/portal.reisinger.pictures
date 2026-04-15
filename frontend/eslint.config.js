@@ -34,6 +34,10 @@ export default tseslint.config(
         {
           selector: 'Property[key.name="force"][value.value=true]',
           message: 'Strict QA Enforcement: Do not use { force: true } in Playwright E2E tests. Fix the UI instead.'
+        },
+        {
+          selector: 'CallExpression[callee.property.name="setViewportSize"]',
+          message: 'Strict QA Enforcement: Do not use page.setViewportSize(). Use Playwright projects/devices in playwright.config.ts instead.'
         }
       ]
     },

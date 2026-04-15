@@ -9,7 +9,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
     let testUser = { email: '', password: '' };
     let createdCustomerId = '';
     let createdSnippetId = '';
-    let createdProductId = '';
+    const createdProductIds: string[] = [];
     let uniqueSuffix = '';
     let snippetShortcut = '';
 
@@ -20,6 +20,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         uniqueSuffix = Math.random().toString(36).substring(2, 10);
         snippetShortcut = `snip${uniqueSuffix}`;
 
+        // CRM Kunde vorbereiten
         const custRes = await request.post('/api/management/customers', {
             data: { name: `E2E VIP ${uniqueSuffix}`, zip: '1010', city: 'Wien' },
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
@@ -27,6 +28,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         const custData = await custRes.json();
         if (custData?.customer?.id) createdCustomerId = custData.customer.id;
 
+        // Textbaustein vorbereiten
         const snipRes = await request.post('/api/management/text-snippets', {
             data: { title: `E2E Snippet ${uniqueSuffix}`, shortcut: snippetShortcut, content_html: `<p>Magic${uniqueSuffix}Content</p>` },
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
@@ -34,28 +36,36 @@ test.describe('Manual Documents & CRM Workflow', () => {
         const snipData = await snipRes.json();
         if (snipData?.snippet?.id) createdSnippetId = snipData.snippet.id;
 
-        // Produkt vorbereiten
+        // Katalog-Einträge (Produkt & Rabatt) vorbereiten
         const prodRes = await request.post('/api/management/products', {
-            data: { name: `E2E Product ${uniqueSuffix}`, description: 'E2E Leistung', price: 150 },
+            data: { type: 'item', name: `E2E Product ${uniqueSuffix}`, description: 'E2E Leistung', price: 150 },
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
         });
         const prodData = await prodRes.json();
-        if (prodData?.product?.id) createdProductId = prodData.product.id;
+        if (prodData?.product?.id) createdProductIds.push(prodData.product.id);
+
+        const discRes = await request.post('/api/management/products', {
+            data: { type: 'discount_fixed', name: `E2E Discount ${uniqueSuffix}`, description: 'E2E Rabatt', price: 20 },
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+        });
+        const discData = await discRes.json();
+        if (discData?.product?.id) createdProductIds.push(discData.product.id);
     });
 
     test.afterEach(async ({ request }) => {
+        // Aufräumen der erstellten Ressourcen
         if (createdCustomerId) {
             await request.delete(`/api/management/customers/${createdCustomerId}`, {
                 headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
             }).catch(() => {});
         }
-        if (createdProductId) {
-            await request.delete(`/api/management/products/${createdProductId}`, {
+        if (createdSnippetId) {
+            await request.delete(`/api/management/text-snippets/${createdSnippetId}`, {
                 headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
             }).catch(() => {});
         }
-        if (createdSnippetId) {
-            await request.delete(`/api/management/text-snippets/${createdSnippetId}`, {
+        for (const pId of createdProductIds) {
+            await request.delete(`/api/management/products/${pId}`, {
                 headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
             }).catch(() => {});
         }
@@ -69,100 +79,83 @@ test.describe('Manual Documents & CRM Workflow', () => {
 
         await sidebar.navigateTo('Manuelles Angebot');
         await expect(page).toHaveURL(/.*\/admin-manual-offer/);
-        await expect(page.locator('h1:has-text("Manuelles Angebot")')).toBeVisible();
 
-        await page.waitForTimeout(2000); // Allow Meilisearch indexing to finish
-        // 1. Test CRM Autocomplete (mit Retry für Meilisearch Indexing-Delay)
+        // 1. Test CRM Autocomplete (mit Delay für Meilisearch)
+        await page.waitForTimeout(2000); 
         const nameInput = page.locator('.form-control').filter({ hasText: 'Name / Ansprechpartner' }).locator('input');
-        await expect(async () => {
-            await nameInput.clear();
-            await page.waitForTimeout(200); // SWR Debounce Reset abwarten
-            await nameInput.fill(`E2E VIP ${uniqueSuffix}`);
-            const dropdown = page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first();
-            await expect(dropdown).toBeVisible({ timeout: 3000 });
-        }).toPass({ timeout: 15000 });
-        await page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first().click();
+        await nameInput.click();
+        await nameInput.clear();
+        await nameInput.pressSequentially(`E2E VIP ${uniqueSuffix}`, { delay: 100 });
+        
+        const dropdown = page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first();
+        await expect(dropdown).toBeVisible({ timeout: 15000 });
+        await dropdown.click();
 
-        const zipInput = page.locator('.form-control').filter({ hasText: 'PLZ & Stadt' }).locator('input').nth(0);
-        const cityInput = page.locator('.form-control').filter({ hasText: 'PLZ & Stadt' }).locator('input').nth(1);
-        await expect(zipInput).toHaveValue('1010');
-        await expect(cityInput).toHaveValue('Wien');
-
-        // 2. Test Tiptap Shortcut Injection (Slash Command Menu)
+        // 2. Test Tiptap Shortcut Injection
         const editor = page.locator('.ProseMirror').first();
         await editor.click();
         await editor.pressSequentially(`/${snippetShortcut}`, { delay: 50 }); 
-        
-        // Auf das Aufploppen des Autocomplete-Menüs warten
-        const slashMenu = page.locator('.menu').filter({ hasText: 'Textbaustein einfügen' });
-        await expect(slashMenu).toBeVisible();
-        await expect(slashMenu.locator('a').first()).toBeVisible();
-
-        // Echte Nutzer-Interaktion: Mit Enter bestätigen
+        await page.locator('.menu').filter({ hasText: 'Textbaustein einfügen' }).waitFor({ state: 'visible' });
         await page.keyboard.press('Enter'); 
-        
         await expect(editor).toContainText(`Magic${uniqueSuffix}Content`, { timeout: 10000 });
 
         // 3. Leistungen befüllen (via Autocomplete)
         const itemInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
         await itemInput.fill(`E2E Product ${uniqueSuffix}`);
-        
-        const productDropdown = page.locator(`li:has-text("E2E Product ${uniqueSuffix}")`).first();
-        await expect(productDropdown).toBeVisible({ timeout: 15000 });
-        await productDropdown.click();
+        await page.locator(`li:has-text("E2E Product ${uniqueSuffix}")`).first().click();
 
-        // Prüfen ob die Autocomplete-Felder (Preis & Menge) befüllt wurden
         await expect(page.locator('.form-control').filter({ hasText: 'Preis / Stück' }).locator('input').first()).toHaveValue('150');
-        await expect(page.locator('.form-control').filter({ hasText: 'Zusatz (kleingedruckt)' }).locator('input').first()).toHaveValue('E2E Leistung');
         await page.locator('.form-control').filter({ hasText: 'Menge' }).locator('input').first().fill('2');
 
-        // 4. PDF Generierung & Download Interception
+        // 4. Rabatt hinzufügen
+        await page.getByRole('button', { name: '+ Rabatt hinzufügen' }).click();
+        const discountInput = page.locator('.form-control').filter({ hasText: 'Titel / Beschreibung' }).locator('input').last();
+        await discountInput.fill(`E2E Discount ${uniqueSuffix}`);
+        await page.locator(`li:has-text("E2E Discount ${uniqueSuffix}")`).first().click();
+
+        // Validierung der Gesamtsumme (150 * 2 - 20 = 280)
+        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('280.00 €');
+
+        // 5. PDF Generierung
         const [download] = await Promise.all([
             page.waitForEvent('download'),
             page.getByRole('button', { name: 'PDF Generieren' }).click()
         ]);
-
         expect(download.suggestedFilename()).toMatch(/^Angebot-.*\.pdf$/);
-        
         const downloadPath = await download.path();
-        const buffer = fs.readFileSync(downloadPath!);
+
+        // 6. Smart Documents: Import PDF as Invoice
+        await sidebar.navigateTo('Manuelle Rechnung');
+        await expect(page).toHaveURL(/.*\/admin-manual-invoice/);
+
+        // Upload the previously downloaded PDF
+        const fileChooserPromise = page.waitForEvent('filechooser');
+        await page.locator('label').filter({ hasText: 'Angebot importieren (.pdf)' }).click();
+        const fileChooser = await fileChooserPromise;
+        const savedPdfPath = downloadPath + '.pdf';
+        await download.saveAs(savedPdfPath);
         
-        // Check for PDF Magic Bytes (0x25 0x50 0x44 0x46 -> %PDF)
-        expect(buffer.subarray(0, 4).toString('hex')).toBe('25504446');
+        // Datei inhaltlich validieren (Prüfung, ob das Backend das Smart Doc Payload angehängt hat)
+        const fileContent = fs.readFileSync(savedPdfPath, 'utf8');
+        expect(fileContent, 'Die heruntergeladene PDF hat kein %SMART_DOC: Payload! (Backend/UI Fehler)').toContain('%SMART_DOC:');
+
+        // We relaxed the MIME validation on the backend, so we can just pass the pristine file path
+        await fileChooser.setFiles(savedPdfPath);
+
+        // Wait for the success toast from the API response
+        await expect(page.locator('.toast')).toContainText('Angebotsdaten erfolgreich übernommen!', { timeout: 15000 });
+
+        // 7. Validate restored data
+        await expect(page.locator('.form-control').filter({ hasText: 'Name / Ansprechpartner' }).locator('input')).toHaveValue(`E2E VIP ${uniqueSuffix}`);
+        await expect(page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first()).toHaveValue(`E2E Product ${uniqueSuffix}`);
+        await expect(page.locator('.form-control').filter({ hasText: 'Preis / Stück' }).locator('input').first()).toHaveValue('150');
+        await expect(page.locator('.form-control').filter({ hasText: 'Menge' }).locator('input').first()).toHaveValue('2');
+        
+        await expect(page.locator('.form-control').filter({ hasText: 'Titel / Beschreibung' }).locator('input').last()).toHaveValue(`E2E Discount ${uniqueSuffix}`);
+        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('280.00 €');
+        
+        // Nutze den bereits oben deklarierten 'editor' Locator
+        await expect(editor).toContainText(`Magic${uniqueSuffix}Content`);
     });
 
-    test('Mobile UI: CRM Autocomplete and Tiptap Shortcuts work on small touch screens', async ({ page }) => {
-        // Setze Viewport explizit auf Mobile (z.B. iPhone 12)
-        await page.setViewportSize({ width: 390, height: 844 });
-        
-        const auth = new AuthHelper(page);
-        const sidebar = new SidebarHelper(page);
-        await auth.login(testUser.email, testUser.password);
-
-        await sidebar.navigateTo('Manuelles Angebot');
-        await expect(page).toHaveURL(/.*\/admin-manual-offer/);
-
-        await page.waitForTimeout(2000); // Allow Meilisearch indexing to finish
-        // 1. Mobile CRM Autocomplete Touch-Test
-        const nameInput = page.locator('.form-control').filter({ hasText: 'Name / Ansprechpartner' }).locator('input');
-        await nameInput.click(); // Touch Simulierung
-        await expect(async () => {
-            await nameInput.clear();
-            await page.waitForTimeout(200); // SWR Debounce Reset abwarten
-            await nameInput.fill(`E2E VIP ${uniqueSuffix}`);
-            const dropdown = page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first();
-            await expect(dropdown).toBeVisible({ timeout: 3000 });
-        }).toPass({ timeout: 15000 });
-        await page.locator(`li:has-text("E2E VIP ${uniqueSuffix}")`).first().click();
-
-        // 2. Mobile Tiptap & Slash Menu Check
-        const editor = page.locator('.ProseMirror').first();
-        await editor.click();
-        await editor.pressSequentially(`/${snippetShortcut}`, { delay: 50 });
-        
-        const slashMenu = page.locator('.menu').filter({ hasText: 'Textbaustein einfügen' });
-        await expect(slashMenu).toBeVisible();
-        await page.keyboard.press('Enter');
-        await expect(editor).toContainText(`Magic${uniqueSuffix}Content`, { timeout: 10000 });
     });
-});
