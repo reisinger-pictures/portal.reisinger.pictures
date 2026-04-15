@@ -12,16 +12,11 @@ import ResponsiveImage from './components/ResponsiveImage';
 import PhotoHistoryModal from './components/PhotoHistoryModal';
 import { useUI } from './components/UIContext';
 import LicenseSelectorCard from './client/components/LicenseSelectorCard';
-
-interface Breadcrumb {
-    name: string;
-    type: 'group' | 'gallery';
-    full_path?: string;
-}
+import { BreadcrumbItem } from '../api';
 
 interface PhotoContextData {
     photo: Photo;
-    breadcrumbs: Breadcrumb[];
+    breadcrumbs: BreadcrumbItem[];
     downloads_count: number;
 }
 

@@ -7,9 +7,6 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 test.describe('Manual Documents & CRM Workflow', () => {
     let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
-    let createdCustomerId = '';
-    let createdSnippetId = '';
-    const createdProductIds: string[] = [];
     let uniqueSuffix = '';
     let snippetShortcut = '';
 
@@ -26,7 +23,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
         });
         const custData = await custRes.json();
-        if (custData?.customer?.id) createdCustomerId = custData.customer.id;
+        if (custData?.customer?.id) helper.trackCustomer(custData.customer.id);
 
         // Textbaustein vorbereiten
         const snipRes = await request.post('/api/management/text-snippets', {
@@ -34,7 +31,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
         });
         const snipData = await snipRes.json();
-        if (snipData?.snippet?.id) createdSnippetId = snipData.snippet.id;
+        if (snipData?.snippet?.id) helper.trackSnippet(snipData.snippet.id);
 
         // Katalog-Einträge (Produkt & Rabatt) vorbereiten
         const prodRes = await request.post('/api/management/products', {
@@ -42,33 +39,17 @@ test.describe('Manual Documents & CRM Workflow', () => {
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
         });
         const prodData = await prodRes.json();
-        if (prodData?.product?.id) createdProductIds.push(prodData.product.id);
+        if (prodData?.product?.id) helper.trackProduct(prodData.product.id);
 
         const discRes = await request.post('/api/management/products', {
             data: { type: 'discount_fixed', name: `E2E Discount ${uniqueSuffix}`, description: 'E2E Rabatt', price: 20 },
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
         });
         const discData = await discRes.json();
-        if (discData?.product?.id) createdProductIds.push(discData.product.id);
+        if (discData?.product?.id) helper.trackProduct(discData.product.id);
     });
 
-    test.afterEach(async ({ request }) => {
-        // Aufräumen der erstellten Ressourcen
-        if (createdCustomerId) {
-            await request.delete(`/api/management/customers/${createdCustomerId}`, {
-                headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
-            }).catch(() => {});
-        }
-        if (createdSnippetId) {
-            await request.delete(`/api/management/text-snippets/${createdSnippetId}`, {
-                headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
-            }).catch(() => {});
-        }
-        for (const pId of createdProductIds) {
-            await request.delete(`/api/management/products/${pId}`, {
-                headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
-            }).catch(() => {});
-        }
+    test.afterEach(async () => {
         if (helper) await helper.teardown();
     });
 

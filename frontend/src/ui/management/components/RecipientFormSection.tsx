@@ -1,12 +1,16 @@
 import AutocompleteInput from '../../components/AutocompleteInput';
-import { Customer } from '../ManagementCustomersView';
+import { Customer } from '../../../api';
 import { LocationResult } from '../../../logic/useLocations';
 import { DocumentFormData } from '../ManagementManualInvoiceView';
 
 interface Props {
     formData: DocumentFormData;
     onUpdate: (field: string, value: string) => void;
-    onMultiUpdate: (updates: Record<string, string>) => void;
+    onMultiUpdate: (updates: RecipientFormUpdates) => void;
+}
+
+export interface RecipientFormUpdates {
+    [key: string]: string;
 }
 
 export default function RecipientFormSection({ formData, onUpdate, onMultiUpdate }: Props) {

@@ -3,7 +3,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import HighlightText from './HighlightText';
 import { useSearch } from '../../logic/useSearch';
 
-export default function GlobalSearchHeader({ onMenuClick }: { onMenuClick: () => void }) {
+export interface GlobalSearchHeaderProps {
+    onMenuClick: () => void;
+}
+
+export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderProps) {
     const [searchParams] = useSearchParams();
     const qParam = searchParams.get('q') || '';
     const [searchQuery, setSearchQuery] = useState(qParam);

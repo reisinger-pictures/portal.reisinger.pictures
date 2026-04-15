@@ -37,7 +37,8 @@ test.describe('Photographer Core Workflow', () => {
         await sidebar.openNewGalleryModal();
         const form = new FormHelper(page, modal);
         await form.fillGalleryModal({ name: galleryName, type: 'Delivery (Downloads)' });
-        await modal.submitModal('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
         await expect(link).toBeVisible({ timeout: 15000 });

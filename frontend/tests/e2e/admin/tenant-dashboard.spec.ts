@@ -5,6 +5,7 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 import { FormHelper } from '../helpers/FormHelper';
+import { UserDetailed } from '../../../src/logic/useUsers';
 
 test.describe('Tenant Management & Invoicing Workflow', () => {
     let helper: E2ESessionHelper;
@@ -69,7 +70,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
 
         const usersRes = await request.get('/api/management/users', { headers: { 'Cookie': helper.getAdminToken() } });
         const usersData = await usersRes.json();
-        const guestUser = usersData.data?.find((u: { id: string; email: string }) => u.email === guestEmail);
+        const guestUser = usersData.data?.find((u: UserDetailed) => u.email === guestEmail);
         if (guestUser) {
             await request.delete(`/api/test/cleanup-user/${guestUser.id}`, { headers: { 'Cookie': helper.getAdminToken() } });
         }

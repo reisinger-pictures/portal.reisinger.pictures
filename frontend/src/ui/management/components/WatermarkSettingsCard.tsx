@@ -4,6 +4,12 @@ import { useAuth } from '../../../logic/useAuth';
 import { useUI } from '../../components/UIContext';
 import { useForm, useWatch } from 'react-hook-form';
 
+export interface WatermarkFormValues {
+    text: string;
+    opacity: number;
+    svg?: FileList;
+}
+
 export default function WatermarkSettingsCard() {
     const [cacheBuster, setCacheBuster] = useState(() => Date.now());
     const { watermark, updateWatermark } = useSettings();
@@ -52,7 +58,7 @@ export default function WatermarkSettingsCard() {
         };
     }, [watchSvg, watermark, cacheBuster]);
 
-    const onSubmit = async (data: { text: string; opacity: number; svg?: FileList }) => {
+    const onSubmit = async (data: WatermarkFormValues) => {
         const fd = new FormData();
         if (data.svg && data.svg.length > 0) {
             fd.append('svg', data.svg[0]);

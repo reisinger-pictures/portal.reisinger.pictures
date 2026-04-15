@@ -2,26 +2,9 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
+import { Order, OrderItem } from '../../api';
 
-interface Order {
-    id: string;
-    status: string;
-    is_quote_request: boolean | number;
-    total_amount: string;
-    created_at: string;
-    user: { name: string; email: string };
-    invoice_snapshot: { invoice_number: string; customer_details: CustomerDetails };
-}
 
-interface OrderItem {
-    filename: string;
-    notes?: string;
-}
-
-interface CustomerDetails {
-    quote_message?: string;
-    items: OrderItem[];
-}
 
 export default function ManagementOrdersView() {
     const { data: orders, error, isLoading, mutate } = useSWR<Order[]>('/api/management/orders', fetcher);
@@ -135,8 +118,8 @@ export default function ManagementOrdersView() {
 
                         <div className="bg-base-200 p-4 rounded-box mb-4 text-sm max-h-40 overflow-y-auto">
                             <strong className="block mb-2">Anforderungen des Kunden:</strong>
-                            <div className="opacity-70 mb-2 italic">{quoteOrder.invoice_snapshot.customer_details.quote_message || 'Keine generelle Nachricht'}</div>
-                            {quoteOrder.invoice_snapshot.customer_details.items.map((item: OrderItem, idx: number) => (
+                            <div className="opacity-70 mb-2 italic">{quoteOrder.invoice_snapshot?.customer_details?.quote_message || 'Keine generelle Nachricht'}</div>
+                            {(quoteOrder.invoice_snapshot?.customer_details?.items || []).map((item: OrderItem, idx: number) => (
                                 <div key={idx} className="mb-2 pb-2 border-b border-base-300 last:border-0 last:mb-0 last:pb-0">
                                     <div className="font-mono font-bold">{item.filename}</div>
                                     <div className="opacity-70">{item.notes || '-'}</div>

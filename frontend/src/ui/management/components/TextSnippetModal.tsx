@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { TextSnippet } from '../ManagementTextSnippetsView';
+import { TextSnippet } from '../../../api';
 import WysiwygEditor from '../../components/WysiwygEditor';
 
 interface Props {

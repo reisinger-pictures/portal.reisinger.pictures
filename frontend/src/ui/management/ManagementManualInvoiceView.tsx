@@ -6,8 +6,9 @@ import WysiwygEditor from '../components/WysiwygEditor';
 import RecipientFormSection from './components/RecipientFormSection';
 import ManualDocumentHeader from './components/ManualDocumentHeader';
 import AutocompleteInput from '../components/AutocompleteInput';
+import { Product, InvoiceItem, InvoiceDiscount } from '../../api';
 
-interface Product { id: string; name: string; description: string; price: number; type?: string; }
+
 
 export interface DocumentFormData {
     type: string;
@@ -28,7 +29,13 @@ export interface DocumentFormData {
     [key: string]: string;
 }
 
-export default function ManagementManualInvoiceView({ type = 'invoice' }: { type?: 'invoice' | 'offer' }) {
+export interface ManagementManualInvoiceViewProps {
+    type?: 'invoice' | 'offer';
+}
+
+
+
+export default function ManagementManualInvoiceView({ type = 'invoice' }: ManagementManualInvoiceViewProps) {
     const { user } = useAuth();
     const { showToast } = useUI();
     const docType = type;
@@ -96,8 +103,8 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
         }
     }, [dueDateOption, isOffer]);
 
-    const [items, setItems] = useState([{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
-    const [discounts, setDiscounts] = useState<{type: string, description: string, notes: string, price: number}[]>([]);
+    const [items, setItems] = useState<InvoiceItem[]>([{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
+    const [discounts, setDiscounts] = useState<InvoiceDiscount[]>([]);
     const [isDragging, setIsDragging] = useState(false);
 
     if (!user?.is_super_admin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung." /></div>;
@@ -136,8 +143,8 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: { type
                 terms_html: data.terms_html || ''
             }));
             
-            const loadedItems = data.items?.filter((i: { type: string }) => i.type === 'item') || [];
-            const loadedDiscounts = data.items?.filter((i: { type: string }) => i.type !== 'item') || [];
+            const loadedItems = data.items?.filter((i: InvoiceItem) => i.type === 'item') || [];
+            const loadedDiscounts = data.items?.filter((i: InvoiceDiscount) => i.type !== 'item') || [];
             
             setItems(loadedItems.length > 0 ? loadedItems : [{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
             setDiscounts(loadedDiscounts);

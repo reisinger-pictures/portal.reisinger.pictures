@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { GalleryGroup, FlatGroup } from '../../logic/useGalleries';
+import { GalleryGroup, FlatGroup, GalleryGroupExtraOpts } from '../../logic/useGalleries';
 import { useUI } from './UIContext';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,8 +20,8 @@ interface Props {
     availableGroups: FlatGroup[];
     editingGroup?: GalleryGroup | null;
     defaultParentId?: string | null;
-    onCreate: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: Record<string, unknown>) => Promise<void>;
-    onUpdate: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: Record<string, unknown>) => Promise<void>;
+    onCreate: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: GalleryGroupExtraOpts) => Promise<void>;
+    onUpdate: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: GalleryGroupExtraOpts) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
 

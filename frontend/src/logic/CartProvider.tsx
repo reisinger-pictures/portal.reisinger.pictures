@@ -3,7 +3,11 @@ import { CartItem, CartContext } from './CartContext';
 import { useAuth } from './useAuth';
 import { useUI } from '../ui/components/UIContext';
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export interface CartProviderProps {
+    children: ReactNode;
+}
+
+export function CartProvider({ children }: CartProviderProps) {
     const { user } = useAuth();
     const { showToast } = useUI();
     const cartKey = `rp_cart_${user?.id || 'guest'}`;

@@ -4,14 +4,9 @@ import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import ProductModal from './components/ProductModal';
+import { Product } from '../../api';
 
-export interface Product {
-    id: string;
-    type: 'item' | 'discount_fixed' | 'discount_percent';
-    name: string;
-    description?: string | null;
-    price: number;
-}
+
 
 export default function ManagementProductsView() {
     const { data: products, error, isLoading, mutate } = useSWR<Product[]>('/api/management/products', fetcher);

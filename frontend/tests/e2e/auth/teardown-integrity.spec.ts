@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
+import { UserDetailed } from '../../../src/logic/useUsers';
 
 test.describe('Teardown Integrity Validation', () => {
     test('Flow AK: UserController@destroy properly wipes user and ensures test isolation', async ({ request }) => {
@@ -18,7 +19,7 @@ test.describe('Teardown Integrity Validation', () => {
             headers: { 'Cookie': adminToken! }
         });
         let usersData = await usersRes.json();
-        let found = usersData.data.find((u: { email: string }) => u.email === testUser.email);
+        let found = usersData.data.find((u: UserDetailed) => u.email === testUser.email);
         expect(found).toBeTruthy();
 
         // 🔥 Teardown triggern (Löschung via API)
@@ -29,7 +30,7 @@ test.describe('Teardown Integrity Validation', () => {
             headers: { 'Cookie': adminToken! }
         });
         usersData = await usersRes.json();
-        found = usersData.data.find((u: { email: string }) => u.email === testUser.email);
+        found = usersData.data.find((u: TestUserResponse) => u.email === testUser.email);
         expect(found).toBeUndefined(); // Darf nicht mehr in der DB sein!
     });
 });

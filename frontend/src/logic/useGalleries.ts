@@ -68,6 +68,27 @@ export const flattenGroups = (groups: GalleryGroup[], depth = 0): FlatGroup[] =>
     return flat;
 };
 
+export interface GalleryGroupExtraOpts {
+    is_free_download?: boolean;
+}
+
+export interface GalleryMetadataOpts {
+    is_free_download?: boolean;
+    is_editorial_only?: boolean;
+    is_hidden?: boolean;
+    restricted_photographers?: boolean;
+    allow_client_metadata_edit?: boolean;
+    apply_metadata_to_photos?: boolean;
+    default_title?: string;
+    default_description?: string;
+    default_keywords?: string;
+    default_location?: string;
+    default_city?: string;
+    default_state?: string;
+    default_country?: string;
+    default_iso_country?: string;
+}
+
 export function useProtectedGalleries() {
     const {user} = useAuth();
     const canFetch = user?.is_admin || user?.is_photographer;
@@ -83,13 +104,13 @@ export function useProtectedGalleries() {
         await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/search'), undefined, { revalidate: true });
     };
 
-    const createGroup = async (name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => {
-        await apiMutate('/api/management/gallery-groups', 'POST', { name, slug, is_public: isPublic, parent_id: parentId });
+    const createGroup = async (name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: GalleryGroupExtraOpts) => {
+        await apiMutate('/api/management/gallery-groups', 'POST', { name, slug, is_public: isPublic, parent_id: parentId, ...extraOpts });
         await invalidateAll();
     };
 
-    const updateGroup = async (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null) => {
-        await apiMutate('/api/management/gallery-groups/' + id, 'PUT', { name, slug, is_public: isPublic, parent_id: parentId });
+    const updateGroup = async (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: GalleryGroupExtraOpts) => {
+        await apiMutate('/api/management/gallery-groups/' + id, 'PUT', { name, slug, is_public: isPublic, parent_id: parentId, ...extraOpts });
         await invalidateAll();
     };
 
@@ -98,12 +119,12 @@ export function useProtectedGalleries() {
         await invalidateAll();
     };
 
-    const createGallery = async (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: Record<string, unknown>) => {
+    const createGallery = async (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: GalleryMetadataOpts) => {
         await apiMutate('/api/management/galleries', 'POST', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts });
         await invalidateAll();
     };
 
-    const updateGallery = async (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: Record<string, unknown>) => {
+    const updateGallery = async (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: GalleryMetadataOpts) => {
         await apiMutate('/api/management/galleries/' + id, 'PUT', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts });
         await invalidateAll();
     };

@@ -3,9 +3,18 @@ import { UIContext, Toast, ConfirmOptions } from './UIContext';
 
 let toastIdCounter = 0;
 
-export const UIProvider = ({ children }: { children: ReactNode }) => {
+export interface UIProviderProps {
+    children: ReactNode;
+}
+
+export interface ConfirmState {
+    options: ConfirmOptions;
+    resolve: (value: boolean) => void;
+}
+
+export const UIProvider = ({ children }: UIProviderProps) => {
     const [toasts, setToasts] = useState<Toast[]>([]);
-    const [confirmState, setConfirmState] = useState<{ options: ConfirmOptions; resolve: (value: boolean) => void } | null>(null);
+    const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
     const showToast = useCallback((type: 'success' | 'error' | 'info', text: string) => {
         const id = ++toastIdCounter;

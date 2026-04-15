@@ -1,12 +1,26 @@
 import useSWR from 'swr';
 import {fetcher} from '../api';
 
+export interface DomainStat {
+    domain: string;
+    count: number;
+}
+
+export interface TopGalleryStat {
+    name: string;
+    count: number;
+}
+
 export interface StatsData {
     galleries_count: number;
     total_downloads: number;
     guest_downloads: number;
-    domain_stats: { domain: string; count: number }[];
-    top_galleries: { name: string; count: number }[];
+    domain_stats: DomainStat[];
+    top_galleries: TopGalleryStat[];
+}
+
+export interface LogPayload {
+    photo_count?: number;
 }
 
 export interface LogEntry {
@@ -18,7 +32,7 @@ export interface LogEntry {
     created_at: string;
     thumb_url?: string;
     resolution_tier?: string;
-    payload?: { photo_count?: number };
+    payload?: LogPayload;
 }
 
 export interface PaginatedLogs {

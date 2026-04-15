@@ -1,15 +1,24 @@
 import {apiMutate, fetcher} from '../api';
 import { IptcData } from '../ui/components/IptcMetadataEditor';
 
+export interface PhotoVersionUser {
+    id: string;
+    name: string;
+}
+
 export interface PhotoVersion extends IptcData {
     id: string;
     created_at: string;
-    user?: { id: string, name: string };
+    user?: PhotoVersionUser;
+}
+
+export interface UpdateMetadataResponse {
+    success: boolean;
 }
 
 export function usePhoto() {
     const updateMetadata = async (id: string, data: IptcData) => {
-        const res = await apiMutate<{ success: boolean }>( `/api/photos/${id}/meta`, 'PUT', data);
+        const res = await apiMutate<UpdateMetadataResponse>( `/api/photos/${id}/meta`, 'PUT', data);
                 return res;
     };
 

@@ -6,7 +6,11 @@ import { useLicenseTerms } from '../../../logic/useLicenseTerms';
 import { useCart } from '../../../logic/CartContext';
 import { useUI } from '../../components/UIContext';
 
-export default function LicenseSelectorCard({ photo }: { photo: Photo }) {
+export interface LicenseSelectorCardProps {
+    photo: Photo;
+}
+
+export default function LicenseSelectorCard({ photo }: LicenseSelectorCardProps) {
     const [usage, setUsage] = useState<UsageTier>('editorial');
     const [duration, setDuration] = useState<DurationTier>('1_year');
     const [frequency, setFrequency] = useState<FrequencyTier>('einmalig');

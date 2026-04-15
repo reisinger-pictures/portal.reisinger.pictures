@@ -9,8 +9,26 @@ export interface Tenant {
     users_count?: number;
     gallery_groups_count?: number;
     open_delivery_notes_count?: number;
-    users?: { id: string, name: string, email: string }[];
-    gallery_groups?: { id: string, name: string, parent_id: string | null }[];
+    users?: TenantUser[];
+    gallery_groups?: TenantGalleryGroup[];
+}
+
+export interface TenantUser {
+    id: string;
+    name: string;
+    email: string;
+}
+
+export interface TenantGalleryGroup {
+    id: string;
+    name: string;
+    parent_id: string | null;
+}
+
+export interface CollectiveInvoiceResponse {
+    success: boolean;
+    invoice_number: string;
+    processed_orders: number;
 }
 
 export function useTenants(id?: string) {
@@ -46,9 +64,8 @@ export function useTenants(id?: string) {
         await mutateDetail();
     };
 
-    
     const generateCollectiveInvoice = async (tenantId: string) => {
-        const result = await apiMutate<{ success: boolean, invoice_number: string, processed_orders: number }>(`/api/management/tenants/${tenantId}/collective-invoice`, 'POST');
+        const result = await apiMutate<CollectiveInvoiceResponse>(`/api/management/tenants/${tenantId}/collective-invoice`, 'POST');
         await mutateDetail();
         return result;
     };

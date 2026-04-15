@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Product } from '../ManagementProductsView';
+import { Product } from '../../../api';
 
 interface Props {
     isOpen: boolean;

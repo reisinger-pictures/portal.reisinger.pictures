@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
 import WysiwygEditor from '../../components/WysiwygEditor';
+import { SendMailResponse } from '../../../api';
 
 interface EmailComposerModalProps {
     isOpen: boolean;
@@ -21,7 +22,7 @@ export default function EmailComposerModal({ isOpen, onClose, galleryId }: Email
         if (!galleryId || !mailSubject || !mailBody) return;
         setSendingMail(true);
         try {
-            const data = await apiMutate<{ success: boolean, notified_count: number }>(
+            const data = await apiMutate<SendMailResponse>(
                 `/api/management/galleries/${galleryId}/send-custom-email`, 'POST', 
                 { subject: mailSubject, body: mailBody }
             );

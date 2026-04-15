@@ -45,9 +45,12 @@ test.describe('Smart Assistance & Metadata Defaults Workflow', () => {
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         // 2. Galerie öffnen und Vorgaben-Modal aufrufen
-        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeVisible();
-        await galLink.click();
+        const galLink = page.locator('main').getByText(galleryName, { exact: true }).first();
+        await expect(async () => {
+            await expect(galLink).toBeVisible({ timeout: 2000 });
+            await galLink.scrollIntoViewIfNeeded();
+            await galLink.click();
+        }).toPass({ timeout: 15000 });
 
         await page.getByRole('button', { name: 'Vorgaben...' }).click();
         await expect(page.locator('h3:has-text("Metadaten-Vorgaben")')).toBeVisible();

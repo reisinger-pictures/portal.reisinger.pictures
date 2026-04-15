@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Customer } from '../ManagementCustomersView';
+import { Customer } from '../../../api';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import { LocationResult } from '../../../logic/useLocations';
 

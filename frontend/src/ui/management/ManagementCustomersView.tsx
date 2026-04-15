@@ -4,18 +4,9 @@ import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import CustomerModal from './components/CustomerModal';
+import { Customer } from '../../api';
 
-export interface Customer {
-    id: string;
-    name: string;
-    company?: string | null;
-    email?: string | null;
-    street?: string | null;
-    zip?: string | null;
-    city?: string | null;
-    country?: string | null;
-    uid?: string | null;
-}
+
 
 export default function ManagementCustomersView() {
     const { data: customers, error, isLoading, mutate } = useSWR<Customer[]>('/api/management/customers', fetcher);

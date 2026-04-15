@@ -1,4 +1,4 @@
-import { Gallery, GalleryGroup, FlatGroup } from '../../logic/useGalleries';
+import { Gallery, GalleryGroup, FlatGroup, GalleryGroupExtraOpts, GalleryMetadataOpts } from '../../logic/useGalleries';
 import GalleryGroupModal from './GalleryGroupModal';
 import GalleryModal from './GalleryModal';
 
@@ -13,10 +13,10 @@ interface GalleryModalsProps {
     editingGallery?: Gallery | null;
     defaultGroupId?: string | null;
 
-    onCreateGroup: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: Record<string, unknown>) => Promise<void>;
-    onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: Record<string, unknown>) => Promise<void>;
-    onUpdateGroup: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: Record<string, unknown>) => Promise<void>;
-    onUpdateGallery: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: Record<string, unknown>) => Promise<void>;
+    onCreateGroup: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: GalleryGroupExtraOpts) => Promise<void>;
+    onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
+    onUpdateGroup: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: GalleryGroupExtraOpts) => Promise<void>;
+    onUpdateGallery: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
     onDeleteGroup: (id: string) => Promise<void>;
     onDeleteGallery: (id: string) => Promise<void>;
 }

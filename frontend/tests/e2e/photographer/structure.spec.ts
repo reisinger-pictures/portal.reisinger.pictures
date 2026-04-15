@@ -30,7 +30,9 @@ test.describe('Management Structure View (Tree)', () => {
         const form = new FormHelper(page, modal);
         await form.fillGroupModal({ name: groupName });
 
-        await modal.clickButton('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.group?.id) helper.trackGroup(resData.group.id);
+        
         await expect(page.locator('.toast')).toContainText('erfolgreich erstellt');
 
         await expect(page.locator('summary').filter({ hasText: groupName }).first()).toBeVisible();

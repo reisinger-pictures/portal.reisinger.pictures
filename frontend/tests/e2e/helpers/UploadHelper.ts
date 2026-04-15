@@ -26,15 +26,15 @@ export class UploadHelper {
         await expect(image).toBeAttached({ timeout: 15000 });
         await expect(image).toBeVisible({ timeout: 15000 });
 
-        // ✨ WICHTIG für Mobile: In den Viewport scrollen, um Lazy Loading zu triggern
-        await image.scrollIntoViewIfNeeded();
-
-        await expect(image).toBeVisible({ timeout: 15000 });
-        await expect(image).toHaveJSProperty('complete', true, { timeout: 15000 });
-
-        // Validierung der tatsächlichen Bilddaten (Width > 0)
+        // ✨ WICHTIG für Mobile: Polling-Block inkl. Scrollen (Robust gegen Layout-Shifts)
         await expect(async () => {
-            expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+            // Kontinuierlich in den Viewport holen. Triggert Lazy-Loading auf natürliche Weise, 
+            // selbst wenn das Layout zwischenzeitlich springt.
+            await image.scrollIntoViewIfNeeded();
+            
+            // Prüfen, ob das Bild vom Browser nativ geladen und decodiert wurde
+            const isLoaded = await image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0);
+            expect(isLoaded, 'Bild ist noch nicht fertig geladen').toBeTruthy();
         }).toPass({ timeout: 15000 });
     }
 }

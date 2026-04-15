@@ -3,22 +3,9 @@ import useSWR from 'swr';
 import { fetcher } from '../../api';
 import PageLayout from '../components/PageLayout';
 import ErrorMessage from '../components/ErrorMessage';
+import { Order } from '../../api';
 
-interface InvoiceSnapshot {
-    invoice_number: string;
-    total_gross: string;
-    created_at: string;
-    customer_details: {
-        items?: { filename: string, tier: string, price: number }[];
-    };
-}
 
-interface Order {
-    id: string;
-    status: string;
-    is_quote_request: boolean;
-    invoice_snapshot: InvoiceSnapshot;
-}
 
 export default function ClientOrdersView() {
     const { data: orders, error, isLoading } = useSWR<Order[]>('/api/orders', fetcher);
@@ -44,7 +31,7 @@ export default function ClientOrdersView() {
                     <div className="space-y-6">
                         {orders.map(order => {
                             const snap = order.invoice_snapshot;
-                            const date = new Date(snap?.created_at).toLocaleDateString('de-DE');
+                            const date = snap?.created_at ? new Date(snap.created_at).toLocaleDateString('de-DE') : '';
                             const isQuote = order.is_quote_request;
                             const isPendingQuote = isQuote && order.status === 'pending';
                             const isBlocked = ['disputed', 'refunded', 'cancelled'].includes(order.status);

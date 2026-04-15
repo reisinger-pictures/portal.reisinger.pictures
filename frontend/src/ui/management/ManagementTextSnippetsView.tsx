@@ -4,13 +4,9 @@ import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import TextSnippetModal from './components/TextSnippetModal';
+import { TextSnippet } from '../../api';
 
-export interface TextSnippet {
-    id: string;
-    title: string;
-    shortcut?: string | null;
-    content_html: string;
-}
+
 
 export default function ManagementTextSnippetsView() {
     const { data: snippets, error, isLoading, mutate } = useSWR<TextSnippet[]>('/api/management/text-snippets', fetcher);

@@ -1,4 +1,5 @@
 import { APIRequestContext } from '@playwright/test';
+import { MailpitMessage } from '../../../src/api';
 
 export class MailpitHelper {
     private baseUrl = 'http://localhost:8025/api/v1';
@@ -14,7 +15,7 @@ export class MailpitHelper {
             const response = await this.request.get(`${this.baseUrl}/messages`);
             const data = await response.json();
             if (data.messages && data.messages.length > 0) {
-                const msg = data.messages.find((m: { To: unknown[]; ID: string }) => JSON.stringify(m.To).includes(email));
+                const msg = data.messages.find((m: MailpitMessage) => JSON.stringify(m.To).includes(email));
                 if (msg) {
                     const detailResponse = await this.request.get(`${this.baseUrl}/message/${msg.ID}`);
                     return await detailResponse.json();

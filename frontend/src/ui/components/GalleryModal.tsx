@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Gallery, FlatGroup } from '../../logic/useGalleries';
+import { Gallery, FlatGroup, GalleryMetadataOpts } from '../../logic/useGalleries';
 import { useUI } from './UIContext';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,8 +25,8 @@ interface Props {
     availableGroups: FlatGroup[];
     editingGallery?: Gallery | null;
     defaultGroupId?: string | null;
-    onCreate: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: Record<string, unknown>) => Promise<void>;
-    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: Record<string, unknown>) => Promise<void>;
+    onCreate: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
+    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
 

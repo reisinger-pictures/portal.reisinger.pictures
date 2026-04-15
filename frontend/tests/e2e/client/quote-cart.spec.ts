@@ -7,6 +7,7 @@ import { GalleryHelper } from '../helpers/GalleryHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
+import { Role } from '../../../src/logic/useUsers';
 
 test.describe('Custom Quotes Full Workflow', () => {
     let helper: E2ESessionHelper;
@@ -46,7 +47,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         const rolesRes = await page.request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken } });
         const rolesData = await rolesRes.json();
         const roles = Array.isArray(rolesData) ? rolesData : (rolesData.data || []);
-        const clientRoleId = roles.find((r: { id: string; name: string }) => r.name === 'client')?.id;
+        const clientRoleId = roles.find((r: Role) => r.name === 'client')?.id;
 
         const galleryUrl = page.url();
         const gallerySlug = galleryUrl.split('/').pop();

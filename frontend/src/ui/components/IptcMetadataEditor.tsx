@@ -23,7 +23,12 @@ interface Props {
     children?: React.ReactNode;
 }
 
-const ReadOnlyField = ({ label, value }: { label: string, value?: string }) => (
+export interface ReadOnlyFieldProps {
+    label: string;
+    value?: string;
+}
+
+const ReadOnlyField = ({ label, value }: ReadOnlyFieldProps) => (
     <div className="mb-4">
         <span className="text-xs font-bold opacity-70 block mb-1">{label}</span>
         <div className="text-sm">{value || <span className="opacity-40 italic">Keine Angabe</span>}</div>

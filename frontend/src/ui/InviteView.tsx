@@ -5,6 +5,7 @@ import {useNavigate, useParams} from 'react-router-dom';
 import PageLayout from './components/PageLayout';
 import { useAuth } from '../logic/useAuth';
 import { apiMutate } from '../api';
+import { RedeemInviteResponse } from '../api';
 
 export default function InviteView() {
     const {token} = useParams<{ token: string }>();
@@ -75,7 +76,7 @@ export default function InviteView() {
         // Auto-Redeem nur wenn: Nicht am Laden, User eingeloggt, Galerie bekannt, kein PW nötig
         if (!loading && !authLoading && user && galleryName && !requiresPassword && !error && !autoRedeeming) {
             setAutoRedeeming(true);
-            apiMutate<{ full_path: string }>('/api/invites/redeem', 'POST', { token })
+            apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', { token })
             .then(resData => {
                 if (resData.full_path) {
                     mutate(() => true, undefined, { revalidate: true });

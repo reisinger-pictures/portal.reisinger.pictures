@@ -19,8 +19,12 @@ export interface UserDetailed {
     photographer_gallery_groups?: GalleryGroup[];
 }
 
+export interface UserListResponse {
+    data: UserDetailed[];
+}
+
 export function useUsers() {
-    const {data: response, mutate: mutateUsers} = useSWR<{data: UserDetailed[]} | UserDetailed[]>('/api/management/users', fetcher);
+    const {data: response, mutate: mutateUsers} = useSWR<UserListResponse | UserDetailed[]>('/api/management/users', fetcher);
     const {data: roles} = useSWR<Role[]>('/api/management/roles', fetcher);
         const users: UserDetailed[] | undefined = response ? (Array.isArray(response) ? response : response.data) : undefined;
 

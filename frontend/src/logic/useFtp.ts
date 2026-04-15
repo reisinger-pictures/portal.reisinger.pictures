@@ -1,14 +1,21 @@
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../api';
 
+export interface FtpTargetGallery {
+    id: string;
+    name: string;
+    slug: string;
+}
+
 export interface FtpStatus {
     ftp_folder: string;
     file_count: number;
-    current_target_gallery: {
-        id: string;
-        name: string;
-        slug: string;
-    } | null;
+    current_target_gallery: FtpTargetGallery | null;
+}
+
+export interface ProcessInboxResponse {
+    success: boolean;
+    processed: number;
 }
 
 export function useFtp() {
@@ -20,7 +27,7 @@ export function useFtp() {
     };
 
     const processInbox = async () => {
-        const data = await apiMutate<{ success: boolean, processed: number }>('/api/management/ftp/process', 'POST');
+        const data = await apiMutate<ProcessInboxResponse>('/api/management/ftp/process', 'POST');
         await mutate();
         return data;
     };

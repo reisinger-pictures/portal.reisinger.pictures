@@ -6,6 +6,9 @@ export class E2ESessionHelper {
     private createdGalleryIds: string[] = [];
     private createdGroupIds: string[] = [];
     private createdTenantIds: string[] = [];
+    private createdCustomerIds: string[] = [];
+    private createdSnippetIds: string[] = [];
+    private createdProductIds: string[] = [];
     private adminToken: string | null = null;
 
     constructor(private request: APIRequestContext) {}
@@ -77,6 +80,9 @@ export class E2ESessionHelper {
     trackGallery(id: string) { if (id) this.createdGalleryIds.push(id); }
     trackGroup(id: string) { if (id) this.createdGroupIds.push(id); }
     trackTenant(id: string) { if (id) this.createdTenantIds.push(id); }
+    trackCustomer(id: string) { if (id) this.createdCustomerIds.push(id); }
+    trackSnippet(id: string) { if (id) this.createdSnippetIds.push(id); }
+    trackProduct(id: string) { if (id) this.createdProductIds.push(id); }
 
     async teardown() {
         await this.ensureAdminLogin();
@@ -93,6 +99,15 @@ export class E2ESessionHelper {
         }
         for (const id of this.createdTenantIds) {
             await this.request.delete(`/api/management/tenants/${id}`, { headers }).catch(() => {});
+        }
+        for (const id of this.createdCustomerIds) {
+            await this.request.delete(`/api/management/customers/${id}`, { headers }).catch(() => {});
+        }
+        for (const id of this.createdSnippetIds) {
+            await this.request.delete(`/api/management/text-snippets/${id}`, { headers }).catch(() => {});
+        }
+        for (const id of this.createdProductIds) {
+            await this.request.delete(`/api/management/products/${id}`, { headers }).catch(() => {});
         }
     }
 }

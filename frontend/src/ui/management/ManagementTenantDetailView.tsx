@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useTenants, Tenant } from '../../logic/useTenants';
+import { useTenants, Tenant, TenantUser } from '../../logic/useTenants';
 import { useUsers } from '../../logic/useUsers';
-import { useProtectedGalleries, flattenGroups } from '../../logic/useGalleries';
+import { useProtectedGalleries, flattenGroups, FlatGroup } from '../../logic/useGalleries';
 import { apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
@@ -70,8 +70,8 @@ const TenantInvoicing = ({ tenant, isGenerating, handleGenerateInvoice }: Tenant
 );
 
 interface TenantRelationsProps {
-    users?: { id: string, name: string, email: string }[];
-    flatGroups: { id: string, name: string, depth: number }[];
+    users?: TenantUser[];
+    flatGroups: FlatGroup[];
     selUsers: string[];
     setSelUsers: React.Dispatch<React.SetStateAction<string[]>>;
     selGroups: string[];

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import ErrorMessage from '../../components/ErrorMessage';
+import { RatingData } from '../../../api';
 
 interface Props {
     galleryId: string;
@@ -7,9 +8,11 @@ interface Props {
     onClose: () => void;
 }
 
+
+
 export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props) {
-    const [ratingsData, setRatingsData] = useState<Array<{lr_uuid?: string; filename?: string; avg_rating?: number; all_comments?: string; thumb_url?: string; user_id?: string; name?: string; email?: string; rated_count?: number}>>([]);
-    const [ratingStatusData, setRatingStatusData] = useState<Array<{lr_uuid?: string; filename?: string; avg_rating?: number; all_comments?: string; thumb_url?: string; user_id?: string; name?: string; email?: string; rated_count?: number}>>([]);
+    const [ratingsData, setRatingsData] = useState<Array<RatingData>>([]);
+    const [ratingStatusData, setRatingStatusData] = useState<Array<RatingData>>([]);
     const [totalGalleryPhotos, setTotalGalleryPhotos] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(false);

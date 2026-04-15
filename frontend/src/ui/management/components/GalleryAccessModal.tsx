@@ -15,7 +15,14 @@ interface UserAccess {
     galleries: GalleryBase[];
 }
 
-export default function GalleryAccessModal({ galleryId, galleryName, isOpen, onClose }: { galleryId: string, galleryName: string, isOpen: boolean, onClose: () => void }) {
+export interface GalleryAccessModalProps {
+    galleryId: string;
+    galleryName: string;
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export default function GalleryAccessModal({ galleryId, galleryName, isOpen, onClose }: GalleryAccessModalProps) {
     const { data: users, isLoading, mutate } = useSWR<UserAccess[]>('/api/management/users', fetcher);
     const { showToast } = useUI();
     const [search, setSearch] = useState('');

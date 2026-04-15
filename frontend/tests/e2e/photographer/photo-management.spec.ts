@@ -153,7 +153,8 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         const dateString = yesterday.toISOString().split('T')[0];
         
         await modal.fillInputByLabel('Ablaufdatum', dateString);
-        await modal.submitModal('Speichern');
+        const resData = await modal.submitModal('Speichern');
+        if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         const link = page.locator('main').locator('a').filter({ hasText: galleryNameK }).first();
         await expect(async () => {

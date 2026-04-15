@@ -8,13 +8,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
 import { useAuth } from '../../logic/useAuth';
+import { TextSnippet } from '../../api';
 
-interface TextSnippet {
-    id: string;
-    title: string;
-    shortcut?: string | null;
-    content_html: string;
-}
+
 
 interface Props {
     value: string;
@@ -22,12 +18,26 @@ interface Props {
     hideSnippets?: boolean;
 }
 
+export interface SlashStateRect {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+}
+
+export interface SlashState {
+    active: boolean;
+    query: string;
+    range: { from: number; to: number };
+    rect: SlashStateRect | null;
+}
+
 export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) {
     const { user } = useAuth();
     const { data: snippets } = useSWR<TextSnippet[]>(user?.is_super_admin ? '/api/management/text-snippets' : null, fetcher);
     const snippetsRef = useRef<TextSnippet[]>([]);
 
-    const [slashState, setSlashState] = useState<{ active: boolean, query: string, range: { from: number, to: number }, rect: { left: number; right: number; top: number; bottom: number } | null }>({ active: false, query: '', range: { from: 0, to: 0 }, rect: null });
+    const [slashState, setSlashState] = useState<SlashState>({ active: false, query: '', range: { from: 0, to: 0 }, rect: null });
     const [selectedIndex, setSelectedIndex] = useState(0);
 
     const editorRef = useRef<Editor | null>(null);

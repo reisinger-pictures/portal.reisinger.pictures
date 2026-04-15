@@ -9,7 +9,11 @@ import { useAuth } from '../../logic/useAuth';
 
 import { useGallery } from '../../logic/useGallery';
 import { usePricing, ResolutionTier } from '../../logic/usePricing';
-export default function DeliveryView({ galleryData }: { galleryData: ReturnType<typeof useGallery> }) {
+export interface DeliveryViewProps {
+    galleryData: ReturnType<typeof useGallery>;
+}
+
+export default function DeliveryView({ galleryData }: DeliveryViewProps) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;

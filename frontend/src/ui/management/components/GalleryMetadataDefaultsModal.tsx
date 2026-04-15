@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Gallery } from '../../../logic/useGalleries';
+import { Gallery, GalleryMetadataOpts } from '../../../logic/useGalleries';
 import IptcMetadataEditor, { IptcData } from '../../components/IptcMetadataEditor';
 import { useUI } from '../../components/UIContext';
 import { useForm, useWatch } from 'react-hook-form';
@@ -8,7 +8,20 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     gallery: Gallery;
-    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: Record<string, unknown>) => Promise<void>;
+    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
+}
+
+export interface MetadataDefaultsFormValues {
+    allow_client_metadata_edit: boolean;
+    apply_metadata_to_photos: boolean;
+    title: string;
+    description: string;
+    keywords: string;
+    location: string;
+    city: string;
+    state: string;
+    country: string;
+    iso_country: string;
 }
 
 export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery, onUpdate }: Props) {
@@ -40,7 +53,7 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
 
     const watchApplyMeta = useWatch({ control, name: 'apply_metadata_to_photos' });
 
-    const onSubmit = async (data: { allow_client_metadata_edit: boolean; apply_metadata_to_photos: boolean; title: string; description: string; keywords: string; location: string; city: string; state: string; country: string; iso_country: string; }) => {
+    const onSubmit = async (data: MetadataDefaultsFormValues) => {
         const metaOpts = {
             allow_client_metadata_edit: data.allow_client_metadata_edit,
             apply_metadata_to_photos: data.apply_metadata_to_photos,

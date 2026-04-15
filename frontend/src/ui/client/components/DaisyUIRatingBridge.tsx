@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Photo } from '../../../logic/useGallery';
 
-export default function DaisyUIRatingBridge({ photo, ratePhoto }: { photo: Photo, ratePhoto: (id: string, rating: number, comment: string) => void }) {
+export interface DaisyUIRatingBridgeProps {
+    photo: Photo;
+    ratePhoto: (id: string, rating: number, comment: string) => void;
+}
+
+export default function DaisyUIRatingBridge({ photo, ratePhoto }: DaisyUIRatingBridgeProps) {
     const [comment, setComment] = useState(photo?.comment || '');
     const [prevPhotoId, setPrevPhotoId] = useState(photo?.id);
     if (photo?.id !== prevPhotoId) {

@@ -4,13 +4,16 @@ import useSWR from 'swr';
 import { fetcher } from '../../api';
 import { useLicenseTerms } from '../../logic/useLicenseTerms';
 import { useAuth } from '../../logic/useAuth';
+import { SystemInfo } from '../../api';
 
 declare const __APP_BUILD_TIME__: string;
+
+
 
 export default function ManagementSettingsView() {
     const { terms: licenseTerms, updateTerms, isLoading: termsLoading } = useLicenseTerms();
     const { user } = useAuth();
-    const { data: sysInfo } = useSWR<{laravel_build_time: string, php_version: string, laravel_version: string, db_version?: string}>('/api/management/settings/system', fetcher);
+    const { data: sysInfo } = useSWR<SystemInfo>('/api/management/settings/system', fetcher);
     
     let reactTime = 'Unbekannt';
     if (typeof __APP_BUILD_TIME__ !== 'undefined') {

@@ -12,7 +12,11 @@ import GalleryHeader from '../components/GalleryHeader';
 import { useUI } from '../components/UIContext';
 import SelectionFilterBar from './components/SelectionFilterBar';
 
-export default function SelectionView({ galleryData }: { galleryData: ReturnType<typeof useGallery> }) {
+export interface SelectionViewProps {
+    galleryData: ReturnType<typeof useGallery>;
+}
+
+export default function SelectionView({ galleryData }: SelectionViewProps) {
     const { gallery, photos, isLoading, ratePhoto, size, setSize, isReachingEnd } = galleryData;
     const { user } = useAuth();
     const { showToast, confirm } = useUI();

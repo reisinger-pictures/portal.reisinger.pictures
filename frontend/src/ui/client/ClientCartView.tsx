@@ -12,11 +12,19 @@ import { useLicenseTerms } from '../../logic/useLicenseTerms';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import PageLayout from '../components/PageLayout';
+import { Order, CheckoutResponse } from '../../api';
 
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 const stripePromise = loadStripe(stripePublicKey);
 
-function StripeCheckoutForm({ orderId, defaultEmail, defaultName, onSuccess }: { orderId: string, defaultEmail?: string, defaultName?: string, onSuccess: (webhookSuccess: boolean) => void }) {
+export interface StripeCheckoutFormProps {
+    orderId: string;
+    defaultEmail?: string;
+    defaultName?: string;
+    onSuccess: (webhookSuccess: boolean) => void;
+}
+
+function StripeCheckoutForm({ orderId, defaultEmail, defaultName, onSuccess }: StripeCheckoutFormProps) {
     const stripe = useStripe();
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -41,7 +49,7 @@ function StripeCheckoutForm({ orderId, defaultEmail, defaultName, onSuccess }: {
                 try {
                     const res = await fetch('/api/orders', { headers: { 'Accept': 'application/json' }, credentials: 'include' });
                     const orders = await res.json();
-                    const currentOrder = orders.find((o: { id: string, status: string }) => o.id === orderId);
+                    const currentOrder = orders.find((o: Order) => o.id === orderId);
                     
                     if (currentOrder && currentOrder.status === 'paid') {
                         clearInterval(pollInterval);
@@ -272,7 +280,7 @@ export default function ClientCartView() {
                 withdrawal_waived: !!data.withdrawal_waived
             };
 
-            const response = await apiMutate<{ success?: boolean, requires_action?: boolean, client_secret?: string, invoice_number: string, order_id?: string }>('/api/orders/checkout', 'POST', payload);
+            const response = await apiMutate<CheckoutResponse>('/api/orders/checkout', 'POST', payload);
             
             if (response.requires_action && response.client_secret) {
                 setClientSecret(response.client_secret);

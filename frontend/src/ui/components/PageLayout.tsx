@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import GalleryModals from './GalleryModals';
 import GlobalSearchHeader from './GlobalSearchHeader';
 
-export default function PageLayout({children, currentView}: {
-    children: React.ReactNode,
-    currentView?: string,
-    hideMobileHeader?: boolean
-}) {
+export interface PageLayoutProps {
+    children: React.ReactNode;
+    currentView?: string;
+    hideMobileHeader?: boolean;
+}
+
+export default function PageLayout({ children, currentView }: PageLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const {
         tree,

@@ -2,27 +2,28 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../../../api';
 import { useUI } from '../../components/UIContext';
+import { InviteData, GenerateInviteResponse } from '../../../api';
 
-export default function InviteModal({galleryId, galleryType, onClose}: { galleryId: string, galleryType: string, onClose: () => void }) {
+export interface InviteModalProps {
+    galleryId: string;
+    galleryType: string;
+    onClose: () => void;
+}
+
+export default function InviteModal({ galleryId, galleryType, onClose }: InviteModalProps) {
     const [name, setName] = useState('');
     const [canEditMeta, setCanEditMeta] = useState(false);
     const [loading, setLoading] = useState(false);
     const [newLink, setNewLink] = useState('');
     const [linkType, setLinkType] = useState<'mass' | 'personal'>('mass');
     const { showToast, confirm } = useUI();
-    const {data: invites, mutate} = useSWR<{
-        id: string,
-        name: string,
-        token: string
-    }[]>(`/api/management/galleries/${galleryId}/invites`, fetcher);
+
+    const {data: invites, mutate} = useSWR<InviteData[]>(`/api/management/galleries/${galleryId}/invites`, fetcher);
 
     const handleGenerate = async () => {
         setLoading(true);
         try {
-            const data = await apiMutate<{
-                success: boolean,
-                link: string
-            }>(`/api/management/galleries/${galleryId}/invites`, 'POST', {name, can_edit_metadata: canEditMeta});
+            const data = await apiMutate<GenerateInviteResponse>(`/api/management/galleries/${galleryId}/invites`, 'POST', {name, can_edit_metadata: canEditMeta});
             if (data.success) {
                 setNewLink(data.link);
                 setName('');
