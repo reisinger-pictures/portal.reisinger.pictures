@@ -80,7 +80,7 @@ test.describe('Smart Assistance & Metadata Defaults Workflow', () => {
         await cityInput.pressSequentially('Linz', { delay: 100 });
         await searchLinzPromise;
 
-        const dropdownLinz = page.locator('li').filter({ has: page.locator('span.text-primary', { exact: true, hasText: 'Linz' }) }).first();
+        const dropdownLinz = page.locator('li').filter({ has: page.locator('span.text-primary', { hasText: 'Linz' }) }).first();
         await expect(dropdownLinz).toBeVisible({ timeout: 15000 });
         await dropdownLinz.click();
 
