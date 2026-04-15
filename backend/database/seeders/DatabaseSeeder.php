@@ -92,6 +92,43 @@ class DatabaseSeeder extends Seeder
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_iban'], ['value' => 'DE96100110012179986174']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_bic'], ['value' => 'NTSBDEB1XXX']);
 
+        // --- Produkte & Katalog (Preise, Pakete, Rabatte) ---
+        $this->command->info('Seede Produkt-Katalog...');
+        $products = [
+            // Pakete (Fixpreise)
+            ['type' => 'item', 'name' => 'Dein (Mini) Shooting', 'description' => 'Bis zu 60 Min. | 3 Bilder', 'price' => 199.00],
+            ['type' => 'item', 'name' => 'n*xt Creative Special', 'description' => 'Bis zu 90 Min. | 15 Bilder | Nur 18-25 J. inkl. Veröffentlichung', 'price' => 300.00],
+            ['type' => 'item', 'name' => 'Dein Shooting', 'description' => 'Bis zu 150 Min. | 15 Bilder', 'price' => 499.00],
+            ['type' => 'item', 'name' => 'N*xt Image (Social Media Special)', 'description' => '30 Min. | 2 Bilder', 'price' => 99.00],
+            
+            // Stundensätze & B2B
+            ['type' => 'item', 'name' => 'B2B Business-Shooting', 'description' => 'Professionelle Bildbearbeitung, Volle Nutzungsrechte (Presse & PR)', 'price' => 150.00],
+            ['type' => 'item', 'name' => 'Privat-Shooting', 'description' => 'Zusätzliche Zeit / Individuelle Verlängerung', 'price' => 100.00],
+
+            // Upsells & Add-ons
+            ['type' => 'item', 'name' => 'Zusatzbild (+1 Bild)', 'price' => 29.00],
+            ['type' => 'item', 'name' => 'Zusatzbilder Paket (+5 Bilder)', 'price' => 125.00],
+            ['type' => 'item', 'name' => 'Zusatzbilder Paket (+10 Bilder)', 'price' => 199.00],
+            ['type' => 'item', 'name' => '48h Express Service', 'price' => 299.00],
+            ['type' => 'item', 'name' => 'Alle Fotos (unbearbeitet JPEG)', 'description' => 'Alle Bilder des Shootings als JPEGs ohne Bearbeitung', 'price' => 1599.00],
+
+            // Rabatte (Prozentual)
+            ['type' => 'discount_percent', 'name' => 'Special Deal OGs (50%)', 'description' => 'Für langjährige Wegbegleiter (inkl. Freigabe)', 'price' => 50.00],
+            ['type' => 'discount_percent', 'name' => 'OG Hochzeit (33%)', 'description' => 'Treue-Rabatt für Hochzeitsreportagen', 'price' => 33.33333],
+            ['type' => 'discount_percent', 'name' => 'Nxt Generation Rabatt (33%)', 'description' => 'Für 18-25 Jährige (Inkl. Freigabe)', 'price' => 33.33333],
+
+            // Rabatte (Fixbeträge / Guthaben)
+            ['type' => 'discount_fixed', 'name' => 'Feedback Bonus (Google)', 'description' => 'Dankeschön für eine Bewertung', 'price' => 30.00],
+            ['type' => 'discount_fixed', 'name' => 'Friends of Friends Voucher', 'description' => 'Everyone can be n*xt', 'price' => 150.00],
+        ];
+
+        foreach ($products as $product) {
+            \App\Models\Product::firstOrCreate(
+                ['name' => $product['name']],
+                $product
+            );
+        }
+
         // Neu: Trigger den Location Import direkt im Seed
         $this->command->info('Starte Smart Assistance Import...');
         \Illuminate\Support\Facades\Artisan::call('app:import-locations', [], $this->command->getOutput());
