@@ -16,7 +16,7 @@ test.describe('Teardown Integrity Validation', () => {
 
         // Verifizieren, dass der Test-User VOR dem Teardown existiert
         let usersRes = await request.get('/api/management/users', {
-            headers: {'Cookie': adminToken!}
+            headers: {'Cookie': adminToken}
         });
         let usersData = await usersRes.json();
         let found = usersData.data.find((u: UserDetailed) => u.email === testUser.email);
@@ -27,7 +27,7 @@ test.describe('Teardown Integrity Validation', () => {
 
         // Verifizieren, dass der Test-User NACH dem Teardown vollständig verschwunden ist
         usersRes = await request.get('/api/management/users', {
-            headers: {'Cookie': adminToken!}
+            headers: {'Cookie': adminToken}
         });
         usersData = await usersRes.json();
         found = usersData.data.find((u: UserDetailed) => u.email === testUser.email);

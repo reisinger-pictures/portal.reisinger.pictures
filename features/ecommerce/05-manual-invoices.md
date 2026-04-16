@@ -16,6 +16,7 @@ Dieses Modul ermöglicht es Super-Admins, individuelle PDF-Dokumente für B2B-So
 - **Positionstypen:** Unterstützung für Leistungen (Menge * Preis), fixe Rabatte (€) und prozentuale Rabatte (%).
 - **Reihenfolge-Interaktivität:** Positionen können über Pfeil-Buttons in der UI verschoben werden.
 - **Hierarchische Berechnung:** Prozentuale Rabatte beziehen sich immer auf die zum jeweiligen Zeitpunkt aktuelle Zwischensumme aller darüberliegenden Leistungen.
+- **Katalog & Batch-Edit:** Häufig genutzte Leistungen und Rabatte werden zur Autovervollständigung in einem zentralen Katalog verwaltet. Die UI trennt dabei strikt nach Typ. Ein responsiver Batch-Edit-Modus ermöglicht die schnelle, gleichzeitige Anpassung von Preisen und Beschreibungen mehrerer Einträge.
 - **Architectural Note:** The calculation logic is intentionally duplicated between Frontend (React) and Backend (Laravel). The frontend provides a real-time UX preview, while the backend strictly recalculates everything for security reasons before PDF generation.
 
 ## 3. Compliance & Branding
