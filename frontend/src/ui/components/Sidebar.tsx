@@ -48,7 +48,8 @@ export default function Sidebar(props: SidebarProps) {
                 <SidebarLoginForm />
             )}
 
-            <ul className="menu bg-base-200 w-full p-2 border-b border-base-300 shrink-0">
+            <div className="flex-1 overflow-y-auto w-full">
+            <ul className="menu bg-base-200 w-full p-2 border-b border-base-300">
                 {isAdminOrPhotog && (
                     <>
                         <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-2">Übersicht</li>
@@ -106,9 +107,7 @@ export default function Sidebar(props: SidebarProps) {
                     </a>
                 </li>
             </ul>
-
-            {/* Spacer, um den Logout-Button nach unten zu drücken */}
-            <div className="flex-1"></div>
+            </div>
 
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">
                 <div className="p-3 text-center">
