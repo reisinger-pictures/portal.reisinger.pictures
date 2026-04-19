@@ -60,10 +60,8 @@ test.describe('Stripe Checkout Workflow', () => {
         // 3. Lizenzen wählen
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
 
-        await page.getByRole('button', { name: 'Kommerziell' }).click();
-        await page.getByRole('button', { name: 'Unbegrenzt' }).click();
-
-        await page.locator('.rounded-xl').filter({ hasText: 'Original' }).getByRole('button', { name: /€/ }).click();
+        // Das neue UI wählt automatisch die erste Kategorie aus. Wir klicken nur noch auf "In den Warenkorb".
+        await page.getByRole('button', { name: 'In den Warenkorb' }).click();
         await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
 
         // 4. Checkout

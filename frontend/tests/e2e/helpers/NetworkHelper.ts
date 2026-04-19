@@ -10,7 +10,7 @@ export class NetworkHelper {
     async waitForApi(urlIncludes: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE'): Promise<Response> {
         return this.page.waitForResponse(res => 
             res.url().includes(urlIncludes) && res.request().method() === method
-        , { timeout: 3000 }).catch(() => { 
+        , { timeout: 15000 }).catch(() => { 
             console.warn('[NetworkHelper] Timeout waiting for ' + method + ' ' + urlIncludes); 
             return null as unknown as Response; 
         });

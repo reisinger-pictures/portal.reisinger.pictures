@@ -77,7 +77,7 @@ const TreeNode = ({
                         <span className="iconify mdi--image-plus text-base text-primary"></span>
                     </button>
                     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenGroupModal(node.id); }} className="btn btn-ghost btn-xs tooltip" data-tip="Unterordner hier erstellen">
-                        <span className="iconify mdi--folder-plus text-base text-secondary"></span>
+                        <span className="iconify mdi--folder-plus text-base text-primary"></span>
                     </button>
                     {hasInhalt && (
                         <div className="join mr-4">

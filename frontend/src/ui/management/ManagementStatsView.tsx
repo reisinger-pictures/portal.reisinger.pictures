@@ -49,7 +49,7 @@ export default function ManagementStatsView() {
                 </div>
                 <div className="stat bg-base-100 rounded-box border border-base-300 shadow-sm">
                     <div className="stat-title text-base-content/70">Downloads Gesamt</div>
-                    <div className="stat-value text-secondary">{stats?.total_downloads || 0}</div>
+                    <div className="stat-value text-primary">{stats?.total_downloads || 0}</div>
                 </div>
             </div>
 

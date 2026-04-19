@@ -24,7 +24,7 @@ class OrderController extends Controller
         return response()->json($orders);
     }
 
-    public function checkout(Request $request, PricingService $pricingService)
+    public function checkout(Request $request, \App\Services\CheckoutService $checkoutService)
     {
         $user = auth('api')->user();
 
@@ -38,9 +38,10 @@ class OrderController extends Controller
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.photoId' => 'required|string|exists:photos,id',
-            'items.*.tier' => 'required|string|in:web,print,original',
-            'items.*.usage' => 'required|string|in:editorial,commercial',
-            'items.*.duration' => 'required|string|in:1_year,unlimited',
+            'items.*.tier' => 'nullable|string|in:web,print,original',
+            'items.*.useCaseId' => 'nullable|string|exists:license_use_cases,id',
+            'items.*.modifierIds' => 'nullable|array',
+            'items.*.modifierIds.*' => 'string|exists:license_modifiers,id',
             'items.*.isQuote' => 'boolean',
             'items.*.notes' => 'nullable|string',
             'billing_name' => 'required|string|max:255',
@@ -66,9 +67,7 @@ class OrderController extends Controller
         if (!$hasQuotesOnly && !$request->withdrawal_waived) {
             return response()->json(['error' => 'Sie müssen auf Ihr Widerrufsrecht verzichten, um digitale Bilddaten zu kaufen.'], 422);
         }
-        $basePrice = (float) (\App\Models\Setting::where('key', 'base_price')->value('value') ?? 35.00);
-        $checkoutService = app(\App\Services\CheckoutService::class);
-        return $checkoutService->processCheckout($request, $user, $basePrice, $paymentMethod);
+        return $checkoutService->processCheckout($request, $user, $paymentMethod);
     }
 
     public function indexAdmin() { return response()->json(Order::with(['user', 'invoiceSnapshot'])->orderBy('created_at', 'desc')->get()); }
@@ -84,7 +83,7 @@ class OrderController extends Controller
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
         
         $request->validate([
-            'custom_price' => 'required|numeric',
+            'custom_price' => 'required|integer',
             'message' => 'required|string'
         ]);
 
@@ -113,7 +112,7 @@ class OrderController extends Controller
     public function generateQuoteLink(Request $request) {
         $user = auth('api')->user();
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
-        $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|numeric']);
+        $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer']);
         $payload = base64_encode(json_encode(['photos' => $request->photo_ids, 'price' => $request->custom_price, 'exp' => now()->addDays(14)->timestamp]));
         $signature = hash_hmac('sha256', $payload, config('app.key'));
         return response()->json(['success' => true, 'link' => rtrim(config('app.frontend_url', config('app.url')), '/') . '/cart?quote_token=' . $payload . '.' . $signature]);
@@ -163,7 +162,7 @@ class OrderController extends Controller
             'items.*.type' => 'required|string|in:item,discount_fixed,discount_percent',
             'items.*.description' => 'required|string',
             'items.*.notes' => 'nullable|string',
-            'items.*.price' => 'required|numeric',
+            'items.*.price' => 'required|integer',
             'items.*.qty' => 'required|numeric|min:0.01',
             'terms_html' => 'nullable|string'
         ]);
@@ -196,7 +195,7 @@ class OrderController extends Controller
                     'row_total' => -$item['price']
                 ];
             } elseif ($item['type'] === 'discount_percent') {
-                $discountAmt = ceil($runningTotal * ($item['price'] / 100) * 100) / 100;
+                $discountAmt = (int) round($runningTotal * ($item['price'] / 10000));
                 $runningTotal -= $discountAmt;
                 $mappedItems[] = [
                     'type' => 'discount_percent',

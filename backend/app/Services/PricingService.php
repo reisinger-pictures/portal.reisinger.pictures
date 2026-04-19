@@ -2,57 +2,41 @@
 
 namespace App\Services;
 
-use App\Models\PricingFactor;
+use App\Models\LicenseUseCase;
+use App\Models\LicenseModifier;
 
 class PricingService
 {
-    public function calculateUpgradeDelta(float $basePrice, string $tier, string $usage, string $duration, string $userFlatrate): float
+    public function calculateItemPriceCents(string $useCaseId, ?array $modifierIds, string $userFlatrateLevel): array
     {
-        $resMult = ['web' => 1.0, 'print' => 2.0, 'original' => 4.0];
-        $useMult = ['editorial' => 1.0, 'commercial' => 3.0];
-        $durMult = ['1_year' => 1.0, 'unlimited' => 2.0];
-
-        $reqMult = ($resMult[$tier] ?? 1.0) * ($useMult[$usage] ?? 1.0) * ($durMult[$duration] ?? 1.0);
-        $requestedPrice = $basePrice * $reqMult;
-
-        $userResMult = ['none' => 0.0, 'web' => 1.0, 'print' => 2.0, 'original' => 4.0];
-        $userPrice = $basePrice * ($userResMult[$userFlatrate] ?? 0.0);
-
-        $delta = $requestedPrice - $userPrice;
-        return $delta > 0 ? round($delta, 2) : 0.00;
-    }
-    /**
-     * Calculates the dynamic price based on a base price and a set of selected factor IDs.
-     *
-     * @param float $basePrice
-     * @param array $factorIds
-     * @return float
-     */
-    public function calculatePrice(float $basePrice, array $factorIds): float
-    {
-        $factors = PricingFactor::whereIn('id', $factorIds)->get();
-        $multiplier = 1.0;
+        $useCase = LicenseUseCase::findOrFail($useCaseId);
+        $basePriceCents = (int) $useCase->base_price;
+        $tier = $useCase->flatrate_tier ?? 'web';
         
-        foreach ($factors as $factor) {
-            $multiplier *= $factor->multiplier;
+        $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
+        $userRank = $ranks[$userFlatrateLevel] ?? 0;
+        $reqRank = $ranks[$tier] ?? 0;
+        
+        $isBaseCovered = $userRank >= $reqRank;
+        $coveredBasePriceCents = $isBaseCovered ? 0 : $basePriceCents;
+
+        $surchargeAmountCents = 0;
+        $modifierNames = [];
+        
+        if (!empty($modifierIds)) {
+            $modifiers = LicenseModifier::whereIn('id', $modifierIds)->get();
+            foreach ($modifiers as $mod) {
+                $modifierNames[] = $mod->name;
+                if ($isBaseCovered && $mod->is_included_in_flatrate) continue;
+                $surchargeAmountCents += (int) round($basePriceCents * ((float)$mod->percent_surcharge / 100));
+            }
         }
 
-        return round($basePrice * $multiplier, 2);
-    }
-
-    /**
-     * Calculates the delta price for upgrades.
-     * If the delta is 0 or negative, it means the checkout can be bypassed.
-     *
-     * @param float $newPrice
-     * @param float $paidPrice
-     * @return float
-     */
-    public function calculateDelta(float $newPrice, float $paidPrice): float
-    {
-        $delta = $newPrice - $paidPrice;
-        
-        // We do not refund money automatically on downgrades, delta bottoms out at 0.00.
-        return $delta > 0 ? round($delta, 2) : 0.00;
+        return [
+            'total_cents' => $coveredBasePriceCents + $surchargeAmountCents,
+            'tier' => $tier,
+            'use_case_name' => $useCase->name,
+            'modifier_names' => $modifierNames
+        ];
     }
 }

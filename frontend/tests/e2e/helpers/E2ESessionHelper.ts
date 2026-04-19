@@ -64,6 +64,7 @@ export class E2ESessionHelper {
         const mailpit = new MailpitHelper(this.request);
         const token = await mailpit.extractPasswordResetToken(email);
         const resetRes = await this.request.post('/api/auth/reset-password', { data: { email, token, password }, headers });
+        if (!resetRes.ok()) throw new Error(`Password reset failed for ${email}. Token: ${token}. Response: ${await resetRes.text()}`);
         const userCookies = resetRes.headers()['set-cookie'];
 
         if (options?.assignGalleryId && options?.wantsNotifications) {

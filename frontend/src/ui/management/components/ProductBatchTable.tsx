@@ -18,7 +18,7 @@ export default function ProductBatchTable({ title, products, onEdit, onDelete, o
     const handleStartBatchMode = () => {
         const initial: Record<string, { description: string; price: number }> = {};
         products.forEach(p => {
-            initial[p.id] = { description: p.description || '', price: p.price };
+            initial[p.id] = { description: p.description || '', price: p.price / 100 };
         });
         setBatchData(initial);
         setIsBatchMode(true);
@@ -39,7 +39,7 @@ export default function ProductBatchTable({ title, products, onEdit, onDelete, o
         const updates = Object.entries(batchData).map(([id, data]) => ({
             id,
             description: data.description,
-            price: data.price
+            price: Math.round(data.price * 100)
         }));
         await onBatchSave(updates);
         setIsSaving(false);
@@ -53,7 +53,7 @@ export default function ProductBatchTable({ title, products, onEdit, onDelete, o
 
     return (
         <div className="bg-base-100 border border-base-300 rounded-box p-4 md:p-6 shadow-sm mb-6 last:mb-0">
-            <h2 className="text-xl font-bold text-secondary mb-3">{title} <span className="opacity-50 text-sm font-normal">({products.length})</span></h2>
+            <h2 className="text-xl font-bold text-primary mb-3">{title} <span className="opacity-50 text-sm font-normal">({products.length})</span></h2>
             
             <div className="flex flex-col sm:flex-row items-center gap-2 mb-4">
                 <div className="relative flex-1 w-full">
@@ -76,7 +76,7 @@ export default function ProductBatchTable({ title, products, onEdit, onDelete, o
                                 </button>
                             </div>
                         ) : (
-                            <button className="btn btn-sm btn-outline btn-secondary w-full" onClick={handleStartBatchMode}>
+                            <button className="btn btn-sm btn-outline btn-primary w-full" onClick={handleStartBatchMode}>
                                 <span className="iconify mdi--table-edit mr-1 text-lg"></span> Batch Edit
                             </button>
                         )}
@@ -134,7 +134,7 @@ export default function ProductBatchTable({ title, products, onEdit, onDelete, o
                                         </label>
                                     ) : (
                                         <div className="font-mono font-bold text-primary whitespace-nowrap">
-                                            {p.price.toFixed(2)} {p.type === 'discount_percent' ? '%' : '€'}
+                                            {(p.price / 100).toFixed(2)} {p.type === 'discount_percent' ? '%' : '€'}
                                         </div>
                                     )}
                                 </td>
@@ -213,7 +213,7 @@ export default function ProductBatchTable({ title, products, onEdit, onDelete, o
                                 </label>
                             ) : (
                                 <div className="font-mono font-bold text-primary text-lg">
-                                    {p.price.toFixed(2)} {p.type === 'discount_percent' ? '%' : '€'}
+                                    {(p.price / 100).toFixed(2)} {p.type === 'discount_percent' ? '%' : '€'}
                                 </div>
                             )}
                         </div>

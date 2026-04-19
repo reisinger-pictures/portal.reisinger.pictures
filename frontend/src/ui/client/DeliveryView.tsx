@@ -9,6 +9,7 @@ import { useAuth } from '../../logic/useAuth';
 
 import { useGallery } from '../../logic/useGallery';
 import { usePricing, ResolutionTier } from '../../logic/usePricing';
+import { useLicenseTerms } from '../../logic/useLicenseTerms';
 export interface DeliveryViewProps {
     galleryData: ReturnType<typeof useGallery>;
 }
@@ -17,7 +18,8 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
-    const { isCovered } = usePricing();
+    const { terms } = useLicenseTerms();
+    const { isCovered } = usePricing(terms);
 
 
     /* moved early return */
@@ -125,7 +127,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                             </div>
 
                             <div className="card-body p-4 bg-base-100 flex flex-col gap-3">
-                                <button onClick={(e) => { e.preventDefault(); navigate('/photos/' + photo.id); }} className="btn btn-secondary btn-sm w-full">
+                                <button onClick={(e) => { e.preventDefault(); navigate('/photos/' + photo.id); }} className="btn btn-outline btn-primary btn-sm w-full">
                                     <span className="iconify mdi--open-in-new mr-1"></span> Bild öffnen
                                 </button>
                             </div>

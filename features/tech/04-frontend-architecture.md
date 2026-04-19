@@ -20,6 +20,7 @@ status: active
 - **State via URL:** Application state (search queries, tabs) MUST be derived from the URL.
 - **Forms:** Strict use of `react-hook-form` and `zod` for form state management and validation. Avoid cascading `useState` hooks for form fields.
 - **Component Granularity (SRP):** Strictly separate concerns. Components should be small and focused. Extract modals, complex forms, and distinct UI sections (like cards or dropzones) into their own sub-components to prevent "God-Components" and minimize unnecessary re-renders.
+- **Loading States & Anti-Flicker (STRICT):** Formulare und detailreiche UIs dürfen erst gerendert werden, wenn die Initialdaten vollständig vom Server geladen sind (`if (isLoading) return <Spinner />`). Dies verhindert ein unschönes 'Aufblinken' leerer Formulare und das vorzeitige Triggern von Validierungsfehlern durch leere Default-States.
 - **Strict Typing (No `any` & No Inline Types):** Inline typing (e.g., `user: { id: string, name: string }` or `Record<string, any>`) is strictly forbidden. Always define explicit `interface` or `type` contracts for form data, component props, state, and API payloads, and import/export them across components. This prevents ESLint violations, redundant type definitions, and brittle code.
 
 

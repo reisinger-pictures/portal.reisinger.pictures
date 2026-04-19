@@ -17,3 +17,9 @@ status: active
 ## 2. On-The-Fly Delivery
 - **Zip-Streaming:** Full gallery ZIPs are not pre-calculated. They are streamed on-the-fly directly to the client via `maennchen/zipstream-php`.
 - **Benefits:** This saves massive amounts of storage space, drastically improves the Time To First Byte (TTFB), and increases perceived interactivity for the user.
+
+## 4. Money Pattern (Fowler)
+- **Strikte Cents-Logik:** Das gesamte System arbeitet intern ausnahmslos mit ganzzahligen Cents (`INTEGER`), um Rundungsfehler bei Floating-Point-Arithmetik zu vermeiden.
+- **Währung:** Fest auf EUR fixiert, wird nicht in der Datenbank gespeichert.
+- **API-Contract:** Alle Geld-Beträge (Preise, Warenkörbe, Rechnungen) werden als Cents (Integer) über die API gesendet und empfangen.
+- **Frontend:** Die Konvertierung in Euro (Division durch 100) erfolgt **ausschließlich** für die Anzeige im Frontend (React) oder beim Generieren von PDFs (Blade).

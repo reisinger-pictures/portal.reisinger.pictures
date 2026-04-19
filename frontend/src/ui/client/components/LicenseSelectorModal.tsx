@@ -17,7 +17,7 @@ export default function LicenseSelectorModal({ photo, onClose }: Props) {
     const { terms } = useLicenseTerms();
     const { user } = useAuth();
     const { showToast } = useUI();
-    const { isCovered, calculateUpgradePrice } = usePricing(parseFloat(terms?.base_price || '35.00'));
+    const { isCovered, calculateUpgradePrice } = usePricing(terms);
     const { addToCart } = useCart(); // Dynamischer Preis
 
     if (!photo) return null;
@@ -42,11 +42,8 @@ export default function LicenseSelectorModal({ photo, onClose }: Props) {
             filename: photo.title || 'Bild ' + photo.id.substring(0, 8),
             thumb_url: photo.thumb_url,
             tier,
-            usage,
-            duration,
             price
         });
-        onClose();
         showToast('success', 'In den Warenkorb gelegt');
     };
 

@@ -1,26 +1,34 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ImageController;
-use App\Http\Controllers\GalleryController;
-use App\Http\Controllers\GalleryFrontendController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DownloadController;
-use App\Http\Controllers\InviteController;
-use App\Http\Controllers\SearchController;
-use App\Http\Controllers\MailController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\SitemapController;
-use App\Http\Controllers\FtpController;
-use App\Http\Controllers\PhotoController;
-use App\Http\Controllers\StatsController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FileDeliveryController;
+use App\Http\Controllers\FtpController;
+use App\Http\Controllers\GalleryController;
+use App\Http\Controllers\GalleryFrontendController;
+use App\Http\Controllers\ImageController;
+use App\Http\Controllers\InviteController;
+use App\Http\Controllers\LicenseCatalogController;
+use App\Http\Controllers\MailController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PhotoController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SearchController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SitemapController;
+use App\Http\Controllers\StatsController;
 use App\Http\Controllers\TenantController;
-use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\TenantInviteController;
 use App\Http\Controllers\TextSnippetController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\WebhookController;
+use App\Models\DownloadLog;
+use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Route;
 
 $throttleLimit = env('AUTH_THROTTLE_LIMIT', 9999);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
@@ -28,33 +36,36 @@ Route::middleware("throttle:$throttleLimit,1")->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 });
-Route::get('/ping', function() { return response()->json(['message' => 'API OK']); });
-Route::get('/settings/license-terms', [\App\Http\Controllers\SettingsController::class, 'getLicenseTerms']);
+Route::get('/ping', function () {
+    return response()->json(['message' => 'API OK']);
+});
+Route::get('/settings/license-terms', [SettingsController::class, 'getLicenseTerms']);
+Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index']);
 
 if (app()->environment('local', 'testing')) {
-    Route::delete('/test/cleanup-user/{id}', function($id) {
-        \App\Models\DownloadLog::where('user_id', $id)->delete();
-        \App\Models\User::find($id)?->delete();
+    Route::delete('/test/cleanup-user/{id}', function ($id) {
+        DownloadLog::where('user_id', $id)->delete();
+        User::find($id)?->delete();
         return response()->json(['success' => true]);
     });
 }
 
-Route::post('/test/flush-queue', function() {
+Route::post('/test/flush-queue', function () {
     if (app()->environment('local', 'testing')) {
-        \Illuminate\Support\Facades\Artisan::call('queue:work', ['--stop-when-empty' => true]);
+        Artisan::call('queue:work', ['--stop-when-empty' => true]);
     }
     return response()->json(['success' => true]);
 });
 
-Route::post('/webhooks/stripe', [\App\Http\Controllers\WebhookController::class, 'handleStripe']);
+Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe']);
 
 Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries']);
 Route::get('/sitemap-images.xml', [SitemapController::class, 'images']);
 
 Route::get('/invites/{token}', [InviteController::class, 'check']);
-Route::get('/tenant-invites/{token}', [\App\Http\Controllers\TenantInviteController::class, 'check']);
+Route::get('/tenant-invites/{token}', [TenantInviteController::class, 'check']);
 Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem']);
-Route::middleware("throttle:$throttleLimit,1")->post('/tenant-invites/redeem', [\App\Http\Controllers\TenantInviteController::class, 'redeem']);
+Route::middleware("throttle:$throttleLimit,1")->post('/tenant-invites/redeem', [TenantInviteController::class, 'redeem']);
 
 Route::get('/search', [SearchController::class, 'search']);
 Route::get('/search/locations', [SearchController::class, 'locations']);
@@ -75,9 +86,9 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/photos/{photoId}/rate', [GalleryFrontendController::class, 'rate']);
     Route::post('/galleries/{id}/finish-rating', [MailController::class, 'finishRating']);
 
-        Route::get('/notifications/preferences', [\App\Http\Controllers\NotificationController::class, 'preferences']);
-    Route::post('/galleries/{id}/opt-in', [\App\Http\Controllers\NotificationController::class, 'toggleGalleryOptIn']);
-    Route::post('/gallery-groups/{id}/opt-in', [\App\Http\Controllers\NotificationController::class, 'toggleGroupOptIn']);
+    Route::get('/notifications/preferences', [NotificationController::class, 'preferences']);
+    Route::post('/galleries/{id}/opt-in', [NotificationController::class, 'toggleGalleryOptIn']);
+    Route::post('/gallery-groups/{id}/opt-in', [NotificationController::class, 'toggleGroupOptIn']);
     Route::put('/photos/{id}/meta', [PhotoController::class, 'updateMetadata']);
     Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions']);
     Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata']);
@@ -102,7 +113,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/gallery-groups/{id}', [GalleryController::class, 'showGroup']);
     Route::get('/management/galleries/{id}/export', [GalleryController::class, 'exportRatings']);
     Route::get('/management/galleries/{id}/rating-status', [GalleryController::class, 'ratingStatus']);
-    
+
     Route::get('/management/galleries/{id}/invites', [InviteController::class, 'index']);
     Route::post('/management/galleries/{id}/invites', [InviteController::class, 'generate']);
     Route::put('/management/invites/{id}', [InviteController::class, 'update']);
@@ -116,24 +127,34 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/users', [UserController::class, 'store']);
     Route::put('/management/users/{id}', [UserController::class, 'update']);
     Route::delete('/management/users/{id}', [UserController::class, 'destroy']);
-    
+
 
     Route::get('/management/settings/watermark', [SettingsController::class, 'getWatermark']);
     Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
     Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
     Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark']);
     Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms']);
+
+    Route::middleware(['super_admin'])->group(function () {
+        Route::post('/management/settings/license-use-cases', [LicenseCatalogController::class, 'storeUseCase']);
+        Route::put('/management/settings/license-use-cases/{id}', [LicenseCatalogController::class, 'updateUseCase']);
+        Route::delete('/management/settings/license-use-cases/{id}', [LicenseCatalogController::class, 'destroyUseCase']);
+        Route::post('/management/settings/license-modifiers', [LicenseCatalogController::class, 'storeModifier']);
+        Route::put('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'updateModifier']);
+        Route::delete('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'destroyModifier']);
+    });
+
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo']);
 
     Route::get('/management/ftp/status', [FtpController::class, 'status']);
     Route::post('/management/ftp/target', [FtpController::class, 'setTarget']);
     Route::post('/management/ftp/process', [FtpController::class, 'process']);
 
-    
+
     Route::get('/management/tenants', [TenantController::class, 'index']);
     Route::post('/management/tenants', [TenantController::class, 'store']);
     Route::get('/management/tenants/{id}', [TenantController::class, 'show']);
-    Route::post('/management/tenants/{id}/invites', [\App\Http\Controllers\TenantInviteController::class, 'invite']);
+    Route::post('/management/tenants/{id}/invites', [TenantInviteController::class, 'invite']);
     Route::put('/management/tenants/{id}', [TenantController::class, 'update']);
     Route::delete('/management/tenants/{id}', [TenantController::class, 'destroy']);
     Route::post('/management/tenants/{id}/collective-invoice', [TenantController::class, 'generateCollectiveInvoice']);
@@ -146,10 +167,10 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/orders/{id}/send-quote', [OrderController::class, 'sendQuote']);
     Route::post('/management/invoices/manual', [OrderController::class, 'generateManualInvoice']);
     Route::post('/management/invoices/extract-offer', [OrderController::class, 'extractOffer']);
-    Route::get('/management/products', [\App\Http\Controllers\ProductController::class, 'index']);
-    Route::post('/management/products', [\App\Http\Controllers\ProductController::class, 'store']);
-    Route::put('/management/products/{id}', [\App\Http\Controllers\ProductController::class, 'update']);
-    Route::delete('/management/products/{id}', [\App\Http\Controllers\ProductController::class, 'destroy']);
+    Route::get('/management/products', [ProductController::class, 'index']);
+    Route::post('/management/products', [ProductController::class, 'store']);
+    Route::put('/management/products/{id}', [ProductController::class, 'update']);
+    Route::delete('/management/products/{id}', [ProductController::class, 'destroy']);
     Route::get('/management/customers', [CustomerController::class, 'index']);
     Route::post('/management/customers', [CustomerController::class, 'store']);
     Route::put('/management/customers/{id}', [CustomerController::class, 'update']);
@@ -163,4 +184,4 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/stats', [StatsController::class, 'index']);
     Route::get('/management/logs', [StatsController::class, 'logs']);
 
-                });
+});

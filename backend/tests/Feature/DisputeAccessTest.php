@@ -15,7 +15,7 @@ class DisputeAccessTest extends TestCase {
         $order = Order::create([
             'user_id' => $user->id,
             'status' => 'paid',
-            'total_amount' => 100.00,
+            'total_amount' => 10000,
             'stripe_payment_intent_id' => 'pi_dispute_test_123'
         ]);
 

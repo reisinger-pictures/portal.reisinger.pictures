@@ -12,7 +12,7 @@ export class MailpitHelper {
 
     async getMessageForEmail(email: string) {
         for (let i = 0; i < 15; i++) {
-            const response = await this.request.get(`${this.baseUrl}/messages`);
+            const response = await this.request.get(`${this.baseUrl}/messages?query=${encodeURIComponent(email)}`);
             const data = await response.json();
             if (data.messages && data.messages.length > 0) {
                 const msg = data.messages.find((m: MailpitMessage) => JSON.stringify(m.To).includes(email));

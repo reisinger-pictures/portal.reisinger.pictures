@@ -9,5 +9,5 @@ class Product extends Model
 {
     use HasUuids;
     protected $fillable = ['type', 'name', 'description', 'price'];
-    protected $casts = ['price' => 'float'];
+    protected $casts = ['price' => 'integer'];
 }

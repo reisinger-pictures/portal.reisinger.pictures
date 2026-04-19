@@ -4,6 +4,7 @@ import { fetcher } from '../../api';
 import PageLayout from '../components/PageLayout';
 import ErrorMessage from '../components/ErrorMessage';
 import { Order } from '../../api';
+import { formatMoney } from '../../logic/utils';
 
 
 
@@ -44,7 +45,7 @@ export default function ClientOrdersView() {
                                         </div>
                                         <div className="flex items-center gap-4 w-full sm:w-auto">
                                             <div className="text-right flex-1 sm:flex-none">
-                                                <div className="font-mono font-bold text-lg text-primary">{isQuote ? '--- €' : `${Number(snap?.total_gross).toFixed(2)} €`}</div>
+                                                <div className="font-mono font-bold text-lg text-primary">{isQuote ? '--- €' : formatMoney(Number(snap?.total_gross))}</div>
                                             </div>
                                             {isPendingQuote ? <span className="badge badge-warning font-bold p-3">Angebot ausständig</span> : 
                                             isBlocked ? <span className="badge badge-error font-bold p-3">Zugriff gesperrt ({order.status})</span> :
@@ -81,7 +82,7 @@ export default function ClientOrdersView() {
                                                     <tr key={idx}>
                                                         <td className="font-mono text-xs">{item.filename}</td>
                                                         <td><span className="badge badge-ghost badge-sm">{item.tier.toUpperCase()}</span></td>
-                                                        <td className="text-right font-mono text-xs">{Number(item.price).toFixed(2)} €</td>
+                                                        <td className="text-right font-mono text-xs">{formatMoney(Number(item.price))}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>

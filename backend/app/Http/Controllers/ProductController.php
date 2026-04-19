@@ -36,7 +36,7 @@ class ProductController extends Controller
             'type' => 'required|string|in:item,discount_fixed,discount_percent',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
-            'price' => 'required|numeric|min:0',
+            'price' => 'required|integer|min:0',
         ]);
 
         $product = Product::create($validated);
@@ -54,7 +54,7 @@ class ProductController extends Controller
             'type' => 'required|string|in:item,discount_fixed,discount_percent',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
-            'price' => 'required|numeric|min:0',
+            'price' => 'required|integer|min:0',
         ]);
 
         $product->update($validated);

@@ -18,13 +18,13 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                 type: editingProduct?.type || 'item',
                 name: editingProduct?.name || '',
                 description: editingProduct?.description || '',
-                price: editingProduct?.price || 0
+                price: editingProduct ? editingProduct.price / 100 : 0
             });
         }
     }, [isOpen, editingProduct, reset]);
 
     const onSubmit = async (data: Partial<Product>) => {
-        await onSave(data);
+        await onSave({ ...data, price: Math.round(Number(data.price) * 100) });
         onClose();
     };
 

@@ -94,7 +94,7 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
                 <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
-                    <span className="iconify mdi--tag-multiple text-secondary"></span> Metadaten-Vorgaben
+                    <span className="iconify mdi--tag-multiple text-primary"></span> Metadaten-Vorgaben
                 </h3>
                 <p className="opacity-70 mb-6 text-sm">Für Galerie: <strong>{gallery.name}</strong></p>
 

@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="🧪 [Test] Frontend: AI Test Runner (last failed)" type="NodeJSConfigurationType" application-parameters="--last-failed" path-to-js-file="ai_test_runner.mjs" working-dir="$PROJECT_DIR$/frontend">
+    <method v="2" />
+  </configuration>
+</component>

@@ -35,8 +35,6 @@ test.describe('Custom Quotes Full Workflow', () => {
         const mailpit = new MailpitHelper(request);
         const sidebar = new SidebarHelper(page);
 
-        await mailpit.deleteAllMessages();
-
         // --- 1. SETUP: Fotograf erstellt Galerie & Bild ---
         await auth.login(photogUser.email, photogUser.password);
         const galleryName = `Quote Test ${Math.random().toString(36).substring(2, 10)}`;
@@ -69,8 +67,8 @@ test.describe('Custom Quotes Full Workflow', () => {
         await page.locator('main').getByText(galleryName).first().click();
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
-        await page.fill('textarea[placeholder*="Besondere Anforderungen"]', 'Exklusiv für Kampagne.');
-        await page.getByRole('button', { name: 'Als Angebot in den Warenkorb' }).click();
+        await page.fill('textarea[placeholder*="Z.B. Exklusivrecht erforderlich"]', 'Exklusiv für Kampagne.');
+        await page.getByRole('button', { name: 'Als Angebot anfragen' }).click();
         await expect(page.locator('.toast')).toContainText('Angebot zum Warenkorb hinzugefügt');
 
         await sidebar.navigateTo('Warenkorb');
@@ -113,14 +111,16 @@ test.describe('Custom Quotes Full Workflow', () => {
         await auth.logout();
 
         // --- 4. CLIENT: Öffnet Link aus Mail ---
-        const token = await mailpit.extractLinkForEmail(clientUser.email, /quote_token=([a-zA-Z0-9.\-_]+)/);
+        const token = await mailpit.extractLinkForEmail(clientUser.email, /quote_token=([^"]+)/);
         expect(token).toBeTruthy();
 
         await auth.login(clientUser.email, clientUser.password);
         await page.goto('/cart?quote_token=' + token);
         
-        await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.');
-        await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1500.00 €');
-        await expect(page.getByRole('button', { name: 'Zahlungspflichtig bestellen' })).toBeVisible();
+        await expect(async () => {
+            await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.', { timeout: 1000 });
+            await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1500.00 €', { timeout: 1000 });
+            await expect(page.getByRole('button', { name: 'Zahlungspflichtig bestellen' })).toBeVisible({ timeout: 1000 });
+        }).toPass({ timeout: 15000 });
     });
 });

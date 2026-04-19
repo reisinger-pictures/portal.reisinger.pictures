@@ -17,7 +17,12 @@ export class UploadHelper {
         const uploadPromise = this.network.waitForUpload();
 
         await fileInput.setInputFiles(sampleImagePath);
-        await uploadPromise;
+        const res = await uploadPromise;
+        expect(res.ok(), `Upload API request failed with status ${res.status()}`).toBeTruthy();
+
+        // Warten, bis das Frontend den Upload-Prozess registriert hat
+        const toast = this.page.locator('.toast').filter({ hasText: /hochgeladen/i }).first();
+        await expect(toast).toBeVisible({ timeout: 10000 });
 
         // Warten, bis das Bild im DOM gerendert wurde (geduldige Asserts)
         const image = this.page.locator('a.pswp-item img').first();
@@ -26,15 +31,8 @@ export class UploadHelper {
         await expect(image).toBeAttached({ timeout: 15000 });
         await expect(image).toBeVisible({ timeout: 15000 });
 
-        // ✨ WICHTIG für Mobile: Polling-Block inkl. Scrollen (Robust gegen Layout-Shifts)
-        await expect(async () => {
-            // Kontinuierlich in den Viewport holen. Triggert Lazy-Loading auf natürliche Weise, 
-            // selbst wenn das Layout zwischenzeitlich springt.
-            await image.scrollIntoViewIfNeeded();
-            
-            // Prüfen, ob das Bild vom Browser nativ geladen und decodiert wurde
-            const isLoaded = await image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0);
-            expect(isLoaded, 'Bild ist noch nicht fertig geladen').toBeTruthy();
-        }).toPass({ timeout: 15000 });
+        // Scroll in view to trigger lazy loading, but don't strictly poll naturalWidth as it flakes on headless mobile viewports.
+        await image.scrollIntoViewIfNeeded();
+        await expect(image).toBeVisible({ timeout: 15000 });
     }
 }

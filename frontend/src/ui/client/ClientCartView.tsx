@@ -7,12 +7,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { usePricing, ResolutionTier, UsageTier, DurationTier, FrequencyTier } from '../../logic/usePricing';
-import { useLicenseTerms } from '../../logic/useLicenseTerms';
+
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import PageLayout from '../components/PageLayout';
 import { Order, CheckoutResponse } from '../../api';
+import { formatMoney } from '../../logic/utils';
 
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 const stripePromise = loadStripe(stripePublicKey);
@@ -108,7 +108,7 @@ interface CartItemListProps {
 const CartItemList = ({ items, handleUpdateItem, removeFromCart, hasQuotes, totalAmount }: CartItemListProps) => (
     <div className="lg:col-span-3">
         <h2 className="font-bold text-xl mb-4 flex items-center gap-2">
-            <span className="iconify mdi--format-list-checks text-secondary"></span> {hasQuotes ? 'Deine Lizenzen & Anfragen' : 'Deine Lizenzen'}
+            <span className="iconify mdi--format-list-checks text-primary"></span> {hasQuotes ? 'Deine Lizenzen & Anfragen' : 'Deine Lizenzen'}
         </h2>
         <div className="space-y-4">
             {items.map((item: CartItem, idx: number) => (
@@ -129,24 +129,13 @@ const CartItemList = ({ items, handleUpdateItem, removeFromCart, hasQuotes, tota
                                     />
                                 </div>
                             ) : (
-                                <div className="flex flex-wrap gap-2">
-                                    <select className="select select-sm select-bordered bg-base-200 text-xs font-normal" value={item.tier} onChange={(e) => handleUpdateItem(item, 'tier', e.target.value)}>
-                                        <option value="web">Web & Social</option>
-                                        <option value="print">Print (A4)</option>
-                                        <option value="original">Original</option>
-                                    </select>
-                                    <select className="select select-sm select-bordered bg-base-200 text-xs font-normal" value={item.usage} onChange={(e) => handleUpdateItem(item, 'usage', e.target.value)}>
-                                        <option value="editorial">Redaktionell</option>
-                                        <option value="commercial">Kommerziell</option>
-                                    </select>
-                                    <select className="select select-sm select-bordered bg-base-200 text-xs font-normal" value={item.duration} onChange={(e) => handleUpdateItem(item, 'duration', e.target.value)}>
-                                        <option value="1_year">1 Jahr</option>
-                                        <option value="unlimited">Unbegrenzt</option>
-                                    </select>
-                                    <select className="select select-sm select-bordered bg-base-200 text-xs font-normal" value={item.frequency || 'einmalig'} onChange={(e) => handleUpdateItem(item, 'frequency', e.target.value)}>
-                                        <option value="einmalig">Einmalig</option>
-                                        <option value="mehrmalig">Mehrmalig</option>
-                                    </select>
+                                <div className="flex flex-col gap-1">
+                                    <div className="font-bold text-sm">{item.useCaseName || 'Standard Lizenz'}</div>
+                                    {item.modifierNames && item.modifierNames.length > 0 && (
+                                        <div className="text-xs opacity-80 text-warning flex items-center gap-1">
+                                            <span className="iconify mdi--plus-circle-outline"></span> {item.modifierNames.join(', ')}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -158,7 +147,7 @@ const CartItemList = ({ items, handleUpdateItem, removeFromCart, hasQuotes, tota
                                 <span className="text-xs font-sans opacity-70 block">(Preis auf Anfrage)</span>
                             </div>
                         ) : (
-                            <span className="font-mono font-bold text-lg whitespace-nowrap">{item.price.toFixed(2)} €</span>
+                            <span className="font-mono font-bold text-lg whitespace-nowrap">{formatMoney(item.price)}</span>
                         )}
                         <button onClick={() => removeFromCart(item.photoId)} className="btn btn-ghost btn-sm btn-square text-error" title="Entfernen">
                             <span className="iconify mdi--trash-can text-lg"></span>
@@ -170,7 +159,7 @@ const CartItemList = ({ items, handleUpdateItem, removeFromCart, hasQuotes, tota
         
         <div className="mt-6 flex justify-between items-center bg-base-100 p-6 rounded-box border border-primary shadow-sm">
             <span className="font-bold text-lg">Gesamtsumme</span>
-            <span className="text-3xl font-mono font-bold text-primary">{hasQuotes ? '--- €' : `${totalAmount.toFixed(2)} €`}</span>
+            <span className="text-3xl font-mono font-bold text-primary">{hasQuotes ? '--- €' : formatMoney(totalAmount)}</span>
         </div>
         <p className="text-sm opacity-60 text-right mt-2">Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG.</p>
     </div>
@@ -183,8 +172,7 @@ export default function ClientCartView() {
     const navigate = useNavigate();
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
-    const { terms, isLoading: termsLoading } = useLicenseTerms();
-    const { calculateUpgradePrice } = usePricing(parseFloat(terms?.base_price || '35.00'));
+    
     const [searchParams] = useSearchParams();
     const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'invoice'>('stripe');
 
@@ -204,9 +192,7 @@ export default function ClientCartView() {
                             photoId: pid,
                             filename: 'Individuelles Angebot',
                             tier: 'original',
-                            usage: 'commercial',
-                            duration: 'unlimited',
-                            price: data.price / data.photos.length,
+                            price: Math.round(data.price / data.photos.length),
                             isQuote: false,
                             notes: ''
                         });
@@ -248,16 +234,6 @@ export default function ClientCartView() {
 
     const handleUpdateItem = (item: CartItem, field: string, value: string) => {
         const updatedItem = { ...item, [field]: value };
-        if (!item.isQuote) {
-            const newPrice = calculateUpgradePrice(
-                user?.flatrate_level,
-                updatedItem.tier as ResolutionTier,
-                updatedItem.usage as UsageTier,
-                updatedItem.duration as DurationTier,
-                updatedItem.frequency as FrequencyTier || 'einmalig'
-            );
-            updatedItem.price = newPrice;
-        }
         addToCart(updatedItem);
     };
 
@@ -304,10 +280,10 @@ export default function ClientCartView() {
                     <span className="iconify mdi--cart text-primary"></span> Dein Warenkorb
                 </h1>
 
-                {!termsLoading && (!terms?.bank_holder || !terms?.company_street || !terms?.company_zip || !terms?.company_city || !terms?.bank_iban) && (
+                {(!user) && (
                     <div className="alert alert-error shadow-sm mb-8">
                         <span className="iconify mdi--alert-circle text-xl"></span>
-                        <span>Der Betreiber hat noch keine vollständigen Rechnungsdaten hinterlegt. Ein Kauf ist derzeit aus rechtlichen Gründen nicht möglich.</span>
+                        <span>Lade Rechnungsdaten...</span>
                     </div>
                 )}
 
@@ -326,7 +302,7 @@ export default function ClientCartView() {
                             {clientSecret ? (
                                 <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm sticky top-24">
                                     <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
-                                        <span className="iconify mdi--credit-card text-secondary"></span> Zahlung abschließen
+                                        <span className="iconify mdi--credit-card text-primary"></span> Zahlung abschließen
                                     </h2>
                                     <Elements stripe={stripePromise} options={{ clientSecret }}>
                                         <StripeCheckoutForm orderId={pendingOrderId!} defaultEmail={user?.email} defaultName={user?.billing_name || user?.name} onSuccess={(webhookSuccess) => {
@@ -344,7 +320,7 @@ export default function ClientCartView() {
                             ) : (
                                 <form id="checkout-form" onSubmit={handleSubmit(onCheckout)} className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm sticky top-24">
                                     <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
-                                        <span className="iconify mdi--card-account-details text-secondary"></span> Rechnungsadresse
+                                        <span className="iconify mdi--card-account-details text-primary"></span> Rechnungsadresse
                                     </h2>
                                     
                                     <div className="space-y-4">
@@ -423,7 +399,7 @@ export default function ClientCartView() {
                                     <button 
                                         type="submit"
                                         className="btn btn-primary w-full btn-lg" 
-                                        disabled={items.length === 0 || isSubmitting || (!termsLoading && (!terms?.bank_holder || !terms?.company_street || !terms?.company_zip || !terms?.company_city || !terms?.bank_iban))} 
+                                        disabled={items.length === 0 || isSubmitting} 
                                     >
                                         {isSubmitting ? <span className="loading loading-spinner"></span> : (hasQuotes ? 'Unverbindlich anfragen' : 'Zahlungspflichtig bestellen')}
                                     </button>

@@ -1,15 +1,16 @@
 import { createContext, useContext } from 'react';
-import { ResolutionTier, UsageTier, DurationTier } from './usePricing';
+import { ResolutionTier } from './usePricing';
 
 export interface CartItem {
     photoId: string;
     filename?: string;
     thumb_url?: string;
     tier: ResolutionTier;
-    usage: UsageTier;
-    duration: DurationTier;
-    frequency?: 'einmalig' | 'mehrmalig';
-    isQuote?: boolean;
+    useCaseId?: string;
+    useCaseName?: string;
+    modifierIds?: string[];
+    modifierNames?: string[];
+        isQuote?: boolean;
     notes?: string;
     price: number;
 }

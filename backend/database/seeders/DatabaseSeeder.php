@@ -82,6 +82,19 @@ class DatabaseSeeder extends Seeder
             'is_public' => true
         ]);
 
+        // Standard-Lizenzen & Preise
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_web'], ['value' => '7500']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_print'], ['value' => '14500']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_original'], ['value' => '45000']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_commercial'], ['value' => '2.0']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_unlimited'], ['value' => '1.5']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_international'], ['value' => '1.5']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_web'], ['value' => 'Web & Social Media (PR & Redaktionell). Längste Kante max. 2560px.']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_print'], ['value' => 'Print & Editorial (bis A4). Längste Kante max. 4000px.']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_original'], ['value' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_national'], ['value' => 'Nutzung nur im Inland (national).']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_international'], ['value' => 'Weltweite, uneingeschränkte räumliche Nutzung.']);
+
         // Reale Impressums- und Bankdaten für den Checkout seeden
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_holder'], ['value' => 'Florian Reisinger']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_street'], ['value' => 'Robert-Stolz-Straße 8']);
@@ -96,30 +109,30 @@ class DatabaseSeeder extends Seeder
         $this->command->info('Seede Produkt-Katalog...');
         $products = [
             // Pakete (Fixpreise)
-            ['type' => 'item', 'name' => 'Dein (Mini) Shooting', 'description' => 'Bis zu 60 Min. | 3 Bilder', 'price' => 199.00],
-            ['type' => 'item', 'name' => 'n*xt Creative Special', 'description' => 'Bis zu 90 Min. | 15 Bilder | Nur 18-25 J. inkl. Veröffentlichung', 'price' => 300.00],
-            ['type' => 'item', 'name' => 'Dein Shooting', 'description' => 'Bis zu 150 Min. | 15 Bilder', 'price' => 499.00],
-            ['type' => 'item', 'name' => 'N*xt Image (Social Media Special)', 'description' => '30 Min. | 2 Bilder', 'price' => 99.00],
+            ['type' => 'item', 'name' => 'Dein (Mini) Shooting', 'description' => 'Bis zu 60 Min. | 3 Bilder', 'price' => 19900],
+            ['type' => 'item', 'name' => 'n*xt Creative Special', 'description' => 'Bis zu 90 Min. | 15 Bilder | Nur 18-25 J. inkl. Veröffentlichung', 'price' => 30000],
+            ['type' => 'item', 'name' => 'Dein Shooting', 'description' => 'Bis zu 150 Min. | 15 Bilder', 'price' => 49900],
+            ['type' => 'item', 'name' => 'N*xt Image (Social Media Special)', 'description' => '30 Min. | 2 Bilder', 'price' => 9900],
             
             // Stundensätze & B2B
-            ['type' => 'item', 'name' => 'B2B Business-Shooting', 'description' => 'Professionelle Bildbearbeitung, Volle Nutzungsrechte (Presse & PR)', 'price' => 150.00],
-            ['type' => 'item', 'name' => 'Privat-Shooting', 'description' => 'Zusätzliche Zeit / Individuelle Verlängerung', 'price' => 100.00],
+            ['type' => 'item', 'name' => 'B2B Business-Shooting', 'description' => 'Professionelle Bildbearbeitung, Volle Nutzungsrechte (Presse & PR)', 'price' => 15000],
+            ['type' => 'item', 'name' => 'Privat-Shooting', 'description' => 'Zusätzliche Zeit / Individuelle Verlängerung', 'price' => 10000],
 
             // Upsells & Add-ons
-            ['type' => 'item', 'name' => 'Zusatzbild (+1 Bild)', 'price' => 29.00],
-            ['type' => 'item', 'name' => 'Zusatzbilder Paket (+5 Bilder)', 'price' => 125.00],
-            ['type' => 'item', 'name' => 'Zusatzbilder Paket (+10 Bilder)', 'price' => 199.00],
-            ['type' => 'item', 'name' => '48h Express Service', 'price' => 299.00],
-            ['type' => 'item', 'name' => 'Alle Fotos (unbearbeitet JPEG)', 'description' => 'Alle Bilder des Shootings als JPEGs ohne Bearbeitung', 'price' => 1599.00],
+            ['type' => 'item', 'name' => 'Zusatzbild (+1 Bild)', 'price' => 2900],
+            ['type' => 'item', 'name' => 'Zusatzbilder Paket (+5 Bilder)', 'price' => 12500],
+            ['type' => 'item', 'name' => 'Zusatzbilder Paket (+10 Bilder)', 'price' => 19900],
+            ['type' => 'item', 'name' => '48h Express Service', 'price' => 29900],
+            ['type' => 'item', 'name' => 'Alle Fotos (unbearbeitet JPEG)', 'description' => 'Alle Bilder des Shootings als JPEGs ohne Bearbeitung', 'price' => 159900],
 
             // Rabatte (Prozentual)
-            ['type' => 'discount_percent', 'name' => 'Special Deal OGs (50%)', 'description' => 'Für langjährige Wegbegleiter (inkl. Freigabe)', 'price' => 50.00],
-            ['type' => 'discount_percent', 'name' => 'OG Hochzeit (33%)', 'description' => 'Treue-Rabatt für Hochzeitsreportagen', 'price' => 33.33333],
-            ['type' => 'discount_percent', 'name' => 'Nxt Generation Rabatt (33%)', 'description' => 'Für 18-25 Jährige (Inkl. Freigabe)', 'price' => 33.33333],
+            ['type' => 'discount_percent', 'name' => 'Special Deal OGs (50%)', 'description' => 'Für langjährige Wegbegleiter (inkl. Freigabe)', 'price' => 5000],
+            ['type' => 'discount_percent', 'name' => 'OG Hochzeit (33%)', 'description' => 'Treue-Rabatt für Hochzeitsreportagen', 'price' => 3333],
+            ['type' => 'discount_percent', 'name' => 'Nxt Generation Rabatt (33%)', 'description' => 'Für 18-25 Jährige (Inkl. Freigabe)', 'price' => 3333],
 
             // Rabatte (Fixbeträge / Guthaben)
-            ['type' => 'discount_fixed', 'name' => 'Feedback Bonus (Google)', 'description' => 'Dankeschön für eine Bewertung', 'price' => 30.00],
-            ['type' => 'discount_fixed', 'name' => 'Friends of Friends Voucher', 'description' => 'Everyone can be n*xt', 'price' => 150.00],
+            ['type' => 'discount_fixed', 'name' => 'Feedback Bonus (Google)', 'description' => 'Dankeschön für eine Bewertung', 'price' => 3000],
+            ['type' => 'discount_fixed', 'name' => 'Friends of Friends Voucher', 'description' => 'Everyone can be n*xt', 'price' => 15000],
         ];
 
         foreach ($products as $product) {

@@ -76,7 +76,7 @@ export default function ManagementFtpInbox() {
                                     {flatGalleries.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                                 </select>
                                 <button onClick={handleSetTarget} disabled={selectedId === ''}
-                                        className="btn btn-secondary">Setzen
+                                        className="btn btn-outline btn-primary">Setzen
                                 </button>
                             </div>
                         )}

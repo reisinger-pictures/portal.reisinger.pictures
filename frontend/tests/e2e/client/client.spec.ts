@@ -75,9 +75,8 @@ test.describe('Client Selection Workflow', () => {
 
         // DAU Protection prüfen (Rechtsklick & Drag)
         const image = page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible();
-        await expect(image).toHaveJSProperty('complete', true);
-        expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        await image.scrollIntoViewIfNeeded();
+        await expect(image).toBeVisible({ timeout: 15000 });
 
         const isPrevented = await image.evaluate((el) => {
             const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });

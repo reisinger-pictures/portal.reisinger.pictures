@@ -22,6 +22,7 @@ export class GalleryHelper {
             this.sessionHelper.trackGallery(res.gallery.id);
         }
 
+        await this.page.reload();
         const galLink = this.page.locator('main').getByText(name, { exact: true }).first();
         await expect(async () => {
             await expect(galLink).toBeVisible({ timeout: 2000 });

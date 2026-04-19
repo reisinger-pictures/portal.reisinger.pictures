@@ -88,8 +88,8 @@
                             @endif
                         </td>
                         <td class="text-right">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
-                        <td class="text-right">{{ number_format($item['price'], 2, ',', '.') }} €</td>
-                        <td class="text-right">{{ number_format($item['row_total'] ?? ($item['price'] * ($item['qty'] ?? 1)), 2, ',', '.') }} €</td>
+                        <td class="text-right">{{ number_format($item['price'] / 100, 2, ',', '.') }} €</td>
+                        <td class="text-right">{{ number_format(($item['row_total'] ?? ($item['price'] * ($item['qty'] ?? 1))) / 100, 2, ',', '.') }} €</td>
                     </tr>
                 @else
                     @php $hasDiscounts = true; @endphp
@@ -105,7 +105,7 @@
                 @if($hasDiscounts)
                     <tr>
                         <td colspan="3" class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>Zwischensumme</strong></td>
-                        <td class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>{{ number_format($subtotal, 2, ',', '.') }} €</strong></td>
+                        <td class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>{{ number_format($subtotal / 100, 2, ',', '.') }} €</strong></td>
                     </tr>
                     @foreach($items as $item)
                         @if(isset($item['type']) && str_starts_with($item['type'], 'discount'))
@@ -122,13 +122,13 @@
                                 <td class="text-right">1</td>
                                 <td class="text-right">
                                     @if($item['type'] === 'discount_fixed')
-                                        {{ number_format($item['price'], 2, ',', '.') }} €
+                                        {{ number_format($item['price'] / 100, 2, ',', '.') }} €
                                     @else
                                         -
                                     @endif
                                 </td>
                                 <td class="text-right" style="color: #2A9D8F;">
-                                    {{ number_format($item['row_total'], 2, ',', '.') }} €
+                                    {{ number_format($item['row_total'] / 100, 2, ',', '.') }} €
                                 </td>
                             </tr>
                         @endif
@@ -137,7 +137,7 @@
                 
                 <tr class="total-row">
                     <td colspan="3" class="text-right">Rechnungsbetrag</td>
-                    <td class="text-right">{{ number_format($snapshot->total_gross, 2, ',', '.') }} €</td>
+                    <td class="text-right">{{ number_format($snapshot->total_gross / 100, 2, ',', '.') }} €</td>
                 </tr>
             </tbody>
         </table>

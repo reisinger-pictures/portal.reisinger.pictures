@@ -20,7 +20,7 @@ class QuoteLinkTest extends TestCase
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/orders/quote-link', [
                 'photo_ids' => ['uuid-1', 'uuid-2'],
-                'custom_price' => 1200.00
+                'custom_price' => 120000
             ]);
 
         $response->assertStatus(200)
@@ -38,7 +38,7 @@ class QuoteLinkTest extends TestCase
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/orders/quote-link', [
                 'photo_ids' => ['uuid-1'],
-                'custom_price' => 100.00
+                'custom_price' => 10000
             ]);
 
         $response->assertStatus(403);

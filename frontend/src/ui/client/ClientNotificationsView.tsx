@@ -67,7 +67,7 @@ export default function ClientNotificationsView() {
                         {data.groups.length > 0 && (
                             <div>
                                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-base-300 pb-2">
-                                    <span className="iconify mdi--folder-multiple text-secondary"></span> Abonnierte Ordner (Meta-Galerien)
+                                    <span className="iconify mdi--folder-multiple text-primary"></span> Abonnierte Ordner (Meta-Galerien)
                                 </h2>
                                 <div className="bg-base-100 rounded-box border border-base-300 shadow-sm overflow-hidden">
                                     {data.groups.map(group => (

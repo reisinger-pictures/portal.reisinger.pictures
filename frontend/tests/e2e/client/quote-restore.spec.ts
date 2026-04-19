@@ -21,7 +21,7 @@ test.describe('Quote Cart Restore Workflow', () => {
 
         // Reale Token-Generierung via Admin API (Real-Flow)
         const quoteRes = await request.post('/api/management/orders/quote-link', {
-            data: { photo_ids: ['mocked-photo-1', 'mocked-photo-2'], custom_price: 1500 },
+            data: { photo_ids: ['mocked-photo-1', 'mocked-photo-2'], custom_price: 150000 },
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
         });
         const quoteData = await quoteRes.json();

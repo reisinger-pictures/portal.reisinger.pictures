@@ -68,7 +68,8 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
         // Da er "Print" als Flatrate hat, muss der "Jetzt herunterladen" Button für "Print" sichtbar sein, ohne Cart-Prozess!
-        await expect(page.locator('.border-success\\/60').filter({ hasText: 'Print (bis A4)' }).getByRole('link', { name: 'Download' })).toBeVisible();
+        await expect(page.locator('label').filter({ hasText: 'Tageszeitungen / Zeitschriften' })).toContainText('Inklusive');
+        await expect(page.getByRole('link', { name: 'Download' })).toBeVisible();
         await auth.logout();
 
         // 4. Flow Q, AG, AJ: Power User Cart, Upselling und Checkout
@@ -77,19 +78,15 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
         // Web-Auflösung in den Warenkorb legen
-        await page.locator('.rounded-xl').filter({ hasText: 'Web & Social Media' }).getByRole('button', { name: /€/ }).click();
+        await page.locator('label').filter({ hasText: 'Web & Social Media' }).click();
+        await page.getByRole('button', { name: 'In den Warenkorb' }).click();
         await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
 
         // Zum Warenkorb gehen
         await sidebar.navigateTo('Warenkorb');
         await expect(page).toHaveURL(/.*\/cart/);
 
-        // Flow AG: Upselling im Warenkorb (Lizenz ändern -> Preis steigt)
-        const priceBefore = await page.locator('.text-3xl.font-mono.text-primary').innerText();
-        await page.locator('select').nth(1).selectOption('commercial'); // Nutzung: Kommerziell
-        await page.waitForTimeout(500); // React Render abwarten
-        const priceAfter = await page.locator('.text-3xl.font-mono.text-primary').innerText();
-        expect(priceBefore).not.toEqual(priceAfter); // Preis muss durch Multiplikator gestiegen sein
+        // Lizenzen im Warenkorb sind Read-Only (V010 RSV), daher entfaellt das Upselling hier.
         
         // Flow Q: Checkout Formular
         await form.fillCheckoutForm({

@@ -100,7 +100,7 @@ export default function SearchView() {
 
                                 <section>
                                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-base-300 pb-2">
-                                        <span className="iconify mdi--image-multiple text-secondary"></span> Fotos
+                                        <span className="iconify mdi--image-multiple text-primary"></span> Fotos
                                         ({results.photos.length})
                                     </h2>
                                     {results.photos.length > 0 ? (

@@ -35,13 +35,13 @@
             <tr>
                 <td><strong>{{ $item['filename'] }}</strong>@if(!empty($item['notes']))<br><small>{{ $item['notes'] }}</small>@endif</td>
                 <td class="text-right">{{ number_format($item['qty'], 2, ',', '.') }}</td>
-                <td class="text-right">{{ number_format($item['price'], 2, ',', '.') }} €</td>
-                <td class="text-right">{{ number_format($item['row_total'], 2, ',', '.') }} €</td>
+                <td class="text-right">{{ number_format($item['price'] / 100, 2, ',', '.') }} €</td>
+                <td class="text-right">{{ number_format($item['row_total'] / 100, 2, ',', '.') }} €</td>
             </tr>
             @endforeach
             <tr class="total-row">
                 <td colspan="3" class="text-right">Voraussichtlicher Gesamtbetrag</td>
-                <td class="text-right">{{ number_format($snapshot->total_gross, 2, ',', '.') }} €</td>
+                <td class="text-right">{{ number_format($snapshot->total_gross / 100, 2, ',', '.') }} €</td>
             </tr>
         </tbody>
     </table>

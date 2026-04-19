@@ -20,12 +20,12 @@ export default function ManagementGalleryActions({ gallery, canSendMail, downloa
             {isPhotographer && (
                 <div className="flex gap-2">
                     {gallery.type === 'selection' && (
-                        <button onClick={onOpenRatings} className="btn btn-secondary btn-sm">
+                        <button onClick={onOpenRatings} className="btn btn-outline btn-primary btn-sm">
                             <span className="iconify mdi--star-outline"></span> Bewertungen...
                         </button>
                     )}
                     {gallery.type === 'delivery' && (
-                        <button onClick={onOpenMetadata} className="btn btn-secondary btn-sm">
+                        <button onClick={onOpenMetadata} className="btn btn-outline btn-primary btn-sm">
                             <span className="iconify mdi--tag-multiple"></span> Vorgaben...
                         </button>
                     )}

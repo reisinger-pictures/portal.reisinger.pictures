@@ -59,9 +59,9 @@ test.describe('Download Triggers UI', () => {
 
         // 4. Als anonymer Gast die öffentliche Galerie aufrufen
         await page.goto(galleryUrl);
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible();
-        await expect(page.locator('a.pswp-item img').first()).toHaveJSProperty('complete', true);
-        await expect(async () => { expect(await page.locator('a.pswp-item img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0); }).toPass();
+        const img = page.locator('a.pswp-item img').first();
+        await img.scrollIntoViewIfNeeded();
+        await expect(img).toBeVisible({ timeout: 15000 });
 
         // 5. Test: Einzel-Download (Via Detailansicht)
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();

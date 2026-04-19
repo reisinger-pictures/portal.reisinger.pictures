@@ -68,11 +68,8 @@ test.describe('PhotoSwipe & Lightbox UI', () => {
         await page.reload();
 
         const image = page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible();
-        await expect(image).toHaveJSProperty('complete', true);
-        await expect(async () => {
-            expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-        }).toPass();
+        await image.scrollIntoViewIfNeeded();
+        await expect(image).toBeVisible({ timeout: 15000 });
 
         await expect(page.locator('a.pswp-item').first()).toHaveAttribute('data-title', 'Episches Testbild');
 

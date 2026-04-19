@@ -67,7 +67,7 @@ return new class extends Migration {
             $table->string('status')->default('pending');
             $table->boolean('is_quote_request')->default(false); // <-- NEU
             $table->string('quote_status')->nullable(); // <-- NEU
-            $table->decimal('total_amount', 10, 2)->default(0);
+            $table->integer('total_amount')->default(0);
             $table->timestamp('created_at')->useCurrent();
         });
 
@@ -76,8 +76,8 @@ return new class extends Migration {
             $table->foreignUuid('order_id')->constrained()->onDelete('cascade');
             $table->string('invoice_number')->unique();
             $table->json('customer_details');
-            $table->decimal('total_net', 10, 2);
-            $table->decimal('total_gross', 10, 2);
+            $table->integer('total_net');
+            $table->integer('total_gross');
             $table->decimal('tax_rate', 5, 2)->default(20.00);
             $table->timestamp('created_at')->useCurrent();
         });

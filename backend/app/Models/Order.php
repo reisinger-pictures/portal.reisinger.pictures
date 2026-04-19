@@ -22,7 +22,7 @@ class Order extends Model
     ];
 
     protected $casts = [
-        'total_amount' => 'decimal:2',
+        'total_amount' => 'integer',
         'is_quote_request' => 'boolean',
     ];
 

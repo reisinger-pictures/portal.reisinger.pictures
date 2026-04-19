@@ -23,8 +23,8 @@ class InvoiceSnapshot extends Model
 
     protected $casts = [
         'customer_details' => 'array',
-        'total_net' => 'decimal:2',
-        'total_gross' => 'decimal:2',
+        'total_net' => 'integer',
+        'total_gross' => 'integer',
         'tax_rate' => 'decimal:2',
     ];
 

@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\Transports\GmailRestTransport;
+use Illuminate\Support\Facades\Gate;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +22,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::define('manage-catalog', function ($user) {
+            return $user->is_super_admin;
+        });
+
         \Illuminate\Support\Facades\Auth::provider('transient_eloquent', function ($app, array $config) {
             return new \App\Auth\TransientUserProvider($app['hash'], $config['model']);
         });

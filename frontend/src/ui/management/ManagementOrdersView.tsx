@@ -3,6 +3,7 @@ import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import { Order, OrderItem } from '../../api';
+import { formatMoney } from '../../logic/utils';
 
 
 
@@ -33,7 +34,7 @@ export default function ManagementOrdersView() {
         setIsGenerating(true);
         try {
             await apiMutate(`/api/management/orders/${quoteOrder.id}/send-quote`, 'POST', {
-                custom_price: parseFloat(customPrice.replace(',', '.')),
+                custom_price: Math.round(parseFloat(customPrice.replace(',', '.')) * 100),
                 message: quoteMessage
             });
             showToast('success', 'Angebot per E-Mail gesendet!');
@@ -81,7 +82,7 @@ export default function ManagementOrdersView() {
                                     <div className="font-bold">{order.user?.name}</div>
                                     <div className="text-xs opacity-70">{order.user?.email}</div>
                                 </td>
-                                <td className="font-mono">{(order.is_quote_request ? true : false) && order.status === 'pending' ? 'Auf Anfrage' : `${Number(order.total_amount).toFixed(2)} €`}</td>
+                                <td className="font-mono">{(order.is_quote_request ? true : false) && order.status === 'pending' ? 'Auf Anfrage' : formatMoney(Number(order.total_amount))}</td>
                                 <td>
                                     <div className="flex flex-col gap-2 items-start">
                                         <select 

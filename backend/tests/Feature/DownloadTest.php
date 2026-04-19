@@ -158,7 +158,7 @@ class DownloadTest extends TestCase
         $order = \App\Models\Order::create([
             'user_id' => $user->id,
             'status' => 'disputed',
-            'total_amount' => 35.00
+            'total_amount' => 3500
         ]);
 
         \App\Models\InvoiceSnapshot::create([
@@ -167,11 +167,11 @@ class DownloadTest extends TestCase
             'customer_details' => [
                 'name' => 'Test Kunde',
                 'items' => [
-                    ['photoId' => $photo->id, 'tier' => 'original', 'price' => 35.00]
+                    ['photoId' => $photo->id, 'tier' => 'original', 'price' => 3500]
                 ]
             ],
-            'total_net' => 35.00,
-            'total_gross' => 35.00,
+            'total_net' => 3500,
+            'total_gross' => 3500,
             'tax_rate' => 0
         ]);
 

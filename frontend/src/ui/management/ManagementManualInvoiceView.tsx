@@ -143,8 +143,8 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                 terms_html: data.terms_html || ''
             }));
             
-            const loadedItems = data.items?.filter((i: InvoiceItem) => i.type === 'item') || [];
-            const loadedDiscounts = data.items?.filter((i: InvoiceDiscount) => i.type !== 'item') || [];
+            const loadedItems = data.items?.filter((i: InvoiceItem) => i.type === 'item').map((i: InvoiceItem) => ({...i, price: i.price / 100})) || [];
+            const loadedDiscounts = data.items?.filter((i: InvoiceDiscount) => i.type !== 'item').map((i: InvoiceDiscount) => ({...i, price: i.price / 100})) || [];
             
             setItems(loadedItems.length > 0 ? loadedItems : [{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
             setDiscounts(loadedDiscounts);
@@ -232,7 +232,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ ...formData, items: [...items, ...discounts.map(d => ({...d, qty: 1}))] })
+                body: JSON.stringify({ ...formData, items: [...items, ...discounts.map(d => ({...d, qty: 1}))].map((i: InvoiceItem | InvoiceDiscount) => ({...i, price: Math.round(i.price * 100)})) })
             });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
@@ -262,14 +262,14 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
 
     return (
         <div 
-            className={`p-6 md:p-10 max-w-6xl mx-auto w-full relative transition-colors duration-200 ${isDragging ? 'bg-secondary/5 rounded-box border-2 border-dashed border-secondary' : ''}`}
+            className={`p-6 md:p-10 max-w-6xl mx-auto w-full relative transition-colors duration-200 ${isDragging ? 'bg-primary/5 rounded-box border-2 border-dashed border-primary' : ''}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
             {isDragging && !isOffer && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-box border-4 border-dashed border-secondary m-6 pointer-events-none">
-                    <div className="text-center text-secondary">
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-box border-4 border-dashed border-primary m-6 pointer-events-none">
+                    <div className="text-center text-primary">
                         <span className="iconify mdi--upload text-6xl mb-2"></span>
                         <h2 className="text-2xl font-bold">Angebot hier ablegen</h2>
                         <p>Die Daten werden automatisch in die Rechnung übernommen.</p>
@@ -286,7 +286,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                 </div>
                 {!isOffer && (
                     <div className="flex-none">
-                        <label className="btn btn-outline btn-secondary shadow-sm cursor-pointer">
+                        <label className="btn btn-outline btn-primary shadow-sm cursor-pointer">
                             <span className="iconify mdi--upload text-xl"></span> Angebot importieren (.pdf)
                             <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload} />
                         </label>
@@ -315,8 +315,8 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
 
                 <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                     <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-                        <h2 className="font-bold text-xl text-secondary">Leistungen / Positionen</h2>
-                        <button type="button" onClick={addItem} className="btn btn-sm btn-outline btn-secondary">+ Leistung hinzufügen</button>
+                        <h2 className="font-bold text-xl text-primary">Leistungen / Positionen</h2>
+                        <button type="button" onClick={addItem} className="btn btn-sm btn-outline btn-primary">+ Leistung hinzufügen</button>
                     </div>
                     
                     <div className="space-y-4">
@@ -366,8 +366,8 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                     {/* Discounts Section */}
                     <div className="mt-6 border-t border-base-300 pt-6">
                         <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-                            <h2 className="font-bold text-xl text-secondary">Rabatte & Abzüge</h2>
-                            <button type="button" onClick={addDiscount} className="btn btn-sm btn-outline btn-secondary">+ Rabatt hinzufügen</button>
+                            <h2 className="font-bold text-xl text-primary">Rabatte & Abzüge</h2>
+                            <button type="button" onClick={addDiscount} className="btn btn-sm btn-outline btn-primary">+ Rabatt hinzufügen</button>
                         </div>
                         
                         <div className="space-y-4">
