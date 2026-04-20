@@ -127,6 +127,11 @@ class Gallery extends Model
         return $this->hasMany(Photo::class)->orderBy('id', 'desc');
     }
 
+    public function latestPhoto()
+    {
+        return $this->hasOne(Photo::class)->latestOfMany();
+    }
+
     public function galleryGroup()
     {
         return $this->belongsTo(GalleryGroup::class);

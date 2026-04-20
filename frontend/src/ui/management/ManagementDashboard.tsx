@@ -199,7 +199,7 @@ export default function ManagementDashboard() {
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                                                         {personalFeed.galleries.slice(0, 3).map(g => (
                                                             <Link key={g.id} to={'/' + g.full_path}
-                                                                  className="card bg-base-100 shadow-sm hover:shadow-xl transition-all border border-base-300">
+                                                                  className="card bg-base-100 shadow-sm hover:shadow-xl transition-shadow transition-transform border border-base-300">
                                                                 <div
                                                                     className="card-body p-4 flex flex-row items-center">
                                                                     <div className="text-2xl mr-2"></div>

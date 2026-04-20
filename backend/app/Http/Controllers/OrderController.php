@@ -212,6 +212,7 @@ class OrderController extends Controller
 
         $total = max(0, $runningTotal);
         
+        $sanitizer = app(\Symfony\Component\HtmlSanitizer\HtmlSanitizer::class);
         $customerDetails = [
             'name' => $validated['customer_name'] ?? '',
             'company' => $validated['customer_company'] ?? '',
@@ -223,7 +224,7 @@ class OrderController extends Controller
             'uid' => $validated['customer_uid'] ?? '',
             'due_date' => $validated['due_date'], // Übernimmt den Freitext exakt so
             'is_collective' => false,
-            'custom_html_terms' => isset($validated['terms_html']) ? strip_tags($validated['terms_html'], '<h1><h2><h3><h4><h5><h6><b><strong><i><em><u><ul><ol><li><p><br><span><div><a>') : null
+            'custom_html_terms' => isset($validated['terms_html']) ? $sanitizer->sanitize($validated['terms_html']) : null
         ];
 
         $isOffer = ($validated['type'] ?? 'invoice') === 'offer';

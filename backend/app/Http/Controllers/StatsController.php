@@ -126,7 +126,7 @@ class StatsController extends Controller
     {
         $user = auth('api')->user();
         $tier = $request->query('tier');
-        $query = DownloadLog::orderBy('id', 'desc');
+        $query = DownloadLog::with('gallery.latestPhoto')->orderBy('id', 'desc');
 
         if ($tier) {
             $query->where('resolution_tier', $tier);
@@ -143,13 +143,9 @@ class StatsController extends Controller
 
         $paginated = $query->paginate(50);
 
-        // Append thumb_url for single images and zips
         $paginated->getCollection()->transform(function ($log) {
-            if ($log->gallery_id) {
-                $photo = \App\Models\Photo::where('gallery_id', $log->gallery_id)->orderBy('id', 'desc')->first();
-                if ($photo) {
-                    $log->thumb_url = $photo->thumb_url;
-                }
+            if ($log->gallery && $log->gallery->latestPhoto) {
+                $log->thumb_url = $log->gallery->latestPhoto->thumb_url;
             }
             return $log;
         });

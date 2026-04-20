@@ -27,4 +27,9 @@ class DownloadLog extends Model
     protected $casts = [
         'payload' => 'array',
     ];
+
+    public function gallery()
+    {
+        return $this->belongsTo(Gallery::class);
+    }
 }

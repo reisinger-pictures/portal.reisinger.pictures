@@ -23,3 +23,10 @@ status: active
 - **Währung:** Fest auf EUR fixiert, wird nicht in der Datenbank gespeichert.
 - **API-Contract:** Alle Geld-Beträge (Preise, Warenkörbe, Rechnungen) werden als Cents (Integer) über die API gesendet und empfangen.
 - **Frontend:** Die Konvertierung in Euro (Division durch 100) erfolgt **ausschließlich** für die Anzeige im Frontend (React) oder beim Generieren von PDFs (Blade).
+
+## 5. Dependency Injection & Security
+- **Service Container:** Zentrale Dienste wie der `HtmlSanitizer` werden als Singleton im `AppServiceProvider` registriert. Dies sichert das DRY-Prinzip und ermöglicht sauberes Mocking in Unit-Tests.
+- **Strikte Whitelists:** HTML-Inputs (z.B. aus dem WYSIWYG-Editor) werden über strenge, explizite Whitelists (`allowElement`) bereinigt, um XSS-Angriffe effektiv zu verhindern. Pauschale Freigaben wie `allowSafeElements()` werden vermieden.
+
+## 6. Performance & Eager Loading
+- **N+1 Problemvermeidung:** Für Performance-kritische Controller (wie `StatsController`) wird konsequent Eloquent Eager Loading (`with('gallery.latestPhoto')`) eingesetzt, um die Anzahl der Datenbank-Queries zu minimieren, ohne komplexe, manuelle `whereIn` oder Collections-Mapping-Logik im Controller zu verstreuen.

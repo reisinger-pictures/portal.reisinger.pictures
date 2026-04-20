@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\Transports\GmailRestTransport;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -14,7 +16,27 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(HtmlSanitizer::class, function ($app) {
+            $config = (new HtmlSanitizerConfig())
+                ->allowElement('p')
+                ->allowElement('strong')
+                ->allowElement('em')
+                ->allowElement('u')
+                ->allowElement('s')
+                ->allowElement('ul')
+                ->allowElement('ol')
+                ->allowElement('li')
+                ->allowElement('br')
+                ->allowElement('a', ['href', 'title', 'target', 'rel'])
+                ->allowElement('table')
+                ->allowElement('thead')
+                ->allowElement('tbody')
+                ->allowElement('tr')
+                ->allowElement('th')
+                ->allowElement('td');
+            
+            return new HtmlSanitizer($config);
+        });
     }
 
     /**

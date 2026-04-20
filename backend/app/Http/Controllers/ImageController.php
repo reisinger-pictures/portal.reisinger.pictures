@@ -43,7 +43,7 @@ class ImageController extends Controller
         }
 
         $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $extension = $file->getClientOriginalExtension();
+        $extension = $file->extension(); // Safer: Derives from actual MIME type, not client input
         $filename = Str::slug($originalName) . '.' . $extension;
         $mimeType = $file->getClientMimeType();
         

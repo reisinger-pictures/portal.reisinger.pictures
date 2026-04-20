@@ -115,29 +115,18 @@ class GalleryFrontendController extends Controller
             }
         }
 
-        $existingRating = \App\Models\Rating::where([
-            'photo_id' => $photo->id,
-            'user_id' => $user->id,
-            'guest_id' => $user->guest_id
-        ])->first();
-
-        if ($existingRating) {
-            $existingRating->update([
-                'rating' => $request->rating,
-                'comment' => $request->comment ?? '',
-                'guest_name' => $user->id ? null : $user->name
-            ]);
-        } else {
-            \App\Models\Rating::create([
-                'id' => (string) \Illuminate\Support\Str::uuid(),
+        \App\Models\Rating::updateOrCreate(
+            [
                 'photo_id' => $photo->id,
                 'user_id' => $user->id,
-                'guest_id' => $user->guest_id,
+                'guest_id' => $user->guest_id
+            ],
+            [
                 'rating' => $request->rating,
                 'comment' => $request->comment ?? '',
                 'guest_name' => $user->id ? null : $user->name
-            ]);
-        }
+            ]
+        );
 
         return response()->json(['success' => true]);
     }

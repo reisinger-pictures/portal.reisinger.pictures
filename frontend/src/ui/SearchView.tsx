@@ -84,7 +84,7 @@ export default function SearchView() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                             {results.galleries.map(g => (
                                                 <div key={g.id}
-                                                     className="card bg-base-100 shadow-xl cursor-pointer hover:shadow-2xl border border-base-300 transition-all hover:-translate-y-1"
+                                                     className="card bg-base-100 shadow-xl cursor-pointer hover:shadow-2xl border border-base-300 transition-shadow transition-transform hover:-translate-y-1"
                                                      onClick={() => navigate('/' + g.full_path)}>
                                                     <div className="card-body p-4 flex flex-row items-center">
                                                         <div className="text-2xl mr-2"></div>
