@@ -120,6 +120,10 @@
         content: " *";
         @apply text-primary font-bold;
     }
+
+    .card.border {
+        @apply transition-shadow!;
+    }
 }
 
 @layer utilities {
