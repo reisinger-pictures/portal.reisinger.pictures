@@ -28,6 +28,7 @@ This directory serves as the single source of truth for all technical concepts, 
 * [01-deployment.md](infrastructure/01-deployment.md) - Docker, Portainer, and Reverse Proxy.
 * [02-email-system.md](infrastructure/02-email-system.md) - Mailpit, Custom Mails, and Opt-ins.
 * [03-accounting-and-lifecycle.md](infrastructure/03-accounting-and-lifecycle.md) - Invoicing, PDFs, and storage cleanup.
+* [04-payout-system.md](infrastructure/04-payout-system.md) - Weighted share pool model, deduplication and statements.
 
 ### 📷 Photos & Metadata
 * [01-upload-and-processing.md](photos/01-upload-and-processing.md) - Lightroom UUIDs and ImageProcessor.

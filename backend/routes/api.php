@@ -97,6 +97,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/orders/{id}/invoice', [OrderController::class, 'downloadInvoice']);
     Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip']);
     Route::delete('/photos/{id}', [PhotoController::class, 'destroy']);
+    Route::get('/payouts/my-statements', [\App\Http\Controllers\PayoutController::class, 'myStatements']);
 });
 
 Route::middleware(['auth:api', 'management'])->group(function () {
@@ -142,6 +143,11 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::post('/management/settings/license-modifiers', [LicenseCatalogController::class, 'storeModifier']);
         Route::put('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'updateModifier']);
         Route::delete('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'destroyModifier']);
+
+        Route::get('/management/payouts', [\App\Http\Controllers\PayoutController::class, 'adminIndex']);
+        Route::post('/management/payouts/calculate', [\App\Http\Controllers\PayoutController::class, 'calculate']);
+        Route::post('/management/payouts/{id}/approve', [\App\Http\Controllers\PayoutController::class, 'approveStatement']);
+        Route::post('/management/payouts/{id}/pay', [\App\Http\Controllers\PayoutController::class, 'markAsPaid']);
     });
 
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo']);

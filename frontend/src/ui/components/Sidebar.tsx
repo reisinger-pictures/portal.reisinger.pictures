@@ -65,6 +65,7 @@ export default function Sidebar(props: SidebarProps) {
                             <>
                                 <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Büro & Dokumente</li>
                                 <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> Shop-Bestellungen</Link></li>
+                                <li><Link to="/admin-payouts" className={props.currentView === 'admin-payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> Payouts & Abrechnung</Link></li>
                                 {user.is_super_admin && (
                                     <>
                                         <li><Link to="/admin-manual-offer" className={props.currentView === 'admin-manual-offer' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-chart-outline text-lg"></span> Manuelles Angebot</Link></li>
@@ -97,6 +98,7 @@ export default function Sidebar(props: SidebarProps) {
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
                         <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> Mein Profil</Link></li>
                         <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> Einkäufe & Anfragen</Link></li>
+                        {user.is_photographer && <li><Link to="/my-payouts" className={props.currentView === 'payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> Meine Abrechnungen</Link></li>}
                     </>
                 )}
                 

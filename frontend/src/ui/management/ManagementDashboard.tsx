@@ -17,6 +17,8 @@ import ManagementManualInvoiceView from './ManagementManualInvoiceView';
 import ManagementCustomersView from './ManagementCustomersView';
 import ManagementProductsView from './ManagementProductsView';
 import ManagementTextSnippetsView from './ManagementTextSnippetsView';
+import ManagementPayoutsView from './ManagementPayoutsView';
+import PhotographerPayoutsView from '../photographer/PhotographerPayoutsView';
 import ErrorBoundary from '../components/ErrorBoundary';
 import PhotographerTeamModal from './components/PhotographerTeamModal';
 
@@ -182,6 +184,8 @@ export default function ManagementDashboard() {
                         {currentView === 'admin-customers' && <ManagementCustomersView/>}
                         {currentView === 'admin-products' && <ManagementProductsView/>}
                         {currentView === 'admin-snippets' && <ManagementTextSnippetsView/>}
+                        {currentView === 'admin-payouts' && <ManagementPayoutsView/>}
+                        {currentView === 'my-payouts' && <PhotographerPayoutsView/>}
                                                 {currentView === 'structure' && (
                             <div className="p-6 md:p-10">
                                 {user?.is_photographer && <ManagementFtpInbox/>}

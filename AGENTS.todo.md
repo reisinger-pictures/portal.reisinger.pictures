@@ -1,5 +1,5 @@
 # 📝 Projekt-Master-Backlog
 
-Aktuelle DB Version: 10
+Aktuelle DB Version: 11
 
-- [x] **Refactoring (Architektur & Performance):** `HtmlSanitizer` als Singleton via DI registrieren (inkl. strenger Whitelist) und N+1 Problem im `StatsController` mit `latestPhoto` Eager-Loading beheben.
+*Alle Aufgaben rund um das Payout-System wurden erfolgreich implementiert und getestet. Das Backlog ist aktuell leer.*
