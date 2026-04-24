@@ -31,7 +31,7 @@ class PayoutCalculationService
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
 
-        $totalShares = 0;
+        $totalShares = '0.0000';
         $totalDownloads = 0;
         $photographerEarnings = [];
 
@@ -39,13 +39,22 @@ class PayoutCalculationService
             return $log->user_id . '_' . $log->gallery_id;
         });
 
+        // N+1 Fix: Load all required galleries and photographer IDs in one go
+        $galleryIds = $logs->pluck('gallery_id')->unique()->filter()->toArray();
+        $galleries = Gallery::whereIn('id', $galleryIds)->get()->keyBy('id');
+        $galleryPhotographers = Photo::whereIn('gallery_id', $galleryIds)
+            ->select('gallery_id', 'user_id')
+            ->groupBy('gallery_id', 'user_id')
+            ->get()
+            ->keyBy('gallery_id');
+
         foreach ($userGalleryLogs as $key => $galleryLogs) {
             $galleryId = $galleryLogs->first()->gallery_id;
-            $gallery = Gallery::find($galleryId);
+            $gallery = $galleries->get($galleryId);
 
             if (!$gallery || $gallery->effective_is_free_download) continue;
 
-            $photographerId = $gallery->photos()->first()?->user_id;
+            $photographerId = $galleryPhotographers->get($galleryId)?->user_id;
             if (!$photographerId) continue;
 
             $maxMultiplier = 1;
@@ -66,31 +75,32 @@ class PayoutCalculationService
             }
 
             $finalPhotoCount = $hasZip ? $maxPhotoCount : $singleImageCount;
-            $shares = $finalPhotoCount * $maxMultiplier;
+            $shares = bcmul((string)$finalPhotoCount, (string)$maxMultiplier, 4);
 
-            $totalShares += $shares;
+            $totalShares = bcadd($totalShares, $shares, 4);
             $totalDownloads += $finalPhotoCount;
 
             if (!isset($photographerEarnings[$photographerId])) {
-                $photographerEarnings[$photographerId] = 0;
+                $photographerEarnings[$photographerId] = '0.0000';
             }
-            $photographerEarnings[$photographerId] += $shares;
+            $photographerEarnings[$photographerId] = bcadd($photographerEarnings[$photographerId], $shares, 4);
         }
 
         $pool->total_shares = $totalShares;
         $pool->total_unique_downloads = $totalDownloads;
-        $pool->value_per_share_cents = $totalShares > 0 ? (int) floor($pool->net_pool_cents / $totalShares) : 0;
+        // bcdiv mit Scale 0 verhält sich für positive Zahlen wie floor()
+        $pool->value_per_share_cents = (float)$totalShares > 0 ? (int) bcdiv((string)$pool->net_pool_cents, $totalShares, 0) : 0;
         $pool->save();
 
         foreach ($photographerEarnings as $photogId => $shares) {
-            $earnings = (int) floor($shares * $pool->value_per_share_cents);
-            $earnings = (int) floor($earnings * ($pool->photographer_share_percent / 100));
+            $earnings = (int) bcmul($shares, (string)$pool->value_per_share_cents, 0);
+            $earnings = (int) bcdiv(bcmul((string)$earnings, (string)$pool->photographer_share_percent, 0), '100', 0);
 
             $stmt = PhotographerStatement::firstOrNew([
                 'user_id' => $photogId, 'month' => $pool->month, 'year' => $pool->year
             ]);
             
-            $stmt->total_shares_earned = ($stmt->total_shares_earned ?? 0) + $shares;
+            $stmt->total_shares_earned = bcadd((string)($stmt->total_shares_earned ?? '0.0000'), $shares, 4);
             $stmt->pool_earnings_cents = ($stmt->pool_earnings_cents ?? 0) + $earnings;
             $stmt->save();
         }
@@ -110,6 +120,21 @@ class PayoutCalculationService
             ->with('invoiceSnapshot')
             ->get();
 
+        // N+1 Fix: Gather all photo IDs and preload them
+        $photoIds = [];
+        foreach ($orders as $order) {
+            $snapshot = $order->invoiceSnapshot;
+            if (!$snapshot) continue;
+            $items = $snapshot->customer_details['items'] ?? [];
+            foreach ($items as $item) {
+                if (isset($item['photoId'])) $photoIds[] = $item['photoId'];
+            }
+        }
+        // Memory-Optimierung: Nur die benötigten Spalten laden, um das PHP Memory Limit zu schonen
+        $photos = Photo::select('id', 'user_id')->whereIn('id', array_unique($photoIds))->get()->keyBy('id');
+
+        $stripeFeePercent = config('services.stripe.fee_percent', 0.04);
+
         foreach ($orders as $order) {
             $snapshot = $order->invoiceSnapshot;
             if (!$snapshot) continue;
@@ -118,17 +143,17 @@ class PayoutCalculationService
             foreach ($items as $item) {
                 if (!isset($item['photoId']) || !isset($item['price']) || $item['price'] <= 0) continue;
                 
-                $photo = Photo::find($item['photoId']);
+                $photo = $photos->get($item['photoId']);
                 if (!$photo || !$photo->user_id) continue;
 
                 $priceCents = (int) $item['price'];
                 
-                // Stripe Fee (Vereinfacht 4% wie im Prompt-Beispiel: 10€ -> 0.40€ Fee)
-                $feeCents = (int) round($priceCents * 0.04);
+                // Nutze die exakte Gebühr aus der Datenbank (Fallback auf Prozentrechnung)
+                $feeCents = $order->stripe_fee_cents ?? (int) round($priceCents * $stripeFeePercent);
                 $netCents = $priceCents - $feeCents;
                 
-                // Fotografen-Anteil: 50% vom Netto-Aufpreis
-                $photogShareCents = (int) floor($netCents * 0.50);
+                // Fotografen-Anteil: 50% vom Netto-Aufpreis (exakt ueber bcmath)
+                $photogShareCents = (int) bcmul((string)$netCents, '0.50', 0);
 
                 $stmt = PhotographerStatement::firstOrNew([
                     'user_id' => $photo->user_id, 'month' => $month, 'year' => $year

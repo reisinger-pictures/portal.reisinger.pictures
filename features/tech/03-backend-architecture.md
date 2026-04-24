@@ -23,6 +23,7 @@ status: active
 - **Währung:** Fest auf EUR fixiert, wird nicht in der Datenbank gespeichert.
 - **API-Contract:** Alle Geld-Beträge (Preise, Warenkörbe, Rechnungen) werden als Cents (Integer) über die API gesendet und empfangen.
 - **Frontend:** Die Konvertierung in Euro (Division durch 100) erfolgt **ausschließlich** für die Anzeige im Frontend (React) oder beim Generieren von PDFs (Blade).
+- **BCMath für Multiplikatoren (STRIKT):** Sobald Cents mit Fließkomma-Faktoren (z.B. Shares, Prozentuale Gebühren) multipliziert oder dividiert werden müssen, ist zwingend die PHP `bcmath` Extension (z.B. `bcmul`, `bcdiv`, `bcadd`) zu verwenden. Type-Casts zu `float` für finanzielle Berechnungen sind untersagt, um IEEE 754 Rundungsfehler zu vermeiden. Relevante Datenbankfelder (wie `total_shares` als `DECIMAL`) müssen im Model als `string` gecastet werden.
 
 ## 5. Dependency Injection & Security
 - **Service Container:** Zentrale Dienste wie der `HtmlSanitizer` werden als Singleton im `AppServiceProvider` registriert. Dies sichert das DRY-Prinzip und ermöglicht sauberes Mocking in Unit-Tests.

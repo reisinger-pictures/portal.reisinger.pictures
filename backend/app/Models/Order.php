@@ -15,6 +15,7 @@ class Order extends Model
         'user_id',
         'status',
         'total_amount',
+        'stripe_fee_cents',
         'is_quote_request',
         'ip_address',
         'stripe_payment_intent_id',
@@ -23,6 +24,7 @@ class Order extends Model
 
     protected $casts = [
         'total_amount' => 'integer',
+        'stripe_fee_cents' => 'integer',
         'is_quote_request' => 'boolean',
     ];
 

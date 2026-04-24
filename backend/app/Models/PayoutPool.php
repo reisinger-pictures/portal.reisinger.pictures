@@ -23,7 +23,7 @@ class PayoutPool extends Model
         'net_pool_cents' => 'integer',
         'photographer_share_percent' => 'integer',
         'total_unique_downloads' => 'integer',
-        'total_shares' => 'float',
+        'total_shares' => 'string',
         'value_per_share_cents' => 'integer',
     ];
 

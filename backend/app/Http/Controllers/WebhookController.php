@@ -33,7 +33,22 @@ class WebhookController extends Controller
             if ($orderId) {
                 $order = Order::with(['user', 'invoiceSnapshot'])->find($orderId);
                 if ($order && $order->status !== 'paid') {
-                    $order->update(['status' => 'paid']);
+                    // Exakte Gebühr via Stripe API abrufen
+                    $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
+                    $intent = $stripe->paymentIntents->retrieve($paymentIntent->id, [
+                        'expand' => ['latest_charge.balance_transaction']
+                    ]);
+                    
+                    $feeCents = $intent->latest_charge->balance_transaction->fee ?? 0;
+                    
+                    if ($feeCents === 0) {
+                        Log::warning("Stripe Webhook: Balance transaction missing or fee is 0 for Order {$orderId}");
+                    }
+
+                    $order->update([
+                        'status' => 'paid',
+                        'stripe_fee_cents' => $feeCents
+                    ]);
                     if ($order->user) {
                         Mail::to($order->user->email)->queue(new InvoiceMail($order, $order->invoiceSnapshot));
                     }

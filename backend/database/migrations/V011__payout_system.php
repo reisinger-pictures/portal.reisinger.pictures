@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->integer('net_pool_cents')->default(0);
             $table->integer('photographer_share_percent')->default(50);
             $table->integer('total_unique_downloads')->default(0);
-            $table->decimal('total_shares', 8, 2)->default(0);
+            $table->decimal('total_shares', 12, 4)->default(0);
             $table->integer('value_per_share_cents')->default(0);
             $table->timestamps();
         });
@@ -27,7 +27,7 @@ return new class extends Migration {
             $table->string('sequence_number')->unique();
             $table->integer('month');
             $table->integer('year');
-            $table->decimal('total_shares_earned', 8, 2)->default(0);
+            $table->decimal('total_shares_earned', 12, 4)->default(0);
             $table->integer('pool_earnings_cents')->default(0);
             $table->integer('delta_surcharge_earnings_cents')->default(0);
             $table->integer('earned_amount_cents')->default(0);
