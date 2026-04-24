@@ -37,7 +37,7 @@ class SearchController extends Controller
             ]);
         }
 
-        if (strlen($q) < 2) {
+        if (strlen($q) < 1) {
             $publicQuery = Gallery::where('is_public', true)
                 ->where(function($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); });
             $publicGalleryIds = $publicQuery->pluck('id')->toArray();
@@ -90,7 +90,7 @@ class SearchController extends Controller
         $q = $request->query('q');
         $type = $request->query('type');
 
-        if (strlen($q) < 2 || !in_array($type, ['city', 'country'])) {
+        if (strlen($q) < 1 || !in_array($type, ['city', 'country'])) {
             return response()->json([]);
         }
 

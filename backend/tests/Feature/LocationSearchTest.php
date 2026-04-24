@@ -30,7 +30,7 @@ class LocationSearchTest extends TestCase
 
     public function test_location_endpoint_requires_minimum_length_and_valid_type()
     {
-        $res = $this->getJson('/api/search/locations?q=L&type=city');
+        $res = $this->getJson('/api/search/locations?q=&type=city');
         $res->assertStatus(200)->assertExactJson([]);
 
         $res2 = $this->getJson('/api/search/locations?q=Linz&type=invalid');

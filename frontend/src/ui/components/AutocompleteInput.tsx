@@ -39,7 +39,7 @@ export default function AutocompleteInput<T>({ label, value, onChange, onSelect,
         return () => clearTimeout(timer);
     }, [query]);
 
-    const fetchUrl = debouncedQuery.length >= 2 ? endpoint + encodeURIComponent(debouncedQuery) : null;
+    const fetchUrl = debouncedQuery.length >= 1 ? endpoint + encodeURIComponent(debouncedQuery) : null;
     // isValidating ist bei SWR true, solange ein Request (auch im Hintergrund) läuft
     const { data, isValidating } = useSWR<T[]>(fetchUrl, fetcher, { keepPreviousData: true });
     const options = data ? mapResponse(data) : [];
@@ -94,7 +94,7 @@ export default function AutocompleteInput<T>({ label, value, onChange, onSelect,
                     className={inputClassName}
                 />
                 {/* Neuer Loading-Spinner am rechten Rand des Inputs */}
-                {isValidating && debouncedQuery.length >= 2 && (
+                {isValidating && debouncedQuery.length >= 1 && (
                     <div className="absolute right-2 top-0 bottom-0 flex items-center pointer-events-none">
                         <span className="loading loading-spinner loading-xs opacity-50 text-primary"></span>
                     </div>

@@ -35,6 +35,13 @@ services:
     networks:
       - portal_internal
 
+  composer_init:
+    image: composer:latest
+    container_name: portal_composer
+    volumes:
+      - /home/webadmin/websites/api-portal.reisinger.pictures:/app:Z
+    command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
+
   backend:
     image: ghcr.io/reisi007/php-apache-mod2rewrite-imagick-exiftool-maria-pdo:8.5
     container_name: portal_backend
@@ -44,13 +51,15 @@ services:
         condition: service_started
       search:
         condition: service_started
+      composer_init:
+        condition: service_completed_successfully
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:Z
-      - /home/webadmin/websites/photos:/var/www/photos:Z
+      - /home/webadmin/portal/images:/var/www/photos:Z
       - /home/webadmin/websites/ftp:/var/www/ftp:Z
     environment:
       - DB_HOST=db
@@ -63,6 +72,7 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - APP_KEY=${APP_KEY}
       - JWT_SECRET=${JWT_SECRET}
+      - LOG_CHANNEL=stderr
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - MAIL_MAILER=${MAIL_MAILER}

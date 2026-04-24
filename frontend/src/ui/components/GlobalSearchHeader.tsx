@@ -25,7 +25,7 @@ export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderPr
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (searchQuery.trim().length >= 2) {
+        if (searchQuery.trim().length >= 1) {
             navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
             (document.activeElement as HTMLElement)?.blur();
         }
@@ -56,7 +56,7 @@ export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderPr
                         <span className="iconify mdi--magnify text-xl"></span>
                     </button>
                 </div>
-                {isSearchFocused && searchQuery.length >= 2 && (
+                {isSearchFocused && searchQuery.length >= 1 && (
                     <div className="absolute top-14 left-0 w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-50 max-h-[60vh] overflow-y-auto">
                         <ul className="menu p-2">
                             <li>
