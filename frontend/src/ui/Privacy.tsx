@@ -18,7 +18,7 @@ export default function Privacy() {
 
                     <h2 className="text-2xl font-bold mt-8 mb-4">2. Cookies und Authentifizierung</h2>
                     <p>
-                        Diese Plattform verwendet sogenannte "HttpOnly"-Cookies, um angemeldete Benutzer sicher zu authentifizieren. Diese Cookies speichern einen Authentifizierungs-Token (JWT) und sind für die technische Funktion des Portals (Zugriff auf private Galerien, Speichern von Bewertungen) zwingend erforderlich. Sie können nicht durch clientseitige Skripte (JavaScript) ausgelesen werden.
+                        Diese Plattform verwendet sogenannte"HttpOnly"-Cookies, um angemeldete Benutzer sicher zu authentifizieren. Diese Cookies speichern einen Authentifizierungs-Token (JWT) und sind für die technische Funktion des Portals (Zugriff auf private Galerien, Speichern von Bewertungen) zwingend erforderlich. Sie können nicht durch clientseitige Skripte (JavaScript) ausgelesen werden.
                     </p>
 
                     <h2 className="text-2xl font-bold mt-8 mb-4">3. Download-Tracking und Urheberrechtsschutz</h2>

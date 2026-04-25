@@ -91,7 +91,7 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
                                         <div key={u.id} className="flex items-center justify-between p-2 hover:bg-base-200 rounded">
                                             <div>
                                                 <div className="font-bold">{u.name}</div>
-                                                <div className="text-xs opacity-70">{u.email}</div>
+                                                <div className="text-sm opacity-70">{u.email}</div>
                                             </div>
                                             <button 
                                                 className={`btn btn-sm w-28 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}

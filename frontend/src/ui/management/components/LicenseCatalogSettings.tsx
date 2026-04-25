@@ -23,12 +23,12 @@ function UseCaseRow({ uc, onSave, onDelete }: { uc: LicenseUseCase, onSave: (id:
             <tr>
                 <td>
                     <div className="flex flex-col gap-2">
-                        <input type="text" className="input input-sm input-bordered w-full" value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} placeholder="Titel" />
-                        <input type="text" className="input input-sm input-bordered w-full text-xs" value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} placeholder="Beschreibung" />
+                        <input type="text" className="input input-bordered w-full" value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} placeholder="Titel" />
+                        <input type="text" className="input input-bordered w-full text-sm" value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} placeholder="Beschreibung" />
                     </div>
                 </td>
                 <td>
-                    <select className="select select-sm select-bordered w-full" value={data.flatrate_tier} onChange={e => setData({...data, flatrate_tier: e.target.value})}>
+                    <select className="select select-bordered w-full" value={data.flatrate_tier} onChange={e => setData({...data, flatrate_tier: e.target.value})}>
                         <option value="web">Web</option>
                         <option value="print">Print</option>
                         <option value="original">Original</option>
@@ -36,7 +36,7 @@ function UseCaseRow({ uc, onSave, onDelete }: { uc: LicenseUseCase, onSave: (id:
                 </td>
                 <td className="text-right">
                     <div className="flex justify-end items-center gap-1">
-                        <input type="number" step="any" className="input input-sm input-bordered w-24 text-right" value={data.base_price} onChange={e => setData({...data, base_price: parseFloat(e.target.value) || 0})} />
+                        <input type="number" step="any" className="input input-bordered w-24 text-right" value={data.base_price} onChange={e => setData({...data, base_price: parseFloat(e.target.value) || 0})} />
                         <span className="font-bold opacity-70">€</span>
                     </div>
                 </td>
@@ -52,7 +52,7 @@ function UseCaseRow({ uc, onSave, onDelete }: { uc: LicenseUseCase, onSave: (id:
         <tr>
             <td>
                 <div className="font-bold text-base">{uc.name}</div>
-                <div className="text-xs opacity-70 mt-1">{uc.description || '-'}</div>
+                <div className="text-sm opacity-70 mt-1">{uc.description || '-'}</div>
             </td>
             <td><span className="badge badge-sm badge-ghost uppercase font-bold">{uc.flatrate_tier}</span></td>
             <td className="text-right font-mono font-bold text-base">{formatMoney(uc.base_price)}</td>
@@ -86,20 +86,20 @@ function ModifierRow({ mod, onSave, onDelete }: { mod: LicenseModifier, onSave: 
             <tr>
                 <td>
                     <div className="flex flex-col gap-2">
-                        <input type="text" className="input input-sm input-bordered w-full" value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} placeholder="Titel" />
-                        <input type="text" className="input input-sm input-bordered w-full text-xs" value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} placeholder="Beschreibung" />
+                        <input type="text" className="input input-bordered w-full" value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} placeholder="Titel" />
+                        <input type="text" className="input input-bordered w-full text-sm" value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} placeholder="Beschreibung" />
                     </div>
                 </td>
                 <td>
                     <label className="cursor-pointer flex items-center gap-2">
-                        <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" checked={data.is_included_in_flatrate} onChange={e => setData({...data, is_included_in_flatrate: e.target.checked})} />
-                        <span className="label-text text-xs leading-tight">In Flatrates<br/>inkludiert</span>
+                        <input type="checkbox" className="checkbox-primary checkbox" checked={data.is_included_in_flatrate} onChange={e => setData({...data, is_included_in_flatrate: e.target.checked})} />
+                        <span className="label-text text-sm leading-tight">In Flatrates<br/>inkludiert</span>
                     </label>
                 </td>
                 <td className="text-right">
                     <div className="flex justify-end items-center gap-1">
                         <span className="font-bold opacity-70">+</span>
-                        <input type="number" step="any" className="input input-sm input-bordered w-20 text-right" value={data.percent_surcharge} onChange={e => setData({...data, percent_surcharge: parseFloat(e.target.value) || 0})} />
+                        <input type="number" step="any" className="input input-bordered w-20 text-right" value={data.percent_surcharge} onChange={e => setData({...data, percent_surcharge: parseFloat(e.target.value) || 0})} />
                         <span className="font-bold opacity-70">%</span>
                     </div>
                 </td>
@@ -115,12 +115,12 @@ function ModifierRow({ mod, onSave, onDelete }: { mod: LicenseModifier, onSave: 
         <tr>
             <td>
                 <div className="font-bold text-base">{mod.name}</div>
-                <div className="text-xs opacity-70 mt-1">{mod.description || '-'}</div>
+                <div className="text-sm opacity-70 mt-1">{mod.description || '-'}</div>
             </td>
             <td>
                 {mod.is_included_in_flatrate 
-                    ? <div className="text-xs font-bold opacity-70 flex items-center gap-1"><span className="iconify mdi--check text-primary"></span> Inkludiert</div>
-                    : <div className="text-xs opacity-50 flex items-center gap-1"><span className="iconify mdi--minus"></span> Kostenpflichtig</div>
+                    ? <div className="text-sm font-bold opacity-70 flex items-center gap-1"><span className="iconify mdi--check text-primary"></span> Inkludiert</div>
+                    : <div className="text-sm opacity-50 flex items-center gap-1"><span className="iconify mdi--minus"></span> Kostenpflichtig</div>
                 }
             </td>
             <td className="text-right font-mono font-bold text-base">+{Number(mod.percent_surcharge).toFixed(0)} %</td>
@@ -213,26 +213,26 @@ export default function LicenseCatalogSettings() {
                         {/* Add New Use Case */}
                         <div className="bg-base-200/50 p-4 rounded-box border border-base-300 flex flex-col md:flex-row gap-3 items-start md:items-end">
                             <div className="form-control flex-1 w-full">
-                                <label className="label py-1"><span className="label-text text-xs font-bold">Neuer Titel</span></label>
-                                <input type="text" placeholder="z.B. PR & Social Media" value={newUc.name} onChange={e=>setNewUc({...newUc, name: e.target.value})} className="input input-sm input-bordered w-full" />
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Neuer Titel</span></label>
+                                <input type="text" placeholder="z.B. PR & Social Media" value={newUc.name} onChange={e=>setNewUc({...newUc, name: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <div className="form-control flex-1 w-full">
-                                <label className="label py-1"><span className="label-text text-xs font-bold">Beschreibung (Optional)</span></label>
-                                <input type="text" placeholder="Details zur Lizenz..." value={newUc.description} onChange={e=>setNewUc({...newUc, description: e.target.value})} className="input input-sm input-bordered w-full" />
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Beschreibung (Optional)</span></label>
+                                <input type="text" placeholder="Details zur Lizenz..." value={newUc.description} onChange={e=>setNewUc({...newUc, description: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <div className="form-control w-full md:w-32">
-                                <label className="label py-1"><span className="label-text text-xs font-bold">Flatrate-Basis</span></label>
-                                <select value={newUc.flatrate_tier} onChange={e=>setNewUc({...newUc, flatrate_tier: e.target.value})} className="select select-sm select-bordered w-full">
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Flatrate-Basis</span></label>
+                                <select value={newUc.flatrate_tier} onChange={e=>setNewUc({...newUc, flatrate_tier: e.target.value})} className="select select-bordered w-full">
                                     <option value="web">Web</option>
                                     <option value="print">Print</option>
                                     <option value="original">Original</option>
                                 </select>
                             </div>
                             <div className="form-control w-full md:w-32">
-                                <label className="label py-1"><span className="label-text text-xs font-bold">Preis (Netto €)</span></label>
-                                <input type="number" step="any" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-sm input-bordered w-full" />
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Preis (Netto €)</span></label>
+                                <input type="number" step="any" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered w-full" />
                             </div>
-                            <button onClick={handleAddUseCase} className="btn btn-sm btn-primary w-full md:w-auto"><span className="iconify mdi--plus"></span> Hinzufügen</button>
+                            <button onClick={handleAddUseCase} className="btn btn-primary w-full md:w-auto"><span className="iconify mdi--plus"></span> Hinzufügen</button>
                         </div>
                     </div>
 
@@ -263,24 +263,24 @@ export default function LicenseCatalogSettings() {
                         {/* Add New Modifier */}
                         <div className="bg-base-200/50 p-4 rounded-box border border-base-300 flex flex-col md:flex-row gap-3 items-start md:items-end">
                             <div className="form-control flex-1 w-full">
-                                <label className="label py-1"><span className="label-text text-xs font-bold">Neuer Zuschlag</span></label>
-                                <input type="text" placeholder="z.B. Titelseite" value={newMod.name} onChange={e=>setNewMod({...newMod, name: e.target.value})} className="input input-sm input-bordered w-full" />
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Neuer Zuschlag</span></label>
+                                <input type="text" placeholder="z.B. Titelseite" value={newMod.name} onChange={e=>setNewMod({...newMod, name: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <div className="form-control flex-1 w-full">
-                                <label className="label py-1"><span className="label-text text-xs font-bold">Beschreibung (Optional)</span></label>
-                                <input type="text" placeholder="Details..." value={newMod.description} onChange={e=>setNewMod({...newMod, description: e.target.value})} className="input input-sm input-bordered w-full" />
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Beschreibung (Optional)</span></label>
+                                <input type="text" placeholder="Details..." value={newMod.description} onChange={e=>setNewMod({...newMod, description: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <div className="form-control w-full md:w-auto self-center md:self-end mb-1">
                                 <label className="cursor-pointer flex items-center gap-2">
-                                    <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" checked={newMod.is_included_in_flatrate} onChange={e=>setNewMod({...newMod, is_included_in_flatrate: e.target.checked})} />
-                                    <span className="label-text text-xs leading-tight font-medium">In Flatrates<br/>inkludieren</span>
+                                    <input type="checkbox" className="checkbox-primary checkbox" checked={newMod.is_included_in_flatrate} onChange={e=>setNewMod({...newMod, is_included_in_flatrate: e.target.checked})} />
+                                    <span className="label-text text-sm leading-tight font-medium">In Flatrates<br/>inkludieren</span>
                                 </label>
                             </div>
                             <div className="form-control w-full md:w-32">
-                                <label className="label py-1"><span className="label-text text-xs font-bold">Aufschlag (%)</span></label>
-                                <input type="number" step="any" placeholder="z.B. 100" value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-sm input-bordered w-full" />
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Aufschlag (%)</span></label>
+                                <input type="number" step="any" placeholder="z.B. 100" value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered w-full" />
                             </div>
-                            <button onClick={handleAddModifier} className="btn btn-sm btn-primary w-full md:w-auto"><span className="iconify mdi--plus"></span> Hinzufügen</button>
+                            <button onClick={handleAddModifier} className="btn btn-primary w-full md:w-auto"><span className="iconify mdi--plus"></span> Hinzufügen</button>
                         </div>
                     </div>
 

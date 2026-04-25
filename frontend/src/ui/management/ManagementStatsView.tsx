@@ -76,7 +76,7 @@ export default function ManagementStatsView() {
                                 <tbody>
                                 {filteredLogs?.map(log => (
                                     <tr key={log.id}>
-                                        <td className="whitespace-nowrap text-xs opacity-70">
+                                        <td className="whitespace-nowrap text-sm opacity-70">
                                             {new Date(log.created_at).toLocaleString('de-DE')}
                                         </td>
                                         <td className="font-bold whitespace-nowrap">{log.user_name_snapshot || 'Anonymer Gast'}</td>
@@ -109,10 +109,7 @@ export default function ManagementStatsView() {
                                         </td>
                                         <td>
                                             <div className="flex items-center gap-2">
-                                                <span className={`badge badge-sm font-bold uppercase ${
-                                                    log.resolution_tier === 'original' ? 'badge-warning' : 
-                                                    log.resolution_tier === 'print' ? 'badge-info' : 'badge-ghost'
-                                                }`}>
+                                                <span className={`badge badge-sm font-bold uppercase ${ log.resolution_tier === 'original' ? 'badge-warning' : log.resolution_tier === 'print' ? 'badge-info' : 'badge-ghost' }`}>
                                                     {log.resolution_tier || 'web'}
                                                 </span>
                                             </div>
@@ -174,7 +171,7 @@ export default function ManagementStatsView() {
                                                 }}
                                                 itemStyle={{color: 'var(--color-base-content)', fontWeight: 'bold'}}
                                             />
-                                            <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: "12px" }} />
+                                            <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize:"12px" }} />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 ) : (

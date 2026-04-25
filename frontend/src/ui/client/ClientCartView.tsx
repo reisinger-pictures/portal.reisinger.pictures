@@ -79,7 +79,7 @@ function StripeCheckoutForm({ orderId, defaultEmail, defaultName, onSuccess }: S
             <button type="submit" disabled={isProcessing || !stripe} className="btn btn-primary w-full btn-lg">
                 {isProcessing ? <span className="loading loading-spinner"></span> : 'Jetzt bezahlen'}
             </button>
-            {isProcessing && <p className="text-xs text-center opacity-70 mt-2">Bitte warten, Zahlung wird verifiziert...</p>}
+            {isProcessing && <p className="text-sm text-center opacity-70 mt-2">Bitte warten, Zahlung wird verifiziert...</p>}
         </form>
     );
 }
@@ -132,7 +132,7 @@ const CartItemList = ({ items, handleUpdateItem, removeFromCart, hasQuotes, tota
                                 <div className="flex flex-col gap-1">
                                     <div className="font-bold text-sm">{item.useCaseName || 'Standard Lizenz'}</div>
                                     {item.modifierNames && item.modifierNames.length > 0 && (
-                                        <div className="text-xs opacity-80 text-warning flex items-center gap-1">
+                                        <div className="text-sm opacity-80 text-warning flex items-center gap-1">
                                             <span className="iconify mdi--plus-circle-outline"></span> {item.modifierNames.join(', ')}
                                         </div>
                                     )}
@@ -144,7 +144,7 @@ const CartItemList = ({ items, handleUpdateItem, removeFromCart, hasQuotes, tota
                         {item.isQuote ? (
                             <div className="text-right">
                                 <span className="font-mono font-bold text-lg whitespace-nowrap text-warning">--- €</span>
-                                <span className="text-xs font-sans opacity-70 block">(Preis auf Anfrage)</span>
+                                <span className="text-sm font-sans opacity-70 block">(Preis auf Anfrage)</span>
                             </div>
                         ) : (
                             <span className="font-mono font-bold text-lg whitespace-nowrap">{formatMoney(item.price)}</span>

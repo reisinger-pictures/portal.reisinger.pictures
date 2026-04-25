@@ -89,7 +89,7 @@ export default function ManagementCustomersView() {
                                 <tr key={c.id}>
                                     <td>
                                         <div className="font-bold">{c.company || '-'}</div>
-                                        <div className="text-xs opacity-70">{c.name}</div>
+                                        <div className="text-sm opacity-70">{c.name}</div>
                                     </td>
                                     <td>{c.email || <span className="opacity-30 italic">Keine E-Mail</span>}</td>
                                     <td>{c.zip} {c.city}</td>

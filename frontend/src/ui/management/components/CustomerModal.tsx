@@ -43,7 +43,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
     return (
         <div className="modal modal-open z-50">
             <div className="modal-box max-w-2xl relative">
-                <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
+                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--account-details text-primary"></span>
                     {editingCustomer ? 'Kunde bearbeiten' : 'Neuen Kunden anlegen'}
@@ -53,23 +53,23 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Name / Ansprechpartner</span></label>
-                            <input type="text" {...register('name')} className="input input-sm input-bordered" />
+                            <input type="text" {...register('name')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Firma</span></label>
-                            <input type="text" {...register('company')} className="input input-sm input-bordered" />
+                            <input type="text" {...register('company')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">E-Mail Adresse</span></label>
-                            <input type="email" {...register('email')} className="input input-sm input-bordered" />
+                            <input type="email" {...register('email')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
-                            <input type="text" {...register('uid')} className="input input-sm input-bordered" />
+                            <input type="text" {...register('uid')} className="input input-bordered" />
                         </div>
                         <div className="form-control md:col-span-2">
                             <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
-                            <input type="text" {...register('street')} className="input input-sm input-bordered" />
+                            <input type="text" {...register('street')} className="input input-bordered" />
                         </div>
                         <div className="form-control md:col-span-2">
                             <label className="label"><span className="label-text font-bold">PLZ & Stadt</span></label>
@@ -104,7 +104,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                                 </div>
                             </div>
                         </div>
-                        <div className="form-control">
+                        <div className="form-control md:col-span-2">
                             <AutocompleteInput<LocationResult>
                                 label="Land"
                                 value={watchCountry || ''}
@@ -116,7 +116,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                         </div>
                     </div>
 
-                    <div className="modal-action mt-6">
+                    <div className="modal-action col-span-full mt-6">
                         <button type="button" className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
                         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                             {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}

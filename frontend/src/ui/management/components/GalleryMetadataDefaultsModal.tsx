@@ -91,7 +91,7 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
     return (
         <dialog className="modal modal-open z-[60]">
             <div className="modal-box max-w-2xl relative">
-                <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
+                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--tag-multiple text-primary"></span> Metadaten-Vorgaben
@@ -104,7 +104,7 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
                             <input type="checkbox" {...register('allow_client_metadata_edit')} className="checkbox checkbox-primary"/>
                             <div>
                                 <span className="label-text font-bold block">Kunden dürfen Metadaten bearbeiten</span>
-                                <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">Erlaubt Kunden mit der Rolle "Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.</span>
+                                <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">Erlaubt Kunden mit der Rolle"Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.</span>
                             </div>
                         </label>
                     </div>
@@ -125,7 +125,7 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
                         </div>
                     )}
                     
-                    <div className="modal-action">
+                    <div className="modal-action col-span-full">
                         <button type="button" className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
                         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                             {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}

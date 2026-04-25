@@ -67,13 +67,13 @@ export default function UploadDropzone({ galleryId, onUploadComplete }: Props) {
                     accept="image/jpeg, .jpg, .jpeg" 
                     onChange={(e) => handleWebUpload(e.target.files)}
                     disabled={uploading}
-                    className="file-input file-input-bordered file-input-primary file-input-sm w-full max-w-xs"
+                    className="file-input-bordered file-input-primary file-input w-full max-w-xs"
                 />
                 {uploading && <div className="mt-4 text-primary font-bold animate-pulse">Lade hoch... Bitte warten.</div>}
             </div>
             <div className="mt-3 flex justify-center">
                 <label className="cursor-pointer label flex items-center gap-2">
-                    <input type="checkbox" checked={replaceExisting} onChange={e => setReplaceExisting(e.target.checked)} className="checkbox checkbox-sm checkbox-primary" />
+                    <input type="checkbox" checked={replaceExisting} onChange={e => setReplaceExisting(e.target.checked)} className="checkbox checkbox-primary" />
                     <span className="label-text opacity-80">Bilder mit gleichem Dateinamen überschreiben</span>
                 </label>
             </div>

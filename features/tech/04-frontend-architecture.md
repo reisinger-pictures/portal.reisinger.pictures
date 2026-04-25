@@ -15,6 +15,10 @@ status: active
 - **Error Boundaries:** Critical UI sections are wrapped in React `ErrorBoundary` components to prevent total application crashes on localized data errors.
 
 ## 3. UI/UX Rules
+- **Form Standard Styling (STRICT):**
+  - **Größen:** Alle Formularelemente (Inputs, Selects, Buttons) nutzen in regulären Formularen die Standardgröße 'md' (DaisyUI Default, kein `-sm` oder `-xs` Suffix). Dies sorgt für bessere Bedienbarkeit auf Touch-Geräten.
+  - **Ausnahme (Table Context):** Innerhalb von engmaschigen Tabellen (z.B. Batch-Edits, User-Listen) und für Modal-Schließen-Buttons (`btn-circle absolute`) sind `input-sm`, `btn-sm` und `btn-xs` ausdrücklich erlaubt, um die Übersichtlichkeit zu wahren.
+  - **Layout:** Formulare sind konsequent mittels CSS-Grid zu strukturieren. Standard-Pattern: `grid grid-cols-1 md:grid-cols-2 gap-4`.
 - **Mobile-First:** Action buttons must not be hidden behind CSS `:hover` states.
 - **Feedback:** Use the global `UIContext` (Toast messages). Never use native `alert()`.
 - **State via URL:** Application state (search queries, tabs) MUST be derived from the URL.

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import {useState} from 'react';
 import useSWR from 'swr';
-import { fetcher, apiMutate } from '../../../api';
-import { useUI } from '../../components/UIContext';
+import {apiMutate, fetcher} from '../../../api';
+import {useUI} from '../../components/UIContext';
 
 interface GalleryBase {
     id: string;
@@ -22,17 +22,17 @@ export interface GalleryAccessModalProps {
     onClose: () => void;
 }
 
-export default function GalleryAccessModal({ galleryId, galleryName, isOpen, onClose }: GalleryAccessModalProps) {
-    const { data: users, isLoading, mutate } = useSWR<UserAccess[]>('/api/management/users', fetcher);
-    const { showToast } = useUI();
+export default function GalleryAccessModal({galleryId, galleryName, isOpen, onClose}: GalleryAccessModalProps) {
+    const {data: users, isLoading, mutate} = useSWR<UserAccess[]>('/api/management/users', fetcher);
+    const {showToast} = useUI();
     const [search, setSearch] = useState('');
     const [processingId, setProcessingId] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
     // Wir filtern Super-Admins raus, da die ohnehin alles sehen.
-    const filteredUsers = users?.filter(u => 
-        !u.is_super_admin && 
+    const filteredUsers = users?.filter(u =>
+        !u.is_super_admin &&
         (u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
     );
 
@@ -60,12 +60,12 @@ export default function GalleryAccessModal({ galleryId, galleryName, isOpen, onC
                 </h3>
                 <p className="text-sm opacity-70 mb-4">Galerie: <strong>{galleryName}</strong></p>
 
-                <input 
-                    type="text" 
-                    placeholder="Nutzer suchen..." 
-                    className="input input-sm input-bordered w-full mb-4 shrink-0" 
-                    value={search} 
-                    onChange={e => setSearch(e.target.value)} 
+                <input
+                    type="text"
+                    placeholder="Nutzer suchen..."
+                    className="input input-bordered w-full mb-4 shrink-0"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
                 />
 
                 <div className="flex-1 overflow-y-auto border border-base-300 rounded-box p-2">
@@ -76,17 +76,19 @@ export default function GalleryAccessModal({ galleryId, galleryName, isOpen, onC
                             {filteredUsers?.map(u => {
                                 const hasAccess = u.galleries.some(g => g.id === galleryId);
                                 return (
-                                    <div key={u.id} className="flex items-center justify-between p-2 hover:bg-base-200 rounded">
+                                    <div key={u.id}
+                                         className="flex items-center justify-between p-2 hover:bg-base-200 rounded">
                                         <div>
                                             <div className="font-bold">{u.name}</div>
-                                            <div className="text-xs opacity-70">{u.email}</div>
+                                            <div className="text-sm opacity-70">{u.email}</div>
                                         </div>
-                                        <button 
+                                        <button
                                             className={`btn btn-sm w-28 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}
                                             onClick={() => toggleAccess(u.id, hasAccess)}
                                             disabled={processingId === u.id}
                                         >
-                                            {processingId === u.id ? <span className="loading loading-spinner"></span> : (hasAccess ? 'Entfernen' : 'Hinzufügen')}
+                                            {processingId === u.id ? <span
+                                                className="loading loading-spinner"></span> : (hasAccess ? 'Entfernen' : 'Hinzufügen')}
                                         </button>
                                     </div>
                                 );

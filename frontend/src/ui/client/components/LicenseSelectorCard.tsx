@@ -79,7 +79,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                 className="iconify mdi--license text-primary"></span> Lizenz wählen</h4>
 
             <div className="space-y-2">
-                <label className="label-text font-bold text-xs opacity-70 uppercase tracking-wide">1. Typ /
+                <label className="label-text font-bold text-sm opacity-70 uppercase tracking-wide">1. Typ /
                     Grundhonorar</label>
                 <div className="flex flex-col gap-2">
                     {catalog.use_cases.map(uc => {
@@ -92,18 +92,18 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                         return (
                             <label key={uc.id}
                                    className={`cursor-pointer p-3 rounded-box border flex items-center gap-3 transition-colors ${actualSelectedUseCaseId === uc.id ? 'border-primary bg-primary/5' : 'border-base-300 bg-base-200/50 hover:bg-base-200'}`}>
-                                <input type="radio" className="radio radio-primary radio-sm"
+                                <input type="radio" className="radio-primary radio"
                                        checked={actualSelectedUseCaseId === uc.id} onChange={() => {
                                     setSelectedUseCaseId(uc.id);
                                     setSelectedModifiers([]);
                                 }}/>
                                 <div className="flex-1">
                                     <div className="font-bold text-sm">{uc.name}</div>
-                                    <div className="text-xs opacity-70">{uc.description}</div>
+                                    <div className="text-sm opacity-70">{uc.description}</div>
                                 </div>
                                 <div className="font-mono font-bold text-sm shrink-0">
                                     {ucCovered ? <span
-                                        className="text-success text-xs">Inklusive</span> : formatMoney(Number(uc.base_price))}
+                                        className="text-success text-sm">Inklusive</span> : formatMoney(Number(uc.base_price))}
                                 </div>
                             </label>
                         );
@@ -114,7 +114,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
             {/* Modifiers nur anzeigen, wenn es welche gibt UND der User upselling machen darf, ODER es inkludierte gibt */}
             {catalog.modifiers.length > 0 && (
                 <div className="space-y-2 pt-2">
-                    <label className="label-text font-bold text-xs opacity-70 uppercase tracking-wide">2. Optionale
+                    <label className="label-text font-bold text-sm opacity-70 uppercase tracking-wide">2. Optionale
                         Zuschläge</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {catalog.modifiers.map(mod => {
@@ -128,17 +128,17 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                             return (
                                 <label key={mod.id}
                                        className={`cursor-pointer p-3 rounded-box border flex items-start gap-3 transition-colors ${isChecked ? 'border-warning bg-warning/5' : 'border-base-300 bg-base-100 hover:bg-base-200'}`}>
-                                    <input type="checkbox" className="checkbox checkbox-warning checkbox-sm mt-0.5"
+                                    <input type="checkbox" className="checkbox-warning checkbox mt-0.5"
                                            checked={isChecked} onChange={(e) => {
                                         if (e.target.checked) setSelectedModifiers([...selectedModifiers, mod.id]);
                                         else setSelectedModifiers(selectedModifiers.filter(id => id !== mod.id));
                                     }}/>
                                     <div className="flex-1">
                                         <div className="font-bold text-sm">{mod.name}</div>
-                                        <div className="text-xs opacity-70 mb-1">{mod.description}</div>
-                                        <div className="font-mono text-xs font-bold text-warning">
+                                        <div className="text-sm opacity-70 mb-1">{mod.description}</div>
+                                        <div className="font-mono text-sm font-bold text-warning">
                                             {isModCovered ? <span
-                                                className="text-success text-xs">Kostenfrei (Flatrate)</span> : `+${formatMoney(currentSurcharge)} (+${Number(mod.percent_surcharge)}%)`}
+                                                className="text-success text-sm">Kostenfrei (Flatrate)</span> : `+${formatMoney(currentSurcharge)} (+${Number(mod.percent_surcharge)}%)`}
                                         </div>
                                     </div>
                                 </label>
@@ -153,7 +153,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                 <div>
                     <div className="text-2xl font-mono font-bold text-primary">{formatMoney(finalPrice)}</div>
                     {isBaseCovered &&
-                        <div className="text-xs text-success font-bold mt-1">Grundhonorar durch Flatrate gedeckt</div>}
+                        <div className="text-sm text-success font-bold mt-1">Grundhonorar durch Flatrate gedeckt</div>}
                 </div>
                 <div className="w-full md:w-auto flex flex-col gap-2">
                     {finalPrice === 0 ? (
@@ -164,7 +164,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                     ) : (
                         <button onClick={handleAddToCart} disabled={!canBuy}
                                 className="btn btn-primary btn-md w-full shadow-sm"
-                                title={!canBuy ? "Bitte Angebot anfragen" : ""}>
+                                title={!canBuy ?"Bitte Angebot anfragen" :""}>
                             <span className="iconify mdi--cart-plus text-lg"></span> In den Warenkorb
                         </button>
                     )}
@@ -172,7 +172,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
             </div>
 
             <div className="mt-2 pt-4 border-t border-base-300">
-                <p className="text-xs font-bold opacity-70 mb-2 uppercase tracking-wide">Sonderanfrage (Angebot)</p>
+                <p className="text-sm font-bold opacity-70 mb-2 uppercase tracking-wide">Sonderanfrage (Angebot)</p>
                 <textarea className="textarea textarea-bordered w-full h-16 text-sm resize-none mb-2"
                           placeholder="Z.B. Exklusivrecht erforderlich..." value={quoteNote}
                           onChange={(e) => setQuoteNote(e.target.value)}></textarea>

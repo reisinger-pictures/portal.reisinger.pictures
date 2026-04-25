@@ -88,8 +88,8 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
                                             <tr key={u.user_id}>
                                                 <td className="font-bold">
                                                     {u.name}
-                                                    {u.email && !u.email.includes('@invite.local') && <span className="block text-xs opacity-70 font-normal">{u.email}</span>}
-                                                    {u.email && u.email.includes('@invite.local') && <span className="block text-xs opacity-50 font-normal">Via Magic Link</span>}
+                                                    {u.email && !u.email.includes('@invite.local') && <span className="block text-sm opacity-70 font-normal">{u.email}</span>}
+                                                    {u.email && u.email.includes('@invite.local') && <span className="block text-sm opacity-50 font-normal">Via Magic Link</span>}
                                                 </td>
                                                 <td className="whitespace-nowrap">{u.rated_count} von {totalGalleryPhotos} Bildern</td>
                                                 <td className="w-1/3 min-w-[100px]">
@@ -123,7 +123,7 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
                                         {ratingsData.map(r => (
                                             <tr key={r.lr_uuid}>
                                                 <td><img src={r.thumb_url} className="w-12 h-12 object-cover rounded shadow-sm" alt={r.filename}/></td>
-                                                <td className="font-mono text-xs">{r.filename}</td>
+                                                <td className="font-mono text-sm">{r.filename}</td>
                                                 <td className="whitespace-nowrap">{r.avg_rating && r.avg_rating > 0 ? '⭐'.repeat(r.avg_rating) : <span className="opacity-50">-</span>}</td>
                                                 <td className="whitespace-pre-wrap text-sm">{r.all_comments || <span className="opacity-50">-</span>}</td>
                                             </tr>

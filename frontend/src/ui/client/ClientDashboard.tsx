@@ -37,7 +37,7 @@ export default function ClientDashboard() {
             </div>
 
             <main className="flex-1 overflow-y-auto flex flex-col w-full relative bg-base-200">
-                <header className="p-4 border-b border-base-300 bg-base-100 sticky top-0 z-30 flex items-center gap-3 ">
+                <header className="p-4 border-b border-base-300 bg-base-100 sticky top-0 z-30 flex items-center gap-3">
                     <button className="btn btn-square btn-ghost md:hidden shrink-0" onClick={() => setIsSidebarOpen(true)}>
                         <span className="iconify mdi--menu text-2xl"></span>
                     </button>
@@ -67,8 +67,7 @@ export default function ClientDashboard() {
                                     <li>
                                         <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`}
                                               onClick={() => setSearchQuery('')} className="text-primary font-bold">
-                                            <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach
-                                            "{searchQuery}"
+                                            <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach "{searchQuery}"
                                         </Link>
                                     </li>
                                     <div className="divider my-0"></div>

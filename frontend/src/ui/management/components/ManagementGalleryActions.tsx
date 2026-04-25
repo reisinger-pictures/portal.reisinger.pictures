@@ -38,7 +38,7 @@ export default function ManagementGalleryActions({ gallery, canSendMail, downloa
                         onClick={onOpenMail}
                         className="btn btn-primary btn-sm"
                         disabled={!canSendMail}
-                        title={!canSendMail ? "Keine Empfänger mit Opt-In vorhanden" : ""}
+                        title={!canSendMail ?"Keine Empfänger mit Opt-In vorhanden" :""}
                     >
                         <span className="iconify mdi--email-fast"></span> E-Mail senden...
                     </button>

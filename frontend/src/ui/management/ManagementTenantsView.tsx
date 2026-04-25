@@ -48,7 +48,7 @@ export default function ManagementTenantsView() {
                     <div key={t.id} className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/tenants/${t.id}`)}>
                         <div className="card-body p-5">
                             <h2 className="card-title text-xl text-primary">{t.name}</h2>
-                            {t.domain ? <code className="text-xs bg-base-200 p-1 rounded">@{t.domain}</code> : <span className="text-xs opacity-50 italic">Keine Auto-Join Domain</span>}
+                            {t.domain ? <code className="text-sm bg-base-200 p-1 rounded">@{t.domain}</code> : <span className="text-sm opacity-50 italic">Keine Auto-Join Domain</span>}
                             
                             <div className="flex gap-4 mt-4 text-sm opacity-80">
                                 <div className="flex items-center gap-1"><span className="iconify mdi--account-group"></span> {t.users_count || 0} User</div>
@@ -82,7 +82,7 @@ export default function ManagementTenantsView() {
                                 </label>
                                 <input type="text" value={newDomain} onChange={e => setNewDomain(e.target.value)} placeholder="firma.de" className="input input-bordered font-mono" />
                             </div>
-                            <div className="modal-action">
+                            <div className="modal-action col-span-full">
                                 <button type="button" className="btn btn-ghost" onClick={() => setCreateOpen(false)}>Abbrechen</button>
                                 <button type="submit" className="btn btn-primary" disabled={isCreating}>Speichern</button>
                             </div>

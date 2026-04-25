@@ -171,7 +171,7 @@ export default function LicenseSettingsCard() {
                             <label className="input input-bordered flex items-center gap-2"><input
                                 type="number" {...register('mult_unlimited')} className="grow"/><span>%</span></label>
                         </div>
-                        <div className="form-control">
+                        <div className="form-control md:col-span-2">
                             <label className="label"><span
                                 className="label-text font-bold">Aufschlag: Weltweit</span></label>
                             <label className="input input-bordered flex items-center gap-2"><input

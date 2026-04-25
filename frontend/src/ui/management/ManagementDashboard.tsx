@@ -146,8 +146,7 @@ export default function ManagementDashboard() {
                                         <li>
                                             <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`}
                                                   onClick={() => setSearchQuery('')} className="text-primary font-bold">
-                                                <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach
-                                                "{searchQuery}"
+                                                <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach "{searchQuery}"
                                             </Link>
                                         </li>
                                         <div className="divider my-0"></div>

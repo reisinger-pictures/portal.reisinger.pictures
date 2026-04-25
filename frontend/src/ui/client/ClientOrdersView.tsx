@@ -61,7 +61,7 @@ export default function ClientOrdersView() {
                                         <div className="bg-warning/10 border-y border-warning/20 p-4 text-sm">
                                             <p className="font-bold mb-1 flex items-center gap-2"><span className="iconify mdi--bank text-warning"></span> Zahlung ausständig (Kauf auf Rechnung)</p>
                                             <p className="opacity-80 mb-2">Bitte überweise den Rechnungsbetrag zeitnah. Gib als Verwendungszweck die Belegnummer an.</p>
-                                            <div className="font-mono text-xs opacity-90 bg-base-100 p-2 rounded inline-block shadow-sm">
+                                            <div className="font-mono text-sm opacity-90 bg-base-100 p-2 rounded inline-block shadow-sm">
                                                 <div>Empfänger: <strong>{terms?.bank_holder}</strong></div>
                                                 <div>IBAN: <strong>{terms?.bank_iban}</strong></div>
                                                 <div>BIC: <strong>{terms?.bank_bic}</strong></div>
@@ -80,9 +80,9 @@ export default function ClientOrdersView() {
                                             <tbody>
                                                 {snap?.customer_details?.items?.map((item, idx) => (
                                                     <tr key={idx}>
-                                                        <td className="font-mono text-xs">{item.filename}</td>
+                                                        <td className="font-mono text-sm">{item.filename}</td>
                                                         <td><span className="badge badge-ghost badge-sm">{item.tier.toUpperCase()}</span></td>
-                                                        <td className="text-right font-mono text-xs">{formatMoney(Number(item.price))}</td>
+                                                        <td className="text-right font-mono text-sm">{formatMoney(Number(item.price))}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>

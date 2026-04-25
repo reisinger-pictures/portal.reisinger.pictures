@@ -18,7 +18,7 @@ export default function RecipientFormSection({ formData, onUpdate, onMultiUpdate
         <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
             <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Rechnungsempfänger</h2>
             <p className="text-sm opacity-60 mb-4">Suche nach Kunden (CRM) oder gib die Daten manuell ein.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 *:md:odd:last:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <AutocompleteInput<Customer>
                     label="Name / Ansprechpartner"
                     value={formData.customer_name}
@@ -40,19 +40,19 @@ export default function RecipientFormSection({ formData, onUpdate, onMultiUpdate
                 />
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Firma</span></label>
-                    <input type="text" value={formData.customer_company} onChange={e => onUpdate('customer_company', e.target.value)} className="input input-sm input-bordered" />
+                    <input type="text" value={formData.customer_company} onChange={e => onUpdate('customer_company', e.target.value)} className="input input-bordered" />
                 </div>
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">E-Mail (wird angedruckt)</span></label>
-                    <input type="email" value={formData.customer_email} onChange={e => onUpdate('customer_email', e.target.value)} className="input input-sm input-bordered" />
+                    <input type="email" value={formData.customer_email} onChange={e => onUpdate('customer_email', e.target.value)} className="input input-bordered" />
                 </div>
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
-                    <input type="text" value={formData.customer_uid} onChange={e => onUpdate('customer_uid', e.target.value)} className="input input-sm input-bordered" />
+                    <input type="text" value={formData.customer_uid} onChange={e => onUpdate('customer_uid', e.target.value)} className="input input-bordered" />
                 </div>
                 <div className="form-control md:col-span-2">
                     <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
-                    <input type="text" value={formData.customer_street} onChange={e => onUpdate('customer_street', e.target.value)} className="input input-sm input-bordered" />
+                    <input type="text" value={formData.customer_street} onChange={e => onUpdate('customer_street', e.target.value)} className="input input-bordered" />
                 </div>
                 <div className="form-control md:col-span-2">
                     <label className="label"><span className="label-text font-bold">PLZ & Stadt</span></label>
@@ -91,7 +91,7 @@ export default function RecipientFormSection({ formData, onUpdate, onMultiUpdate
                         </div>
                     </div>
                 </div>
-                <div className="form-control">
+                <div className="form-control md:col-span-2">
                     <AutocompleteInput<LocationResult>
                         label="Land"
                         value={formData.customer_country}

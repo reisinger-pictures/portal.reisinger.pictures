@@ -43,7 +43,7 @@ export default function PhotographerPayoutsView() {
                                 <tr key={stmt.id}>
                                     <td className="whitespace-nowrap font-bold">{stmt.month} / {stmt.year}</td>
                                     <td className="font-mono text-sm opacity-80">{stmt.sequence_number}</td>
-                                    <td className="text-right text-xs font-mono opacity-80">
+                                    <td className="text-right text-sm font-mono opacity-80">
                                         Pool: {formatMoney(stmt.pool_earnings_cents)}<br/>
                                         Delta (Aufpreis): {formatMoney(stmt.delta_surcharge_earnings_cents)}<br/>
                                         <span className="opacity-50">Rollover: {formatMoney(stmt.rolled_over_amount_cents)}</span>

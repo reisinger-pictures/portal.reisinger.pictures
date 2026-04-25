@@ -121,7 +121,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     return (
         <dialog className="modal modal-open z-[60]">
             <div className="modal-box max-w-2xl relative">
-                <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
+                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
 
                 <div className="flex justify-between items-center mb-6 mr-8">
                     <h3 className="font-bold text-xl flex items-center gap-2">
@@ -136,7 +136,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 </div>
 
                 <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="flex flex-col md:flex-row gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="form-control w-full md:w-1/2">
                             <label className="label"><span className="label-text font-bold">Name der Galerie</span></label>
                             <input type="text" {...register('name')} className="input input-bordered w-full" />
@@ -147,7 +147,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                         </div>
                     </div>
 
-                    <div className="flex flex-col md:flex-row gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="form-control w-full md:w-1/2">
                             <label className="label"><span className="label-text font-bold">Galerie-Typ</span></label>
                             <select {...register('type')} className="select select-bordered w-full">
@@ -202,10 +202,10 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                         </>
                     )}
 
-                    <div className="flex flex-col md:flex-row gap-4 mb-6 pt-4 border-t border-base-300">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pt-4 border-t border-base-300">
                         <div className="form-control w-full md:w-1/2">
                             <label className="label"><span className="label-text font-bold">Passwort (Optional)</span></label>
-                            <input type="text" {...register('password')} className="input input-bordered w-full" placeholder={editingGallery ? "Leer = Aktuelles behalten" : "Leer = Nur Magic Link"} />
+                            <input type="text" {...register('password')} className="input input-bordered w-full" placeholder={editingGallery ?"Leer = Aktuelles behalten" :"Leer = Nur Magic Link"} />
                         </div>
                         <div className="form-control w-full md:w-1/2">
                             <label className="label"><span className="label-text font-bold">Ablaufdatum (Optional)</span></label>
@@ -213,7 +213,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                         </div>
                     </div>
 
-                    <div className="modal-action flex justify-between mt-8">
+                    <div className="modal-action col-span-full flex justify-between mt-8">
                         {editingGallery ? (
                             <button type="button" className="btn btn-outline btn-error" onClick={handleDelete}>Löschen</button>
                         ) : <div></div>}

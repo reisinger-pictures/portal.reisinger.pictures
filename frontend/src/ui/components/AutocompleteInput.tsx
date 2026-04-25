@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import useSWR from 'swr';
-import { fetcher } from '../../api';
+import {fetcher} from '../../api';
 
 export interface AutocompleteOption<T> {
     id: string;
@@ -14,14 +14,24 @@ interface Props<T> {
     value: string;
     onChange: (val: string) => void;
     onSelect: (item: T) => void;
-    endpoint: string; 
+    endpoint: string;
     mapResponse: (data: T[]) => AutocompleteOption<T>[];
     placeholder?: string;
     disabled?: boolean;
     className?: string;
 }
 
-export default function AutocompleteInput<T>({ label, value, onChange, onSelect, endpoint, mapResponse, placeholder, disabled, className }: Props<T>) {
+export default function AutocompleteInput<T>({
+                                                 label,
+                                                 value,
+                                                 onChange,
+                                                 onSelect,
+                                                 endpoint,
+                                                 mapResponse,
+                                                 placeholder,
+                                                 disabled,
+                                                 className
+                                             }: Props<T>) {
     const [query, setQuery] = useState(value || '');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -41,7 +51,7 @@ export default function AutocompleteInput<T>({ label, value, onChange, onSelect,
 
     const fetchUrl = debouncedQuery.length >= 1 ? endpoint + encodeURIComponent(debouncedQuery) : null;
     // isValidating ist bei SWR true, solange ein Request (auch im Hintergrund) läuft
-    const { data, isValidating } = useSWR<T[]>(fetchUrl, fetcher, { keepPreviousData: true });
+    const {data, isValidating} = useSWR<T[]>(fetchUrl, fetcher, {keepPreviousData: true});
     const options = data ? mapResponse(data) : [];
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -72,7 +82,7 @@ export default function AutocompleteInput<T>({ label, value, onChange, onSelect,
     }, []);
 
     // Ergänze Padding rechts (pr-8), damit der Text nicht in den Spinner läuft
-    const inputClassName = (className || "input input-sm input-bordered w-full") + " pr-8";
+    const inputClassName = (className || "input input-bordered w-full") + " pr-8";
 
     return (
         <div className="relative flex-1 w-full form-control" ref={wrapperRef}>
@@ -106,11 +116,14 @@ export default function AutocompleteInput<T>({ label, value, onChange, onSelect,
                         <li
                             key={opt.id}
                             className={`px-4 py-2 cursor-pointer flex flex-col border-b border-base-200/50 last:border-0 ${activeIndex === idx ? 'bg-base-200' : 'hover:bg-base-200'}`}
-                            onClick={() => { onSelect(opt.raw); setIsOpen(false); }}
+                            onClick={() => {
+                                onSelect(opt.raw);
+                                setIsOpen(false);
+                            }}
                             onMouseEnter={() => setActiveIndex(idx)}
                         >
                             <span className="font-bold text-sm text-primary">{opt.title}</span>
-                            {opt.subtitle && <span className="text-xs opacity-70">{opt.subtitle}</span>}
+                            {opt.subtitle && <span className="text-sm opacity-70">{opt.subtitle}</span>}
                         </li>
                     ))}
                 </ul>

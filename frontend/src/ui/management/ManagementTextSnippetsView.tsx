@@ -69,7 +69,7 @@ export default function ManagementTextSnippetsView() {
                                     <button className="btn btn-ghost btn-xs btn-square text-error" onClick={() => handleDelete(s.id)} title="Löschen"><span className="iconify mdi--trash-can text-base"></span></button>
                                 </div>
                             </div>
-                            {s.shortcut && <code className="text-xs bg-base-200 p-1 rounded w-fit mt-1">/{s.shortcut}</code>}
+                            {s.shortcut && <code className="text-sm bg-base-200 p-1 rounded w-fit mt-1">/{s.shortcut}</code>}
                             <div className="mt-4 p-3 bg-base-200/50 rounded-box border border-base-300 opacity-80 text-sm line-clamp-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: s.content_html }}></div>
                         </div>
                     </div>

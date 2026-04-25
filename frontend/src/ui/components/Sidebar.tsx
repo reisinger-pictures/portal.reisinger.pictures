@@ -94,7 +94,7 @@ export default function Sidebar(props: SidebarProps) {
                 
                 {user && (
                     <>
-                        {isAdminOrPhotog && <div className="divider my-1 text-xs opacity-50">Dein Account</div>}
+                        {isAdminOrPhotog && <div className="divider my-1 text-sm opacity-50">Dein Account</div>}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
                         <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> Mein Profil</Link></li>
                         <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> Einkäufe & Anfragen</Link></li>
@@ -113,7 +113,7 @@ export default function Sidebar(props: SidebarProps) {
 
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">
                 <div className="p-3 text-center">
-                    <a href="https://reisinger.pictures/impressum/" target="_blank" rel="noopener noreferrer" className="text-xs font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <a href="https://reisinger.pictures/impressum/" target="_blank" rel="noopener noreferrer" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                         <span className="iconify mdi--open-in-new"></span> Impressum & Datenschutz
                     </a>
                 </div>

@@ -33,10 +33,10 @@ export default function UserTable({ users, searchTerm, onEdit }: UserTableProps)
                                 <div className="flex flex-wrap gap-1">
                                     {u.roles && u.roles.length > 0 ? u.roles.map(r => (
                                         <span key={r.id} className="badge badge-primary badge-sm">{r.name}</span>
-                                    )) : <span className="text-xs opacity-50">Keine Rolle</span>}
+                                    )) : <span className="text-sm opacity-50">Keine Rolle</span>}
                                 </div>
                             </td>
-                            <td className="text-xs opacity-80">
+                            <td className="text-sm opacity-80">
                                 {(u.gallery_groups || []).length} Gruppen, {(u.galleries || []).length} Galerien
                             </td>
                             <td>
@@ -47,7 +47,7 @@ export default function UserTable({ users, searchTerm, onEdit }: UserTableProps)
                     {filteredUsers?.length === 0 && (
                         <tr>
                             <td colSpan={5} className="text-center py-8 opacity-50">
-                                Keine Nutzer gefunden, die "{searchTerm}" entsprechen.
+                                Keine Nutzer gefunden, die"{searchTerm}" entsprechen.
                             </td>
                         </tr>
                     )}

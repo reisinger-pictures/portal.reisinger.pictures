@@ -11,7 +11,7 @@ const resetSchema = z.object({
     password: z.string().min(8, 'Das Passwort muss mindestens 8 Zeichen lang sein.'),
     passwordConfirm: z.string()
 }).refine((data) => data.password === data.passwordConfirm, {
-    message: "Die Passwörter stimmen nicht überein.",
+    message:"Die Passwörter stimmen nicht überein.",
     path: ["passwordConfirm"],
 });
 
@@ -77,7 +77,7 @@ export default function ResetPassword() {
                                 {...register('password')} 
                                 className={`input input-bordered ${errors.password ? 'input-error' : ''}`}
                             />
-                            {errors.password && <span className="text-error text-xs mt-1">{errors.password.message}</span>}
+                            {errors.password && <span className="text-error text-sm mt-1">{errors.password.message}</span>}
                         </div>
                         
                         <div className="form-control">
@@ -87,7 +87,7 @@ export default function ResetPassword() {
                                 {...register('passwordConfirm')} 
                                 className={`input input-bordered ${errors.passwordConfirm ? 'input-error' : ''}`}
                             />
-                            {errors.passwordConfirm && <span className="text-error text-xs mt-1">{errors.passwordConfirm.message}</span>}
+                            {errors.passwordConfirm && <span className="text-error text-sm mt-1">{errors.passwordConfirm.message}</span>}
                         </div>
                         
                         <div className="form-control mt-6">

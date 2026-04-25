@@ -92,11 +92,11 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
     return (
         <dialog className="modal modal-open z-[60]">
             <div className="modal-box relative">
-                <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
+                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-lg mb-4">{editingGroup ? 'Meta-Galerie bearbeiten' : 'Neue Meta-Galerie erstellen'}</h3>
 
                 <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="flex flex-col md:flex-row gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="form-control w-full md:w-1/2">
                             <label className="label"><span className="label-text font-bold">Name</span></label>
                             <input type="text" {...register('name')} className="input input-bordered w-full" />
@@ -152,7 +152,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                         </select>
                     </div>
 
-                    <div className="modal-action flex justify-between">
+                    <div className="modal-action col-span-full flex justify-between">
                         {editingGroup ? (
                             <button type="button" className="btn btn-outline btn-error" onClick={handleDelete}>Löschen</button>
                         ) : <div></div>}

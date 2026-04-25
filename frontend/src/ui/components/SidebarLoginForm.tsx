@@ -31,14 +31,14 @@ export default function SidebarLoginForm() {
             <h3 className="font-bold mb-3 flex items-center gap-2"><span className="iconify mdi--login"></span> Anmelden</h3>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
                 <div>
-                    <input type="email" placeholder="E-Mail Adresse" {...register('email')} className={`input input-sm input-bordered w-full ${errors.email ? 'input-error' : ''}`}/>
-                    {errors.email && <p className="text-xs text-error mt-1">{errors.email.message}</p>}
+                    <input type="email" placeholder="E-Mail Adresse" {...register('email')} className={`input input-bordered w-full ${errors.email ? 'input-error' : ''}`}/>
+                    {errors.email && <p className="text-sm text-error mt-1">{errors.email.message}</p>}
                 </div>
                 <div>
-                    <input type="password" placeholder="Passwort" {...register('password')} className={`input input-sm input-bordered w-full ${errors.password ? 'input-error' : ''}`}/>
+                    <input type="password" placeholder="Passwort" {...register('password')} className={`input input-bordered w-full ${errors.password ? 'input-error' : ''}`}/>
                 </div>
-                {authError && <p className="text-xs text-error font-semibold leading-tight">{authError}</p>}
-                <button type="submit" className="btn btn-sm btn-primary w-full mt-2" disabled={isSubmitting}>
+                {authError && <p className="text-sm text-error font-semibold leading-tight">{authError}</p>}
+                <button type="submit" className="btn btn-primary w-full mt-2" disabled={isSubmitting}>
                     {isSubmitting ? <span className="loading loading-spinner"></span> : 'Login'}
                 </button>
             </form>

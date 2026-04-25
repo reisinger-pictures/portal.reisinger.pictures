@@ -59,11 +59,11 @@ export const UIProvider = ({ children }: UIProviderProps) => {
                         <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => handleConfirm(false)}>✕</button>
                         <h3 className="font-bold text-xl mb-4">{confirmState.options.title}</h3>
                         <p className="mb-8 opacity-80">{confirmState.options.message}</p>
-                        <div className="modal-action flex justify-end gap-2 mt-0">
+                        <div className="modal-action col-span-full flex justify-end gap-2 mt-0">
                             <button className="btn btn-ghost" onClick={() => handleConfirm(false)}>
                                 {confirmState.options.cancelText || 'Abbrechen'}
                             </button>
-                            <button className={`btn btn-${confirmState.options.confirmColor || 'primary'}`} onClick={() => handleConfirm(true)}>
+                            <button className={`btn-${confirmState.options.confirmColor || 'primary'}`} onClick={() => handleConfirm(true)}>
                                 {confirmState.options.confirmText || 'Bestätigen'}
                             </button>
                         </div>

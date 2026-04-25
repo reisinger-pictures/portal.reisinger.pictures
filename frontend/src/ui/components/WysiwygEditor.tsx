@@ -220,7 +220,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
             
             <EditorContent editor={editor} />
             
-            <div className="bg-base-200 border-t border-base-300 p-1 flex justify-end items-center rounded-b-box text-xs opacity-60">
+            <div className="bg-base-200 border-t border-base-300 p-1 flex justify-end items-center rounded-b-box text-sm opacity-60">
                  <span className={editor.getHTML().length > 90000 ? 'text-error font-bold' : ''}>
                      {editor.getHTML().length.toLocaleString('de-DE')} / 100.000 Zeichen (HTML)
                  </span>
@@ -234,7 +234,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
                         left: slashState.rect.left 
                     }}
                 >
-                    <li className="menu-title text-xs opacity-70 px-4 py-2">Textbaustein einfügen</li>
+                    <li className="menu-title text-sm opacity-70 px-4 py-2">Textbaustein einfügen</li>
                     {filteredSnippets.length > 0 ? filteredSnippets.map((s, idx) => (
                         <li key={s.id}>
                             <a 
@@ -243,11 +243,11 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
                                 onMouseEnter={() => setSelectedIndex(idx)}
                             >
                                 <span className="truncate flex-1">{s.title}</span>
-                                {s.shortcut && <span className="opacity-50 text-xs font-mono ml-2 shrink-0">/{s.shortcut}</span>}
+                                {s.shortcut && <span className="opacity-50 text-sm font-mono ml-2 shrink-0">/{s.shortcut}</span>}
                             </a>
                         </li>
                     )) : (
-                        <li className="px-4 py-2 text-xs opacity-50">Keine Bausteine gefunden</li>
+                        <li className="px-4 py-2 text-sm opacity-50">Keine Bausteine gefunden</li>
                     )}
                 </ul>
             )}

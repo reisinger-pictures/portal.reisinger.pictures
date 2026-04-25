@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../../logic/useAuth';
-import { useUI } from '../components/UIContext';
+import {useEffect, useState} from 'react';
+import {useAuth} from '../../logic/useAuth';
+import {useUI} from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import WysiwygEditor from '../components/WysiwygEditor';
 import RecipientFormSection from './components/RecipientFormSection';
 import ManualDocumentHeader from './components/ManualDocumentHeader';
 import AutocompleteInput from '../components/AutocompleteInput';
-import { Product, InvoiceItem, InvoiceDiscount } from '../../api';
-
+import {InvoiceDiscount, InvoiceItem, Product} from '../../api';
 
 
 export interface DocumentFormData {
@@ -26,6 +25,7 @@ export interface DocumentFormData {
     customer_email: string;
     customer_uid: string;
     terms_html: string;
+
     [key: string]: string;
 }
 
@@ -34,10 +34,9 @@ export interface ManagementManualInvoiceViewProps {
 }
 
 
-
-export default function ManagementManualInvoiceView({ type = 'invoice' }: ManagementManualInvoiceViewProps) {
-    const { user } = useAuth();
-    const { showToast } = useUI();
+export default function ManagementManualInvoiceView({type = 'invoice'}: ManagementManualInvoiceViewProps) {
+    const {user} = useAuth();
+    const {showToast} = useUI();
     const docType = type;
     const isOffer = docType === 'offer';
 
@@ -88,7 +87,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
     // INTELLIGENTE SYNC LOGIK: Rechnungsdatum -> Leistungsdatum
     useEffect(() => {
         if (!isOffer && !serviceDateDirty) {
-            setFormData(prev => ({ ...prev, service_date: formatDateToDE(formData.date) }));
+            setFormData(prev => ({...prev, service_date: formatDateToDE(formData.date)}));
         }
     }, [formData.date, isOffer, serviceDateDirty]);
 
@@ -103,13 +102,13 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
         }
     }, [dueDateOption, isOffer]);
 
-    const [items, setItems] = useState<InvoiceItem[]>([{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
+    const [items, setItems] = useState<InvoiceItem[]>([{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
     const [discounts, setDiscounts] = useState<InvoiceDiscount[]>([]);
     const [isDragging, setIsDragging] = useState(false);
 
-    if (!user?.is_super_admin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung." /></div>;
+    if (!user?.is_super_admin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung."/></div>;
 
-    const handleUpdateField = (field: string, value: string) => setFormData(p => ({ ...p, [field]: value }));
+    const handleUpdateField = (field: string, value: string) => setFormData(p => ({...p, [field]: value}));
 
     const handleServiceDateManualChange = (val: string) => {
         setServiceDateDirty(true);
@@ -119,17 +118,17 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
     const processPdfFile = async (file: File) => {
         const fd = new FormData();
         fd.append('pdf', file);
-        
+
         try {
             const res = await fetch('/api/management/invoices/extract-offer', {
                 method: 'POST',
                 body: fd,
-                headers: { 'Accept': 'application/json' },
+                headers: {'Accept': 'application/json'},
                 credentials: 'include'
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || data.message || 'Fehler beim Auslesen.');
-            
+
             setFormData(prev => ({
                 ...prev,
                 customer_name: data.customer_name || '',
@@ -142,15 +141,27 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                 customer_uid: data.customer_uid || '',
                 terms_html: data.terms_html || ''
             }));
-            
-            const loadedItems = data.items?.filter((i: InvoiceItem) => i.type === 'item').map((i: InvoiceItem) => ({...i, price: i.price / 100})) || [];
-            const loadedDiscounts = data.items?.filter((i: InvoiceDiscount) => i.type !== 'item').map((i: InvoiceDiscount) => ({...i, price: i.price / 100})) || [];
-            
-            setItems(loadedItems.length > 0 ? loadedItems : [{ type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
+
+            const loadedItems = data.items?.filter((i: InvoiceItem) => i.type === 'item').map((i: InvoiceItem) => ({
+                ...i,
+                price: i.price / 100
+            })) || [];
+            const loadedDiscounts = data.items?.filter((i: InvoiceDiscount) => i.type !== 'item').map((i: InvoiceDiscount) => ({
+                ...i,
+                price: i.price / 100
+            })) || [];
+
+            setItems(loadedItems.length > 0 ? loadedItems : [{
+                type: 'item',
+                description: '',
+                notes: '',
+                qty: 1,
+                price: 0
+            }]);
             setDiscounts(loadedDiscounts);
-            
+
             showToast('success', 'Angebotsdaten erfolgreich übernommen!');
-        } catch(err: unknown) {
+        } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : String(err));
         }
     };
@@ -176,7 +187,7 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
         e.preventDefault();
         setIsDragging(false);
         if (isOffer) return;
-        
+
         const file = e.dataTransfer.files?.[0];
         if (file && file.type === 'application/pdf') {
             await processPdfFile(file);
@@ -188,24 +199,29 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
     const handleItemChange = (index: number, field: string, value: string | number) => {
         setItems(prev => {
             const newArr = [...prev];
-            newArr[index] = { ...newArr[index], [field]: value };
+            newArr[index] = {...newArr[index], [field]: value};
             return newArr;
         });
     };
-    
+
     const handleDiscountChange = (index: number, field: string, value: string | number) => {
         setDiscounts(prev => {
             const newArr = [...prev];
-            newArr[index] = { ...newArr[index], [field]: value };
+            newArr[index] = {...newArr[index], [field]: value};
             return newArr;
         });
     };
-    
-    const addDiscount = () => setDiscounts([...discounts, { type: 'discount_fixed', description: '', notes: '', price: 0 }]);
+
+    const addDiscount = () => setDiscounts([...discounts, {
+        type: 'discount_fixed',
+        description: '',
+        notes: '',
+        price: 0
+    }]);
     const removeDiscount = (index: number) => setDiscounts(discounts.filter((_, i) => i !== index));
 
-    
-    const addItem = () => setItems([...items, { type: 'item', description: '', notes: '', qty: 1, price: 0 }]);
+
+    const addItem = () => setItems([...items, {type: 'item', description: '', notes: '', qty: 1, price: 0}]);
     const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
     const moveItemUp = (index: number) => {
         if (index === 0) return;
@@ -230,9 +246,15 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
         try {
             const res = await fetch('/api/management/invoices/manual', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
                 credentials: 'include',
-                body: JSON.stringify({ ...formData, items: [...items, ...discounts.map(d => ({...d, qty: 1}))].map((i: InvoiceItem | InvoiceDiscount) => ({...i, price: Math.round(i.price * 100)})) })
+                body: JSON.stringify({
+                    ...formData,
+                    items: [...items, ...discounts.map(d => ({
+                        ...d,
+                        qty: 1
+                    }))].map((i: InvoiceItem | InvoiceDiscount) => ({...i, price: Math.round(i.price * 100)}))
+                })
             });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
@@ -251,24 +273,27 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
             a.download = (isOffer ? 'Angebot-' : 'Rechnung-') + formData.invoice_number + '.pdf';
             a.click();
             showToast('success', 'Dokument wurde erstellt.');
-        } catch (err: unknown) { showToast('error', err instanceof Error ? err.message : 'Fehler'); }
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : 'Fehler');
+        }
         setIsGenerating(false);
     };
 
     const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    const total = discounts.reduce((t, d) => d.type === 'discount_percent' ? t * (1 - d.price/100) : t - d.price, subtotal);
+    const total = discounts.reduce((t, d) => d.type === 'discount_percent' ? t * (1 - d.price / 100) : t - d.price, subtotal);
     const hasInvalidItems = items.some(i => !i.description.trim() || i.qty <= 0) || discounts.some(d => !d.description.trim());
     const isFormValid = items.length > 0 && total >= 0 && !hasInvalidItems;
 
     return (
-        <div 
+        <div
             className={`p-6 md:p-10 max-w-6xl mx-auto w-full relative transition-colors duration-200 ${isDragging ? 'bg-primary/5 rounded-box border-2 border-dashed border-primary' : ''}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
             {isDragging && !isOffer && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-box border-4 border-dashed border-primary m-6 pointer-events-none">
+                <div
+                    className="absolute inset-0 z-50 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-box border-4 border-dashed border-primary m-6 pointer-events-none">
                     <div className="text-center text-primary">
                         <span className="iconify mdi--upload text-6xl mb-2"></span>
                         <h2 className="text-2xl font-bold">Angebot hier ablegen</h2>
@@ -276,10 +301,12 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                     </div>
                 </div>
             )}
-            <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+            <div
+                className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
                 <div>
                     <h1 className="text-4xl font-bold flex items-center gap-2 mb-2">
-                        <span className={`iconify ${isOffer ? 'mdi--file-chart-outline' : 'mdi--file-document-edit-outline'} text-primary`}></span>
+                        <span
+                            className={`iconify ${isOffer ? 'mdi--file-chart-outline' : 'mdi--file-document-edit-outline'} text-primary`}></span>
                         {isOffer ? 'Manuelles Angebot' : 'Manuelle Rechnung'}
                     </h1>
                     <p className="opacity-70">{isOffer ? 'Erstelle ein unverbindliches Angebot für Kunden.' : 'Erstelle eine freie PDF-Rechnung.'}</p>
@@ -288,51 +315,65 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                     <div className="flex-none">
                         <label className="btn btn-outline btn-primary shadow-sm cursor-pointer">
                             <span className="iconify mdi--upload text-xl"></span> Angebot importieren (.pdf)
-                            <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload} />
+                            <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload}/>
                         </label>
                     </div>
                 )}
             </div>
 
             <form onSubmit={handleDownload} className="space-y-8">
-                <ManualDocumentHeader 
-                    docType={docType} 
-                    data={formData} 
+                <ManualDocumentHeader
+                    docType={docType}
+                    data={formData}
                     dueDateOption={dueDateOption}
-                    onUpdate={handleUpdateField} 
+                    onUpdate={handleUpdateField}
                     onOptionChange={setDueDateOption}
                     onServiceDateChange={handleServiceDateManualChange}
                 />
-                
-                <RecipientFormSection formData={formData} onUpdate={handleUpdateField} onMultiUpdate={(u) => setFormData(p => ({...p, ...u}))} />
-                
+
+                <RecipientFormSection formData={formData} onUpdate={handleUpdateField}
+                                      onMultiUpdate={(u) => setFormData(p => ({...p, ...u}))}/>
+
                 {isOffer && (
                     <div className="bg-base-100 p-6 rounded-box border border-primary/30 shadow-md">
                         <h2 className="font-bold text-xl mb-4 text-primary">Angebotstext (Einleitung)</h2>
-                        <WysiwygEditor value={formData.terms_html} onChange={v => handleUpdateField('terms_html', v)} />
+                        <WysiwygEditor value={formData.terms_html} onChange={v => handleUpdateField('terms_html', v)}/>
                     </div>
                 )}
 
                 <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                     <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
                         <h2 className="font-bold text-xl text-primary">Leistungen / Positionen</h2>
-                        <button type="button" onClick={addItem} className="btn btn-sm btn-outline btn-primary">+ Leistung hinzufügen</button>
+                        <button type="button" onClick={addItem} className="btn btn-sm btn-outline btn-primary">+
+                            Leistung hinzufügen
+                        </button>
                     </div>
-                    
+
                     <div className="space-y-4">
                         {items.map((item, idx) => (
-                            <div key={idx} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
+                            <div key={idx}
+                                 className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
                                 <div className="flex flex-col gap-1 self-center shrink-0 mr-2">
-                                    <button type="button" onClick={() => moveItemUp(idx)} disabled={idx === 0} className="btn btn-xs btn-ghost btn-square"><span className="iconify mdi--arrow-up text-lg opacity-50"></span></button>
-                                    <button type="button" onClick={() => moveItemDown(idx)} disabled={idx === items.length - 1} className="btn btn-xs btn-ghost btn-square"><span className="iconify mdi--arrow-down text-lg opacity-50"></span></button>
+                                    <button type="button" onClick={() => moveItemUp(idx)} disabled={idx === 0}
+                                            className="btn btn-xs btn-ghost btn-square"><span
+                                        className="iconify mdi--arrow-up text-lg opacity-50"></span></button>
+                                    <button type="button" onClick={() => moveItemDown(idx)}
+                                            disabled={idx === items.length - 1}
+                                            className="btn btn-xs btn-ghost btn-square"><span
+                                        className="iconify mdi--arrow-down text-lg opacity-50"></span></button>
                                 </div>
                                 <div className="form-control flex-1 w-full">
-                                    <label className="label py-1"><span className="label-text text-xs font-bold">Titel / Name</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold">Titel / Name</span></label>
                                     <AutocompleteInput<Product>
                                         value={item.description}
                                         onChange={val => handleItemChange(idx, 'description', val)}
                                         endpoint="/api/management/products?type=item&q="
-                                        mapResponse={(data) => data.map(p => ({ id: p.id, title: p.name, subtitle: `${p.price.toFixed(2)} €`, raw: p }))}
+                                        mapResponse={(data) => data.map(p => ({
+                                            id: p.id,
+                                            title: p.name,
+                                            subtitle: `${p.price.toFixed(2)} €`,
+                                            raw: p
+                                        }))}
                                         onSelect={(p) => {
                                             handleItemChange(idx, 'description', p.name);
                                             handleItemChange(idx, 'notes', p.description || '');
@@ -343,50 +384,74 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                                     />
                                 </div>
                                 <div className="form-control flex-1 w-full">
-                                    <label className="label py-1"><span className="label-text text-xs font-bold">Zusatz (kleingedruckt)</span></label>
-                                    <input type="text" value={item.notes} onChange={e => handleItemChange(idx, 'notes', e.target.value)} className="input input-sm input-bordered w-full" placeholder="Optional" />
+                                    <label className="label py-1"><span className="label-text text-sm font-bold">Zusatz (kleingedruckt)</span></label>
+                                    <input type="text" value={item.notes}
+                                           onChange={e => handleItemChange(idx, 'notes', e.target.value)}
+                                           className="input input-sm input-bordered w-full"
+                                           placeholder="Optional"/>
                                 </div>
                                 <div className="form-control w-20 shrink-0">
-                                    <label className="label py-1"><span className="label-text text-xs font-bold">Menge</span></label>
-                                    <input required type="number" step="0.01" min="0.01" value={item.qty} onChange={e => handleItemChange(idx, 'qty', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered w-full font-mono text-center" />
+                                    <label className="label py-1"><span
+                                        className="label-text text-sm font-bold">Menge</span></label>
+                                    <input required type="number" step="0.01" min="0.01" value={item.qty}
+                                           onChange={e => handleItemChange(idx, 'qty', parseFloat(e.target.value) || 0)}
+                                           className="input input-sm input-bordered w-full font-mono text-center"/>
                                 </div>
                                 <div className="form-control w-full md:w-28 shrink-0">
-                                    <label className="label py-1"><span className="label-text text-xs font-bold">Preis / Stück</span></label>
-                                    <input required type="number" step="any" value={item.price} onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered w-full font-mono text-right" />
+                                    <label className="label py-1"><span className="label-text text-sm font-bold">Preis / Stück</span></label>
+                                    <input required type="number" step="any" value={item.price}
+                                           onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                           className="input input-sm input-bordered w-full font-mono text-right"/>
                                 </div>
                                 <div className="form-control w-full md:w-28 shrink-0">
-                                    <label className="label py-1"><span className="label-text text-xs font-bold">Gesamt</span></label>
-                                    <div className="text-right font-mono font-bold mt-1 text-base-content">{(item.price * item.qty).toFixed(2)} €</div>
+                                    <label className="label py-1"><span
+                                        className="label-text text-sm font-bold">Gesamt</span></label>
+                                    <div
+                                        className="text-right font-mono font-bold mt-1 text-base-content">{(item.price * item.qty).toFixed(2)} €
+                                    </div>
                                 </div>
-                                <button type="button" onClick={() => removeItem(idx)} className="btn btn-sm btn-ghost text-error shrink-0 mt-7"><span className="iconify mdi--trash-can text-lg"></span></button>
+                                <button type="button" onClick={() => removeItem(idx)}
+                                        className="btn btn-sm btn-ghost text-error shrink-0 mt-7"><span
+                                    className="iconify mdi--trash-can text-lg"></span></button>
                             </div>
                         ))}
                     </div>
-                    
+
                     {/* Discounts Section */}
                     <div className="mt-6 border-t border-base-300 pt-6">
                         <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
                             <h2 className="font-bold text-xl text-primary">Rabatte & Abzüge</h2>
-                            <button type="button" onClick={addDiscount} className="btn btn-sm btn-outline btn-primary">+ Rabatt hinzufügen</button>
+                            <button type="button" onClick={addDiscount} className="btn btn-sm btn-outline btn-primary">+
+                                Rabatt hinzufügen
+                            </button>
                         </div>
-                        
+
                         <div className="space-y-4">
                             {discounts.map((discount, idx) => (
-                                <div key={idx} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
+                                <div key={idx}
+                                     className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
                                     <div className="form-control w-full md:w-1/4 shrink-0">
-                                        <label className="label py-1"><span className="label-text text-xs font-bold">Art</span></label>
-                                        <select value={discount.type} onChange={e => handleDiscountChange(idx, 'type', e.target.value)} className="select select-sm select-bordered w-full bg-base-100">
+                                        <label className="label py-1"><span
+                                            className="label-text text-sm font-bold">Art</span></label>
+                                        <select value={discount.type}
+                                                onChange={e => handleDiscountChange(idx, 'type', e.target.value)}
+                                                className="select select-sm select-bordered w-full bg-base-100">
                                             <option value="discount_fixed">Fixer Betrag (€)</option>
                                             <option value="discount_percent">Prozentual (%)</option>
                                         </select>
                                     </div>
                                     <div className="form-control flex-1 w-full">
-                                        <label className="label py-1"><span className="label-text text-xs font-bold">Titel / Beschreibung</span></label>
+                                        <label className="label py-1"><span className="label-text text-sm font-bold">Titel / Beschreibung</span></label>
                                         <AutocompleteInput<Product>
                                             value={discount.description}
                                             onChange={val => handleDiscountChange(idx, 'description', val)}
                                             endpoint="/api/management/products?type=discount_fixed,discount_percent&q="
-                                            mapResponse={(data) => data.map(p => ({ id: p.id, title: p.name, subtitle: `${p.price.toFixed(2)} ${p.type === 'discount_percent' ? '%' : '€'}`, raw: p }))}
+                                            mapResponse={(data) => data.map(p => ({
+                                                id: p.id,
+                                                title: p.name,
+                                                subtitle: `${p.price.toFixed(2)} ${p.type === 'discount_percent' ? '%' : '€'}`,
+                                                raw: p
+                                            }))}
                                             onSelect={(p) => {
                                                 handleDiscountChange(idx, 'type', p.type || 'discount_fixed');
                                                 handleDiscountChange(idx, 'description', p.name);
@@ -398,31 +463,42 @@ export default function ManagementManualInvoiceView({ type = 'invoice' }: Manage
                                         />
                                     </div>
                                     <div className="form-control w-full md:w-32 shrink-0">
-                                        <label className="label py-1"><span className="label-text text-xs font-bold">Wert</span></label>
+                                        <label className="label py-1"><span
+                                            className="label-text text-sm font-bold">Wert</span></label>
                                         <div className="join w-full">
-                                            <input required type="number" step="any" min="0" value={discount.price} onChange={e => handleDiscountChange(idx, 'price', parseFloat(e.target.value) || 0)} className="input input-sm input-bordered join-item w-full font-mono text-right bg-base-100" />
-                                            <span className="btn btn-sm btn-disabled join-item">{discount.type === 'discount_percent' ? '%' : '€'}</span>
+                                            <input required type="number" step="any" min="0" value={discount.price}
+                                                   onChange={e => handleDiscountChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                                   className="input input-sm input-bordered join-item w-full font-mono text-right bg-base-100"/>
+                                            <span
+                                                className="btn btn-sm btn-disabled join-item">{discount.type === 'discount_percent' ? '%' : '€'}</span>
                                         </div>
                                     </div>
-                                    <button type="button" onClick={() => removeDiscount(idx)} className="btn btn-sm btn-ghost text-error shrink-0 mt-7"><span className="iconify mdi--trash-can text-lg"></span></button>
+                                    <button type="button" onClick={() => removeDiscount(idx)}
+                                            className="btn btn-sm btn-ghost text-error shrink-0 mt-7"><span
+                                        className="iconify mdi--trash-can text-lg"></span></button>
                                 </div>
                             ))}
-                            {discounts.length === 0 && <p className="text-sm opacity-50 italic px-2">Keine Rabatte angewendet.</p>}
+                            {discounts.length === 0 &&
+                                <p className="text-sm opacity-50 italic px-2">Keine Rabatte angewendet.</p>}
                         </div>
                     </div>
-                    
-<div className="text-right text-2xl font-bold mt-6 pt-4 border-t border-base-300">Gesamtbetrag: {total.toFixed(2)} €</div>
+
+                    <div
+                        className="text-right text-2xl font-bold mt-6 pt-4 border-t border-base-300">Gesamtbetrag: {total.toFixed(2)} €
+                    </div>
                 </div>
 
                 {!isOffer && (
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                         <h2 className="font-bold text-xl mb-4">Zusatztexte / Sonderkonditionen</h2>
-                        <WysiwygEditor value={formData.terms_html} onChange={v => handleUpdateField('terms_html', v)} />
+                        <WysiwygEditor value={formData.terms_html} onChange={v => handleUpdateField('terms_html', v)}/>
                     </div>
                 )}
 
                 <div className="flex justify-end pt-4 pb-20">
-                    <button type="submit" disabled={isGenerating || !isFormValid} className="btn btn-primary btn-lg shadow-xl w-full md:w-auto" title={!isFormValid ? "Bitte alle Pflichtfelder ausfüllen (Titel/Menge)." : ""}>
+                    <button type="submit" disabled={isGenerating || !isFormValid}
+                            className="btn btn-primary btn-lg shadow-xl w-full md:w-auto"
+                            title={!isFormValid ? "Bitte alle Pflichtfelder ausfüllen (Titel/Menge)." : ""}>
                         {isGenerating ? <span className="loading loading-spinner"></span> : 'PDF Generieren'}
                     </button>
                 </div>

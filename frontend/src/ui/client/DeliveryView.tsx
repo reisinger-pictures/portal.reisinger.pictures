@@ -47,7 +47,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                                 <div className="text-right">
                                     <span className="font-bold text-sm block leading-none mb-1">E-Mail Updates</span>
                                 </div>
-                                <input type="checkbox" className="toggle toggle-primary toggle-sm md:toggle-md" checked={galleryData.wantsNotifications} onChange={(e) => galleryData.toggleOptIn(gallery.id, e.target.checked)} />
+                                <input type="checkbox" className="toggle-primary toggle md:toggle-md" checked={galleryData.wantsNotifications} onChange={(e) => galleryData.toggleOptIn(gallery.id, e.target.checked)} />
                             </label>
                         )}
                         {totalPhotos > 0 && (() => {
@@ -73,7 +73,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                                         <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> Alle herunterladen (.zip) <span className="iconify mdi--chevron-down"></span>
                                     </div>
                                     <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 border border-base-300 rounded-box w-52">
-                                        <li className="menu-title px-4 py-2 text-xs opacity-70 uppercase tracking-wider">Qualität wählen</li>
+                                        <li className="menu-title px-4 py-2 text-sm opacity-70 uppercase tracking-wider">Qualität wählen</li>
                                         {allowedTiers.map(t => (
                                             <li key={t.id}>
                                                 <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + t.id} target="_self" className="font-bold">
@@ -114,7 +114,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="object-cover w-full h-full select-none" draggable={false} alt={photo.title || 'Bild'} />
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="select object-cover w-full h-full select-none" draggable={false} alt={photo.title || 'Bild'} />
                             </a>
 
                             <div className="absolute top-2 right-2 opacity-100">

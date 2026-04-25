@@ -74,7 +74,7 @@ export default function ClientNotificationsView() {
                                         <div key={group.id} className="flex justify-between items-center p-4 border-b border-base-300 last:border-b-0 hover:bg-base-200/50 transition-colors">
                                             <div>
                                                 <div className="font-bold text-lg">{group.name}</div>
-                                                <div className="text-xs opacity-70">Benachrichtigt bei neuen Galerien in diesem Ordner.</div>
+                                                <div className="text-sm opacity-70">Benachrichtigt bei neuen Galerien in diesem Ordner.</div>
                                             </div>
                                             <input type="checkbox" className="toggle toggle-primary" checked={group.wants_notifications} onChange={() => toggleOptIn(group.id, 'group', group.wants_notifications)} />
                                         </div>
@@ -96,7 +96,7 @@ export default function ClientNotificationsView() {
                                                     {gallery.name}
                                                     <span className="badge badge-sm badge-ghost">{gallery.gallery_type === 'selection' ? 'Auswahl' : 'Delivery'}</span>
                                                 </div>
-                                                <div className="text-xs opacity-70">Benachrichtigt bei neuen Fotos in dieser Galerie.</div>
+                                                <div className="text-sm opacity-70">Benachrichtigt bei neuen Fotos in dieser Galerie.</div>
                                             </div>
                                             <input type="checkbox" className="toggle toggle-primary" checked={gallery.wants_notifications} onChange={() => toggleOptIn(gallery.id, 'gallery', gallery.wants_notifications)} />
                                         </div>

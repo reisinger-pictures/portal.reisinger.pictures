@@ -109,7 +109,7 @@ export default function WatermarkSettingsCard() {
                     <div className="mt-8 border border-base-300 rounded-box overflow-hidden relative h-48 bg-base-300 flex items-center justify-center">
                         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,_var(--color-base-content)_1px,_transparent_1px)] [background-size:20px_20px]"></div>
                         
-                        <div className="absolute flex flex-col items-center justify-center -rotate-12 select-none pointer-events-none" style={{ opacity: watchOpacity }}>
+                        <div className="select absolute flex flex-col items-center justify-center -rotate-12 select-none pointer-events-none" style={{ opacity: watchOpacity }}>
                             {previewUrl && (
                                 <img src={previewUrl} alt="Watermark SVG" className="w-24 h-24 md:w-32 md:h-32 object-contain mb-2 drop-shadow-md" />
                             )}
@@ -120,7 +120,7 @@ export default function WatermarkSettingsCard() {
                             )}
                         </div>
                         
-                        <span className="absolute bottom-2 left-2 text-xs font-bold opacity-50 bg-base-100 px-2 py-1 rounded shadow">Vorschau (Live)</span>
+                        <span className="absolute bottom-2 left-2 text-sm font-bold opacity-50 bg-base-100 px-2 py-1 rounded shadow">Vorschau (Live)</span>
                     </div>
 
                     <div className="mt-6 border-t border-base-300 pt-6">

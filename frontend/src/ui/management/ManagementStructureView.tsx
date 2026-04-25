@@ -61,7 +61,7 @@ const TreeNode = ({
         );
     }
 
-    // Ab hier weiß TypeScript, dass "node" eine GalleryGroup sein muss
+    // Ab hier weiß TypeScript, dass"node" eine GalleryGroup sein muss
     const hasInhalt = ((node.children?.length ?? 0) > 0) || ((node.galleries?.length ?? 0) > 0);
 
     return (

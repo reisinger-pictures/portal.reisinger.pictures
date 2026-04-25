@@ -17,7 +17,7 @@ export default function ResponsiveImage({ src, srcSet, sizes, alt, className, co
             <img
                 src={src}
                 srcSet={srcSet}
-                sizes={sizes || "(max-width: 600px) 400px, (max-width: 1200px) 800px, 1200px"}
+                sizes={sizes ||"(max-width: 600px) 400px, (max-width: 1200px) 800px, 1200px"}
                 alt={alt || ''}
                 className={`transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'} ${className || ''}`}
                 onLoad={() => setLoaded(true)}

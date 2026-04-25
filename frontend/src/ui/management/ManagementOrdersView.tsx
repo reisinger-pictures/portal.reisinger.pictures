@@ -80,7 +80,7 @@ export default function ManagementOrdersView() {
                                 </td>
                                 <td>
                                     <div className="font-bold">{order.user?.name}</div>
-                                    <div className="text-xs opacity-70">{order.user?.email}</div>
+                                    <div className="text-sm opacity-70">{order.user?.email}</div>
                                 </td>
                                 <td className="font-mono">{(order.is_quote_request ? true : false) && order.status === 'pending' ? 'Auf Anfrage' : formatMoney(Number(order.total_amount))}</td>
                                 <td>
@@ -138,7 +138,7 @@ export default function ManagementOrdersView() {
                             <textarea value={quoteMessage} onChange={e => setQuoteMessage(e.target.value)} className="textarea textarea-bordered w-full h-24" placeholder="Hallo, hier ist mein Angebot für Ihre speziellen Rechte..."></textarea>
                         </div>
 
-                        <div className="modal-action">
+                        <div className="modal-action col-span-full">
                             <button className="btn btn-ghost" onClick={() => setQuoteOrder(null)}>Abbrechen</button>
                             <button className="btn btn-primary" onClick={handleSendQuote} disabled={!customPrice || !quoteMessage || isGenerating}>
                                 {isGenerating ? <span className="loading loading-spinner"></span> : 'Kalkulieren & E-Mail senden'}

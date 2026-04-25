@@ -35,25 +35,25 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
     return (
         <div className="modal modal-open z-50">
             <div className="modal-box max-w-4xl relative flex flex-col h-[80vh]">
-                <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
+                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2 shrink-0">
                     <span className="iconify mdi--text-box-multiple text-primary"></span>
                     {editingSnippet ? 'Textbaustein bearbeiten' : 'Neuen Textbaustein anlegen'}
                 </h3>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
-                    <div className="flex flex-col md:flex-row gap-4 mb-4 shrink-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 shrink-0">
                         <div className="form-control flex-1">
                             <label className="label"><span className="label-text font-bold">Titel (Intern) *</span></label>
-                            <input required type="text" {...register('title')} className="input input-sm input-bordered" placeholder="z.B. AGB Angebot" />
+                            <input required type="text" {...register('title')} className="input input-bordered" placeholder="z.B. AGB Angebot" />
                         </div>
                         <div className="form-control w-full md:w-1/3">
                             <label className="label">
                                 <span className="label-text font-bold">Kürzel (Shortcut)</span>
                             </label>
                             <div className="join w-full">
-                                <span className="btn btn-sm no-animation join-item bg-base-300 border-base-300 font-mono opacity-70 cursor-default">/</span>
-                                <input type="text" {...register('shortcut')} className="input input-sm input-bordered join-item w-full font-mono lowercase" placeholder="agb" />
+                                <span className="btn no-animation join-item bg-base-300 border-base-300 font-mono opacity-70 cursor-default">/</span>
+                                <input type="text" {...register('shortcut')} className="input input-bordered join-item w-full font-mono lowercase" placeholder="agb" />
                             </div>
                         </div>
                     </div>
@@ -65,7 +65,7 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
                         </div>
                     </div>
 
-                    <div className="modal-action shrink-0 mt-2">
+                    <div className="modal-action col-span-full shrink-0 mt-2">
                         <button type="button" className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
                         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                             {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}

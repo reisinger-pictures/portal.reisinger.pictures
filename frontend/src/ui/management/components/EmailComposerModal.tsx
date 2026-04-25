@@ -54,7 +54,7 @@ export default function EmailComposerModal({ isOpen, onClose, galleryId }: Email
                     <WysiwygEditor value={mailBody} onChange={setMailBody} />
                 </div>
 
-                <div className="modal-action">
+                <div className="modal-action col-span-full">
                     <button className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
                     <button className="btn btn-primary" disabled={sendingMail || !mailSubject || !mailBody} onClick={handleSendCustomMail}>
                         {sendingMail ? <span className="loading loading-spinner"></span> : 'Nachricht Senden'}
