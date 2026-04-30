@@ -20,17 +20,49 @@ class ImportLocations extends Command
         $tempDir = storage_path('app/private/temp');
         if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
 
-        // 1. POSTLEITZAHLEN IMPORT
-        $zipPath = $tempDir . '/AT_postal.zip';
-        $txtPath = $tempDir . '/AT.txt';
+        $zipPostalPath = $tempDir . '/AT_postal.zip';
+        $txtPostalPath = $tempDir . '/AT_postal.txt';
+        $zipPlacesPath = $tempDir . '/AT_places.zip';
+        $txtPlacesPath = $tempDir . '/AT_places.txt';
 
+        // 1. Lade GeoNames Orte-Datensatz (für Einwohner)
+        $this->info('Lade GeoNames Orte-Datensatz (AT) für Einwohnerzahlen...');
+        $response = Http::get('http://download.geonames.org/export/dump/AT.zip');
+        $populations = [];
+        if ($response->successful()) {
+            file_put_contents($zipPlacesPath, $response->body());
+            $zip = new \ZipArchive;
+            if ($zip->open($zipPlacesPath) === true) {
+                $zip->extractTo($tempDir, 'AT.txt');
+                rename($tempDir . '/AT.txt', $txtPlacesPath);
+                $zip->close();
+            }
+            
+            if (file_exists($txtPlacesPath) && ($handle = fopen($txtPlacesPath, "r")) !== FALSE) {
+                while (($data = fgetcsv($handle, 0, "\t")) !== FALSE) {
+                    if (count($data) >= 15) {
+                        $name = trim($data[1]);
+                        $pop = (int) $data[14];
+                        if ($pop > 0) {
+                            if (!isset($populations[$name]) || $pop > $populations[$name]) {
+                                $populations[$name] = $pop;
+                            }
+                        }
+                    }
+                }
+                fclose($handle);
+            }
+        }
+
+        // 2. Lade PLZ Daten
         $this->info('Lade GeoNames PLZ-Datensatz (AT) herunter...');
         $response = Http::get('http://download.geonames.org/export/zip/AT.zip');
         if ($response->successful()) {
-            file_put_contents($zipPath, $response->body());
+            file_put_contents($zipPostalPath, $response->body());
             $zip = new \ZipArchive;
-            if ($zip->open($zipPath) === true) {
+            if ($zip->open($zipPostalPath) === true) {
                 $zip->extractTo($tempDir, 'AT.txt');
+                rename($tempDir . '/AT.txt', $txtPostalPath);
                 $zip->close();
             }
         }
@@ -45,18 +77,19 @@ class ImportLocations extends Command
         $locations = [];
         $count = 0;
 
-        if (file_exists($txtPath) && ($handle = fopen($txtPath, "r")) !== FALSE) {
+        if (file_exists($txtPostalPath) && ($handle = fopen($txtPostalPath, "r")) !== FALSE) {
             while (($data = fgetcsv($handle, 0, "\t")) !== FALSE) {
                 if (count($data) >= 4) {
+                    $cityName = trim($data[2]);
                     $locations[] = [
                         'id' => Str::uuid()->toString(),
                         'type' => 'city',
-                        'name' => $data[2], // City Name
-                        'postal_code' => $data[1], // PLZ
-                        'state' => $data[3] ?: null, // State
+                        'name' => $cityName,
+                        'postal_code' => $data[1],
+                        'state' => $data[3] ?: null,
                         'country' => 'Österreich',
                         'iso_country' => 'AT',
-                        'population' => 0
+                        'population' => $populations[$cityName] ?? 0
                     ];
                     $count++;
 
@@ -70,17 +103,20 @@ class ImportLocations extends Command
             if (!empty($locations)) DB::table('locations')->insert($locations);
         }
 
-        @unlink($zipPath);
-        @unlink($txtPath);
+        @unlink($zipPostalPath);
+        @unlink($txtPostalPath);
+        @unlink($zipPlacesPath);
+        @unlink($txtPlacesPath);
         $this->info("{$count} österreichische PLZ-Gebiete erfolgreich importiert.");
 
-        // 2. LÄNDER IMPORT
+        // 3. LÄNDER IMPORT
         $this->info('Lade weltweite Länder-Daten (GeoNames) herunter...');
         $countryResponse = Http::get('http://download.geonames.org/export/dump/countryInfo.txt');
         
         if ($countryResponse->successful()) {
             $countryLines = explode("\n", $countryResponse->body());
             $countryInserts = [];
+            $fallback = ['AT' => 'Österreich', 'DE' => 'Deutschland', 'CH' => 'Schweiz', 'IT' => 'Italien', 'FR' => 'Frankreich', 'ES' => 'Spanien', 'US' => 'Vereinigte Staaten', 'GB' => 'Vereinigtes Königreich', 'NL' => 'Niederlande', 'BE' => 'Belgien'];
             
             foreach ($countryLines as $line) {
                 $line = trim($line);
@@ -89,8 +125,7 @@ class ImportLocations extends Command
                 $data = explode("\t", $line);
                 if (count($data) >= 5) {
                     $iso = trim($data[0]);
-                    // Übersetzt den ISO-Code via PHP intl in den deutschen Namen (z.B. DE -> Deutschland)
-                    $name = class_exists('Locale') ? \Locale::getDisplayRegion('und-' . $iso, 'de') : $data[4];
+                    $name = class_exists('Locale') ? \Locale::getDisplayRegion('und-' . $iso, 'de') : ($fallback[$iso] ?? $data[4]);
                     if (empty($name)) $name = $data[4];
 
                     $countryInserts[] = [
@@ -100,7 +135,7 @@ class ImportLocations extends Command
                         'postal_code' => null,
                         'state' => null,
                         'country' => null,
-                        'iso_country' => $data[0],
+                        'iso_country' => $iso,
                         'population' => isset($data[7]) ? (int) $data[7] : 0
                     ];
                 }
@@ -108,11 +143,11 @@ class ImportLocations extends Command
             
             if (!empty($countryInserts)) {
                 DB::table('locations')->insert($countryInserts);
-                $this->info(count($countryInserts) . ' Länder erfolgreich in denselben Index importiert.');
+                $this->info(count($countryInserts) . ' Länder erfolgreich importiert.');
             }
         }
 
-        // 3. SYNCHRONISATION
+        // 4. SYNCHRONISATION
         $this->info('Synchronisiere mit Meilisearch...');
         $this->call('scout:sync-index-settings');
         $this->call('scout:import', ['model' => Location::class]);

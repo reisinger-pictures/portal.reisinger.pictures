@@ -264,6 +264,7 @@ class GalleryController extends Controller
 
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
+            'slug' => 'nullable|string|max:255',
             'type' => 'nullable|in:selection,delivery',
             'is_live' => 'nullable|boolean',
             'is_public' => 'nullable|boolean',
@@ -283,7 +284,20 @@ class GalleryController extends Controller
             'default_country' => 'nullable|string',
             'default_iso_country' => 'nullable|string|max:2',
             'password' => 'nullable|string',
+            'expires_at' => 'nullable|date',
         ]);
+
+        if (array_key_exists('slug', $validated) && $validated['slug'] !== $gallery->slug) {
+            $slug = Str::slug($validated['slug']);
+            if (Gallery::where('slug', $slug)->exists()) {
+                $slug = $slug . '-' . time();
+            }
+            $validated['slug'] = $slug;
+        }
+
+        if (array_key_exists('expires_at', $validated)) {
+            $validated['expires_at'] = $validated['expires_at'] ? Carbon::parse($validated['expires_at'])->endOfDay() : null;
+        }
 
         if ($request->filled('password')) {
             $validated['password_hash'] = Hash::make($request->password);

@@ -97,13 +97,16 @@ class SearchController extends Controller
         $results = Location::search($q)
             ->where('type', $type)
             ->orderBy('population', 'desc')
+            ->orderBy('postal_code', 'asc')
             ->take(30)
             ->get();
 
         if ($type === 'city') {
             // Merging: Bei Städten behalten wir pro Name nur den Eintrag mit der höchsten Population
             // (oder den ersten Treffer, falls Population bei beiden 0 ist)
-            $results = $results->unique('name')->values()->take(10);
+            $results = $results->unique(function ($item) {
+                return $item->name . '-' . $item->state;
+            })->values()->take(10);
         }
 
         return response()->json($results);

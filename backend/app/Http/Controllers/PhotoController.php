@@ -49,7 +49,7 @@ class PhotoController extends Controller
             'headline' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             
-            'keywords' => 'nullable|string|max:255',
+            'keywords' => 'nullable|string',
             'location' => 'nullable|string|max:255',
             'city' => 'nullable|string|max:255',
             'state' => 'nullable|string|max:255',

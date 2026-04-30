@@ -1,15 +1,38 @@
 # 📝 Projekt-Master-Backlog
 
-Aktuelle DB Version: 13
+Aktuelle DB Version: 14
 
-## Kürzlich abgeschlossen
-- [x] Formular-UI auf Standardgröße 'md' und CSS-Grids umgestellt.
-- [x] Lightroom Plugin Upload-Logik konsolidiert.
-- [x] Backend Bugfixes: `GalleryController` & `ImageProcessor`.
-- [x] Frontend UX: Grid-Konflikte (`md:w-1/2` in CSS-Grids) in Modals behoben.
+## ✅ Abgeschlossene Fixes (Kürzlich)
 
-## Nächste Schritte (Testing & Stabilisierung)
-- [ ] **Frontend Tests:** E2E Roundtrip-Tests (UI -> DB -> UI) für GalleryModal und GalleryGroupModal implementieren, die sicherstellen, dass ALLE Formularfelder (inkl. is_editorial_only, is_hidden) korrekt gespeichert und beim erneuten Bearbeiten wieder korrekt in die UI geladen werden.
-- [ ] **Backend Tests:** `GalleryControllerTest` (bzw. entsprechende Feature-Tests) um Validierung für Passwort-Hashing und Galerie-Updates erweitern.
-- [ ] **Backend Tests:** `ImageProcessorTest` um Wasserzeichen-Kachel-Generierung (mit ImagickDraw `setCompositeOperator`) erweitern, um künftige "Blindflüge" zu vermeiden.
-- [ ] **Frontend Tests:** E2E/UI-Tests für die Formular-Darstellung optimieren (z.B. Playwright Visual Regression oder Check auf Sichtbarkeit von Rand-Elementen).
+- [x] **Bugfix (Backend - ImportLocations):** `ImportLocations.php` umschreiben. Joins zwischen `AT.zip` (PLZ) und
+  `AT.txt` (Einwohner) implementiert.
+- [x] **Bugfix (Backend - ImportLocations):** Statischer Fallback für Ländernamen integriert (Überbrückung fehlendes
+  `intl`).
+- [x] **Bugfix (Backend - SearchController):** Sekundäre Sortierung (`postal_code`) und erweitertes
+  Deduplizierungs-Logik (`name` + `state`).
+- [x] **Bugfix (Backend - GalleryController):** Validierungs-Whitelist um `slug` und `expires_at` erweitert (Fix für
+  PDOException).
+- [x] **Bugfix (Backend - DB/Validation):** IPTC-Keywords auf `TEXT` migriert (Migration `V013`) und `max:255` Limit
+  aufgehoben.
+
+## 🏗️ Infrastruktur & Technical Debt
+
+- [ ] **Docker:** PHP-Image anpassen und `intl`-Extension permanent aktivieren.
+- [ ] **Clean-up:** Statisches Fallback-Array in `ImportLocations.php` entfernen, sobald `intl` im Image vorhanden ist.
+- [ ] **Refactor:** Slug-Kollisions-Logik in `GalleryController` von `time()` auf iterative Suffixe (z.B. `-1`, `-2`)
+  umstellen.
+
+## 🐛 Nächste Fehlerbehebungen (Robustheit)
+
+- [ ] **Error Handling:** `Carbon::parse` in `GalleryController` absichern (Validierungsfehler statt Exception).
+- [ ] **Error Handling:** `ZipArchive` in `ImportLocations.php` mit Fehlerprüfungen ausstatten (Prüfung von `open` und
+  `extractTo`).
+
+## 🧪 Ausstehende Tests
+
+- [ ] **Backend Test (Locations):** Verifizieren des Joins in `ImportLocations` (PLZ + Einwohner) und
+  Population-Ranking.
+- [ ] **Backend Test (Stress-Keywords):** Speichern von IPTC-Keywords > 255 Zeichen validieren.
+- [ ] **Backend Test (Gallery Updates):** Validierung der Slug-Kollisions-Logik und `expires_at` Konvertierung.
+- [ ] **E2E Test (Transient Rights):** Magic-Link-Gäste Speichervorgänge und Versionierung prüfen.
+- [ ] **Frontend Tests:** E2E Roundtrip-Tests für Modale (is_editorial_only, is_hidden Speicherung).
