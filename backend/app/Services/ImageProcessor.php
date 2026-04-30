@@ -275,7 +275,7 @@ class ImageProcessor
                 $margin = (int)(max($im->getImageWidth(), $im->getImageHeight()) * 0.05);
                 $draw = new \ImagickDraw();
                 $draw->setFillColor(new \ImagickPixel('transparent'));
-                $draw->setComposite(\Imagick::COMPOSITE_COPY);
+                $draw->setCompositeOperator(\Imagick::COMPOSITE_COPY);
                 $draw->rectangle(0, 0, $im->getImageWidth(), $margin); // Oben
                 $draw->rectangle(0, $im->getImageHeight() - $margin, $im->getImageWidth(), $im->getImageHeight()); // Unten
                 $draw->rectangle(0, 0, $margin, $im->getImageHeight()); // Links

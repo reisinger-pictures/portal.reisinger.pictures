@@ -10,7 +10,9 @@ const groupSchema = z.object({
     slug: z.string(),
     is_public: z.enum(['null', 'true', 'false']),
     parent_id: z.string(),
-    is_free_download: z.boolean().optional()
+    is_free_download: z.boolean().optional(),
+    is_editorial_only: z.boolean().optional(),
+    is_hidden: z.boolean().optional()
 });
 type GroupFormValues = z.infer<typeof groupSchema>;
 
@@ -32,7 +34,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
 
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GroupFormValues>({
         resolver: zodResolver(groupSchema),
-        defaultValues: { name: '', slug: '', is_public: 'null', parent_id: '' }
+        defaultValues: { name: '', slug: '', is_public: 'null', parent_id: '', is_free_download: false, is_editorial_only: false, is_hidden: false }
     });
 
     useEffect(() => {
@@ -41,6 +43,8 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                 name: editingGroup?.name || '',
                 slug: editingGroup?.slug || '',
                 is_free_download: editingGroup?.is_free_download || false,
+                is_editorial_only: editingGroup?.is_editorial_only || false,
+                is_hidden: editingGroup?.is_hidden || false,
                 is_public: editingGroup?.is_public === null || editingGroup?.is_public === undefined ? 'null' : (editingGroup.is_public ? 'true' : 'false'),
                 parent_id: editingGroup?.parent_id || defaultParentId || ''
             });
@@ -62,10 +66,10 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
 
         try {
             if (editingGroup) {
-                await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download });
+                await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download, is_editorial_only: data.is_editorial_only, is_hidden: data.is_hidden });
                 showToast('success', 'Ordner erfolgreich aktualisiert.');
             } else {
-                await onCreate(data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download });
+                await onCreate(data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download, is_editorial_only: data.is_editorial_only, is_hidden: data.is_hidden });
                 showToast('success', 'Ordner erfolgreich erstellt.');
             }
             onClose();
@@ -97,11 +101,11 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
 
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="form-control w-full md:w-1/2">
+                        <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Name</span></label>
                             <input type="text" {...register('name')} className="input input-bordered w-full" />
                         </div>
-                        <div className="form-control w-full md:w-1/2">
+                        <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">URL Slug</span></label>
                             <input type="text" {...register('slug')}
                                    onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true})}
@@ -119,12 +123,28 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                         </select>
                     </div>
 
-                    <div className="form-control mb-4">
-                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
+                    <div className="space-y-3 mb-4">
+                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-primary/20 w-full">
                             <input type="checkbox" {...register('is_free_download')} className="checkbox checkbox-primary" />
                             <div>
                                 <span className="label-text font-bold block">Kostenlosen Download erlauben</span>
-                                <span className="label-text-alt opacity-70 block mt-1">Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterladen.</span>
+                                <span className="label-text-alt opacity-70 leading-tight block mt-1">Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterladen.</span>
+                            </div>
+                        </label>
+                        
+                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
+                            <input type="checkbox" {...register('is_editorial_only')} className="checkbox checkbox-primary" />
+                            <div>
+                                <span className="label-text font-bold block">Nur für redaktionelle Nutzung (Shop)</span>
+                                <span className="label-text-alt opacity-70 leading-tight block mt-1">Sperrt kommerzielle Lizenzen im Checkout für diesen Ordner.</span>
+                            </div>
+                        </label>
+
+                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
+                            <input type="checkbox" {...register('is_hidden')} className="checkbox checkbox-primary" />
+                            <div>
+                                <span className="label-text font-bold block">Im Frontend verstecken</span>
+                                <span className="label-text-alt opacity-70 leading-tight block mt-1">Wird nicht in Suchergebnissen oder Feeds gelistet.</span>
                             </div>
                         </label>
                     </div>

@@ -134,17 +134,24 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
             -- Eingabefelder für Defaults (nur sichtbar wenn applyMeta true ist)
             local iptcFields = f:column {
                 spacing = f:control_spacing(),
-                margin_top = 5,
-                margin_left = 120,
-                f:row { f:static_text { title="Titel:", width=90 }, f:edit_field { value = LrView.bind{key="defTitle", bind_to_object=props}, fill_horizontal=1 } },
-                f:row { f:static_text { title="Headline:", width=90 }, f:edit_field { value = LrView.bind{key="defHeadline", bind_to_object=props}, fill_horizontal=1 } },
-                f:row { f:static_text { title="Beschreibung:", width=90 }, f:edit_field { value = LrView.bind{key="defDesc", bind_to_object=props}, fill_horizontal=1, height_in_lines=3 } },
-                f:row { f:static_text { title="Keywords:", width=90 }, f:edit_field { value = LrView.bind{key="defKeywords", bind_to_object=props}, fill_horizontal=1 } },
-                f:row { f:static_text { title="Ort:", width=90 }, f:edit_field { value = LrView.bind{key="defLocation", bind_to_object=props}, fill_horizontal=1 } },
-                f:row { f:static_text { title="Stadt:", width=90 }, f:edit_field { value = LrView.bind{key="defCity", bind_to_object=props}, fill_horizontal=1 } },
-                f:row { f:static_text { title="Bundesland:", width=90 }, f:edit_field { value = LrView.bind{key="defState", bind_to_object=props}, fill_horizontal=1 } },
-                f:row { f:static_text { title="Land:", width=90 }, f:edit_field { value = LrView.bind{key="defCountry", bind_to_object=props}, fill_horizontal=1 } },
-                f:row { f:static_text { title="ISO (z.B. DE):", width=90 }, f:edit_field { value = LrView.bind{key="defIso", bind_to_object=props}, width_in_chars=5 } }
+                margin_top = 10,
+                f:row { f:static_text { title="Titel:", width=120 }, f:edit_field { value = LrView.bind{key="defTitle", bind_to_object=props}, fill_horizontal=1, width_in_chars=40 } },
+                f:row { f:static_text { title="Headline:", width=120 }, f:edit_field { value = LrView.bind{key="defHeadline", bind_to_object=props}, fill_horizontal=1, width_in_chars=40 } },
+                f:row { f:static_text { title="Beschreibung:", width=120 }, f:edit_field { value = LrView.bind{key="defDesc", bind_to_object=props}, fill_horizontal=1, width_in_chars=40, height_in_lines=4 } },
+                f:row { f:static_text { title="Keywords:", width=120 }, f:edit_field { value = LrView.bind{key="defKeywords", bind_to_object=props}, fill_horizontal=1, width_in_chars=40 } },
+                f:row { 
+                    f:static_text { title="PLZ / Ort:", width=120 }, 
+                    f:edit_field { value = LrView.bind{key="defLocation", bind_to_object=props}, width_in_chars=10, placeholder_string="PLZ" },
+                    f:spacer { width = 5 },
+                    f:edit_field { value = LrView.bind{key="defCity", bind_to_object=props}, fill_horizontal=1, placeholder_string="Stadt" } 
+                },
+                f:row { f:static_text { title="Bundesland:", width=120 }, f:edit_field { value = LrView.bind{key="defState", bind_to_object=props}, fill_horizontal=1, width_in_chars=40 } },
+                f:row { 
+                    f:static_text { title="Land / ISO:", width=120 }, 
+                    f:edit_field { value = LrView.bind{key="defCountry", bind_to_object=props}, fill_horizontal=1, placeholder_string="Land" },
+                    f:spacer { width = 5 },
+                    f:edit_field { value = LrView.bind{key="defIso", bind_to_object=props}, width_in_chars=5, placeholder_string="DE" }
+                }
             }
 
             table.insert(rows, f:row {

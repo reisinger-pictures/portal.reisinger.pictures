@@ -70,6 +70,8 @@ export const flattenGroups = (groups: GalleryGroup[], depth = 0): FlatGroup[] =>
 
 export interface GalleryGroupExtraOpts {
     is_free_download?: boolean;
+    is_editorial_only?: boolean;
+    is_hidden?: boolean;
 }
 
 export interface GalleryMetadataOpts {

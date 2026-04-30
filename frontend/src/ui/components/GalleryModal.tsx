@@ -14,7 +14,9 @@ const gallerySchema = z.object({
     gallery_group_id: z.string(),
     password: z.string().optional(),
     expires_at: z.string().optional(),
-    is_free_download: z.boolean().optional()
+    is_free_download: z.boolean().optional(),
+    is_editorial_only: z.boolean().optional(),
+    is_hidden: z.boolean().optional()
 });
 type GalleryFormValues = z.infer<typeof gallerySchema>;
 
@@ -38,7 +40,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
         defaultValues: {
-            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: ''
+            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', is_free_download: false, is_editorial_only: false, is_hidden: false
         }
     });
 
@@ -53,7 +55,9 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 gallery_group_id: editingGallery?.gallery_group_id || defaultGroupId || '',
                 password: '',
                 expires_at: editingGallery?.expires_at ? editingGallery.expires_at.split('T')[0] : '',
-                is_free_download: editingGallery?.is_free_download || false
+                is_free_download: editingGallery?.is_free_download || false,
+                is_editorial_only: editingGallery?.is_editorial_only || false,
+                is_hidden: editingGallery?.is_hidden || false
             });
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);
@@ -87,7 +91,11 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
     const onSubmit = async (data: GalleryFormValues) => {
         const pId = data.gallery_group_id === '' ? null : data.gallery_group_id;
-        const metaOpts = { is_free_download: data.is_free_download };
+        const metaOpts = { 
+            is_free_download: data.is_free_download,
+            is_editorial_only: data.is_editorial_only,
+            is_hidden: data.is_hidden
+        };
 
         try {
             if (editingGallery) {
@@ -137,25 +145,25 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="form-control w-full md:w-1/2">
+                        <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Name der Galerie</span></label>
                             <input type="text" {...register('name')} className="input input-bordered w-full" />
                         </div>
-                        <div className="form-control w-full md:w-1/2">
+                        <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">URL Slug</span></label>
                             <input type="text" {...register('slug')} onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true, shouldTouch: true})} className="input input-bordered w-full text-sm font-mono opacity-70" />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="form-control w-full md:w-1/2">
+                        <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Galerie-Typ</span></label>
                             <select {...register('type')} className="select select-bordered w-full">
                                 <option value="delivery">Delivery (Downloads)</option>
                                 <option value="selection">Auswahl (Ratings)</option>
                             </select>
                         </div>
-                        <div className="form-control w-full md:w-1/2">
+                        <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Sichtbarkeit</span></label>
                             <select disabled={isVisibilityForced} value={isVisibilityForced ? (forcedVisibility ? 'true' : 'false') : (watchIsPublic ? 'true' : 'false')} onChange={e => setValue('is_public', e.target.value === 'true')} className="select select-bordered w-full">
                                 <option value="false">Privat (Nur mit Link / Passwort)</option>
@@ -180,34 +188,47 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                     </div>
 
                     {watchType === 'delivery' && (
-                        <>
-                        <div className="form-control w-full mb-4">
-                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-primary/20">
+                        <div className="space-y-3 mb-4">
+                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-primary/20 w-full">
                                 <input type="checkbox" {...register('is_free_download')} className="checkbox checkbox-primary" />
                                 <div>
                                     <span className="label-text font-bold block">Kostenlosen Download erlauben</span>
-                                    <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">Deaktiviert Wasserzeichen und Lizenzprüfung. Gäste können direkt herunterladen.</span>
+                                    <span className="label-text-alt opacity-70 leading-tight block mt-1">Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste.</span>
                                 </div>
                             </label>
-                        </div>
-                        <div className="form-control w-full mb-4">
-                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
+
+                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
+                                <input type="checkbox" {...register('is_editorial_only')} className="checkbox checkbox-primary" />
+                                <div>
+                                    <span className="label-text font-bold block">Nur für redaktionelle Nutzung (Shop)</span>
+                                    <span className="label-text-alt opacity-70 leading-tight block mt-1">Sperrt kommerzielle Lizenzen im Checkout.</span>
+                                </div>
+                            </label>
+
+                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
+                                <input type="checkbox" {...register('is_hidden')} className="checkbox checkbox-primary" />
+                                <div>
+                                    <span className="label-text font-bold block">Im Frontend verstecken</span>
+                                    <span className="label-text-alt opacity-70 leading-tight block mt-1">Wird nicht in Suchergebnissen oder Feeds gelistet.</span>
+                                </div>
+                            </label>
+
+                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
                                 <input type="checkbox" {...register('is_live')} className="checkbox checkbox-primary" />
                                 <div>
                                     <span className="label-text font-bold block">LIVE Galerie</span>
-                                    <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">Die Galerie aktualisiert sich für Besucher automatisch alle 10s.</span>
+                                    <span className="label-text-alt opacity-70 leading-tight block mt-1">Automatischer Refresh für Besucher alle 10 Sekunden.</span>
                                 </div>
                             </label>
                         </div>
-                        </>
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pt-4 border-t border-base-300">
-                        <div className="form-control w-full md:w-1/2">
+                        <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Passwort (Optional)</span></label>
                             <input type="text" {...register('password')} className="input input-bordered w-full" placeholder={editingGallery ?"Leer = Aktuelles behalten" :"Leer = Nur Magic Link"} />
                         </div>
-                        <div className="form-control w-full md:w-1/2">
+                        <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Ablaufdatum (Optional)</span></label>
                             <input type="date" {...register('expires_at')} className="input input-bordered w-full" />
                         </div>

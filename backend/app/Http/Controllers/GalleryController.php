@@ -286,7 +286,7 @@ class GalleryController extends Controller
         ]);
 
         if ($request->filled('password')) {
-            $validated['password_hash'] = IlluminateSupportFacadesHash::make($request->password);
+            $validated['password_hash'] = Hash::make($request->password);
         }
         unset($validated['password']);
 

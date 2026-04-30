@@ -47,7 +47,7 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
                             <label className="label"><span className="label-text font-bold">Titel (Intern) *</span></label>
                             <input required type="text" {...register('title')} className="input input-bordered" placeholder="z.B. AGB Angebot" />
                         </div>
-                        <div className="form-control w-full md:w-1/3">
+                        <div className="form-control w-full">
                             <label className="label">
                                 <span className="label-text font-bold">Kürzel (Shortcut)</span>
                             </label>

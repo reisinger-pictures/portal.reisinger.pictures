@@ -27,10 +27,11 @@ return function(mode)
         local lastErr = ""
         local lastDetail = ""
         
+        -- 1. Login Loop
         while true do
             jwt, lastErr, lastDetail = Api.login()
             if jwt then
-                local isAllowed = Api.checkRole(jwt)
+                local isAllowed, userData = Api.checkRole(jwt)
                 if isAllowed then break else
                     LrDialogs.message(Api.getTitle("Zugriff verweigert"), "Dein Account hat nicht die erforderliche Fotografen- oder Admin-Rolle.", "critical")
                     return
@@ -46,7 +47,7 @@ return function(mode)
                     props.password = prefs.apiPass or ""
                     props.useTestUrl = prefs.useTestUrl == true
 
-                    local errUI = f:spacer { height = 0 } -- Fix: Verhindert nil-Loch im Lua-Array
+                    local errUI = f:spacer { height = 0 }
                     if loginFailed then
                         local errText = "Fehler: " .. tostring(lastErr)
                         if prefs.useTestUrl and lastDetail and lastDetail ~= "" then
@@ -91,10 +92,11 @@ return function(mode)
                     end
                 end)
                 
-                if not success then return end -- User hat Abbrechen gedrückt
+                if not success then return end
             end
         end
 
+        -- 2. Daten laden
         local treeData = nil
         local function reloadTree()
             local data, status = Api.call("/api/management/galleries?filter_type=" .. mode, "GET", nil, jwt)
@@ -107,6 +109,7 @@ return function(mode)
             return
         end
 
+        -- 3. Haupt-UI
         LrFunctionContext.callWithContext("GalleryManagerContext", function(context)
             local props = LrBinding.makePropertyTable(context)
             local f = LrView.osFactory()
@@ -161,11 +164,10 @@ return function(mode)
             end
 
             local uiElements = { spacing = f:control_spacing(), width = 600 }
-            
             table.insert(uiElements, f:static_text { title = string.format("Bereit für den Upload: %d Bilder", photoCount), font = "<system/bold>" })
             table.insert(uiElements, f:separator { fill_horizontal = 1 })
             
-            -- META GALERIEN BLOCK
+            -- Meta Galerien
             table.insert(uiElements, f:row {
                 f:static_text { title = "Meta-Galerie (Ordner):", width = 130 },
                 f:popup_menu { items = LrView.bind{key="groupItems", bind_to_object=props}, value = LrView.bind{key="selectedGroupId", bind_to_object=props}, fill_horizontal = 1 }
@@ -200,7 +202,7 @@ return function(mode)
             table.insert(uiElements, f:separator { fill_horizontal = 1 })
             table.insert(uiElements, f:spacer { height = 10 })
 
-            -- ZIEL GALERIEN BLOCK
+            -- Ziel Galerien
             table.insert(uiElements, f:row {
                 f:static_text { title = "Ziel-Galerie:", width = 130 },
                 f:popup_menu { items = LrView.bind{key="galleries", bind_to_object=props}, value = LrView.bind{key="selectedGalleryId", bind_to_object=props}, fill_horizontal = 1 }
@@ -280,19 +282,33 @@ return function(mode)
                 cancelVerb = "Schließen"
             }
 
+            -- 4. Upload Execution
             if result == "ok" then
                 if not props.hasGallery or props.selectedGalleryId == "" then LrDialogs.message(Api.getTitle("Abbruch"), "Bitte eine Galerie auswählen.", "warning"); return end
                 if photoCount == 0 then LrDialogs.message(Api.getTitle("Keine Bilder"), "Bitte markiere Bilder im Lightroom Raster.", "warning"); return end
 
                 LrTasks.startAsyncTask(function()
+                    local tempPath = LrPathUtils.getStandardFilePath('temp')
+                    local galleryUploadDir = LrPathUtils.child(tempPath, "Reisinger_Uploads_" .. props.selectedGalleryId)
+                    LrFileUtils.createAllDirectories(galleryUploadDir)
+                    
+                    local logFilePath = LrPathUtils.child(galleryUploadDir, "upload_log.txt")
+                    local function logMsg(msg)
+                        local fl = io.open(logFilePath, "a")
+                        if fl then
+                            fl:write(tostring(os.date()) .. " - " .. tostring(msg) .. "\n")
+                            fl:close()
+                        end
+                    end
+
+                    logMsg("=== NEUER EXPORT/UPLOAD GESTARTET ===")
+                    logMsg("Galerie ID: " .. tostring(props.selectedGalleryId))
+                    logMsg("Anzahl Bilder: " .. tostring(photoCount))
+
                     if mode == "delivery" and props.convertToDelivery then Api.call("/api/management/galleries/" .. props.selectedGalleryId, "PUT", { is_live = false }, jwt) end
 
                     local progress = LrProgressScope({ title = Api.getTitle("Exportiere und Lade hoch (" .. photoCount .. " Bilder)...") })
                     progress:setCancelable(true)
-
-                    local tempPath = LrPathUtils.getStandardFilePath('temp')
-                    local galleryUploadDir = LrPathUtils.child(tempPath, "Reisinger_Uploads_" .. props.selectedGalleryId)
-                    LrFileUtils.createAllDirectories(galleryUploadDir)
 
                     local exportSettings = { LR_format = "JPEG", LR_export_quality = 80, LR_export_colorSpace = "sRGB", LR_export_destinationType = "specificFolder", LR_export_destinationPathPrefix = galleryUploadDir, LR_export_useSubfolder = false }
                     if mode == "selection" then
@@ -301,31 +317,86 @@ return function(mode)
                         exportSettings.LR_size_doConstrain = false; exportSettings.LR_minimizeEmbeddedMetadata = false; exportSettings.LR_removeLocationMetadata = false
                     end
 
+                    exportSettings.LR_collisionHandling = "skip"
+
                     local session = LrExportSession({ photosToExport = targetPhotos, exportSettings = exportSettings })
                     local i = 0
+                    local errorCount = 0
+                    
                     for _, rendition in session:renditions() do
-                        if progress:isCanceled() then break end
-                        i = i + 1; progress:setPortionComplete(i - 1, photoCount)
+                        if progress:isCanceled() then 
+                            logMsg("Upload durch Benutzer abgebrochen.")
+                            break 
+                        end
+                        i = i + 1
+                        
+                        local path = rendition.destinationPath
+                        local success = false
+                        
+                        logMsg("--- Bild " .. i .. " ---")
+                        if path then logMsg("Geplanter Zielpfad: " .. path) end
 
-                        local success, pathOrMessage = rendition:waitForRender()
-                        if success then
-                            local path = pathOrMessage
+                        logMsg("Warte auf Lightroom-Render...")
+                        local ok, pathOrMessage = rendition:waitForRender()
+                        if ok then
+                            path = pathOrMessage
+                            success = true
+                            logMsg("Render erfolgreich: " .. tostring(path))
+                        else
+                            -- Lightroom hat wg. 'skip' nicht gerendert oder es gab einen Fehler
+                            if path and LrFileUtils.exists(path) then
+                                logMsg("Render durch LR übersprungen (Datei existiert), nutze existierende Datei: " .. tostring(path))
+                                success = true
+                            else
+                                logMsg("Render fehlgeschlagen oder Datei fehlt: " .. tostring(pathOrMessage))
+                            end
+                        end
+
+                        if success and path then
                             local filename = LrPathUtils.leafName(path)
                             local lrUuid = rendition.photo:getRawMetadata("uuid")
-                            progress:setCaption("Upload: " .. filename)
+                            progress:setCaption("Upload " .. i .. "/" .. photoCount .. ": " .. filename)
 
+                            logMsg("Starte Upload für UUID: " .. tostring(lrUuid))
+                            
                             local resBody, resHeaders = LrHttp.postMultipart(Api.getApiUrl() .. "/api/management/upload", {
                                 { name = "gallery_id", value = tostring(props.selectedGalleryId) },
                                 { name = "lr_uuid",    value = lrUuid },
                                 { name = "file",       fileName = filename, filePath = path, contentType = "image/jpeg" }
                             }, { { field = "Authorization", value = "Bearer " .. jwt } })
 
-                            if resHeaders and resHeaders.status == 200 then LrFileUtils.delete(path) else LrDialogs.message(Api.getTitle("Upload Fehler"), "Bild " .. filename .. " fehlgeschlagen.", "warning") end
+                            local status = resHeaders and resHeaders.status
+                            logMsg("HTTP Status: " .. tostring(status))
+
+                            if status == 200 then 
+                                logMsg("Upload erfolgreich. Lösche lokale Datei.")
+                                LrFileUtils.delete(path) 
+                            else 
+                                errorCount = errorCount + 1
+                                local errDetail = resBody or (resHeaders and resHeaders.error and resHeaders.error.localizedMessage) or "Unbekannter Fehler"
+                                logMsg("UPLOAD FEHLER: " .. tostring(errDetail))
+                                LrFunctionContext.callWithContext("UploadError", function(cx)
+                                    local viewFactory = LrView.osFactory()
+                                    LrDialogs.presentModalDialog {
+                                        title = Api.getTitle("Upload Fehler"),
+                                        contents = viewFactory:column {
+                                            spacing = viewFactory:control_spacing(),
+                                            viewFactory:static_text { title = "Bild " .. filename .. " fehlgeschlagen (HTTP " .. tostring(status or 'N/A') .. ")." },
+                                            viewFactory:edit_field { value = errDetail, height_in_lines = 10, width_in_chars = 50 }
+                                        },
+                                        cancelVerb = "< exclude >",
+                                        actionVerb = "OK"
+                                    }
+                                end)
+                            end
+                        else
+                            logMsg("Überspringe Upload, success=false oder path=nil")
+                            errorCount = errorCount + 1
                         end
+                        progress:setPortionComplete(i, photoCount)
                     end
                     progress:done()
                     
-                    -- Ermittle den Pfad der ausgewählten Galerie für den Web-Redirect
                     local selectedGalPath = ""
                     for _, g in ipairs(props.galleries) do
                         if g.value == props.selectedGalleryId and g.raw then
@@ -334,17 +405,25 @@ return function(mode)
                         end
                     end
 
-                    local confirm = LrDialogs.confirm(
-                        Api.getTitle("Upload abgeschlossen!"), 
-                        "Alle Bilder wurden erfolgreich hochgeladen.\n\nMöchtest du die Galerie jetzt im Web-Portal öffnen, um sie zu überprüfen und Kunden zu benachrichtigen?", 
-                        "Im Web öffnen", 
-                        "Schließen"
-                    )
-                    
-                    if confirm == "ok" and selectedGalPath ~= "" then
-                        local url = Api.getApiUrl() .. "/" .. selectedGalPath
-                        LrHttp.openUrlInBrowser(url)
+                    if errorCount == 0 then
+                        local confirm = LrDialogs.confirm(
+                            Api.getTitle("Upload abgeschlossen!"), 
+                            "Alle Bilder (" .. photoCount .. ") wurden erfolgreich hochgeladen.\n\nMöchtest du die Galerie jetzt im Web-Portal öffnen, um sie zu überprüfen und Kunden zu benachrichtigen?", 
+                            "Im Web öffnen", 
+                            "Schließen"
+                        )
+                        if confirm == "ok" and selectedGalPath ~= "" then
+                            local url = Api.getApiUrl() .. "/" .. selectedGalPath
+                            LrHttp.openUrlInBrowser(url)
+                        end
+                    else
+                        LrDialogs.message(
+                            Api.getTitle("Upload mit Fehlern abgeschlossen"), 
+                            errorCount .. " von " .. photoCount .. " Bildern konnten nicht hochgeladen werden.\n\nBitte prüfe die aufgetretenen Fehlermeldungen oder die Log-Datei im Temp-Ordner.", 
+                            "warning"
+                        )
                     end
+                    logMsg("=== UPLOAD SCHLEIFE BEENDET ===")
                 end)
             end
         end)

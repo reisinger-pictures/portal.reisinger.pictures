@@ -52,7 +52,6 @@ function Api.login()
     
     local token = data and data.access_token
     
-    -- LrHttp gibt resHeaders als Liste von Tabellen zurück: { {field="Set-Cookie", value="..."} }
     if status == 200 and resHeaders and not token then
         for _, header in ipairs(resHeaders) do
             if type(header) == "table" and header.field and string.lower(header.field) == "set-cookie" then
@@ -80,7 +79,7 @@ end
 function Api.checkRole(jwt)
     local data, status = Api.call("/api/auth/me", "GET", nil, jwt)
     if status == 200 and data then
-        if data.is_photographer or data.is_admin then return true, data end
+        if data.is_photographer or data.is_admin or data.is_super_admin then return true, data end
     end
     return false, nil
 end
