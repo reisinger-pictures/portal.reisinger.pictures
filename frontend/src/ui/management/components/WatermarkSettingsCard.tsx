@@ -3,12 +3,16 @@ import { useSettings } from '../../../logic/useSettings';
 import { useAuth } from '../../../logic/useAuth';
 import { useUI } from '../../components/UIContext';
 import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
-export interface WatermarkFormValues {
-    text: string;
-    opacity: number;
-    svg?: FileList;
-}
+const watermarkSchema = z.object({
+    text: z.string().optional(),
+    opacity: z.coerce.number().min(0.05).max(1.0),
+    svg: z.custom<FileList>((val) => typeof window !== 'undefined' && val instanceof FileList, 'Muss eine Dateiliste sein').optional()
+});
+
+export type WatermarkFormValues = z.infer<typeof watermarkSchema>;
 
 export default function WatermarkSettingsCard() {
     const [cacheBuster, setCacheBuster] = useState(() => Date.now());
@@ -17,8 +21,9 @@ export default function WatermarkSettingsCard() {
     const { showToast } = useUI();
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-    const { register, handleSubmit, reset, control, formState, setValue } = useForm({
-        defaultValues: { text: 'reisinger.pictures', opacity: 0.15, svg: undefined as FileList | undefined }
+    const { register, handleSubmit, reset, control, formState, setValue } = useForm<WatermarkFormValues>({
+        resolver: zodResolver(watermarkSchema),
+        defaultValues: { text: 'reisinger.pictures', opacity: 0.15, svg: undefined }
     });
 
     useEffect(() => {
@@ -33,9 +38,8 @@ export default function WatermarkSettingsCard() {
 
     const watchOpacity = useWatch({ control, name: 'opacity', defaultValue: 0.15 });
     const watchText = useWatch({ control, name: 'text', defaultValue: 'reisinger.pictures' });
-    const watchSvg = useWatch({ control, name: 'svg' });
+    const watchSvg = useWatch({ control, name: 'svg' }) as FileList | undefined;
 
-    // Live Vorschau: Entweder neues SVG vom Datei-Input, oder bestehendes aus der DB laden
     useEffect(() => {
         let objectUrl: string | null = null;
         let isActive = true;
@@ -63,7 +67,7 @@ export default function WatermarkSettingsCard() {
         if (data.svg && data.svg.length > 0) {
             fd.append('svg', data.svg[0]);
         }
-        fd.append('text', data.text);
+        fd.append('text', data.text || '');
         fd.append('opacity', data.opacity.toString());
 
         try {

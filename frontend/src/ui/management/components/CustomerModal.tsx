@@ -1,8 +1,23 @@
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Customer } from '../../../api';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import { LocationResult } from '../../../logic/useLocations';
+
+const customerSchema = z.object({
+    name: z.string().min(1, 'Name oder Ansprechpartner ist erforderlich'),
+    company: z.string().optional(),
+    email: z.string().email('Ungültige E-Mail-Adresse').or(z.literal('')),
+    street: z.string().optional(),
+    zip: z.string().optional(),
+    city: z.string().optional(),
+    country: z.string().optional(),
+    uid: z.string().optional()
+});
+
+type CustomerFormValues = z.infer<typeof customerSchema>;
 
 interface Props {
     isOpen: boolean;
@@ -12,7 +27,9 @@ interface Props {
 }
 
 export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave }: Props) {
-    const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting } } = useForm<Partial<Customer>>();
+    const { register, handleSubmit, reset, setValue, control, formState: { errors, isSubmitting } } = useForm<CustomerFormValues>({
+        resolver: zodResolver(customerSchema)
+    });
 
     useEffect(() => {
         if (isOpen) {
@@ -33,7 +50,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
     const watchCity = useWatch({ control, name: 'city' });
     const watchCountry = useWatch({ control, name: 'country' });
 
-    const onSubmit = async (data: Partial<Customer>) => {
+    const onSubmit = async (data: CustomerFormValues) => {
         await onSave(data);
         onClose();
     };
@@ -53,7 +70,8 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Name / Ansprechpartner</span></label>
-                            <input type="text" {...register('name')} className="input input-bordered" />
+                            <input type="text" {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
+                            {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Firma</span></label>
@@ -61,7 +79,8 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">E-Mail Adresse</span></label>
-                            <input type="email" {...register('email')} className="input input-bordered" />
+                            <input type="email" {...register('email')} className={`input input-bordered ${errors.email ? 'input-error' : ''}`} />
+                            {errors.email && <span className="text-error text-xs mt-1">{errors.email.message}</span>}
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
@@ -82,8 +101,8 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                                         mapResponse={(data) => data.map(loc => ({ id: loc.id, title: loc.postal_code || '', subtitle: loc.name, raw: loc }))}
                                         onSelect={(loc) => {
                                             setValue('city', loc.name);
-                                            setValue('zip', loc.postal_code || watchZip);
-                                            setValue('country', loc.country || watchCountry);
+                                            setValue('zip', loc.postal_code || watchZip || '');
+                                            setValue('country', loc.country || watchCountry || '');
                                         }}
                                         placeholder="PLZ"
                                     />
@@ -96,8 +115,8 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                                         mapResponse={(data) => data.map(loc => ({ id: loc.id, title: loc.name, subtitle: loc.postal_code ? loc.postal_code : '', raw: loc }))}
                                         onSelect={(loc) => {
                                             setValue('city', loc.name);
-                                            setValue('zip', loc.postal_code || watchZip);
-                                            setValue('country', loc.country || watchCountry);
+                                            setValue('zip', loc.postal_code || watchZip || '');
+                                            setValue('country', loc.country || watchCountry || '');
                                         }}
                                         placeholder="Stadt"
                                     />
