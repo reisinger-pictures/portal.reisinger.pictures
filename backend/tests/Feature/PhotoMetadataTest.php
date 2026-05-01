@@ -138,5 +138,28 @@ class PhotoMetadataTest extends TestCase {
              ->deleteJson("/api/photos/{$photo1->id}")
              ->assertStatus(403);
     }
-}
 
+
+    public function test_can_save_stress_keywords_longer_than_255_chars() {
+        $photog = User::factory()->create();
+        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $gallery = Gallery::factory()->create();
+        $photog->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photog->id]);
+
+        $longKeywords = str_repeat('long_keyword_string, ', 50); // > 1000 Zeichen
+        $this->assertGreaterThan(255, strlen($longKeywords));
+
+        $token = auth('api')->login($photog);
+        $res = $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->putJson("/api/photos/{$photo->id}/meta", [
+                 'keywords' => $longKeywords
+             ]);
+
+        $res->assertStatus(200);
+        $this->assertDatabaseHas('photos', [
+            'id' => $photo->id,
+            'keywords' => $longKeywords
+        ]);
+    }
+}

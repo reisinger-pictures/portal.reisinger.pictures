@@ -22,6 +22,7 @@ status: active
 * **No `force: true` in Playwright:** Bypassing actionability checks defeats the purpose of E2E tests. If Playwright cannot click an element naturally, a human probably can't either. Always wait for elements to become stable and uncovered (e.g., wait for animations to finish or modals to close via `toBeHidden()`) instead of forcing clicks.
 * **No Try-Catch Anti-Pattern:** Never mask failing tests by wrapping production code or assertions in `try-catch` blocks purely to pass a test. Exceptions must bubble up and fail the test clearly.
 * **Single Reason to Fail (SRP):** Tests (PHPUnit & Playwright) MUST focus on a single behavior. Avoid monolithic 20-step tests.
+* **Semantic Scoping & Landmarks (REQUIRED):** Um "Strict Mode Violations" zu vermeiden (z.B. wenn ein Passwort-Feld sowohl in der Sidebar als auch im Hauptinhalt existiert), MÜSSEN Locators über semantische HTML-Landmarks eingeschränkt werden. Nutze bevorzugt `page.locator('main').locator(...)` anstatt dich auf wechselnde Utility-CSS-Klassen (wie `.input-warning`) zu verlassen.
 * **User-Facing Locators (REQUIRED):**
   * Avoid technical selectors (CSS class, ID) if possible.
   * Use role-based locators: `page.getByRole('button', { name: 'Login' })`.

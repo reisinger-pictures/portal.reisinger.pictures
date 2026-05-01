@@ -19,7 +19,8 @@
         "php-open-source-saver/jwt-auth": "^2.9",
         "barryvdh/laravel-dompdf": "^3.0",
         "stripe/stripe-php": "^13.0",
-        "symfony/html-sanitizer": "^8.0"
+        "symfony/html-sanitizer": "^8.0",
+        "ext-zip": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

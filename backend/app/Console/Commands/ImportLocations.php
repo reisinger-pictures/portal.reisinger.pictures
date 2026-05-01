@@ -33,9 +33,14 @@ class ImportLocations extends Command
             file_put_contents($zipPlacesPath, $response->body());
             $zip = new \ZipArchive;
             if ($zip->open($zipPlacesPath) === true) {
-                $zip->extractTo($tempDir, 'AT.txt');
-                rename($tempDir . '/AT.txt', $txtPlacesPath);
+                if ($zip->extractTo($tempDir, 'AT.txt')) {
+                    rename($tempDir . '/AT.txt', $txtPlacesPath);
+                } else {
+                    $this->error('Fehler beim Extrahieren der AT_places.zip');
+                }
                 $zip->close();
+            } else {
+                $this->error('Fehler beim Öffnen der AT_places.zip');
             }
             
             if (file_exists($txtPlacesPath) && ($handle = fopen($txtPlacesPath, "r")) !== FALSE) {
@@ -61,9 +66,14 @@ class ImportLocations extends Command
             file_put_contents($zipPostalPath, $response->body());
             $zip = new \ZipArchive;
             if ($zip->open($zipPostalPath) === true) {
-                $zip->extractTo($tempDir, 'AT.txt');
-                rename($tempDir . '/AT.txt', $txtPostalPath);
+                if ($zip->extractTo($tempDir, 'AT.txt')) {
+                    rename($tempDir . '/AT.txt', $txtPostalPath);
+                } else {
+                    $this->error('Fehler beim Extrahieren der AT_postal.zip');
+                }
                 $zip->close();
+            } else {
+                $this->error('Fehler beim Öffnen der AT_postal.zip');
             }
         }
 
@@ -116,8 +126,6 @@ class ImportLocations extends Command
         if ($countryResponse->successful()) {
             $countryLines = explode("\n", $countryResponse->body());
             $countryInserts = [];
-            $fallback = ['AT' => 'Österreich', 'DE' => 'Deutschland', 'CH' => 'Schweiz', 'IT' => 'Italien', 'FR' => 'Frankreich', 'ES' => 'Spanien', 'US' => 'Vereinigte Staaten', 'GB' => 'Vereinigtes Königreich', 'NL' => 'Niederlande', 'BE' => 'Belgien'];
-            
             foreach ($countryLines as $line) {
                 $line = trim($line);
                 if (empty($line) || str_starts_with($line, '#')) continue;
@@ -125,7 +133,7 @@ class ImportLocations extends Command
                 $data = explode("\t", $line);
                 if (count($data) >= 5) {
                     $iso = trim($data[0]);
-                    $name = class_exists('Locale') ? \Locale::getDisplayRegion('und-' . $iso, 'de') : ($fallback[$iso] ?? $data[4]);
+                    $name = \Locale::getDisplayRegion('und-' . $iso, 'de');
                     if (empty($name)) $name = $data[4];
 
                     $countryInserts[] = [

@@ -100,9 +100,8 @@ class GalleryController extends Controller
         ]);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
-        if (GalleryGroup::where('slug', $slug)->exists()) {
-            $slug = $slug . '-' . time();
-        }
+        $count = \App\Models\GalleryGroup::where('slug', 'LIKE', "{$slug}%")->count();
+        $slug = $count > 0 ? "{$slug}-{$count}" : $slug;
 
         $group = GalleryGroup::create([
             'name' => $request->name,
@@ -136,8 +135,9 @@ class GalleryController extends Controller
         $group = GalleryGroup::findOrFail($id);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
-        if ($slug !== $group->slug && GalleryGroup::where('slug', $slug)->exists()) {
-            $slug = $slug . '-' . time();
+        if ($slug !== $group->slug) {
+            $count = \App\Models\GalleryGroup::where('slug', 'LIKE', "{$slug}%")->count();
+            $slug = $count > 0 ? "{$slug}-{$count}" : $slug;
         }
 
         $group->update([
@@ -201,7 +201,8 @@ class GalleryController extends Controller
         ]);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
-        if (Gallery::where('slug', $slug)->exists()) $slug = $slug . '-' . time();
+        $count = \App\Models\Gallery::where('slug', 'LIKE', "{$slug}%")->count();
+        $slug = $count > 0 ? "{$slug}-{$count}" : $slug;
 
         $isPublic = $request->is_public ?? false;
 
@@ -216,7 +217,16 @@ class GalleryController extends Controller
             $isPublic = false;
         }
 
-        return DB::transaction(function () use ($request, $slug, $isPublic, $user) {
+        $expiresAt = null;
+        if ($request->expires_at) {
+            try {
+                $expiresAt = Carbon::parse($request->expires_at)->endOfDay();
+            } catch (\Exception $e) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['expires_at' => 'Ungültiges Datumsformat.']);
+            }
+        }
+
+        return DB::transaction(function () use ($request, $slug, $isPublic, $user, $expiresAt) {
             $gallery = Gallery::create([
                 'name' => $request->name,
                 'slug' => $slug,
@@ -229,7 +239,7 @@ class GalleryController extends Controller
                 'restricted_photographers' => $request->restricted_photographers ?? null,
                 'gallery_group_id' => $request->gallery_group_id,
                 'password_hash' => $request->password ? Hash::make($request->password) : null,
-                'expires_at' => $request->expires_at ? Carbon::parse($request->expires_at)->endOfDay() : null,
+                'expires_at' => $expiresAt,
                 'allow_client_metadata_edit' => $request->allow_client_metadata_edit ?? false,
                 'apply_metadata_to_photos' => $request->apply_metadata_to_photos ?? false,
                 'default_title' => $request->default_title,
@@ -289,14 +299,20 @@ class GalleryController extends Controller
 
         if (array_key_exists('slug', $validated) && $validated['slug'] !== $gallery->slug) {
             $slug = Str::slug($validated['slug']);
-            if (Gallery::where('slug', $slug)->exists()) {
-                $slug = $slug . '-' . time();
-            }
-            $validated['slug'] = $slug;
+            $count = \App\Models\Gallery::where('slug', 'LIKE', "{$slug}%")->count();
+            $validated['slug'] = $count > 0 ? "{$slug}-{$count}" : $slug;
         }
 
         if (array_key_exists('expires_at', $validated)) {
-            $validated['expires_at'] = $validated['expires_at'] ? Carbon::parse($validated['expires_at'])->endOfDay() : null;
+            if ($validated['expires_at']) {
+                try {
+                    $validated['expires_at'] = Carbon::parse($validated['expires_at'])->endOfDay();
+                } catch (\Exception $e) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['expires_at' => 'Ungültiges Datumsformat.']);
+                }
+            } else {
+                $validated['expires_at'] = null;
+            }
         }
 
         if ($request->filled('password')) {

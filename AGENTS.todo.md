@@ -17,22 +17,28 @@ Aktuelle DB Version: 14
 
 ## 🏗️ Infrastruktur & Technical Debt
 
-- [ ] **Docker:** PHP-Image anpassen und `intl`-Extension permanent aktivieren.
-- [ ] **Clean-up:** Statisches Fallback-Array in `ImportLocations.php` entfernen, sobald `intl` im Image vorhanden ist.
+- [x] **Docker:** PHP-Image anpassen und `intl`-Extension permanent aktivieren.
+- [x] **Clean-up:** Statisches Fallback-Array in `ImportLocations.php` entfernt (`\Locale` wird nun nativ genutzt).
 - [ ] **Refactor:** Slug-Kollisions-Logik in `GalleryController` von `time()` auf iterative Suffixe (z.B. `-1`, `-2`)
   umstellen.
+- [ ] **Database:** In der nächsten Migration (z.B. V014) sicherstellen, dass die UI-Flags `is_hidden`, `is_free_download`, `is_editorial_only` explizit als `boolean` mit `default(false)` migriert werden, um Nullable-Inkonsistenzen zu vermeiden.
 
 ## 🐛 Nächste Fehlerbehebungen (Robustheit)
 
-- [ ] **Error Handling:** `Carbon::parse` in `GalleryController` absichern (Validierungsfehler statt Exception).
-- [ ] **Error Handling:** `ZipArchive` in `ImportLocations.php` mit Fehlerprüfungen ausstatten (Prüfung von `open` und
+- [x] **Error Handling:** `Carbon::parse` in `GalleryController` absichern (Validierungsfehler statt Exception).
+- [x] **Error Handling:** `ZipArchive` in `ImportLocations.php` mit Fehlerprüfungen ausstatten (Prüfung von `open` und
   `extractTo`).
 
 ## 🧪 Ausstehende Tests
 
-- [ ] **Backend Test (Locations):** Verifizieren des Joins in `ImportLocations` (PLZ + Einwohner) und
+- [x] **Backend Test (Locations):** Verifizieren des Joins in `ImportLocations` (PLZ + Einwohner) und
   Population-Ranking.
-- [ ] **Backend Test (Stress-Keywords):** Speichern von IPTC-Keywords > 255 Zeichen validieren.
-- [ ] **Backend Test (Gallery Updates):** Validierung der Slug-Kollisions-Logik und `expires_at` Konvertierung.
-- [ ] **E2E Test (Transient Rights):** Magic-Link-Gäste Speichervorgänge und Versionierung prüfen.
-- [ ] **Frontend Tests:** E2E Roundtrip-Tests für Modale (is_editorial_only, is_hidden Speicherung).
+- [x] **Backend Test (Stress-Keywords):** Speichern von IPTC-Keywords > 255 Zeichen validieren.
+- [x] **Backend Test (Gallery Updates):** Validierung der Slug-Kollisions-Logik und `expires_at` Konvertierung.
+- [x] **E2E Test (Transient Rights):** Magic-Link-Gäste Speichervorgänge und Versionierung prüfen. *(Wird bereits vollständig durch Flow A in photo-management.spec.ts validiert)*
+- [x] **Frontend Tests:** E2E Roundtrip-Tests für alle UI-Flags in Modalen (Gallery & Group) über FormHelper und Backend-API Validierung erstellt.
+## 🧹 E2E Testing & State-Management (Neu)
+
+- [x] **E2E Teardown Erweitern:** `E2ESessionHelper.ts` anpassen, kaskadierendes Löschen von Orders und Statements integriert.
+- [x] **E2E Security Tests:** Magic-Link Authentifizierung mit Passwort-Prompt abgedeckt.
+- [~] **E2E Stripe Webhooks:** VERWORFEN. Keine lokalen Test-Routen (`/test/...`) in die Production-API mischen. Logik ist im Backend via `DisputeAccessTest.php` ausreichend abgesichert.

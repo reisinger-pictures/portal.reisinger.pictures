@@ -7,12 +7,18 @@ export interface FillGalleryModalParams {
     type?: string;
     visibility?: string;
     freeDownload?: boolean;
+    editorialOnly?: boolean;
+    hidden?: boolean;
+    live?: boolean;
     expiresAt?: string;
 }
 
 export interface FillGroupModalParams {
     name?: string;
     visibility?: string;
+    freeDownload?: boolean;
+    editorialOnly?: boolean;
+    hidden?: boolean;
 }
 
 export interface FillUserModalParams {
@@ -50,25 +56,31 @@ export class FormHelper {
     constructor(private page: Page, private modal: ModalHelper) {}
 
     async fillGalleryModal(params: FillGalleryModalParams) {
-        if (params.name) await this.modal.fillInputByLabel('Name der Galerie', params.name);
-        if (params.type) await this.modal.selectByLabel('Galerie-Typ', params.type);
-        if (params.visibility) await this.modal.selectByLabel('Sichtbarkeit', params.visibility);
+        if (params.name !== undefined) await this.modal.fillInputByLabel('Name der Galerie', params.name);
+        if (params.type !== undefined) await this.modal.selectByLabel('Galerie-Typ', params.type);
+        if (params.visibility !== undefined) await this.modal.selectByLabel('Sichtbarkeit', params.visibility);
         if (params.freeDownload !== undefined) await this.modal.toggleCheckboxByLabel('Kostenlosen Download erlauben', params.freeDownload);
+        if (params.editorialOnly !== undefined) await this.modal.toggleCheckboxByLabel('Nur für redaktionelle Nutzung (Shop)', params.editorialOnly);
+        if (params.hidden !== undefined) await this.modal.toggleCheckboxByLabel('Im Frontend verstecken', params.hidden);
+        if (params.live !== undefined) await this.modal.toggleCheckboxByLabel('LIVE Galerie', params.live);
         if (params.expiresAt) await this.modal.fillInputByLabel('Ablaufdatum', params.expiresAt);
     }
 
     async fillGroupModal(params: FillGroupModalParams) {
-        if (params.name) await this.modal.fillInputByLabel('Name', params.name);
-        if (params.visibility) await this.modal.selectByLabel('Sichtbarkeits-Vorgabe', params.visibility);
+        if (params.name !== undefined) await this.modal.fillInputByLabel('Name', params.name);
+        if (params.visibility !== undefined) await this.modal.selectByLabel('Sichtbarkeits-Vorgabe', params.visibility);
+        if (params.freeDownload !== undefined) await this.modal.toggleCheckboxByLabel('Kostenlosen Download erlauben', params.freeDownload);
+        if (params.editorialOnly !== undefined) await this.modal.toggleCheckboxByLabel('Nur für redaktionelle Nutzung (Shop)', params.editorialOnly);
+        if (params.hidden !== undefined) await this.modal.toggleCheckboxByLabel('Im Frontend verstecken', params.hidden);
     }
 
     async fillUserModal(params: FillUserModalParams) {
         if (params.name) await this.modal.fillInputByLabel('Name', params.name);
-        if (params.email) await this.modal.fillInputByLabel('E-Mail Adresse', params.email);
+        if (params.email !== undefined) await this.modal.fillInputByLabel('E-Mail Adresse', params.email);
     }
 
     async fillTenantModal(params: FillTenantModalParams) {
-        if (params.name) await this.modal.fillInputByLabel('Name (z.B. Firma XYZ)', params.name);
+        if (params.name !== undefined) await this.modal.fillInputByLabel('Name (z.B. Firma XYZ)', params.name);
     }
 
     async fillInviteModal(params: FillInviteModalParams) {

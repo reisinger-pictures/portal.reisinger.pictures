@@ -40,7 +40,7 @@ test.describe('Payout System UI Workflow', () => {
         await expect(page.locator('.toast')).toContainText('Abrechnung erfolgreich durchgeführt!');
 
         // Der 100,50 € Pool sollte nun in der Liste sichtbar sein
-        await expect(page.locator('div.font-mono.text-right').filter({ hasText: '100.50 €' })).toBeVisible();
+        await expect(page.locator('div.font-mono.text-right').filter({ hasText: '100.50 €' }).first()).toBeVisible();
 
         await auth.logout();
 

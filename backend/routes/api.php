@@ -44,10 +44,20 @@ Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index
 
 if (app()->environment('local', 'testing')) {
     Route::delete('/test/cleanup-user/{id}', function ($id) {
-        DownloadLog::where('user_id', $id)->delete();
-        User::find($id)?->delete();
+        $user = User::find($id);
+        if ($user) {
+            \App\Models\PhotographerStatement::where('user_id', $id)->delete();
+            $orderIds = \App\Models\Order::where('user_id', $id)->pluck('id');
+            if ($orderIds->isNotEmpty()) {
+                \App\Models\InvoiceSnapshot::whereIn('order_id', $orderIds)->delete();
+                \App\Models\Order::whereIn('id', $orderIds)->delete();
+            }
+            DownloadLog::where('user_id', $id)->delete();
+            $user->delete();
+        }
         return response()->json(['success' => true]);
     });
+
 }
 
 Route::post('/test/flush-queue', function () {

@@ -77,4 +77,48 @@ class GalleryApiTest extends TestCase
 
         $response->assertStatus(401);
     }
+
+
+    public function test_gallery_slug_collision_and_expires_at_conversion() {
+        $photographer = $this->createUserWithRole('photographer');
+        $token = \Illuminate\Support\Facades\Auth::guard('api')->login($photographer);
+
+        // Erste Galerie
+        $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+            ->postJson('/api/management/galleries', [
+                'name' => 'Kollision',
+                'type' => 'delivery',
+                'slug' => 'kollision'
+            ])->assertStatus(200);
+
+        // Zweite Galerie mit selbem Slug
+        $res2 = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+            ->postJson('/api/management/galleries', [
+                'name' => 'Kollision',
+                'type' => 'delivery',
+                'slug' => 'kollision',
+                'expires_at' => '2026-12-31'
+            ]);
+            
+        $res2->assertStatus(200);
+        
+        $this->assertNotEquals('kollision', $res2->json('gallery.slug'));
+        $this->assertStringStartsWith('kollision-', $res2->json('gallery.slug'));
+        $this->assertStringContainsString('2026-12-31T23:59:59', $res2->json('gallery.expires_at'));
+    }
+
+    public function test_invalid_date_throws_validation_error() {
+        $photographer = $this->createUserWithRole('photographer');
+        $token = \Illuminate\Support\Facades\Auth::guard('api')->login($photographer);
+
+        $res = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+            ->postJson('/api/management/galleries', [
+                'name' => 'Invalid Date',
+                'type' => 'delivery',
+                'expires_at' => 'Kein Datum'
+            ]);
+            
+        $res->assertStatus(422);
+        $res->assertJsonValidationErrors(['expires_at']);
+    }
 }
