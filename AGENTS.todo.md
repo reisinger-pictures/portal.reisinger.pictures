@@ -2,43 +2,40 @@
 
 Aktuelle DB Version: 14
 
-## ✅ Abgeschlossene Fixes (Kürzlich)
-
-- [x] **Bugfix (Backend - ImportLocations):** `ImportLocations.php` umschreiben. Joins zwischen `AT.zip` (PLZ) und
-  `AT.txt` (Einwohner) implementiert.
-- [x] **Bugfix (Backend - ImportLocations):** Statischer Fallback für Ländernamen integriert (Überbrückung fehlendes
-  `intl`).
-- [x] **Bugfix (Backend - SearchController):** Sekundäre Sortierung (`postal_code`) und erweitertes
-  Deduplizierungs-Logik (`name` + `state`).
-- [x] **Bugfix (Backend - GalleryController):** Validierungs-Whitelist um `slug` und `expires_at` erweitert (Fix für
-  PDOException).
-- [x] **Bugfix (Backend - DB/Validation):** IPTC-Keywords auf `TEXT` migriert (Migration `V013`) und `max:255` Limit
-  aufgehoben.
-
 ## 🏗️ Infrastruktur & Technical Debt
 
-- [x] **Docker:** PHP-Image anpassen und `intl`-Extension permanent aktivieren.
-- [x] **Clean-up:** Statisches Fallback-Array in `ImportLocations.php` entfernt (`\Locale` wird nun nativ genutzt).
-- [ ] **Refactor:** Slug-Kollisions-Logik in `GalleryController` von `time()` auf iterative Suffixe (z.B. `-1`, `-2`)
-  umstellen.
-- [ ] **Database:** In der nächsten Migration (z.B. V014) sicherstellen, dass die UI-Flags `is_hidden`, `is_free_download`, `is_editorial_only` explizit als `boolean` mit `default(false)` migriert werden, um Nullable-Inkonsistenzen zu vermeiden.
+- [ ] **Database:** In der nächsten Migration (z.B. V014) sicherstellen, dass die UI-Flags `is_hidden`,
+  `is_free_download`, `is_editorial_only` explizit als `boolean` mit `default(false)` migriert werden, um
+  Nullable-Inkonsistenzen zu vermeiden.
 
-## 🐛 Nächste Fehlerbehebungen (Robustheit)
+## 📝 TODOs: AI Batch-Edit & Refactoring
 
-- [x] **Error Handling:** `Carbon::parse` in `GalleryController` absichern (Validierungsfehler statt Exception).
-- [x] **Error Handling:** `ZipArchive` in `ImportLocations.php` mit Fehlerprüfungen ausstatten (Prüfung von `open` und
-  `extractTo`).
+### 🔒 Sicherheit & Robustheit
 
-## 🧪 Ausstehende Tests
+- [ ] **Robustes JSON-Parsing:** `generateMetadata` in `useLMStudio.ts` mit `try-catch` absichern und ggf. Validierung (
+  z.B. Zod) hinzufügen, um fehlerhafte KI-Antworten abzufangen.
+- [ ] **Backend-Autorisierung:** Verifizieren, dass der API-Endpunkt `updateMetadata` im Backend die Berechtigung des
+  Users für die spezifische `galleryId` prüft (nicht nur die globale Rolle).
+- [ ] **Konfigurations-Optionen:** Hardcoded URL `http://127.0.0.1:1234` durch eine Konfiguration (z.B. via Environment
+  Variable oder User-Settings) ersetzbar machen.
 
-- [x] **Backend Test (Locations):** Verifizieren des Joins in `ImportLocations` (PLZ + Einwohner) und
-  Population-Ranking.
-- [x] **Backend Test (Stress-Keywords):** Speichern von IPTC-Keywords > 255 Zeichen validieren.
-- [x] **Backend Test (Gallery Updates):** Validierung der Slug-Kollisions-Logik und `expires_at` Konvertierung.
-- [x] **E2E Test (Transient Rights):** Magic-Link-Gäste Speichervorgänge und Versionierung prüfen. *(Wird bereits vollständig durch Flow A in photo-management.spec.ts validiert)*
-- [x] **Frontend Tests:** E2E Roundtrip-Tests für alle UI-Flags in Modalen (Gallery & Group) über FormHelper und Backend-API Validierung erstellt.
-## 🧹 E2E Testing & State-Management (Neu)
+### 🚀 Performance & Refactoring
 
-- [x] **E2E Teardown Erweitern:** `E2ESessionHelper.ts` anpassen, kaskadierendes Löschen von Orders und Statements integriert.
-- [x] **E2E Security Tests:** Magic-Link Authentifizierung mit Passwort-Prompt abgedeckt.
-- [~] **E2E Stripe Webhooks:** VERWORFEN. Keine lokalen Test-Routen (`/test/...`) in die Production-API mischen. Logik ist im Backend via `DisputeAccessTest.php` ausreichend abgesichert.
+- [ ] **Helper-Extraktion:** Die Funktion `getCompressedBase64` aus `useLMStudio.ts` in eine zentrale Utility-Klasse (
+  z.B. `frontend/src/logic/utils/ImageHelper.ts`) auslagern.
+- [ ] **Error-Logging:** Leeren `catch`-Block beim Meilisearch-Fallback in `AIBatchEditModal.tsx` durch aussagekräftiges
+  `console.warn` oder Error-Tracking ersetzen.
+- [ ] **Todo-Management:** Die stetig wachsende Liste in `AGENTS.todo.md` sichten und abgeschlossene Punkte löschen.
+
+### ✨ User Experience (UX)
+
+- [ ] **Batch-Automation:** Einen Button "Alle generieren" im `AIBatchEditModal` implementieren, der die Generierung für
+  alle Bilder in der Liste sequentiell (oder parallel <-- NEIN, nur 1 Request parallel solange wir lokal sind, gernew
+  mehr bei externen provideren, dan aber in einem request) startet.
+- [ ] **Input-Validierung:** Max-Length Validierung für den generierten Titel (50 Zeichen) direkt im UI-Feld
+  anzeigen. (<-- eventuell sollen wir den Titel auch länger machen)
+- [ ] **Prompt verbessern**: Prompt wenn möglich verkürzen. Ich weiß nicht ob wir nicht den Default JSON ausgeben
+  sollen. Soll wirklich so viel im User und so wenig im System promt stehen? Kann man das Format auch kürzer / besser
+  definieren. 50 Zeichen für den Titel ist zu wenig. Es sollen alle Felder im UI danach ausgefüllt sein (gerne auch mit
+  Meilisearch). Mir fehlt auf die schnelle die Location innerhalb einer Stadt im JSON... Ziel ist wie eine große
+  Bildagentur die Bilder zu beschreiben. Recherchiere wie das Best practise promting mit gemma 4 ist.

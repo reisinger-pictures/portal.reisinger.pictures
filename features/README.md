@@ -33,6 +33,7 @@ This directory serves as the single source of truth for all technical concepts, 
 ### 📷 Photos & Metadata
 * [01-upload-and-processing.md](photos/01-upload-and-processing.md) - Lightroom UUIDs and ImageProcessor.
 * [02-metadata-versioning.md](photos/02-metadata-versioning.md) - Client edits and snapshot reverting.
+* [03-ai-batch-edit.md](photos/03-ai-batch-edit.md) - Local AI metadata generation via LM Studio.
 
 ### 🔍 Search & Discovery
 * [01-search-and-discovery.md](search/01-search-and-discovery.md) - Meilisearch integration.

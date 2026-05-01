@@ -11,9 +11,10 @@ interface Props {
     onOpenMail: () => void;
     onOpenAccess?: () => void;
     onOpenPhotographerTeam?: () => void;
+    onOpenAIBatchEdit?: () => void;
 }
 
-export default function ManagementGalleryActions({ gallery, canSendMail, downloadsCount, isPhotographer, onOpenRatings, onOpenMetadata, onOpenInvite, onOpenMail, onOpenAccess, onOpenPhotographerTeam }: Props) {
+export default function ManagementGalleryActions({ gallery, canSendMail, downloadsCount, isPhotographer, onOpenRatings, onOpenMetadata, onOpenInvite, onOpenMail, onOpenAccess, onOpenPhotographerTeam, onOpenAIBatchEdit }: Props) {
     return (
         <div className="flex flex-wrap gap-4 items-center">
             {gallery.type === 'delivery' && <span className="badge badge-ghost font-normal">{downloadsCount || 0} Downloads</span>}
@@ -30,6 +31,7 @@ export default function ManagementGalleryActions({ gallery, canSendMail, downloa
                         </button>
                     )}
                     {onOpenAccess && <button onClick={onOpenAccess} className="btn btn-outline btn-sm"><span className="iconify mdi--account-key"></span> Zugriff...</button>}
+                    {gallery.type === 'delivery' && isPhotographer && onOpenAIBatchEdit && <button onClick={onOpenAIBatchEdit} className="btn btn-outline btn-sm"><span className="iconify mdi--robot-outline"></span> KI Batch-Edit</button>}
                     {onOpenPhotographerTeam && <button onClick={onOpenPhotographerTeam} className="btn btn-outline btn-sm"><span className="iconify mdi--camera-account"></span> Fotografen...</button>}
                     <button onClick={onOpenInvite} className="btn btn-outline btn-sm">
                         <span className="iconify mdi--link"></span> Einladungslink...

@@ -16,6 +16,7 @@ import GalleryMetadataDefaultsModal from './components/GalleryMetadataDefaultsMo
 import GalleryModals from '../components/GalleryModals';
 import ManagementGalleryActions from './components/ManagementGalleryActions';
 import PhotographerTeamModal from './components/PhotographerTeamModal';
+import AIBatchEditModal from './components/AIBatchEditModal';
 
 export default function ManagementGalleryView() {
     const params = useParams();
@@ -37,6 +38,7 @@ export default function ManagementGalleryView() {
     const [isMetadataModalOpen, setIsMetadataModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const [isPhotographerTeamModalOpen, setIsPhotographerTeamModalOpen] = useState(false);
+    const [isAIBatchModalOpen, setIsAIBatchModalOpen] = useState(false);
 
     usePhotoSwipe({ galleryRef, trigger: photos.length });
 
@@ -68,6 +70,7 @@ export default function ManagementGalleryView() {
                         onOpenInvite={() => setIsInviteModalOpen(true)}
                         onOpenAccess={user?.is_admin ? () => setIsAccessModalOpen(true) : undefined}
                         onOpenPhotographerTeam={user?.is_admin || user?.is_photographer ? () => setIsPhotographerTeamModalOpen(true) : undefined}
+                        onOpenAIBatchEdit={user?.is_photographer ? () => setIsAIBatchModalOpen(true) : undefined}
                         onOpenMail={() => setIsMailModalOpen(true)}
                     />
                 </div>
@@ -120,6 +123,7 @@ export default function ManagementGalleryView() {
                 <GalleryAccessModal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} galleryId={gallery.id} galleryName={gallery.name} />
                 <PhotographerTeamModal isOpen={isPhotographerTeamModalOpen} onClose={() => setIsPhotographerTeamModalOpen(false)} item={gallery} isGroup={false} onUpdateState={() => mutate()} />
                 <GalleryMetadataDefaultsModal isOpen={isMetadataModalOpen} onClose={() => setIsMetadataModalOpen(false)} gallery={gallery} onUpdate={async (...args) => { await updateGallery(...args); mutate(); }} />
+                <AIBatchEditModal isOpen={isAIBatchModalOpen} onClose={() => setIsAIBatchModalOpen(false)} photos={photos} galleryId={gallery.id} />
 
                 <GalleryModals
                     availableGroups={availableGroups}
