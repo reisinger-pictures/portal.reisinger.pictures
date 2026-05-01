@@ -34,26 +34,26 @@ export function CartProvider({ children }: CartProviderProps) {
 
     // Initiale Lade-Logik & Re-Load bei User-Wechsel mit Zod-Validierung
     useEffect(() => {
-        setIsLoaded(false);
+        queueMicrotask(() => setIsLoaded(false));
         try {
             const saved = localStorage.getItem(cartKey);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 const validation = cartSchema.safeParse(parsed);
                 if (validation.success) {
-                    setItems(validation.data);
+                    queueMicrotask(() => setItems(validation.data));
                 } else {
                     console.warn('LocalStorage Cart Mismatch:', validation.error);
-                    setItems([]);
+                    queueMicrotask(() => setItems([]));
                 }
             } else {
-                setItems([]);
+                queueMicrotask(() => setItems([]));
             }
         } catch {
             showToast('error', 'Warenkorb konnte nicht geladen werden.');
-            setItems([]);
+            queueMicrotask(() => setItems([]));
         }
-        setIsLoaded(true);
+        queueMicrotask(() => setIsLoaded(true));
     }, [cartKey, showToast]);
 
     // Speichern bei Änderungen

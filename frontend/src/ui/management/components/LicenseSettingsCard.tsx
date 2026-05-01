@@ -7,13 +7,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
 const licenseSettingsSchema = z.object({
-    base_price: z.coerce.number().min(0, "Muss positiv sein"),
-    mult_commercial: z.coerce.number().min(0),
-    mult_international: z.coerce.number().min(0),
-    mult_unlimited: z.coerce.number().min(0),
-    price_original: z.coerce.number().min(0),
-    price_print: z.coerce.number().min(0),
-    price_web: z.coerce.number().min(0),
+    base_price: z.number().min(0, "Muss positiv sein"),
+    mult_commercial: z.number().min(0),
+    mult_international: z.number().min(0),
+    mult_unlimited: z.number().min(0),
+    price_original: z.number().min(0),
+    price_print: z.number().min(0),
+    price_web: z.number().min(0),
     term_1_year: z.string().optional(),
     term_commercial: z.string().optional(),
     term_editorial: z.string().optional(),
@@ -116,7 +116,7 @@ export default function LicenseSettingsCard() {
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <div className="form-control w-full max-w-xs">
                         <label className="label"><span className="label-text font-bold">Basispreis (Netto in €)</span></label>
-                        <input type="number" step="0.5" {...register('base_price')} className="input input-bordered w-full font-mono text-lg text-primary font-bold"/>
+                        <input type="number" step="0.5" {...register('base_price', { valueAsNumber: true })} className="input input-bordered w-full font-mono text-lg text-primary font-bold"/>
                         <div className="label"><span className="label-text-alt opacity-70">Gilt für Redaktionell, 1 Jahr, Web.</span></div>
                     </div>
 
@@ -143,15 +143,15 @@ export default function LicenseSettingsCard() {
                         <div className="col-span-full font-bold border-b border-base-300 pb-2 mt-4 text-primary">Preis-Faktoren (Zuschläge in %)</div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Aufschlag: Kommerziell</span></label>
-                            <label className="input input-bordered flex items-center gap-2"><input type="number" {...register('mult_commercial')} className="grow"/><span>%</span></label>
+                            <label className="input input-bordered flex items-center gap-2"><input type="number" {...register('mult_commercial', { valueAsNumber: true })} className="grow"/><span>%</span></label>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Aufschlag: Unbegrenzte Dauer</span></label>
-                            <label className="input input-bordered flex items-center gap-2"><input type="number" {...register('mult_unlimited')} className="grow"/><span>%</span></label>
+                            <label className="input input-bordered flex items-center gap-2"><input type="number" {...register('mult_unlimited', { valueAsNumber: true })} className="grow"/><span>%</span></label>
                         </div>
                         <div className="form-control md:col-span-2">
                             <label className="label"><span className="label-text font-bold">Aufschlag: Weltweit</span></label>
-                            <label className="input input-bordered flex items-center gap-2"><input type="number" {...register('mult_international')} className="grow"/><span>%</span></label>
+                            <label className="input input-bordered flex items-center gap-2"><input type="number" {...register('mult_international', { valueAsNumber: true })} className="grow"/><span>%</span></label>
                         </div>
                     </div>
 

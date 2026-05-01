@@ -32,7 +32,7 @@ export function useLMStudio(enabled: boolean = true) {
                     console.info(`ℹ️ LM Studio: Keine Modelle unter ${baseUrl} gefunden. KI-Features sind deaktiviert.`);
                 }
             })
-            .catch((err) => {
+            .catch(() => {
                 setIsAvailable(false);
                 setModelId(null);
                 console.info(`ℹ️ LM Studio: Unter ${baseUrl} nicht erreichbar. Lokale KI-Features sind deaktiviert.`);
@@ -75,7 +75,7 @@ export function useLMStudio(enabled: boolean = true) {
             const text = data.choices?.[0]?.message?.content || '{}';
             
             // Regex to clean potential markdown blocks from AI output
-            const cleanText = text.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+            const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
             
             const parsed = JSON.parse(cleanText);
             const validationResult = lmStudioResponseSchema.safeParse(parsed);

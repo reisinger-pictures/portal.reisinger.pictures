@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 const watermarkSchema = z.object({
     text: z.string().optional(),
-    opacity: z.coerce.number().min(0.05).max(1.0),
+    opacity: z.number().min(0.05).max(1.0),
     svg: z.custom<FileList>((val) => typeof window !== 'undefined' && val instanceof FileList, 'Muss eine Dateiliste sein').optional()
 });
 
@@ -106,7 +106,7 @@ export default function WatermarkSettingsCard() {
 
                     <div className="form-control w-full max-w-xl">
                         <label className="label"><span className="label-text font-bold">Basis-Deckkraft (Delivery-Galerien)</span></label>
-                        <input type="range" min="0.05" max="0.6" step="0.05" {...register('opacity')} className="range range-primary" />
+                        <input type="range" min="0.05" max="0.6" step="0.05" {...register('opacity', { valueAsNumber: true })} className="range range-primary" />
                         <div className="text-sm mt-2 opacity-70 font-mono">{Math.round(watchOpacity * 100)} %</div>
                     </div>
 
