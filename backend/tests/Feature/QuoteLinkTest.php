@@ -14,7 +14,7 @@ class QuoteLinkTest extends TestCase
     public function test_photographer_can_generate_quote_link()
     {
         $photographer = User::factory()->create();
-        $photographer->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photographer->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -32,7 +32,7 @@ class QuoteLinkTest extends TestCase
     public function test_client_cannot_generate_quote_link()
     {
         $client = User::factory()->create();
-        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
         $token = auth('api')->login($client);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])

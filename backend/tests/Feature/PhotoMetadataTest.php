@@ -13,7 +13,7 @@ class PhotoMetadataTest extends TestCase {
 
     public function test_client_with_rights_can_update_metadata_and_creates_version() {
         $client = User::factory()->create(['can_edit_metadata' => true]);
-        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
         
         $gallery = Gallery::factory()->create([
             'allow_client_metadata_edit' => true,
@@ -56,7 +56,7 @@ class PhotoMetadataTest extends TestCase {
 
     public function test_client_without_rights_cannot_update_metadata() {
         $client = User::factory()->create(['can_edit_metadata' => false]); // Recht fehlt
-        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
         
         $gallery = Gallery::factory()->create([
             'allow_client_metadata_edit' => true,
@@ -77,7 +77,7 @@ class PhotoMetadataTest extends TestCase {
 
     public function test_client_cannot_change_artist_metadata() {
         $client = clone User::factory()->create(['can_edit_metadata' => true]);
-        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
         
         // Neu: Echten Fotografen anlegen, aus dem sich das 'artist' Attribut ableitet
         $photographer = clone User::factory()->create(['name' => 'Original Photographer']);
@@ -116,10 +116,10 @@ class PhotoMetadataTest extends TestCase {
 
     public function test_photographer_cannot_update_or_delete_other_photographers_photo() {
         $photog1 = User::factory()->create();
-        $photog1->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog1->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $photog2 = User::factory()->create();
-        $photog2->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog2->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $gallery1 = Gallery::factory()->create(['restricted_photographers' => true]);
         $photog1->galleries()->attach($gallery1);
@@ -142,7 +142,7 @@ class PhotoMetadataTest extends TestCase {
 
     public function test_photographer_can_update_editorial_flag_and_it_is_returned() {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $gallery = Gallery::factory()->create(['type' => 'delivery']);
         $photog->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photog->id]);
@@ -170,7 +170,7 @@ class PhotoMetadataTest extends TestCase {
 
     public function test_can_save_stress_keywords_longer_than_255_chars() {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $gallery = Gallery::factory()->create();
         $photog->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photog->id]);

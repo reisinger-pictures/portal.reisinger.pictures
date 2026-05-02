@@ -10,39 +10,16 @@ use Illuminate\Support\Facades\Storage;
 
 class PhotoController extends Controller
 {
-        private function checkMetadataRights($photo, $user)
-    {
-        if (!$user) return ['allowed' => false, 'is_client' => false];
-        
-        $isPhotographer = $user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id));
-        if ($isPhotographer) {
-            return ['allowed' => true, 'is_client' => false];
-        }
-
-        $isClientWithRights = $photo->gallery->allow_client_metadata_edit 
-            && $user->can_edit_metadata 
-            && $user->canAccessGallery($photo->gallery_id);
-            
-        $isGuestWithTransientRights = $photo->gallery->allow_client_metadata_edit 
-            && in_array($photo->gallery_id, $user->transient_meta_galleries ?? []);
-
-        if ($isClientWithRights || $isGuestWithTransientRights) {
-            return ['allowed' => true, 'is_client' => true];
-        }
-
-        return ['allowed' => false, 'is_client' => false];
-    }
-
-    public function updateMetadata(Request $request, $id)
+        public function updateMetadata(Request $request, $id)
     {
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
         
-        $rights = $this->checkMetadataRights($photo, $user);
-
-        if (!$rights['allowed']) {
+        if (\Illuminate\Support\Facades\Gate::denies('updateMetadata', $photo)) {
             return response()->json(['error' => 'Keine Berechtigung, Metadaten zu bearbeiten.'], 403);
         }
+
+        $isClient = !($user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id)));
 
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
@@ -58,9 +35,9 @@ class PhotoController extends Controller
             'is_editorial_only' => 'nullable|boolean',
         ]);
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($photo, $user, $rights, $validated) {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($photo, $user, $isClient, $validated) {
             // Versionierung: Nur wenn ein Kunde ändert, speichern wir den Vorzustand
-            if ($rights['is_client']) {
+            if ($isClient) {
                 PhotoMetadataVersion::create([
                     'photo_id' => $photo->id,
                     'user_id' => $user->id,
@@ -92,9 +69,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        $isPhotographer = $user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id));
-        
-        if (!$isPhotographer) {
+        if (\Illuminate\Support\Facades\Gate::denies('viewVersions', $photo)) {
             return response()->json(['error' => 'Keine Berechtigung. Nur für Fotografen/Admins.'], 403);
         }
 
@@ -107,9 +82,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        $isPhotographerOrAdmin = $user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id));
-        
-        if (!$isPhotographerOrAdmin) {
+        if (\Illuminate\Support\Facades\Gate::denies('revertMetadata', $photo)) {
             return response()->json(['error' => 'Keine Berechtigung für Revert. Nur für Fotografen/Admins.'], 403);
         }
 
@@ -136,7 +109,7 @@ class PhotoController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
 
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id))) {
+        if (\Illuminate\Support\Facades\Gate::denies('delete', $photo)) {
             return response()->json(['error' => 'Keine Löschberechtigung.'], 403);
         }
 

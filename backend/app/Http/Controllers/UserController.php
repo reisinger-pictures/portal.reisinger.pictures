@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Role;
+use App\Enums\UserRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -38,7 +39,7 @@ class UserController extends Controller
         $user = auth('api')->user();
         $query = Role::query();
         if (!$user || !$user->is_super_admin) {
-            $query->where('name', '!=', 'super_admin');
+            $query->where('name', '!=', UserRole::SUPER_ADMIN->value);
         }
         return $query->get();
     }
@@ -106,7 +107,7 @@ class UserController extends Controller
             }
         }
 
-        $superAdminRole = Role::where('name', 'super_admin')->first();
+        $superAdminRole = Role::where('name', UserRole::SUPER_ADMIN->value)->first();
         $wantsSuperAdmin = $superAdminRole && in_array($superAdminRole->id, $request->role_ids ?? []);
 
         if ($wantsSuperAdmin !== $user->is_super_admin && !$currentUser->is_super_admin) {

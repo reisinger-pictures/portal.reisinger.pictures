@@ -15,7 +15,7 @@ class GalleryUpdateDeleteTest extends TestCase {
         Storage::fake('photos');
 
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($photog);
 
         $gallery = Gallery::factory()->create();
@@ -39,10 +39,10 @@ class GalleryUpdateDeleteTest extends TestCase {
 
     public function test_photographer_cannot_update_or_delete_other_photographers_gallery() {
         $photog1 = User::factory()->create();
-        $photog1->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog1->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $photog2 = User::factory()->create();
-        $photog2->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog2->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $gallery = Gallery::factory()->create(['restricted_photographers' => true]);
         $photog1->galleries()->attach($gallery);
@@ -62,7 +62,7 @@ class GalleryUpdateDeleteTest extends TestCase {
 
     public function test_deleting_group_moves_galleries_to_root() {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($photog);
 
         $group = \App\Models\GalleryGroup::factory()->create();

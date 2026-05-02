@@ -1,6 +1,6 @@
 import ResponsiveImage from './components/ResponsiveImage';
 import ErrorMessage from './components/ErrorMessage';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 import {useSearch} from '../logic/useSearch';
 import Sidebar from './components/Sidebar';
@@ -14,9 +14,12 @@ export default function SearchView() {
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    useEffect(() => {
+    const [prevQuery, setPrevQuery] = useState(query);
+
+    if (query !== prevQuery) {
+        setPrevQuery(query);
         setLocalQuery(query);
-    }, [query]);
+    }
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();

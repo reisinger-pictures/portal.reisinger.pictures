@@ -54,11 +54,12 @@ class OrderController extends Controller
             'withdrawal_waived' => 'required|boolean',
         ]);
 
-        $isClient = $user->roles()->where('name', 'client')->exists();
-        // Jeder darf via Stripe einkaufen. Rolle wird nur für Rechnungskauf geprüft.
+        if (\Illuminate\Support\Facades\Gate::denies('purchase-upgrades')) {
+            return response()->json(['error' => __('messages.upgrade_not_allowed')], 403);
+        }
 
         $paymentMethod = $request->payment_method ?? 'stripe';
-        if ($paymentMethod === 'invoice' && !$isClient && !$user->is_power_user && !$user->is_admin) {
+        if ($paymentMethod === 'invoice' && \Illuminate\Support\Facades\Gate::denies('purchase-on-invoice')) {
             return response()->json(['error' => 'Kauf auf Rechnung nicht erlaubt.'], 403);
         }
 

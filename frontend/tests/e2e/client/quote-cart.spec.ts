@@ -17,7 +17,7 @@ test.describe('Custom Quotes Full Workflow', () => {
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
-        clientUser = await helper.createIsolatedUser('client');
+        clientUser = await helper.createIsolatedUser('power_user');
         photogUser = await helper.createIsolatedUser('photographer');
         adminUser = await helper.createIsolatedUser('admin');
     });
@@ -45,7 +45,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         const rolesRes = await page.request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken } });
         const rolesData = await rolesRes.json();
         const roles = Array.isArray(rolesData) ? rolesData : (rolesData.data || []);
-        const clientRoleId = roles.find((r: Role) => r.name === 'client')?.id;
+        const powerUserRoleId = roles.find((r: Role) => r.name === 'power_user')?.id;
 
         const galleryUrl = page.url();
         const gallerySlug = galleryUrl.split('/').pop();
@@ -54,9 +54,9 @@ test.describe('Custom Quotes Full Workflow', () => {
         const galId = galData.gallery?.id;
 
         // Wir weisen dem Client die Galerie zu
-        if (clientRoleId && galId) {
+        if (powerUserRoleId && galId) {
             await page.request.put(`/api/management/users/${clientUser.id}`, {
-                data: { role_ids: [clientRoleId], gallery_ids: [galId], gallery_group_ids: [], can_edit_metadata: false },
+                data: { role_ids: [powerUserRoleId], gallery_ids: [galId], gallery_group_ids: [], can_edit_metadata: false },
                 headers: { 'Cookie': validAdminToken, 'Accept': 'application/json', 'Content-Type': 'application/json' }
             });
         }

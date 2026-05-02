@@ -10,7 +10,7 @@ class GalleryGroupTest extends TestCase {
 
     public function test_photographer_can_create_gallery_group() {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -21,7 +21,7 @@ class GalleryGroupTest extends TestCase {
 
     public function test_client_cannot_create_gallery_group() {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
         $token = auth('api')->login($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])

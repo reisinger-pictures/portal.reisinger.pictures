@@ -24,7 +24,7 @@ class RetroactiveGalleryDefaultsTest extends TestCase
     public function test_downloaded_images_contain_retroactively_applied_metadata()
     {
         $photog = User::factory()->create(['name' => 'Test Fotograf']);
-        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $gallery = Gallery::factory()->create([
             'type' => 'delivery',

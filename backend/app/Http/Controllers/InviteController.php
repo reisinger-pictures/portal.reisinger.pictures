@@ -16,15 +16,14 @@ class InviteController extends Controller
 {
     public function generate(Request $request, $galleryId)
     {
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($galleryId))) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $gallery = Gallery::findOrFail($galleryId);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         $request->validate([
             'name' => 'nullable|string|max:255',
             'can_edit_metadata' => 'boolean'
         ]);
 
-        $gallery = Gallery::findOrFail($galleryId);
         $token = Str::random(64);
         
         GalleryInvite::create([
@@ -42,15 +41,13 @@ class InviteController extends Controller
 
     public function sendEmail(Request $request, $galleryId)
     {
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($galleryId))) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $gallery = Gallery::findOrFail($galleryId);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         $request->validate([
             'email' => 'required|email',
             'name' => 'nullable|string|max:255'
         ]);
-
-        $gallery = Gallery::findOrFail($galleryId);
         
         \Illuminate\Support\Facades\DB::transaction(function () use ($gallery, $request) {
             $token = Str::random(64);
@@ -151,17 +148,16 @@ class InviteController extends Controller
 
     public function index($galleryId)
     {
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($galleryId))) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $gallery = Gallery::findOrFail($galleryId);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         return response()->json(\App\Models\GalleryInvite::where('gallery_id', $galleryId)->orderBy('id', 'desc')->get());
     }
 
     public function update(Request $request, $id)
     {
-        $invite = \App\Models\GalleryInvite::findOrFail($id);
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($invite->gallery_id))) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $invite = \App\Models\GalleryInvite::with('gallery')->findOrFail($id);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $invite->gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
         $request->validate(['name' => 'nullable|string|max:255']);
         $invite->update(['name' => $request->name]);
         return response()->json(['success' => true]);
@@ -169,9 +165,8 @@ class InviteController extends Controller
 
     public function destroy($id)
     {
-        $invite = \App\Models\GalleryInvite::findOrFail($id);
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($invite->gallery_id))) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $invite = \App\Models\GalleryInvite::with('gallery')->findOrFail($id);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $invite->gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         \App\Models\GalleryInvite::destroy($id);
         return response()->json(['success' => true]);

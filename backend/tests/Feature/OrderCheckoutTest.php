@@ -27,7 +27,7 @@ class OrderCheckoutTest extends TestCase {
 
     public function test_checkout_calculates_delta_pricing_with_flatrate_and_modifiers() {
         $user = User::factory()->create(['flatrate_level' => 'print']);
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'power_user']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::POWER_USER->value]));
         $token = auth('api')->login($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
@@ -60,7 +60,8 @@ class OrderCheckoutTest extends TestCase {
 
     public function test_checkout_blocks_commercial_license_for_editorial_photo() {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'power_user']));
         $token = auth('api')->login($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
@@ -93,7 +94,7 @@ class OrderCheckoutTest extends TestCase {
 
     public function test_admin_without_flatrate_pays_full_price() {
         $user = User::factory()->create(['flatrate_level' => 'none']);
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $token = auth('api')->login($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);

@@ -12,7 +12,7 @@ class ProductApiTest extends TestCase {
 
     public function test_super_admin_can_manage_products() {
         $superAdmin = User::factory()->create();
-        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => 'super_admin']));
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
         $token = auth('api')->login($superAdmin);
 
         // 1. Create
@@ -51,7 +51,7 @@ class ProductApiTest extends TestCase {
 
     public function test_normal_admin_cannot_manage_products() {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])

@@ -48,6 +48,17 @@ class AppServiceProvider extends ServiceProvider
             return $user->is_super_admin;
         });
 
+        Gate::define('purchase-upgrades', function ($user) {
+            $isClient = $user->roles()->where('name', \App\Enums\UserRole::CLIENT->value)->exists();
+            $isPrivileged = $user->is_power_user || $user->is_admin || $user->is_super_admin || $user->is_photographer;
+            return !$isClient || $isPrivileged;
+        });
+
+        Gate::define('purchase-on-invoice', function ($user) {
+            $isClient = $user->roles()->where('name', \App\Enums\UserRole::CLIENT->value)->exists();
+            return $isClient || $user->is_power_user || $user->is_admin || $user->is_super_admin;
+        });
+
         \Illuminate\Support\Facades\Auth::provider('transient_eloquent', function ($app, array $config) {
             return new \App\Auth\TransientUserProvider($app['hash'], $config['model']);
         });

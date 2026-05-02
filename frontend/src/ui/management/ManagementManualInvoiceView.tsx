@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useState} from 'react';
 import {useAuth} from '../../logic/useAuth';
 import {useUI} from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
@@ -42,13 +42,19 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [dueDateOption, setDueDateOption] = useState('0');
+    const getOfferValidUntil = () => {
+        const d = new Date();
+        d.setDate(d.getDate() + 14);
+        return 'Gültig bis ' + d.toLocaleDateString('de-AT', {day: '2-digit', month: '2-digit', year: 'numeric'});
+    };
+    const getInvoiceDefaultDue = () => 'Zahlbar sofort nach Erhalt der Rechnung.';
     const [serviceDateDirty, setServiceDateDirty] = useState(false);
 
     const [formData, setFormData] = useState<DocumentFormData>({
         type: docType,
         invoice_number: (isOffer ? 'A-' : 'R-') + new Date().getFullYear() + '-' + Math.floor(100 + Math.random() * 900),
         date: new Date().toISOString().split('T')[0],
-        due_date: '', // Wird via useEffect initialisiert
+        due_date: isOffer ? getOfferValidUntil() : getInvoiceDefaultDue(),
         service_date: '',
         validity: '',
         customer_name: '',
@@ -69,8 +75,10 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
         return iso;
     };
 
-    // Reset Form when URL type changes
-    useEffect(() => {
+    // Derived State Pattern: Reset Form when URL type changes
+    const [prevDocType, setPrevDocType] = useState(docType);
+    if (docType !== prevDocType) {
+        setPrevDocType(docType);
         setServiceDateDirty(false);
         setDueDateOption('0');
         const newDate = new Date().toISOString().split('T')[0];
@@ -81,26 +89,9 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
             date: newDate,
             service_date: isOffer ? '' : formatDateToDE(newDate),
             validity: isOffer ? '14 Tage ab Ausstellungsdatum' : '',
+            due_date: isOffer ? getOfferValidUntil() : getInvoiceDefaultDue()
         }));
-    }, [docType, isOffer]);
-
-    // INTELLIGENTE SYNC LOGIK: Rechnungsdatum -> Leistungsdatum
-    useEffect(() => {
-        if (!isOffer && !serviceDateDirty) {
-            setFormData(prev => ({...prev, service_date: formatDateToDE(formData.date)}));
-        }
-    }, [formData.date, isOffer, serviceDateDirty]);
-
-    // FÄLLIGKEITS-LOGIK WIEDERHERGESTELLT
-    useEffect(() => {
-        if (dueDateOption === '0') {
-            handleUpdateField('due_date', isOffer ? 'Wir freuen uns auf Ihre Rückmeldung.' : 'Zahlbar sofort nach Erhalt der Rechnung.');
-        } else if (dueDateOption === '14') {
-            handleUpdateField('due_date', isOffer ? 'Dieses Angebot ist gültig für 14 Tage ab Ausstellungsdatum.' : 'Zahlbar innerhalb von 14 Tagen nach Rechnungsdatum.');
-        } else if (dueDateOption === '1m') {
-            handleUpdateField('due_date', isOffer ? 'Dieses Angebot ist gültig für 1 Monat ab Ausstellungsdatum.' : 'Zahlbar innerhalb von 1 Monat nach Rechnungsdatum.');
-        }
-    }, [dueDateOption, isOffer]);
+    }
 
     const [items, setItems] = useState<InvoiceItem[]>([{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
     const [discounts, setDiscounts] = useState<InvoiceDiscount[]>([]);
@@ -108,7 +99,23 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
 
     if (!user?.is_super_admin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung."/></div>;
 
-    const handleUpdateField = (field: string, value: string) => setFormData(p => ({...p, [field]: value}));
+    const handleUpdateField = (field: string, value: string) => {
+        setFormData(p => {
+            const next = {...p, [field]: value};
+            // Auto-Sync Date -> Service Date
+            if (field === 'date' && !isOffer && !serviceDateDirty) {
+                next.service_date = formatDateToDE(value);
+            }
+            return next;
+        });
+    };
+
+    const handleOptionChange = (opt: string) => {
+        setDueDateOption(opt);
+        let text = formData.due_date;
+        if (opt === '0') text = isOffer ? getOfferValidUntil() : getInvoiceDefaultDue();
+        handleUpdateField('due_date', text);
+    };
 
     const handleServiceDateManualChange = (val: string) => {
         setServiceDateDirty(true);
@@ -271,7 +278,9 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
             const a = document.createElement('a');
             a.href = url;
             a.download = (isOffer ? 'Angebot-' : 'Rechnung-') + formData.invoice_number + '.pdf';
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             showToast('success', 'Dokument wurde erstellt.');
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : 'Fehler');
@@ -327,7 +336,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                     data={formData}
                     dueDateOption={dueDateOption}
                     onUpdate={handleUpdateField}
-                    onOptionChange={setDueDateOption}
+                    onOptionChange={handleOptionChange}
                     onServiceDateChange={handleServiceDateManualChange}
                 />
 
@@ -377,7 +386,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                                         onSelect={(p) => {
                                             handleItemChange(idx, 'description', p.name);
                                             handleItemChange(idx, 'notes', p.description || '');
-                                            handleItemChange(idx, 'price', p.price);
+                                            handleItemChange(idx, 'price', p.price / 100);
                                         }}
                                         placeholder="z.B. Fotoshooting"
                                         className="input input-sm input-bordered w-full"
@@ -456,7 +465,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                                                 handleDiscountChange(idx, 'type', p.type || 'discount_fixed');
                                                 handleDiscountChange(idx, 'description', p.name);
                                                 handleDiscountChange(idx, 'notes', p.description || '');
-                                                handleDiscountChange(idx, 'price', p.price);
+                                                handleDiscountChange(idx, 'price', p.type === 'discount_percent' ? p.price : p.price / 100);
                                             }}
                                             placeholder="z.B. Stammkundenrabatt"
                                             className="input input-sm input-bordered w-full bg-base-100"

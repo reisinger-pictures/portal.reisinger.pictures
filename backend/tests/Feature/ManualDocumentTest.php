@@ -23,7 +23,7 @@ class ManualDocumentTest extends TestCase
     public function test_super_admin_can_generate_manual_document_with_discounts()
     {
         $superAdmin = User::factory()->create();
-        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => 'super_admin']));
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
         $token = auth('api')->login($superAdmin);
 
         $payload = [
@@ -49,7 +49,7 @@ class ManualDocumentTest extends TestCase
     public function test_normal_admin_cannot_generate_manual_document()
     {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -65,7 +65,7 @@ class ManualDocumentTest extends TestCase
     public function test_smart_document_can_be_generated_and_extracted_securely()
     {
         $superAdmin = User::factory()->create();
-        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => 'super_admin']));
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
         $token = auth('api')->login($superAdmin);
 
         $payload = [

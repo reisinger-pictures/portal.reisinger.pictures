@@ -60,7 +60,7 @@ class MailController extends Controller
         // Strikte Logik: Wir informieren NUR Fotografen/Admins, die explizit dieser Galerie
         // zugewiesen sind UND Benachrichtigungen (wants_notifications = true) aktiviert haben.
         $notifiedUsers = User::whereHas('roles', function($q) { 
-            $q->whereIn('name', ['photographer', 'admin']); 
+            $q->whereIn('name', [\App\Enums\UserRole::PHOTOGRAPHER->value, \App\Enums\UserRole::ADMIN->value]); 
         })
         ->whereHas('galleries', function($q) use ($gallery) { 
             $q->where('galleries.id', $gallery->id)

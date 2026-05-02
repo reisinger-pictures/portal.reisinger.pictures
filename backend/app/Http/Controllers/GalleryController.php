@@ -265,12 +265,10 @@ class GalleryController extends Controller
      */
     public function updateGallery(Request $request, $id)
     {
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($id))) {
+        $gallery = Gallery::findOrFail($id);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
-
-        $gallery = Gallery::findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
@@ -359,12 +357,10 @@ class GalleryController extends Controller
      */
     public function destroyGallery($id)
     {
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($id))) {
+        $gallery = Gallery::findOrFail($id);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) {
             return response()->json(['error' => 'Nur Super-Admins oder der besitzende Fotograf dürfen diese Galerie löschen.'], 403);
         }
-
-        $gallery = Gallery::findOrFail($id);
         
         // Dispatch Job to delete files asynchronously
         \App\Jobs\DeleteGalleryFolderJob::dispatch((string) $gallery->id);
@@ -378,12 +374,10 @@ class GalleryController extends Controller
      */
     public function ratingStatus($id)
     {
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($id))) {
+        $gallery = Gallery::findOrFail($id);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
-
-        $gallery = Gallery::findOrFail($id);
         $totalPhotos = $gallery->photos()->count();
 
         $users = \App\Models\User::whereHas('galleries', function($q) use ($id) {
@@ -434,12 +428,10 @@ class GalleryController extends Controller
      */
     public function exportRatings($id)
     {
-        $user = auth('api')->user();
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($id))) {
+        $gallery = Gallery::findOrFail($id);
+        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
-
-        Gallery::findOrFail($id);
         $photos = Photo::where('gallery_id', $id)->get();
         $export = [];
 

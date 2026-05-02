@@ -10,7 +10,7 @@ class SettingsAndStatsTest extends TestCase {
 
     public function test_admin_can_access_stats() {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/management/stats');

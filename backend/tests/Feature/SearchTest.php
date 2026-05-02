@@ -57,7 +57,7 @@ class SearchTest extends TestCase {
 
     public function test_search_respects_role_based_filtering() {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
 
         Gallery::factory()->create(['is_public' => false, 'name' => 'Secret Admin Stuff']);
         Gallery::factory()->create(['is_public' => true, 'name' => 'Public Showcase']);
@@ -72,7 +72,7 @@ class SearchTest extends TestCase {
 
     public function test_client_can_find_photos_from_authorized_private_gallery() {
         $client = User::factory()->create();
-        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
 
         $privateGallery = Gallery::factory()->create(['is_public' => false, 'type' => 'delivery']);
         $client->galleries()->attach($privateGallery);
@@ -88,7 +88,7 @@ class SearchTest extends TestCase {
 
     public function test_photographer_can_find_photos_from_own_gallery_but_not_others() {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $ownGallery = Gallery::factory()->create(['is_public' => false, 'type' => 'delivery']);
         $photog->galleries()->attach($ownGallery);

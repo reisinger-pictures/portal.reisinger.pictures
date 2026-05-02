@@ -14,7 +14,7 @@ class TenantIsolationTest extends TestCase
 
     public function test_customer_manager_cannot_update_or_delete_user_from_other_tenant()
     {
-        $roleManager = Role::firstOrCreate(['name' => 'customer_manager']);
+        $roleManager = Role::firstOrCreate(['name' => \App\Enums\UserRole::CUSTOMER_MANAGER->value]);
         
         $tenantA = Tenant::create(['name' => 'Tenant A', 'invoice_frequency' => 'immediate']);
         $tenantB = Tenant::create(['name' => 'Tenant B', 'invoice_frequency' => 'immediate']);
@@ -92,7 +92,7 @@ class TenantIsolationTest extends TestCase
         $this->assertTrue($user->tenants->contains($tenant->id));
         
         // Prüfen, ob er die Client-Rolle bekommen hat
-        $this->assertTrue($user->roles->contains('name', 'client'));
+        $this->assertTrue($user->roles->contains('name', \App\Enums\UserRole::CLIENT->value));
     }
 
     public function test_customer_manager_cannot_view_other_tenant_details()

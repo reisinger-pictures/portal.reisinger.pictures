@@ -3,6 +3,7 @@ import { useCart, CartItem } from '../../logic/CartContext';
 import { useUI } from '../components/UIContext';
 import { apiMutate } from '../../api';
 import { useAuth } from '../../logic/useAuth';
+import { UserRole } from '../../logic/useUsers';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -369,7 +370,7 @@ export default function ClientCartView() {
                                                     <input type="radio" name="payment_method" value="stripe" className="radio radio-primary" checked={paymentMethod === 'stripe'} onChange={() => setPaymentMethod('stripe')} />
                                                     <span className="font-bold flex items-center gap-2"><span className="iconify mdi--credit-card"></span> Kreditkarte (Stripe)</span>
                                                 </label>
-                                                {(user?.roles?.includes('client') || user?.is_power_user || user?.is_admin) && (
+                                                {(user?.roles?.includes(UserRole.CLIENT) || user?.is_power_user || user?.is_admin) && (
                                                     <label className="cursor-pointer flex items-center gap-3">
                                                         <input type="radio" name="payment_method" value="invoice" className="radio radio-primary" checked={paymentMethod === 'invoice'} onChange={() => setPaymentMethod('invoice')} />
                                                         <span className="font-bold flex items-center gap-2"><span className="iconify mdi--receipt-text-outline"></span> Kauf auf Rechnung</span>

@@ -35,14 +35,14 @@ test.describe('Manual Documents & CRM Workflow', () => {
 
         // Katalog-Einträge (Produkt & Rabatt) vorbereiten
         const prodRes = await request.post('/api/management/products', {
-            data: { type: 'item', name: `E2E Product ${uniqueSuffix}`, description: 'E2E Leistung', price: 150 },
+            data: { type: 'item', name: `E2E Product ${uniqueSuffix}`, description: 'E2E Leistung', price: 15000 },
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
         });
         const prodData = await prodRes.json();
         if (prodData?.product?.id) helper.trackProduct(prodData.product.id);
 
         const discRes = await request.post('/api/management/products', {
-            data: { type: 'discount_fixed', name: `E2E Discount ${uniqueSuffix}`, description: 'E2E Rabatt', price: 20 },
+            data: { type: 'discount_fixed', name: `E2E Discount ${uniqueSuffix}`, description: 'E2E Rabatt', price: 2000 },
             headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
         });
         const discData = await discRes.json();

@@ -9,14 +9,7 @@ interface Props {
     onServiceDateChange: (val: string) => void;
 }
 
-export default function ManualDocumentHeader({
-                                                 docType,
-                                                 data,
-                                                 dueDateOption,
-                                                 onUpdate,
-                                                 onOptionChange,
-                                                 onServiceDateChange
-                                             }: Props) {
+export default function ManualDocumentHeader({ docType, data, dueDateOption, onUpdate, onOptionChange, onServiceDateChange }: Props) {
     const isOffer = docType === 'offer';
 
     return (
@@ -24,7 +17,7 @@ export default function ManualDocumentHeader({
             <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">
                 {isOffer ? 'Angebotsdetails' : 'Rechnungsdetails'}
             </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Belegnummer</span></label>
                     <input required type="text" value={data.invoice_number}
@@ -38,16 +31,8 @@ export default function ManualDocumentHeader({
                            className="input input-bordered"/>
                 </div>
 
-                {isOffer ? (
-                    <div className="form-control">
-                        <label className="label"><span
-                            className="label-text font-bold">Gültigkeit (Kurzform)</span></label>
-                        <input type="text" value={data.validity || ''}
-                               onChange={e => onUpdate('validity', e.target.value)} className="input input-bordered"
-                               placeholder="z.B. 14 Tage"/>
-                    </div>
-                ) : (
-                    <div className="form-control">
+                {!isOffer && (
+                    <div className="form-control lg:col-span-2">
                         <label className="label"><span className="label-text font-bold">Leistungsdatum / Zeitraum</span></label>
                         <input
                             type="text"
@@ -59,15 +44,13 @@ export default function ManualDocumentHeader({
                     </div>
                 )}
 
-                <div className="form-control lg:col-span-3">
+                <div className="form-control lg:col-span-2">
                     <label className="label"><span
                         className="label-text font-bold">{isOffer ? 'Hinweistext (Gültigkeit & Annahme)' : 'Zahlungsziel / Fälligkeitstext'}</span></label>
                     <div className="flex flex-col sm:flex-row gap-2 w-full">
                         <select className="select select-bordered w-full sm:w-1/3" value={dueDateOption}
                                 onChange={e => onOptionChange(e.target.value)}>
-                            <option value="0">Sofort</option>
-                            <option value="14">14 Tage</option>
-                            <option value="1m">1 Monat</option>
+                            <option value="0">Standard</option>
                             <option value="custom">Freitext...</option>
                         </select>
                         {dueDateOption !== 'custom' ? (

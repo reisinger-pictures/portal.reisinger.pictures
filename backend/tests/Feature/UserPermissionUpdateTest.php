@@ -13,12 +13,12 @@ class UserPermissionUpdateTest extends TestCase {
 
     public function test_admin_can_update_user_permissions_and_sync_relations() {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
 
         $targetUser = User::factory()->create();
         
-        $role = Role::firstOrCreate(['name' => 'client']);
+        $role = Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]);
         $group = GalleryGroup::factory()->create();
         $gallery = Gallery::factory()->create();
 

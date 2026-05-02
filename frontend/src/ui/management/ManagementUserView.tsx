@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import {UserDetailed, useUsers} from '../../logic/useUsers';
+import {UserDetailed, useUsers, UserRole} from '../../logic/useUsers';
 import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import UserPermissionsModal from './components/UserPermissionsModal';
@@ -24,8 +24,8 @@ export default function ManagementUserView() {
     const allowedRoles = currentUser?.is_super_admin 
         ? roles 
         : (currentUser?.is_admin 
-            ? roles?.filter(r => r.name !== 'super_admin') 
-            : roles?.filter(r => ['power_user', 'client', 'customer_manager'].includes(r.name)));
+            ? roles?.filter(r => r.name !== UserRole.SUPER_ADMIN) 
+            : roles?.filter(r => [UserRole.POWER_USER, UserRole.CLIENT, UserRole.CUSTOMER_MANAGER].includes(r.name)));
 
     const handleSaveUser = async (id: string, selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean, flatrateLevel: string) => {
         try {

@@ -1,7 +1,7 @@
 import ResponsiveImage from '../components/ResponsiveImage';
 import { useRef } from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import { useAuth } from '../../logic/useAuth';
@@ -16,11 +16,13 @@ export interface DeliveryViewProps {
 
 export default function DeliveryView({ galleryData }: DeliveryViewProps) {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
     const { terms } = useLicenseTerms();
     const { isCovered } = usePricing(terms);
-
+    const isClientView = searchParams.get('view') === 'client';
+    const hasFullAccess = (user?.is_admin || user?.is_photographer || user?.is_super_admin) && !isClientView;
 
     /* moved early return */
     const galleryRef = useRef<HTMLDivElement>(null);
@@ -55,7 +57,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                                 { id: 'web', label: 'Web & Social' },
                                 { id: 'print', label: 'Print (A4)' },
                                 { id: 'original', label: 'Original' }
-                            ].filter(t => isCovered(user?.flatrate_level, t.id as ResolutionTier, 'editorial', '1_year') || gallery?.effective_is_free_download || user?.is_admin || user?.is_photographer);
+                            ].filter(t => isCovered(user?.flatrate_level, t.id as ResolutionTier, 'editorial', '1_year') || gallery?.effective_is_free_download || hasFullAccess);
 
                             if (allowedTiers.length === 0) return null;
 

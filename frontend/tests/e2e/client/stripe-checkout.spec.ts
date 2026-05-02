@@ -15,7 +15,7 @@ test.describe('Stripe Checkout Workflow', () => {
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
         photogUser = await helper.createIsolatedUser('photographer');
-        buyerUser = await helper.createIsolatedUser('client');
+        buyerUser = await helper.createIsolatedUser('power_user');
     });
 
     test.afterEach(async () => {

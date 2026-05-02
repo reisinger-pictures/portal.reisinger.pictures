@@ -23,7 +23,7 @@ class PhotoUploadTest extends TestCase
     public function test_photographer_can_upload_to_delivery_and_apply_fallbacks()
     {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $gallery = Gallery::factory()->create([
             'type' => 'delivery',
@@ -58,7 +58,7 @@ class PhotoUploadTest extends TestCase
     public function test_upload_to_selection_gallery_skips_metadata_extraction()
     {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $gallery = Gallery::factory()->create([
             'type' => 'selection',
@@ -90,10 +90,10 @@ class PhotoUploadTest extends TestCase
     public function test_photographer_cannot_upload_to_unassigned_gallery()
     {
         $photogA = User::factory()->create();
-        $photogA->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photogA->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $photogB = User::factory()->create();
-        $photogB->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photogB->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'restricted_photographers' => true]);
         $photogA->galleries()->attach($gallery);

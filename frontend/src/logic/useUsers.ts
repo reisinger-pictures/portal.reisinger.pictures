@@ -2,18 +2,30 @@ import useSWR from 'swr';
 import {apiMutate, fetcher} from '../api';
 import {Gallery, GalleryGroup} from './useGalleries';
 
-export interface Role { id: string; name: string; }
+export enum UserRole {
+    SUPER_ADMIN = 'super_admin',
+    ADMIN = 'admin',
+    PHOTOGRAPHER = 'photographer',
+    CUSTOMER_MANAGER = 'customer_manager',
+    POWER_USER = 'power_user',
+    CLIENT = 'client'
+}
+
+export interface Role {
+    id: string;
+    name: UserRole;
+}
 
 export interface UserDetailed {
-    id: string; 
-    name: string; 
-    email: string; 
+    id: string;
+    name: string;
+    email: string;
     is_photographer?: boolean;
     is_super_admin?: boolean;
     can_edit_metadata: boolean;
     flatrate_level: 'none' | 'web' | 'print' | 'original';
-    roles: Role[]; 
-    gallery_groups: GalleryGroup[]; 
+    roles: Role[];
+    gallery_groups: GalleryGroup[];
     galleries: Gallery[];
     photographer_galleries?: Gallery[];
     photographer_gallery_groups?: GalleryGroup[];
@@ -24,9 +36,12 @@ export interface UserListResponse {
 }
 
 export function useUsers() {
-    const {data: response, mutate: mutateUsers} = useSWR<UserListResponse | UserDetailed[]>('/api/management/users', fetcher);
+    const {
+        data: response,
+        mutate: mutateUsers
+    } = useSWR<UserListResponse | UserDetailed[]>('/api/management/users', fetcher);
     const {data: roles} = useSWR<Role[]>('/api/management/roles', fetcher);
-        const users: UserDetailed[] | undefined = response ? (Array.isArray(response) ? response : response.data) : undefined;
+    const users: UserDetailed[] | undefined = response ? (Array.isArray(response) ? response : response.data) : undefined;
 
     const createUser = async (name: string, email: string) => {
         await apiMutate('/api/management/users', 'POST', {name, email});
@@ -34,7 +49,13 @@ export function useUsers() {
     };
 
     const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string) => {
-        await apiMutate(`/api/management/users/${id}`, 'PUT', { role_ids, gallery_group_ids, gallery_ids, can_edit_metadata, flatrate_level });
+        await apiMutate(`/api/management/users/${id}`, 'PUT', {
+            role_ids,
+            gallery_group_ids,
+            gallery_ids,
+            can_edit_metadata,
+            flatrate_level
+        });
         await mutateUsers();
     };
 

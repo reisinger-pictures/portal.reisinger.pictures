@@ -10,7 +10,7 @@ class UserControllerTest extends TestCase {
 
     public function test_admin_can_create_user() {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
 
         // Vor dem Test die Mailpit API bereinigen
@@ -33,7 +33,7 @@ class UserControllerTest extends TestCase {
 
     public function test_photographer_cannot_create_user() {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($photog);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])

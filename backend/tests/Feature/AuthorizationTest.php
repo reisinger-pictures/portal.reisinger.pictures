@@ -17,7 +17,7 @@ class AuthorizationTest extends TestCase
     public function test_admin_does_not_have_implicit_access_to_galleries()
     {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         
         $gallery = Gallery::factory()->create();
         
@@ -78,9 +78,9 @@ class AuthorizationTest extends TestCase
     public function test_photographer_team_access_logic()
     {
         $photogA = User::factory()->create();
-        $photogA->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photogA->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $photogB = User::factory()->create();
-        $photogB->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photogB->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
         $group = GalleryGroup::factory()->create(['restricted_photographers' => true]);
         $gallery = Gallery::factory()->create(['gallery_group_id' => $group->id, 'restricted_photographers' => null]);

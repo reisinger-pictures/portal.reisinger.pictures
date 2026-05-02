@@ -84,7 +84,7 @@ class TenantInviteController extends Controller
             $user->tenants()->syncWithoutDetaching([$invite->tenant_id]);
 
             // Automatisch die Client-Rolle vergeben
-            $clientRole = \App\Models\Role::where('name', 'client')->first();
+            $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
             if ($clientRole) {
                 $user->roles()->syncWithoutDetaching([$clientRole->id]);
             }

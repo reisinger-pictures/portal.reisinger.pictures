@@ -10,7 +10,7 @@ class FtpImportTest extends TestCase {
 
     public function test_photographer_can_get_ftp_status() {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/management/ftp/status');

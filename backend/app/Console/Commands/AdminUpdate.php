@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use App\Models\User;
 use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
+use App\Enums\UserRole;
 
 class AdminUpdate extends Command
 {
@@ -30,7 +31,7 @@ class AdminUpdate extends Command
         $admin->save();
 
         // Weise grundlegende Rollen zu
-        $roles = Role::whereIn('name', ['admin', 'photographer', 'client'])->pluck('id');
+        $roles = Role::whereIn('name', [UserRole::ADMIN->value, UserRole::PHOTOGRAPHER->value, UserRole::CLIENT->value])->pluck('id');
         $admin->roles()->syncWithoutDetaching($roles);
 
         $this->info('Admin user updated successfully.');

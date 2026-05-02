@@ -25,7 +25,7 @@ class StorageLifecycleTest extends TestCase
     {
         // Require flatrate_level to bypass watermark generation (which would 404 without ImageMagick)
         $user = User::factory()->create(['flatrate_level' => 'original']);
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true]);
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);

@@ -11,7 +11,7 @@ class NotificationOptInTest extends TestCase {
 
     public function test_client_can_toggle_opt_in_and_mail_controller_respects_it() {
         $client = User::factory()->create(['email' => 'optin@test.com']);
-        $client->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
         $gallery = Gallery::factory()->create();
         $client->galleries()->attach($gallery, ['wants_notifications' => false]); // Startet opt-out
 
@@ -24,7 +24,7 @@ class NotificationOptInTest extends TestCase {
 
         // 2. Mail Controller Test (Sollte den User nun inkludieren)
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $adminToken = auth('api')->login($admin);
         
         \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages');

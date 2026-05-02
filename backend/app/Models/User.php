@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Notifications\Notifiable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 use Illuminate\Support\Facades\Cache;
+use App\Enums\UserRole;
 
 class User extends Authenticatable implements JWTSubject
 {
@@ -20,7 +21,7 @@ class User extends Authenticatable implements JWTSubject
     public $transient_meta_galleries = [];
 
     public function getIsSuperAdminAttribute(): bool {
-        return $this->roles()->where('name', 'super_admin')->exists();
+        return $this->roles()->where('name', UserRole::SUPER_ADMIN->value)->exists();
     }
 
     protected $visible = [
@@ -86,19 +87,19 @@ class User extends Authenticatable implements JWTSubject
     }
 
     public function getIsPhotographerAttribute(): bool {
-        return $this->roles()->where('name', 'photographer')->exists();
+        return $this->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists();
     }
 
     public function getIsAdminAttribute(): bool {
-        return $this->roles()->whereIn('name', ['admin', 'super_admin'])->exists();
+        return $this->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists();
     }
 
     public function getIsCustomerManagerAttribute(): bool {
-        return $this->roles()->where('name', 'customer_manager')->exists();
+        return $this->roles()->where('name', UserRole::CUSTOMER_MANAGER->value)->exists();
     }
 
     public function getIsPowerUserAttribute(): bool {
-        return $this->roles()->where('name', 'power_user')->exists();
+        return $this->roles()->where('name', UserRole::POWER_USER->value)->exists();
     }
 
     private function getSubGroupIds($parentIds) {

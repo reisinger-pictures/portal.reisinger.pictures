@@ -85,7 +85,7 @@ class TenantController extends Controller
         ]);
         
         $superAdmins = \App\Models\User::whereIn('id', $request->user_ids ?? [])
-            ->whereHas('roles', function($q) { $q->where('name', 'super_admin'); })
+            ->whereHas('roles', function($q) { $q->where('name', \App\Enums\UserRole::SUPER_ADMIN->value); })
             ->exists();
             
         if ($superAdmins) {

@@ -48,7 +48,7 @@ class AuthController extends Controller
                 // Auto-Join the user to the matching Tenant
                 $user->tenants()->attach($tenant->id);
                 // Assign Standard-Client Role by default to protect billing
-                $clientRole = \App\Models\Role::where('name', 'client')->first();
+                $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
                 if ($clientRole) {
                     $user->roles()->attach($clientRole->id);
                 }

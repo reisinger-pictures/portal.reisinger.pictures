@@ -23,7 +23,7 @@ export class GalleryHelper {
         }
 
         await this.page.reload();
-        const galLink = this.page.locator('main').getByText(name, { exact: true }).first();
+        const galLink = this.page.locator('main').locator('a').filter({ hasText: name }).first();
         await expect(async () => {
             await expect(galLink).toBeVisible({ timeout: 2000 });
             await galLink.scrollIntoViewIfNeeded();

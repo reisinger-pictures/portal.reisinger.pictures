@@ -57,5 +57,13 @@ test.describe('License Catalog Admin Workflow', () => {
         const updatedRow = modContainer.locator('tr').filter({ hasText: modName });
         await expect(updatedRow).toContainText('+45 %');
         await expect(updatedRow).toContainText('Kostenpflichtig');
+    
+        // 3. Löschen zum Aufräumen
+        await updatedRow.locator('button').filter({ has: page.locator('.mdi--trash-can') }).click();
+        const confirmModal = page.locator('.modal-global');
+        await expect(confirmModal).toBeVisible();
+        await confirmModal.getByRole('button', { name: 'Bestätigen' }).click();
+        await expect(page.locator('.toast')).toContainText('Zuschlag gelöscht');
+        await expect(updatedRow).toBeHidden();
     });
 });

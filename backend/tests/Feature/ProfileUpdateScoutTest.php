@@ -16,7 +16,7 @@ class ProfileUpdateScoutTest extends TestCase
     public function test_updating_metadata_copyright_updates_scout_index_for_photos()
     {
         $photographer = User::factory()->create(['name' => 'Old Name', 'metadata_copyright' => 'Old Copyright']);
-        $photographer->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $photographer->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         
         $gallery = Gallery::factory()->create();
         $photographer->galleries()->attach($gallery);

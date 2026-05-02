@@ -84,7 +84,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         const auth = new AuthHelper(page);
 
         await auth.login(clientUser.email, clientUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
+        await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
         
         // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
         const image = page.locator('a.pswp-item img').first();
@@ -112,15 +112,12 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         expect(download.suggestedFilename()).toMatch(/\.zip$/i);
     });
 
-    test('Test 2: Single Download UI correctly shows Cart button for restricted resolutions', async ({
-                                                                                                         page,
-                                                                                                         request
-                                                                                                     }) => {
+    test('Test 2: Normal client does not see upgrade options and cart button', async ({page, request}) => {
         const galleryName = await setupGalleryAndAssign(page, request, 'print');
         const auth = new AuthHelper(page);
 
         await auth.login(clientUser.email, clientUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
+        await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
 
         // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
         const image = page.locator('a.pswp-item img').first();
@@ -131,13 +128,11 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible();
 
         // Werbung/Kampagne erfordert Original -> Der Kunde hat aber nur Print
-        await page.locator('label').filter({hasText: 'Werbung / Kampagne'}).click();
+        // Da es ein normaler Kunde ist, darf er keine Upsells kaufen, daher ist die Option versteckt.
+        await expect(page.locator('label').filter({hasText: 'Werbung / Kampagne'})).toBeHidden();
 
         const cartButton = page.getByRole('button', {name: /In den Warenkorb/i});
-        await expect(cartButton).toBeVisible();
-
-        const downloadLink = page.getByRole('link', {name: 'Download', exact: true});
-        await expect(downloadLink).toBeHidden();
+        await expect(cartButton).toBeHidden();
     });
 
     test('Test 3: Single Download executes successfully when covered by flatrate', async ({page, request}) => {
@@ -145,7 +140,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         const auth = new AuthHelper(page);
 
         await auth.login(clientUser.email, clientUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
+        await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
 
         // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
         const image = page.locator('a.pswp-item img').first();
@@ -170,4 +165,35 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
 
         expect(download.suggestedFilename()).toMatch(/\.jpg$/i);
     });
+
+    test('Test 4: Admin and Photographer see the Admin Download button in PhotoDetailView', async ({page, request}) => {
+        const galleryName = await setupGalleryAndAssign(page, request, 'original');
+        const auth = new AuthHelper(page);
+
+        // Login als Fotograf
+        await auth.login(photogUser.email, photogUser.password);
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateTo('Galerien');
+        await page.locator('main').locator('a').filter({hasText: galleryName}).first().click();
+
+        const image = page.locator('a.pswp-item img').first();
+        await expect(image).toBeVisible({timeout: 15000});
+
+        await page.locator('button[title="Details & Metadaten"]').first().click();
+        await expect(page.locator('h4:has-text("IPTC Metadaten")')).toBeVisible();
+
+        const adminDownloadBtn = page.getByRole('link', { name: 'Admin Download' });
+        await expect(adminDownloadBtn).toBeVisible();
+
+        // target="_blank" entfernen, um den Download im gleichen Tab zu catchen
+        await adminDownloadBtn.evaluate(node => node.removeAttribute('target'));
+
+        const [download] = await Promise.all([
+            page.waitForEvent('download', {timeout: 30000}),
+            adminDownloadBtn.click()
+        ]);
+
+        expect(download.suggestedFilename()).toMatch(/\.jpg$/i);
+    });
+
 });

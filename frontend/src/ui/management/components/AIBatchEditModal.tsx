@@ -38,7 +38,14 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
     const [progress, setProgress] = useState(0);
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    useEffect(() => {
+    const [prevIsOpen, setPrevIsOpen] = useState(false);
+    const [prevPhotos, setPrevPhotos] = useState<Photo[]>([]);
+
+    // Derived State Pattern: Sync props to state directly during render
+    if (isOpen !== prevIsOpen || photos !== prevPhotos) {
+        setPrevIsOpen(isOpen);
+        setPrevPhotos(photos);
+        
         if (isOpen) {
             setRows(photos.map(p => ({
                 photoId: p.id,
@@ -62,13 +69,16 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
             }
             setIsGeneratingAll(false);
         }
-        
+    }
+
+    // Cleanup on unmount
+    useEffect(() => {
         return () => {
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
             }
         };
-    }, [isOpen, photos]);
+    }, []);
 
     if (!isOpen) return null;
 

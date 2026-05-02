@@ -52,11 +52,11 @@ export default function InviteView() {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
                 credentials: 'include', // CRITICAL FIX: Damit das JWT-Cookie nicht verworfen wird
-                body: JSON.stringify({token, name, email, password})
+                body: JSON.stringify({token, name: name || null, email: email || null, password: password || null})
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Fehler beim Beitritt.');
+            if (!res.ok) throw new Error(data.error || data.message || JSON.stringify(data) || 'Fehler beim Beitritt.');
             if (data.requires_mail_verification) {
                 setRegSuccess(data.message);
                 return;

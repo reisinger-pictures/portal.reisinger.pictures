@@ -12,6 +12,47 @@ const watermarkSchema = z.object({
 
 export type WatermarkFormValues = z.infer<typeof watermarkSchema>;
 
+const renderSvgToDataUrl = async (blob: Blob, opacity: number, size: number): Promise<string | null> => {
+    return new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(blob);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return resolve(null);
+            
+            const scale = Math.min(size / img.width, size / img.height);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (size - w) / 2;
+            const y = (size - h) / 2;
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = w;
+            tempCanvas.height = h;
+            const tempCtx = tempCanvas.getContext('2d');
+            if (tempCtx) {
+                tempCtx.fillStyle = '#ffffff';
+                tempCtx.fillRect(0, 0, w, h);
+                tempCtx.drawImage(img, 0, 0, w, h);
+            }
+            
+            ctx.globalAlpha = opacity;
+            ctx.drawImage(tempCanvas, x, y, w, h);
+            
+            resolve(canvas.toDataURL('image/png'));
+            URL.revokeObjectURL(url);
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
+        img.src = url;
+    });
+};
+
 const renderSvgToCanvas = async (blob: Blob, opacity: number, size: number): Promise<Blob | null> => {
     return new Promise((resolve) => {
         const img = new Image();
@@ -89,33 +130,18 @@ export default function WatermarkSettingsCard() {
     const watchOpacity = useWatch({control, name: 'opacity', defaultValue: 0.15});
     const activeBlob = svgFile || serverSvgBlob;
 
-    // Exact 1:1 Preview Rendering
+    // Exact 1:1 Preview Rendering using Data URL to avoid memory leaks and revokeObjectURL side-effects
     useEffect(() => {
         let isActive = true;
         if (activeBlob) {
-            renderSvgToCanvas(activeBlob, watchOpacity, 500).then(blob => {
-                if (!isActive || !blob) return;
-                const url = URL.createObjectURL(blob);
-                setPreviewRenderedUrl(prev => {
-                    if (prev) URL.revokeObjectURL(prev);
-                    return url;
-                });
+            renderSvgToDataUrl(activeBlob, watchOpacity, 500).then(dataUrl => {
+                if (isActive) setPreviewRenderedUrl(dataUrl);
             });
         } else {
-            setPreviewRenderedUrl(prev => {
-                if (prev) URL.revokeObjectURL(prev);
-                return null;
-            });
+            setPreviewRenderedUrl(null);
         }
         return () => { isActive = false; };
     }, [activeBlob, watchOpacity]);
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (previewRenderedUrl) URL.revokeObjectURL(previewRenderedUrl);
-        };
-    }, [previewRenderedUrl]);
 
     const onSubmit = async (data: WatermarkFormValues) => {
         setGenerating(true);

@@ -160,6 +160,7 @@ export default function LicenseCatalogSettings() {
     const handleDeleteUC = async (id: string) => {
         if (await confirm({ title: 'Löschen?', message: 'Kategorie wirklich löschen?', confirmColor: 'error' })) {
             await deleteUseCase(id);
+            showToast('success', 'Kategorie gelöscht');
         }
     };
 
@@ -175,6 +176,7 @@ export default function LicenseCatalogSettings() {
     const handleDeleteMod = async (id: string) => {
         if (await confirm({ title: 'Löschen?', message: 'Zuschlag wirklich löschen?', confirmColor: 'error' })) {
             await deleteModifier(id);
+            showToast('success', 'Zuschlag gelöscht');
         }
     };
 

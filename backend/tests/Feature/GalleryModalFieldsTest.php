@@ -11,7 +11,7 @@ class GalleryModalFieldsTest extends TestCase {
 
     public function test_can_create_and_update_entities_with_all_modal_fields() {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($user);
 
         // 1. Group erstellen mit allen Settings

@@ -1,9 +1,11 @@
 import {useState} from 'react';
 import {Photo} from '../../../logic/useGallery';
 import {useAuth} from '../../../logic/useAuth';
+import {UserRole} from '../../../logic/useUsers';
 import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
 import {useLicenseCatalog} from '../../../logic/useLicenseCatalog';
+import {useSearchParams} from 'react-router-dom';
 import {formatMoney} from '../../../logic/utils';
 import {ResolutionTier} from '../../../logic/usePricing';
 
@@ -16,6 +18,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
     const {user} = useAuth();
     const {showToast} = useUI();
     const {addToCart} = useCart();
+    const [searchParams] = useSearchParams();
 
     const [selectedUseCaseId, setSelectedUseCaseId] = useState<string>('');
     const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
@@ -24,15 +27,49 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
     if (isLoading || !catalog) return <span className="loading loading-spinner m-6"></span>;
 
     const isPhotoEditorialOnly = photo?.effective_is_editorial_only || photo?.is_editorial_only;
-    const availableUseCases = catalog.use_cases.filter(uc => !(isPhotoEditorialOnly && /werbung|kampagne|kommerziell/i.test(uc.name + ' ' + (uc.description || ''))));
-    const actualSelectedUseCaseId = selectedUseCaseId || (availableUseCases.length > 0 ? availableUseCases[0].id : (catalog.use_cases.length > 0 ? catalog.use_cases[0].id : ''));
-    const selectedUseCase = catalog.use_cases.find(u => u.id === actualSelectedUseCaseId) || catalog.use_cases[0];
+    const isClientView = searchParams.get('view') === 'client';
+    const isActuallyAdmin = user?.is_super_admin || user?.is_admin || user?.is_photographer;
+    const hasFullAccess = !!isActuallyAdmin && !isClientView;
 
-    const canBuy = true;
-    const hasFullAccess = user?.is_admin || user?.is_photographer;
+    let canBuy = true;
+    if (user) {
+        const isNormalClient = user.roles?.includes(UserRole.CLIENT) && !user.roles?.includes(UserRole.POWER_USER) && !isActuallyAdmin;
+        if (isNormalClient) canBuy = false;
+        if (isClientView && !user.roles?.includes(UserRole.POWER_USER)) canBuy = false;
+    }
 
     const RES_RANKS: Record<string, number> = {'none': 0, 'web': 1, 'print': 2, 'original': 3};
     const userRank = RES_RANKS[user?.flatrate_level || 'none'] || 0;
+
+    const displayedUseCases = catalog.use_cases.filter(uc => {
+        const isCommercialBlocked = isPhotoEditorialOnly && /werbung|kampagne|kommerziell/i.test(uc.name + ' ' + (uc.description || ''));
+        if (isCommercialBlocked) return false;
+        
+        const ucReqRank = RES_RANKS[uc.flatrate_tier || 'web'] || 0;
+        const ucCovered = userRank >= ucReqRank || photo?.gallery?.effective_is_free_download;
+        if (!canBuy && !ucCovered) return false;
+
+        return true;
+    });
+
+    displayedUseCases.sort((a, b) => {
+        const aReqRank = RES_RANKS[a.flatrate_tier || 'web'] || 0;
+        const aCovered = userRank >= aReqRank || photo?.gallery?.effective_is_free_download;
+        const aPrice = aCovered ? 0 : Number(a.base_price);
+
+        const bReqRank = RES_RANKS[b.flatrate_tier || 'web'] || 0;
+        const bCovered = userRank >= bReqRank || photo?.gallery?.effective_is_free_download;
+        const bPrice = bCovered ? 0 : Number(b.base_price);
+
+        if (aPrice !== bPrice) {
+            return aPrice - bPrice;
+        }
+        return Number(a.base_price) - Number(b.base_price);
+    });
+
+    const actualSelectedUseCaseId = selectedUseCaseId || (displayedUseCases.length > 0 ? displayedUseCases[0].id : '');
+    const selectedUseCase = catalog.use_cases.find(u => u.id === actualSelectedUseCaseId) || catalog.use_cases[0];
+
     const reqRank = RES_RANKS[selectedUseCase?.flatrate_tier || 'web'] || 0;
 
     const basePrice = selectedUseCase ? Number(selectedUseCase.base_price) : 0;
@@ -82,36 +119,27 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                 <label className="label-text font-bold text-sm opacity-70 uppercase tracking-wide">1. Typ /
                     Grundhonorar</label>
                 <div className="flex flex-col gap-2">
-                    {catalog.use_cases.map(uc => {
+                    {displayedUseCases.map(uc => {
                         const ucReqRank = RES_RANKS[uc.flatrate_tier || 'web'] || 0;
                         const ucCovered = userRank >= ucReqRank || photo?.gallery?.effective_is_free_download;
 
-                        if (!canBuy && !ucCovered) return null;
-
-                        const isCommercialBlocked = isPhotoEditorialOnly && /werbung|kampagne|kommerziell/i.test(uc.name + ' ' + (uc.description || ''));
-
                         return (
                             <label key={uc.id}
-                                   className={`p-3 rounded-box border flex items-center gap-3 transition-colors ${actualSelectedUseCaseId === uc.id && !isCommercialBlocked ? 'border-primary bg-primary/5' : 'border-base-300 bg-base-200/50 hover:bg-base-200'} ${isCommercialBlocked ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer'}`}>
-                                <input type="radio" className="radio-primary radio" disabled={isCommercialBlocked}
-                                       checked={actualSelectedUseCaseId === uc.id && !isCommercialBlocked}
+                                   className={`p-3 rounded-box border flex items-center gap-3 transition-colors ${actualSelectedUseCaseId === uc.id ? 'border-primary bg-primary/5' : 'border-base-300 bg-base-200/50 hover:bg-base-200'} cursor-pointer`}>
+                                <input type="radio" className="radio-primary radio"
+                                       checked={actualSelectedUseCaseId === uc.id}
                                        onChange={() => {
-                                           if (isCommercialBlocked) return;
                                            setSelectedUseCaseId(uc.id);
                                            setSelectedModifiers([]);
                                        }}/>
                                 <div className="flex-1">
                                     <div className="font-bold text-sm flex flex-wrap items-center gap-2">
                                         {uc.name}
-                                        {isCommercialBlocked && <span
-                                            className="badge badge-error badge-sm text-white text-[10px] uppercase">Nur Redaktionell</span>}
                                     </div>
                                     <div className="text-sm opacity-70">{uc.description}</div>
                                 </div>
                                 <div className="font-mono font-bold text-sm shrink-0">
-                                    {isCommercialBlocked ?
-                                        <span className="text-error text-sm">Gesperrt</span> : (ucCovered ? <span
-                                            className="text-success text-sm">Inklusive</span> : formatMoney(Number(uc.base_price)))}
+                                    {ucCovered ? <span className="text-success text-sm">Inklusive</span> : formatMoney(Number(uc.base_price))}
                                 </div>
                             </label>
                         );
@@ -185,15 +213,17 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                 </div>
             </div>
 
-            <div className="mt-2 pt-4 border-t border-base-300">
-                <p className="text-sm font-bold opacity-70 mb-2 uppercase tracking-wide">Sonderanfrage (Angebot)</p>
-                <textarea className="textarea textarea-bordered w-full h-16 text-sm resize-none mb-2"
-                          placeholder="Z.B. Exklusivrecht erforderlich..." value={quoteNote}
-                          onChange={(e) => setQuoteNote(e.target.value)}></textarea>
-                <button onClick={handleCustomQuote} className="btn btn-outline btn-sm w-full"><span
-                    className="iconify mdi--file-document-edit-outline"></span> Als Angebot anfragen
-                </button>
-            </div>
+            {canBuy && (
+                <div className="mt-2 pt-4 border-t border-base-300">
+                    <p className="text-sm font-bold opacity-70 mb-2 uppercase tracking-wide">Sonderanfrage (Angebot)</p>
+                    <textarea className="textarea textarea-bordered w-full h-16 text-sm resize-none mb-2"
+                              placeholder="Z.B. Exklusivrecht erforderlich..." value={quoteNote}
+                              onChange={(e) => setQuoteNote(e.target.value)}></textarea>
+                    <button onClick={handleCustomQuote} className="btn btn-outline btn-sm w-full"><span
+                        className="iconify mdi--file-document-edit-outline"></span> Als Angebot anfragen
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

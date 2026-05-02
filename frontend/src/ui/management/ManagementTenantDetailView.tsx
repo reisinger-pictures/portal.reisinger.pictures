@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useState} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {Tenant, TenantUser, useTenants} from '../../logic/useTenants';
 import {useUsers} from '../../logic/useUsers';
@@ -171,15 +171,15 @@ export default function ManagementTenantDetailView() {
     const [inviteEmail, setInviteEmail] = useState('');
     const [isInviting, setIsInviting] = useState(false);
 
-    useEffect(() => {
-        if (tenant) {
-            setName(tenant.name);
-            setDomain(tenant.domain || '');
-            setFreq(tenant.invoice_frequency);
-            setSelUsers(tenant.users?.map(u => u.id) || []);
-            setSelGroups(tenant.gallery_groups?.map(g => g.id) || []);
-        }
-    }, [tenant]);
+    const [prevTenantId, setPrevTenantId] = useState<string | null>(null);
+    if (tenant && tenant.id !== prevTenantId) {
+        setPrevTenantId(tenant.id);
+        setName(tenant.name);
+        setDomain(tenant.domain || '');
+        setFreq(tenant.invoice_frequency);
+        setSelUsers(tenant.users?.map(u => u.id) || []);
+        setSelGroups(tenant.gallery_groups?.map(g => g.id) || []);
+    }
 
     const handleSaveGeneral = async (e: React.FormEvent) => {
         e.preventDefault();
