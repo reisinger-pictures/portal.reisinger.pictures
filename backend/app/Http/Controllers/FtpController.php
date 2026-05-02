@@ -9,12 +9,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Services\PhotoProcessingService;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class FtpController extends Controller
 {
-    /**
-     * Gibt den Status der FTP-Inbox für den eingeloggten User zurück.
-     */
     public function status()
     {
         $user = auth('api')->user();
@@ -22,7 +20,6 @@ class FtpController extends Controller
 
         $fileCount = 0;
         if (is_dir($inboxPath)) {
-            // Wir suchen nach Bildern direkt im User-Ordner
             $files = glob($inboxPath . '/*.{jpg,jpeg,JPG,JPEG}', GLOB_BRACE);
             $fileCount = count($files);
         }
@@ -36,9 +33,6 @@ class FtpController extends Controller
         ]);
     }
 
-    /**
-     * Setzt die Ziel-Galerie für den FTP-Import.
-     */
     public function setTarget(Request $request)
     {
         $request->validate(['gallery_id' => 'nullable|string|exists:galleries,id']);
@@ -52,9 +46,6 @@ class FtpController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Verschiebt Bilder aus der FTP-Inbox in die gewählte Galerie.
-     */
     public function process(Request $request)
     {
         $user = auth('api')->user();
@@ -68,47 +59,50 @@ class FtpController extends Controller
         $gallery = Gallery::find($user->current_ftp_gallery_id);
         $inboxPath = $this->getInboxPath($user);
 
-        if (!is_dir($inboxPath)) {
-            return response()->json(['success' => true, 'processed' => 0]);
-        }
+        if (!is_dir($inboxPath)) return response()->json(['success' => true, 'processed' => 0]);
 
         $imageFiles = glob($inboxPath . '/*.{jpg,jpeg,JPG,JPEG}', GLOB_BRACE);
-        if (empty($imageFiles)) {
-            return response()->json(['success' => true, 'processed' => 0]);
-        }
+        if (empty($imageFiles)) return response()->json(['success' => true, 'processed' => 0]);
 
         $processedCount = 0;
         $photoService = app(PhotoProcessingService::class);
 
         foreach ($imageFiles as $file) {
             $originalName = pathinfo($file, PATHINFO_FILENAME);
-            $extension = pathinfo($file, PATHINFO_EXTENSION);
-            $filename = Str::slug($originalName) . '.' . strtolower($extension);
+            $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if ($extension === 'jpeg') $extension = 'jpg';
 
-            // Zielverzeichnis in der 'photos' disk (e.g. photos/1/mein-bild.jpg)
+            // Dateinamen IMMER aus UUID generieren!
+            $photoId = (string) Str::uuid();
+            $filename = $photoId . '.' . $extension;
+
             $targetDir = (string) $gallery->id;
             $targetRelativePath = $targetDir . '/' . $filename;
             $thumbsDir = $targetDir . '/_thumbs';
 
-            // Datei verschieben
             Storage::disk('photos')->put($targetRelativePath, file_get_contents($file));
             unlink($file);
 
-            // Thumbnail und Metadaten verarbeiten
             $targetPath = Storage::disk('photos')->path($targetRelativePath);
             $thumbPath = Storage::disk('photos')->path($thumbsDir . '/' . md5($filename . '1024') . '.webp');
 
-            // Falls das Thumbs-Verzeichnis fehlt
             if (!is_dir(dirname($thumbPath))) {
                 mkdir(dirname($thumbPath), 0755, true);
             }
 
             $meta = $photoService->processImage($targetPath, $thumbPath, $gallery);
+            if (empty($meta['title'])) {
+                $meta['title'] = $originalName; // Dateiname als Titel retten
+            }
 
-            \Illuminate\Support\Facades\DB::transaction(function () use ($gallery, $filename, $meta) {
-                Photo::updateOrCreate(
-                    ['gallery_id' => $gallery->id, 'filename' => $filename],
-                    array_merge(['lr_uuid' => 'ftp-' . uniqid(), 'user_id' => $user->id], $meta)
+            DB::transaction(function () use ($gallery, $meta, $photoId, $user) {
+                Photo::create(
+                    array_merge([
+                        'id' => $photoId,
+                        'gallery_id' => $gallery->id,
+                        'lr_uuid' => 'ftp-' . uniqid(),
+                        'user_id' => $user->id
+                    ], $meta)
                 );
             });
 
@@ -118,13 +112,9 @@ class FtpController extends Controller
         return response()->json(['success' => true, 'processed' => $processedCount]);
     }
 
-    /**
-     * Hilfsmethode zur Bestimmung des lokalen Pfads der User-Inbox.
-     */
     private function getInboxPath($user)
     {
         $folder = $user->ftp_slug ?? $user->id;
-        // Nutzt den Pfad aus der Filesystem-Config
         return Storage::disk('ftp_inbox')->path((string) $folder);
     }
 }

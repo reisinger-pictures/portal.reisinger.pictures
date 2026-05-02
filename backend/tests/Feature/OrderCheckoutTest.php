@@ -57,4 +57,67 @@ class OrderCheckoutTest extends TestCase {
         // Total = 40.00
         $this->assertDatabaseHas('orders', ['id' => $orderId, 'total_amount' => 4000]);
     }
+
+    public function test_checkout_blocks_commercial_license_for_editorial_photo() {
+        $user = User::factory()->create();
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'client']));
+        $token = auth('api')->login($user);
+
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
+        $user->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'is_editorial_only' => true]);
+        
+        $useCase = \App\Models\LicenseUseCase::create([
+            'name' => 'Commercial License', 
+            'base_price' => 45000, 
+            'flatrate_tier' => 'original', 
+            'is_commercial' => true
+        ]);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
+                         ->postJson("/api/orders/checkout", [
+                             'items' => [
+                                 [
+                                     'photoId' => $photo->id, 
+                                     'tier' => 'original',
+                                     'useCaseId' => $useCase->id, 
+                                     'modifierIds' => []
+                                 ]
+                             ],
+                             'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true
+                         ]);
+
+        $response->assertStatus(403);
+        $response->assertJson(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."]);
+    }
+
+    public function test_admin_without_flatrate_pays_full_price() {
+        $user = User::factory()->create(['flatrate_level' => 'none']);
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'admin']));
+        $token = auth('api')->login($user);
+
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
+        $user->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
+                         ->postJson("/api/orders/checkout", [
+                             'items' => [
+                                 [
+                                     'photoId' => $photo->id, 
+                                     'tier' => 'original',
+                                     'useCaseId' => '11111111-1111-1111-1111-111111111111', 
+                                     'modifierIds' => []
+                                 ]
+                             ],
+                             'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true
+                         ]);
+
+        $response->assertStatus(200);
+        $orderId = $response->json('order_id');
+        
+        // Use Case (Original) = 80€ Base * 4.0 (Keine Flatrate -> voller Preis)
+        // Preis = 80€ (Base) * (Keine Modifikatoren) -> Backend Price Service gibt einfach Base zurück.
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'total_amount' => 8000]);
+    }
 }

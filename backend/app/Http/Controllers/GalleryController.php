@@ -108,9 +108,9 @@ class GalleryController extends Controller
             'slug' => $slug,
             'parent_id' => $request->parent_id,
             'is_public' => $request->is_public,
-            'is_free_download' => $request->is_free_download,
-            'is_editorial_only' => $request->is_editorial_only,
-            'is_hidden' => $request->is_hidden,
+            'is_free_download' => $request->is_free_download ?? false,
+            'is_editorial_only' => $request->is_editorial_only ?? false,
+            'is_hidden' => $request->is_hidden ?? false,
             'restricted_photographers' => $request->restricted_photographers
         ]);
         return response()->json(['success' => true, 'group' => $group]);
@@ -233,9 +233,9 @@ class GalleryController extends Controller
                 'type' => $request->type,
                 'is_live' => $request->type === 'selection' ? false : ($request->is_live ?? false),
                 'is_public' => $isPublic,
-                'is_free_download' => $request->is_free_download ?? null,
-                'is_editorial_only' => $request->is_editorial_only ?? null,
-                'is_hidden' => $request->is_hidden ?? null,
+                'is_free_download' => $request->is_free_download ?? false,
+                'is_editorial_only' => $request->is_editorial_only ?? false,
+                'is_hidden' => $request->is_hidden ?? false,
                 'restricted_photographers' => $request->restricted_photographers ?? null,
                 'gallery_group_id' => $request->gallery_group_id,
                 'password_hash' => $request->password ? Hash::make($request->password) : null,
@@ -323,6 +323,12 @@ class GalleryController extends Controller
         if (isset($validated['type']) && $validated['type'] === 'selection') {
             $validated['is_live'] = false;
             $validated['is_public'] = false;
+        }
+
+        foreach (['is_free_download', 'is_editorial_only', 'is_hidden'] as $field) {
+            if (array_key_exists($field, $validated) && $validated[$field] === null) {
+                $validated[$field] = false;
+            }
         }
 
         $gallery->update($validated);
@@ -458,7 +464,7 @@ class GalleryController extends Controller
             $export[] = [
                 'id' => $photo->id,
                 'filename' => $photo->title ?: 'Bild ' . substr($photo->id, 0, 8),
-                'thumb_url' => '/api/media/' . $photo->gallery->slug . '/_thumbs/800/' . $photo->id . '.webp',
+                'thumb_url' => $photo->thumb_url,
                 'lr_uuid' => $photo->lr_uuid,
                 'avg_rating' => ceil($ratings->where('rating', '>', 0)->avg('rating') ?? 0),
                 'all_comments' => implode("\n", $comments)

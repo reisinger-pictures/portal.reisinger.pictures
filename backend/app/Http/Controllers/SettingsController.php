@@ -38,18 +38,18 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function getWatermarkImage()
+    public function getWatermarkSvg()
     {
-        $path = storage_path('app/private/watermark.svg');
+        $path = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/watermark.svg');
         if (!file_exists($path)) abort(404);
         return response()->file($path, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'no-cache, no-store, must-revalidate']);
     }
 
     public function getWatermark()
     {
+        $disk = \Illuminate\Support\Facades\Storage::disk('photos');
         return response()->json([
-            'has_svg' => file_exists(storage_path('app/private/watermark.svg')),
-            'text' => Setting::where('key', 'watermark_text')->value('value') ?? 'reisinger.pictures',
+            'has_svg' => $disk->exists('_watermarks/watermark.svg'),
             'opacity' => (float) (Setting::where('key', 'watermark_opacity')->value('value') ?? 0.15)
         ]);
     }
@@ -57,20 +57,42 @@ class SettingsController extends Controller
     public function updateWatermark(Request $request)
     {
         $request->validate([
-            'text' => 'nullable|string|max:100',
             'opacity' => 'nullable|numeric|min:0.05|max:1.0',
-            'svg' => 'nullable|file|mimes:svg'
+            'svg' => 'nullable|file',
+            'bucket_500' => 'nullable|file',
+            'bucket_1000' => 'nullable|file',
+            'bucket_2000' => 'nullable|file',
+            'bucket_500_sel' => 'nullable|file',
+            'bucket_1000_sel' => 'nullable|file',
+            'bucket_2000_sel' => 'nullable|file',
         ]);
 
-        if ($request->hasFile('svg')) {
-            $request->file('svg')->move(storage_path('app/private'), 'watermark.svg');
-        }
-
-        Setting::updateOrCreate(['key' => 'watermark_text'], ['value' => $request->text ?? '']);
         if ($request->has('opacity')) Setting::updateOrCreate(['key' => 'watermark_opacity'], ['value' => $request->opacity]);
+        
+        $disk = \Illuminate\Support\Facades\Storage::disk('photos');
+        $dir = '_watermarks';
+        if (!$disk->exists($dir)) $disk->makeDirectory($dir);
 
-        $oldCaches = glob(storage_path('app/private/watermark_master_*.png'));
-        if ($oldCaches) array_map('unlink', $oldCaches);
+        if ($request->hasFile('svg')) $disk->putFileAs($dir, $request->file('svg'), 'watermark.svg');
+        if ($request->hasFile('bucket_500')) $disk->putFileAs($dir, $request->file('bucket_500'), 'master_500.png');
+        if ($request->hasFile('bucket_1000')) $disk->putFileAs($dir, $request->file('bucket_1000'), 'master_1000.png');
+        if ($request->hasFile('bucket_2000')) $disk->putFileAs($dir, $request->file('bucket_2000'), 'master_2000.png');
+        if ($request->hasFile('bucket_500_sel')) $disk->putFileAs($dir, $request->file('bucket_500_sel'), 'master_selection_500.png');
+        if ($request->hasFile('bucket_1000_sel')) $disk->putFileAs($dir, $request->file('bucket_1000_sel'), 'master_selection_1000.png');
+        if ($request->hasFile('bucket_2000_sel')) $disk->putFileAs($dir, $request->file('bucket_2000_sel'), 'master_selection_2000.png');
+
+        // Cache-Busting: Lösche alle generierten Wasserzeichen-Bilder asynchron im Hintergrund
+        dispatch(function () {
+            $disk = \Illuminate\Support\Facades\Storage::disk('photos');
+            $directories = $disk->directories();
+            foreach ($directories as $dir) {
+                // Nur Galerie-Ordner (UUIDs) durchsuchen
+                if (\Illuminate\Support\Str::isUuid($dir)) {
+                    $disk->deleteDirectory($dir . '/_watermarked');
+                    $disk->deleteDirectory($dir . '/_thumbs/_watermarked');
+                }
+            }
+        });
 
         return response()->json(['success' => true]);
     }

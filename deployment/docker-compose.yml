@@ -43,7 +43,7 @@ services:
     command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
 
   backend:
-    image: ghcr.io/reisi007/php-apache-mod2rewrite-imagick-exiftool-maria-pdo:8.5
+    image: ghcr.io/reisi007/php-apache-mod2rewrite-exiftool-maria-pdo:8.5
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
@@ -93,6 +93,7 @@ services:
       - STRIPE_KEY=${STRIPE_KEY}
       - STRIPE_SECRET=${STRIPE_SECRET}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - PROXY_DELIVERY_HEADER=${PROXY_DELIVERY_HEADER}
     command: >
       sh -c "
       echo 'Warte 10 Sekunden auf Services (MariaDB & Meilisearch)...';

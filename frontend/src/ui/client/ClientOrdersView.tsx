@@ -49,10 +49,10 @@ export default function ClientOrdersView() {
                                             </div>
                                             {isPendingQuote ? <span className="badge badge-warning font-bold p-3">Angebot ausständig</span> : 
                                             isBlocked ? <span className="badge badge-error font-bold p-3">Zugriff gesperrt ({order.status})</span> :
-                                            <><button className="btn btn-primary btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/download-zip', '_self')} title="Lizenzierte Bilder als ZIP herunterladen">
+                                            <><button className="btn btn-primary btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/download-zip', '_blank')} title="Lizenzierte Bilder als ZIP herunterladen">
                                                 <span className="iconify mdi--zip-box"></span> Bilder ZIP
                                             </button>
-                                            <button className="btn btn-outline btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/invoice', '_self')} title="Rechnung als PDF herunterladen">
+                                            <button className="btn btn-outline btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/invoice', '_blank')} title="Rechnung als PDF herunterladen">
                                                 <span className="iconify mdi--file-pdf-box text-error"></span> Beleg
                                             </button></>}
                                         </div>

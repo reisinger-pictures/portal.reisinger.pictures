@@ -42,9 +42,9 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
             reset({
                 name: editingGroup?.name || '',
                 slug: editingGroup?.slug || '',
-                is_free_download: editingGroup?.is_free_download || false,
-                is_editorial_only: editingGroup?.is_editorial_only || false,
-                is_hidden: editingGroup?.is_hidden || false,
+                is_free_download: !!editingGroup?.is_free_download,
+                is_editorial_only: !!editingGroup?.is_editorial_only,
+                is_hidden: !!editingGroup?.is_hidden,
                 is_public: editingGroup?.is_public === null || editingGroup?.is_public === undefined ? 'null' : (editingGroup.is_public ? 'true' : 'false'),
                 parent_id: editingGroup?.parent_id || defaultParentId || ''
             });

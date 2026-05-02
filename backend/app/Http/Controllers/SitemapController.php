@@ -46,7 +46,7 @@ class SitemapController extends Controller
         })->with('gallery')->chunk(100, function ($photos) use (&$xml, $baseUrl) {
             foreach ($photos as $photo) {
                 $pageUrl = $baseUrl . '/photos/' . $photo->id;
-                $imageUrl = $baseUrl . '/api/media/' . $photo->gallery->slug . '/' . $photo->filename;
+                $imageUrl = $baseUrl . '/api/media/' . $photo->gallery_id . '/' . $photo->filename;
                 
                 $xml .= '  <url>' . "\n";
                 $xml .= '    <loc>' . $pageUrl . '</loc>' . "\n";

@@ -27,6 +27,17 @@ class CheckoutService {
                 if (!$photo->gallery->is_public && !$user->canAccessGallery($photo->gallery_id)) abort(403, 'Zugriff verweigert');
                 
                 $isItemQuote = isset($item['isQuote']) && $item['isQuote'];
+                
+                if (!$isItemQuote && !empty($item['useCaseId'])) {
+                    $useCase = \App\Models\LicenseUseCase::find($item['useCaseId']);
+                    if ($useCase) {
+                        $isCommercial = $useCase->is_commercial || preg_match('/werbung|kampagne|kommerziell/i', $useCase->name . ' ' . $useCase->description);
+                        if ($isCommercial && ($photo->effective_is_editorial_only || $photo->is_editorial_only)) {
+                            return response()->json(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."], 403);
+                        }
+                    }
+                }
+
                 $itemCents = 0;
                 $tier = $item['tier'] ?? 'web';
                 $useCaseName = $item['useCaseName'] ?? 'Standard Lizenz';

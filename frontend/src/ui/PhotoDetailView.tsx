@@ -26,16 +26,12 @@ export default function PhotoDetailView() {
     const {user} = useAuth();
     const {updateMetadata, deletePhoto} = usePhoto();
     const { showToast, confirm } = useUI();
-    const {data, error, isLoading, mutate} = useSWR<PhotoContextData>(
-        id ? '/api/photos/' + id + '/context' : null, fetcher
-    );
+    const {data, error, isLoading, mutate} = useSWR<PhotoContextData>(id ? '/api/photos/' + id + '/context' : null, fetcher);
 
     const [iptcData, setIptcData] = useState<IptcData>({});
     const [saving, setSaving] = useState(false);
-
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [prevPhotoId, setPrevPhotoId] = useState<string | undefined>(undefined);
-
 
     if (data?.photo && data.photo.id !== prevPhotoId) {
         setPrevPhotoId(data.photo.id);
@@ -49,17 +45,13 @@ export default function PhotoDetailView() {
             city: data.photo.city || '',
             state: data.photo.state || '',
             country: data.photo.country || '',
-            iso_country: data.photo.iso_country || ''
+            iso_country: data.photo.iso_country || '',
+            is_editorial_only: data.photo.is_editorial_only || false
         });
     }
 
-    if (isLoading) return <PageLayout>
-        <div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div>
-
-        </PageLayout>;
-    if (error || !data) return <PageLayout>
-        <div className="p-8"><ErrorMessage message="Foto konnte nicht geladen werden oder keine Berechtigung." /></div>
-    </PageLayout>;
+    if (isLoading) return <PageLayout><div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div></PageLayout>;
+    if (error || !data) return <PageLayout><div className="p-8"><ErrorMessage message="Foto konnte nicht geladen werden oder keine Berechtigung." /></div></PageLayout>;
 
     const {photo, breadcrumbs} = data;
     const isPhotographer = user?.is_super_admin || user?.is_admin || (user?.is_photographer && data?.photo && (user?.my_galleries?.some(g => g.id === data.photo.gallery_id) || user?.photographer_galleries?.some(g => g.id === data.photo.gallery_id)));
@@ -90,20 +82,14 @@ export default function PhotoDetailView() {
     return (
         <PageLayout hideMobileHeader>
             <div className="container mx-auto p-4 md:p-8">
-                {/* Header / Breadcrumbs */}
                 <div className="flex items-center mb-6 gap-4">
-                    <button onClick={() => navigate(-1)} className="btn btn-circle btn-ghost shrink-0">
-                        <span className="iconify mdi--arrow-left text-2xl"></span>
-                    </button>
+                    <button onClick={() => navigate(-1)} className="btn btn-circle btn-ghost shrink-0"><span className="iconify mdi--arrow-left text-2xl"></span></button>
                     <div className="text-sm breadcrumbs flex-1 overflow-hidden whitespace-nowrap">
                         <ul>
                             <li><a onClick={() => navigate('/')}>Dashboard</a></li>
                             {breadcrumbs.map((bc, idx) => (
                                 <li key={idx}>
-                                    {bc.type === 'gallery' && bc.full_path
-                                        ? <a onClick={() => navigate('/' + bc.full_path)} className="font-semibold text-base-content opacity-80 hover:opacity-100 cursor-pointer">{bc.name}</a>
-                                        : <span className="opacity-70">{bc.name}</span>
-                                    }
+                                    {bc.type === 'gallery' && bc.full_path ? <a onClick={() => navigate('/' + bc.full_path)} className="font-semibold text-base-content opacity-80 hover:opacity-100 cursor-pointer">{bc.name}</a> : <span className="opacity-70">{bc.name}</span>}
                                 </li>
                             ))}
                             <li className="truncate max-w-[200px] opacity-50">Bilddetails</li>
@@ -111,39 +97,23 @@ export default function PhotoDetailView() {
                     </div>
                 </div>
 
-                {/* Content Area */}
-                <div className="flex flex-col xl:flex-row gap-8 items-start">
-
-                    {/* Linke Spalte */}
-                    <div className="flex-1 w-full flex flex-col gap-4">
+                <div className="flex flex-col gap-8 items-start">
+                    <div className="w-full flex flex-col gap-4">
                         <div className="bg-base-200 rounded-box flex items-center justify-center p-4 min-h-[40vh] overflow-hidden">
                             <ResponsiveImage src={photo.url} alt={photo.title || 'Bild'} containerClassName="flex items-center justify-center w-full h-full min-h-[40vh] bg-transparent" className="max-w-full h-auto max-h-[70vh] object-contain rounded drop-shadow-xl" />
                         </div>
-
                         {isPhotographer && (<div className="flex justify-end w-full bg-base-100 p-4 rounded-box border border-base-300 shadow-sm mt-2"><button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap"><span className="iconify mdi--trash-can"></span> Bild löschen</button></div>)}
                     </div>
 
-                    {/* Rechte Spalte: Formular */}
-                    <div className="w-full lg:w-[450px] xl:w-[600px] 2xl:w-[700px] shrink-0 flex flex-col gap-6">
+                    <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                         {data.photo.gallery?.type === 'delivery' && (
                             <LicenseSelectorCard photo={data.photo} />
                         )}
-                        <IptcMetadataEditor
-                            data={iptcData}
-                            onChange={setIptcData}
-                            disabled={!canEdit}
-                            showArtist={isPhotographer}
-                        >
+                        <IptcMetadataEditor data={iptcData} onChange={setIptcData} disabled={!canEdit} showArtist={isPhotographer}>
                             {canEdit && (
                                 <div className="flex flex-col sm:flex-row gap-2 mt-6 pt-4 border-t border-base-300">
-                                    <button onClick={handleSaveMeta} disabled={saving} className="btn btn-primary flex-1 w-full">
-                                        {saving ? <span className="loading loading-spinner"></span> : 'Speichern'}
-                                    </button>
-                                    {isPhotographer && (
-                                        <button onClick={() => setIsHistoryOpen(true)} className="btn btn-outline w-full sm:w-auto" title="Änderungshistorie anzeigen">
-                                            <span className="iconify mdi--history"></span> Historie
-                                        </button>
-                                    )}
+                                    <button onClick={handleSaveMeta} disabled={saving} className="btn btn-primary flex-1 w-full">{saving ? <span className="loading loading-spinner"></span> : 'Speichern'}</button>
+                                    {isPhotographer && (<button onClick={() => setIsHistoryOpen(true)} className="btn btn-outline w-full sm:w-auto" title="Änderungshistorie anzeigen"><span className="iconify mdi--history"></span> Historie</button>)}
                                 </div>
                             )}
                         </IptcMetadataEditor>
@@ -152,22 +122,16 @@ export default function PhotoDetailView() {
             </div>
 
             <PhotoHistoryModal photoId={photo.id} isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} onReverted={async () => {
-            const newData = await mutate();
-            if (newData?.photo) {
-                setIptcData({
-                    title: newData.photo.title || '',
-                    description: newData.photo.description || '',
-                    artist: newData.photo.artist || '',
-                    headline: newData.photo.headline || '',
-                    keywords: newData.photo.keywords || '',
-                    location: newData.photo.location || '',
-                    city: newData.photo.city || '',
-                    state: newData.photo.state || '',
-                    country: newData.photo.country || '',
-                    iso_country: newData.photo.iso_country || ''
-                });
-            }
-        }} />
+                const newData = await mutate();
+                if (newData?.photo) {
+                    setIptcData({
+                        title: newData.photo.title || '', description: newData.photo.description || '', artist: newData.photo.artist || '',
+                        headline: newData.photo.headline || '', keywords: newData.photo.keywords || '', location: newData.photo.location || '',
+                        city: newData.photo.city || '', state: newData.photo.state || '', country: newData.photo.country || '',
+                        iso_country: newData.photo.iso_country || '', is_editorial_only: newData.photo.is_editorial_only || false
+                    });
+                }
+            }} />
         </PageLayout>
     );
 }

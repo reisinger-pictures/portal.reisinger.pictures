@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Gallery;
+use App\Models\Photo;
 use Illuminate\Http\Request;
 use App\Services\WatermarkService;
 use Illuminate\Support\Facades\Cache;
@@ -12,129 +13,133 @@ class FileDeliveryController extends Controller
 {
     public function serve(Request $request, $slug, $identifier)
     {
-        $gallery = Gallery::where('slug', $slug)->firstOrFail();
-        $user = auth('api')->user();
+        $gallery = \Illuminate\Support\Str::isUuid($slug) 
+            ? Gallery::where('id', $slug)->first() 
+            : Gallery::where('slug', $slug)->first();
+        if (!$gallery) return response()->json(['error' => 'Galerie nicht gefunden'], 404);
 
+        $user = auth('api')->user();
         $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
         $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($gallery->id)));
 
-        if ($isExpired && !$canManage) {
-            abort(403, 'Forbidden (Expired)');
-        }
-
+        if ($isExpired && !$canManage) return response()->json(['error' => 'Galerie abgelaufen'], 403);
+        
         if (!$gallery->is_public) {
-            if (!$user) abort(401, 'Unauthorized');
-            if (!$user->canAccessGallery($gallery->id)) abort(403, 'Forbidden');
+            if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
+            if (!$user->canAccessGallery($gallery->id)) return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $needsWatermark = true;
-        if ($gallery->effective_is_free_download) {
-            $needsWatermark = false;
-        } elseif ($user && ($user->is_admin || $user->is_photographer)) {
-            $needsWatermark = false;
-        } elseif ($user && $user->canAccessGallery($gallery->id)) {
+        $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/\\');
+        $processor = app(\App\Services\ImageProcessor::class);
+        $watermarkService = app(WatermarkService::class);
+        
+        // 1. Konzeptueller Check: Hat der User das Recht auf die cleane Originaldatei?
+        $logicalNeedsWatermark = true;
+        if ($gallery->effective_is_free_download) $logicalNeedsWatermark = false;
+        elseif ($user && ($user->is_admin || $user->is_photographer)) $logicalNeedsWatermark = false;
+        elseif ($user && $user->canAccessGallery($gallery->id)) {
             $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
-            $userRank = $ranks[$user->flatrate_level ?? 'none'] ?? 0;
-            // Wenn der User mindestens die Web-Flatrate hat, blenden wir Wasserzeichen im UI aus
-            if ($userRank >= 1) {
-                $needsWatermark = false;
+            if (($ranks[$user->flatrate_level ?? 'none'] ?? 0) >= 1) $logicalNeedsWatermark = false;
+        }
+
+        // 2. Pfad-Prüfung und HTTP 403 Schutz
+        $isWatermarkedRequest = str_starts_with($identifier, 'watermarked/');
+        if ($isWatermarkedRequest) {
+            $identifier = substr($identifier, 12);
+        } else {
+            if ($logicalNeedsWatermark) {
+                return response()->json(['error' => 'Zugriff auf Original-Ressource verweigert. Wasserzeichen erforderlich.'], 403);
             }
         }
-        
-        $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/');
-        $watermarkService = app(WatermarkService::class);
-        $processor = app(\App\Services\ImageProcessor::class);
 
-        // --- LAZY THUMBNAIL GENERATION (UUID statt Dateiname) ---
+        // 3. Physischer Check: Wasserzeichen generieren, wenn angefordert UND global konfiguriert
+        $globalWatermarkExists = \Illuminate\Support\Facades\Storage::disk('photos')->exists('_watermarks/master_500.png');
+        $generateWatermark = $isWatermarkedRequest && $globalWatermarkExists;
+        $path = null;
+
+        // --- LAZY THUMBNAILS ---
         if (preg_match('#^_thumbs/(\d+)/([a-f0-9\-]+)\.webp$#i', $identifier, $matches)) {
             $size = (int) $matches[1];
             $photoId = $matches[2];
-            
-            $photo = \App\Models\Photo::where('id', $photoId)->where('gallery_id', $gallery->id)->firstOrFail();
-            
-            $originalPath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
-            $sourcePath = $baseStoragePath . '/' . $gallery->id . '/_thumbs/' . $size . '/' . $photo->id . '.webp';
-            $xAccelPath = '/protected-photos/' . $gallery->id . '/_thumbs/' . $size . '/' . $photo->id . '.webp';
 
-            if (!file_exists($sourcePath) && file_exists($originalPath)) {
-                if (!is_dir(dirname($sourcePath))) @mkdir(dirname($sourcePath), 0755, true);
-                
-                $lockKey = 'thumb_gen_' . md5($sourcePath);
+            $photo = Photo::where('id', $photoId)->where('gallery_id', $gallery->id)->first();
+            if (!$photo) return response()->json(['error' => 'Foto nicht gefunden'], 404);
+
+            $originalPath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
+            if (!file_exists($originalPath)) return response()->json(['error' => 'Original fehlt auf der Festplatte'], 404);
+
+            $thumbPath = $baseStoragePath . '/' . $gallery->id . '/_thumbs/' . $size . '/' . $photo->id . '.webp';
+            
+            if (!file_exists($thumbPath)) {
+                if (!is_dir(dirname($thumbPath))) @mkdir(dirname($thumbPath), 0755, true);
                 try {
-                    Cache::lock($lockKey, 30)->block(15, function () use ($originalPath, $sourcePath, $size, $processor) {
-                        if (file_exists($sourcePath)) return;
-                        $processor->generateThumbnail($originalPath, $sourcePath, $size);
-                    });
-                } catch (\Exception $e) {
-                    Log::error("Lazy Thumb Error: " . $e->getMessage());
-                    $sourcePath = $originalPath; 
-                }
+                    $processor->generateThumbnail($originalPath, $thumbPath, $size);
+                } catch (\Throwable $e) {}
             }
 
-            $path = $sourcePath;
+            if (!file_exists($thumbPath)) return response()->json(['error' => 'Thumbnail fehlt'], 500);
 
-            if ($needsWatermark && $path !== $originalPath) {
-                $path = $baseStoragePath . '/' . $gallery->id . '/_thumbs/_watermarked/' . $size . '/' . $photo->id . '.webp';
-                $xAccelPath = '/protected-photos/' . $gallery->id . '/_thumbs/_watermarked/' . $size . '/' . $photo->id . '.webp';
-                if (!file_exists($path) && file_exists($sourcePath)) {
-                    if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
-                    $watermarkService->applyWatermark($sourcePath, $path, null, $gallery->type);
+            $path = $thumbPath;
+
+            if ($generateWatermark) {
+                $wmPath = $baseStoragePath . '/' . $gallery->id . '/_thumbs/_watermarked/' . $size . '/' . $photo->id . '.webp';
+                if (!file_exists($wmPath)) {
+                    if (!is_dir(dirname($wmPath))) @mkdir(dirname($wmPath), 0755, true);
+                    try {
+                        $watermarkService->applyWatermark($path, $wmPath, null, $gallery->type);
+                        if (!file_exists($wmPath)) throw new \Exception("Watermark file missing.");
+                    } catch (\Exception $e) {
+                        return response()->json(['error' => 'SECURITY: Watermark-Fail.'], 500);
+                    }
                 }
+                $path = $wmPath; 
             }
         } 
-        // --- ORIGINAL IMAGE DELIVERY (UUID statt Dateiname) ---
+        // --- ORIGINAL BILDER ---
         else {
             if (preg_match('#^([a-f0-9\-]+)\.[a-z0-9]+$#i', $identifier, $matches)) {
                 $photoId = $matches[1];
-                $photo = \App\Models\Photo::where('id', $photoId)->where('gallery_id', $gallery->id)->firstOrFail();
+                $photo = Photo::where('id', $photoId)->where('gallery_id', $gallery->id)->first();
+                if (!$photo) return response()->json(['error' => 'Foto nicht gefunden'], 404);
             } else {
-                abort(404, 'Invalid file identifier');
+                return response()->json(['error' => 'Ungültiges URL-Format'], 400);
             }
 
-            $sourcePath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
-            $path = $sourcePath;
-            $xAccelPath = '/protected-photos/' . $gallery->id . '/' . $photo->filename;
+            $originalPath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
+            if (!file_exists($originalPath)) return response()->json(['error' => 'Original fehlt auf der Festplatte'], 404);
+            
+            $path = $originalPath;
 
-            if ($needsWatermark) {
-                $path = $baseStoragePath . '/' . $gallery->id . '/_watermarked/' . $photo->filename;
-                $xAccelPath = '/protected-photos/' . $gallery->id . '/_watermarked/' . $photo->filename;
-                if (!file_exists($path) && file_exists($sourcePath)) {
-                    if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
-                    $watermarkService->applyWatermark($sourcePath, $path, 2000, $gallery->type);
+            if ($generateWatermark) {
+                $wmPath = $baseStoragePath . '/' . $gallery->id . '/_watermarked/' . $photo->filename;
+                if (!file_exists($wmPath)) {
+                    if (!is_dir(dirname($wmPath))) @mkdir(dirname($wmPath), 0755, true);
+                    try {
+                        $watermarkService->applyWatermark($path, $wmPath, 2000, $gallery->type);
+                        if (!file_exists($wmPath)) throw new \Exception("Watermark file missing.");
+                    } catch (\Exception $e) {
+                        return response()->json(['error' => 'SECURITY: Watermark-Fail.'], 500);
+                    }
                 }
+                $path = $wmPath;
             }
         }
 
-        if (!file_exists($path)) abort(404, 'File not found');
+        if (!file_exists($path)) return response()->json(['error' => 'Datei nicht gefunden'], 404);
 
-        $realBase = realpath($baseStoragePath);
-        $realPath = realpath($path);
-        if ($realPath && !str_starts_with($realPath, $realBase)) {
-            abort(403, 'Path Traversal Detected');
-        }
-
-        // Hit-Registry (Drosselung auf max. 1 Datenbank-Update pro 24 Stunden pro Asset)
         $cacheKey = 'photo_hit_' . $photo->id;
         if (!Cache::has($cacheKey)) {
             $photo->update(['last_accessed_at' => now()]);
             Cache::put($cacheKey, true, now()->addHours(24));
         }
 
-        $mime = $photo->mime_type ?? mime_content_type($path);
-        $proxyHeader = env('PROXY_DELIVERY_HEADER', false);
+        $headers = ['Content-Type' => $photo->mime_type ?? mime_content_type($path), 'Cache-Control' => 'private, max-age=31536000, immutable'];
 
-        if ($proxyHeader) {
-            $deliveryPath = (strtolower($proxyHeader) === 'x-sendfile') ? $path : $xAccelPath;
-            return response('', 200)->withHeaders([
-                'Content-Type' => $mime,
-                'Cache-Control' => 'public, max-age=31536000, immutable',
-                $proxyHeader => $deliveryPath
-            ]);
+        if ($proxyHeader = env('PROXY_DELIVERY_HEADER')) {
+            $headers[$proxyHeader] = $path;
+            return response()->make('', 200, $headers);
         }
 
-        return response()->file($path, [
-            'Content-Type' => $mime,
-            'Cache-Control' => 'public, max-age=31536000, immutable'
-        ]);
+        return response()->file($path, $headers);
     }
 }

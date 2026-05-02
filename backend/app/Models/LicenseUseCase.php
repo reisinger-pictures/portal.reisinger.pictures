@@ -5,6 +5,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class LicenseUseCase extends Model {
     use HasUuids;
     public const UPDATED_AT = null;
-    protected $fillable = ['name', 'description', 'base_price', 'flatrate_tier', 'sort_order'];
-    protected $casts = ['base_price' => 'integer'];
+    protected $fillable = ['name', 'description', 'base_price', 'flatrate_tier', 'sort_order', 'is_commercial'];
+    protected $casts = ['base_price' => 'integer', 'is_commercial' => 'boolean'];
 }

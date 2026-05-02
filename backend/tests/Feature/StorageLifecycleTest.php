@@ -28,11 +28,11 @@ class StorageLifecycleTest extends TestCase
         $user->roles()->attach(Role::firstOrCreate(['name' => 'client']));
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true]);
         $user->galleries()->attach($gallery);
-        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'filename' => 'hit_test.jpg']);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
         // Create dummy file
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
-        Storage::disk('photos')->put($gallery->id . '/hit_test.jpg', file_get_contents($fixturePath));
+        Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, file_get_contents($fixturePath));
 
         // Ensure initially null
         $this->assertNull($photo->last_accessed_at);

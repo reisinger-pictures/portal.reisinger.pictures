@@ -14,7 +14,6 @@ class PhotoFactory extends Factory
     {
         return [
             'gallery_id' => Gallery::factory(),
-            'filename' => $this->faker->uuid() . '.jpg',
             'lr_uuid' => $this->faker->uuid(),
             'width' => 2000,
             'height' => 1333,

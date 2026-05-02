@@ -22,21 +22,24 @@ export class ModalHelper {
     async toggleCheckboxByLabel(labelText: string, targetState: boolean = true) {
         const container = this.activeModal.locator('.form-control, .label').filter({ hasText: labelText }).first();
         const checkbox = container.locator('input[type="checkbox"]');
+        
+        await checkbox.setChecked(targetState);
+        
+        // Kurz warten, bis React den State verarbeitet hat (Anti-Flakiness)
+        if (targetState) {
+            await expect(checkbox).toBeChecked({ timeout: 2000 });
+        } else {
+            await expect(checkbox).not.toBeChecked({ timeout: 2000 });
+        }
+    }
 
-        const currentState = await checkbox.isChecked();
-
-        if (currentState !== targetState) {
-            // Bei DaisyUI sind Checkboxen und Toggles sicht- und klickbare Elemente.
-            // Direkter Klick auf den Input ist wesentlich robuster als Klick auf das Label/den Text.
-            // Klick über das Label (Container) für stabiles DaisyUI Verhalten
-            await container.click();
-
-            // Kurz warten, bis React den State verarbeitet hat (Anti-Flakiness)
-            if (targetState) {
-                await expect(checkbox).toBeChecked({ timeout: 2000 });
-            } else {
-                await expect(checkbox).not.toBeChecked({ timeout: 2000 });
-            }
+    async assertCheckboxByLabel(labelText: string, expectedState: boolean = true) {
+        const container = this.activeModal.locator('.form-control, .label').filter({ hasText: labelText }).first();
+        const checkbox = container.locator('input[type="checkbox"]');
+        if (expectedState) {
+            await expect(checkbox).toBeChecked();
+        } else {
+            await expect(checkbox).not.toBeChecked();
         }
     }
 

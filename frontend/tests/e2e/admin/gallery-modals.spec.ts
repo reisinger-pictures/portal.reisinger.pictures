@@ -44,16 +44,13 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
         await expect(page.locator('.toast')).toContainText('Ordner erfolgreich erstellt');
 
         // 2. Roundtrip Check
+        await page.reload();
         await page.locator('summary').filter({ hasText: uniqueName }).locator('button[data-tip="Ordner bearbeiten"]').click();
         
         // Assert Modal UI is populated
-        const hiddenCheckbox = page.locator('.label').filter({ hasText: 'Im Frontend verstecken' }).locator('input[type="checkbox"]');
-        const editorialCheckbox = page.locator('.label').filter({ hasText: 'Nur für redaktionelle Nutzung (Shop)' }).locator('input[type="checkbox"]');
-        const freeDownloadCheckbox = page.locator('.label').filter({ hasText: 'Kostenlosen Download erlauben' }).locator('input[type="checkbox"]');
-
-        await expect(hiddenCheckbox).toBeChecked();
-        await expect(editorialCheckbox).toBeChecked();
-        await expect(freeDownloadCheckbox).toBeChecked();
+        await modal.assertCheckboxByLabel('Im Frontend verstecken', true);
+        await modal.assertCheckboxByLabel('Nur für redaktionelle Nutzung (Shop)', true);
+        await modal.assertCheckboxByLabel('Kostenlosen Download erlauben', true);
     });
 
     test('Photographer can save and restore all boolean flags via Gallery Modal', async ({ page }) => {
@@ -84,17 +81,13 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
         await expect(page.locator('.toast')).toContainText('Galerie erfolgreich erstellt');
 
         // 2. Roundtrip Check
-        await page.locator('div').filter({ has: page.locator('span', { hasText: uniqueName }) }).locator('button[data-tip="Bearbeiten"]').first().click();
+        await page.reload();
+        await page.locator('a').filter({ hasText: uniqueName }).locator('..').locator('button[data-tip="Bearbeiten"]').click();
         
         // Assert Modal UI is populated
-        const hiddenCheckbox = page.locator('.label').filter({ hasText: 'Im Frontend verstecken' }).locator('input[type="checkbox"]');
-        const editorialCheckbox = page.locator('.label').filter({ hasText: 'Nur für redaktionelle Nutzung (Shop)' }).locator('input[type="checkbox"]');
-        const freeDownloadCheckbox = page.locator('.label').filter({ hasText: 'Kostenlosen Download erlauben' }).locator('input[type="checkbox"]');
-        const liveCheckbox = page.locator('.label').filter({ hasText: 'LIVE Galerie' }).locator('input[type="checkbox"]');
-
-        await expect(hiddenCheckbox).toBeChecked();
-        await expect(editorialCheckbox).toBeChecked();
-        await expect(freeDownloadCheckbox).toBeChecked();
-        await expect(liveCheckbox).toBeChecked();
+        await modal.assertCheckboxByLabel('Im Frontend verstecken', true);
+        await modal.assertCheckboxByLabel('Nur für redaktionelle Nutzung (Shop)', true);
+        await modal.assertCheckboxByLabel('Kostenlosen Download erlauben', true);
+        await modal.assertCheckboxByLabel('LIVE Galerie', true);
     });
 });

@@ -14,12 +14,12 @@ class LicenseCatalogController extends Controller {
     }
     public function storeUseCase(Request $request) {
         Gate::authorize('manage-catalog');
-        $data = $request->validate(['name' => 'required|string', 'description' => 'nullable|string', 'base_price' => 'required|integer', 'flatrate_tier' => 'nullable|string', 'sort_order' => 'integer']);
+        $data = $request->validate(['name' => 'required|string', 'description' => 'nullable|string', 'base_price' => 'required|integer', 'flatrate_tier' => 'nullable|string', 'sort_order' => 'integer', 'is_commercial' => 'boolean']);
         return response()->json(LicenseUseCase::create($data));
     }
     public function updateUseCase(Request $request, $id) {
         Gate::authorize('manage-catalog');
-        $data = $request->validate(['name' => 'required|string', 'description' => 'nullable|string', 'base_price' => 'required|integer', 'flatrate_tier' => 'nullable|string', 'sort_order' => 'integer']);
+        $data = $request->validate(['name' => 'required|string', 'description' => 'nullable|string', 'base_price' => 'required|integer', 'flatrate_tier' => 'nullable|string', 'sort_order' => 'integer', 'is_commercial' => 'boolean']);
         $uc = LicenseUseCase::findOrFail($id); $uc->update($data); return response()->json($uc);
     }
     public function destroyUseCase($id) {

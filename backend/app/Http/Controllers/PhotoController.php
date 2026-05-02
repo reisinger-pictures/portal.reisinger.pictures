@@ -55,6 +55,7 @@ class PhotoController extends Controller
             'state' => 'nullable|string|max:255',
             'country' => 'nullable|string|max:255',
             'iso_country' => 'nullable|string|max:2',
+            'is_editorial_only' => 'nullable|boolean',
         ]);
 
         return \Illuminate\Support\Facades\DB::transaction(function () use ($photo, $user, $rights, $validated) {

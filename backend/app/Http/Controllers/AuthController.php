@@ -142,6 +142,14 @@ class AuthController extends Controller
         $user->load(['galleries', 'roles', 'galleryGroups', 'photographerGalleries', 'photographerGalleryGroups']);
         $user->load('roles');
 
+        $missingWatermark = false;
+        if ($user->is_super_admin) {
+            $disk = \Illuminate\Support\Facades\Storage::disk('photos');
+            if (!$disk->exists('_watermarks/master_500.png') || !$disk->exists('_watermarks/watermark.svg')) {
+                $missingWatermark = true;
+            }
+        }
+
         return response()->json([
             'id' => $user->id,
             'name' => $user->name,
@@ -157,6 +165,7 @@ class AuthController extends Controller
             'is_power_user' => $user->is_power_user,
             'is_pending' => $user->is_pending,
             'roles' => $user->roles->pluck('name'),
+            'missing_watermark' => $missingWatermark,
             'transient_meta_galleries' => $user->transient_meta_galleries ?? [],
             'my_galleries' => $user->galleries ?? [],
             'photographer_galleries' => $user->photographerGalleries ?? [],

@@ -84,7 +84,7 @@ Route::get('/galleries/{slug}', [GalleryFrontendController::class, 'show']);
 Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])->where('filename', '.*');
 
 $downloadThrottle = env('DOWNLOAD_THROTTLE', 9999);
-Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{photoId}/download', [DownloadController::class, 'downloadSingle']);
+Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', [DownloadController::class, 'downloadSingle']);
 Route::get('/orders/quote-decode', [OrderController::class, 'decodeQuoteLink']);
 Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip']);
 
@@ -141,8 +141,9 @@ Route::middleware(['auth:api', 'management'])->group(function () {
 
 
     Route::get('/management/settings/watermark', [SettingsController::class, 'getWatermark']);
-    Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
-    Route::get('/management/settings/watermark/image', [SettingsController::class, 'getWatermarkImage']);
+    Route::get('/management/settings/watermark/svg', [SettingsController::class, 'getWatermarkSvg']);
+
+
     Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark']);
     Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms']);
 

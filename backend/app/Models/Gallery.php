@@ -56,6 +56,10 @@ class Gallery extends Model
         'allow_client_metadata_edit' => 'boolean',
         'apply_metadata_to_photos' => 'boolean',
         'expires_at' => 'datetime',
+        'is_free_download' => 'boolean',
+        'is_editorial_only' => 'boolean',
+        'is_hidden' => 'boolean',
+        'restricted_photographers' => 'boolean',
     ];
 
     // Dieses Attribut wird bei JSON-Responses automatisch angehängt
@@ -63,20 +67,12 @@ class Gallery extends Model
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
-        if ($this->is_editorial_only !== null) return (bool) $this->is_editorial_only;
-        if ($this->galleryGroup) return $this->galleryGroup->effective_is_editorial_only;
-        return false;
+        return $this->is_editorial_only || ($this->galleryGroup ? $this->galleryGroup->effective_is_editorial_only : false);
     }
-
-    
-
-    
 
     public function getEffectiveIsFreeDownloadAttribute(): bool
     {
-        if ($this->is_free_download !== null) return (bool) $this->is_free_download;
-        if ($this->galleryGroup) return $this->galleryGroup->effective_is_free_download;
-        return false;
+        return $this->is_free_download || ($this->galleryGroup ? $this->galleryGroup->effective_is_free_download : false);
     }
 
     public function getEffectiveRestrictedPhotographersAttribute(): bool
@@ -88,9 +84,7 @@ class Gallery extends Model
 
     public function getEffectiveIsHiddenAttribute(): bool
     {
-        if ($this->is_hidden !== null) return (bool) $this->is_hidden;
-        if ($this->galleryGroup) return $this->galleryGroup->effective_is_hidden;
-        return false;
+        return $this->is_hidden || ($this->galleryGroup ? $this->galleryGroup->effective_is_hidden : false);
     }
 
     public function getFullPathAttribute()

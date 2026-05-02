@@ -41,15 +41,14 @@ class StorageCommandsTest extends TestCase
     public function test_downscale_editorial_scales_old_editorial_images()
     {
         $gallery = Gallery::factory()->create(['is_editorial_only' => true]);
-        Photo::factory()->create([
+        $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'created_at' => Carbon::now()->subDays(8),
-            'is_downscaled' => false,
-            'filename' => 'test.jpg'
+            'is_downscaled' => false
         ]);
 
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
-        Storage::disk('photos')->put($gallery->id . '/test.jpg', file_get_contents($fixturePath));
+        Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, file_get_contents($fixturePath));
 
         $this->artisan('app:downscale-editorial')->assertExitCode(0);
     }

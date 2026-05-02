@@ -65,6 +65,12 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         // 3. Flow P: Flatrate User Bypass (Sofort Download)
         await auth.login(flatrateUser.email, flatrateUser.password);
         await page.locator('main').getByText(galleryName).first().click();
+        
+        // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
+        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        
+        // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
+        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
         // Da er "Print" als Flatrate hat, muss der "Jetzt herunterladen" Button für "Print" sichtbar sein, ohne Cart-Prozess!
@@ -75,6 +81,12 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         // 4. Flow Q, AG, AJ: Power User Cart, Upselling und Checkout
         await auth.login(powerUser.email, powerUser.password);
         await page.locator('main').getByText(galleryName).first().click();
+        
+        // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
+        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        
+        // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
+        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
         // Web-Auflösung in den Warenkorb legen

@@ -25,62 +25,48 @@ class DatabaseSeeder extends Seeder
         $adminUser->roles()->sync(\App\Models\Role::pluck('id')->toArray());
 
         // 1. Root-Gruppe "Privat" (strikt privat)
-        $privatGroup = GalleryGroup::create([
-            'name' => 'Privat',
-            'slug' => 'privat',
-            'is_public' => false
-        ]);
+        $privatGroup = GalleryGroup::firstOrCreate(
+            ['slug' => 'privat'],
+            ['name' => 'Privat', 'is_public' => false]
+        );
 
         // 2. Root-Gruppe "Presse" (öffentlich)
-        $presseGroup = GalleryGroup::create([
-            'name' => 'Presse',
-            'slug' => 'presse',
-            'is_public' => true
-        ]);
+        $presseGroup = GalleryGroup::firstOrCreate(
+            ['slug' => 'presse'],
+            ['name' => 'Presse', 'is_public' => true]
+        );
 
         // 3. Untergruppen für Presse (Regionen)
-        $oberoesterreich = GalleryGroup::create([
-            'name' => 'Oberösterreich',
-            'slug' => 'oberoesterreich',
-            'parent_id' => $presseGroup->id,
-            'is_public' => true
-        ]);
+        $oberoesterreich = GalleryGroup::firstOrCreate(
+            ['slug' => 'oberoesterreich'],
+            ['name' => 'Oberösterreich', 'parent_id' => $presseGroup->id, 'is_public' => true]
+        );
 
-        $oesterreich = GalleryGroup::create([
-            'name' => 'Österreich',
-            'slug' => 'oesterreich',
-            'parent_id' => $presseGroup->id,
-            'is_public' => true
-        ]);
+        $oesterreich = GalleryGroup::firstOrCreate(
+            ['slug' => 'oesterreich'],
+            ['name' => 'Österreich', 'parent_id' => $presseGroup->id, 'is_public' => true]
+        );
 
-        $wien = GalleryGroup::create([
-            'name' => 'Wien',
-            'slug' => 'wien',
-            'parent_id' => $presseGroup->id,
-            'is_public' => true
-        ]);
+        $wien = GalleryGroup::firstOrCreate(
+            ['slug' => 'wien'],
+            ['name' => 'Wien', 'parent_id' => $presseGroup->id, 'is_public' => true]
+        );
 
         // 4. "Sport" als Meta-Galerien (GalleryGroup) anlegen
-        GalleryGroup::create([
-            'name' => 'Sport',
-            'slug' => 'sport-oberoesterreich',
-            'parent_id' => $oberoesterreich->id,
-            'is_public' => true
-        ]);
+        GalleryGroup::firstOrCreate(
+            ['slug' => 'sport-oberoesterreich'],
+            ['name' => 'Sport', 'parent_id' => $oberoesterreich->id, 'is_public' => true]
+        );
 
-        GalleryGroup::create([
-            'name' => 'Sport',
-            'slug' => 'sport-oesterreich',
-            'parent_id' => $oesterreich->id,
-            'is_public' => true
-        ]);
+        GalleryGroup::firstOrCreate(
+            ['slug' => 'sport-oesterreich'],
+            ['name' => 'Sport', 'parent_id' => $oesterreich->id, 'is_public' => true]
+        );
 
-        GalleryGroup::create([
-            'name' => 'Sport',
-            'slug' => 'sport-wien',
-            'parent_id' => $wien->id,
-            'is_public' => true
-        ]);
+        GalleryGroup::firstOrCreate(
+            ['slug' => 'sport-wien'],
+            ['name' => 'Sport', 'parent_id' => $wien->id, 'is_public' => true]
+        );
 
         // Standard-Lizenzen & Preise
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_web'], ['value' => '7500']);

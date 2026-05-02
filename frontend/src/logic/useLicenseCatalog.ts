@@ -1,7 +1,7 @@
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../api';
 
-export interface LicenseUseCase { id: string; name: string; description: string; base_price: number; flatrate_tier: string; sort_order: number; }
+export interface LicenseUseCase { id: string; name: string; description: string; base_price: number; flatrate_tier: string; sort_order: number; is_commercial?: boolean; }
 export interface LicenseModifier { id: string; name: string; description: string; percent_surcharge: number; is_included_in_flatrate: boolean; sort_order: number; }
 export interface LicenseCatalog { use_cases: LicenseUseCase[]; modifiers: LicenseModifier[]; }
 

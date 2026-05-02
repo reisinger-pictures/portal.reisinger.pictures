@@ -61,7 +61,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
 
                             if (allowedTiers.length === 1) {
                                 return (
-                                    <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + allowedTiers[0].id} target="_self" className="btn btn-primary">
+                                    <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + allowedTiers[0].id} target="_blank" className="btn btn-primary">
                                         <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> Alle herunterladen (.zip)
                                     </a>
                                 );
@@ -76,7 +76,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                                         <li className="menu-title px-4 py-2 text-sm opacity-70 uppercase tracking-wider">Qualität wählen</li>
                                         {allowedTiers.map(t => (
                                             <li key={t.id}>
-                                                <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + t.id} target="_self" className="font-bold">
+                                                <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + t.id} target="_blank" className="font-bold">
                                                     <span className="uppercase">{t.id}</span> Format
                                                 </a>
                                             </li>

@@ -13,6 +13,7 @@ export interface IptcData {
     state?: string;
     country?: string;
     iso_country?: string;
+    is_editorial_only?: boolean;
 }
 
 interface Props {
@@ -50,7 +51,7 @@ export default function IptcMetadataEditor({data, onChange, showArtist = true, d
 
     const addKeywords = (text: string) => {
         if (disabled) return;
-        const newKeywords = text.split(/[,;\s\n]+/).map(k => k.trim()).filter(k => k.length > 0);
+        const newKeywords = text.split(/[,;\n]+/).map(k => k.trim()).filter(k => k.length > 0);
         const uniqueKeywords = new Set(keywordsArray);
         let added = false;
         newKeywords.forEach(kw => {
@@ -244,6 +245,17 @@ export default function IptcMetadataEditor({data, onChange, showArtist = true, d
                         className="label-text font-bold opacity-70">Urheber / Copyright</span></label>
                     <input type="text" value={data.artist || ''} disabled
                            className="input input-sm input-bordered bg-base-200 text-base-content/60 cursor-not-allowed w-full"/>
+                </div>
+            )}
+            {!disabled && (
+                <div className="form-control md:col-span-2 mt-2">
+                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300">
+                        <input type="checkbox" checked={data.is_editorial_only || false} onChange={e => handleMultiChange({ is_editorial_only: e.target.checked })} className="checkbox checkbox-primary"/>
+                        <div>
+                            <span className="label-text font-bold block">Nur für redaktionelle Nutzung (Shop)</span>
+                            <span className="label-text-alt opacity-70 block mt-1">Sperrt kommerzielle Lizenzen im Checkout explizit für dieses Bild.</span>
+                        </div>
+                    </label>
                 </div>
             )}
             {children}

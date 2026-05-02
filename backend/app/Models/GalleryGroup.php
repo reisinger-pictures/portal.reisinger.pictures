@@ -26,6 +26,10 @@ class GalleryGroup extends Model
 
     protected $casts = [
         'is_public' => 'boolean',
+        'is_free_download' => 'boolean',
+        'is_editorial_only' => 'boolean',
+        'is_hidden' => 'boolean',
+        'restricted_photographers' => 'boolean',
     ];
 
     protected static function booted()
@@ -48,20 +52,12 @@ class GalleryGroup extends Model
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
-        if ($this->is_editorial_only !== null) return (bool) $this->is_editorial_only;
-        if ($this->parent) return $this->parent->effective_is_editorial_only;
-        return false;
+        return $this->is_editorial_only || ($this->parent ? $this->parent->effective_is_editorial_only : false);
     }
-
-    
-
-    
 
     public function getEffectiveIsFreeDownloadAttribute(): bool
     {
-        if ($this->is_free_download !== null) return (bool) $this->is_free_download;
-        if ($this->parent) return $this->parent->effective_is_free_download;
-        return false;
+        return $this->is_free_download || ($this->parent ? $this->parent->effective_is_free_download : false);
     }
 
     public function getEffectiveRestrictedPhotographersAttribute(): bool
@@ -73,9 +69,7 @@ class GalleryGroup extends Model
 
     public function getEffectiveIsHiddenAttribute(): bool
     {
-        if ($this->is_hidden !== null) return (bool) $this->is_hidden;
-        if ($this->parent) return $this->parent->effective_is_hidden;
-        return false;
+        return $this->is_hidden || ($this->parent ? $this->parent->effective_is_hidden : false);
     }
 
     public function parent()

@@ -5,7 +5,7 @@ import { formatMoney } from '../../../logic/utils';
 
 function UseCaseRow({ uc, onSave, onDelete }: { uc: LicenseUseCase, onSave: (id: string, data: Partial<LicenseUseCase>) => Promise<void>, onDelete: (id: string) => void }) {
     const [isEditing, setIsEditing] = useState(false);
-    const [data, setData] = useState<Partial<LicenseUseCase>>({ ...uc, base_price: uc.base_price / 100 });
+    const [data, setData] = useState<Partial<LicenseUseCase>>({ ...uc, base_price: uc.base_price / 100, is_commercial: uc.is_commercial || false });
     const { showToast } = useUI();
 
     const handleSave = async () => {
@@ -28,11 +28,15 @@ function UseCaseRow({ uc, onSave, onDelete }: { uc: LicenseUseCase, onSave: (id:
                     </div>
                 </td>
                 <td>
-                    <select className="select select-bordered w-full" value={data.flatrate_tier} onChange={e => setData({...data, flatrate_tier: e.target.value})}>
+                    <select className="select select-bordered w-full mb-2" value={data.flatrate_tier} onChange={e => setData({...data, flatrate_tier: e.target.value})}>
                         <option value="web">Web</option>
                         <option value="print">Print</option>
                         <option value="original">Original</option>
                     </select>
+                    <label className="cursor-pointer flex items-center gap-2">
+                        <input type="checkbox" className="checkbox-primary checkbox checkbox-sm" checked={!!data.is_commercial} onChange={e => setData({...data, is_commercial: e.target.checked})} />
+                        <span className="label-text text-xs leading-tight">Kommerzielle Lizenz</span>
+                    </label>
                 </td>
                 <td className="text-right">
                     <div className="flex justify-end items-center gap-1">
@@ -54,7 +58,10 @@ function UseCaseRow({ uc, onSave, onDelete }: { uc: LicenseUseCase, onSave: (id:
                 <div className="font-bold text-base">{uc.name}</div>
                 <div className="text-sm opacity-70 mt-1">{uc.description || '-'}</div>
             </td>
-            <td><span className="badge badge-sm badge-ghost uppercase font-bold">{uc.flatrate_tier}</span></td>
+            <td>
+                <span className="badge badge-sm badge-ghost uppercase font-bold block w-fit">{uc.flatrate_tier}</span>
+                {uc.is_commercial && <div className="text-xs text-warning font-bold mt-1">Kommerziell</div>}
+            </td>
             <td className="text-right font-mono font-bold text-base">{formatMoney(uc.base_price)}</td>
             <td className="text-right">
                 <div className="flex justify-end gap-1">
@@ -138,15 +145,15 @@ export default function LicenseCatalogSettings() {
     const { catalog, isLoading, createUseCase, updateUseCase, deleteUseCase, createModifier, updateModifier, deleteModifier } = useLicenseCatalog();
     const { showToast, confirm } = useUI();
 
-    const [newUc, setNewUc] = useState({ name: '', description: '', base_price: '', flatrate_tier: 'web' });
+    const [newUc, setNewUc] = useState({ name: '', description: '', base_price: '', flatrate_tier: 'web', is_commercial: false });
     const [newMod, setNewMod] = useState({ name: '', description: '', percent_surcharge: '', is_included_in_flatrate: false });
 
     const handleAddUseCase = async () => {
         if (!newUc.name || !newUc.base_price) { showToast('error', 'Name und Preis sind Pflichtfelder'); return; }
         try {
-            await createUseCase({ name: newUc.name, description: newUc.description, base_price: Math.round(parseFloat(newUc.base_price) * 100), flatrate_tier: newUc.flatrate_tier });
+            await createUseCase({ name: newUc.name, description: newUc.description, base_price: Math.round(parseFloat(newUc.base_price) * 100), flatrate_tier: newUc.flatrate_tier, is_commercial: newUc.is_commercial });
             showToast('success', 'Kategorie hinzugefügt');
-            setNewUc({ name: '', description: '', base_price: '', flatrate_tier: 'web' });
+            setNewUc({ name: '', description: '', base_price: '', flatrate_tier: 'web', is_commercial: false });
         } catch { showToast('error', 'Fehler beim Speichern'); }
     };
 
@@ -222,11 +229,15 @@ export default function LicenseCatalogSettings() {
                             </div>
                             <div className="form-control w-full md:w-32">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Flatrate-Basis</span></label>
-                                <select value={newUc.flatrate_tier} onChange={e=>setNewUc({...newUc, flatrate_tier: e.target.value})} className="select select-bordered w-full">
+                                <select value={newUc.flatrate_tier} onChange={e=>setNewUc({...newUc, flatrate_tier: e.target.value})} className="select select-bordered w-full mb-2">
                                     <option value="web">Web</option>
                                     <option value="print">Print</option>
                                     <option value="original">Original</option>
                                 </select>
+                                <label className="cursor-pointer flex items-center gap-2">
+                                    <input type="checkbox" className="checkbox-primary checkbox checkbox-sm" checked={newUc.is_commercial} onChange={e=>setNewUc({...newUc, is_commercial: e.target.checked})} />
+                                    <span className="label-text text-xs leading-tight">Kommerziell</span>
+                                </label>
                             </div>
                             <div className="form-control w-full md:w-32">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Preis (Netto €)</span></label>

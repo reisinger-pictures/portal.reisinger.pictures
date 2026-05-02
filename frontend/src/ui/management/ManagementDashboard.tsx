@@ -107,6 +107,15 @@ export default function ManagementDashboard() {
                 </div>
 
                 <main className="flex-1 overflow-y-auto flex flex-col w-full relative">
+                    {user?.missing_watermark && currentView !== 'settings' && (
+                        <div className="m-4 md:m-6 mb-0 alert alert-warning shadow-sm">
+                            <span className="iconify mdi--watermark text-xl"></span>
+                            <div>
+                                <h3 className="font-bold">Bildschutz konfigurieren</h3>
+                                <p className="text-sm">Bitte lade in den <Link to="/settings" className="underline font-bold">Einstellungen</Link> ein SVG-Logo als Wasserzeichen hoch.</p>
+                            </div>
+                        </div>
+                    )}
                     {isImpressumMissing && currentView !== 'settings' && (
                         <div className="m-4 md:m-6 mb-0 alert alert-error shadow-sm">
                             <span className="iconify mdi--alert-circle text-xl"></span>

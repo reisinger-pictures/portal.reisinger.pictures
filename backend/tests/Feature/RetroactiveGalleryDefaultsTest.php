@@ -34,14 +34,13 @@ class RetroactiveGalleryDefaultsTest extends TestCase
 
         $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
-            'filename' => 'retro_test.jpg',
             'user_id' => $photog->id,
             'title' => null,
             'city' => null,
         ]);
 
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
-        Storage::disk('photos')->put($gallery->id . '/retro_test.jpg', file_get_contents($fixturePath));
+        Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, file_get_contents($fixturePath));
 
         $token = auth('api')->login($photog);
 

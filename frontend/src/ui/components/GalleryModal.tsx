@@ -55,9 +55,9 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 gallery_group_id: editingGallery?.gallery_group_id || defaultGroupId || '',
                 password: '',
                 expires_at: editingGallery?.expires_at ? editingGallery.expires_at.split('T')[0] : '',
-                is_free_download: editingGallery?.is_free_download || false,
-                is_editorial_only: editingGallery?.is_editorial_only || false,
-                is_hidden: editingGallery?.is_hidden || false
+                is_free_download: !!editingGallery?.is_free_download,
+                is_editorial_only: !!editingGallery?.is_editorial_only,
+                is_hidden: !!editingGallery?.is_hidden
             });
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);

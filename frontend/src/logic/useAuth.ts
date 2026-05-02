@@ -23,6 +23,7 @@ export interface User {
     is_customer_manager?: boolean;
     is_power_user?: boolean;
     roles: string[];
+    missing_watermark?: boolean;
     transient_meta_galleries?: string[];
     my_galleries?: Gallery[];
     photographer_galleries?: Gallery[];

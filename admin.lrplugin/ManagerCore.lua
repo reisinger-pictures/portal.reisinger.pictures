@@ -357,7 +357,7 @@ return function(mode)
                             local lrUuid = rendition.photo:getRawMetadata("uuid")
                             progress:setCaption("Upload " .. i .. "/" .. photoCount .. ": " .. filename)
 
-                            logMsg("Starte Upload für UUID: " .. tostring(lrUuid))
+                            logMsg("Starte Upload für UUID: " .. tostring(lrUuid) .. " (Backend generiert nun UUID-Filenames)")
                             
                             local resBody, resHeaders = LrHttp.postMultipart(Api.getApiUrl() .. "/api/management/upload", {
                                 { name = "gallery_id", value = tostring(props.selectedGalleryId) },

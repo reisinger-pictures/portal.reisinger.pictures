@@ -140,6 +140,34 @@ class PhotoMetadataTest extends TestCase {
     }
 
 
+    public function test_photographer_can_update_editorial_flag_and_it_is_returned() {
+        $photog = User::factory()->create();
+        $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));
+        $gallery = Gallery::factory()->create(['type' => 'delivery']);
+        $photog->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photog->id]);
+
+        $token = auth('api')->login($photog);
+
+        $res = $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->putJson("/api/photos/{$photo->id}/meta", [
+                 'is_editorial_only' => true
+             ]);
+
+        $res->assertStatus(200);
+        $this->assertDatabaseHas('photos', [
+            'id' => $photo->id,
+            'is_editorial_only' => 1
+        ]);
+
+        $resContext = $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->getJson("/api/photos/{$photo->id}/context");
+        
+        $resContext->assertStatus(200);
+        $this->assertTrue($resContext->json('photo.is_editorial_only'));
+        $this->assertTrue($resContext->json('photo.effective_is_editorial_only'));
+    }
+
     public function test_can_save_stress_keywords_longer_than_255_chars() {
         $photog = User::factory()->create();
         $photog->roles()->attach(Role::firstOrCreate(['name' => 'photographer']));

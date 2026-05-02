@@ -25,6 +25,10 @@ export interface Photo {
     state?: string;
     country?: string;
     iso_country?: string;
+    is_editorial_only?: boolean;
+    effective_is_editorial_only?: boolean;
+    is_hidden?: boolean;
+    effective_is_hidden?: boolean;
 }
 
 export interface PaginatedGalleryResponse {
