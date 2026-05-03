@@ -31,7 +31,7 @@ class DeletePhotoFilesJob implements ShouldQueue
             "{$this->galleryId}/_watermarked/{$this->filename}",
         ];
         
-        $sizes = [400, 800, 1024, 1200, 2000];
+        $sizes = \App\Models\Photo::DERIVATIVE_SIZES;
         foreach ($sizes as $size) {
             // Alte Thumbs (md5) und neue Thumbs berücksichtigen
             $oldThumbName = md5($this->filename . '1024') . '.webp';

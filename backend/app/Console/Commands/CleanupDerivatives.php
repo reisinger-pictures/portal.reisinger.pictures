@@ -24,7 +24,7 @@ class CleanupDerivatives extends Command
 
         $count = 0;
         $basePath = rtrim(Storage::disk('photos')->path(''), '/');
-        $sizes = [400, 800, 1200, 2000];
+        $sizes = \App\Models\Photo::DERIVATIVE_SIZES;
 
         foreach ($photos as $photo) {
             $deleted = false;

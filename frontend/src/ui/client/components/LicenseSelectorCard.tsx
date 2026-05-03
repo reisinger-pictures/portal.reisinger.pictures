@@ -195,10 +195,15 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                         <a href={`/api/photos/${photo.id}/download?tier=${photo?.gallery?.effective_is_free_download ? 'original' : selectedUseCase?.flatrate_tier}`}
                            target="_blank" className="btn btn-success btn-md text-white w-full shadow-sm"><span
                             className="iconify mdi--download text-lg"></span> Download</a>
-                    ) : (
-                        <button onClick={handleAddToCart} disabled={!canBuy}
+                    ) : canBuy ? (
+                        <button onClick={handleAddToCart}
                                 className="btn btn-primary btn-md w-full shadow-sm"><span
                             className="iconify mdi--cart-plus text-lg"></span> In den Warenkorb
+                        </button>
+                    ) : (
+                        <button onClick={handleCustomQuote} className="btn btn-outline btn-primary w-full shadow-sm"
+                                title="Erweiterte Rechte als Angebot beim Fotografen anfragen">
+                            <span className="iconify mdi--email-fast text-lg"></span> Upgrade anfragen
                         </button>
                     )}
 

@@ -13,6 +13,8 @@ class Photo extends Model
 
     public const UPDATED_AT = null;
 
+    public const DERIVATIVE_SIZES = [250, 400, 800, 1024, 1200, 2000];
+
     protected $visible = [
         'id', 'gallery_id', 'lr_uuid', 'width', 'height', 
         'title', 'headline', 'description', 'artist', 'keywords', 'location', 
@@ -105,11 +107,16 @@ class Photo extends Model
     public function toSearchableArray() {
         return [
             'id' => $this->id,
-            'title' => $this->title,
-            'description' => $this->description,
-            'artist' => $this->artist,
-            'keywords' => $this->keywords,
-            'location' => $this->location,
+            'title' => $this->title ?? '',
+            'headline' => $this->headline ?? '',
+            'description' => $this->description ?? '',
+            'artist' => $this->artist ?? '',
+            'keywords' => $this->keywords ?? '',
+            'location' => $this->location ?? '',
+            'city' => $this->city ?? '',
+            'state' => $this->state ?? '',
+            'country' => $this->country ?? '',
+            'iso_country' => $this->iso_country ?? '',
             'gallery_id' => $this->gallery_id,
             'is_hidden' => $this->effective_is_hidden,
         ];
