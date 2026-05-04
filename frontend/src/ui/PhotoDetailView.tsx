@@ -109,7 +109,7 @@ export default function PhotoDetailView() {
                         {data.photo.gallery?.type === 'delivery' && (
                             <LicenseSelectorCard photo={data.photo} />
                         )}
-                        <IptcMetadataEditor data={iptcData} onChange={setIptcData} disabled={!canEdit} showArtist={isPhotographer}>
+                        <IptcMetadataEditor data={iptcData} onChange={setIptcData} disabled={!canEdit} showArtist={isPhotographer} showEditorialFlag={true} capturedAt={data.photo.captured_at}>
                             {canEdit && (
                                 <div className="flex flex-col sm:flex-row gap-2 mt-6 pt-4 border-t border-base-300">
                                     <button onClick={handleSaveMeta} disabled={saving} className="btn btn-primary flex-1 w-full">{saving ? <span className="loading loading-spinner"></span> : 'Speichern'}</button>

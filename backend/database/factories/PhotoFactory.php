@@ -20,6 +20,7 @@ class PhotoFactory extends Factory
             'title' => $this->faker->sentence(),
             'description' => $this->faker->paragraph(),
             'user_id' => \App\Models\User::factory(),
+            'captured_at' => $this->faker->optional()->dateTimeThisYear(),
         ];
     }
 }

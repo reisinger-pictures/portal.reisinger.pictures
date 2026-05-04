@@ -35,10 +35,6 @@ class InvoiceMail extends Mailable implements ShouldQueue
             'bankBic' => \App\Models\Setting::where('key', 'bank_bic')->value('value')
         ]);
 
-        $tempPath = storage_path('app/private/temp/invoice_' . $this->snapshot->invoice_number . '_' . uniqid() . '.pdf');
-        if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);
-        $pdf->save($tempPath);
-
         $mail = $this->subject('Ihre Rechnung ' . $this->snapshot->invoice_number)
                     ->bcc(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
                     ->view('emails.custom')
@@ -46,8 +42,7 @@ class InvoiceMail extends Mailable implements ShouldQueue
                         'subject' => 'Ihre Rechnung ' . $this->snapshot->invoice_number,
                         'customBody' => '<p>Guten Tag ' . $this->snapshot->customer_details['name'] . ',</p><p>vielen Dank für Ihre Bestellung im Bild-Portal. Anbei erhalten Sie Ihre Rechnung als PDF-Dokument.</p><p>Ihre Lizenzen und Downloads sind ab sofort in Ihrem Account verfügbar.</p>'
                     ])
-                    ->attach($tempPath, [
-                        'as' => $this->snapshot->invoice_number . '.pdf',
+                    ->attachData($pdf->output(), $this->snapshot->invoice_number . '.pdf', [
                         'mime' => 'application/pdf',
                     ]);
 

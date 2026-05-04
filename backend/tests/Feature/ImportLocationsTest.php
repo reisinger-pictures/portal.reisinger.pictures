@@ -19,4 +19,18 @@ class ImportLocationsTest extends TestCase {
         // Da die Downloads 404 sind, sollte das Command gracefully durchlaufen, ohne Daten zu seeden.
         $this->assertDatabaseCount('locations', 0);
     }
+
+    public function test_import_locations_command_handles_connection_timeouts() {
+        $tempDir = storage_path('app/private/temp');
+        @unlink($tempDir . '/AT_postal.txt');
+        @unlink($tempDir . '/AT_places.txt');
+        @unlink($tempDir . '/countryInfo.txt');
+
+        Http::fake(function () {
+            throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: Connection timed out');
+        });
+
+        $this->artisan('app:import-locations')->assertExitCode(0);
+        $this->assertDatabaseCount('locations', 0);
+    }
 }

@@ -20,7 +20,9 @@ interface Props {
     data: IptcData;
     onChange: (data: IptcData) => void;
     showArtist?: boolean;
+    showEditorialFlag?: boolean;
     disabled?: boolean;
+    capturedAt?: string;
     children?: React.ReactNode;
 }
 
@@ -36,7 +38,7 @@ const ReadOnlyField = ({label, value}: ReadOnlyFieldProps) => (
     </div>
 );
 
-export default function IptcMetadataEditor({data, onChange, showArtist = true, disabled = false, children}: Props) {
+export default function IptcMetadataEditor({data, onChange, showArtist = true, showEditorialFlag = false, disabled = false, capturedAt, children}: Props) {
     const [keywordInput, setKeywordInput] = useState('');
 
     const handleChange = (field: keyof IptcData, value: string) => {
@@ -102,6 +104,7 @@ export default function IptcMetadataEditor({data, onChange, showArtist = true, d
                     <div className="md:col-span-2">
                         <ReadOnlyField label="Beschreibung" value={data.description}/>
                     </div>
+                    {capturedAt && <ReadOnlyField label="Aufnahmedatum" value={new Date(capturedAt).toLocaleString('de-DE', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} />}
                     <div className="md:col-span-2 mb-4">
                         <span className="text-sm font-bold opacity-70 block mb-2">Schlagwörter</span>
                         <div className="flex flex-wrap gap-2">
@@ -239,6 +242,13 @@ export default function IptcMetadataEditor({data, onChange, showArtist = true, d
                 </div>
             </div>
 
+            {capturedAt && (
+                <div className="form-control md:col-span-2 mt-4 pt-4 border-t border-base-300">
+                    <label className="label pb-1"><span className="label-text font-bold opacity-70">Aufnahmedatum</span></label>
+                    <div className="text-sm px-1 py-1">{new Date(capturedAt).toLocaleString('de-DE', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr</div>
+                </div>
+            )}
+
             {showArtist && (
                 <div className="form-control md:col-span-2 mt-4 pt-4 border-t border-base-300">
                     <label className="label pb-1"><span
@@ -247,7 +257,7 @@ export default function IptcMetadataEditor({data, onChange, showArtist = true, d
                            className="input input-sm input-bordered bg-base-200 text-base-content/60 cursor-not-allowed w-full"/>
                 </div>
             )}
-            {!disabled && (
+            {!disabled && showEditorialFlag && (
                 <div className="form-control md:col-span-2 mt-2">
                     <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300">
                         <input type="checkbox" checked={data.is_editorial_only || false} onChange={e => handleMultiChange({ is_editorial_only: e.target.checked })} className="checkbox checkbox-primary"/>

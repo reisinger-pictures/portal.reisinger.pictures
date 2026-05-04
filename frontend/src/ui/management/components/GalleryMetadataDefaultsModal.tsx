@@ -125,9 +125,9 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
                         </div>
                     )}
                     
-                    <div className="modal-action col-span-full">
-                        <button type="button" className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                    <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 w-full">
+                        <button type="button" className="btn btn-ghost w-full sm:w-auto" onClick={onClose}>Abbrechen</button>
+                        <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isSubmitting}>
                             {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
                         </button>
                     </div>

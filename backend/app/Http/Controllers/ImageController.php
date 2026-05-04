@@ -89,18 +89,19 @@ class ImageController extends Controller
             }
 
             if ($existingPhoto) {
-                $existingPhoto->update(array_merge([
+                $existingPhoto->forceFill(array_merge([
                     'user_id' => $user->id,
                     'lr_uuid' => $lrUuid
-                ], $meta));
+                ], $meta))->save();
                 $photo = $existingPhoto;
             } else {
-                $photo = Photo::create(array_merge([
+                $photo = new Photo();
+                $photo->forceFill(array_merge([
                     'id' => $photoId,
                     'gallery_id' => $gallery->id, 
                     'lr_uuid' => $lrUuid, 
                     'user_id' => $user->id
-                ], $meta));
+                ], $meta))->save();
             }
 
             return response()->json(['success' => true, 'photo_id' => $photo->id]);

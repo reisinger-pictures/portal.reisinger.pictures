@@ -29,6 +29,7 @@ export interface Photo {
     effective_is_editorial_only?: boolean;
     is_hidden?: boolean;
     effective_is_hidden?: boolean;
+    captured_at?: string;
 }
 
 export interface PaginatedGalleryResponse {

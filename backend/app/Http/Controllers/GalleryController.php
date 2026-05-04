@@ -331,22 +331,26 @@ class GalleryController extends Controller
 
         $gallery->update($validated);
 
-        // Retroaktive Metadaten-Übernahme
+        // Retroaktive Metadaten-Übernahme mit sicherem Chunking für Meilisearch
         if ($gallery->apply_metadata_to_photos) {
-            $updated = false;
-            foreach ($gallery->photos as $photo) {
-                $changed = false;
-                if (empty($photo->title) && $gallery->default_title) { $photo->title = $gallery->default_title; $changed = true; }
-                if (empty($photo->description) && $gallery->default_description) { $photo->description = $gallery->default_description; $changed = true; }
-                if (empty($photo->keywords) && $gallery->default_keywords) { $photo->keywords = $gallery->default_keywords; $changed = true; }
-                if (empty($photo->location) && $gallery->default_location) { $photo->location = $gallery->default_location; $changed = true; }
-                if (empty($photo->city) && $gallery->default_city) { $photo->city = $gallery->default_city; $changed = true; }
-                if (empty($photo->state) && $gallery->default_state) { $photo->state = $gallery->default_state; $changed = true; }
-                if (empty($photo->country) && $gallery->default_country) { $photo->country = $gallery->default_country; $changed = true; }
-                if (empty($photo->iso_country) && $gallery->default_iso_country) { $photo->iso_country = $gallery->default_iso_country; $changed = true; }
-                if ($changed) { $photo->save(); $updated = true; }
-            }
-            if ($updated) { $gallery->photos()->searchable(); }
+            $gallery->photos()->chunkById(100, function ($photos) use ($gallery) {
+                $hasUpdates = false;
+                foreach ($photos as $photo) {
+                    $changed = false;
+                    if (empty($photo->title) && $gallery->default_title) { $photo->title = $gallery->default_title; $changed = true; }
+                    if (empty($photo->description) && $gallery->default_description) { $photo->description = $gallery->default_description; $changed = true; }
+                    if (empty($photo->keywords) && $gallery->default_keywords) { $photo->keywords = $gallery->default_keywords; $changed = true; }
+                    if (empty($photo->location) && $gallery->default_location) { $photo->location = $gallery->default_location; $changed = true; }
+                    if (empty($photo->city) && $gallery->default_city) { $photo->city = $gallery->default_city; $changed = true; }
+                    if (empty($photo->state) && $gallery->default_state) { $photo->state = $gallery->default_state; $changed = true; }
+                    if (empty($photo->country) && $gallery->default_country) { $photo->country = $gallery->default_country; $changed = true; }
+                    if (empty($photo->iso_country) && $gallery->default_iso_country) { $photo->iso_country = $gallery->default_iso_country; $changed = true; }
+                    if ($changed) { $photo->save(); $hasUpdates = true; }
+                }
+                if ($hasUpdates) {
+                    $photos->searchable();
+                }
+            });
         }
 
         return response()->json(['success' => true, 'gallery' => $gallery]);

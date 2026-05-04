@@ -190,4 +190,38 @@ class PhotoMetadataTest extends TestCase {
             'keywords' => $longKeywords
         ]);
     }
+    public function test_captured_at_is_readonly_and_returned_in_context() {
+        $photog = User::factory()->create();
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $gallery = Gallery::factory()->create(['type' => 'delivery']);
+        $photog->galleries()->attach($gallery);
+        $photo = Photo::factory()->create([
+            'gallery_id' => $gallery->id, 
+            'user_id' => $photog->id,
+            'captured_at' => '2025-01-01 12:00:00'
+        ]);
+
+        $token = auth('api')->login($photog);
+
+        // 1. Context API prüft, ob Datum ausgeliefert wird
+        $resContext = $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->getJson("/api/photos/{$photo->id}/context");
+             
+        $resContext->assertStatus(200);
+        $this->assertEquals('2025-01-01T12:00:00.000000Z', $resContext->json('photo.captured_at'));
+
+        // 2. Security: User darf das EXIF-Datum nicht manipulieren
+        $resUpdate = $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->putJson("/api/photos/{$photo->id}/meta", [
+                 'title' => 'Updated Title',
+                 'captured_at' => '2099-01-01 00:00:00'
+             ]);
+
+        $resUpdate->assertStatus(200);
+        $this->assertDatabaseHas('photos', [
+            'id' => $photo->id,
+            'title' => 'Updated Title',
+            'captured_at' => '2025-01-01 12:00:00' // Datum muss exakt bleiben
+        ]);
+    }
 }

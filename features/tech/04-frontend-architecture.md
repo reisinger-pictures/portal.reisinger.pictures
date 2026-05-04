@@ -15,7 +15,8 @@ status: active
 - **Error Boundaries:** Critical UI sections are wrapped in React `ErrorBoundary` components to prevent total application crashes on localized data errors.
 
 ## 3. UI/UX Rules
-- **Form Standard Styling (STRICT):**
+- **Modal Actions (Mobile First):** Modal-Buttons im Fußbereich müssen auf mobilen Geräten die volle Breite einnehmen und vertikal gestapelt werden (`flex flex-col sm:flex-row gap-3 w-full`, Buttons mit `w-full sm:w-auto`).
+  - **Form Standard Styling (STRICT):**
   - **Größen:** Alle Formularelemente (Inputs, Selects, Buttons) nutzen in regulären Formularen die Standardgröße 'md' (DaisyUI Default, kein `-sm` oder `-xs` Suffix). Dies sorgt für bessere Bedienbarkeit auf Touch-Geräten.
   - **Ausnahme (Table Context):** Innerhalb von engmaschigen Tabellen (z.B. Batch-Edits, User-Listen) und für Modal-Schließen-Buttons (`btn-circle absolute`) sind `input-sm`, `btn-sm` und `btn-xs` ausdrücklich erlaubt, um die Übersichtlichkeit zu wahren.
   - **Layout:** Formulare sind konsequent mittels CSS-Grid zu strukturieren. Standard-Pattern: `grid grid-cols-1 md:grid-cols-2 gap-4`.

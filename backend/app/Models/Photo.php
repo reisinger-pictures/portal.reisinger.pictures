@@ -21,7 +21,7 @@ class Photo extends Model
         'city', 'state', 'country', 'iso_country', 'created_at', 'url', 'thumb_url', 
         'rating', 'comment', 'gallery', 'artist',
         'is_editorial_only', 'is_hidden',
-        'effective_is_editorial_only', 'effective_is_hidden', 'last_accessed_at', 'is_downscaled'
+        'effective_is_editorial_only', 'effective_is_hidden', 'last_accessed_at', 'is_downscaled', 'captured_at'
     ];
 
     protected $fillable = [
@@ -38,6 +38,7 @@ class Photo extends Model
     
     protected $casts = [
         'is_editorial_only' => 'boolean',
+        'captured_at' => 'datetime',
         'is_hidden' => 'boolean',
         'is_downscaled' => 'boolean',
     ];

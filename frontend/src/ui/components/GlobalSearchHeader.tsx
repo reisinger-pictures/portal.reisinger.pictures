@@ -57,7 +57,7 @@ export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderPr
                     </button>
                 </div>
                 {isSearchFocused && searchQuery.length >= 1 && (
-                    <div className="absolute top-14 left-0 w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-50 max-h-[60vh] overflow-y-auto">
+                    <div className="fixed top-[72px] left-2 right-2 md:absolute md:top-14 md:left-0 md:right-auto md:w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-[100] max-h-[60vh] overflow-y-auto">
                         <ul className="menu p-2">
                             <li>
                                 <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`}  className="text-primary font-bold">
@@ -71,9 +71,14 @@ export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderPr
                                         <li key={g.id}><Link to={'/' + g.full_path} >📁 <HighlightText text={g.name} highlight={searchQuery} /></Link></li>
                                     ))}
                                     {searchResults.photos.map(p => (
-                                        <li key={p.id}><Link to={'/photos/' + p.id} >
-                                            <span className="iconify mdi--image-outline opacity-70"></span> <HighlightText text={p.title || 'Foto'} highlight={searchQuery} />
-                                        </Link></li>
+                                        <li key={p.id}>
+                                            <Link to={'/photos/' + p.id} className="py-2">
+                                                <div className="flex items-center gap-3">
+                                                    <img src={p.thumb_url} className="w-10 h-10 object-cover rounded shadow-sm shrink-0" alt="" />
+                                                    <span className="truncate leading-tight flex-1"><HighlightText text={p.title || 'Foto'} highlight={searchQuery} /></span>
+                                                </div>
+                                            </Link>
+                                        </li>
                                     ))}
                                     {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (
                                         <li className="disabled"><span className="opacity-50">Keine direkten Treffer</span></li>

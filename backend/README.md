@@ -21,6 +21,7 @@ Da wir eine maßgeschneiderte SaaS-Architektur verwenden, weicht dieses Setup in
 
 ## 4. Suche (Meilisearch & Scout)
 * **Filterable Attributes:** Wir nutzen Meilisearch nativ, um das Rechte-System abzubilden (`whereIn('gallery_id', [...])`). 
+* **Location Cache (GeoNames):** Die Datensätze für die Autovervollständigung von Orten werden lokal unter `storage/app/private/temp/` zwischengespeichert (`AT_postal.txt`, `AT_places.txt`, `countryInfo.txt`), um API-Limits und Timeouts abzufangen. 
 * **WICHTIG NACH UPDATES:** Wenn Änderungen an der Suche (Modelle oder Filter) vorgenommen werden, muss zwingend folgender Befehl ausgeführt werden, um die `scout.php` Konfiguration in die Meilisearch-Engine zu pushen:
   ```bash
   php artisan scout:sync-index-settings

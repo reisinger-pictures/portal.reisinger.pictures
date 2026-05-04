@@ -24,57 +24,60 @@ class ImportLocations extends Command
         $txtPostalPath = $tempDir . '/AT_postal.txt';
         $zipPlacesPath = $tempDir . '/AT_places.zip';
         $txtPlacesPath = $tempDir . '/AT_places.txt';
+        $countryTxtPath = $tempDir . '/countryInfo.txt';
 
         // 1. Lade GeoNames Orte-Datensatz (für Einwohner)
         $this->info('Lade GeoNames Orte-Datensatz (AT) für Einwohnerzahlen...');
-        $response = Http::get('http://download.geonames.org/export/dump/AT.zip');
-        $populations = [];
-        if ($response->successful()) {
-            file_put_contents($zipPlacesPath, $response->body());
-            $zip = new \ZipArchive;
-            if ($zip->open($zipPlacesPath) === true) {
-                if ($zip->extractTo($tempDir, 'AT.txt')) {
-                    rename($tempDir . '/AT.txt', $txtPlacesPath);
-                } else {
-                    $this->error('Fehler beim Extrahieren der AT_places.zip');
+        try {
+            $response = Http::timeout(5)->get('http://download.geonames.org/export/dump/AT.zip');
+            if ($response->successful()) {
+                file_put_contents($zipPlacesPath, $response->body());
+                $zip = new \ZipArchive;
+                if ($zip->open($zipPlacesPath) === true) {
+                    if ($zip->extractTo($tempDir, 'AT.txt')) {
+                        rename($tempDir . '/AT.txt', $txtPlacesPath);
+                    }
+                    $zip->close();
                 }
-                $zip->close();
-            } else {
-                $this->error('Fehler beim Öffnen der AT_places.zip');
             }
-            
-            if (file_exists($txtPlacesPath) && ($handle = fopen($txtPlacesPath, "r")) !== FALSE) {
-                while (($data = fgetcsv($handle, 0, "\t")) !== FALSE) {
-                    if (count($data) >= 15) {
-                        $name = trim($data[1]);
-                        $pop = (int) $data[14];
-                        if ($pop > 0) {
-                            if (!isset($populations[$name]) || $pop > $populations[$name]) {
-                                $populations[$name] = $pop;
-                            }
+        } catch (\Exception $e) {
+            $this->warn('Download fehlgeschlagen. Greife auf lokalen Cache zurück: ' . basename($txtPlacesPath));
+        }
+
+        $populations = [];
+        if (file_exists($txtPlacesPath) && filesize($txtPlacesPath) > 0 && ($handle = fopen($txtPlacesPath, "r")) !== FALSE) {
+            while (($data = fgetcsv($handle, 0, "\t")) !== FALSE) {
+                if (count($data) >= 15) {
+                    $name = trim($data[1]);
+                    $pop = (int) $data[14];
+                    if ($pop > 0) {
+                        if (!isset($populations[$name]) || $pop > $populations[$name]) {
+                            $populations[$name] = $pop;
                         }
                     }
                 }
-                fclose($handle);
             }
+            fclose($handle);
+        } else {
+            $this->error('Kein Cache für Orte gefunden. Überspringe Population-Zuweisung.');
         }
 
         // 2. Lade PLZ Daten
         $this->info('Lade GeoNames PLZ-Datensatz (AT) herunter...');
-        $response = Http::get('http://download.geonames.org/export/zip/AT.zip');
-        if ($response->successful()) {
-            file_put_contents($zipPostalPath, $response->body());
-            $zip = new \ZipArchive;
-            if ($zip->open($zipPostalPath) === true) {
-                if ($zip->extractTo($tempDir, 'AT.txt')) {
-                    rename($tempDir . '/AT.txt', $txtPostalPath);
-                } else {
-                    $this->error('Fehler beim Extrahieren der AT_postal.zip');
+        try {
+            $response = Http::timeout(5)->get('http://download.geonames.org/export/zip/AT.zip');
+            if ($response->successful()) {
+                file_put_contents($zipPostalPath, $response->body());
+                $zip = new \ZipArchive;
+                if ($zip->open($zipPostalPath) === true) {
+                    if ($zip->extractTo($tempDir, 'AT.txt')) {
+                        rename($tempDir . '/AT.txt', $txtPostalPath);
+                    }
+                    $zip->close();
                 }
-                $zip->close();
-            } else {
-                $this->error('Fehler beim Öffnen der AT_postal.zip');
             }
+        } catch (\Exception $e) {
+            $this->warn('Download fehlgeschlagen. Greife auf lokalen Cache zurück: ' . basename($txtPostalPath));
         }
 
         $this->info('Leere Meilisearch-Index (verhindert Ghost-Records)...');
@@ -87,7 +90,7 @@ class ImportLocations extends Command
         $locations = [];
         $count = 0;
 
-        if (file_exists($txtPostalPath) && ($handle = fopen($txtPostalPath, "r")) !== FALSE) {
+        if (file_exists($txtPostalPath) && filesize($txtPostalPath) > 0 && ($handle = fopen($txtPostalPath, "r")) !== FALSE) {
             while (($data = fgetcsv($handle, 0, "\t")) !== FALSE) {
                 if (count($data) >= 4) {
                     $cityName = trim($data[2]);
@@ -111,20 +114,27 @@ class ImportLocations extends Command
             }
             fclose($handle);
             if (!empty($locations)) DB::table('locations')->insert($locations);
+            $this->info("{$count} österreichische PLZ-Gebiete erfolgreich importiert.");
+        } else {
+            $this->error('Kein Cache für PLZ gefunden. Abbruch des Städte-Imports.');
         }
 
         @unlink($zipPostalPath);
-        @unlink($txtPostalPath);
         @unlink($zipPlacesPath);
-        @unlink($txtPlacesPath);
-        $this->info("{$count} österreichische PLZ-Gebiete erfolgreich importiert.");
 
         // 3. LÄNDER IMPORT
         $this->info('Lade weltweite Länder-Daten (GeoNames) herunter...');
-        $countryResponse = Http::get('http://download.geonames.org/export/dump/countryInfo.txt');
-        
-        if ($countryResponse->successful()) {
-            $countryLines = explode("\n", $countryResponse->body());
+        try {
+            $countryResponse = Http::timeout(5)->get('http://download.geonames.org/export/dump/countryInfo.txt');
+            if ($countryResponse->successful()) {
+                file_put_contents($countryTxtPath, $countryResponse->body());
+            }
+        } catch (\Exception $e) {
+            $this->warn('Länder-Download fehlgeschlagen. Greife auf lokalen Cache zurück.');
+        }
+
+        if (file_exists($countryTxtPath) && filesize($countryTxtPath) > 0) {
+            $countryLines = explode("\n", file_get_contents($countryTxtPath));
             $countryInserts = [];
             foreach ($countryLines as $line) {
                 $line = trim($line);
@@ -153,6 +163,8 @@ class ImportLocations extends Command
                 DB::table('locations')->insert($countryInserts);
                 $this->info(count($countryInserts) . ' Länder erfolgreich importiert.');
             }
+        } else {
+            $this->error('Kein Cache für Länder gefunden.');
         }
 
         // 4. SYNCHRONISATION

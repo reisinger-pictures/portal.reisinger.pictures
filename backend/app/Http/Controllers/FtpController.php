@@ -96,14 +96,15 @@ class FtpController extends Controller
             }
 
             DB::transaction(function () use ($gallery, $meta, $photoId, $user) {
-                Photo::create(
+                $photo = new Photo();
+                $photo->forceFill(
                     array_merge([
                         'id' => $photoId,
                         'gallery_id' => $gallery->id,
                         'lr_uuid' => 'ftp-' . uniqid(),
                         'user_id' => $user->id
                     ], $meta)
-                );
+                )->save();
             });
 
             $processedCount++;

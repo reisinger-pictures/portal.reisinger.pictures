@@ -56,4 +56,26 @@ test.describe('Metadata & Detail View Workflow', () => {
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page.getByRole('button', { name: 'Speichern' })).toBeEnabled();
     });
+    test('UI displays captured_at as readonly field', async ({ page }) => {
+        const galleryHelper = new GalleryHelper(page, helper);
+        await galleryHelper.createAndOpenDeliveryGallery(galleryName + ' Date');
+
+        const upload = new UploadHelper(page);
+        await upload.uploadSampleImage();
+        
+        // Mock the API to inject a specific captured_at date
+        await page.route('**/api/photos/*/context', async route => {
+            const response = await route.fetch();
+            const json = await response.json();
+            json.photo.captured_at = '2026-05-01T14:30:00.000000Z';
+            await route.fulfill({ json });
+        });
+
+        await page.locator('button[title="Details & Metadaten"]').first().click();
+        await expect(page.locator('h4:has-text("IPTC Metadaten")')).toBeVisible();
+
+        // Validate the UI displays the formatted date
+        await expect(page.locator('span.opacity-70').filter({ hasText: 'Aufnahmedatum' })).toBeVisible();
+        await expect(page.locator('div.text-sm').filter({ hasText: '2026' }).first()).toBeVisible();
+    });
 });

@@ -43,7 +43,7 @@ class PhotoProcessingService
         $process = new Process([
             'exiftool', '-json', '-Title', '-ObjectName', '-XPTitle', 
             '-ImageDescription', '-Caption-Abstract', '-Keywords', '-Sub-location', '-City', '-Province-State', 
-            '-Country-PrimaryLocationName', '-Country-PrimaryLocationCode',
+            '-Country-PrimaryLocationName', '-Country-PrimaryLocationCode', '-DateTimeOriginal', '-CreateDate',
             $targetPath
         ]);
         $process->run();
@@ -60,6 +60,12 @@ class PhotoProcessingService
             $meta['state'] = $m['Province-State'] ?? $meta['state'];
             $meta['country'] = $m['Country-PrimaryLocationName'] ?? $meta['country'];
             $meta['iso_country'] = $m['Country-PrimaryLocationCode'] ?? $meta['iso_country'];
+            $dateStr = $m['DateTimeOriginal'] ?? $m['CreateDate'] ?? null;
+            if ($dateStr) {
+                try {
+                    $meta['captured_at'] = \Carbon\Carbon::createFromFormat('Y:m:d H:i:s', substr($dateStr, 0, 19))->toDateTimeString();
+                } catch (\Exception $e) {}
+            }
         }
 
         return $meta;

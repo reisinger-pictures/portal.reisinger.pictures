@@ -15,9 +15,8 @@ Schedule::command('app:cleanup-galleries')->dailyAt('03:00');
 Schedule::command('app:downscale-editorial')->dailyAt('04:00');
 Schedule::command('app:cleanup-derivatives')->dailyAt('05:00');
 
-// Storage Lifecycle & Cache Registry
-Schedule::command('app:downscale-editorial')->dailyAt('04:00');
-Schedule::command('app:cleanup-derivatives')->dailyAt('05:00');
+// Temp-Dateien (alte Skalierungs-Caches & Artefakte) bereinigen
+Schedule::command('app:cleanup-temp')->dailyAt('02:30');
 
 // Automatische Sammelrechnungen (täglich prüfen)
 Schedule::command('app:process-collective-invoices')->dailyAt('23:00');
