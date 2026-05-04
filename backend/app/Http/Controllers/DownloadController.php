@@ -43,7 +43,8 @@ class DownloadController extends Controller
 
         $artist = trim($photo->artist ?? config('app.name', 'Reisinger Foto Portal'), "\"\'");
         $copyright = 'Copyright ' . date('Y') . ' ' . $artist;
-        $instructions = 'Licensed to / Downloaded by: ' . $userName;
+        $editorialNotice = ($photo->effective_is_editorial_only || $photo->is_editorial_only) ? ' - EDITORIAL USE ONLY / NUR FÜR REDAKTIONELLE NUTZUNG FREIGEGEBEN' : '';
+        $instructions = 'Licensed to / Downloaded by: ' . $userName . $editorialNotice;
         $agbUrl = 'https://reisinger.pictures/agb';
 
         $args = [

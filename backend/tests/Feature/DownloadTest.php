@@ -77,6 +77,36 @@ class DownloadTest extends TestCase
         );
     }
 
+    public function test_editorial_only_flag_is_injected_into_metadata()
+    {
+        $user = User::factory()->create(['name' => 'Editorial Tester', 'flatrate_level' => 'original']);
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false, 'is_editorial_only' => true]);
+        $user->galleries()->attach($gallery);
+        
+        $photographer = User::factory()->create(['name' => 'Test Fotograf']);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+
+        $fixturePath = base_path('tests/Fixtures/sample.jpg');
+        $content = file_get_contents($fixturePath);
+        Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, $content);
+        
+        $token = auth('api')->login($user);
+        
+        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+            ->get('/api/photos/' . $photo->id . '/download');
+
+        $response->assertStatus(200);
+
+        $downloadedFilePath = $response->getFile()->getPathname();
+        
+        $process = new Process(['exiftool', '-json', $downloadedFilePath]);
+        $process->run();
+        $metaData = json_decode($process->getOutput(), true)[0];
+
+        $this->assertArrayHasKey('SpecialInstructions', $metaData);
+        $this->assertStringContainsString('EDITORIAL USE ONLY', $metaData['SpecialInstructions']);
+    }
+
     public function test_guest_can_download_public_gallery_zip_and_structure_is_valid()
     {
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'is_free_download' => true, 'slug' => 'test-zip']);

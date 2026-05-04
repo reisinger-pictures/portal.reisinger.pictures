@@ -46,7 +46,8 @@ export default function PhotoDetailView() {
             state: data.photo.state || '',
             country: data.photo.country || '',
             iso_country: data.photo.iso_country || '',
-            is_editorial_only: data.photo.is_editorial_only || false
+            is_editorial_only: data.photo.is_editorial_only || false,
+            effective_is_editorial_only: data.photo.effective_is_editorial_only || false
         });
     }
 
@@ -128,7 +129,7 @@ export default function PhotoDetailView() {
                         title: newData.photo.title || '', description: newData.photo.description || '', artist: newData.photo.artist || '',
                         headline: newData.photo.headline || '', keywords: newData.photo.keywords || '', location: newData.photo.location || '',
                         city: newData.photo.city || '', state: newData.photo.state || '', country: newData.photo.country || '',
-                        iso_country: newData.photo.iso_country || '', is_editorial_only: newData.photo.is_editorial_only || false
+                        iso_country: newData.photo.iso_country || '', is_editorial_only: newData.photo.is_editorial_only || false, effective_is_editorial_only: newData.photo.effective_is_editorial_only || false
                     });
                 }
             }} />

@@ -14,6 +14,7 @@ export interface IptcData {
     country?: string;
     iso_country?: string;
     is_editorial_only?: boolean;
+    effective_is_editorial_only?: boolean;
 }
 
 interface Props {
@@ -259,11 +260,18 @@ export default function IptcMetadataEditor({data, onChange, showArtist = true, s
             )}
             {!disabled && showEditorialFlag && (
                 <div className="form-control md:col-span-2 mt-2">
-                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300">
-                        <input type="checkbox" checked={data.is_editorial_only || false} onChange={e => handleMultiChange({ is_editorial_only: e.target.checked })} className="checkbox checkbox-primary"/>
+                    <label className={`cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border ${data.effective_is_editorial_only && !data.is_editorial_only ? 'border-warning' : 'border-base-300'}`}>
+                        <input type="checkbox" checked={data.is_editorial_only || data.effective_is_editorial_only || false} 
+                               disabled={data.effective_is_editorial_only && !data.is_editorial_only}
+                               onChange={e => handleMultiChange({ is_editorial_only: e.target.checked })} 
+                               className="checkbox checkbox-primary"/>
                         <div>
                             <span className="label-text font-bold block">Nur für redaktionelle Nutzung (Shop)</span>
-                            <span className="label-text-alt opacity-70 block mt-1">Sperrt kommerzielle Lizenzen im Checkout explizit für dieses Bild.</span>
+                            <span className="label-text-alt opacity-70 block mt-1">
+                                {data.effective_is_editorial_only && !data.is_editorial_only 
+                                    ? 'Wird durch die übergeordnete Galerie erzwungen.' 
+                                    : 'Sperrt kommerzielle Lizenzen im Checkout explizit für dieses Bild.'}
+                            </span>
                         </div>
                     </label>
                 </div>

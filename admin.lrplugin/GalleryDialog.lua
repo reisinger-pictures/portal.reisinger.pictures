@@ -136,7 +136,6 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
                 spacing = f:control_spacing(),
                 margin_top = 10,
                 f:row { f:static_text { title="Titel:", width=120 }, f:edit_field { value = LrView.bind{key="defTitle", bind_to_object=props}, fill_horizontal=1, width_in_chars=40 } },
-                f:row { f:static_text { title="Headline:", width=120 }, f:edit_field { value = LrView.bind{key="defHeadline", bind_to_object=props}, fill_horizontal=1, width_in_chars=40 } },
                 f:row { f:static_text { title="Beschreibung:", width=120 }, f:edit_field { value = LrView.bind{key="defDesc", bind_to_object=props}, fill_horizontal=1, width_in_chars=40, height_in_lines=4 } },
                 f:row { f:static_text { title="Keywords:", width=120 }, f:edit_field { value = LrView.bind{key="defKeywords", bind_to_object=props}, fill_horizontal=1, width_in_chars=40 } },
                 f:row { 
@@ -189,7 +188,6 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
                     payload.allow_client_metadata_edit = props.allowClientMeta
                     payload.apply_metadata_to_photos = props.applyMeta
                     payload.default_title = props.defTitle
-                    payload.default_headline = props.defHeadline
                     payload.default_description = props.defDesc
                     payload.default_keywords = props.defKeywords
                     payload.default_location = props.defLocation
