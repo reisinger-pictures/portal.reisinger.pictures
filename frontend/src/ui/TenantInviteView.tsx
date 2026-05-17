@@ -18,6 +18,7 @@ export default function TenantInviteView() {
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [acceptPrivacy, setAcceptPrivacy] = useState(false);
 
     useEffect(() => {
         fetch('/api/tenant-invites/' + token, { headers: { 'Accept': 'application/json' } })
@@ -42,7 +43,7 @@ export default function TenantInviteView() {
         setIsSubmitting(true);
 
         try {
-            await apiMutate('/api/tenant-invites/redeem', 'POST', { token, name, password });
+            await apiMutate('/api/tenant-invites/redeem', 'POST', { token, name, password, accept_privacy: acceptPrivacy });
             
             // SWR Cache revalidieren, da nun ein JWT existiert
             await mutate(() => true, undefined, { revalidate: true });
@@ -88,6 +89,15 @@ export default function TenantInviteView() {
                                 <label className="label"><span className="label-text font-bold">Passwort festlegen</span></label>
                                 <input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} className="input input-bordered" />
                                 <span className="label-text-alt opacity-70 mt-1">Mindestens 8 Zeichen</span>
+                            </div>
+
+                            <div className="form-control mt-4 mb-2">
+                                <label className="cursor-pointer label justify-start gap-3">
+                                    <input type="checkbox" required className="checkbox checkbox-primary checkbox-sm mt-0.5" checked={acceptPrivacy} onChange={e => setAcceptPrivacy(e.target.checked)} />
+                                    <span className="label-text text-sm leading-tight">
+                                        Ich habe die <a href="/privacy" target="_blank" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.
+                                    </span>
+                                </label>
                             </div>
 
                             <div className="form-control mt-6">

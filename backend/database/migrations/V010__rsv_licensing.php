@@ -32,7 +32,7 @@ return new class extends Migration {
 
         DB::table('license_use_cases')->insert([
             ['id' => Str::uuid(), 'name' => 'Tageszeitungen / Zeitschriften', 'description' => 'Redaktionelle Nutzung Print (kleiner als 2-spaltig).', 'base_price' => 8000, 'flatrate_tier' => 'print', 'sort_order' => 10, 'is_commercial' => false],
-            ['id' => Str::uuid(), 'name' => 'Corporate Publishing / PR', 'description' => 'Kundenmagazine, Geschäftsberichte.', 'base_price' => 15000, 'flatrate_tier' => 'print', 'sort_order' => 20, 'is_commercial' => false],
+            ['id' => Str::uuid(), 'name' => 'Corporate Publishing / PR', 'description' => 'Kundenmagazine, Geschäftsberichte.', 'base_price' => 15000, 'flatrate_tier' => 'print', 'sort_order' => 20, 'is_commercial' => true],
             ['id' => Str::uuid(), 'name' => 'Web & Social Media', 'description' => 'Redaktionelle Online-Nutzung.', 'base_price' => 4500, 'flatrate_tier' => 'web', 'sort_order' => 30, 'is_commercial' => false],
             ['id' => Str::uuid(), 'name' => 'Werbung / Kampagne', 'description' => 'Kommerzielle Kampagnen, Inserate, Plakate.', 'base_price' => 45000, 'flatrate_tier' => 'original', 'sort_order' => 40, 'is_commercial' => true],
         ]);

@@ -60,7 +60,8 @@ class TenantInviteController extends Controller
         $request->validate([
             'token' => 'required|string',
             'name' => 'required|string|max:255',
-            'password' => 'required|string|min:8'
+            'password' => 'required|string|min:8',
+            'accept_privacy' => 'required|accepted'
         ]);
 
         $invite = TenantInvite::where('token', $request->token)

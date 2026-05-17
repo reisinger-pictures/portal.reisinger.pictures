@@ -68,6 +68,7 @@ test.describe('Client Selection Workflow', () => {
         await page.goto(inviteLink);
         
         await expect(page.locator('h2:has-text("Willkommen zur Fotoauswahl")')).toBeVisible();
+        await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
         await page.getByRole('button', { name: 'Weiter als Test Client' }).click();
 
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();

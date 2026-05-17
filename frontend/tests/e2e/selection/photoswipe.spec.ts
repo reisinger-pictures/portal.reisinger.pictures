@@ -54,6 +54,7 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
 
         // 2. Client Interaction
         await page.goto(inviteLink);
+        await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
         await page.getByRole('button', { name: 'Weiter als Lightbox Tester' }).click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
 

@@ -56,6 +56,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         await expect(page.locator('h2:has-text("Unternehmens-Account")')).toBeVisible();
         await page.getByPlaceholder('z.B. Maria Muster').fill('Tenant Angestellter');
         await page.locator('.card-body').locator('input[type="password"]').fill('SecurePass123!');
+        await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
         await page.getByRole('button', { name: 'Account aktivieren & Anmelden' }).click();
         
         await expect(page.locator('h1:has-text("Willkommen zurück")')).toBeVisible({ timeout: 15000 });

@@ -97,6 +97,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         
         await page.getByPlaceholder('z.B. Maria Muster').fill('Test Gast Bewerter');
         await page.getByPlaceholder('maria@beispiel.de').fill('gast@example.com');
+        await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
         await page.getByRole('button', { name: 'Galerie öffnen' }).click();
         
         await expect(page.locator(`h1:has-text("${galleryNameA}")`)).toBeVisible();

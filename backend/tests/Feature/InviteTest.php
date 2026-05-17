@@ -18,7 +18,8 @@ class InviteTest extends TestCase {
         $response = $this->postJson('/api/invites/redeem', [
             'token' => 'randomtoken123',
             'name' => 'Guest User',
-            'email' => 'guest@example.com'
+            'email' => 'guest@example.com',
+            'accept_privacy' => true
         ]);
 
         $response->assertStatus(200)->assertCookie('rp_jwt');

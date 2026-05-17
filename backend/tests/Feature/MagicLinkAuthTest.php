@@ -24,7 +24,8 @@ class MagicLinkAuthTest extends TestCase
         $res = $this->postJson('/api/invites/redeem', [
             'token' => 'test-token',
             'name' => 'Test Guest',
-            'email' => 'guest@example.com'
+            'email' => 'guest@example.com',
+            'accept_privacy' => true
         ]);
 
         $res->assertStatus(200)->assertCookie('rp_jwt');
@@ -73,7 +74,8 @@ class MagicLinkAuthTest extends TestCase
 
         $res = $this->withHeaders(['Authorization' => "Bearer $initialToken"])
             ->postJson('/api/invites/redeem', [
-                'token' => 'test-token-2'
+                'token' => 'test-token-2',
+                'accept_privacy' => true
             ]);
 
         $res->assertStatus(200)->assertCookie('rp_jwt');

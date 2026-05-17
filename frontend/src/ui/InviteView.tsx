@@ -24,6 +24,7 @@ export default function InviteView() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [acceptPrivacy, setAcceptPrivacy] = useState(false);
 
     useEffect(() => {
         fetch('/api/invites/' + token, {headers: {'Accept': 'application/json'}})
@@ -52,7 +53,7 @@ export default function InviteView() {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
                 credentials: 'include', // CRITICAL FIX: Damit das JWT-Cookie nicht verworfen wird
-                body: JSON.stringify({token, name: name || null, email: email || null, password: password || null})
+                body: JSON.stringify({token, name: name || null, email: email || null, password: password || null, accept_privacy: acceptPrivacy})
             });
 
             const data = await res.json();
@@ -76,7 +77,8 @@ export default function InviteView() {
         // Auto-Redeem nur wenn: Nicht am Laden, User eingeloggt, Galerie bekannt, kein PW nötig
         if (!loading && !authLoading && user && galleryName && !requiresPassword && !error && !autoRedeeming) {
             setAutoRedeeming(true);
-            apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', { token })
+            // Nur senden, wenn der User existiert (und somit Datenschutzerklärung bei Registrierung akzeptiert hat)
+            apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', { token, accept_privacy: !!user })
             .then(resData => {
                 if (resData.full_path) {
                     mutate(() => true, undefined, { revalidate: true });
@@ -123,10 +125,19 @@ export default function InviteView() {
                         </div>
                     )}
                     {!regSuccess && inviteName && !requiresPassword ? (
-                            <div className="form-control mt-4">
-                                <button onClick={handleSubmit} className="btn btn-primary w-full text-lg">Weiter
-                                    als {inviteName}</button>
-                            </div>
+                            <form onSubmit={handleSubmit}>
+                                <div className="form-control mt-4 mb-4">
+                                    <label className="cursor-pointer label justify-start gap-3">
+                                        <input type="checkbox" required className="checkbox checkbox-primary checkbox-sm mt-0.5" checked={acceptPrivacy} onChange={e => setAcceptPrivacy(e.target.checked)} />
+                                        <span className="label-text text-sm leading-tight">
+                                            Ich habe die <a href="/privacy" target="_blank" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.
+                                        </span>
+                                    </label>
+                                </div>
+                                <div className="form-control">
+                                    <button type="submit" className="btn btn-primary w-full text-lg">Weiter als {inviteName}</button>
+                                </div>
+                            </form>
                         ) : (
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 {!regSuccess && !inviteName && (
@@ -163,6 +174,14 @@ export default function InviteView() {
                                     </div>
                                 )}
 
+                                <div className="form-control mt-4 mb-2">
+                                    <label className="cursor-pointer label justify-start gap-3">
+                                        <input type="checkbox" required className="checkbox checkbox-primary checkbox-sm mt-0.5" checked={acceptPrivacy} onChange={e => setAcceptPrivacy(e.target.checked)} />
+                                        <span className="label-text text-sm leading-tight">
+                                            Ich habe die <a href="/privacy" target="_blank" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.
+                                        </span>
+                                    </label>
+                                </div>
                                 <div className="form-control mt-6">
                                     <button type="submit" className="btn btn-primary w-full text-lg">
                                         {inviteName ? `Weiter als ${inviteName}` : 'Galerie öffnen'}

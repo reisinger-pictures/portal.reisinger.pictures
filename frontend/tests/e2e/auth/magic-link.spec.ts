@@ -56,6 +56,7 @@ test.describe('Gallery Invite Link Workflow', () => {
         const guestEmail = `gast-${uniqueId()}@example.com`;
         await page.getByPlaceholder('z.B. Maria Muster').fill('Gast Bewerter');
         await page.getByPlaceholder('maria@beispiel.de').fill(guestEmail);
+        await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
         await page.getByRole('button', { name: 'Galerie öffnen' }).click();
 
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
@@ -116,6 +117,7 @@ test.describe('Gallery Invite Link Workflow', () => {
 
         // Enter wrong password
         await pwdInput.fill('WrongPassword!');
+        await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
         await page.getByRole('button', { name: 'Weiter als Secure Guest' }).click();
         await expect(page.locator('.alert-error')).toContainText('Das Galerie-Passwort ist nicht korrekt.');
 

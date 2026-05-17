@@ -82,7 +82,8 @@ class InviteController extends Controller
             'token' => 'required|string',
             'name' => 'nullable|string',
             'email' => 'nullable|email',
-            'password' => 'nullable|string'
+            'password' => 'nullable|string',
+            'accept_privacy' => 'required|accepted'
         ]);
 
         $invite = \App\Models\GalleryInvite::where('token', $request->token)->with('gallery')->firstOrFail();
