@@ -87,9 +87,9 @@
                                 <small style="color: #666;">Auflösung: {{ strtoupper($item['tier']) }}</small>
                             @endif
                         </td>
-                        <td class="text-right">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
-                        <td class="text-right">{{ number_format($item['price'] / 100, 2, ',', '.') }} €</td>
-                        <td class="text-right">{{ number_format(($item['row_total'] ?? ($item['price'] * ($item['qty'] ?? 1))) / 100, 2, ',', '.') }} €</td>
+                        <td class="text-right" style="white-space: nowrap;">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
+                        <td class="text-right" style="white-space: nowrap;">{{ number_format($item['price'] / 100, 2, ',', '.') }} €</td>
+                        <td class="text-right" style="white-space: nowrap;">{{ number_format(($item['row_total'] ?? ($item['price'] * ($item['qty'] ?? 1))) / 100, 2, ',', '.') }} €</td>
                     </tr>
                 @else
                     @php $hasDiscounts = true; @endphp
@@ -119,15 +119,15 @@
                                         <br><small style="color: #666;">{{ $item['notes'] }}</small>
                                     @endif
                                 </td>
-                                <td class="text-right">1</td>
-                                <td class="text-right">
+                                <td class="text-right" style="white-space: nowrap;">1</td>
+                                <td class="text-right" style="white-space: nowrap;">
                                     @if($item['type'] === 'discount_fixed')
                                         {{ number_format($item['price'] / 100, 2, ',', '.') }} €
                                     @else
                                         -
                                     @endif
                                 </td>
-                                <td class="text-right" style="color: #2A9D8F;">
+                                <td class="text-right" style="color: #2A9D8F; white-space: nowrap;">
                                     {{ number_format($item['row_total'] / 100, 2, ',', '.') }} €
                                 </td>
                             </tr>

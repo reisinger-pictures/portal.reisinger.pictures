@@ -7,7 +7,7 @@ import RecipientFormSection from './components/RecipientFormSection';
 import ManualDocumentHeader from './components/ManualDocumentHeader';
 import AutocompleteInput from '../components/AutocompleteInput';
 import {InvoiceDiscount, InvoiceItem, Product} from '../../api';
-
+import ShootingCalculatorModal from './components/ShootingCalculatorModal';
 
 export interface DocumentFormData {
     type: string;
@@ -25,14 +25,12 @@ export interface DocumentFormData {
     customer_email: string;
     customer_uid: string;
     terms_html: string;
-
     [key: string]: string;
 }
 
 export interface ManagementManualInvoiceViewProps {
     type?: 'invoice' | 'offer';
 }
-
 
 export default function ManagementManualInvoiceView({type = 'invoice'}: ManagementManualInvoiceViewProps) {
     const {user} = useAuth();
@@ -75,7 +73,6 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
         return iso;
     };
 
-    // Derived State Pattern: Reset Form when URL type changes
     const [prevDocType, setPrevDocType] = useState(docType);
     if (docType !== prevDocType) {
         setPrevDocType(docType);
@@ -97,12 +94,20 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
     const [discounts, setDiscounts] = useState<InvoiceDiscount[]>([]);
     const [isDragging, setIsDragging] = useState(false);
 
+    const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+    const handleAddPackageFromCalculator = (newItem: InvoiceItem, newDiscount: InvoiceDiscount | null) => {
+        setItems(prev => [...prev, newItem]);
+        if (newDiscount) {
+            setDiscounts(prev => [...prev, newDiscount]);
+        }
+    };
+
     if (!user?.is_super_admin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung."/></div>;
 
     const handleUpdateField = (field: string, value: string) => {
         setFormData(p => {
             const next = {...p, [field]: value};
-            // Auto-Sync Date -> Service Date
             if (field === 'date' && !isOffer && !serviceDateDirty) {
                 next.service_date = formatDateToDE(value);
             }
@@ -158,13 +163,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                 price: i.price / 100
             })) || [];
 
-            setItems(loadedItems.length > 0 ? loadedItems : [{
-                type: 'item',
-                description: '',
-                notes: '',
-                qty: 1,
-                price: 0
-            }]);
+            setItems(loadedItems.length > 0 ? loadedItems : [{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
             setDiscounts(loadedDiscounts);
 
             showToast('success', 'Angebotsdaten erfolgreich übernommen!');
@@ -219,14 +218,8 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
         });
     };
 
-    const addDiscount = () => setDiscounts([...discounts, {
-        type: 'discount_fixed',
-        description: '',
-        notes: '',
-        price: 0
-    }]);
+    const addDiscount = () => setDiscounts([...discounts, {type: 'discount_fixed', description: '', notes: '', price: 0}]);
     const removeDiscount = (index: number) => setDiscounts(discounts.filter((_, i) => i !== index));
-
 
     const addItem = () => setItems([...items, {type: 'item', description: '', notes: '', qty: 1, price: 0}]);
     const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
@@ -260,7 +253,10 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                     items: [...items, ...discounts.map(d => ({
                         ...d,
                         qty: 1
-                    }))].map((i: InvoiceItem | InvoiceDiscount) => ({...i, price: Math.round(i.price * 100)}))
+                    }))].map((i: InvoiceItem | InvoiceDiscount) => ({
+                        ...i, 
+                        price: i.type === 'discount_percent' ? Number((i.price * 100).toFixed(4)) : Math.round(i.price * 100)
+                    }))
                 })
             });
             if (!res.ok) {
@@ -353,9 +349,15 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                 <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                     <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
                         <h2 className="font-bold text-xl text-primary">Leistungen / Positionen</h2>
-                        <button type="button" onClick={addItem} className="btn btn-sm btn-outline btn-primary">+
-                            Leistung hinzufügen
-                        </button>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => setIsCalculatorOpen(true)}
+                                    className="btn btn-sm btn-outline btn-secondary">
+                                <span className="iconify mdi--calculator"></span> Paket-Kalkulator
+                            </button>
+                            <button type="button" onClick={addItem} className="btn btn-sm btn-outline btn-primary">+
+                                Leistung hinzufügen
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-4">
@@ -426,7 +428,6 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                         ))}
                     </div>
 
-                    {/* Discounts Section */}
                     <div className="mt-6 border-t border-base-300 pt-6">
                         <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
                             <h2 className="font-bold text-xl text-primary">Rabatte & Abzüge</h2>
@@ -512,6 +513,12 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                     </button>
                 </div>
             </form>
+
+            <ShootingCalculatorModal
+                isOpen={isCalculatorOpen}
+                onClose={() => setIsCalculatorOpen(false)}
+                onAddPackage={handleAddPackageFromCalculator}
+            />
         </div>
     );
 }

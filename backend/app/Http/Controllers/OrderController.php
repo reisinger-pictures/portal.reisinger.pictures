@@ -163,7 +163,7 @@ class OrderController extends Controller
             'items.*.type' => 'required|string|in:item,discount_fixed,discount_percent',
             'items.*.description' => 'required|string',
             'items.*.notes' => 'nullable|string',
-            'items.*.price' => 'required|integer',
+            'items.*.price' => 'required|numeric',
             'items.*.qty' => 'required|numeric|min:0.01',
             'terms_html' => 'nullable|string'
         ]);

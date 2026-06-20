@@ -139,4 +139,34 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await expect(editor).toContainText(`Magic${uniqueSuffix}Content`);
     });
 
+    test('Super Admin can use the Shooting Package Calculator with 50% OG discount', async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        await sidebar.navigateTo('Manuelles Angebot');
+        
+        // Kalkulator Modal öffnen
+        await page.locator('button:has-text("Paket-Kalkulator")').click();
+        const calcModal = page.locator('.modal-open');
+        await expect(calcModal).toBeVisible();
+
+        // Werte eintragen (60 Min, 6 Bilder = 50 + 100 + 100 = 250€)
+        await calcModal.locator('input[type="number"]').nth(0).fill('60');
+        await calcModal.locator('input[type="number"]').nth(1).fill('6');
+        
+        // 50% OG Rabatt auswählen
+        await calcModal.locator('select').selectOption('50');
+        
+        // Berechnen & Hinzufügen klicken
+        await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();
+        await expect(calcModal).toBeHidden();
+
+        // Validierung in der Haupt-Tabelle
+        // Leistungsposten prüfen (250.00 €)
+        await expect(page.locator('table').first()).toContainText('Individuelles Shooting-Paket');
+        
+        // Gesamtsumme prüfen (250€ - 50% = 125€)
+        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('125.00 €');
     });
+});

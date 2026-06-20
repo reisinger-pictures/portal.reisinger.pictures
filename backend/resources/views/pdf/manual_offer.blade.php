@@ -34,9 +34,15 @@
             @foreach($items as $item)
             <tr>
                 <td><strong>{{ $item['filename'] }}</strong>@if(!empty($item['notes']))<br><small>{{ $item['notes'] }}</small>@endif</td>
-                <td class="text-right">{{ number_format($item['qty'], 2, ',', '.') }}</td>
-                <td class="text-right">{{ number_format($item['price'] / 100, 2, ',', '.') }} €</td>
-                <td class="text-right">{{ number_format($item['row_total'] / 100, 2, ',', '.') }} €</td>
+                <td class="text-right" style="white-space: nowrap;">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
+                <td class="text-right" style="white-space: nowrap;">
+                    @if(isset($item['type']) && $item['type'] === 'discount_percent')
+                        {{ rtrim(rtrim(number_format($item['price'] / 100, 4, ',', '.'), '0'), ',') }} %
+                    @else
+                        {{ number_format($item['price'] / 100, 2, ',', '.') }} €
+                    @endif
+                </td>
+                <td class="text-right" style="white-space: nowrap;">{{ number_format($item['row_total'] / 100, 2, ',', '.') }} €</td>
             </tr>
             @endforeach
             <tr class="total-row">
