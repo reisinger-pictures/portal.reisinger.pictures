@@ -5,10 +5,10 @@ export type TerritoryTier = 'national' | 'international';
 
 const RES_RANKS: Record<string, number> = { 'none': 0, 'web': 1, 'print': 2, 'original': 3 };
 
-export function usePricing(terms: Record<string, string> | undefined | null) {
+export function usePricing(terms: Record<string, string | undefined> | undefined | null) {
     const getRequiredTerm = (key: string): number => {
         if (!terms) return 0; // Warten, bis SWR geladen hat
-        const val = parseInt(terms[key], 10);
+        const val = parseInt(terms[key] || '', 10);
         if (isNaN(val)) {
             throw new Error(`Kritischer Systemfehler: Preisfaktor '${key}' fehlt in der Datenbank. Bitte Administrator kontaktieren!`);
         }
