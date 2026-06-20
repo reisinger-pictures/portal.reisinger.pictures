@@ -1,16 +1,24 @@
 import useSWR from 'swr';
-import { fetcher, apiMutate } from '../api';
+import {apiMutate, fetcher} from '../api';
 
 export interface LicenseTerms {
-    [key: string]: string;
+    calc_base_price?: string;
+    calc_hourly_rate?: string;
+    calc_images_per_hour?: string;
+
+    [key: string]: string | undefined;
 }
 
 export interface LicenseTermsPayload {
-    [key: string]: string | number;
+    calc_base_price?: string | number;
+    calc_hourly_rate?: string | number;
+    calc_images_per_hour?: string | number;
+
+    [key: string]: string | number | undefined;
 }
 
 export function useLicenseTerms() {
-    const { data, isLoading, mutate } = useSWR<LicenseTerms>('/api/settings/license-terms', fetcher, {
+    const {data, isLoading, mutate} = useSWR<LicenseTerms>('/api/settings/license-terms', fetcher, {
         revalidateOnFocus: false
     });
 
@@ -19,5 +27,5 @@ export function useLicenseTerms() {
         await mutate();
     };
 
-    return { terms: data, isLoading, updateTerms };
+    return {terms: data, isLoading, updateTerms};
 }
