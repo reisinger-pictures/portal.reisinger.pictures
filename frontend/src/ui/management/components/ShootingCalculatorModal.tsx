@@ -49,7 +49,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     };
 
     // --- Live Calculation (Derived State) ---
-    const basePrice = 50;
+    const basePrice = parseFloat(terms?.calc_base_price || '50');
     const hourlyRate = parseFloat(terms?.calc_hourly_rate || '100');
     const imagesPerHourPackage = parseInt(terms?.calc_images_per_hour || '6', 10);
     const durationHours = calcDuration / 60;

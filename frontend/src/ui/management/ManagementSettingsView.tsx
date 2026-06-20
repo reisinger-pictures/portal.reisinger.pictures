@@ -5,6 +5,77 @@ import {fetcher, SystemInfo} from '../../api';
 import {useLicenseTerms} from '../../logic/useLicenseTerms';
 import {useAuth} from '../../logic/useAuth';
 
+import {useEffect, useState} from 'react';
+import {useUI} from '../components/UIContext';
+
+function CalculatorSettingsCard() {
+    const {terms, updateTerms} = useLicenseTerms();
+    const {showToast} = useUI();
+    const [basePrice, setBasePrice] = useState('50');
+    const [hourlyRate, setHourlyRate] = useState('100');
+    const [imagesPerHour, setImagesPerHour] = useState('6');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (terms) {
+            setBasePrice(terms.calc_base_price || '50');
+            setHourlyRate(terms.calc_hourly_rate || '100');
+            setImagesPerHour(terms.calc_images_per_hour || '6');
+        }
+    }, [terms]);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await updateTerms({
+                calc_base_price: basePrice,
+                calc_hourly_rate: hourlyRate,
+                calc_images_per_hour: imagesPerHour
+            });
+            showToast('success', 'Kalkulator-Einstellungen gespeichert.');
+        } catch {
+            showToast('error', 'Fehler beim Speichern.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="card bg-base-100 border border-base-300 shadow-sm">
+            <div className="card-body p-6 md:p-8">
+                <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
+                    <span className="iconify mdi--calculator text-primary text-3xl"></span> Shooting-Paket Kalkulator
+                </h2>
+                <p className="text-sm opacity-70 mb-6">Definiere die Standardwerte für den automatischen Paket-Rechner
+                    in den manuellen Angeboten und Rechnungen.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="form-control">
+                        <label className="label"><span className="label-text font-bold">Grundpreis (€) *</span></label>
+                        <input type="number" step="any" min="0" className="input input-bordered" value={basePrice}
+                               onChange={e => setBasePrice(e.target.value)}/>
+                    </div>
+                    <div className="form-control">
+                        <label className="label"><span className="label-text font-bold">Stundensatz (€) *</span></label>
+                        <input type="number" step="any" min="0" className="input input-bordered" value={hourlyRate}
+                               onChange={e => setHourlyRate(e.target.value)}/>
+                    </div>
+                    <div className="form-control">
+                        <label className="label"><span
+                            className="label-text font-bold">Bearbeitung Bilder pro Stunde *</span></label>
+                        <input type="number" min="1" className="input input-bordered" value={imagesPerHour}
+                               onChange={e => setImagesPerHour(e.target.value)}/>
+                    </div>
+                </div>
+                <div className="mt-6 border-t border-base-300 pt-6">
+                    <button onClick={handleSave} disabled={isSaving} className="btn btn-primary px-8">
+                        {isSaving ? <span className="loading loading-spinner"></span> : 'Einstellungen anwenden'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 declare const __APP_BUILD_TIME__: string;
 
 
@@ -123,24 +194,7 @@ export default function ManagementSettingsView() {
             </div>
             <WatermarkSettingsCard/>
 
-            <div className="card bg-base-200 border border-base-300">
-                <div className="card-body">
-                    <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-                        <span className="iconify mdi--calculator text-primary text-3xl"></span> Shooting-Paket Kalkulator
-                    </h2>
-                    <p className="text-sm opacity-70 mb-6">Definiere die Standardwerte für den automatischen Paket-Rechner in den manuellen Angeboten und Rechnungen.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Stundensatz (Netto in €)</span></label>
-                            <input type="number" step="any" className="input input-bordered" placeholder="100" value={licenseTerms?.calc_hourly_rate || ''} onChange={e => updateTerms({calc_hourly_rate: e.target.value})}/>
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Bilder pro Stunde (Inkludiert)</span></label>
-                            <input type="number" className="input input-bordered" placeholder="6" value={licenseTerms?.calc_images_per_hour || ''} onChange={e => updateTerms({calc_images_per_hour: e.target.value})}/>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <CalculatorSettingsCard/>
 
             <div className="mt-8 pt-8 border-t border-base-300">
                 <div
