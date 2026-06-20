@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {InvoiceDiscount, InvoiceItem} from '../../../api';
+import { useLicenseTerms } from '../../../logic/useLicenseTerms';
 
 // Definiere den exakten Typen für deine Rabatte
 type DiscountOption = '0' | '33' | '50';
@@ -32,6 +33,7 @@ function roundToPsychologicalValue(value: number): number {
 }
 
 export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}: ShootingCalculatorModalProps) {
+    const { terms } = useLicenseTerms();
     const [calcDuration, setCalcDuration] = useState<number>(90);
     const [calcImages, setCalcImages] = useState<number>(15);
     const [calcIsFlatrate, setCalcIsFlatrate] = useState<boolean>(false);
@@ -48,8 +50,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
 
     // --- Live Calculation (Derived State) ---
     const basePrice = 50;
-    const hourlyRate = 100;
-    const imagesPerHourPackage = 6;
+    const hourlyRate = parseFloat(terms?.calc_hourly_rate || '100');
+    const imagesPerHourPackage = parseInt(terms?.calc_images_per_hour || '6', 10);
     const durationHours = calcDuration / 60;
     const timePrice = durationHours * hourlyRate;
     const imagesPrice = (hourlyRate / imagesPerHourPackage) * calcImages;

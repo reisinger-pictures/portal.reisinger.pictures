@@ -123,6 +123,25 @@ export default function ManagementSettingsView() {
             </div>
             <WatermarkSettingsCard/>
 
+            <div className="card bg-base-200 border border-base-300">
+                <div className="card-body">
+                    <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
+                        <span className="iconify mdi--calculator text-primary text-3xl"></span> Shooting-Paket Kalkulator
+                    </h2>
+                    <p className="text-sm opacity-70 mb-6">Definiere die Standardwerte für den automatischen Paket-Rechner in den manuellen Angeboten und Rechnungen.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">Stundensatz (Netto in €)</span></label>
+                            <input type="number" step="any" className="input input-bordered" placeholder="100" value={licenseTerms?.calc_hourly_rate || ''} onChange={e => updateTerms({calc_hourly_rate: e.target.value})}/>
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">Bilder pro Stunde (Inkludiert)</span></label>
+                            <input type="number" className="input input-bordered" placeholder="6" value={licenseTerms?.calc_images_per_hour || ''} onChange={e => updateTerms({calc_images_per_hour: e.target.value})}/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="mt-8 pt-8 border-t border-base-300">
                 <div
                     className="text-sm opacity-60 font-mono bg-base-200 p-4 rounded-box border border-base-300 shadow-sm leading-relaxed">

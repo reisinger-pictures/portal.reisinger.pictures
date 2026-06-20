@@ -8,6 +8,8 @@ import { z } from 'zod';
 
 const licenseSettingsSchema = z.object({
     base_price: z.number().min(0, "Muss positiv sein"),
+    calc_hourly_rate: z.number().min(0),
+    calc_images_per_hour: z.number().min(1),
     mult_commercial: z.number().min(0),
     mult_international: z.number().min(0),
     mult_unlimited: z.number().min(0),
@@ -35,6 +37,8 @@ export default function LicenseSettingsCard() {
         resolver: zodResolver(licenseSettingsSchema),
         defaultValues: {
             base_price: 35.00,
+            calc_hourly_rate: 100,
+            calc_images_per_hour: 6,
             mult_commercial: 100,
             mult_international: 50,
             mult_unlimited: 50,
@@ -57,6 +61,8 @@ export default function LicenseSettingsCard() {
         if (terms) {
             reset({
                 base_price: parseInt(terms.base_price || '3500', 10) / 100,
+                calc_hourly_rate: parseFloat(terms.calc_hourly_rate || '100'),
+                calc_images_per_hour: parseInt(terms.calc_images_per_hour || '6', 10),
                 term_editorial: terms.editorial || '',
                 term_commercial: terms.commercial || '',
                 term_1_year: terms['1_year'] || '',
@@ -152,6 +158,16 @@ export default function LicenseSettingsCard() {
                         <div className="form-control md:col-span-2">
                             <label className="label"><span className="label-text font-bold">Aufschlag: Weltweit</span></label>
                             <label className="input input-bordered flex items-center gap-2"><input type="number" {...register('mult_international', { valueAsNumber: true })} className="grow"/><span>%</span></label>
+                        </div>
+
+                        <div className="col-span-full font-bold border-b border-base-300 pb-2 mt-4 text-primary">Shooting-Paket Kalkulator</div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">Stundensatz (Netto in €)</span></label>
+                            <label className="input input-bordered flex items-center gap-2"><input type="number" step="any" {...register('calc_hourly_rate', { valueAsNumber: true })} className="grow"/><span>€</span></label>
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">Bilder pro Stunde (Inkludiert)</span></label>
+                            <input type="number" {...register('calc_images_per_hour', { valueAsNumber: true })} className="input input-bordered w-full"/>
                         </div>
                     </div>
 

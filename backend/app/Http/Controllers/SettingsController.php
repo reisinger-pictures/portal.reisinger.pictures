@@ -113,6 +113,8 @@ class SettingsController extends Controller
             'print' => Setting::where('key', 'term_print')->value('value') ?? 'Hohe Auflösung für den Druck.',
             'original' => Setting::where('key', 'term_original')->value('value') ?? 'Maximale Originalauflösung.',
             'base_price' => Setting::where('key', 'base_price')->value('value') ?? '35.00',
+            'calc_hourly_rate' => Setting::where('key', 'calc_hourly_rate')->value('value') ?? '100',
+            'calc_images_per_hour' => Setting::where('key', 'calc_images_per_hour')->value('value') ?? '6',
             'bank_iban' => Setting::where('key', 'bank_iban')->value('value') ?? '',
             'bank_bic' => Setting::where('key', 'bank_bic')->value('value') ?? '',
             'bank_holder' => Setting::where('key', 'bank_holder')->value('value') ?? '',
@@ -128,6 +130,8 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'base_price' => 'nullable|integer|min:500',
+            'calc_hourly_rate' => 'nullable|numeric|min:0',
+            'calc_images_per_hour' => 'nullable|numeric|min:1',
             'term_editorial' => 'nullable|string',
             'term_commercial' => 'nullable|string',
             'term_1_year' => 'nullable|string',
