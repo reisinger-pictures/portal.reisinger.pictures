@@ -20,6 +20,7 @@ This directory serves as the single source of truth for all technical concepts, 
 * [04-crm-and-contracts.md](ecommerce/04-crm-and-contracts.md) - CRM, Text Snippets and PDF Contracts.
 * [05-manual-invoices.md](ecommerce/05-manual-invoices.md) - Stateless PDF generation for B2B.
 * [06-legal-evidence-and-disputes.md](ecommerce/06-legal-evidence-and-disputes.md) - Dispute protection and access locking.
+* [07-psychological-pricing.md](ecommerce/07-psychological-pricing.md) - Psychological price rounding (intentionally inexact discounts) — desired-behavior invariant.
 
 ### 🖼️ Gallery Management
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.
@@ -46,4 +47,3 @@ This directory serves as the single source of truth for all technical concepts, 
 * [05-testing-guidelines.md](tech/05-testing-guidelines.md) - Strict UI-first testing rules.
 * [06-post-mortem-gallery-bugs.md](tech/06-post-mortem-gallery-bugs.md) - Bug tracking and prevention.
 * [07-security-and-perf-refinement.md](tech/07-security-and-perf-refinement.md) - Security and performance hardening.
-* [08-testing-initiative.md](tech/08-testing-initiative.md) - Test- & quality-initiative: package-based unit/E2E test expansion + review workflow.

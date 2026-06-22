@@ -1,58 +1,29 @@
-import { useState, useEffect, ReactNode } from 'react';
-import { CartItem, CartContext } from './CartContext';
-import { useAuth } from './useAuth';
-import { useUI } from '../ui/components/UIContext';
-import { z } from 'zod';
-
-const cartItemSchema = z.object({
-    photoId: z.string(),
-    filename: z.string().optional(),
-    thumb_url: z.string().optional(),
-    tier: z.enum(['web', 'print', 'original']),
-    useCaseId: z.string().optional(),
-    useCaseName: z.string().optional(),
-    modifierIds: z.array(z.string()).optional(),
-    modifierNames: z.array(z.string()).optional(),
-    isQuote: z.boolean().optional(),
-    notes: z.string().optional(),
-    price: z.number()
-});
-
-const cartSchema = z.array(cartItemSchema);
+import {useState, useEffect, ReactNode} from 'react';
+import {CartItem, CartContext} from './CartContext';
+import {useAuth} from './useAuth';
+import {useUI} from '../ui/components/UIContext';
+import {addToCartPure, removeFromCartPure, calculateTotalAmount, loadCartItems} from './cartLogic';
 
 export interface CartProviderProps {
     children: ReactNode;
 }
 
-export function CartProvider({ children }: CartProviderProps) {
-    const { user } = useAuth();
-    const { showToast } = useUI();
+export function CartProvider({children}: CartProviderProps) {
+    const {user} = useAuth();
+    const {showToast} = useUI();
     const cartKey = `rp_cart_${user?.id || 'guest'}`;
 
     const [items, setItems] = useState<CartItem[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // Initiale Lade-Logik & Re-Load bei User-Wechsel mit Zod-Validierung
+    // Initiale Lade-Logik & Re-Load bei User-Wechsel mit Zod-Validierung (reine Logik in cartLogic.ts)
     useEffect(() => {
         queueMicrotask(() => setIsLoaded(false));
-        try {
-            const saved = localStorage.getItem(cartKey);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                const validation = cartSchema.safeParse(parsed);
-                if (validation.success) {
-                    queueMicrotask(() => setItems(validation.data));
-                } else {
-                    console.warn('LocalStorage Cart Mismatch:', validation.error);
-                    queueMicrotask(() => setItems([]));
-                }
-            } else {
-                queueMicrotask(() => setItems([]));
-            }
-        } catch {
+        const result = loadCartItems(localStorage.getItem(cartKey));
+        if (result.error === 'invalid-json') {
             showToast('error', 'Warenkorb konnte nicht geladen werden.');
-            queueMicrotask(() => setItems([]));
         }
+        queueMicrotask(() => setItems(result.items));
         queueMicrotask(() => setIsLoaded(true));
     }, [cartKey, showToast]);
 
@@ -69,26 +40,20 @@ export function CartProvider({ children }: CartProviderProps) {
     }, [items, cartKey, showToast, isLoaded]);
 
     const addToCart = (item: CartItem) => {
-        setItems(prev => {
-            const existing = prev.find(i => i.photoId === item.photoId);
-            if (existing) {
-                return prev.map(i => i.photoId === item.photoId ? item : i);
-            }
-            return [...prev, item];
-        });
+        setItems(prev => addToCartPure(prev, item));
     };
 
     const removeFromCart = (photoId: string) => {
-        setItems(prev => prev.filter(i => i.photoId !== photoId));
+        setItems(prev => removeFromCartPure(prev, photoId));
     };
 
     const clearCart = () => setItems([]);
 
-    const totalAmount = items.reduce((sum, item) => sum + (item.isQuote ? 0 : item.price), 0);
+    const totalAmount = calculateTotalAmount(items);
     const itemCount = items.length;
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, clearCart, totalAmount, itemCount }}>
+        <CartContext.Provider value={{items, addToCart, removeFromCart, clearCart, totalAmount, itemCount}}>
             {children}
         </CartContext.Provider>
     );

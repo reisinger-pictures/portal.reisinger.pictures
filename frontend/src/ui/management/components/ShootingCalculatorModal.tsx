@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {InvoiceDiscount, InvoiceItem} from '../../../api';
 import { useLicenseTerms } from '../../../logic/useLicenseTerms';
+import {calculateShootingPrice} from '../../../logic/shootingCalculator';
 
 // Definiere den exakten Typen für deine Rabatte
 type DiscountOption = '0' | '33' | '50';
@@ -9,27 +10,6 @@ interface ShootingCalculatorModalProps {
     isOpen: boolean;
     onClose: () => void;
     onAddPackage: (item: InvoiceItem, discount: InvoiceDiscount | null) => void;
-}
-
-/**
- * Berechnet den "psychologischen" Preis.
- * Rundet auf den nächsten 5er. Wenn das Ergebnis auf 0 endet (z.B. 100, 20),
- * wird 1 abgezogen (z.B. 99, 19). Bei Werten unter 12 Euro wird normal auf ganze Euros gerundet.
- */
-function roundToPsychologicalValue(value: number): number {
-    if (value < 12) {
-        return Math.max(1, Math.round(value));
-    }
-    let rounded;
-    if (value >= 1000) {
-        rounded = Math.round(value / 50) * 50;
-    } else {
-        rounded = Math.round(value / 5) * 5;
-    }
-    if (rounded !== 0 && (rounded % 10 === 0 || (value >= 1000 && rounded % 50 === 0))) {
-        rounded -= 1;
-    }
-    return rounded;
 }
 
 export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}: ShootingCalculatorModalProps) {
@@ -48,32 +28,16 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
         }
     };
 
-    // --- Live Calculation (Derived State) ---
-    const basePrice = parseFloat(terms?.calc_base_price || '50');
-    const hourlyRate = parseFloat(terms?.calc_hourly_rate || '100');
-    const imagesPerHourPackage = parseInt(terms?.calc_images_per_hour || '6', 10);
-    const durationHours = calcDuration / 60;
-    const timePrice = durationHours * hourlyRate;
-    const imagesPrice = (hourlyRate / imagesPerHourPackage) * calcImages;
-
-    const multiplier = calcIsFlatrate ? 1.2 : 1;
-    const rawTotal = (basePrice + timePrice + imagesPrice) * multiplier;
-    
-    // Listenpreis psychologisch runden
-    const packagePriceEuro = roundToPsychologicalValue(rawTotal);
-
-    let currentDiscountPercent = 0;
-    if (calcDiscount === '33') currentDiscountPercent = 100 / 3;
-    else if (calcDiscount === '50') currentDiscountPercent = 50;
-
-    const rawFinalPrice = packagePriceEuro - (packagePriceEuro * (currentDiscountPercent / 100));
-    
-    // Finalen Preis nach Rabatt ebenfalls psychologisch runden
-    const finalPriceEuro = calcDiscount !== '0' ? roundToPsychologicalValue(rawFinalPrice) : packagePriceEuro;
-    
-    // Absolute Euro-Differenz berechnen (damit es auf der Rechnung glatt aufgeht)
-    const discountAbsolute = packagePriceEuro - finalPriceEuro;
-    // -----------------------------------------
+    // --- Live Calculation (Derived State) — reine Logik in shootingCalculator.ts ---
+    const {packagePrice: packagePriceEuro, finalPrice: finalPriceEuro, discountAbsolute} = calculateShootingPrice({
+        calc_base_price: terms?.calc_base_price,
+        calc_hourly_rate: terms?.calc_hourly_rate,
+        calc_images_per_hour: terms?.calc_images_per_hour,
+        duration: calcDuration,
+        images: calcImages,
+        flatrate: calcIsFlatrate,
+        discount: calcDiscount,
+    });
 
     const handleCalculate = () => {
         const newItem: InvoiceItem = {

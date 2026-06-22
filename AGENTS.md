@@ -22,8 +22,7 @@
   * **Safe Patching Policy (CRITICAL):** Alle `patch.mjs` Scripts MÜSSEN den Erfolg einer Ersetzung validieren. Prüfe zwingend mit `.includes()` oder `.indexOf()`, ob der Zielstring existiert, *bevor* du `.replace()` aufrufst. Prüfe danach, ob sich der `content` tatsächlich verändert hat. Brich mit einer klaren `console.error` ab, falls der Patch ins Leere läuft. Blinde `.replace()` Aufrufe sind untersagt!
 
 ## 3. AI Agent Roles & Responsibilities
-The system and workflow are managed via three strictly separated agent roles:
-* **Planner:** Analyzes the problem, designs the architecture/solution, documents the requirements in the `features/` folder, and creates tasks in `AGENTS.todo.md`.
-* **Maker:** Reads the planning and strictly implements the changes in code (e.g., generates `patch.mjs` scripts). The Maker must **never** independently remove items from `AGENTS.todo.md`. Also update the documents in the `features/` folder and add tasks in `AGENTS.todo.md` as needed. 
-* **Checker:** Verifies the Maker's changes against the Definition of Done (DoD) and runs tests. Neue Überprüfungsregel für die Backlog-Pflege: Abgehakte und vollständig umgesetzte TODOs löschen, abgehakte aber unvollständige TODOs präzisieren (wieder als offen [ ] markieren), offene und nicht umgesetzte TODOs unverändert lassen.
+The system and workflow are managed via a Main/Secondary Model architecture to prevent context pollution:
+* **Main Model (Planner & Reviewer):** Has the full project context. Analyzes the problem, designs the architecture, updates documentation, and reviews implementations. Delegates isolated coding tasks to the Secondary Model by providing only the necessary files and specific instructions.
+* **Secondary Model (Implementer):** Runs in a fresh, isolated context. Receives specific instructions and target files from the Main Model, implements the changes, and generates the patch script.
 * **Testing Execution Rule (STRICT):** Nie Playwright direkt aufrufen (z.B. `npx playwright test`), sondern immer zwingend via `node ai_test_runner.mjs`! Dies stellt sicher, dass Fehler-Reports für die Analyse generiert werden.

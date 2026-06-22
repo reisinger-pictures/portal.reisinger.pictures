@@ -12,9 +12,10 @@ e.g. `.claude/plans/`), which is invisible to other sessions and to the user.
 - **Detailed specs (SOLL-ZUSTAND):** `features/<area>/<NN-topic>.md` with YAML frontmatter (`domain`, `topic`,
   `status`). This is the single source of truth — see `features/README.md` and `AGENTS.md` §1 (Golden Rule: Features
   First: document target state here *before* implementing).
-- **Test & quality initiative:** full spec at `features/tech/08-testing-initiative.md`; actionable package TODOs
-  mirrored in `AGENTS.todo.md`. Follow its per-package workflow: spec → implement (cheap model) → review (expensive
-  model) → fix. Respect `features/tech/05-testing-guidelines.md`.
+- **Test-Initiative (abgeschlossen):** alle Pakete umgesetzt — Backend PHPUnit (`tests/Feature/` + `tests/Unit/`),
+  Frontend Vitest (`src/logic/__tests__/`), Playwright E2E (`tests/e2e/`). Verbleibende Arbeit = die einzeln
+  angehbaren **REVIEW-Aufgaben (`R-NN`)** in `AGENTS.todo.md` (gefundene Bugs/Kanten, gruppiert nach Schwere).
+  Verbindliche Test-Regeln in `features/tech/05-testing-guidelines.md`.
 
 ## Project Overview
 
@@ -170,16 +171,20 @@ Key services in `backend/app/Services/`:
 
 **Backend (PHPUnit):**
 
-- Located in `backend/tests/Feature/`
-- Uses test database on port 3307
-- Test Meilisearch on port 7701
-- Test mail server on port 1026
+- `backend/tests/Feature/` (DB-abhängig, Default) + `backend/tests/Unit/` (DB-/framework-frei, z. B. reine Berechnungen)
+- Test-DB port 3307, Test-Meilisearch port 7701, Test-Mail (Mailpit) port 1026
+- Vorbild-Tests: `StatsCalculationServiceTest.php`, `PayoutShareMultiplierTest.php`
 
-**Frontend (Playwright):**
+**Frontend (Vitest — Unit, reine Logik):**
 
-- Located in `frontend/tests/e2e/`
-- Organized by role: `auth/`, `admin/`, `photographer/`, `client/`, `delivery/`, `selection/`
-- Helpers in `frontend/tests/e2e/helpers/`
+- Located in `frontend/src/logic/__tests__/` (`environment: node`, kein DOM, keine `@testing-library`)
+- Testet extrahierte Pure-Logik: `pricingLogic.ts`, `cartLogic.ts`, `shootingCalculator.ts`, `utils.ts`
+
+**Frontend (Playwright — E2E):**
+
+- Located in `frontend/tests/e2e/`, organized by role: `auth/`, `admin/`, `photographer/`, `client/`, `delivery/`, `selection/`, `guest/`
+- Helpers in `frontend/tests/e2e/helpers/` (POM/DRY — `E2ESessionHelper`, `AuthHelper`, …)
+- Projects: Desktop Chrome + Mobile Chrome (beide laufen für jede Spec)
 
 ## Important Concepts
 
@@ -271,3 +276,50 @@ pnpm run test:e2e -- tests/e2e/path/to/test.spec.ts       # Playwright E2E
   Vorab-Freigabe kann an einen fortgesetzten Subagenten weitergereicht werden — Default bleibt die
   Haupt-Agent-Ausführung.
 - **Hintergrund-Subagenten** dürfen nicht stumm am Permission-Gate blockieren — der Haupt-Agent hält die Loop aktiv.
+
+## Test-Paket-Workflow (bewährter Prozess)
+
+Wiederverwendbarer Prozess für systematische Test-Arbeit (Spec → Implement → Review → Fix). Backlog in
+`AGENTS.todo.md` (Review-Aufgaben `R-NN`), Specs/SOLL-ZUSTAND in `features/`, Test-Regelwerk in
+`features/tech/05-testing-guidelines.md`. **Pro Batch ein Freigabe-Loop:**
+
+1. **Aufgaben ermitteln.** Haupt-Agent liest `AGENTS.todo.md`, wählt die nächsten offenen Aufgaben (Abhängige zuerst).
+2. **Subagenten parallel starten („interne Absprache").** Pro Paket ein Subagent (`general-purpose`) mit
+   **selbst-contained Prompt**: vollständige Spec, das jeweilige Pattern aus `features/tech/05-testing-guidelines.md`,
+   Liste der zu lesenden Dateien (Target-Model/Service + abhängige Models + Factories + Vorbild-Test, z. B.
+   `StatsCalculationServiceTest.php`) und **strikter Anweisung: nur fertigen Test-Code als Text zurückliefern —
+   NICHTS schreiben, NICHTS ausführen** (Main Agent führt nach Freigabe selbst aus).
+3. **Bündeln.** Haupt-Agent sammelt die Ergebnisse (Datei, Testzahl, geplante Aktionen, REVIEW-Marker) und reicht
+   sie **als kompakte Tabelle sichtbar** an den Nutzer weiter (Freigabe via `AskUserQuestion`).
+4. **Ausführen (nach Freigabe).** Haupt-Agent schreibt alle Test-Dateien selbst, legt ggf. Verzeichnisse an
+   (z. B. `tests/Unit/`).
+5. **Test-Run + Fix-Loop.** Haupt-Agent führt die Suite aus (Backend `~/.config/herd/bin/php.bat ./vendor/bin/phpunit
+   <dateien>`, Frontend `pnpm exec vitest run <datei>` / `pnpm exec playwright test <spec>`). Bei Fehlern liest er
+   die fehlerverursachende Logik und **korrigiert die Test-Annahmen** (Tests frieren das **aktuelle** Verhalten ein
+   — auch Bugs; Bugs werden als `R-NN` in `AGENTS.todo.md` markiert, nie „passend gemacht"), bis die neuen Dateien
+   grün sind.
+6. **Verifikation.** Haupt-Agent läuft die **Gesamt-Suite** (keine Regression: Backend phpunit, Frontend `vitest run`
+   + `build` + `lint:fix` + betroffene E2E) und dokumentiert das Ergebnis.
+
+**Laufumgebung:** Test-DB (3307), Test-Meili (7701), Test-Mail (1026) werden als **laufend angenommen** — nicht nach
+Docker suchen, direkt Tests laufen.
+
+**Lessons Learned (Fix-Loop-Fallstricke):**
+
+- **PHPUnit 12:** Data-Provider als `#[\PHPUnit\Framework\Attributes\DataProvider('name')]`-**Attribut**, nicht als
+  `@dataProvider`-Annotation (Annotationen sind entfernt).
+- **DB NOT-NULL-Constraints + Timestamp-Trait:** „null"-Code-Pfade (`gallery_id`, `flatrate_level`, `created_at`
+  etc.) sind über die echte DB oft **nicht erreichbar** — stattdessen `$model->setRelation('relation', null)`,
+  Speicher-Zuweisung ohne `save()`, oder Query-Builder-`update()` für `created_at` nutzen. Im Test kommentieren.
+- **Auth-abhängige Model-Logik** (`requiresWatermark` etc.): `$this->actingAs($user, 'api')` mit Guard `api`.
+- **Prozessglobale Caches** (`unrestricted_photographer_gallery_ids`, `gallery_tree_admin`, `watermark_version`):
+  in `setUp()` via `Cache::flush()` (oder gezieltem `forget`) zwischen Tests resetten.
+- **Geld = Cents (Integer)** konsequent; Rundung exakt gegen Service-Logik (`round`, `floor` via `bcdiv` scale 0).
+- **REVIEW-Marker** als Test-Name-Suffix `_review` + PHPDoc-Kommentar **und** Eintrag als `R-NN` in
+  `AGENTS.todo.md`; dokumentierte Bugs nie „grün" frickeln.
+- **Gewünschtes Verhalten nachschlagen (Features-First, verbindlich):** Scheinbar fehlerhaftes Verhalten ist oft
+  **gewünscht** (z. B. psychologische Preis-Rundung: angezeigte `-50 %`/`-33 %` Rabatte sind bewusst mathematisch
+  ungenau — siehe `features/ecommerce/07-psychological-pricing.md`). **Vor** jedem „Bug-Fix" / „passend-Machen"
+  **zuerst in `features/` nachschlagen** — dort dokumentierte Invarianten sind absichtlich und dürfen **nicht**
+  „korrigiert" werden. Tests frieren das echte Verhalten ein und verweisen per Kommentar auf das Feature-Doc
+  (kein Bug-REVIEW für dokumentiert-gewünschtes Verhalten). Gilt analog für jede Domäne, nicht nur Pricing.

@@ -2,21 +2,21 @@
 
 namespace App\Services;
 
-use Symfony\Component\Process\Process;
 use App\Models\Gallery;
+use Symfony\Component\Process\Process;
 
 class PhotoProcessingService
 {
     /**
      * Extrahiert Metadaten via ExifTool und wendet Galerie-Vorgaben an.
-     * Hinweis: Thumbnail-Generierung wurde hier entfernt, da diese nun 
+     * Hinweis: Thumbnail-Generierung wurde hier entfernt, da diese nun
      * Lazy (on-the-fly) über den FileDeliveryController passiert.
      */
     public function processImage(string $targetPath, string $thumbPath, Gallery $gallery): array
     {
         $size = @getimagesize($targetPath);
-        $width = $size ? (int) $size[0] : 0;
-        $height = $size ? (int) $size[1] : 0;
+        $width = $size ? (int)$size[0] : 0;
+        $height = $size ? (int)$size[1] : 0;
 
         $applyDefaults = $gallery->type !== 'selection' && $gallery->apply_metadata_to_photos;
 
@@ -39,21 +39,16 @@ class PhotoProcessingService
             return $meta;
         }
 
-        // Metadaten via Exiftool auslesen
-        $process = new Process([
-            'exiftool', '-json', '-Title', '-ObjectName', '-XPTitle', 
-            '-ImageDescription', '-Caption-Abstract', '-Keywords', '-Sub-location', '-City', '-Province-State', 
-            '-Country-PrimaryLocationName', '-Country-PrimaryLocationCode', '-DateTimeOriginal', '-CreateDate',
-            $targetPath
-        ]);
-        $process->run();
-        $metaData = json_decode($process->getOutput(), true);
-        
+        // Metadaten via ExifTool auslesen. runExifTool ist als protected-Methode
+        // extrahiert, damit der externe Binary-Aufruf (exiftool) in Tests stumm
+        // geschaltet werden kann, ohne das echte Binary aufzurufen.
+        $metaData = $this->runExifTool($targetPath);
+
         if (is_array($metaData) && isset($metaData[0])) {
             $m = $metaData[0];
             $meta['title'] = $m['Title'] ?? $m['ObjectName'] ?? $m['XPTitle'] ?? $meta['title'];
             $meta['description'] = $m['ImageDescription'] ?? $m['Caption-Abstract'] ?? $meta['description'];
-            
+
             $meta['keywords'] = is_array($m['Keywords'] ?? null) ? implode(', ', $m['Keywords']) : ($m['Keywords'] ?? $meta['keywords']);
             $meta['location'] = $m['Sub-location'] ?? $meta['location'];
             $meta['city'] = $m['City'] ?? $meta['city'];
@@ -64,10 +59,30 @@ class PhotoProcessingService
             if ($dateStr) {
                 try {
                     $meta['captured_at'] = \Carbon\Carbon::createFromFormat('Y:m:d H:i:s', substr($dateStr, 0, 19))->toDateTimeString();
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
         }
 
         return $meta;
+    }
+
+    /**
+     * Führt ExifTool aus und liefert die dekodierten Metadaten (array) oder null.
+     * Als protected extrahiert → in Tests als Seam überschreibbar, ohne das
+     * exiftool-Binary wirklich aufzurufen.
+     *
+     * @return array|null
+     */
+    protected function runExifTool(string $targetPath)
+    {
+        $process = new Process([
+            'exiftool', '-json', '-Title', '-ObjectName', '-XPTitle',
+            '-ImageDescription', '-Caption-Abstract', '-Keywords', '-Sub-location', '-City', '-Province-State',
+            '-Country-PrimaryLocationName', '-Country-PrimaryLocationCode', '-DateTimeOriginal', '-CreateDate',
+            $targetPath
+        ]);
+        $process->run();
+        return json_decode($process->getOutput(), true);
     }
 }
