@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class PayoutPool extends Model
 {
-    use HasUuids;
+    use HasFactory, HasUuids;
 
     protected $fillable = [
         'month', 'year', 'product_id', 'gross_amount_cents', 

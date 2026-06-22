@@ -45,3 +45,5 @@ This directory serves as the single source of truth for all technical concepts, 
 * [04-frontend-architecture.md](tech/04-frontend-architecture.md) - React, Vite, SWR, and UI rules.
 * [05-testing-guidelines.md](tech/05-testing-guidelines.md) - Strict UI-first testing rules.
 * [06-post-mortem-gallery-bugs.md](tech/06-post-mortem-gallery-bugs.md) - Bug tracking and prevention.
+* [07-security-and-perf-refinement.md](tech/07-security-and-perf-refinement.md) - Security and performance hardening.
+* [08-testing-initiative.md](tech/08-testing-initiative.md) - Test- & quality-initiative: package-based unit/E2E test expansion + review workflow.
