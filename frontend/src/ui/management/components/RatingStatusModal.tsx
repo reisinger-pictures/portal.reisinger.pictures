@@ -21,10 +21,10 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
         if (!isOpen) return;
 
         let isMounted = true;
-        setIsLoading(true);
-        setError(false);
 
         const fetchRatings = async () => {
+            setIsLoading(true);
+            setError(false);
             try {
                 const headers = { 'Accept': 'application/json' };
                 const [resExport, resStatus] = await Promise.all([

@@ -137,11 +137,13 @@ export default function WatermarkSettingsCard() {
             renderSvgToDataUrl(activeBlob, watchOpacity, 500).then(dataUrl => {
                 if (isActive) setPreviewRenderedUrl(dataUrl);
             });
-        } else {
-            setPreviewRenderedUrl(null);
         }
         return () => { isActive = false; };
     }, [activeBlob, watchOpacity]);
+
+    // Derive the effective preview URL in render: when there is no active blob,
+    // no preview should be shown regardless of any previously rendered URL.
+    const effectivePreviewUrl = activeBlob ? previewRenderedUrl : null;
 
     const onSubmit = async (data: WatermarkFormValues) => {
         setGenerating(true);
@@ -220,8 +222,8 @@ export default function WatermarkSettingsCard() {
                         <div
                             className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,_var(--color-base-content)_1px,_transparent_1px)] [background-size:20px_20px]"></div>
                         <div className="flex flex-col items-center justify-center pointer-events-none w-1/3 h-full">
-                            {previewRenderedUrl ? (
-                                <img src={previewRenderedUrl} alt="Watermark Preview" className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]" />
+                            {effectivePreviewUrl ? (
+                                <img src={effectivePreviewUrl} alt="Watermark Preview" className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]" />
                             ) : (
                                 <span className="opacity-50 font-bold bg-base-100 p-2 rounded">Kein Logo vorhanden</span>
                             )}

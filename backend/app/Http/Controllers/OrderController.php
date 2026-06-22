@@ -8,12 +8,22 @@ use App\Models\InvoiceSnapshot;
 use App\Models\InvoiceSequence;
 use App\Models\Photo;
 use App\Services\PricingService;
+use App\Services\ManualInvoiceService;
+use App\Services\QuoteLinkService;
+use App\Http\Requests\CheckoutRequest;
+use App\Http\Requests\SendQuoteRequest;
+use App\Http\Requests\GenerateManualInvoiceRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\InvoiceMail;
 
 class OrderController extends Controller
 {
+    public function __construct(
+        private ManualInvoiceService $invoiceService,
+        private QuoteLinkService $quoteLinkService
+    ) {}
+
     public function index()
     {
         $orders = Order::where('user_id', auth()->id())
@@ -24,7 +34,7 @@ class OrderController extends Controller
         return response()->json($orders);
     }
 
-    public function checkout(Request $request, \App\Services\CheckoutService $checkoutService)
+    public function checkout(CheckoutRequest $request, \App\Services\CheckoutService $checkoutService)
     {
         $user = auth('api')->user();
 
@@ -35,24 +45,7 @@ class OrderController extends Controller
             return response()->json(['error' => 'Der Betreiber hat noch keine vollständigen Rechnungsdaten (Impressum & Bank) hinterlegt. Kauf derzeit nicht möglich.'], 400);
         }
 
-        $request->validate([
-            'items' => 'required|array|min:1',
-            'items.*.photoId' => 'required|string|exists:photos,id',
-            'items.*.tier' => 'nullable|string|in:web,print,original',
-            'items.*.useCaseId' => 'nullable|string|exists:license_use_cases,id',
-            'items.*.modifierIds' => 'nullable|array',
-            'items.*.modifierIds.*' => 'string|exists:license_modifiers,id',
-            'items.*.isQuote' => 'boolean',
-            'items.*.notes' => 'nullable|string',
-            'billing_name' => 'required|string|max:255',
-            'billing_company' => 'nullable|string|max:255',
-            'billing_street' => 'required|string|max:255',
-            'billing_zip' => 'required|string|max:20',
-            'billing_city' => 'required|string|max:255',
-            'payment_method' => 'nullable|string|in:stripe,invoice',
-            'quote_message' => 'nullable|string',
-            'withdrawal_waived' => 'required|boolean',
-        ]);
+        $validated = $request->validated();
 
         if (\Illuminate\Support\Facades\Gate::denies('purchase-upgrades')) {
             return response()->json(['error' => __('messages.upgrade_not_allowed')], 403);
@@ -79,14 +72,10 @@ class OrderController extends Controller
         return response()->json(['success' => true]);
     }
     
-    public function sendQuote(Request $request, $id) {
+    public function sendQuote(SendQuoteRequest $request, $id) {
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
-        
-        $request->validate([
-            'custom_price' => 'required|integer',
-            'message' => 'required|string'
-        ]);
+
+        $validated = $request->validated();
 
         $order = Order::with(['user', 'invoiceSnapshot'])->findOrFail($id);
         $order->update(['status' => 'cancelled']);
@@ -114,119 +103,48 @@ class OrderController extends Controller
         $user = auth('api')->user();
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
         $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer']);
-        $payload = base64_encode(json_encode(['photos' => $request->photo_ids, 'price' => $request->custom_price, 'exp' => now()->addDays(14)->timestamp]));
-        $signature = hash_hmac('sha256', $payload, config('app.key'));
-        return response()->json(['success' => true, 'link' => rtrim(config('app.frontend_url', config('app.url')), '/') . '/cart?quote_token=' . $payload . '.' . $signature]);
+
+        $link = $this->quoteLinkService->generateQuoteLink($request->photo_ids, $request->custom_price);
+
+        return response()->json(['success' => true, 'link' => $link]);
     }
 
     public function decodeQuoteLink(Request $request) {
         $token = $request->query('token');
-        if (!$token || strpos($token, '.') === false) return response()->json(['error' => 'Invalid token format'], 400);
-        list($payload, $signature) = explode('.', $token, 2);
-        if (!hash_equals(hash_hmac('sha256', $payload, config('app.key')), $signature)) return response()->json(['error' => 'Invalid signature'], 400);
-        $data = json_decode(base64_decode($payload), true);
-        if (isset($data['exp']) && $data['exp'] < time()) return response()->json(['error' => 'Token expired'], 400);
+        if (!$token) return response()->json(['error' => 'Invalid token format'], 400);
+
+        $data = $this->quoteLinkService->decodeQuoteToken($token);
+        if (!$data) return response()->json(['error' => 'Invalid signature or expired token'], 400);
+
         return response()->json($data);
     }
 
     public function downloadInvoice($id) {
         $order = Order::where('id', $id)->where('user_id', auth()->id())->with('invoiceSnapshot')->firstOrFail();
         if ($order->is_quote_request && $order->status === 'pending') abort(403, 'Angebot noch nicht abgerechnet.');
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', ['order' => $order, 'snapshot' => $order->invoiceSnapshot, 'items' => $order->invoiceSnapshot->customer_details['items'] ?? []])->download($order->invoiceSnapshot->invoice_number . '.pdf');
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', [
+            'order' => $order, 
+            'snapshot' => $order->invoiceSnapshot, 
+            'items' => $order->invoiceSnapshot->customer_details['items'] ?? [],
+            'bankHolder' => \App\Models\Setting::where('key', 'bank_holder')->value('value'),
+            'bankIban' => \App\Models\Setting::where('key', 'bank_iban')->value('value'),
+            'bankBic' => \App\Models\Setting::where('key', 'bank_bic')->value('value')
+        ])->download($order->invoiceSnapshot->invoice_number . '.pdf');
     }
 
     
     
-    public function generateManualInvoice(Request $request)
+    public function generateManualInvoice(GenerateManualInvoiceRequest $request)
     {
         $user = auth('api')->user();
-        if (!$user || !$user->is_super_admin) {
-            return response()->json(['error' => 'Keine Berechtigung'], 403);
-        }
+        $validated = $request->validated();
 
-        $validated = $request->validate([
-            'invoice_number' => 'required|string',
-            'date' => 'required|date',
-            'due_date' => 'required|string',
-            'type' => 'nullable|string|in:invoice,offer',
-            'service_date' => 'nullable|string',
-            'validity' => 'nullable|string',
-            'customer_name' => 'nullable|string',
-            'customer_company' => 'nullable|string',
-            'customer_street' => 'nullable|string',
-            'customer_zip' => 'nullable|string',
-            'customer_city' => 'nullable|string',
-            'customer_country' => 'nullable|string',
-            'customer_email' => 'nullable|email',
-            'customer_uid' => 'nullable|string',
-            'items' => 'required|array|min:1',
-            'items.*.type' => 'required|string|in:item,discount_fixed,discount_percent',
-            'items.*.description' => 'required|string',
-            'items.*.notes' => 'nullable|string',
-            'items.*.price' => 'required|numeric',
-            'items.*.qty' => 'required|numeric|min:0.01',
-            'terms_html' => 'nullable|string'
-        ]);
+        $processed = $this->invoiceService->processItems($validated['items']);
+        $mappedItems = $processed['items'];
+        $total = $processed['total'];
 
-        $runningTotal = 0;
-        $mappedItems = [];
-
-        foreach ($validated['items'] as $item) {
-            if ($item['type'] === 'item') {
-                $rowTotal = $item['price'] * $item['qty'];
-                $runningTotal += $rowTotal;
-                $mappedItems[] = [
-                    'type' => 'item',
-                    'filename' => $item['description'],
-                    'notes' => $item['notes'] ?? '',
-                    'tier' => 'custom',
-                    'qty' => $item['qty'],
-                    'price' => $item['price'],
-                    'row_total' => $rowTotal
-                ];
-            } elseif ($item['type'] === 'discount_fixed') {
-                $runningTotal -= $item['price'];
-                $mappedItems[] = [
-                    'type' => 'discount_fixed',
-                    'filename' => $item['description'],
-                    'notes' => $item['notes'] ?? '',
-                    'tier' => 'custom',
-                    'qty' => 1,
-                    'price' => $item['price'],
-                    'row_total' => -$item['price']
-                ];
-            } elseif ($item['type'] === 'discount_percent') {
-                $discountAmt = (int) round($runningTotal * ($item['price'] / 10000));
-                $runningTotal -= $discountAmt;
-                $mappedItems[] = [
-                    'type' => 'discount_percent',
-                    'filename' => $item['description'],
-                    'notes' => $item['notes'] ?? '',
-                    'tier' => 'custom',
-                    'qty' => 1,
-                    'price' => $item['price'], 
-                    'row_total' => -$discountAmt,
-                    'calculated_percentage' => $item['price']
-                ];
-            }
-        }
-
-        $total = max(0, $runningTotal);
-        
         $sanitizer = app(\Symfony\Component\HtmlSanitizer\HtmlSanitizer::class);
-        $customerDetails = [
-            'name' => $validated['customer_name'] ?? '',
-            'company' => $validated['customer_company'] ?? '',
-            'street' => $validated['customer_street'] ?? '',
-            'zip' => $validated['customer_zip'] ?? '',
-            'city' => $validated['customer_city'] ?? '',
-            'country' => $validated['customer_country'] ?? '',
-            'email' => $validated['customer_email'] ?? '',
-            'uid' => $validated['customer_uid'] ?? '',
-            'due_date' => $validated['due_date'], // Übernimmt den Freitext exakt so
-            'is_collective' => false,
-            'custom_html_terms' => isset($validated['terms_html']) ? $sanitizer->sanitize($validated['terms_html']) : null
-        ];
+        $customerDetails = $this->invoiceService->prepareCustomerDetails($validated, $sanitizer);
 
         $isOffer = ($validated['type'] ?? 'invoice') === 'offer';
         $docTitle = $isOffer ? 'ANGEBOT' : 'RECHNUNG';
@@ -245,33 +163,23 @@ class OrderController extends Controller
         $snapshot->created_at = $validated['date'];
 
         $viewName = $isOffer ? 'pdf.manual_offer' : 'pdf.invoice';
+        $bankDetails = $this->invoiceService->getBankDetails();
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
             'title' => $docTitle,
             'snapshot' => $snapshot,
             'items' => $mappedItems,
-            'bankHolder' => \App\Models\Setting::where('key', 'bank_holder')->value('value'),
-            'bankIban' => \App\Models\Setting::where('key', 'bank_iban')->value('value'),
-            'bankBic' => \App\Models\Setting::where('key', 'bank_bic')->value('value')
+            'bankHolder' => $bankDetails['holder'],
+            'bankIban' => $bankDetails['iban'],
+            'bankBic' => $bankDetails['bic']
         ]);
 
         $output = $pdf->output();
 
         if ($isOffer) {
-            $smartData = [
-                'customer_name' => $validated['customer_name'] ?? '',
-                'customer_company' => $validated['customer_company'] ?? '',
-                'customer_street' => $validated['customer_street'] ?? '',
-                'customer_zip' => $validated['customer_zip'] ?? '',
-                'customer_city' => $validated['customer_city'] ?? '',
-                'customer_country' => $validated['customer_country'] ?? '',
-                'customer_email' => $validated['customer_email'] ?? '',
-                'customer_uid' => $validated['customer_uid'] ?? '',
-                'items' => $validated['items'] ?? [],
-                'terms_html' => $validated['terms_html'] ?? ''
-            ];
-            $payload = base64_encode(json_encode($smartData));
-            $signature = hash_hmac('sha256', $payload, config('app.key'));
-            $output .= "\n%SMART_DOC:{$payload}.{$signature}%\n";
+            $offerData = $this->invoiceService->prepareOfferData($validated);
+            $payloadData = $this->invoiceService->generateOfferPayload($offerData);
+            $output .= "\n{$payloadData['marker']}\n";
         }
 
         return response()->streamDownload(function() use ($output) {
@@ -288,17 +196,19 @@ class OrderController extends Controller
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
-        $request->validate(['pdf' => 'required|file']); // MIME type check removed, we rely on the HMAC signature instead
+        $request->validate(['pdf' => 'required|file']);
         $content = file_get_contents($request->file('pdf')->getPathname());
-        
-        if (preg_match('/%SMART_DOC:(.*?)\.(.*?)%/', $content, $matches)) {
-            $payload = $matches[1];
-            $signature = $matches[2];
-            if (hash_equals(hash_hmac('sha256', $payload, config('app.key')), $signature)) {
-                return response()->json(json_decode(base64_decode($payload), true));
-            }
+
+        $data = $this->invoiceService->extractOfferFromPdf($content);
+
+        if (!$data) {
+            return response()->json(['error' => 'Kein eingebettetes Angebot in diesem PDF gefunden.'], 404);
+        }
+
+        if (isset($data['_signature_error'])) {
             return response()->json(['error' => 'Signatur ungültig oder manipuliert. Das Angebot wurde eventuell verändert.'], 400);
         }
-        return response()->json(['error' => 'Kein eingebettetes Angebot in diesem PDF gefunden.'], 404);
+
+        return response()->json($data);
     }
 }

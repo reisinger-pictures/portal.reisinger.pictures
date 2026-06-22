@@ -20,6 +20,7 @@ export default defineConfig({
         useGitignore: true,
         useDefaultPatterns: true,
         customPatterns: [
+            "CLAUDE.md",
             "backend/vendor/**",
             "frontend/**"
         ]

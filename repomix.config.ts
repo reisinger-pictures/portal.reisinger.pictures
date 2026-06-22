@@ -1,4 +1,4 @@
-import { defineConfig } from "repomix";
+import {defineConfig} from "repomix";
 
 export const MJS_PATCH_INSTRUCTION = `
 File Modification Rule (CRITICAL):
@@ -20,6 +20,7 @@ export default defineConfig({
         useGitignore: true,
         useDefaultPatterns: true,
         customPatterns: [
+            "CLAUDE.md",
             "frontend/node_modules/**",
             "backend/vendor/**"
         ]

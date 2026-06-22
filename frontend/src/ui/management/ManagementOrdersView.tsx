@@ -82,7 +82,7 @@ export default function ManagementOrdersView() {
                                     <div className="font-bold">{order.user?.name}</div>
                                     <div className="text-sm opacity-70">{order.user?.email}</div>
                                 </td>
-                                <td className="font-mono">{(order.is_quote_request ? true : false) && order.status === 'pending' ? 'Auf Anfrage' : formatMoney(Number(order.total_amount))}</td>
+                                <td className="font-mono">{(order.is_quote_request ? true : false) && order.status === 'pending' ? 'Auf Anfrage' : formatMoney(Number(order.total_gross))}</td>
                                 <td>
                                     <div className="flex flex-col gap-2 items-start">
                                         <select 
@@ -119,8 +119,8 @@ export default function ManagementOrdersView() {
 
                         <div className="bg-base-200 p-4 rounded-box mb-4 text-sm max-h-40 overflow-y-auto">
                             <strong className="block mb-2">Anforderungen des Kunden:</strong>
-                            <div className="opacity-70 mb-2 italic">{quoteOrder.invoice_snapshot?.customer_details?.quote_message || 'Keine generelle Nachricht'}</div>
-                            {(quoteOrder.invoice_snapshot?.customer_details?.items || []).map((item: OrderItem, idx: number) => (
+                            <div className="opacity-70 mb-2 italic">{(typeof quoteOrder.invoice_snapshot?.customer_details === 'object' ? quoteOrder.invoice_snapshot?.customer_details?.quote_message : null) || 'Keine generelle Nachricht'}</div>
+                            {(typeof quoteOrder.invoice_snapshot?.customer_details === 'object' ? (quoteOrder.invoice_snapshot?.customer_details?.items || []) : []).map((item: OrderItem, idx: number) => (
                                 <div key={idx} className="mb-2 pb-2 border-b border-base-300 last:border-0 last:mb-0 last:pb-0">
                                     <div className="font-mono font-bold">{item.filename}</div>
                                     <div className="opacity-70">{item.notes || '-'}</div>

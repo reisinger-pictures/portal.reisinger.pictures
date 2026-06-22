@@ -1,6 +1,6 @@
-import { Page, FrameLocator } from '@playwright/test';
-import { CreditCard } from './CreditCardHelper';
-import { ModalHelper } from './ModalHelper';
+import {FrameLocator, Page} from '@playwright/test';
+import {CreditCard} from './CreditCardHelper';
+import {ModalHelper} from './ModalHelper';
 
 export interface FillGalleryModalParams {
     name?: string;
@@ -51,9 +51,9 @@ export interface FillProfileFormParams {
     copyright?: string;
 }
 
-
 export class FormHelper {
-    constructor(private page: Page, private modal: ModalHelper) {}
+    constructor(private page: Page, private modal: ModalHelper) {
+    }
 
     async fillGalleryModal(params: FillGalleryModalParams) {
         if (params.name !== undefined) await this.modal.fillInputByLabel('Name der Galerie', params.name);
@@ -85,9 +85,9 @@ export class FormHelper {
 
     async fillInviteModal(params: FillInviteModalParams) {
         if (params.type === 'mass') {
-            await this.page.locator('.form-control').filter({ hasText: 'Massen-Link' }).locator('input[type="radio"]').check();
+            await this.page.locator('.form-control').filter({hasText: 'Massen-Link'}).locator('input[type="radio"]').check();
         } else {
-            await this.page.locator('.form-control').filter({ hasText: 'Persönlicher Link' }).locator('input[type="radio"]').check();
+            await this.page.locator('.form-control').filter({hasText: 'Persönlicher Link'}).locator('input[type="radio"]').check();
             if (params.name) await this.modal.fillInputByLabel('Name des Gastes', params.name);
         }
         if (params.canEditMeta !== undefined) {
@@ -105,22 +105,23 @@ export class FormHelper {
     }
 
     async fillProfileForm(params: FillProfileFormParams) {
-        if (params.name) await this.page.locator('.form-control').filter({ hasText: 'Dein Name' }).locator('input').fill(params.name);
-        if (params.ftpSlug) await this.page.locator('.form-control').filter({ hasText: 'FTP Upload Ordner' }).locator('input').fill(params.ftpSlug);
-        if (params.copyright) await this.page.locator('.form-control').filter({ hasText: 'Standard-Urheber' }).locator('input').fill(params.copyright);
+        if (params.name) await this.page.locator('.form-control').filter({hasText: 'Dein Name'}).locator('input').fill(params.name);
+        if (params.ftpSlug) await this.page.locator('.form-control').filter({hasText: 'FTP Upload Ordner'}).locator('input').fill(params.ftpSlug);
+        if (params.copyright) await this.page.locator('.form-control').filter({hasText: 'Standard-Urheber'}).locator('input').fill(params.copyright);
     }
 
     async fillStripeForm(frame: FrameLocator, card: CreditCard) {
-        // Der sicherste Weg, um Stripe-Felder sprachunabhängig zu finden: Autocomplete-Attribute
-        const cardNumberInput = frame.locator('input[autocomplete="cc-number"]');
-        const expDateInput = frame.locator('input[autocomplete="cc-exp"]');
-        const cvcInput = frame.locator('input[autocomplete="cc-csc"]');
+        const cardNumberInput = frame.locator('input[autocomplete="cc-number"], input[name="cardnumber"], input[name="number"]').first();
+        const expDateInput = frame.locator('input[autocomplete="cc-exp"], input[name="exp-date"], input[name="expiry"]').first();
+        const cvcInput = frame.locator('input[autocomplete="cc-csc"], input[name="cvc"]').first();
 
-        await cardNumberInput.clear();
         await cardNumberInput.fill(card.number);
-        await expDateInput.clear();
         await expDateInput.fill(card.exp);
-        await cvcInput.clear();
         await cvcInput.fill(card.cvc);
+        
+        // Anti-Flakiness: Blur erzwingt Stripe-interne Validierung. Kurzer Wait stellt sicher,
+        // dass der Submit-Button im DOM den State-Update mitbekommt.
+        await cvcInput.blur().catch(() => {});
+        await this.page.waitForTimeout(1000);
     }
 }

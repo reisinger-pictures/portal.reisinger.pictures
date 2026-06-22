@@ -45,7 +45,7 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
     if (isOpen !== prevIsOpen || photos !== prevPhotos) {
         setPrevIsOpen(isOpen);
         setPrevPhotos(photos);
-        
+
         if (isOpen) {
             setRows(photos.map(p => ({
                 photoId: p.id,
@@ -61,24 +61,31 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
                 country: p.country || '',
                 iso_country: p.iso_country || ''
             })));
-            abortControllerRef.current = new AbortController();
         } else {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-                abortControllerRef.current = null;
-            }
             setIsGeneratingAll(false);
         }
     }
 
-    // Cleanup on unmount
+    // Manage the AbortController lifecycle in an effect so refs are never
+    // touched during render. A fresh controller is created when the modal
+    // opens; the previous one is aborted and cleared when it closes.
     useEffect(() => {
+        if (!isOpen) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                abortControllerRef.current = null;
+            }
+            return;
+        }
+
+        abortControllerRef.current = new AbortController();
         return () => {
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
+                abortControllerRef.current = null;
             }
         };
-    }, []);
+    }, [isOpen]);
 
     if (!isOpen) return null;
 

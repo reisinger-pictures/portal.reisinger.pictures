@@ -6,6 +6,11 @@ use Illuminate\Http\Request;
 use App\Models\GalleryGroup;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Http\Requests\StoreGroupRequest;
+use App\Http\Requests\UpdateGroupRequest;
+use App\Http\Requests\StoreGalleryRequest;
+use App\Http\Requests\UpdateGalleryRequest;
+use App\Services\GalleryTreeService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -15,70 +20,19 @@ use Carbon\Carbon;
 
 class GalleryController extends Controller
 {
+    public function __construct(
+        private GalleryTreeService $galleryTreeService
+    ) {}
+
     /**
      * Zeigt den gesamten Galerie-Baum für die Verwaltung an.
      */
     public function indexAdmin(Request $request)
     {
         $user = auth('api')->user();
-
-        $tree = Cache::rememberForever('gallery_tree_admin', function () {
-            $groups = GalleryGroup::whereNull('parent_id')->with(['children', 'galleries'])->get();
-            $rootGalleries = Gallery::whereNull('gallery_group_id')->get();
-            return [
-                'groups' => $groups->toArray(),
-                'root_galleries' => $rootGalleries->toArray()
-            ];
-        });
-
         $filterType = $request->query('filter_type');
-        $treeArray = json_decode(json_encode($tree), true);
 
-        // Filter anwenden (Admins sehen alles, normale Nutzer nur ihre zugewiesenen Galerien)
-        if (!$user->is_admin) {
-            $allowedGalleryIds = $user->getAllowedGalleryIds();
-
-            $filterNode = function($groups) use (&$filterNode, $allowedGalleryIds) {
-                $result = [];
-                foreach ($groups as $group) {
-                    if (isset($group['galleries'])) {
-                        $group['galleries'] = array_values(array_filter($group['galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
-                    }
-                    if (isset($group['children'])) {
-                        $group['children'] = $filterNode($group['children']);
-                    }
-                    $result[] = $group;
-                }
-                return $result;
-            };
-
-            $treeArray['groups'] = $filterNode($treeArray['groups']);
-            $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
-        }
-
-        // Optionaler Filter nach Typ (selection/delivery)
-        if ($filterType) {
-            $filterByType = function($groups) use (&$filterByType, $filterType) {
-                $result = [];
-                foreach ($groups as $group) {
-                    if (isset($group['galleries'])) {
-                        $group['galleries'] = array_values(array_filter($group['galleries'], function($g) use ($filterType) {
-                            return $g['type'] === $filterType;
-                        }));
-                    }
-                    if (isset($group['children'])) {
-                        $group['children'] = $filterByType($group['children']);
-                    }
-                    $result[] = $group;
-                }
-                return $result;
-            };
-
-            $treeArray['groups'] = $filterByType($treeArray['groups']);
-            $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], function($g) use ($filterType) {
-                return $g['type'] === $filterType;
-            }));
-        }
+        $treeArray = $this->galleryTreeService->getAdminTree($user, $filterType);
 
         return response()->json($treeArray);
     }
@@ -86,19 +40,8 @@ class GalleryController extends Controller
     /**
      * Erstellt eine neue Meta-Galerie (Ordner).
      */
-    public function storeGroup(Request $request)
+    public function storeGroup(StoreGroupRequest $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255',
-            'parent_id' => 'nullable|string|exists:gallery_groups,id',
-            'is_public' => 'nullable|boolean',
-            'is_free_download' => 'nullable|boolean',
-            'is_editorial_only' => 'nullable|boolean',
-            'is_hidden' => 'nullable|boolean',
-            'restricted_photographers' => 'nullable|boolean'
-        ]);
-
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
         $count = \App\Models\GalleryGroup::where('slug', 'LIKE', "{$slug}%")->count();
         $slug = $count > 0 ? "{$slug}-{$count}" : $slug;
@@ -119,19 +62,8 @@ class GalleryController extends Controller
     /**
      * Aktualisiert eine Meta-Galerie (Ordner).
      */
-    public function updateGroup(Request $request, $id)
+    public function updateGroup(UpdateGroupRequest $request, $id)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255',
-            'parent_id' => 'nullable|string|exists:gallery_groups,id',
-            'is_public' => 'nullable|boolean',
-            'is_free_download' => 'nullable|boolean',
-            'is_editorial_only' => 'nullable|boolean',
-            'is_hidden' => 'nullable|boolean',
-            'restricted_photographers' => 'nullable|boolean'
-        ]);
-
         $group = GalleryGroup::findOrFail($id);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
@@ -168,37 +100,9 @@ class GalleryController extends Controller
     /**
      * Erstellt eine neue Galerie.
      */
-    public function storeGallery(Request $request)
+    public function storeGallery(StoreGalleryRequest $request)
     {
         $user = auth('api')->user();
-        if (!$user || !$user->is_photographer) {
-            return response()->json(['error' => 'Nur Fotografen dürfen Galerien erstellen.'], 403);
-        }
-
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255',
-            'type' => 'required|in:selection,delivery',
-            'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
-            'is_public' => 'boolean',
-            'is_live' => 'boolean',
-            'is_free_download' => 'nullable|boolean',
-            'is_editorial_only' => 'nullable|boolean',
-            'is_hidden' => 'nullable|boolean',
-            'restricted_photographers' => 'nullable|boolean',
-            'password' => 'nullable|string',
-            'expires_at' => 'nullable|date',
-            'allow_client_metadata_edit' => 'boolean',
-            'apply_metadata_to_photos' => 'boolean',
-            'default_title' => 'nullable|string',
-            'default_description' => 'nullable|string',
-            'default_keywords' => 'nullable|string',
-            'default_location' => 'nullable|string',
-            'default_city' => 'nullable|string',
-            'default_state' => 'nullable|string',
-            'default_country' => 'nullable|string',
-            'default_iso_country' => 'nullable|string|max:2',
-        ]);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->name);
         $count = \App\Models\Gallery::where('slug', 'LIKE', "{$slug}%")->count();
@@ -257,43 +161,20 @@ class GalleryController extends Controller
             }
 
             return response()->json(['success' => true, 'gallery' => $gallery]);
-        });
+        }, 3);
     }
 
     /**
      * Aktualisiert eine bestehende Galerie.
      */
-    public function updateGallery(Request $request, $id)
+    public function updateGallery(UpdateGalleryRequest $request, $id)
     {
         $gallery = Gallery::findOrFail($id);
         if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
-        $validated = $request->validate([
-            'name' => 'nullable|string|max:255',
-            'slug' => 'nullable|string|max:255',
-            'type' => 'nullable|in:selection,delivery',
-            'is_live' => 'nullable|boolean',
-            'is_public' => 'nullable|boolean',
-            'is_free_download' => 'nullable|boolean',
-            'is_editorial_only' => 'nullable|boolean',
-            'is_hidden' => 'nullable|boolean',
-            'restricted_photographers' => 'nullable|boolean',
-            'gallery_group_id' => 'nullable|string|exists:gallery_groups,id',
-            'allow_client_metadata_edit' => 'nullable|boolean',
-            'apply_metadata_to_photos' => 'nullable|boolean',
-            'default_title' => 'nullable|string',
-            'default_description' => 'nullable|string',
-            'default_keywords' => 'nullable|string',
-            'default_location' => 'nullable|string',
-            'default_city' => 'nullable|string',
-            'default_state' => 'nullable|string',
-            'default_country' => 'nullable|string',
-            'default_iso_country' => 'nullable|string|max:2',
-            'password' => 'nullable|string',
-            'expires_at' => 'nullable|date',
-        ]);
+        $validated = $request->validated();
 
         if (array_key_exists('slug', $validated) && $validated['slug'] !== $gallery->slug) {
             $slug = Str::slug($validated['slug']);
@@ -478,7 +359,7 @@ class GalleryController extends Controller
         $group = GalleryGroup::with('children')->findOrFail($id);
         $user = auth('api')->user();
 
-        $groupIds = $this->getAllSubgroupIDs($group);
+        $groupIds = $this->galleryTreeService->getAllSubgroupIds($group);
         $groupIds[] = $group->id;
 
         $galleryIds = Gallery::whereIn('gallery_group_id', $groupIds)->pluck('id')->toArray();
@@ -498,16 +379,6 @@ class GalleryController extends Controller
             'last_page' => $photos->lastPage(),
             'total' => $photos->total()
         ]);
-    }
-
-    private function getAllSubgroupIDs($group)
-    {
-        $ids = [];
-        foreach ($group->children as $child) {
-            $ids[] = $child->id;
-            $ids = array_merge($ids, $this->getAllSubgroupIDs($child));
-        }
-        return $ids;
     }
 
     public function syncAccess(Request $request, $id) {

@@ -52,7 +52,15 @@ class ImageController extends Controller
         $isLrUpload = $request->lr_uuid && !Str::startsWith($request->lr_uuid, ['web-', 'ftp-']);
         $lrUuid = $request->lr_uuid ?? Str::uuid()->toString();
 
-        return DB::transaction(function () use ($file, $gallery, $user, $originalName, $extension, $mimeType, $targetDir, $thumbsDir, $isLrUpload, $lrUuid, $request) {
+        // Heavy Lifting (ExifTool CLI) VOR der DB-Transaktion ausführen, um Deadlocks zu vermeiden!
+        $photoService = app(\App\Services\PhotoProcessingService::class);
+        $meta = $photoService->processImage($file->getPathname(), '', $gallery);
+        $meta['mime_type'] = $mimeType;
+        if (empty($meta['title'])) {
+            $meta['title'] = $originalName;
+        }
+
+        return DB::transaction(function () use ($file, $gallery, $user, $extension, $targetDir, $thumbsDir, $isLrUpload, $lrUuid, $request, $meta) {
             
             $query = Photo::where('gallery_id', $gallery->id);
             if ($isLrUpload) {
@@ -78,15 +86,6 @@ class ImageController extends Controller
 
             $targetPath = Storage::disk('photos')->path($targetDir . '/' . $filename);
             $thumbPath = Storage::disk('photos')->path($thumbsDir . '/' . md5($filename . '1024') . '.webp');
-            
-            $photoService = app(\App\Services\PhotoProcessingService::class);
-            $meta = $photoService->processImage($targetPath, $thumbPath, $gallery);
-            $meta['mime_type'] = $mimeType;
-            
-            // Wenn das Bild keinen eigenen Titel in den Metadaten hat, retten wir den Dateinamen
-            if (empty($meta['title'])) {
-                $meta['title'] = $originalName;
-            }
 
             if ($existingPhoto) {
                 $existingPhoto->forceFill(array_merge([
@@ -105,6 +104,6 @@ class ImageController extends Controller
             }
 
             return response()->json(['success' => true, 'photo_id' => $photo->id]);
-        });
+        }, 3);
     }
 }

@@ -154,12 +154,21 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE
 // --- Global Data Contracts ---
 export interface Customer { id: string; name: string; company?: string | null; email?: string | null; street?: string | null; zip?: string | null; city?: string | null; country?: string | null; uid?: string | null; }
 export interface Product { id: string; type: 'item' | 'discount_fixed' | 'discount_percent'; name: string; description?: string | null; price: number; }
+export interface Gallery { id: string; gallery_group_id?: string; name: string; slug: string; full_path: string; type: string; is_live: boolean | number; is_public: boolean | number; expires_at?: string | null; created_at: string; }
+export interface User { id: string; name: string; email: string; is_admin: boolean | number; is_photographer: boolean | number; is_pending: boolean | number; can_edit_metadata: boolean | number; flatrate_level: string; roles?: Array<{ id: string; name: string }> | null; gallery_groups?: unknown[] | null; galleries?: Gallery[] | null; photographer_galleries?: Gallery[] | null; photographer_gallery_groups?: unknown[] | null; }
 export interface TextSnippet { id: string; title: string; shortcut?: string | null; content_html: string; }
-export interface OrderItem { photoId?: string; tier: string; price: number; filename?: string; notes?: string; qty?: number; row_total?: number; type?: string; description?: string; calculated_percentage?: number; }
+export interface OrderItem { id?: string; order_id?: string; photo_id?: string; tier: string; price: number; use_case_id?: string; qty?: number; filename?: string; notes?: string; row_total?: number; type?: string; description?: string; calculated_percentage?: number; }
 export interface InvoiceItem { type: string; description: string; notes: string; qty: number; price: number; row_total?: number; filename?: string; tier?: string; }
 export interface InvoiceDiscount { type: string; description: string; notes: string; price: number; calculated_percentage?: number; row_total?: number; filename?: string; tier?: string; }
-export interface InvoiceSnapshot { invoice_number: string; total_gross: string | number; created_at: string; customer_details: { name?: string; company?: string; items: OrderItem[]; quote_message?: string; email?: string; street?: string; zip?: string; city?: string; country?: string; uid?: string; terms_html?: string; due_date?: string; }; }
-export interface Order { id: string; status: string; is_quote_request: boolean | number; total_amount: string | number; created_at: string; user?: { name: string; email: string; }; invoice_snapshot?: InvoiceSnapshot; }
+
+export interface InvoiceCustomerDetails {
+    items?: OrderItem[];
+    quote_message?: string;
+    [key: string]: unknown;
+}
+
+export interface InvoiceSnapshot { id?: string; invoice_number: string; total_gross: string | number; total_net: string | number; tax_rate: number; created_at: string; customer_details: string | InvoiceCustomerDetails; }
+export interface Order { id: string; user_id?: string; status: string; is_quote_request: boolean | number; total_net: string | number; total_gross: string | number; tax_rate: number; payment_method?: string; billing_name?: string; billing_company?: string; billing_street?: string; billing_zip?: string; billing_city?: string; stripe_payment_intent_id?: string; created_at: string; updated_at: string; user?: User; invoice_snapshot?: InvoiceSnapshot; items?: OrderItem[]; }
 export interface CheckoutResponse { success?: boolean; requires_action?: boolean; client_secret?: string; invoice_number: string; order_id?: string; }
 export interface RedeemInviteResponse { full_path?: string; message?: string; requires_mail_verification?: boolean; }
 export interface SendMailResponse { success: boolean; notified_count: number; }

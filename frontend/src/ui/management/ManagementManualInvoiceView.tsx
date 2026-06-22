@@ -5,9 +5,13 @@ import ErrorMessage from '../components/ErrorMessage';
 import WysiwygEditor from '../components/WysiwygEditor';
 import RecipientFormSection from './components/RecipientFormSection';
 import ManualDocumentHeader from './components/ManualDocumentHeader';
-import AutocompleteInput from '../components/AutocompleteInput';
-import {InvoiceDiscount, InvoiceItem, Product} from '../../api';
+import {InvoiceDiscount, InvoiceItem} from '../../api';
 import ShootingCalculatorModal from './components/ShootingCalculatorModal';
+import InvoiceItemsTable from './components/invoice/InvoiceItemsTable';
+import InvoiceDiscountsSection from './components/invoice/InvoiceDiscountsSection';
+import InvoiceTotalSummary from './components/invoice/InvoiceTotalSummary';
+import InvoiceDragDropZone from './components/invoice/InvoiceDragDropZone';
+import {formatDateToDE, formatLocaleDate} from '../../logic/utils';
 
 export interface DocumentFormData {
     type: string;
@@ -43,12 +47,12 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
     const getOfferValidUntil = () => {
         const d = new Date();
         d.setDate(d.getDate() + 14);
-        return 'Gültig bis ' + d.toLocaleDateString('de-AT', {day: '2-digit', month: '2-digit', year: 'numeric'});
+        return 'Gültig bis ' + formatLocaleDate(d);
     };
     const getInvoiceDefaultDue = () => 'Zahlbar sofort nach Erhalt der Rechnung.';
     const [serviceDateDirty, setServiceDateDirty] = useState(false);
 
-    const [formData, setFormData] = useState<DocumentFormData>({
+    const [formData, setFormData] = useState<DocumentFormData>(() => ({
         type: docType,
         invoice_number: (isOffer ? 'A-' : 'R-') + new Date().getFullYear() + '-' + Math.floor(100 + Math.random() * 900),
         date: new Date().toISOString().split('T')[0],
@@ -64,14 +68,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
         customer_email: '',
         customer_uid: '',
         terms_html: ''
-    });
-
-    const formatDateToDE = (iso: string) => {
-        if (!iso) return '';
-        const parts = iso.split('-');
-        if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
-        return iso;
-    };
+    }));
 
     const [prevDocType, setPrevDocType] = useState(docType);
     if (docType !== prevDocType) {
@@ -296,35 +293,11 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
-            {isDragging && !isOffer && (
-                <div
-                    className="absolute inset-0 z-50 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-box border-4 border-dashed border-primary m-6 pointer-events-none">
-                    <div className="text-center text-primary">
-                        <span className="iconify mdi--upload text-6xl mb-2"></span>
-                        <h2 className="text-2xl font-bold">Angebot hier ablegen</h2>
-                        <p>Die Daten werden automatisch in die Rechnung übernommen.</p>
-                    </div>
-                </div>
-            )}
-            <div
-                className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
-                <div>
-                    <h1 className="text-4xl font-bold flex items-center gap-2 mb-2">
-                        <span
-                            className={`iconify ${isOffer ? 'mdi--file-chart-outline' : 'mdi--file-document-edit-outline'} text-primary`}></span>
-                        {isOffer ? 'Manuelles Angebot' : 'Manuelle Rechnung'}
-                    </h1>
-                    <p className="opacity-70">{isOffer ? 'Erstelle ein unverbindliches Angebot für Kunden.' : 'Erstelle eine freie PDF-Rechnung.'}</p>
-                </div>
-                {!isOffer && (
-                    <div className="flex-none">
-                        <label className="btn btn-outline btn-primary shadow-sm cursor-pointer">
-                            <span className="iconify mdi--upload text-xl"></span> Angebot importieren (.pdf)
-                            <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload}/>
-                        </label>
-                    </div>
-                )}
-            </div>
+            <InvoiceDragDropZone
+                isDragging={isDragging}
+                isOffer={isOffer}
+                onFileUpload={handleFileUpload}
+            />
 
             <form onSubmit={handleDownload} className="space-y-8">
                 <ManualDocumentHeader
@@ -354,148 +327,26 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                                     className="btn btn-sm btn-outline btn-secondary">
                                 <span className="iconify mdi--calculator"></span> Paket-Kalkulator
                             </button>
-                            <button type="button" onClick={addItem} className="btn btn-sm btn-outline btn-primary">+
-                                Leistung hinzufügen
-                            </button>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        {items.map((item, idx) => (
-                            <div key={idx}
-                                 className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
-                                <div className="flex flex-col gap-1 self-center shrink-0 mr-2">
-                                    <button type="button" onClick={() => moveItemUp(idx)} disabled={idx === 0}
-                                            className="btn btn-xs btn-ghost btn-square"><span
-                                        className="iconify mdi--arrow-up text-lg opacity-50"></span></button>
-                                    <button type="button" onClick={() => moveItemDown(idx)}
-                                            disabled={idx === items.length - 1}
-                                            className="btn btn-xs btn-ghost btn-square"><span
-                                        className="iconify mdi--arrow-down text-lg opacity-50"></span></button>
-                                </div>
-                                <div className="form-control flex-1 w-full">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Titel / Name</span></label>
-                                    <AutocompleteInput<Product>
-                                        value={item.description}
-                                        onChange={val => handleItemChange(idx, 'description', val)}
-                                        endpoint="/api/management/products?type=item&q="
-                                        mapResponse={(data) => data.map(p => ({
-                                            id: p.id,
-                                            title: p.name,
-                                            subtitle: `${p.price.toFixed(2)} €`,
-                                            raw: p
-                                        }))}
-                                        onSelect={(p) => {
-                                            handleItemChange(idx, 'description', p.name);
-                                            handleItemChange(idx, 'notes', p.description || '');
-                                            handleItemChange(idx, 'price', p.price / 100);
-                                        }}
-                                        placeholder="z.B. Fotoshooting"
-                                        className="input input-sm input-bordered w-full"
-                                    />
-                                </div>
-                                <div className="form-control flex-1 w-full">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Zusatz (kleingedruckt)</span></label>
-                                    <input type="text" value={item.notes}
-                                           onChange={e => handleItemChange(idx, 'notes', e.target.value)}
-                                           className="input input-sm input-bordered w-full"
-                                           placeholder="Optional"/>
-                                </div>
-                                <div className="form-control w-20 shrink-0">
-                                    <label className="label py-1"><span
-                                        className="label-text text-sm font-bold">Menge</span></label>
-                                    <input required type="number" step="0.01" min="0.01" value={item.qty}
-                                           onChange={e => handleItemChange(idx, 'qty', parseFloat(e.target.value) || 0)}
-                                           className="input input-sm input-bordered w-full font-mono text-center"/>
-                                </div>
-                                <div className="form-control w-full md:w-28 shrink-0">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Preis / Stück</span></label>
-                                    <input required type="number" step="any" value={item.price}
-                                           onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                                           className="input input-sm input-bordered w-full font-mono text-right"/>
-                                </div>
-                                <div className="form-control w-full md:w-28 shrink-0">
-                                    <label className="label py-1"><span
-                                        className="label-text text-sm font-bold">Gesamt</span></label>
-                                    <div
-                                        className="text-right font-mono font-bold mt-1 text-base-content">{(item.price * item.qty).toFixed(2)} €
-                                    </div>
-                                </div>
-                                <button type="button" onClick={() => removeItem(idx)}
-                                        className="btn btn-sm btn-ghost text-error shrink-0 mt-7"><span
-                                    className="iconify mdi--trash-can text-lg"></span></button>
-                            </div>
-                        ))}
-                    </div>
+                    <InvoiceItemsTable
+                        items={items}
+                        onItemChange={handleItemChange}
+                        onAddItem={addItem}
+                        onRemoveItem={removeItem}
+                        onMoveItemUp={moveItemUp}
+                        onMoveItemDown={moveItemDown}
+                    />
 
-                    <div className="mt-6 border-t border-base-300 pt-6">
-                        <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-                            <h2 className="font-bold text-xl text-primary">Rabatte & Abzüge</h2>
-                            <button type="button" onClick={addDiscount} className="btn btn-sm btn-outline btn-primary">+
-                                Rabatt hinzufügen
-                            </button>
-                        </div>
+                    <InvoiceDiscountsSection
+                        discounts={discounts}
+                        onDiscountChange={handleDiscountChange}
+                        onAddDiscount={addDiscount}
+                        onRemoveDiscount={removeDiscount}
+                    />
 
-                        <div className="space-y-4">
-                            {discounts.map((discount, idx) => (
-                                <div key={idx}
-                                     className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
-                                    <div className="form-control w-full md:w-1/4 shrink-0">
-                                        <label className="label py-1"><span
-                                            className="label-text text-sm font-bold">Art</span></label>
-                                        <select value={discount.type}
-                                                onChange={e => handleDiscountChange(idx, 'type', e.target.value)}
-                                                className="select select-sm select-bordered w-full bg-base-100">
-                                            <option value="discount_fixed">Fixer Betrag (€)</option>
-                                            <option value="discount_percent">Prozentual (%)</option>
-                                        </select>
-                                    </div>
-                                    <div className="form-control flex-1 w-full">
-                                        <label className="label py-1"><span className="label-text text-sm font-bold">Titel / Beschreibung</span></label>
-                                        <AutocompleteInput<Product>
-                                            value={discount.description}
-                                            onChange={val => handleDiscountChange(idx, 'description', val)}
-                                            endpoint="/api/management/products?type=discount_fixed,discount_percent&q="
-                                            mapResponse={(data) => data.map(p => ({
-                                                id: p.id,
-                                                title: p.name,
-                                                subtitle: `${p.price.toFixed(2)} ${p.type === 'discount_percent' ? '%' : '€'}`,
-                                                raw: p
-                                            }))}
-                                            onSelect={(p) => {
-                                                handleDiscountChange(idx, 'type', p.type || 'discount_fixed');
-                                                handleDiscountChange(idx, 'description', p.name);
-                                                handleDiscountChange(idx, 'notes', p.description || '');
-                                                handleDiscountChange(idx, 'price', p.type === 'discount_percent' ? p.price : p.price / 100);
-                                            }}
-                                            placeholder="z.B. Stammkundenrabatt"
-                                            className="input input-sm input-bordered w-full bg-base-100"
-                                        />
-                                    </div>
-                                    <div className="form-control w-full md:w-32 shrink-0">
-                                        <label className="label py-1"><span
-                                            className="label-text text-sm font-bold">Wert</span></label>
-                                        <div className="join w-full">
-                                            <input required type="number" step="any" min="0" value={discount.price}
-                                                   onChange={e => handleDiscountChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                                                   className="input input-sm input-bordered join-item w-full font-mono text-right bg-base-100"/>
-                                            <span
-                                                className="btn btn-sm btn-disabled join-item">{discount.type === 'discount_percent' ? '%' : '€'}</span>
-                                        </div>
-                                    </div>
-                                    <button type="button" onClick={() => removeDiscount(idx)}
-                                            className="btn btn-sm btn-ghost text-error shrink-0 mt-7"><span
-                                        className="iconify mdi--trash-can text-lg"></span></button>
-                                </div>
-                            ))}
-                            {discounts.length === 0 &&
-                                <p className="text-sm opacity-50 italic px-2">Keine Rabatte angewendet.</p>}
-                        </div>
-                    </div>
-
-                    <div
-                        className="text-right text-2xl font-bold mt-6 pt-4 border-t border-base-300">Gesamtbetrag: {total.toFixed(2)} €
-                    </div>
+                    <InvoiceTotalSummary total={total} />
                 </div>
 
                 {!isOffer && (

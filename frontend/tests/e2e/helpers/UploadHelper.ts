@@ -18,7 +18,16 @@ export class UploadHelper {
 
         await fileInput.setInputFiles(sampleImagePath);
         const res = await uploadPromise;
-        expect(res.ok(), `Upload API request failed with status ${res.status()}`).toBeTruthy();
+        
+        let errorBody = '';
+        if (!res.ok()) {
+            errorBody = await res.text();
+            console.error('\n--- UPLOAD ERROR RESPONSE BODY ---');
+            console.error(errorBody);
+            console.error('----------------------------------\n');
+        }
+        
+        expect(res.ok(), `Upload API request failed with status ${res.status()}. Details: ${errorBody}`).toBeTruthy();
 
         // Warten, bis das Frontend den Upload-Prozess registriert hat
         const toast = this.page.locator('.toast').filter({ hasText: /hochgeladen/i }).first();

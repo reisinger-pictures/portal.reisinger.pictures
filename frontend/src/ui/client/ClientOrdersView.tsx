@@ -3,7 +3,7 @@ import useSWR from 'swr';
 import { fetcher } from '../../api';
 import PageLayout from '../components/PageLayout';
 import ErrorMessage from '../components/ErrorMessage';
-import { Order } from '../../api';
+import { Order, OrderItem } from '../../api';
 import { formatMoney } from '../../logic/utils';
 
 
@@ -78,13 +78,13 @@ export default function ClientOrdersView() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {snap?.customer_details?.items?.map((item, idx) => (
+                                                {(typeof snap?.customer_details === 'object' && snap?.customer_details?.items) ? snap?.customer_details?.items?.map((item: OrderItem, idx: number) => (
                                                     <tr key={idx}>
                                                         <td className="font-mono text-sm">{item.filename}</td>
                                                         <td><span className="badge badge-ghost badge-sm">{item.tier.toUpperCase()}</span></td>
                                                         <td className="text-right font-mono text-sm">{formatMoney(Number(item.price))}</td>
                                                     </tr>
-                                                ))}
+                                                )) : null}
                                             </tbody>
                                         </table>
                                     </div>

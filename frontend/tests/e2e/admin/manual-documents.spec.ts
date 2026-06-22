@@ -162,9 +162,10 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();
         await expect(calcModal).toBeHidden();
 
-        // Validierung in der Haupt-Tabelle
+        // Validierung in der Haupt-Tabelle (jetzt div-basiert nach Refactoring)
         // Leistungsposten prüfen (250.00 €)
-        await expect(page.locator('table').first()).toContainText('Individuelles Shooting-Paket');
+        // Der Text befindet sich im value Attribut des Input-Feldes
+        await expect(page.locator('input[value="Individuelles Shooting-Paket"]')).toBeVisible();
         
         // Gesamtsumme prüfen (250€ - 50% = 125€)
         await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('125.00 €');

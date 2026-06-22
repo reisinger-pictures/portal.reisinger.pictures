@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ErrorMessage from './components/ErrorMessage';
 import { useSWRConfig } from 'swr';
 import {useNavigate, useParams} from 'react-router-dom';
@@ -12,6 +12,7 @@ export default function InviteView() {
     const navigate = useNavigate();
     const { mutate } = useSWRConfig();
     const { user, isLoading: authLoading } = useAuth();
+    const autoRedeemStartedRef = useRef(false);
     const [autoRedeeming, setAutoRedeeming] = useState(false);
 
     const [loading, setLoading] = useState(true);
@@ -75,25 +76,31 @@ export default function InviteView() {
     
     useEffect(() => {
         // Auto-Redeem nur wenn: Nicht am Laden, User eingeloggt, Galerie bekannt, kein PW nötig
-        if (!loading && !authLoading && user && galleryName && !requiresPassword && !error && !autoRedeeming) {
-            setAutoRedeeming(true);
+        if (!loading && !authLoading && user && galleryName && !requiresPassword && !error && !autoRedeemStartedRef.current) {
+            autoRedeemStartedRef.current = true;
             // Nur senden, wenn der User existiert (und somit Datenschutzerklärung bei Registrierung akzeptiert hat)
-            apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', { token, accept_privacy: !!user })
-            .then(resData => {
-                if (resData.full_path) {
-                    mutate(() => true, undefined, { revalidate: true });
-                    navigate('/' + resData.full_path, {replace: true});
-                } else {
+            // setAutoRedeeming wird bewusst NICHT synchron im Effect-Body aufgerufen (react-hooks/set-state-in-effect),
+            // sondern erst asynchron, sobald der Request unterwegs ist.
+            Promise.resolve()
+                .then(() => setAutoRedeeming(true))
+                .then(() => apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', { token, accept_privacy: !!user }))
+                .then(resData => {
+                    if (resData.full_path) {
+                        mutate(() => true, undefined, { revalidate: true });
+                        navigate('/' + resData.full_path, {replace: true});
+                    } else {
+                        setAutoRedeeming(false);
+                        autoRedeemStartedRef.current = false;
+                    }
+                })
+                .catch((err) => {
+                    console.error("Auto-redeem failed", err);
+                    setError('Automatischer Beitritt fehlgeschlagen. Bitte manuell versuchen.');
                     setAutoRedeeming(false);
-                }
-            })
-            .catch((err) => {
-                console.error("Auto-redeem failed", err);
-                setError('Automatischer Beitritt fehlgeschlagen. Bitte manuell versuchen.');
-                setAutoRedeeming(false);
-            });
+                    autoRedeemStartedRef.current = false;
+                });
         }
-    }, [loading, authLoading, user, galleryName, requiresPassword, error, token, autoRedeeming, navigate, mutate]);
+    }, [loading, authLoading, user, galleryName, requiresPassword, error, token, navigate, mutate]);
 
     if (loading || authLoading || autoRedeeming) return <PageLayout>
         <div className="flex h-full items-center justify-center"><span

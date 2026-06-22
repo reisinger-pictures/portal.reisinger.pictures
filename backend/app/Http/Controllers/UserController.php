@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Role;
 use App\Enums\UserRole;
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -44,14 +46,11 @@ class UserController extends Controller
         return $query->get();
     }
 
-    public function store(Request $request)
+    public function store(StoreUserRequest $request)
     {
         $currentUser = auth('api')->user();
 
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email'
-        ]);
+        $validated = $request->validated();
 
         if (!$currentUser->is_admin) {
             if (!$currentUser->is_customer_manager) {
@@ -90,7 +89,7 @@ class UserController extends Controller
         });
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateUserRequest $request, $id)
     {
         $currentUser = auth('api')->user();
         $user = User::findOrFail($id);
@@ -114,14 +113,7 @@ class UserController extends Controller
             return response()->json(['error' => 'Nur Super Admins können die Super Admin Rolle verwalten.'], 403);
         }
 
-        $request->validate([
-            'role_ids' => 'array',
-            'role_ids.*' => 'exists:roles,id',
-            'gallery_group_ids' => 'array',
-            'gallery_ids' => 'array',
-            'can_edit_metadata' => 'boolean',
-            'flatrate_level' => 'nullable|string|in:none,web,print,original'
-        ]);
+        $validated = $request->validated();
 
         $user->roles()->sync($request->role_ids ?? []);
         $user->galleryGroups()->sync($request->gallery_group_ids ?? []);

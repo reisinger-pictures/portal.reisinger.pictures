@@ -1,5 +1,5 @@
-import { MJS_PATCH_INSTRUCTION } from './repomix.config';
-import { defineConfig } from "repomix";
+import {MJS_PATCH_INSTRUCTION} from './repomix.config';
+import {defineConfig} from "repomix";
 
 export default defineConfig({
     output: {
@@ -20,6 +20,7 @@ export default defineConfig({
         useGitignore: true,
         useDefaultPatterns: true,
         customPatterns: [
+            "CLAUDE.md",
             "frontend/node_modules/**",
             "backend/vendor/**",
             "admin.lrplugin/**"

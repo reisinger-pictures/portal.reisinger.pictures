@@ -16,13 +16,24 @@ class WebhookController extends Controller
         $sig_header = $request->header('Stripe-Signature');
         $endpoint_secret = config('services.stripe.webhook_secret');
 
+        // Lokaler Entwicklungs-Fallback: Lese das Secret live aus der Datei des Auto-Tunnelers
+        $secretFile = storage_path('app/private/stripe_secret.txt');
+        if (empty($endpoint_secret) && file_exists($secretFile)) {
+            $endpoint_secret = trim(file_get_contents($secretFile));
+        }
+
         $event = null;
 
         try {
             $event = \Stripe\Webhook::constructEvent($payload, $sig_header, $endpoint_secret);
         } catch(\UnexpectedValueException $e) {
+            Log::error('Stripe Webhook Error: Invalid payload', ['exception' => $e->getMessage()]);
             return response()->json(['error' => 'Invalid payload'], 400);
         } catch(\Stripe\Exception\SignatureVerificationException $e) {
+            Log::error('Stripe Webhook Error: Invalid signature', [
+                'exception' => $e->getMessage(),
+                'configured_secret' => $endpoint_secret
+            ]);
             return response()->json(['error' => 'Invalid signature'], 400);
         }
 
