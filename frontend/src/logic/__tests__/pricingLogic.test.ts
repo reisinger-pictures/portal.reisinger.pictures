@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import {RES_RANKS, getRequiredTerm, isCovered, calculateUpgradePrice, PricingTerms} from '../pricingLogic';
+import {RES_RANKS, getRequiredTerm, getRequiredMultiplier, isCovered, calculateUpgradePrice, PricingTerms} from '../pricingLogic';
 
 // Beispiel-Terms (handgerechnet, Integer — die Logik parst ALLE Faktoren via parseInt):
 //   price_print − price_web = 1500;
@@ -36,6 +36,34 @@ describe('getRequiredTerm', () => {
     it('throws on empty / non-numeric value', () => {
         expect(() => getRequiredTerm({price_web: ''}, 'price_web')).toThrow();
         expect(() => getRequiredTerm({price_web: 'abc'}, 'price_web')).toThrow();
+    });
+});
+
+describe('getRequiredMultiplier', () => {
+    it('returns 1 while terms are not loaded (null/undefined) — neutral multiplier', () => {
+        expect(getRequiredMultiplier(null, 'mult_commercial')).toBe(1);
+        expect(getRequiredMultiplier(undefined, 'mult_commercial')).toBe(1);
+    });
+
+    it('parses an integer multiplier', () => {
+        expect(getRequiredMultiplier({mult_commercial: '2'}, 'mult_commercial')).toBe(2);
+    });
+
+    // R-05 · P1 · Bugfix: dezimale Multiplikatoren dürfen NICHT trunciert werden.
+    // Vor dem Fix parste getRequiredTerm('1.5') via parseInt → 1 (stiller Preisverlust).
+    it('parses a decimal multiplier WITHOUT truncation (R-05 fix)', () => {
+        expect(getRequiredMultiplier({mult_unlimited: '1.5'}, 'mult_unlimited')).toBe(1.5);
+        expect(getRequiredMultiplier({mult_commercial: '2.0'}, 'mult_commercial')).toBe(2);
+        expect(getRequiredMultiplier({mult_international: '1.25'}, 'mult_international')).toBe(1.25);
+    });
+
+    it('throws when the multiplier is missing', () => {
+        expect(() => getRequiredMultiplier({mult_commercial: '2'}, 'mult_unlimited')).toThrow();
+    });
+
+    it('throws on empty / non-numeric value', () => {
+        expect(() => getRequiredMultiplier({mult_commercial: ''}, 'mult_commercial')).toThrow();
+        expect(() => getRequiredMultiplier({mult_commercial: 'abc'}, 'mult_commercial')).toThrow();
     });
 });
 
@@ -114,5 +142,20 @@ describe('calculateUpgradePrice', () => {
     it('applies the international-territory multiplier', () => {
         // print (2500) · 2 − web (1000) = 4000
         expect(calculateUpgradePrice(TERMS, 'web', 'print', 'editorial', '1_year', 'international')).toBe(4000);
+    });
+
+    // R-05 · P1 · Bugfix-Regression: ein DEZIMALER Multiplikator darf nicht trunciert werden.
+    // Vor dem Fix: mult_commercial='1.5' → parseInt → 1 → web(1000)·1 − web(1000) = 0 (Bug).
+    // Nach Fix:    web(1000) · 1.5 − web(1000) = 500. Backend liefert mult_* dezimal (numeric|min:1).
+    it('R-05: decimal mult_commercial=1.5 is preserved (500 delta, not 0)', () => {
+        const decimalTerms: PricingTerms = {
+            price_web: '1000',
+            price_print: '2500',
+            price_original: '1500',
+            mult_commercial: '1.5',
+            mult_unlimited: '3',
+            mult_international: '2',
+        };
+        expect(calculateUpgradePrice(decimalTerms, 'web', 'web', 'commercial', '1_year', 'national')).toBe(500);
     });
 });

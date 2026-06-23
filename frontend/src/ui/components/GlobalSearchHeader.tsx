@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useBrand } from '../../logic/useBrand';
 import HighlightText from './HighlightText';
 import { useSearch } from '../../logic/useSearch';
 
@@ -8,6 +9,7 @@ export interface GlobalSearchHeaderProps {
 }
 
 export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderProps) {
+    const { logoSrc, portalName } = useBrand();
     const [searchParams] = useSearchParams();
     const qParam = searchParams.get('q') || '';
     const [searchQuery, setSearchQuery] = useState(qParam);
@@ -37,8 +39,8 @@ export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderPr
                 <span className="iconify mdi--menu text-2xl"></span>
             </button>
             <Link to="/" className="md:hidden flex items-center gap-2 shrink-0 mr-1">
-                <img src="/android-chrome-192x192.png" alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
-                <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">Reisinger Portal</span>
+                <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
+                <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
             </Link>
             
             <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full">

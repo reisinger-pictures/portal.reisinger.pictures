@@ -14,6 +14,7 @@ class StoreGroupRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tenant_id' => 'nullable|string|exists:tenants,id',
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'parent_id' => 'nullable|string|exists:gallery_groups,id',

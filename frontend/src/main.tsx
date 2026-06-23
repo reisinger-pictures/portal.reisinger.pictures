@@ -4,6 +4,9 @@ import {BrowserRouter} from 'react-router-dom';
 import { SWRConfig } from 'swr';
 import App from './App';
 import './index.css';
+import { applyTheme } from './logic/useBrand';
+
+applyTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

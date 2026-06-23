@@ -86,10 +86,12 @@ class ManualInvoiceService
      */
     public function getBankDetails(): array
     {
+        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $get = fn($k) => Setting::where('key', $pfx . $k)->value('value') ?? Setting::where('key', $k)->value('value');
         return [
-            'holder' => Setting::where('key', 'bank_holder')->value('value'),
-            'iban' => Setting::where('key', 'bank_iban')->value('value'),
-            'bic' => Setting::where('key', 'bank_bic')->value('value')
+            'holder' => $get('bank_holder'),
+            'iban' => $get('bank_iban'),
+            'bic' => $get('bank_bic')
         ];
     }
 

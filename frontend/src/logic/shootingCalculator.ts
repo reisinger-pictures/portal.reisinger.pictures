@@ -7,8 +7,10 @@ export interface ShootingPriceInput {
     calc_base_price?: string;
     calc_hourly_rate?: string;
     calc_images_per_hour?: string;
+    calc_outdoor_multiplier?: string;
     duration: number; // Minuten
     images: number;
+    isOutdoor: boolean;
     flatrate: boolean;
     discount: ShootingDiscount;
 }
@@ -19,9 +21,6 @@ export interface ShootingPriceResult {
     discountAbsolute: number; // packagePrice − finalPrice
 }
 
-/**
- * Berechnet den "psychologischen" Preis (verhaltensgleich zur ursprünglichen Inline-Logik).
- */
 export function roundToPsychologicalValue(value: number): number {
     if (value < 12) {
         return Math.max(1, Math.round(value));
@@ -38,13 +37,30 @@ export function roundToPsychologicalValue(value: number): number {
     return rounded;
 }
 
-export function calculateShootingPrice(input: ShootingPriceInput): ShootingPriceResult {
+export function calculateShootingPrice(input: ShootingPriceInput): ShootingPriceResult { return calculateCustomStudioPrice(input); }
+
+export function calculateCustomStudioPrice(input: ShootingPriceInput): ShootingPriceResult {
     const basePrice = parseFloat(input.calc_base_price || '50');
     const hourlyRate = parseFloat(input.calc_hourly_rate || '100');
-    const imagesPerHourPackage = parseInt(input.calc_images_per_hour || '6', 10);
+    
+    const DEFAULT_IMAGES_PER_HOUR = 6;
+    const parsedImagesPerHour = parseInt(input.calc_images_per_hour || String(DEFAULT_IMAGES_PER_HOUR), 10);
+    const imagesPerHourPackage =
+        Number.isFinite(parsedImagesPerHour) && parsedImagesPerHour >= 1
+            ? parsedImagesPerHour
+            : DEFAULT_IMAGES_PER_HOUR;
+            
     const durationHours = input.duration / 60;
     const timePrice = durationHours * hourlyRate;
-    const imagesPrice = (hourlyRate / imagesPerHourPackage) * input.images;
+    
+    // Basis-Bildpreis ermitteln
+    let imagesPrice = (hourlyRate / imagesPerHourPackage) * input.images;
+    
+    // Faktor dynamisch aus den DB-Settings parsen (Default: 0.5)
+    if (input.isOutdoor) {
+        const outdoorMultiplier = parseFloat(input.calc_outdoor_multiplier || '0.5');
+        imagesPrice = imagesPrice * outdoorMultiplier;
+    }
 
     const multiplier = input.flatrate ? 1.2 : 1;
     const rawTotal = (basePrice + timePrice + imagesPrice) * multiplier;
@@ -59,4 +75,36 @@ export function calculateShootingPrice(input: ShootingPriceInput): ShootingPrice
     const discountAbsolute = packagePrice - finalPrice;
 
     return {packagePrice, finalPrice, discountAbsolute};
+}
+
+
+export interface B2CFlexInput {
+    type: 'portrait' | 'couple' | 'nude';
+    setup: 'outdoor' | 'outdoor_flash' | 'indoor';
+    extraImages: number;
+    isFullyPrivate: boolean;
+}
+
+export function calculateB2CFlexPrice(input: B2CFlexInput): ShootingPriceResult {
+    const basePrice = 149;
+    let setupFee = 0;
+    
+    if (input.setup === 'outdoor_flash' || input.setup === 'indoor') {
+        setupFee = 50;
+    }
+
+    const extraImagesFee = input.extraImages * 15;
+    let privacyFee = 0;
+
+    if (input.type === 'nude' && input.isFullyPrivate) {
+        privacyFee = 200 + (input.extraImages * 5);
+    }
+
+    const total = basePrice + setupFee + extraImagesFee + privacyFee;
+
+    return {
+        packagePrice: total,
+        finalPrice: total,
+        discountAbsolute: 0
+    };
 }

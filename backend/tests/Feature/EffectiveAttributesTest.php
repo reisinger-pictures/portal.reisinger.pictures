@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class EffectiveAttributesTest extends TestCase
@@ -323,45 +324,136 @@ class EffectiveAttributesTest extends TestCase
     }
 
     // -----------------------------------------------------------------------
-    // REVIEW: Zyklus / Selbstreferenz — dokumentiert aktuelles (ungeschütztes) Verhalten.
-    // Die Accessoren und getFullPathAttribute haben KEINEN Zyklus-Schutz.
-    // Diese Tests werden bewusst übersprungen, bis ein Ticket den produktiven Code härtet.
+    // R-03 (BK-03): Zyklus-Schutz in getFullPathAttribute + effective_*-Accessoren.
+    // Produktiver Code terminiert jetzt bei zirkulärer / selbstreferenzieller parent_id
+    // (visited-set) und lehnt zyklische parent_id beim Speichern ab.
     // -----------------------------------------------------------------------
 
-    public function test_review_full_path_infinite_loop_on_circular_parent_chain(): void
+    /**
+     * Zyklus in der Group-Kette (A→B→A) darf getFullPathAttribute nicht zum Überlaufen bringen.
+     * Da der saving-Hook das Schreiben eines Zyklus verhindert, wird der Zyklus hier per
+     * Query-Builder direkt in die DB geschrieben (umgeht Model-Events) und testet genau den
+     * defensiven Runtime-Schutz gegen bereits vorhandene fehlerhafte Daten.
+     */
+    public function test_full_path_terminates_on_circular_parent_chain(): void
     {
-        $this->markTestSkipped(
-            'REVIEW/BK-03: Gallery::getFullPathAttribute und GalleryGroup::effective_* haben '
-            . 'keinen Zyklus-Schutz. Eine zirkuläre parent_id-Kette (A→B→A) bzw. '
-            . 'Selbstreferenz (A→A) führt zu Endlosrekursion/Stack-Overflow. '
-            . 'Ticket für produktives Härten (visited-set oder max-Tiefe) erforderlich. '
-            . 'Dieser Test dokumentiert das Risiko, wird aber nicht grün getestet.'
-        );
+        $a = GalleryGroup::factory()->create(['slug' => 'a']);
+        $b = GalleryGroup::factory()->create(['slug' => 'b', 'parent_id' => $a->id]);
 
-        // Zur Dokumentation des reproduzierenden Falls (wird wegen skip nicht ausgeführt):
-        // $a = GalleryGroup::factory()->create(['slug' => 'a']);
-        // $b = GalleryGroup::factory()->create(['slug' => 'b', 'parent_id' => $a->id]);
-        // $a->update(['parent_id' => $b->id]); // Zyklus A→B→A
-        // $gallery = Gallery::factory()->create(['gallery_group_id' => $a->id]);
-        // $gallery->full_path; // Endlosschleife
+        // Zyklus A→B→A direkt in der DB erzwingen (saving-Hook umgangen).
+        DB::table('gallery_groups')->where('id', $a->id)->update(['parent_id' => $b->id]);
+
+        // Frische Instanz laden, damit die parent-Relation neu aufgelöst wird.
+        $a = GalleryGroup::find($a->id);
+        $gallery = Gallery::factory()->create([
+            'slug' => 'shoot',
+            'gallery_group_id' => $a->id,
+        ]);
+
+        // Terminiert ohne Stack-Overflow. Exakte Slug-Reihenfolge im Zyklus ist nicht Teil der Invariante.
+        $path = $gallery->full_path;
+
+        $this->assertStringStartsWith('galleries/', $path);
+        $this->assertStringContainsString('shoot', $path);
     }
 
-    public function test_review_effective_accessor_infinite_loop_on_self_reference(): void
+    /**
+     * Selbstreferenz (A→A) terminiert in getFullPathAttribute.
+     */
+    public function test_full_path_terminates_on_self_referencing_parent(): void
     {
-        // Selbstreferenz.parent_id = eigene id: effective_* würde endlos rekursiv aufrufen.
+        $group = GalleryGroup::factory()->create(['slug' => 'self']);
+        DB::table('gallery_groups')->where('id', $group->id)->update(['parent_id' => $group->id]);
+
+        $group = GalleryGroup::find($group->id);
+        $gallery = Gallery::factory()->create([
+            'slug' => 'g',
+            'gallery_group_id' => $group->id,
+        ]);
+
+        $path = $gallery->full_path;
+
+        $this->assertStringStartsWith('galleries/', $path);
+        $this->assertStringContainsString('/g', $path);
+    }
+
+    /**
+     * effective_*-Accessoren terminieren bei Selbstreferenz und liefern den defensiven
+     * Fallback (false), da kein echter true-Wert in der Kette steht.
+     */
+    public function test_effective_accessor_terminates_on_self_reference(): void
+    {
         $group = GalleryGroup::factory()->create(['is_editorial_only' => false]);
+        DB::table('gallery_groups')->where('id', $group->id)->update(['parent_id' => $group->id]);
+
+        $group = GalleryGroup::find($group->id);
+
+        // Terminiert (kein Overflow) und liefert false, weil is_editorial_only false ist.
+        $this->assertFalse($group->effective_is_editorial_only);
+        $this->assertFalse($group->effective_is_hidden);
+        $this->assertFalse($group->effective_is_free_download);
+        $this->assertFalse($group->effective_restricted_photographers);
+    }
+
+    /**
+     * effective_*-Accessoren terminieren bei zirkulärer Kette UND ein echter true-Wert in der
+     * Kette wird weiterhin korrekt propagiert.
+     */
+    public function test_effective_accessor_finds_true_in_circular_chain(): void
+    {
+        $a = GalleryGroup::factory()->create(['slug' => 'a', 'is_editorial_only' => true]);
+        $b = GalleryGroup::factory()->create(['slug' => 'b', 'is_editorial_only' => false, 'parent_id' => $a->id]);
+
+        DB::table('gallery_groups')->where('id', $a->id)->update(['parent_id' => $b->id]);
+
+        $b = GalleryGroup::find($b->id);
+
+        // Terminiert trotz Zyklus und a.is_editorial_only=true wird gefunden.
+        $this->assertTrue($b->effective_is_editorial_only);
+    }
+
+    /**
+     * DB-Schicht: saving-Hook lehnt Selbstreferenz ab.
+     */
+    public function test_saving_rejects_self_referencing_parent_id(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $group = GalleryGroup::factory()->create();
         $group->parent_id = $group->id;
         $group->save();
+    }
 
-        // Sanity guard (nur im Test, nicht im produktiven Code): recognize self-reference.
-        if ($group->parent && $group->parent->id === $group->id) {
-            $this->markTestSkipped(
-                'REVIEW/BK-03: Selbstreferenzender parent_id erkannt. '
-                . 'GalleryGroup::effective_is_editorial_only würde endlos rekursieren. '
-                . 'Produktiver Code braucht Zyklus-Schutz. Dokumentiert, nicht „grün" gemacht.'
-            );
+    /**
+     * DB-Schicht: saving-Hook lehnt einen Zyklus (A→B→A) beim Update ab.
+     */
+    public function test_saving_rejects_circular_parent_chain(): void
+    {
+        $a = GalleryGroup::factory()->create();
+        $b = GalleryGroup::factory()->create(['parent_id' => $a->id]);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        // Würde A→B→A erzeugen.
+        $a->parent_id = $b->id;
+        $a->save();
+    }
+
+    /**
+     * DB-Schicht: eine legitime tiefe, aber azyklische Kette wird weiterhin akzeptiert
+     * (kein False Positive im Zyklus-Schutz).
+     */
+    public function test_saving_allows_deep_acyclic_chain(): void
+    {
+        $root = GalleryGroup::factory()->create(['parent_id' => null]);
+        $current = $root;
+
+        for ($i = 0; $i < 5; $i++) {
+            $current = GalleryGroup::factory()->create(['parent_id' => $current->id]);
         }
 
-        $this->assertTrue($group->effective_is_editorial_only);
+        // Alle Speichern-Operationen waren erfolgreich (kein Exception).
+        $this->assertNotNull($current->parent_id);
+        $this->assertIsBool($current->effective_is_editorial_only);
     }
 }

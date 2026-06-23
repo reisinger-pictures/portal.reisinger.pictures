@@ -146,6 +146,15 @@ class PricingServiceTest extends TestCase
         $this->assertSame(['Exclusivity'], $result['modifier_names']);
     }
 
+    /**
+     * R-07 (BK-04) — als GEWOLLT eingefroren (Stakeholder-Entscheid 2026-06-23):
+     * Der Modifier-Surcharge wird auch bei flatrate-gedeckter Basis (isBaseCovered=true) auf
+     * dem VOLLSTÄNDIGEN basePriceCents berechnet — sofern der Modifier nicht in der Flatrate
+     * enthalten ist. Modell: die Flatrate deckt die Basis-Lizenz; Premium-Modifier sind
+     * kostenpflichtige Add-ons (ihr % auf dem Katalog-Basispreis), unabhängig von der Deckung.
+     * Eine Alternative (Surcharge nur auf ungedecktem Antil = 0 bei Deckung → Modifier gratis)
+     * wurde bewusst verworfen. Siehe AGENTS.todo.md "Akzeptiert"-Bereich.
+     */
     public function test_modifier_surcharge_added_even_when_base_covered_if_not_included_in_flatrate(): void
     {
         $useCase = LicenseUseCase::factory()->create([

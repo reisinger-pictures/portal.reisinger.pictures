@@ -102,7 +102,11 @@ class ImageProcessor
         elseif ($targetWmSize <= 1000) $bucket = 1000;
 
         $prefix = $galleryType === 'selection' ? 'master_selection_' : 'master_';
-        $wmPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $prefix . $bucket . '.png');
+        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $wmPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $pfx . $prefix . $bucket . '.png');
+        if (!file_exists($wmPath)) {
+            $wmPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $prefix . $bucket . '.png');
+        }
         
         if (file_exists($wmPath)) {
             $wm = @imagecreatefrompng($wmPath);

@@ -21,6 +21,7 @@ class Gallery extends Model
         'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos', 
         'default_title', 'default_description', 'default_keywords', 
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
+        'tenant_id',
         'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers'
     ];
 
@@ -56,6 +57,7 @@ class Gallery extends Model
         'allow_client_metadata_edit' => 'boolean',
         'apply_metadata_to_photos' => 'boolean',
         'expires_at' => 'datetime',
+        'tenant_id' => 'string',
         'is_free_download' => 'boolean',
         'is_editorial_only' => 'boolean',
         'is_hidden' => 'boolean',
@@ -91,12 +93,21 @@ class Gallery extends Model
     {
         $path = $this->slug;
         $group = $this->galleryGroup;
-        
+
+        // R-03: Zyklus-Schutz — verhindert Endlosrekursion bei zirkulärer oder selbstreferenzieller
+        // parent_id-Kette. Defensiv, schützt auch vor bereits vorhandenen fehlerhaften Daten.
+        $visited = [];
+
         while ($group) {
+            if (isset($visited[$group->id])) {
+                break;
+            }
+            $visited[$group->id] = true;
+
             $path = $group->slug . '/' . $path;
-            $group = $group->parent; 
+            $group = $group->parent;
         }
-        
+
         return 'galleries/' . $path;
     }
 

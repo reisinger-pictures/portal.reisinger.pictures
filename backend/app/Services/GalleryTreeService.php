@@ -12,7 +12,7 @@ class GalleryTreeService
     /**
      * Get the complete gallery tree for admin view with optional filtering
      */
-    public function getAdminTree(User $user, ?string $filterType = null): array
+    public function getAdminTree(User $user, ?string $filterType = null, ?string $tenantId = null): array
     {
         $tree = Cache::rememberForever('gallery_tree_admin', function () {
             $groups = GalleryGroup::whereNull('parent_id')->with(['children', 'galleries'])->get();
@@ -35,7 +35,28 @@ class GalleryTreeService
         if ($filterType) {
             $treeArray = $this->filterTreeByType($treeArray, $filterType);
         }
+        if ($tenantId) {
+            $treeArray = $this->filterTreeByTenant($treeArray, $tenantId);
+        }
 
+        return $treeArray;
+    }
+
+
+    private function filterTreeByTenant(array $treeArray, string $tenantId): array
+    {
+        $filterNode = function($groups) use (&$filterNode, $tenantId) {
+            $result = [];
+            foreach ($groups as $group) {
+                if ($group['tenant_id'] === $tenantId) {
+                    if (isset($group['children'])) $group['children'] = $filterNode($group['children']);
+                    $result[] = $group;
+                }
+            }
+            return $result;
+        };
+        $treeArray['groups'] = $filterNode($treeArray['groups']);
+        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], fn($g) => $g['tenant_id'] === $tenantId));
         return $treeArray;
     }
 

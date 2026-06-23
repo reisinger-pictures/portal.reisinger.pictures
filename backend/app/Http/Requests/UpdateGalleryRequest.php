@@ -14,6 +14,7 @@ class UpdateGalleryRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tenant_id' => 'nullable|string|exists:tenants,id',
             'name' => 'nullable|string|max:255',
             'slug' => 'nullable|string|max:255',
             'type' => 'nullable|in:selection,delivery',

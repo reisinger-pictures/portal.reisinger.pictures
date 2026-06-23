@@ -1,15 +1,14 @@
 import {describe, it, expect} from 'vitest';
-import {roundToPsychologicalValue, calculateShootingPrice, ShootingPriceInput} from '../shootingCalculator';
-
-// Psychologische Rundung ist GEWÜNSCHTES Verhalten (angezeigte Rabatte bewusst mathematisch ungenau).
-// Siehe features/ecommerce/07-psychological-pricing.md — KEIN Bug-REVIEW für die Rundungs-Ungenauigkeit.
+import {roundToPsychologicalValue, calculateShootingPrice, ShootingPriceInput, calculateB2CFlexPrice} from '../shootingCalculator';
 
 const defaults = (overrides: Partial<ShootingPriceInput> = {}): ShootingPriceInput => ({
     calc_base_price: '50',
     calc_hourly_rate: '100',
     calc_images_per_hour: '6',
+    calc_outdoor_multiplier: '0.5',
     duration: 90,
     images: 15,
+    isOutdoor: false,
     flatrate: false,
     discount: '0',
     ...overrides,
@@ -47,6 +46,11 @@ describe('calculateShootingPrice', () => {
         expect(calculateShootingPrice(defaults())).toEqual({packagePrice: 449, finalPrice: 449, discountAbsolute: 0});
     });
 
+    it('halves the images price component when isOutdoor is true', () => {
+        // Base 50 + Time 150 + (Images 250 * 0.5 = 125) = 325 -> gerundet auf 325
+        expect(calculateShootingPrice(defaults({isOutdoor: true}))).toEqual({packagePrice: 325, finalPrice: 325, discountAbsolute: 0});
+    });
+
     it('flatrate (+20%) → {539,539,0}', () => {
         expect(calculateShootingPrice(defaults({flatrate: true}))).toEqual({packagePrice: 539, finalPrice: 539, discountAbsolute: 0});
     });
@@ -55,8 +59,6 @@ describe('calculateShootingPrice', () => {
         expect(calculateShootingPrice(defaults({discount: '33'}))).toEqual({packagePrice: 449, finalPrice: 299, discountAbsolute: 150});
     });
 
-    // 50%: angezeigte −50% sind bewusst ungenau (eff. ≈ 49,9 %) wg. psychologischer Endpreis-Rundung.
-    // Siehe features/ecommerce/07-psychological-pricing.md — gewünschtes Verhalten, kein Bug.
     it('50% discount → {449,225,224} (desired inexact rounding)', () => {
         expect(calculateShootingPrice(defaults({discount: '50'}))).toEqual({packagePrice: 449, finalPrice: 225, discountAbsolute: 224});
     });
@@ -73,16 +75,17 @@ describe('calculateShootingPrice', () => {
         expect(calculateShootingPrice(defaults({images: 0}))).toEqual({packagePrice: 199, finalPrice: 199, discountAbsolute: 0});
     });
 
-    // REVIEW (echter potentieller Bug, KEIN gewünschtes Verhalten): calc_images_per_hour='0' →
-    // Division durch null → Infinity. Siehe features/ecommerce/07-psychological-pricing.md (Kante).
-    it('_review: calc_images_per_hour "0" yields Infinity (division by zero)', () => {
+    it('calc_images_per_hour "0" falls back to default 6 (no Infinity)', () => {
         const result = calculateShootingPrice(defaults({calc_images_per_hour: '0'}));
-        expect(result.packagePrice).toBe(Infinity);
-        expect(result.finalPrice).toBe(Infinity);
+        expect(Number.isFinite(result.packagePrice)).toBe(true);
+        expect(Number.isFinite(result.finalPrice)).toBe(true);
+        expect(result).toEqual({packagePrice: 449, finalPrice: 449, discountAbsolute: 0});
     });
 
-    it('combines flatrate and discount (flatrate + 50% → {539,269,270})', () => {
-        expect(calculateShootingPrice(defaults({flatrate: true, discount: '50'}))).toEqual({packagePrice: 539, finalPrice: 269, discountAbsolute: 270});
+    it('combines flatrate, outdoor and discount correctly', () => {
+        // (Base 50 + Time 150 + (Images 250 * 0.5 = 125)) * 1.2 = 325 * 1.2 = 390 -> gerundet auf 389
+        // 389 - 50% = 194.5 -> gerundet auf 195
+        expect(calculateShootingPrice(defaults({flatrate: true, isOutdoor: true, discount: '50'}))).toEqual({packagePrice: 389, finalPrice: 195, discountAbsolute: 194});
     });
 
     it('honours a custom hourly rate', () => {
@@ -91,5 +94,34 @@ describe('calculateShootingPrice', () => {
 
     it('honours a custom images-per-hour', () => {
         expect(calculateShootingPrice(defaults({calc_images_per_hour: '10'}))).toEqual({packagePrice: 349, finalPrice: 349, discountAbsolute: 0});
+    });
+
+    it('non-numeric calc_images_per_hour falls back to default (finite result)', () => {
+        const result = calculateShootingPrice(defaults({calc_images_per_hour: 'abc'}));
+        expect(Number.isFinite(result.packagePrice)).toBe(true);
+        expect(Number.isFinite(result.finalPrice)).toBe(true);
+        expect(result).toEqual({packagePrice: 449, finalPrice: 449, discountAbsolute: 0});
+    });
+
+    it('negative calc_images_per_hour falls back to default (finite result)', () => {
+        const result = calculateShootingPrice(defaults({calc_images_per_hour: '-5'}));
+        expect(Number.isFinite(result.packagePrice)).toBe(true);
+        expect(Number.isFinite(result.finalPrice)).toBe(true);
+        expect(result).toEqual({packagePrice: 449, finalPrice: 449, discountAbsolute: 0});
+    });
+});
+
+describe('calculateB2CFlexPrice', () => {
+    it('calculates portrait correctly', () => {
+        expect(calculateB2CFlexPrice({ type: 'portrait', setup: 'outdoor', extraImages: 0, isFullyPrivate: false })).toEqual({ packagePrice: 149, finalPrice: 149, discountAbsolute: 0 });
+    });
+    it('calculates couple indoor correctly', () => {
+        expect(calculateB2CFlexPrice({ type: 'couple', setup: 'indoor', extraImages: 5, isFullyPrivate: false })).toEqual({ packagePrice: 274, finalPrice: 274, discountAbsolute: 0 });
+    });
+    it('calculates nude outdoor private correctly', () => {
+        expect(calculateB2CFlexPrice({ type: 'nude', setup: 'outdoor', extraImages: 0, isFullyPrivate: true })).toEqual({ packagePrice: 349, finalPrice: 349, discountAbsolute: 0 });
+    });
+    it('calculates nude indoor private correctly', () => {
+        expect(calculateB2CFlexPrice({ type: 'nude', setup: 'indoor', extraImages: 10, isFullyPrivate: true })).toEqual({ packagePrice: 599, finalPrice: 599, discountAbsolute: 0 });
     });
 });

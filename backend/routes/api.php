@@ -39,6 +39,8 @@ Route::middleware("throttle:$throttleLimit,1")->group(function () {
 Route::get('/ping', function () {
     return response()->json(['message' => 'API OK']);
 });
+// R-01 (naming): Lizenzbedingungen + Preisfaktoren — öffentlich, KEINE Bank-/Firmendaten
+// (diese liegen in /settings/billing-details hinter auth:api).
 Route::get('/settings/license-terms', [SettingsController::class, 'getLicenseTerms']);
 Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index']);
 
@@ -93,6 +95,8 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
+    // R-01 (naming): Bankverbindung & Impressum — sensibel, nur authentifiziert.
+    Route::get('/settings/billing-details', [SettingsController::class, 'getBillingDetails']);
     Route::post('/photos/{photoId}/rate', [GalleryFrontendController::class, 'rate']);
     Route::post('/galleries/{id}/finish-rating', [MailController::class, 'finishRating']);
 
@@ -146,6 +150,10 @@ Route::middleware(['auth:api', 'management'])->group(function () {
 
     Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark']);
     Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms']);
+    // R-01: Billing-/Impressum-Konfiguration ist ein Super-Admin-Anliegen (s. isImpressumMissing-
+    // Gate im Frontend) → zusätzlich super_admin-gesichert. Lesen (GET /settings/billing-details)
+    // bleibt auth:api, da Klienten die Bankdaten für "Kauf auf Rechnung" brauchen.
+    Route::put('/management/settings/billing-details', [SettingsController::class, 'updateBillingDetails'])->middleware('super_admin');
 
     Route::middleware(['super_admin'])->group(function () {
         Route::post('/management/settings/license-use-cases', [LicenseCatalogController::class, 'storeUseCase']);

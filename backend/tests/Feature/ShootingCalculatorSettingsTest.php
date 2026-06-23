@@ -26,6 +26,19 @@ class ShootingCalculatorSettingsTest extends TestCase
     }
 
     /**
+     * Erzeugt einen Super-Admin-User mit Rolle und gibt einen gültigen JWT zurück.
+     * Benötigt für billing-details-WRITE (R-01: super_admin-gesichert).
+     */
+    private function superAdminToken(): string
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->roles()->attach(
+            Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value])
+        );
+        return auth('api')->login($superAdmin);
+    }
+
+    /**
      * Gültiges calc_*-Payload. Setzt immer die required mult_*-Felder,
      * damit calc_*-spezifische Validierungsregeln nicht durch fehlende
      * required-Felder überlagert werden.
@@ -45,7 +58,8 @@ class ShootingCalculatorSettingsTest extends TestCase
 
     public function test_get_license_terms_returns_defaults_when_settings_missing(): void
     {
-        // Frische DB, keine Settings vorhanden → hardcoded Defaults
+        // R-01: GET /settings/license-terms ist öffentlich (nur Lizenztexte + Preisfaktoren,
+        // KEINE Bankdaten). Frische DB → hardcoded Defaults.
         $response = $this->getJson('/api/settings/license-terms');
 
         $response->assertStatus(200)
@@ -67,12 +81,91 @@ class ShootingCalculatorSettingsTest extends TestCase
             ]))
             ->assertStatus(200);
 
-        // Folge-GET liefert die gespeicherten Werte
+        // Folge-GET liefert die gespeicherten Werte (license-terms ist öffentlich, s. R-01)
         $this->getJson('/api/settings/license-terms')
             ->assertStatus(200)
             ->assertJsonPath('calc_base_price', '75')
             ->assertJsonPath('calc_hourly_rate', '150')
             ->assertJsonPath('calc_images_per_hour', '10');
+    }
+
+    // ------------------------------------------------------------------
+    // R-01 (security/naming): Lizenztexte sind public-safe, Bank-/Firmendaten liegen
+    // im separaten, auth-geschützten Endpunkt /settings/billing-details.
+    // ------------------------------------------------------------------
+
+    public function test_license_terms_is_public_and_omits_billing_data(): void
+    {
+        // Sensible Werte persistieren, damit ein Leak erkannt würde (nicht nur leere Defaults).
+        Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'AT99 9999 9999 9999 9999']);
+        Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Max Mustermann']);
+        Setting::updateOrCreate(['key' => 'company_email'], ['value' => 'finance@reisinger.pictures']);
+        Setting::updateOrCreate(['key' => 'company_city'], ['value' => 'Wien']);
+
+        // Vollständig anonymer Aufruf (kein Authorization-Header) — license-terms ist öffentlich.
+        $this->getJson('/api/settings/license-terms')
+            ->assertStatus(200)
+            ->assertJsonMissingPath('bank_iban')
+            ->assertJsonMissingPath('bank_bic')
+            ->assertJsonMissingPath('bank_holder')
+            ->assertJsonMissingPath('company_street')
+            ->assertJsonMissingPath('company_zip')
+            ->assertJsonMissingPath('company_city')
+            ->assertJsonMissingPath('company_country')
+            ->assertJsonMissingPath('company_email')
+            // Regression-Guard: legitime öffentliche Felder bleiben verfügbar (Gallery-Flow).
+            ->assertJsonStructure([
+                'editorial', 'commercial', '1_year', 'unlimited',
+                'mult_commercial', 'mult_unlimited', 'mult_international',
+                'base_price', 'calc_base_price', 'calc_hourly_rate', 'calc_images_per_hour',
+            ])
+            ->assertJsonPath('mult_commercial', '2.0')
+            ->assertJsonPath('calc_images_per_hour', '6');
+    }
+
+    public function test_billing_details_rejects_anonymous_request(): void
+    {
+        // Billing-/Impressum-Daten sind sensibel → anonym = 401 (kein Leak).
+        $this->getJson('/api/settings/billing-details')->assertStatus(401);
+    }
+
+    public function test_billing_details_returns_data_when_authenticated(): void
+    {
+        // GET bleibt auth:api (Klienten brauchen Bankdaten für "Kauf auf Rechnung").
+        Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'AT99 9999 9999 9999 9999']);
+        Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Max Mustermann']);
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->getJson('/api/settings/billing-details')
+            ->assertStatus(200)
+            ->assertJsonPath('bank_iban', 'AT99 9999 9999 9999 9999')
+            ->assertJsonPath('bank_holder', 'Max Mustermann');
+    }
+
+    public function test_billing_details_update_requires_super_admin(): void
+    {
+        // R-01: WRITE ist super_admin-gesichert. Ein regulärer Admin -> 403.
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/billing-details', [
+                'bank_iban' => 'AT11 2222 3333 4444 5555',
+            ])
+            ->assertStatus(403);
+    }
+
+    public function test_billing_details_update_persists_for_super_admin(): void
+    {
+        $token = $this->superAdminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/billing-details', [
+                'bank_iban' => 'AT11 2222 3333 4444 5555',
+            ])
+            ->assertStatus(200);
+
+        $this->assertSame('AT11 2222 3333 4444 5555', Setting::where('key', 'bank_iban')->value('value'));
     }
 
     // ------------------------------------------------------------------

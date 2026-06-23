@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {Link, useNavigate} from 'react-router-dom';
+import { useBrand } from '../../logic/useBrand';
 import {useAuth} from '../../logic/useAuth';
 import {useSearch} from '../../logic/useSearch';
 import {Gallery} from '../../logic/useGalleries';
@@ -7,6 +8,7 @@ import Sidebar from '../components/Sidebar';
 import HighlightText from '../components/HighlightText';
 
 export default function ClientDashboard() {
+    const { logoSrc, portalName } = useBrand();
     const {user} = useAuth();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -42,8 +44,8 @@ export default function ClientDashboard() {
                         <span className="iconify mdi--menu text-2xl"></span>
                     </button>
                     <Link to="/" className="md:hidden flex items-center gap-2 shrink-0 mr-1">
-                        <img src="/android-chrome-192x192.png" alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
-                        <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">Reisinger Portal</span>
+                        <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
+                        <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
                     </Link>
 
                     <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full">

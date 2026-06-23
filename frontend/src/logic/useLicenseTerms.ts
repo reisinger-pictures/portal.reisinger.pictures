@@ -29,3 +29,21 @@ export function useLicenseTerms() {
 
     return {terms: data, isLoading, updateTerms};
 }
+
+/**
+ * R-01 (naming/SRP): Bankverbindung & Impressum — nur Lizenztexte-unabhängige, sensible Felder
+ * (IBAN, BIC, Empfänger, Firmenadresse, company_email). Authentifiziert (GET hinter auth:api).
+ * Lizenztexte + Preisfaktoren liefert useLicenseTerms() (public-safe).
+ */
+export function useBillingDetails() {
+    const {data, isLoading, mutate} = useSWR<LicenseTerms>('/api/settings/billing-details', fetcher, {
+        revalidateOnFocus: false
+    });
+
+    const updateBillingDetails = async (payload: LicenseTermsPayload) => {
+        await apiMutate('/api/management/settings/billing-details', 'PUT', payload);
+        await mutate();
+    };
+
+    return {billingDetails: data, isLoading, updateBillingDetails};
+}

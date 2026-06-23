@@ -40,17 +40,22 @@ class SettingsController extends Controller
 
     public function getWatermarkSvg()
     {
-        $path = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/watermark.svg');
+        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $path = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $pfx . 'watermark.svg');
+        if (!file_exists($path)) {
+            $path = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/watermark.svg');
+        }
         if (!file_exists($path)) abort(404);
         return response()->file($path, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'no-cache, no-store, must-revalidate']);
     }
 
     public function getWatermark()
     {
+        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
         $disk = \Illuminate\Support\Facades\Storage::disk('photos');
         return response()->json([
-            'has_svg' => $disk->exists('_watermarks/watermark.svg'),
-            'opacity' => (float) (Setting::where('key', 'watermark_opacity')->value('value') ?? 0.15)
+            'has_svg' => $disk->exists('_watermarks/' . $pfx . 'watermark.svg'),
+            'opacity' => (float) (Setting::where('key', $pfx . 'watermark_opacity')->value('value') ?? Setting::where('key', 'watermark_opacity')->value('value') ?? 0.15)
         ]);
     }
 
@@ -73,13 +78,14 @@ class SettingsController extends Controller
         $dir = '_watermarks';
         if (!$disk->exists($dir)) $disk->makeDirectory($dir);
 
-        if ($request->hasFile('svg')) $disk->putFileAs($dir, $request->file('svg'), 'watermark.svg');
-        if ($request->hasFile('bucket_500')) $disk->putFileAs($dir, $request->file('bucket_500'), 'master_500.png');
-        if ($request->hasFile('bucket_1000')) $disk->putFileAs($dir, $request->file('bucket_1000'), 'master_1000.png');
-        if ($request->hasFile('bucket_2000')) $disk->putFileAs($dir, $request->file('bucket_2000'), 'master_2000.png');
-        if ($request->hasFile('bucket_500_sel')) $disk->putFileAs($dir, $request->file('bucket_500_sel'), 'master_selection_500.png');
-        if ($request->hasFile('bucket_1000_sel')) $disk->putFileAs($dir, $request->file('bucket_1000_sel'), 'master_selection_1000.png');
-        if ($request->hasFile('bucket_2000_sel')) $disk->putFileAs($dir, $request->file('bucket_2000_sel'), 'master_selection_2000.png');
+        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        if ($request->hasFile('svg')) $disk->putFileAs($dir, $request->file('svg'), $pfx . 'watermark.svg');
+        if ($request->hasFile('bucket_500')) $disk->putFileAs($dir, $request->file('bucket_500'), $pfx . 'master_500.png');
+        if ($request->hasFile('bucket_1000')) $disk->putFileAs($dir, $request->file('bucket_1000'), $pfx . 'master_1000.png');
+        if ($request->hasFile('bucket_2000')) $disk->putFileAs($dir, $request->file('bucket_2000'), $pfx . 'master_2000.png');
+        if ($request->hasFile('bucket_500_sel')) $disk->putFileAs($dir, $request->file('bucket_500_sel'), $pfx . 'master_selection_500.png');
+        if ($request->hasFile('bucket_1000_sel')) $disk->putFileAs($dir, $request->file('bucket_1000_sel'), $pfx . 'master_selection_1000.png');
+        if ($request->hasFile('bucket_2000_sel')) $disk->putFileAs($dir, $request->file('bucket_2000_sel'), $pfx . 'master_selection_2000.png');
 
         // Cache-Busting: Lösche alle generierten Wasserzeichen-Bilder asynchron im Hintergrund
         dispatch(function () {
@@ -97,6 +103,11 @@ class SettingsController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * R-01 (security/naming): Lizenzbedingungen + Preisfaktoren — KEINE Bank-/Firmendaten.
+     * Öffentlich (Gallery-/License-Selector-/Calculator-Flows). Sensible Billing-/Impressum-Daten
+     * liegen bewusst im separaten, auth-geschützten Endpunkt getBillingDetails() (SRP-Trennung).
+     */
     public function getLicenseTerms()
     {
         return response()->json([
@@ -116,24 +127,39 @@ class SettingsController extends Controller
             'calc_base_price' => Setting::where('key', 'calc_base_price')->value('value') ?? '50',
             'calc_hourly_rate' => Setting::where('key', 'calc_hourly_rate')->value('value') ?? '100',
             'calc_images_per_hour' => Setting::where('key', 'calc_images_per_hour')->value('value') ?? '6',
-            'bank_iban' => Setting::where('key', 'bank_iban')->value('value') ?? '',
-            'bank_bic' => Setting::where('key', 'bank_bic')->value('value') ?? '',
-            'bank_holder' => Setting::where('key', 'bank_holder')->value('value') ?? '',
-            'company_street' => Setting::where('key', 'company_street')->value('value') ?? '',
-            'company_zip' => Setting::where('key', 'company_zip')->value('value') ?? '',
-            'company_city' => Setting::where('key', 'company_city')->value('value') ?? '',
-            'company_country' => Setting::where('key', 'company_country')->value('value') ?? '',
-            'company_email' => Setting::where('key', 'company_email')->value('value') ?? 'hello@reisinger.pictures'
+            'calc_outdoor_multiplier' => Setting::where('key', 'calc_outdoor_multiplier')->value('value') ?? '0.5',
+        ]);
+    }
+
+    /**
+     * R-01: Bankverbindung & Impressum — NUR authentifiziert (ClientOrdersView, Management).
+     * Getrennt von den Lizenzbedingungen: Lizenztexte sind public-safe, Billing-/Firmendaten
+     * sind sensibel und dürfen anonym nicht exponiert werden.
+     */
+    public function getBillingDetails()
+    {
+        return response()->json([
+            'bank_iban' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_bank_iban' : 'bank_iban')->value('value') ?? Setting::where('key', 'bank_iban')->value('value') ?? '',
+            'bank_bic' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_bank_bic' : 'bank_bic')->value('value') ?? Setting::where('key', 'bank_bic')->value('value') ?? '',
+            'bank_holder' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_bank_holder' : 'bank_holder')->value('value') ?? Setting::where('key', 'bank_holder')->value('value') ?? '',
+            'company_street' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_street' : 'company_street')->value('value') ?? Setting::where('key', 'company_street')->value('value') ?? '',
+            'company_zip' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_zip' : 'company_zip')->value('value') ?? Setting::where('key', 'company_zip')->value('value') ?? '',
+            'company_city' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_city' : 'company_city')->value('value') ?? Setting::where('key', 'company_city')->value('value') ?? '',
+            'company_country' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_country' : 'company_country')->value('value') ?? Setting::where('key', 'company_country')->value('value') ?? '',
+            'company_email' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_email' : 'company_email')->value('value') ?? Setting::where('key', 'company_email')->value('value') ?? 'hello@reisinger.pictures',
         ]);
     }
 
     public function updateLicenseTerms(Request $request)
     {
+        // R-01 (naming/SRP): nur Lizenzbedingungen + Preisfaktoren. Bank-/Firmendaten gehören
+        // in updateBillingDetails() (separater Endpunkt).
         $validated = $request->validate([
             'base_price' => 'nullable|integer|min:500',
             'calc_base_price' => 'nullable|numeric|min:0',
             'calc_hourly_rate' => 'nullable|numeric|min:0',
             'calc_images_per_hour' => 'nullable|integer|min:1',
+            'calc_outdoor_multiplier' => 'nullable|numeric|min:0.1|max:1',
             'term_editorial' => 'nullable|string',
             'term_commercial' => 'nullable|string',
             'term_1_year' => 'nullable|string',
@@ -146,6 +172,23 @@ class SettingsController extends Controller
             'term_web' => 'nullable|string',
             'term_print' => 'nullable|string',
             'term_original' => 'nullable|string',
+        ]);
+
+        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        foreach ($validated as $key => $value) {
+            if ($value !== null) {
+                Setting::updateOrCreate(['key' => $pfx . $key], ['value' => $value]);
+            }
+        }
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * R-01: Bankverbindung & Impressum speichern (nur Lizenzbedingungen-unabhängige Felder).
+     */
+    public function updateBillingDetails(Request $request)
+    {
+        $validated = $request->validate([
             'bank_holder' => 'nullable|string',
             'bank_iban' => 'nullable|string',
             'bank_bic' => 'nullable|string',

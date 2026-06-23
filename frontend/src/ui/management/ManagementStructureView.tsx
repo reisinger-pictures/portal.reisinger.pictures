@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useTenants } from '../../logic/useTenants';
 import { Gallery, GalleryGroup, GalleryTreeResponse } from '../../logic/useGalleries';
 
-// Type Guards für sauberes Casting
 function isGallery(node: Gallery | GalleryGroup): node is Gallery {
     return 'type' in node;
 }
@@ -20,8 +20,8 @@ const TreeNode = ({
                       node,
                       onEditGroup,
                       onEditGallery,
-    onOpenPhotographerTeam,
-    onOpenGroupModal,
+                      onOpenPhotographerTeam,
+                      onOpenGroupModal,
                       onOpenGalleryModal,
                       expandSignal
                   }: {
@@ -44,7 +44,6 @@ const TreeNode = ({
         if (effectiveSignal < prevSignal) setIsOpen(false);
     }
 
-    // Falls es eine Gallery ist (Type Guard greift hier)
     if (isGallery(node)) {
         const isExpired = node.expires_at && new Date(node.expires_at) < new Date();
         return (
@@ -61,7 +60,6 @@ const TreeNode = ({
         );
     }
 
-    // Ab hier weiß TypeScript, dass"node" eine GalleryGroup sein muss
     const hasInhalt = ((node.children?.length ?? 0) > 0) || ((node.galleries?.length ?? 0) > 0);
 
     return (
@@ -116,7 +114,11 @@ const TreeNode = ({
 };
 
 export default function ManagementStructureView({ tree, onOpenGroupModal, onOpenGalleryModal, onEditGroup, onEditGallery, onOpenPhotographerTeam }: Props) {
+    const { tenants } = useTenants();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentTenantFilter = searchParams.get('tenant_id') || '';
     const [expandSignal, setExpandSignal] = useState(0);
+    
     const safeGroups = Array.isArray(tree?.groups) ? [...tree.groups].sort((a,b)=>a.name.localeCompare(b.name)) : [];
     const safeRootGalleries = Array.isArray(tree?.root_galleries) ? [...tree.root_galleries].sort((a,b)=>a.name.localeCompare(b.name)) : [];
 
@@ -127,6 +129,25 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
                     <h1 className="text-4xl font-bold mb-2">Galerien</h1>
                     <p className="opacity-70 text-lg">Verwalte deine Ordner und Galerien.</p>
                 </div>
+                
+                <div className="form-control w-full md:w-72">
+                    <label className="label py-1"><span className="label-text font-bold opacity-70">Mandanten-Filter</span></label>
+                    <select 
+                        className="select select-bordered select-sm w-full" 
+                        value={currentTenantFilter} 
+                        onChange={e => {
+                            setSearchParams(prev => {
+                                if (e.target.value) prev.set('tenant_id', e.target.value);
+                                else prev.delete('tenant_id');
+                                return prev;
+                            });
+                        }}
+                    >
+                        <option value="">-- Alle Mandanten / Eigene --</option>
+                        {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                </div>
+
                 <div className="join shadow-sm">
                     <button onClick={() => onOpenGalleryModal()} className="btn btn-primary join-item"><span className="iconify mdi--image-plus"></span> Neue Galerie</button>
                     <button onClick={() => onOpenGroupModal()} className="btn btn-outline join-item"><span className="iconify mdi--folder-plus"></span> Neuer Ordner</button>

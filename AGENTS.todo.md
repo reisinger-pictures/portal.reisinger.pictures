@@ -17,42 +17,56 @@ entfernen), Bugfix-Test ergänzen und **gesamte Suite grün** halten (`backend`:
 
 ---
 
-## 🔒 Sicherheit & Datenlecke
+## 🎯 Priorisierung (Stand: 2026-06-25)
 
-### R-01 · 🔴 `GET /api/settings/license-terms` ist public und exponiert Bank-/Kontaktdaten ☐
+Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Abschluss der Multi-Brand-Infrastruktur.
 
-- **Symptom:** Der Endpunkt ist ohne Authentifizierung aufrufbar und liefert u. a. `bank_iban`, `bank_bic`,
-  `bank_holder`, `company_email` — potenzielles Datenleck (IBAN-/Kontaktdaten-Harvesting).
-- **Ursache:** Route ohne Auth-Middleware — `backend/routes/api.php:42`
-  `Route::get('/settings/license-terms', [SettingsController::class, 'getLicenseTerms']);` (außerhalb aller
-  `auth`/`admin`-Gruppen). Response baut sensible Felder auf —
-  `backend/app/Http/Controllers/SettingsController.php:119-126`.
-- **Vorschlag:** Entweder Endpunkt hinter Auth/`admin` legen **oder** sensible Felder aus der Public-Antwort
-  entfernen. Vorher prüfen, welche Caller den anonymen Zugang brauchen (z. B. Checkout-/Impressum-Anzeige im
-  Frontend) und diese über einen separaten, reduzierten Public-Endpunkt versorgen.
-- **Herkunft:** BK-10.
-
-### R-02 · 🟡 `User::getSubGroupIds` baut CTE-ID-Liste per String-Concatenation ☐
-
-- **Symptom:** Für die `WITH RECURSIVE`-CTE werden die Eltern-UUIDs per `implode` + manuelle Quotes zu einem
-  SQL-String zusammengebaut statt gebundene Parameter/`whereIn` zu verwenden → Robustheits-/Sicherheitsrisiko
-  (Injection-nah, falls Nicht-UUID-Werte eingeschleust werden). Kein nachgewiesener Exploit.
-- **Ursache:** `backend/app/Models/User.php:158-160`
-  ```php
-  $inIds = implode(',', array_map(fn($id) => "'" . $id . "'", $parentIds));
-  ```
-- **Vorschlag:** Auf gebundene Parameter (`?`-Platzhalter + Bindings) bzw. `whereIn` umstellen; leere Liste früh
-  `return []`.
-- **Herkunft:** BK-01 (auch §1).
-
-> **Verwandt (Cache):** Prozessglobaler Cache `unrestricted_photographer_gallery_ids`
-> (`backend/app/Models/User.php:216`, `Cache::rememberForever(...)` ohne User/Role-Scope) → siehe **R-10 (c)**.
+| Prio         | Aufgaben                                    | Fokus                                                                     |
+|--------------|---------------------------------------------|---------------------------------------------------------------------------|
+| **Erledigt** | A-01 ✓, A-02 ✓                              | **Multi-Domain-Infrastruktur & B2C-Pricing (ATR) vollständig integriert** |
+| **P0**       | R-01 ✓, R-02 ✓                              | Sicherheit & Datenintegrität (Public-Endpoint, SQL-Bindings)              |
+| **P1**       | R-03 ✓, R-04 ✓, R-05 ✓                      | Schleifen- & Berechnungs-Guards (Zyklus, Div-by-0, Typ-Parsing)           |
+| **P2**       | R-06, R-11, R-13                            | Utility- & Logik-Konsistenz (Datumsformat, Nullish, Collections)          |
+| *offen*      | R-07 ✓ (akzeptiert), R-08, R-09, R-10, R-12 | R-07 als gewollt eingefroren; Rest niedrige Code-Qualität                 |
 
 ---
 
+## 🌐 Multi-Domain-Architektur & Pricing-Strategie (Zweigleisigkeit 2026)
+
+### Brand-Infrastruktur & B2C-Erweiterung
+
+#### **A-01 · 🔴 P0 · Multi-Domain-Infrastruktur & Theme-Weiche** ☑ erledigt (2026-06-25)
+
+- **Zentrale Datenhaltung & Backend-Context:** Middleware zur dynamischen Erkennung des Brands (`all-the.rest` vs
+  `reisinger.pictures`) via Host/Referer implementiert. Settings-Abfragen greifen im ATR-Kontext linter- und typsicher
+  auf das `atr_`-Präfix zu.
+- **Frontend-Theme-Switch (Tailwind v4):** Pre-Boot-Skript in `index.html` implementiert, das Favicons, Webmanifests und
+  Metas flackerfrei zur Laufzeit tauscht. Tailwind v4 Themes (`b2b-light`, `b2b-dark`, `atr-light`, `atr-dark`)
+  formvollendet mit harmonischen OKLCH-Werten und markenspezifischen Rahmenkonturen definiert.
+- **Backend-PDF-Invoicing:** Dynamische Farbanpassungen und Logo-Vererbung aus dem photos-Storage direkt in den
+  Blade-Templates verankert.
+
+#### **A-02 · 🔴 P0 · `ShootingCalculatorModal.tsx` Rewrite & B2C-Pricing** ☑ erledigt (2026-06-25)
+
+- **Logik-Implementierung (`shootingCalculator.ts`):** Mathematisch exakte `calculateB2CFlexPrice()` Formel für den
+  B2C-Tarif implementiert (149€ Basis, Setup-Fee, Privacy-Fee für Akt). Vollständige Linter-konforme Typisierung der
+  Select-Literale etabliert.
+- **UI-Weiche & Entfesselung:** Das Modal steuert die Rechner-Inhalte vollautomatisch zur Laufzeit. Die
+  Einstellungskarte für den B2B-Kalkulator wird auf `all-the.rest` konsequent ausgeblendet, bleibt aber auf dem
+  Hauptportal voll administrierbar.
+
 ## 🔁 Rekursion / Endlosschleife
 
-### R-03 · 🟡 Kein Schutz gegen `parent_id`-Zyklus → Endlosrekursion ☐
+### R-03 · 🟡 **P1** · Kein Schutz gegen `parent_id`-Zyklus → Endlosrekursion ☑ erledigt (2026-06-23)
+
+- **Resolution:** Kombinierter Schutz (defensiv + DB-Schicht).
+    - `GalleryGroup`: 4 `effective_*`-Accessoren rekursiv → **iterativ** (`walkParentChain`-Generator mit
+      Visited-Set); `Gallery::getFullPathAttribute` While-Schleife mit Visited-Set. Terminieren bei Zyklus/
+      Selbstreferenz (kein Stack-Overflow), verhaltensgleich für azyklische Bäume.
+    - `GalleryGroup::booted()`: neuer `saving`-Hook lehnt selbstreferenzierende/zyklische `parent_id` ab
+      (`InvalidArgumentException`).
+    - Tests: `EffectiveAttributesTest` — 2 übersprungene `_review`/`markTestSkipped` durch 7 gehärtete Tests
+      ersetzt (Terminierung + true-Propagation + saving-Rejektion + deep-acyclic OK).
 
 - **Symptom:** Ein zirkulärer (`A → B → A`) oder selbstreferenzieller `parent_id` führt in der `effective_*`-Kaskade
   und in `getFullPath` zu Endlosrekursion (Timeout / Stack-Overflow möglich).
@@ -70,7 +84,11 @@ entfernen), Bugfix-Test ergänzen und **gesamte Suite grün** halten (`backend`:
 
 ## ➗ Numerik / Division durch null
 
-### R-04 · 🟡 Shooting Calculator: `calc_images_per_hour = 0` → `Infinity` ☐
+### R-04 · 🟡 **P1** · Shooting Calculator: `calc_images_per_hour = 0` → `Infinity` ☑ erledigt (2026-06-23)
+
+- **Resolution:** Guard in `calculateShootingPrice` (`shootingCalculator.ts`): `parsedImagesPerHour < 1` oder
+  nicht-finite → Fallback auf dokumentierten Default `6`. Psycholog. Rundung unangetastet. Tests:
+  `shootingCalculator.test.ts` — `_review` ersetzt + 2 Regressionstests (`'0'`/`'abc'`/`'-5'` → finite).
 
 - **Symptom:** `calculateShootingPrice({calc_images_per_hour: '0', …})` liefert `packagePrice`/`finalPrice = Infinity`
   (UI würde „Infinity €" anzeigen). Settings-Eingabefeld hat nur clientseitiges `min="1"`, kein Server-/Logik-Guard.
@@ -81,11 +99,14 @@ entfernen), Bugfix-Test ergänzen und **gesamte Suite grün** halten (`backend`:
   Wert. Hintergrund siehe `features/ecommerce/07-psychological-pricing.md` (Kante).
 - **Herkunft:** FE-04 (auch §1).
 
----
-
 ## 🧮 Parsing & Berechnungslogik
 
-### R-05 · 🟡 Pricing: `parseInt` trunciert dezimale Multiplikatoren ☐
+### R-05 · 🟡 **P1** · Pricing: `parseInt` trunciert dezimale Multiplikatoren ☑ erledigt (2026-06-23)
+
+- **Resolution:** Parsing aufgeteilt — `getRequiredTerm` (`parseInt`) für Cent-Preise (`price_*`), neuer
+  `getRequiredMultiplier` (`parseFloat`, Fallback `1`) für `mult_*`. 3 Caller umgestellt + Re-Export.
+  Backend validiert `mult_*` als `numeric|min:1` (Dezimal erlaubt/Default). Tests: `pricingLogic.test.ts` —
+  neuer `getRequiredMultiplier`-Block + End-to-End-Bugfix (dezimaler Multiplikator `1.5` bleibt erhalten).
 
 - **Symptom:** `getRequiredTerm` parst **alle** Preisfaktoren via `parseInt` → dezimale Multiplikatoren wie
   `mult_commercial = '1.5'` werden zu `1` (stille Preisverfälschung). Preise selbst sind Integer-Cents (unkritisch),
@@ -95,25 +116,30 @@ entfernen), Bugfix-Test ergänzen und **gesamte Suite grün** halten (`backend`:
 - **Vorschlag:** Für Multiplikatoren `parseFloat` verwenden (z. B. eigenes `getRequiredMultiplier`) **oder** die
   erlaubten Wertebereiche in `SettingsController` klären (Integer erzwingen ↔ Dezimal zulassen) und dort
   validieren. Test friert aktuelles Verhalten ein.
+- **Konkret (Review):** Parsing aufteilen — `parseInt` für Cent-Preise (`price_*`), `parseFloat` für Multiplikatoren
+  (`mult_*`), z. B. via separates `getRequiredMultiplier()`.
 - **Herkunft:** FE-02.
 
-### R-06 · 🟢 `formatDateToDE` zerfällt ISO-Datum-mit-Uhrzeit ☐
+### R-06 · 🟢 **P2** · `formatDateToDE` zerfällt ISO-Datum-mit-Uhrzeit ☐
 
 - **Symptom:** `formatDateToDE('2024-06-22T12:00:00Z')` → `'22T12:00:00Z.06.2024'` (falsch).
 - **Ursache:** `frontend/src/logic/utils.ts` `formatDateToDE` (~Zeile 49): `iso.split('-')` nimmt genau 3 Teile an;
   bei ISO-Datetime landet die Uhrzeit im 3. Teil.
 - **Vorschlag:** Nur den Datumsanteil verwenden (`iso.slice(0, 10)`) **oder** robust via `Date` parsen und
   `formatLocaleDate` nutzen. Test mit `_review`-Suffix existiert.
+- **Konkret (Review):** `.slice(0, 10)` vor dem Split (Zeitanteil abschneiden); danach den `_review`-Test
+  bereinigen/umschreiben.
 - **Herkunft:** FE-01 (auch §1).
 
-### R-07 · 🟡 PricingService: Modifier-Surcharge auf vollem Basispreis (Intention klären) ☐
+### R-07 · 🟡 PricingService: Modifier-Surcharge auf vollem Basispreis ☑ akzeptiert als GEWOLLT (2026-06-23)
 
-- **Symptom:** Der Modifier-Surcharge wird auf den **vollen** `basePriceCents` berechnet, auch wenn der Basispreis
-  durch die Flatrate bereits gedeckt ist (`isBaseCovered === true`).
-- **Ursache:** `backend/app/Services/PricingService.php:31`
-  `$surchargeAmountCents += (int) round($basePriceCents * ((float)$mod->percent_surcharge / 100));`
-- **Vorschlag:** Mit Stakeholder klären, ob gewollt (Surcharge unabhängig von Deckung) oder Bug (Surcharge nur auf
-  nicht-gedecktem Anteil). Aktuelles Verhalten ist durch BK-04 eingefroren.
+- **Entscheidung (Stakeholder):** Das Verhalten ist **gewollt** und bleibt unverändert. Modell: die Flatrate
+  deckt die Basis-Lizenz; Premium-Modifier (nicht in Flatrate enthalten) sind kostenpflichtige Add-ons, ihr
+  `%`-Aufschlag wird auf dem **vollen** `basePriceCents` berechnet — unabhängig von der Deckung. Alternative
+  (Surcharge nur auf ungedecktem Anteil = 0 bei Deckung → Modifier gratis) wurde bewusst verworfen.
+- **Eingefroren durch:**
+  `tests/Feature/PricingServiceTest.php::test_modifier_surcharge_added_even_when_base_covered_if_not_included_in_flatrate`
+  (mit R-07-Kommentar). Keine Code-Änderung.
 - **Herkunft:** BK-04.
 
 ---
@@ -154,13 +180,14 @@ entfernen), Bugfix-Test ergänzen und **gesamte Suite grün** halten (`backend`:
   → Cache-Key um User/Role ergänzen oder absichern, dass der Admin-Baum wirklich für alle Admins identisch ist.
 - **Herkunft:** BK-08.
 
-### R-11 · 🟢 `Photo::getArtistAttribute`: Copyright `'0'` fällt auf `name` zurück ☐
+### R-11 · 🟢 **P2** · `Photo::getArtistAttribute`: Copyright `'0'` fällt auf `name` zurück ☐
 
 - **Symptom:** Ein Copyright-Wert `'0'` (String) ist für `?:` falsy → fällt fälschlich auf `name` zurück statt `'0'`
   zu respektieren.
 - **Ursache:** `backend/app/Models/Photo.php:54` `return $this->user->metadata_copyright ?: $this->user->name;`
 - **Vorschlag:** Expliziten Null-Check statt `?:`, z. B. `$this->user->metadata_copyright ?? $this->user->name`
   (respektiert `'0'`).
+- **Konkret (Review):** `?:` → `??` (Nullish Coalescing), damit der legitime String `'0'` erhalten bleibt.
 - **Herkunft:** BK-02.
 
 ### R-12 · 🟢 `pricingLogic.isCovered`: ungenutzter `terms`-Parameter ☐
@@ -172,13 +199,14 @@ entfernen), Bugfix-Test ergänzen und **gesamte Suite grün** halten (`backend`:
   bewusst als Platzhalter dokumentiert lassen.
 - **Herkunft:** FE-02.
 
-### R-13 · 🟢 `utils.isEmpty` behandelt RegExp/Map/Set als „leer" ☐
+### R-13 · 🟢 **P2** · `utils.isEmpty` behandelt RegExp/Map/Set als „leer" ☐
 
 - **Symptom:** `isEmpty(/regex/)`, `isEmpty(new Map())`, `isEmpty(new Set())` → `true`, weil sie keine aufzählbaren
   Eigen-Keys besitzen.
 - **Ursache:** `frontend/src/logic/utils.ts` `isEmpty` (~Zeile 87): `Object.keys(value).length === 0` für Objekte.
 - **Vorschlag:** Klären, ob Collections berücksichtigt werden sollen (dann `size`/`Map.size`/`Set.size` prüfen);
   falls ja, erweitern. Aktuelles Verhalten eingefroren.
+- **Konkret (Review):** `Map`/`Set` anhand ihrer `.size`-Eigenschaft validieren (statt `Object.keys`).
 - **Herkunft:** FE-01.
 
 ---
@@ -202,3 +230,182 @@ entfernen), Bugfix-Test ergänzen und **gesamte Suite grün** halten (`backend`:
   NOT-NULL-Constraints
     + Timestamp-Trait nicht erreichbar und nur via `setRelation`/Speicher-Zuweisung ohne `save()` bzw. Query-Builder-
       `update()` testbar (BK-02, BK-05). Keine Code-Änderung nötig — dokumentierte Test-Technik.
+
+---
+
+## 🌐 Multi-Domain-Architektur & Pricing-Strategie (Zweigleisigkeit 2026)
+
+Basierend auf den Entscheidungen zur Systemarchitektur wird das Portal-Backend zu einem **schlanken
+Multi-Tenant-System (Single-Codebase)** ausgebaut. Es gibt keine getrennten Builds oder Deployments. Die Steuerung
+erfolgt dynamisch zur Laufzeit über den Hostnamen (Domain).
+
+### 🛠️ Kernkomponenten der Infrastruktur
+
+1. **Zentrale Datenhaltung:** Eine gemeinsame Datenbank für beide Brands. Rechnungen, Bestellungen und Konfigurationen
+   erhalten eine string-basierte Unterscheidung via `brand`-Flag (`all-the.rest` oder `reisinger.pictures`).
+2. **Frontend-Theme-Switch (Tailwind v4):** Die Erkennung erfolgt im Client über `window.location.hostname`. Das Skript
+   injiziert ein `data-theme`-Attribut in das `<html>`-Tag. Die Steuerung nutzt die neue Tailwind CSS v4 `@theme`
+   -Direktive und native CSS-Variablen:
+    * `all-the.rest` $\rightarrow$ B2C-Theme (dynamischer Dark-/Light-Mode-Wechsel).
+    * `reisinger.pictures` $\rightarrow$ Premium-/B2B-Theme (Ausrichtung noch offen).
+3. **Backend-PDF-Invoicing:** Um Rendering-Fehler moderner CSS-Compiler in PDF-Engines zu vermeiden, werden die
+   Markenfarben (HEX) im Backend (z.B. PHP-Match-Query) für den Rechnungskopf pragmatisch hardcodiert.
+
+---
+
+### 📊 Der neue Pricing-Algorithmus (`all-the.rest` · B2C Flex-Tarif)
+
+Das neue `ShootingCalculatorModal.tsx` für **all-the.rest** bricht die historische Komplexität in ein modulares
+Paketsystem auf. **Wichtig:** Treue- und OG-Rabatte fallen für diesen Tarif komplett weg.
+
+#### 1. Basiswerte & Konstanten
+
+* **Grundpreis:** 149 € (Inklusive 20 Bilder, fixer Zeitrahmen von 1,5 bis 2 Stunden).
+* **Zusätzliche Bilder:** 15 € pro Bild.
+
+#### 2. Die mathematische Formel
+
+Das finale Honorar berechnet sich nach folgender Struktur:
+
+$$FinalPrice = 149 + SetupFee + (ExtraImages \times 15) + PrivacyFee$$
+
+Wobei die einzelnen Faktoren folgenden festen Regeln unterliegen:
+
+* **Setup-Aufschlag (`SetupFee`):**
+    * `outdoor` (Natürliches Licht): **0 €**
+    * `outdoor_flash` (Mobiles Blitz-Setup): **+50 €**
+    * `indoor` (Fotostudio): **+50 €**
+
+* **Schutzraum-Aufschlag (`PrivacyFee`):**
+  Greift exklusiv, wenn der Bereich `akt` (Akt & Boudoir) gewählt wurde **und** das absolute Online-Verbot (
+  `isFullyPrivate`) aktiv ist:
+  $$\text{PrivacyFee} = 100 + (TotalImages \times 5)$$
+  Da $TotalImages = 20 + ExtraImages$, reduziert sich die Formel für den Aufschlag auf:
+  $$\text{PrivacyFee} = 200 + (ExtraImages \times 5)$$
+  *In allen anderen Bereichen oder Konfigurationen ist die $\text{PrivacyFee} = 0$.*
+
+#### 3. Super-Admin Cheat-Sheet für manuelle Kontrollen
+
+| Bereich (`type`) | Setup (`setup`) | Zusätzliche Bilder | Online-Verbot  | Berechnungsschritte                                 | Endpreis  |
+|:-----------------|:----------------|:-------------------|:---------------|:----------------------------------------------------|:----------|
+| **Portrait**     | Outdoor (Natur) | 0                  | Nicht relevant | $149 + 0 + 0 + 0$                                   | **149 €** |
+| **Pärchen**      | Indoor (Studio) | 5                  | Nicht relevant | $149 + 50 + (5 \times 15) + 0$                      | **274 €** |
+| **Akt**          | Outdoor (Natur) | 0                  | Ja (Aktiv)     | $149 + 0 + 0 + [100 + (20 \times 5)]$               | **349 €** |
+| **Akt**          | Indoor (Studio) | 10                 | Ja (Aktiv)     | $149 + 50 + (10 \times 15) + [100 + (30 \times 5)]$ | **599 €** |
+
+---
+
+### 🔄 Refactoring-Fahrplan `ShootingCalculatorModal.tsx` (`reisinger.pictures`)
+
+Das bestehende Modal im Portal nutzt bisher ein System aus Stundensätzen, halbierten Bild-Stückpreisen bei Outdoor,
+pauschalen Flatrate-Aufschlägen (+20 %) und prozentualen Rabatten (33 % / 50 %).
+
+* **To-Do:** Die Berechnungslogiken im Code sauber in zwei getrennte Strategien kapseln: `calculateB2CFlexPrice()` (
+  `all-the.rest`) und `calculateCustomStudioPrice()` (`reisinger.pictures`).
+* **UI-Weiche:** Sobald im Super-Admin-Portal das Paket für `all-the.rest` kalkuliert wird, sperrt das UI die
+  Rabatt-Auswahl, da dieser Tarif starr bleibt.
+
+---
+
+### 🔍 Status-Überblick der verbleibenden Code-Qualitäts-Aufgaben (Review-Backlog)
+
+Die folgenden Aufgaben aus der Qualitäts-Initiative sind weiterhin offen und müssen parallel stabil gehalten werden:
+
+* **`R-06` (P2 - Utility):** Datums-Parsing-Fehler in `formatDateToDE` bei ISO-Strings beheben (`.slice(0, 10)` vor
+  Split nutzen).
+* **`R-08` (Qualität):** Inkonsistente 403-Fehlerbehandlung im `CheckoutService` auf einheitliches JSON umstellen.
+* **`R-09` (Qualität):** Toten `null`-Zweig im `InvoiceService` für Mail-Empfänger bereinigen.
+* **`R-10` (Mittel):** `GalleryTreeService` logisch nachbessern (Leere Gruppen-Hüllen entfernen, eigene ID in Subgroups
+  inkludieren, Admin-Cache benutzerabhängig scope-en).
+* **`R-11` (P2 - Logik):** `Photo::getArtistAttribute` von `?:` auf Nullish Coalescing `??` umstellen, damit der
+  Copyright-String `'0'` nicht überschrieben wird.
+* **`R-12` (Qualität):** Ungenutzten `terms`-Parameter aus `pricingLogic.isCovered` entfernen.
+* **`R-13` (P2 - Utility):** `utils.isEmpty` so erweitern, dass `Map`- und `Set`-Strukturen anhand ihrer `.size` korrekt
+  validiert werden.
+
+---
+
+## 🌐 Multi-Domain-Architektur & Pricing-Strategie (Zweigleisigkeit 2026)
+
+Basierend auf den Entscheidungen zur Systemarchitektur wird das Portal-Backend zu einem **schlanken
+Multi-Tenant-System (Single-Codebase)** ausgebaut. Es gibt keine getrennten Builds oder Deployments. Die Steuerung
+erfolgt dynamisch zur Laufzeit über den Hostnamen (Domain).
+
+### 🛠️ Aufgaben-Spezifikation
+
+#### **A-01 · 🔴 P0 · Multi-Domain-Infrastruktur & Theme-Weiche**
+
+* **Zentrale Datenhaltung & Backend-Context:**
+    * [ ] Backend-Middleware (`BrandContextMiddleware`) zur Erkennung des Brands (`all-the.rest` vs
+      `reisinger.pictures`) anhand des Host-Headers implementieren.
+    * [ ] Settings-Controller/-Logik erweitern, um markenspezifische Bank-/Firmendaten auszuliefern (z.B.
+      `atr_bank_iban` vs `rp_bank_iban`).
+    * [ ] PHPUnit Tests für die Brand-Erkennung und Settings-Trennung schreiben.
+* **Frontend-Theme-Switch (Tailwind v4):**
+    * [ ] Logik in `main.tsx` implementieren, die `window.location.hostname` auswertet und das `data-theme` Attribut
+      dynamisch im `<html>`-Tag setzt.
+    * [ ] Tailwind v4 Themes in `index.css` final definieren (ATR = B2C, RP = B2B).
+    * [ ] Playwright E2E Test für den Theme-Switch basierend auf origin/hostname schreiben.
+* **Backend-PDF-Invoicing:**
+    * [ ] `header.blade.php`, `footer.blade.php` und `invoice.blade.php` anpassen, sodass Farben (HEX) und Logos
+      dynamisch via PHP-Match-Query aus dem Brand-Context geladen werden.
+    * [ ] PHPUnit Tests für die PDF-Generierung unter beiden Brand-Kontexten ergänzen.
+
+#### **A-02 · 🔴 P0 · `ShootingCalculatorModal.tsx` Rewrite & B2C-Pricing (`all-the.rest`)**
+
+Das neue `ShootingCalculatorModal.tsx` für **all-the.rest** bricht die historische Komplexität in ein modulares
+Paketsystem auf. **Wichtig:** Treue- und OG-Rabatte fallen für diesen Tarif komplett weg.
+
+* **Logik-Implementierung (`shootingCalculator.ts`):**
+    * [ ] Funktion `calculateB2CFlexPrice()` für `all-the.rest` implementieren (Formel: 149 + SetupFee + (ExtraImages *
+      15) + PrivacyFee).
+    * [ ] Funktion `calculateCustomStudioPrice()` für `reisinger.pictures` kapseln (bestehende Logik).
+    * [ ] Ausführliche Unit-Tests (Vitest) für beide Berechnungsstrategien schreiben.
+* **UI-Weiche (`ShootingCalculatorModal.tsx`):**
+    * [ ] Hostname/Brand-Context im Frontend auslesen (`useBrand` Hook).
+    * [ ] UI dynamisch anpassen: Rabatt-Auswahl bei `all-the.rest` sperren/ausblenden, spezifische Toggles für Setup (
+      Indoor/Outdoor/Flash) und Privacy einblenden.
+    * [ ] Playwright E2E Tests für beide Ausprägungen des Kalkulator-Modals schreiben.
+
+* **Basiswerte & Konstanten:**
+    * **Grundpreis:** 149 € (Inklusive 20 Bilder, fixer Zeitrahmen von 1,5 bis 2 Stunden).
+    * **Zusätzliche Bilder:** 15 € pro Bild.
+
+* **Die mathematische Formel:**
+  Das finale Honorar berechnet sich nach folgender Struktur:
+  $$FinalPrice = 149 + SetupFee + (ExtraImages \times 15) + PrivacyFee$$
+
+* **Setup-Aufschlag (`SetupFee`):**
+    * `outdoor` (Natürliches Licht): **0 €**
+    * `outdoor_flash` (Mobiles Blitz-Setup): **+50 €**
+    * `indoor` (Fotostudio): **+50 €**
+
+* **Schutzraum-Aufschlag (`PrivacyFee`):**
+  Greift exklusiv, wenn der Bereich `akt` (Akt & Boudoir) gewählt wurde **und** das absolute Online-Verbot (
+  `isFullyPrivate`) aktiv ist:
+  $$\text{PrivacyFee} = 100 + (TotalImages \times 5)$$
+  Da $TotalImages = 20 + ExtraImages$, reduziert sich die Formel für den Aufschlag auf:
+  $$\text{PrivacyFee} = 200 + (ExtraImages \times 5)$$
+  *In allen anderen Bereichen oder Konfigurationen ist die $\text{PrivacyFee} = 0$.*
+
+* **UI-Weiche im Portal:** Sobald im Super-Admin-Portal das Paket für `all-the.rest` kalkuliert wird, sperrt das UI die
+  Rabatt-Auswahl, da dieser Tarif starr bleibt. Für `reisinger.pictures` bleibt die alte Logik vorerst aktiv (
+  `calculateCustomStudioPrice()`).
+
+---
+
+### 📊 Super-Admin Cheat-Sheet für manuelle Kontrollen (ATR)
+
+| Bereich (`type`) | Setup (`setup`) | Zusätzliche Bilder | Online-Verbot  | Berechnungsschritte                                 | Endpreis  |
+|:-----------------|:----------------|:-------------------|:---------------|:----------------------------------------------------|:----------|
+| **Portrait**     | Outdoor (Natur) | 0                  | Nicht relevant | $149 + 0 + 0 + 0$                                   | **149 €** |
+| **Pärchen**      | Indoor (Studio) | 5                  | Nicht relevant | $149 + 50 + (5 \times 15) + 0$                      | **274 €** |
+| **Akt**          | Outdoor (Natur) | 0                  | Ja (Aktiv)     | $149 + 0 + 0 + [100 + (20 \times 5)]$               | **349 €** |
+| **Akt**          | Indoor (Studio) | 10                 | Ja (Aktiv)     | $149 + 50 + (10 \times 15) + [100 + (30 \times 5)]$ | **599 €** |
+
+---
+
+### 🔍 Status-Überblick der verbleibenden Code-Qualitäts-Aufgaben (Review-Backlog)
+
+Die offenen Punkte (`R-06` bis `R-13`) bleiben wie oben tabelarisch erfasst gültig und müssen parallel stabil gehalten
+werden.

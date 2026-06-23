@@ -22,17 +22,29 @@ class WebhookController extends Controller
             $endpoint_secret = trim(file_get_contents($secretFile));
         }
 
+        // Splitte kommagetrennte Secrets für Multi-Domain-Infrastrukturen auf
+        $secrets = array_filter(array_map('trim', explode(',', $endpoint_secret)));
         $event = null;
+        $lastException = null;
 
-        try {
-            $event = \Stripe\Webhook::constructEvent($payload, $sig_header, $endpoint_secret);
-        } catch(\UnexpectedValueException $e) {
-            Log::error('Stripe Webhook Error: Invalid payload', ['exception' => $e->getMessage()]);
-            return response()->json(['error' => 'Invalid payload'], 400);
-        } catch(\Stripe\Exception\SignatureVerificationException $e) {
-            Log::error('Stripe Webhook Error: Invalid signature', [
-                'exception' => $e->getMessage(),
-                'configured_secret' => $endpoint_secret
+        foreach ($secrets as $secret) {
+            try {
+                $event = \Stripe\Webhook::constructEvent($payload, $sig_header, $secret);
+                $lastException = null;
+                break; // Gültige Signatur gefunden, Schleife abbrechen!
+            } catch (\Stripe\Exception\SignatureVerificationException $e) {
+                $lastException = $e;
+            } catch (\UnexpectedValueException $e) {
+                Log::error('Stripe Webhook Error: Invalid payload', ['exception' => $e->getMessage()]);
+                return response()->json(['error' => 'Invalid payload'], 400);
+            }
+        }
+
+        // Falls kein Secret passte, schlage lautstark fehl
+        if ($lastException || !$event) {
+            Log::error('Stripe Webhook Error: Invalid signature across all configured secrets', [
+                'exception' => $lastException ? $lastException->getMessage() : 'No secrets configured',
+                'configured_secrets_count' => count($secrets)
             ]);
             return response()->json(['error' => 'Invalid signature'], 400);
         }

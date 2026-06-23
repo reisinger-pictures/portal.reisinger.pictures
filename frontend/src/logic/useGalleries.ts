@@ -1,4 +1,5 @@
 import useSWR, { mutate as globalMutate } from 'swr';
+import { useSearchParams } from 'react-router-dom';
 import {apiMutate, fetcher} from '../api';
 import {useAuth} from './useAuth';
 

@@ -2,24 +2,26 @@ import WatermarkSettingsCard from './components/WatermarkSettingsCard';
 import LicenseCatalogSettings from './components/LicenseCatalogSettings';
 import useSWR from 'swr';
 import {fetcher, SystemInfo} from '../../api';
-import {useLicenseTerms} from '../../logic/useLicenseTerms';
+import {useBillingDetails} from '../../logic/useLicenseTerms';
 import {useAuth} from '../../logic/useAuth';
 import CalculatorSettingsCard from './components/CalculatorSettingsCard';
+import { useBrand } from '../../logic/useBrand';
 
 declare const __APP_BUILD_TIME__: string;
 
 
 export default function ManagementSettingsView() {
-    const {terms: licenseTerms, updateTerms, isLoading: termsLoading} = useLicenseTerms();
+    const {billingDetails, updateBillingDetails, isLoading: termsLoading} = useBillingDetails();
     const {user} = useAuth();
     const {data: sysInfo} = useSWR<SystemInfo>('/api/management/settings/system', fetcher);
+    const { isAtr } = useBrand();
 
     let reactTime = 'Unbekannt';
     if (typeof __APP_BUILD_TIME__ !== 'undefined') {
         reactTime = new Date(__APP_BUILD_TIME__).toLocaleString('de-DE');
     }
 
-    const isImpressumMissing = user?.is_super_admin && !termsLoading && (!licenseTerms?.bank_holder || !licenseTerms?.company_street || !licenseTerms?.company_zip || !licenseTerms?.company_city || !licenseTerms?.bank_iban);
+    const isImpressumMissing = user?.is_super_admin && !termsLoading && (!billingDetails?.bank_holder || !billingDetails?.company_street || !billingDetails?.company_zip || !billingDetails?.company_city || !billingDetails?.bank_iban);
 
     return (
         <div className="p-10 max-w-4xl mx-auto w-full flex flex-col gap-8">
@@ -53,52 +55,52 @@ export default function ManagementSettingsView() {
                             <label className="label"><span
                                 className="label-text font-bold">Firmenname / Kontoinhaber *</span></label>
                             <input type="text"
-                                   className={`input input-bordered ${!licenseTerms?.bank_holder ? 'input-error' : ''}`}
+                                   className={`input input-bordered ${!billingDetails?.bank_holder ? 'input-error' : ''}`}
                                    placeholder="Name des Inhabers"
-                                   value={licenseTerms?.bank_holder || ''}
-                                   onChange={e => updateTerms({bank_holder: e.target.value})}/>
+                                   value={billingDetails?.bank_holder || ''}
+                                   onChange={e => updateBillingDetails({bank_holder: e.target.value})}/>
                         </div>
 
                         <div className="form-control md:col-span-2">
                             <label className="label"><span className="label-text font-bold">Straße & Hausnummer *</span></label>
                             <input type="text"
-                                   className={`input input-bordered ${!licenseTerms?.company_street ? 'input-error' : ''}`}
+                                   className={`input input-bordered ${!billingDetails?.company_street ? 'input-error' : ''}`}
                                    placeholder="Musterstraße 1"
-                                   value={licenseTerms?.company_street || ''}
-                                   onChange={e => updateTerms({company_street: e.target.value})}/>
+                                   value={billingDetails?.company_street || ''}
+                                   onChange={e => updateBillingDetails({company_street: e.target.value})}/>
                         </div>
 
                         <div className="flex gap-4 md:col-span-2 w-full">
                             <div className="form-control w-1/3">
                                 <label className="label"><span className="label-text font-bold">PLZ *</span></label>
                                 <input type="text"
-                                       className={`input input-bordered w-full ${!licenseTerms?.company_zip ? 'input-error' : ''}`}
+                                       className={`input input-bordered w-full ${!billingDetails?.company_zip ? 'input-error' : ''}`}
                                        placeholder="4020"
-                                       value={licenseTerms?.company_zip || ''}
-                                       onChange={e => updateTerms({company_zip: e.target.value})}/>
+                                       value={billingDetails?.company_zip || ''}
+                                       onChange={e => updateBillingDetails({company_zip: e.target.value})}/>
                             </div>
                             <div className="form-control flex-1">
                                 <label className="label"><span className="label-text font-bold">Stadt *</span></label>
                                 <input type="text"
-                                       className={`input input-bordered w-full ${!licenseTerms?.company_city ? 'input-error' : ''}`}
+                                       className={`input input-bordered w-full ${!billingDetails?.company_city ? 'input-error' : ''}`}
                                        placeholder="Linz"
-                                       value={licenseTerms?.company_city || ''}
-                                       onChange={e => updateTerms({company_city: e.target.value})}/>
+                                       value={billingDetails?.company_city || ''}
+                                       onChange={e => updateBillingDetails({company_city: e.target.value})}/>
                             </div>
                         </div>
 
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Land</span></label>
                             <input type="text" className="input input-bordered" placeholder="Österreich"
-                                   value={licenseTerms?.company_country || ''}
-                                   onChange={e => updateTerms({company_country: e.target.value})}/>
+                                   value={billingDetails?.company_country || ''}
+                                   onChange={e => updateBillingDetails({company_country: e.target.value})}/>
                         </div>
 
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">E-Mail für Rückfragen</span></label>
                             <input type="email" className="input input-bordered" placeholder="hello@reisinger.pictures"
-                                   value={licenseTerms?.company_email || ''}
-                                   onChange={e => updateTerms({company_email: e.target.value})}/>
+                                   value={billingDetails?.company_email || ''}
+                                   onChange={e => updateBillingDetails({company_email: e.target.value})}/>
                         </div>
                     </div>
 
@@ -108,23 +110,23 @@ export default function ManagementSettingsView() {
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">IBAN *</span></label>
                             <input type="text"
-                                   className={`input input-bordered font-mono ${!licenseTerms?.bank_iban ? 'input-error' : ''}`}
+                                   className={`input input-bordered font-mono ${!billingDetails?.bank_iban ? 'input-error' : ''}`}
                                    placeholder="AT..."
-                                   value={licenseTerms?.bank_iban || ''}
-                                   onChange={e => updateTerms({bank_iban: e.target.value})}/>
+                                   value={billingDetails?.bank_iban || ''}
+                                   onChange={e => updateBillingDetails({bank_iban: e.target.value})}/>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">BIC</span></label>
                             <input type="text" className="input input-bordered font-mono" placeholder="BIC"
-                                   value={licenseTerms?.bank_bic || ''}
-                                   onChange={e => updateTerms({bank_bic: e.target.value})}/>
+                                   value={billingDetails?.bank_bic || ''}
+                                   onChange={e => updateBillingDetails({bank_bic: e.target.value})}/>
                         </div>
                     </div>
                 </div>
             </div>
             <WatermarkSettingsCard/>
 
-            <CalculatorSettingsCard/>
+            {!isAtr && <CalculatorSettingsCard/>}
 
             <div className="mt-8 pt-8 border-t border-base-300">
                 <div

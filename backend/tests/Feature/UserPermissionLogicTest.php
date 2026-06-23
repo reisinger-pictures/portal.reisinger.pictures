@@ -366,10 +366,9 @@ class UserPermissionLogicTest extends TestCase
     }
 
     /**
-     * REVIEW-Marker: String-Concatenation in getSubGroupIds (Zeile ~108).
-     * Bei sehr vielen Parent-IDs wird eine lange IN-Liste gebaut.
-     * Dieser Test stellt sicher, dass der Base-Case mit mehreren IDs funktioniert
-     * und dedupliziert (Zyklen / Überschneidungen).
+     * R-02 resolved: getSubGroupIds nutzt jetzt gebundene Parameter (?-Platzhalter) statt
+     * String-Concatenation. Dieser Test friert das Verhalten für viele Parent-IDs ein
+     * (Base-Case + Dedup bei Überschneidungen) und deckt gleichzeitig den Bound-Parameter-Pfad.
      */
     public function test_get_sub_group_ids_handles_large_uuid_list(): void
     {
@@ -392,6 +391,38 @@ class UserPermissionLogicTest extends TestCase
             $this->assertContains($id, $result);
         }
         $this->assertSame(count($allIds), count($result));
+    }
+
+    /**
+     * R-02 regression: Parent-IDs mit SQL-Sonderzeichen (einfaches Quote) müssen als reine
+     * Werte behandelt werden (gebundene Parameter), nicht in den SQL-String interpoliert werden.
+     * Mit der alten String-Concatenation hätte ein Wert wie `x'--` die IN-Liste kaputtgemacht;
+     * mit ?-Platzhaltern wird er sauber gesucht (kein Match → leere Menge, kein SQL-Fehler).
+     */
+    public function test_get_sub_group_ids_with_quote_in_id_uses_bound_parameters(): void
+    {
+        $user = User::factory()->create();
+        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($user, ["x'-- OR 1=1 --"]);
+
+        $this->assertSame([], $result);
+    }
+
+    /**
+     * R-02 regression: Der Empty-Early-Return greift auch nach array_filter (falsy aber non-null),
+     * sodass kein `WHERE id IN ()` erzeugt wird.
+     */
+    public function test_get_sub_group_ids_empty_after_filter_returns_empty_array(): void
+    {
+        $user = User::factory()->create();
+        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($user, array_values(array_filter([], fn($id) => $id !== null)));
+
+        $this->assertSame([], $result);
     }
 
     // =====================================================================

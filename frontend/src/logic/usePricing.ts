@@ -1,5 +1,5 @@
 // Dünner Hook-Wrapper: reicht `terms` an die pure Logik in pricingLogic.ts weiter (verhaltensgleich).
-export {RES_RANKS, getRequiredTerm, isCovered, calculateUpgradePrice} from './pricingLogic';
+export {RES_RANKS, getRequiredTerm, getRequiredMultiplier, isCovered, calculateUpgradePrice} from './pricingLogic';
 export type {PricingTerms, ResolutionTier, UsageTier, DurationTier, TerritoryTier} from './pricingLogic';
 import {isCovered, calculateUpgradePrice, PricingTerms, ResolutionTier, UsageTier, DurationTier, TerritoryTier} from './pricingLogic';
 

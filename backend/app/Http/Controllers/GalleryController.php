@@ -54,7 +54,8 @@ class GalleryController extends Controller
             'is_free_download' => $request->is_free_download ?? false,
             'is_editorial_only' => $request->is_editorial_only ?? false,
             'is_hidden' => $request->is_hidden ?? false,
-            'restricted_photographers' => $request->restricted_photographers
+            'restricted_photographers' => $request->restricted_photographers,
+            'tenant_id' => $request->tenant_id
         ]);
         return response()->json(['success' => true, 'group' => $group]);
     }
@@ -141,6 +142,7 @@ class GalleryController extends Controller
                 'is_editorial_only' => $request->is_editorial_only ?? false,
                 'is_hidden' => $request->is_hidden ?? false,
                 'restricted_photographers' => $request->restricted_photographers ?? null,
+                'tenant_id' => $request->tenant_id,
                 'gallery_group_id' => $request->gallery_group_id,
                 'password_hash' => $request->password ? Hash::make($request->password) : null,
                 'expires_at' => $expiresAt,

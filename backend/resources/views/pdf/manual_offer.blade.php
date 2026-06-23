@@ -3,18 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <title>Angebot {{ $snapshot->invoice_number }}</title>
+    @php
+        $isAtr = config('app.brand') === 'all-the.rest';
+        $primaryColor = $isAtr ? '#2A9D8F' : '#1E5631';
+        $secondaryColor = $isAtr ? '#2A9D8F' : '#A4B494';
+    @endphp
     <style>
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; font-size: 13px; line-height: 1.5; }
         .invoice-details { margin-bottom: 30px; width: 100%; }
         .invoice-details td { vertical-align: top; padding: 0; border: none; }
-        h1, h2, h3, h4, h5, h6 { page-break-after: avoid; color: #264653; }
+        h1, h2, h3, h4, h5, h6 { page-break-after: avoid; color: {{ $secondaryColor }}; }
         table.items { width: 100%; border-collapse: collapse; margin-top: 20px; }
         table.items th, table.items td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
         table.items th { background-color: #f8f9fa; font-weight: bold; }
         .text-right { text-align: right !important; }
-        .total-row td { font-size: 16px; font-weight: bold; border-top: 2px solid #264653; padding-top: 15px; }
+        .total-row td { font-size: 16px; font-weight: bold; border-top: 2px solid {{ $secondaryColor }}; padding-top: 15px; }
         .editor-content table { width: 100%; border-collapse: collapse; margin: 15px 0; }
         .editor-content table td, .editor-content table th { border: 1px solid #ccc; padding: 8px; }
+        .editor-content table th { background-color: #f2f2f2; font-weight: bold; }
         .footer { position: absolute; bottom: 30px; width: 100%; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; text-align: center; }
     </style>
 </head>

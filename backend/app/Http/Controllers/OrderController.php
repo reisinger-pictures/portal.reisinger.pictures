@@ -38,9 +38,11 @@ class OrderController extends Controller
     {
         $user = auth('api')->user();
 
-        $holder = \App\Models\Setting::where('key', 'bank_holder')->value('value');
-        $iban = \App\Models\Setting::where('key', 'bank_iban')->value('value');
-        $street = \App\Models\Setting::where('key', 'company_street')->value('value');
+        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $get = fn($k) => \App\Models\Setting::where('key', $pfx . $k)->value('value') ?? \App\Models\Setting::where('key', $k)->value('value');
+        $holder = $get('bank_holder');
+        $iban = $get('bank_iban');
+        $street = $get('company_street');
         if (empty($holder) || empty($iban) || empty($street)) {
             return response()->json(['error' => 'Der Betreiber hat noch keine vollständigen Rechnungsdaten (Impressum & Bank) hinterlegt. Kauf derzeit nicht möglich.'], 400);
         }
@@ -126,9 +128,9 @@ class OrderController extends Controller
             'order' => $order, 
             'snapshot' => $order->invoiceSnapshot, 
             'items' => $order->invoiceSnapshot->customer_details['items'] ?? [],
-            'bankHolder' => \App\Models\Setting::where('key', 'bank_holder')->value('value'),
-            'bankIban' => \App\Models\Setting::where('key', 'bank_iban')->value('value'),
-            'bankBic' => \App\Models\Setting::where('key', 'bank_bic')->value('value')
+            'bankHolder' => $get('bank_holder'),
+            'bankIban' => $get('bank_iban'),
+            'bankBic' => $get('bank_bic')
         ])->download($order->invoiceSnapshot->invoice_number . '.pdf');
     }
 

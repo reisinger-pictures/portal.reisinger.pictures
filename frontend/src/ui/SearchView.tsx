@@ -2,11 +2,13 @@ import ResponsiveImage from './components/ResponsiveImage';
 import ErrorMessage from './components/ErrorMessage';
 import { useState } from 'react';
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
+import { useBrand } from '../logic/useBrand';
 import {useSearch} from '../logic/useSearch';
 import Sidebar from './components/Sidebar';
 import HighlightText from './components/HighlightText';
 
 export default function SearchView() {
+    const { logoSrc, portalName } = useBrand();
     const [searchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
     const [localQuery, setLocalQuery] = useState(query);
@@ -45,8 +47,8 @@ export default function SearchView() {
                             <span className="iconify mdi--menu text-2xl"></span>
                         </button>
                         <Link to="/" className="flex items-center gap-2 shrink-0">
-                            <img src="/android-chrome-192x192.png" alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
-                            <span className="font-bold text-base truncate">Reisinger Foto Portal</span>
+                            <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
+                            <span className="font-bold text-base truncate">{portalName}</span>
                         </Link>
                     </header>
 

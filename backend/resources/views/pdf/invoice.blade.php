@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>@if(str_starts_with($snapshot->invoice_number, 'L-')) Lieferschein @else Rechnung @endif {{ $snapshot->invoice_number }}</title>
+    @php
+        $isAtr = config('app.brand') === 'all-the.rest';
+        $primaryColor = $isAtr ? '#2A9D8F' : '#1E5631';
+        $secondaryColor = $isAtr ? '#2A9D8F' : '#A4B494';
+    @endphp
     <style>
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; font-size: 13px; line-height: 1.5; }
         .invoice-details { margin-bottom: 40px; width: 100%; }
@@ -14,9 +19,9 @@
         table.items { width: 100%; border-collapse: collapse; margin-bottom: 0px; }
         table.items thead { display: table-header-group; }
         table.items th, table.items td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
-        table.items th { background-color: #f8f9fa; font-weight: bold; color: #264653; }
+        table.items th { background-color: #f8f9fa; font-weight: bold; color: {{ $primaryColor }}; }
         .text-right { text-align: right !important; }
-        .total-row td { font-size: 16px; font-weight: bold; border-top: 2px solid #264653; padding-top: 15px; }
+        .total-row td { font-size: 16px; font-weight: bold; border-top: 2px solid {{ $secondaryColor }}; padding-top: 15px; }
         .footer { position: absolute; bottom: 30px; width: 100%; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; text-align: center; }
     </style>
 </head>
@@ -127,7 +132,7 @@
                                         -
                                     @endif
                                 </td>
-                                <td class="text-right" style="color: #2A9D8F; white-space: nowrap;">
+                                <td class="text-right" style="color: {{ $primaryColor }}; white-space: nowrap;">
                                     {{ number_format($item['row_total'] / 100, 2, ',', '.') }} €
                                 </td>
                             </tr>

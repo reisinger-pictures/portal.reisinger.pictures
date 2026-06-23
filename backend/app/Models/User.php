@@ -27,31 +27,14 @@ class User extends Authenticatable implements JWTSubject
     protected $visible = [
         'id', 'name', 'email', 'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
         'current_ftp_gallery_id', 'ftp_slug',
-        'billing_name',
-        'billing_company',
-        'billing_street',
-        'billing_zip',
-        'billing_city', 'created_at', 'is_admin', 'is_photographer',
+        'created_at', 'is_admin', 'is_photographer',
         'is_pending', 'is_customer_manager', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
     ];
 
     protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'metadata_copyright',
-        'can_edit_metadata',
-        'flatrate_level',
-        'can_purchase_upgrades',
-        'current_ftp_gallery_id',
-        'ftp_slug',
-        // Billing-Felder sind persistierbar (CheckoutService schreibt sie via $user->update()).
-        // Vorher fehlten sie hier → das Update war ein No-Op und InvoiceService las immer null.
-        'billing_name',
-        'billing_company',
-        'billing_street',
-        'billing_zip',
-        'billing_city',
+        'name', 'email', 'password', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
+        'can_purchase_upgrades', 'current_ftp_gallery_id', 'ftp_slug', 'tenant_id',
+        'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city'
     ];
 
     protected static function booted()
@@ -71,59 +54,20 @@ class User extends Authenticatable implements JWTSubject
     }
 
     protected $casts = [
-        'can_edit_metadata' => 'boolean',
-
+        'can_edit_metadata' => 'boolean'
     ];
 
-    public function getJWTIdentifier()
-    {
-        return $this->getKey();
-    }
+    public function getJWTIdentifier() { return $this->getKey(); }
+    public function getJWTCustomClaims() { return []; }
 
-    public function getJWTCustomClaims()
-    {
-        return [];
-    }
-
-    public function roles()
-    {
-        return $this->belongsToMany(Role::class, 'user_roles');
-    }
-
-    public function galleryGroups()
-    {
-        return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups')->withPivot('wants_notifications');
-    }
-
-    public function galleries()
-    {
-        return $this->belongsToMany(Gallery::class, 'user_galleries')->withPivot('wants_notifications');
-    }
-
-    public function photographerGalleries()
-    {
-        return $this->belongsToMany(Gallery::class, 'photographer_galleries');
-    }
-
-    public function photographerGalleryGroups()
-    {
-        return $this->belongsToMany(GalleryGroup::class, 'photographer_gallery_groups');
-    }
-
-    public function currentFtpGallery()
-    {
-        return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id');
-    }
-
-    public function photos()
-    {
-        return $this->hasMany(Photo::class);
-    }
-
-    public function tenants()
-    {
-        return $this->belongsToMany(Tenant::class);
-    }
+    public function roles() { return $this->belongsToMany(Role::class, 'user_roles'); }
+    public function galleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups')->withPivot('wants_notifications'); }
+    public function galleries() { return $this->belongsToMany(Gallery::class, 'user_galleries')->withPivot('wants_notifications'); }
+    public function photographerGalleries() { return $this->belongsToMany(Gallery::class, 'photographer_galleries'); }
+    public function photographerGalleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'photographer_gallery_groups'); }
+    public function currentFtpGallery() { return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id'); }
+    public function photos() { return $this->hasMany(Photo::class); }
+    public function tenants() { return $this->belongsToMany(Tenant::class); }
 
     public function getIsPendingAttribute(): bool
     {
@@ -131,45 +75,29 @@ class User extends Authenticatable implements JWTSubject
         return $this->roles()->count() === 0 && $this->galleryGroups()->count() === 0 && $this->galleries()->count() === 0;
     }
 
-    public function getIsPhotographerAttribute(): bool
-    {
-        return $this->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists();
-    }
-
-    public function getIsAdminAttribute(): bool
-    {
-        return $this->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists();
-    }
-
-    public function getIsCustomerManagerAttribute(): bool
-    {
-        return $this->roles()->where('name', UserRole::CUSTOMER_MANAGER->value)->exists();
-    }
-
-    public function getIsPowerUserAttribute(): bool
-    {
-        return $this->roles()->where('name', UserRole::POWER_USER->value)->exists();
-    }
+    public function getIsPhotographerAttribute(): bool { return $this->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists(); }
+    public function getIsAdminAttribute(): bool { return $this->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists(); }
+    public function getIsCustomerManagerAttribute(): bool { return $this->roles()->where('name', UserRole::CUSTOMER_MANAGER->value)->exists(); }
+    public function getIsPowerUserAttribute(): bool { return $this->roles()->where('name', UserRole::POWER_USER->value)->exists(); }
 
     private function getSubGroupIds($parentIds)
     {
         if (empty($parentIds)) return [];
 
-        $inIds = implode(',', array_map(function ($id) {
-            return "'" . $id . "'";
-        }, $parentIds));
+        $parentIds = array_values($parentIds);
+        $placeholders = implode(', ', array_fill(0, count($parentIds), '?'));
 
         $query = "
-            WITH RECURSIVE cte AS (
-                SELECT id FROM gallery_groups WHERE id IN ($inIds)
+            WITH RECURSIVE child_groups AS (
+                SELECT id, parent_id FROM gallery_groups WHERE id IN ($placeholders)
                 UNION ALL
-                SELECT g.id FROM gallery_groups g
-                INNER JOIN cte ON g.parent_id = cte.id
+                SELECT g.id, g.parent_id FROM gallery_groups g
+                INNER JOIN child_groups cg ON g.parent_id = cg.id
             )
-            SELECT id FROM cte;
+            SELECT id FROM child_groups
         ";
 
-        $result = \Illuminate\Support\Facades\DB::select($query);
+        $result = \Illuminate\Support\Facades\DB::select($query, $parentIds);
         return array_values(array_unique(array_column($result, 'id')));
     }
 
@@ -178,8 +106,6 @@ class User extends Authenticatable implements JWTSubject
         if ($this->guest_id) {
             return $this->transient_galleries ?? [];
         }
-
-        // Admins haben keinen globalen Zugriff mehr auf private Galerien
 
         // 1. Direct assignments
         $galleryIds = $this->galleries()->pluck('galleries.id')->toArray();
@@ -193,24 +119,29 @@ class User extends Authenticatable implements JWTSubject
             $galleryIds = array_unique(array_merge($galleryIds, $groupGalleryIds));
         }
 
-        // 3. Domain Mapping (Only applies to Delivery galleries!)
-        // 3. Tenant Integration (Only applies to Delivery galleries!)
-        foreach ($this->tenants as $tenant) {
-            $tenantGroupIds = $tenant->galleryGroups()->pluck('gallery_groups.id')->toArray();
-            $domainGroupIds = $this->getSubGroupIds($tenantGroupIds);
+        // 3. Tenant Integration (Direct column assignments + Pivot group assignments)
+        $tenantIds = $this->tenants()->pluck('tenants.id')->toArray();
+        if (!empty($tenantIds)) {
+            // Direct column assignments (New feature)
+            $tenantGalleryIds = Gallery::whereIn('tenant_id', $tenantIds)->where('type', 'delivery')->pluck('id')->toArray();
+            $directGroupIds = GalleryGroup::whereIn('tenant_id', $tenantIds)->pluck('id')->toArray();
 
-            if (!empty($domainGroupIds)) {
-                $domainGalleryIds = Gallery::whereIn('gallery_group_id', $domainGroupIds)
-                    ->where('type', 'delivery')
-                    ->pluck('id')->toArray();
-                $galleryIds = array_unique(array_merge($galleryIds, $domainGalleryIds));
+            // Pivot table group assignments (Existing B2B setup)
+            $pivotGroupIds = \Illuminate\Support\Facades\DB::table('gallery_group_tenant')->whereIn('tenant_id', $tenantIds)->pluck('gallery_group_id')->toArray();
+            
+            $combinedGroupIds = array_unique(array_merge($directGroupIds, $pivotGroupIds));
+            $allTenantGroupIds = $this->getSubGroupIds($combinedGroupIds);
+
+            if (!empty($allTenantGroupIds)) {
+                $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allTenantGroupIds)->where('type', 'delivery')->pluck('id')->toArray();
+                $tenantGalleryIds = array_unique(array_merge($tenantGalleryIds, $groupGalleryIds));
             }
+            $galleryIds = array_unique(array_merge($galleryIds, $tenantGalleryIds));
         }
 
         if (!empty($this->transient_galleries)) {
             $galleryIds = array_unique(array_merge($galleryIds, $this->transient_galleries));
         }
-
 
         if ($this->is_photographer) {
             $unrestrictedIds = \Illuminate\Support\Facades\Cache::rememberForever('unrestricted_photographer_gallery_ids', function () {
@@ -224,10 +155,9 @@ class User extends Authenticatable implements JWTSubject
 
             $photogGroupIds = $this->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
             $allPhotogGroupIds = $this->getSubGroupIds($photogGroupIds);
-            if (!empty($allPhotogGroupIds)) {
-                $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allPhotogGroupIds)->pluck('id')->toArray();
-                $galleryIds = array_merge($galleryIds, $groupGalleryIds);
-            }
+            
+            $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allPhotogGroupIds)->pluck('id')->toArray();
+            $galleryIds = array_merge($galleryIds, $groupGalleryIds);
         }
 
         $galleryIds = array_values(array_unique($galleryIds));
@@ -257,9 +187,7 @@ class User extends Authenticatable implements JWTSubject
 
     public function canAccessGallery($galleryId): bool
     {
-        if ($this->is_super_admin) return true; // 🌟 GOD MODE
-
-        // Normale Admins müssen wie alle anderen explizite Rechte besitzen
+        if ($this->is_super_admin) return true;
 
         if ($this->is_photographer && $this->canPhotographerAccessGallery($galleryId)) {
             return true;

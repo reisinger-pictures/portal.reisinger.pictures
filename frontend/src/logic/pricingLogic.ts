@@ -19,6 +19,19 @@ export function getRequiredTerm(terms: PricingTerms, key: string): number {
     return val;
 }
 
+// R-05: Wie getRequiredTerm, aber für dezimale Multiplikatoren (mult_*). Der Backend validiert
+// diese als `numeric|min:1` (SettingsController::updateLicenseTerms), Default-Werte sind dezimal
+// ('2.0'/'1.5'/'1.5'). parseInt würde '1.5' zu 1 truncieren → stille Preisverfälschung, daher
+// parseFloat. Fallback bei nicht geladenen terms: 1 (neutraler Multiplikator — verhindert 0-Preis).
+export function getRequiredMultiplier(terms: PricingTerms, key: string): number {
+    if (!terms) return 1; // SWR noch nicht geladen — neutraler Multiplikator
+    const val = parseFloat(terms[key] || '');
+    if (isNaN(val)) {
+        throw new Error(`Kritischer Systemfehler: Preisfaktor '${key}' fehlt in der Datenbank. Bitte Administrator kontaktieren!`);
+    }
+    return val;
+}
+
 export function isCovered(
     // `terms` wird von isCovered selbst nicht gebraucht (nur Rang-Vergleich); der Parameter bleibt
     // aus Signatur-Symmetrie zu calculateUpgradePrice erhalten (Hook reicht `terms` einheitlich durch).
@@ -48,9 +61,9 @@ export function calculateUpgradePrice(
     const priceOriginal = getRequiredTerm(terms, 'price_original');
     const prices: Record<string, number> = {web: priceWeb, print: pricePrint, original: priceOriginal};
 
-    const multCommercial = getRequiredTerm(terms, 'mult_commercial');
-    const multUnlimited = getRequiredTerm(terms, 'mult_unlimited');
-    const multInternational = getRequiredTerm(terms, 'mult_international');
+    const multCommercial = getRequiredMultiplier(terms, 'mult_commercial');
+    const multUnlimited = getRequiredMultiplier(terms, 'mult_unlimited');
+    const multInternational = getRequiredMultiplier(terms, 'mult_international');
 
     const useMult = reqUsage === 'commercial' ? multCommercial : 1.0;
     const durMult = reqDuration === 'unlimited' ? multUnlimited : 1.0;

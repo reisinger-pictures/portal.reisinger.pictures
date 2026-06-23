@@ -25,14 +25,17 @@ class InvoiceMail extends Mailable implements ShouldQueue
 
     public function build()
     {
+        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $get = fn($k) => \App\Models\Setting::where('key', $pfx . $k)->value('value') ?? \App\Models\Setting::where('key', $k)->value('value');
+        
         // PDF on-the-fly generieren
         $pdf = Pdf::loadView('pdf.invoice', [
             'order' => $this->order,
             'snapshot' => $this->snapshot,
             'items' => $this->snapshot->customer_details['items'] ?? [],
-            'bankHolder' => \App\Models\Setting::where('key', 'bank_holder')->value('value'),
-            'bankIban' => \App\Models\Setting::where('key', 'bank_iban')->value('value'),
-            'bankBic' => \App\Models\Setting::where('key', 'bank_bic')->value('value')
+            'bankHolder' => $get('bank_holder'),
+            'bankIban' => $get('bank_iban'),
+            'bankBic' => $get('bank_bic')
         ]);
 
         $mail = $this->subject('Ihre Rechnung ' . $this->snapshot->invoice_number)

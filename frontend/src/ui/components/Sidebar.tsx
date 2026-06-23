@@ -1,4 +1,5 @@
 import {Link, useNavigate} from 'react-router-dom';
+import { useBrand } from '../../logic/useBrand';
 import SidebarLoginForm from './SidebarLoginForm';
 import {useAuth} from '../../logic/useAuth';
 import {Gallery, GalleryGroup, GalleryTreeResponse} from '../../logic/useGalleries';
@@ -17,6 +18,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar(props: SidebarProps) {
+    const { logoSrc, portalName } = useBrand();
     const {user, logout} = useAuth();
     const navigate = useNavigate();
     const { itemCount } = useCart();
@@ -34,8 +36,8 @@ export default function Sidebar(props: SidebarProps) {
             <div className="p-6 border-b border-base-300 flex justify-between items-start relative">
                 <div className="min-w-0 flex-1">
                     <Link to="/" className="flex items-center gap-3 text-xl font-bold text-base-content opacity-70 hover:opacity-100 mb-2 transition-opacity">
-                        <img src="/android-chrome-192x192.png" alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100 shrink-0"/>
-                        <span className="whitespace-nowrap">Reisinger Foto Portal</span>
+                        <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100 shrink-0"/>
+                        <span className="whitespace-nowrap">{portalName}</span>
                     </Link>
                 </div>
                 {/* Mobile Close Button */}

@@ -21,7 +21,8 @@ class GalleryGroup extends Model
         'is_free_download',
         'is_editorial_only',
         'is_hidden',
-        'restricted_photographers'
+        'restricted_photographers',
+        'tenant_id'
     ];
 
     protected $casts = [
@@ -34,17 +35,52 @@ class GalleryGroup extends Model
 
     protected static function booted()
     {
-        static::saved(function () { 
-            \Illuminate\Support\Facades\DB::afterCommit(function() {
-            Cache::forget('gallery_tree_admin');
-            Cache::forget('unrestricted_photographer_gallery_ids');
-        }); 
+        // R-03: Zyklus-Schutz beim Speichern. Eine parent_id, die einen Zyklus bilden würde
+        // (Selbstreferenz A→A oder Kette A→…→A), wird abgelehnt. Der defensive Runtime-Schutz
+        // in walkParentChain() fängt zusätzlich bereits vorhandene fehlerhafte Daten ab.
+        static::saving(function (GalleryGroup $group) {
+            $parentId = $group->parent_id;
+
+            // Selbstreferenz.
+            if ($parentId !== null && $parentId === $group->id) {
+                throw new \InvalidArgumentException(
+                    'GalleryGroup#parent_id darf nicht auf sich selbst verweisen (Zyklus).'
+                );
+            }
+
+            // Zyklus über die bestehende Eltern-Kette des Ziel-Parents aufbauen.
+            if ($parentId !== null) {
+                $visited = [$group->id => true];
+                $cursor = GalleryGroup::find($parentId);
+
+                while ($cursor !== null) {
+                    if (isset($visited[$cursor->id])) {
+                        throw new \InvalidArgumentException(
+                            'GalleryGroup#parent_id würde einen Zyklus erzeugen.'
+                        );
+                    }
+                    $visited[$cursor->id] = true;
+
+                    // Wurzel erreicht.
+                    if ($cursor->parent_id === null) {
+                        break;
+                    }
+                    $cursor = GalleryGroup::find($cursor->parent_id);
+                }
+            }
         });
-        static::deleted(function () { 
+
+        static::saved(function () {
             \Illuminate\Support\Facades\DB::afterCommit(function() {
             Cache::forget('gallery_tree_admin');
             Cache::forget('unrestricted_photographer_gallery_ids');
-        }); 
+        });
+        });
+        static::deleted(function () {
+            \Illuminate\Support\Facades\DB::afterCommit(function() {
+            Cache::forget('gallery_tree_admin');
+            Cache::forget('unrestricted_photographer_gallery_ids');
+        });
         });
     }
 
@@ -52,24 +88,75 @@ class GalleryGroup extends Model
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
-        return $this->is_editorial_only || ($this->parent ? $this->parent->effective_is_editorial_only : false);
+        // R-03: ||-Kaskade, iterativ mit Zyklus-Schutz (walkParentChain). Eigener Wert true
+        // gewinnt, sonst Parent-Kette durchlaufen, bis ein true gefunden wird oder Wurzel/Zyklus.
+        foreach ($this->walkParentChain() as $node) {
+            if ((bool) $node->is_editorial_only) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function getEffectiveIsFreeDownloadAttribute(): bool
     {
-        return $this->is_free_download || ($this->parent ? $this->parent->effective_is_free_download : false);
+        foreach ($this->walkParentChain() as $node) {
+            if ((bool) $node->is_free_download) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function getEffectiveRestrictedPhotographersAttribute(): bool
     {
-        if ($this->restricted_photographers !== null) return (bool) $this->restricted_photographers;
-        if ($this->parent) return $this->parent->effective_restricted_photographers;
+        // Null = erben; ein expliziter Wert (auch false) bricht die Kaskade.
+        foreach ($this->walkParentChain() as $node) {
+            if ($node->restricted_photographers !== null) {
+                return (bool) $node->restricted_photographers;
+            }
+        }
+
         return false;
     }
 
     public function getEffectiveIsHiddenAttribute(): bool
     {
-        return $this->is_hidden || ($this->parent ? $this->parent->effective_is_hidden : false);
+        foreach ($this->walkParentChain() as $node) {
+            if ((bool) $node->is_hidden) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Iterativer Aufstieg durch die parent-Kette inkl. des aktuellen Knotens.
+     * Zyklus-Schutz (R-03): ein Visited-Set aus IDs verhindert Endlosrekursion bei zirkulärer
+     * oder selbstreferenzieller parent_id. Defensiv — schützt auch vor bereits vorhandenen
+     * fehlerhaften Daten in der DB.
+     *
+     * @return \Generator<int, self>
+     */
+    private function walkParentChain(): \Generator
+    {
+        $visited = [];
+        $node = $this;
+
+        while ($node !== null) {
+            if (isset($visited[$node->id])) {
+                // Zyklus erkannt: Abbruch, kein Stack-Overflow.
+                break;
+            }
+            $visited[$node->id] = true;
+
+            yield $node;
+
+            $node = $node->parent;
+        }
     }
 
     public function parent()

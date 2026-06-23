@@ -83,6 +83,7 @@ class DatabaseSeeder extends Seeder
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_base_price'], ['value' => '50']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_hourly_rate'], ['value' => '100']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_images_per_hour'], ['value' => '6']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_outdoor_multiplier'], ['value' => '0.5']);
 
         // Reale Impressums- und Bankdaten für den Checkout seeden
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_holder'], ['value' => 'Florian Reisinger']);

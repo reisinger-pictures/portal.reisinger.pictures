@@ -6,13 +6,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Reisinger Foto Portal</title>
 
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <link rel="manifest" href="/site.webmanifest">
-  <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#2A9D8F">
-  <meta name="msapplication-TileColor" content="#2A9D8F">
-  <meta name="theme-color" content="#2A9D8F">
+  <script>
+    (function() {
+      var isAtr = window.location.hostname.includes('all-the.rest');
+      var brand = isAtr ? 'atr' : 'rp';
+      var themeColor = isAtr ? '#8940FA' : '#2A9D8F';
+      var head = document.head;
+      
+      var links = [
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/brands/' + brand + '/apple-touch-icon.png' },
+        { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/brands/' + brand + '/favicon-32x32.png' },
+        { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/brands/' + brand + '/favicon-16x16.png' },
+        { rel: 'manifest', href: '/brands/' + brand + '/site.webmanifest' },
+        { rel: 'mask-icon', href: '/brands/' + brand + '/safari-pinned-tab.svg', color: themeColor }
+      ];
+      
+      links.forEach(function(attr) {
+        var el = document.createElement('link');
+        for (var k in attr) el.setAttribute(k, attr[k]);
+        head.appendChild(el);
+      });
+      
+      var metas = [
+        { name: 'msapplication-TileColor', content: themeColor },
+        { name: 'theme-color', content: themeColor }
+      ];
+      
+      metas.forEach(function(attr) {
+        var el = document.createElement('meta');
+        for (var k in attr) el.setAttribute(k, attr[k]);
+        head.appendChild(el);
+      });
+    })();
+  </script>
+
+
 </head>
 
 <body>

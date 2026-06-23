@@ -324,7 +324,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                         <h2 className="font-bold text-xl text-primary">Leistungen / Positionen</h2>
                         <div className="flex gap-2">
                             <button type="button" onClick={() => setIsCalculatorOpen(true)}
-                                    className="btn btn-sm btn-outline btn-secondary">
+                                    className="btn btn-sm btn-primary">
                                 <span className="iconify mdi--calculator"></span> Paket-Kalkulator
                             </button>
                         </div>

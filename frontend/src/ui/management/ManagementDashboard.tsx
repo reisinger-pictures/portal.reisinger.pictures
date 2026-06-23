@@ -3,7 +3,7 @@ import { useState } from 'react';
 import {Link, useLocation, useNavigate} from 'react-router-dom';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
-import { useLicenseTerms } from '../../logic/useLicenseTerms';
+import { useBillingDetails } from '../../logic/useLicenseTerms';
 import {useSearch} from '../../logic/useSearch';
 import Sidebar from '../components/Sidebar';
 import GalleryModals from '../components/GalleryModals';
@@ -25,6 +25,7 @@ import PhotographerTeamModal from './components/PhotographerTeamModal';
 export default function ManagementDashboard() {
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchParams] = useSearchParams();
     const pathView = location.pathname.replace('/', '');
     const currentView = pathView || 'structure';
 
@@ -43,8 +44,8 @@ export default function ManagementDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const {results: searchResults} = useSearch(searchQuery, false, true); // Leere Query überspringen
     const {user} = useAuth();
-    const { terms, isLoading: termsLoading } = useLicenseTerms();
-    const isImpressumMissing = user?.is_super_admin && !termsLoading && (!terms?.bank_holder || !terms?.company_street || !terms?.company_zip || !terms?.company_city || !terms?.bank_iban);
+    const { billingDetails, isLoading: termsLoading } = useBillingDetails();
+    const isImpressumMissing = user?.is_super_admin && !termsLoading && (!billingDetails?.bank_holder || !billingDetails?.company_street || !billingDetails?.company_zip || !billingDetails?.company_city || !billingDetails?.bank_iban);
     const {results: personalFeed, isLoading: feedLoading} = useSearch('', true);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);

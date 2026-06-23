@@ -53,7 +53,7 @@ export default function CalculatorSettingsCard() {
         <div className="card bg-base-100 border border-base-300 shadow-sm">
             <div className="card-body p-6 md:p-8">
                 <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-                    <span className="iconify mdi--calculator text-primary text-3xl"></span> Shooting-Paket Kalkulator
+                    <span className="iconify mdi--calculator text-primary text-3xl"></span> B2B Shooting-Paket Kalkulator
                 </h2>
                 <p className="text-sm opacity-70 mb-6">
                     Definiere die Standardwerte für den automatischen Paket-Rechner in den manuellen Angeboten und Rechnungen.

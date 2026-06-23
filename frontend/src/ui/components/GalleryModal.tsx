@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Gallery, FlatGroup, GalleryMetadataOpts } from '../../logic/useGalleries';
 import { useUI } from './UIContext';
 import { useForm, useWatch } from 'react-hook-form';
+import useSWR from 'swr';
+import { fetcher } from '../../logic/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
@@ -14,6 +16,7 @@ const gallerySchema = z.object({
     gallery_group_id: z.string(),
     password: z.string().optional(),
     expires_at: z.string().optional(),
+    tenant_id: z.string().optional(),
     is_free_download: z.boolean().optional(),
     is_editorial_only: z.boolean().optional(),
     is_hidden: z.boolean().optional()
@@ -36,6 +39,7 @@ const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace
 
 export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
+    const { data: tenants } = useSWR<any[]>('/api/management/tenants', fetcher);
 
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
@@ -48,6 +52,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         if (isOpen) {
             reset({
                 name: editingGallery?.name || '',
+                tenant_id: editingGallery?.tenant_id || '',
                 slug: editingGallery?.slug || '',
                 type: editingGallery?.type || 'delivery',
                 is_public: editingGallery?.is_public || false,
@@ -179,7 +184,16 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                         </div>
                     </div>
 
+                    
                     <div className="form-control w-full mb-4">
+                        <label className="label"><span className="label-text font-bold">Zugeordneter Mandant (Verschieben)</span></label>
+                        <select {...register('tenant_id')} className="select select-bordered w-full">
+                            <option value="">-- Kein spezifischer Mandant --</option>
+                            {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                    </div>
+
+<div className="form-control w-full mb-4">
                         <label className="label"><span className="label-text font-bold">In welchem Ordner soll die Galerie liegen?</span></label>
                         <select {...register('gallery_group_id')} className="select select-bordered w-full">
                             <option value="">-- Oberste Ebene (Root) --</option>

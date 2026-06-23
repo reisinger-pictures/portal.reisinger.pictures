@@ -15,6 +15,7 @@ class StoreGalleryRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tenant_id' => 'nullable|string|exists:tenants,id',
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'type' => 'required|in:selection,delivery',

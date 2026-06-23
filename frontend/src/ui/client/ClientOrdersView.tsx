@@ -1,4 +1,4 @@
-import { useLicenseTerms } from '../../logic/useLicenseTerms';
+import { useBillingDetails } from '../../logic/useLicenseTerms';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
 import PageLayout from '../components/PageLayout';
@@ -10,7 +10,7 @@ import { formatMoney } from '../../logic/utils';
 
 export default function ClientOrdersView() {
     const { data: orders, error, isLoading } = useSWR<Order[]>('/api/orders', fetcher);
-    const { terms } = useLicenseTerms();
+    const { billingDetails } = useBillingDetails();
 
     if (isLoading) return <PageLayout currentView="orders"><div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div></PageLayout>;
     if (error) return <PageLayout currentView="orders"><div className="p-8"><ErrorMessage message="Fehler beim Laden der Einkäufe." /></div></PageLayout>;
@@ -62,9 +62,9 @@ export default function ClientOrdersView() {
                                             <p className="font-bold mb-1 flex items-center gap-2"><span className="iconify mdi--bank text-warning"></span> Zahlung ausständig (Kauf auf Rechnung)</p>
                                             <p className="opacity-80 mb-2">Bitte überweise den Rechnungsbetrag zeitnah. Gib als Verwendungszweck die Belegnummer an.</p>
                                             <div className="font-mono text-sm opacity-90 bg-base-100 p-2 rounded inline-block shadow-sm">
-                                                <div>Empfänger: <strong>{terms?.bank_holder}</strong></div>
-                                                <div>IBAN: <strong>{terms?.bank_iban}</strong></div>
-                                                <div>BIC: <strong>{terms?.bank_bic}</strong></div>
+                                                <div>Empfänger: <strong>{billingDetails?.bank_holder}</strong></div>
+                                                <div>IBAN: <strong>{billingDetails?.bank_iban}</strong></div>
+                                                <div>BIC: <strong>{billingDetails?.bank_bic}</strong></div>
                                             </div>
                                         </div>
                                     )}
