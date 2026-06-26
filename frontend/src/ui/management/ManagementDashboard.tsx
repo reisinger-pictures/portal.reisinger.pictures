@@ -25,7 +25,6 @@ import PhotographerTeamModal from './components/PhotographerTeamModal';
 export default function ManagementDashboard() {
     const navigate = useNavigate();
     const location = useLocation();
-    const [searchParams] = useSearchParams();
     const pathView = location.pathname.replace('/', '');
     const currentView = pathView || 'structure';
 

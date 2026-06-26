@@ -51,7 +51,7 @@ class Photo extends Model
 
     public function getArtistAttribute() {
         if (!$this->user) return null;
-        return $this->user->metadata_copyright ?: $this->user->name;
+        return $this->user->metadata_copyright ?? $this->user->name;
     }
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool {

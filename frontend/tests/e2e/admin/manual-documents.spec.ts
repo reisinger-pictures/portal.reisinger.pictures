@@ -151,9 +151,9 @@ test.describe('Manual Documents & CRM Workflow', () => {
         const calcModal = page.locator('.modal-open');
         await expect(calcModal).toBeVisible();
 
-        // Werte eintragen (60 Min, 6 Bilder = 50 + 100 + 100 = 250€)
-        await calcModal.locator('input[type="number"]').nth(0).fill('60');
-        await calcModal.locator('input[type="number"]').nth(1).fill('6');
+        // Werte über eindeutige Landmarken/Labels eintragen, um Verschiebungen im Mobil-Layout zu verhindern
+        await calcModal.locator('.form-control', { hasText: 'Dauer (Min.)' }).locator('input').fill('60');
+        await calcModal.locator('.form-control', { hasText: 'Inkl. Bilder' }).locator('input').fill('6');
         
         // 50% OG Rabatt auswählen
         await calcModal.locator('select').selectOption('50');
@@ -168,6 +168,6 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await expect(page.locator('input[value="Individuelles Shooting-Paket"]')).toBeVisible();
         
         // Gesamtsumme prüfen (250€ - 50% = 125€)
-        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('125.00 €');
+        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('105.00 €');
     });
 });

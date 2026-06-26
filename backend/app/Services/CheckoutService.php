@@ -17,14 +17,17 @@ class CheckoutService {
     }
 
     public function processCheckout($request, $user, $paymentMethod) {
-        return DB::transaction(function () use ($request, $user, $paymentMethod) {
+        try {
+            return DB::transaction(function () use ($request, $user, $paymentMethod) {
             $totalNetCents = 0;
             $lineItems = [];
             $isQuoteRequest = false;
 
             foreach ($request->items as $item) {
                 $photo = Photo::with('gallery')->findOrFail($item['photoId']);
-                if (!$photo->gallery->is_public && !$user->canAccessGallery($photo->gallery_id)) abort(403, 'Zugriff verweigert');
+                if (!$photo->gallery->is_public && !$user->canAccessGallery($photo->gallery_id)) {
+                    throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => 'Zugriff verweigert'], 403));
+                }
                 
                 $isItemQuote = isset($item['isQuote']) && $item['isQuote'];
                 
@@ -33,7 +36,7 @@ class CheckoutService {
                     if ($useCase) {
                         $isCommercial = $useCase->is_commercial || preg_match('/werbung|kampagne|kommerziell/i', $useCase->name . ' ' . $useCase->description);
                         if ($isCommercial && ($photo->effective_is_editorial_only || $photo->is_editorial_only)) {
-                            return response()->json(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."], 403);
+                            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."], 403));
                         }
                     }
                 }
@@ -64,6 +67,7 @@ class CheckoutService {
                     'photoId' => $photo->id,
                     'filename' => $photo->title ?: 'Bild ' . substr($photo->id, 0, 8),
                     'tier' => $tier,
+                    'useCaseId' => $item['useCaseId'] ?? null,
                     'useCaseName' => $useCaseName,
                     'modifierNames' => $modifierNames,
                     'price' => $itemCents,
@@ -82,8 +86,12 @@ class CheckoutService {
 
             $order = Order::create(['user_id' => $user->id, 'status' => $orderStatus, 'total_amount' => $totalNetCents, 'is_quote_request' => $isQuoteRequest]);
 
+            $prefix = $isLieferschein ? 'L-' : 'P-';
+            $invoiceNumber = \App\Models\InvoiceSequence::getNextInvoiceNumber($prefix);
+
             $snapshot = InvoiceSnapshot::create([
                 'order_id' => $order->id,
+                'invoice_number' => $invoiceNumber,
                 'customer_details' => [
                     'name' => $request->billing_name, 'company' => $request->billing_company, 'street' => $request->billing_street,
                     'zip' => $request->billing_zip, 'city' => $request->billing_city, 'email' => $user->email,
@@ -92,7 +100,11 @@ class CheckoutService {
                 'total_net' => $totalNetCents, 'total_gross' => $totalNetCents, 'tax_rate' => 0.00
             ]);
 
-            if ($isQuoteRequest || $isLieferschein || $paymentMethod === 'invoice') {
+            if ($isQuoteRequest) {
+                return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
+            }
+
+            if ($isLieferschein || $paymentMethod === 'invoice') {
                 if (!$isQuoteRequest) Mail::to($user->email)->queue(new InvoiceMail($order, $snapshot));
                 return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
             }
@@ -105,5 +117,8 @@ class CheckoutService {
             $order->update(['ip_address' => $request->ip(), 'stripe_payment_intent_id' => $paymentIntent->id]);
             return response()->json(['success' => true, 'requires_action' => true, 'client_secret' => $paymentIntent->client_secret, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
         });
+        } catch (\Illuminate\Http\Exceptions\HttpResponseException $e) {
+            return $e->getResponse();
+        }
     }
 }

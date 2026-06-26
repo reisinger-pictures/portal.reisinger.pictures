@@ -120,7 +120,7 @@ Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Absc
   (`mult_*`), z. B. via separates `getRequiredMultiplier()`.
 - **Herkunft:** FE-02.
 
-### R-06 · 🟢 **P2** · `formatDateToDE` zerfällt ISO-Datum-mit-Uhrzeit ☐
+### R-06 · 🟢 **P2** · `formatDateToDE` zerfällt ISO-Datum-mit-Uhrzeit ☑ erledigt (2026-06-26)
 
 - **Symptom:** `formatDateToDE('2024-06-22T12:00:00Z')` → `'22T12:00:00Z.06.2024'` (falsch).
 - **Ursache:** `frontend/src/logic/utils.ts` `formatDateToDE` (~Zeile 49): `iso.split('-')` nimmt genau 3 Teile an;
@@ -146,7 +146,7 @@ Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Absc
 
 ## 🧹 Code-Qualität, Konsistenz & Kanten
 
-### R-08 · 🟢 `CheckoutService`: inkonsistente 403-Behandlung ☐
+### R-08 · 🟢 `CheckoutService`: inkonsistente 403-Behandlung ☑ erledigt (2026-06-26)
 
 - **Symptom:** Zugriffsschutz teils via `abort(403)` (→ leere 403-Seite/Exception), teils via
   `response()->json([...], 403)` (→ strukturierte JSON-Antwort) — inkonsistent für Frontend-Caller.
@@ -156,7 +156,7 @@ Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Absc
 - **Herkunft:** BK-06. *(Hinweis: die ursprünglich vermutete Redundanz `effective||is_editorial_only` existiert im
   Code nicht — verworfen.)*
 
-### R-09 · 🟢 `InvoiceService`: `mailTo = null`-Zweig ist praktisch tot ☐
+### R-09 · 🟢 `InvoiceService`: `mailTo = null`-Zweig ist praktisch tot ☑ erledigt (2026-06-26)
 
 - **Symptom:** Der `if ($mailTo)`-Guard schützt einen `null`-Fall, der über die Fallback-Kette (Initiator →
   Fallback-User → `mail.from.address`) nicht erreicht wird.
@@ -180,7 +180,7 @@ Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Absc
   → Cache-Key um User/Role ergänzen oder absichern, dass der Admin-Baum wirklich für alle Admins identisch ist.
 - **Herkunft:** BK-08.
 
-### R-11 · 🟢 **P2** · `Photo::getArtistAttribute`: Copyright `'0'` fällt auf `name` zurück ☐
+### R-11 · 🟢 **P2** · `Photo::getArtistAttribute`: Copyright `'0'` fällt auf `name` zurück ☑ erledigt (2026-06-26)
 
 - **Symptom:** Ein Copyright-Wert `'0'` (String) ist für `?:` falsy → fällt fälschlich auf `name` zurück statt `'0'`
   zu respektieren.
@@ -190,7 +190,7 @@ Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Absc
 - **Konkret (Review):** `?:` → `??` (Nullish Coalescing), damit der legitime String `'0'` erhalten bleibt.
 - **Herkunft:** BK-02.
 
-### R-12 · 🟢 `pricingLogic.isCovered`: ungenutzter `terms`-Parameter ☐
+### R-12 · 🟢 `pricingLogic.isCovered`: ungenutzter `terms`-Parameter ☑ erledigt (2026-06-26)
 
 - **Symptom:** Die extrahierte Funktion `isCovered` nimmt `terms` (als `_terms`) entgegen, nutzt es im Body aber
   nicht (nur Rang-Vergleich). Rein kosmetisch.
@@ -199,7 +199,7 @@ Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Absc
   bewusst als Platzhalter dokumentiert lassen.
 - **Herkunft:** FE-02.
 
-### R-13 · 🟢 **P2** · `utils.isEmpty` behandelt RegExp/Map/Set als „leer" ☐
+### R-13 · 🟢 **P2** · `utils.isEmpty` behandelt RegExp/Map/Set als „leer" ☑ erledigt (2026-06-26)
 
 - **Symptom:** `isEmpty(/regex/)`, `isEmpty(new Map())`, `isEmpty(new Set())` → `true`, weil sie keine aufzählbaren
   Eigen-Keys besitzen.
@@ -358,7 +358,8 @@ Paketsystem auf. **Wichtig:** Treue- und OG-Rabatte fallen für diesen Tarif kom
 
 * **Logik-Implementierung (`shootingCalculator.ts`):**
     * [ ] Funktion `calculateB2CFlexPrice()` für `all-the.rest` implementieren (Formel: 149 + SetupFee + (ExtraImages *
-      15) + PrivacyFee).
+        15)
+            + PrivacyFee).
     * [ ] Funktion `calculateCustomStudioPrice()` für `reisinger.pictures` kapseln (bestehende Logik).
     * [ ] Ausführliche Unit-Tests (Vitest) für beide Berechnungsstrategien schreiben.
 * **UI-Weiche (`ShootingCalculatorModal.tsx`):**
@@ -409,3 +410,11 @@ Paketsystem auf. **Wichtig:** Treue- und OG-Rabatte fallen für diesen Tarif kom
 
 Die offenen Punkte (`R-06` bis `R-13`) bleiben wie oben tabelarisch erfasst gültig und müssen parallel stabil gehalten
 werden.
+
+### Manuell und unstrukturiert (einbauen in die Struktur)
+
+- ich möchte das SVG Logo des Tenants nutzen und pro Tenant die Transparenz einstellen
+- ich möchte meinen Stundenlohn auf 80€ beim seed anpassen
+- Outdoor Faktor und Online Verbots aufpreis soll konfigurierbar sein und nicht hard coded mit geschickt werden
+- der B2b (Premium) Kalkulator ist auch bei all the rest sichtbar, das ist ok
+- weiße bei den obrigen Sachen auf Inkkonsistenzen hin und lass mich entscheiden

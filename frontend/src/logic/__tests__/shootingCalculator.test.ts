@@ -3,7 +3,7 @@ import {roundToPsychologicalValue, calculateShootingPrice, ShootingPriceInput, c
 
 const defaults = (overrides: Partial<ShootingPriceInput> = {}): ShootingPriceInput => ({
     calc_base_price: '50',
-    calc_hourly_rate: '100',
+    calc_hourly_rate: '80',
     calc_images_per_hour: '6',
     calc_outdoor_multiplier: '0.5',
     duration: 90,
@@ -43,49 +43,49 @@ describe('roundToPsychologicalValue', () => {
 
 describe('calculateShootingPrice', () => {
     it('defaults (90 min / 15 imgs, no flatrate, no discount) → {449,449,0}', () => {
-        expect(calculateShootingPrice(defaults())).toEqual({packagePrice: 449, finalPrice: 449, discountAbsolute: 0});
+        expect(calculateShootingPrice(defaults())).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
     });
 
     it('halves the images price component when isOutdoor is true', () => {
-        // Base 50 + Time 150 + (Images 250 * 0.5 = 125) = 325 -> gerundet auf 325
-        expect(calculateShootingPrice(defaults({isOutdoor: true}))).toEqual({packagePrice: 325, finalPrice: 325, discountAbsolute: 0});
+        // Base 50 + Time 120 + (Images 200 * 0.5 = 100) = 270 -> gerundet auf 269
+        expect(calculateShootingPrice(defaults({isOutdoor: true}))).toEqual({packagePrice: 269, finalPrice: 269, discountAbsolute: 0});
     });
 
-    it('flatrate (+20%) → {539,539,0}', () => {
-        expect(calculateShootingPrice(defaults({flatrate: true}))).toEqual({packagePrice: 539, finalPrice: 539, discountAbsolute: 0});
+    it('flatrate (+20%) → {445,445,0}', () => {
+        expect(calculateShootingPrice(defaults({flatrate: true}))).toEqual({packagePrice: 445, finalPrice: 445, discountAbsolute: 0});
     });
 
-    it('33% discount → {449,299,150}', () => {
-        expect(calculateShootingPrice(defaults({discount: '33'}))).toEqual({packagePrice: 449, finalPrice: 299, discountAbsolute: 150});
+    it('33% discount → {369,245,124}', () => {
+        expect(calculateShootingPrice(defaults({discount: '33'}))).toEqual({packagePrice: 369, finalPrice: 245, discountAbsolute: 124});
     });
 
-    it('50% discount → {449,225,224} (desired inexact rounding)', () => {
-        expect(calculateShootingPrice(defaults({discount: '50'}))).toEqual({packagePrice: 449, finalPrice: 225, discountAbsolute: 224});
+    it('50% discount → {369,185,184} (desired inexact rounding)', () => {
+        expect(calculateShootingPrice(defaults({discount: '50'}))).toEqual({packagePrice: 369, finalPrice: 185, discountAbsolute: 184});
     });
 
     it('honours a custom base price', () => {
-        expect(calculateShootingPrice(defaults({calc_base_price: '100'}))).toEqual({packagePrice: 499, finalPrice: 499, discountAbsolute: 0});
+        expect(calculateShootingPrice(defaults({calc_base_price: '100'}))).toEqual({packagePrice: 419, finalPrice: 419, discountAbsolute: 0});
     });
 
     it('zero duration removes the time component → {299,299,0}', () => {
-        expect(calculateShootingPrice(defaults({duration: 0}))).toEqual({packagePrice: 299, finalPrice: 299, discountAbsolute: 0});
+        expect(calculateShootingPrice(defaults({duration: 0}))).toEqual({packagePrice: 249, finalPrice: 249, discountAbsolute: 0});
     });
 
     it('zero images removes the images component → {199,199,0}', () => {
-        expect(calculateShootingPrice(defaults({images: 0}))).toEqual({packagePrice: 199, finalPrice: 199, discountAbsolute: 0});
+        expect(calculateShootingPrice(defaults({images: 0}))).toEqual({packagePrice: 169, finalPrice: 169, discountAbsolute: 0});
     });
 
     it('calc_images_per_hour "0" falls back to default 6 (no Infinity)', () => {
         const result = calculateShootingPrice(defaults({calc_images_per_hour: '0'}));
         expect(Number.isFinite(result.packagePrice)).toBe(true);
         expect(Number.isFinite(result.finalPrice)).toBe(true);
-        expect(result).toEqual({packagePrice: 449, finalPrice: 449, discountAbsolute: 0});
+        expect(result).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
     });
 
     it('combines flatrate, outdoor and discount correctly', () => {
-        // (Base 50 + Time 150 + (Images 250 * 0.5 = 125)) * 1.2 = 325 * 1.2 = 390 -> gerundet auf 389
-        // 389 - 50% = 194.5 -> gerundet auf 195
-        expect(calculateShootingPrice(defaults({flatrate: true, isOutdoor: true, discount: '50'}))).toEqual({packagePrice: 389, finalPrice: 195, discountAbsolute: 194});
+        // (Base 50 + Time 120 + (Images 200 * 0.5 = 100)) * 1.2 = 270 * 1.2 = 324 -> gerundet auf 325
+        // 325 - 50% = 162.5 -> gerundet auf 165
+        expect(calculateShootingPrice(defaults({flatrate: true, isOutdoor: true, discount: '50'}))).toEqual({packagePrice: 325, finalPrice: 165, discountAbsolute: 160});
     });
 
     it('honours a custom hourly rate', () => {
@@ -93,21 +93,21 @@ describe('calculateShootingPrice', () => {
     });
 
     it('honours a custom images-per-hour', () => {
-        expect(calculateShootingPrice(defaults({calc_images_per_hour: '10'}))).toEqual({packagePrice: 349, finalPrice: 349, discountAbsolute: 0});
+        expect(calculateShootingPrice(defaults({calc_images_per_hour: '10'}))).toEqual({packagePrice: 289, finalPrice: 289, discountAbsolute: 0});
     });
 
     it('non-numeric calc_images_per_hour falls back to default (finite result)', () => {
         const result = calculateShootingPrice(defaults({calc_images_per_hour: 'abc'}));
         expect(Number.isFinite(result.packagePrice)).toBe(true);
         expect(Number.isFinite(result.finalPrice)).toBe(true);
-        expect(result).toEqual({packagePrice: 449, finalPrice: 449, discountAbsolute: 0});
+        expect(result).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
     });
 
     it('negative calc_images_per_hour falls back to default (finite result)', () => {
         const result = calculateShootingPrice(defaults({calc_images_per_hour: '-5'}));
         expect(Number.isFinite(result.packagePrice)).toBe(true);
         expect(Number.isFinite(result.finalPrice)).toBe(true);
-        expect(result).toEqual({packagePrice: 449, finalPrice: 449, discountAbsolute: 0});
+        expect(result).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
     });
 });
 

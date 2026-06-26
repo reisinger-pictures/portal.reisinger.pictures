@@ -51,8 +51,8 @@ describe('formatDateToDE', () => {
 
     // REVIEW (aktueller Bug): Split erfolgt nur auf '-' und nimmt 3 Teile an.
     // Ein ISO-Datum mit Zeitanteil erzeugt daher fehlerhaft "TagZeit.Monat.Jahr".
-    it('_review: mishandles ISO datetime by splitting only on dash', () => {
-        expect(formatDateToDE('2024-06-22T12:00:00Z')).toBe('22T12:00:00Z.06.2024');
+    it('handles ISO datetime by extracting the date part', () => {
+        expect(formatDateToDE('2024-06-22T12:00:00Z')).toBe('22.06.2024');
     });
 });
 
@@ -178,10 +178,12 @@ describe('isEmpty', () => {
     });
 
     // REVIEW-freundlich: RegExp/Map/Set sind Objekte ohne aufzählbare Eigen-Keys → gelten als "leer".
-    it('treats RegExp, Map and Set instances as empty (no enumerable own keys)', () => {
+    it('treats RegExp as empty, and Map/Set based on size', () => {
         expect(isEmpty(/regex/)).toBe(true);
         expect(isEmpty(new Map())).toBe(true);
         expect(isEmpty(new Set())).toBe(true);
+        expect(isEmpty(new Map([['a', 1]]))).toBe(false);
+        expect(isEmpty(new Set([1]))).toBe(false);
     });
 });
 

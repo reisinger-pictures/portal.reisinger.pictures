@@ -69,33 +69,33 @@ describe('getRequiredMultiplier', () => {
 
 describe('isCovered', () => {
     it('is false for commercial usage regardless of resolution', () => {
-        expect(isCovered(TERMS, 'original', 'web', 'commercial', '1_year', 'national')).toBe(false);
+        expect(isCovered('original', 'web', 'commercial', '1_year', 'national')).toBe(false);
     });
 
     it('is false for unlimited duration', () => {
-        expect(isCovered(TERMS, 'original', 'web', 'editorial', 'unlimited', 'national')).toBe(false);
+        expect(isCovered('original', 'web', 'editorial', 'unlimited', 'national')).toBe(false);
     });
 
     it('is false for international territory', () => {
-        expect(isCovered(TERMS, 'original', 'web', 'editorial', '1_year', 'international')).toBe(false);
+        expect(isCovered('original', 'web', 'editorial', '1_year', 'international')).toBe(false);
     });
 
     it('is true when user rank >= requested rank (editorial/1_year/national)', () => {
-        expect(isCovered(TERMS, 'original', 'web', 'editorial', '1_year', 'national')).toBe(true);
-        expect(isCovered(TERMS, 'web', 'web', 'editorial', '1_year', 'national')).toBe(true);
+        expect(isCovered('original', 'web', 'editorial', '1_year', 'national')).toBe(true);
+        expect(isCovered('web', 'web', 'editorial', '1_year', 'national')).toBe(true);
     });
 
     it('is false when user rank < requested rank', () => {
-        expect(isCovered(TERMS, 'web', 'print', 'editorial', '1_year', 'national')).toBe(false);
+        expect(isCovered('web', 'print', 'editorial', '1_year', 'national')).toBe(false);
     });
 
     it('treats undefined / "none" user level as rank 0 (covers nothing)', () => {
-        expect(isCovered(TERMS, undefined, 'web', 'editorial', '1_year', 'national')).toBe(false);
-        expect(isCovered(TERMS, 'none', 'web', 'editorial', '1_year', 'national')).toBe(false);
+        expect(isCovered(undefined, 'web', 'editorial', '1_year', 'national')).toBe(false);
+        expect(isCovered('none', 'web', 'editorial', '1_year', 'national')).toBe(false);
     });
 
     it('defaults territory to national when omitted', () => {
-        expect(isCovered(TERMS, 'original', 'web', 'editorial', '1_year')).toBe(true);
+        expect(isCovered('original', 'web', 'editorial', '1_year')).toBe(true);
     });
 });
 

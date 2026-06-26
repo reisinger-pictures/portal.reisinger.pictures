@@ -81,7 +81,7 @@ class DatabaseSeeder extends Seeder
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_national'], ['value' => 'Nutzung nur im Inland (national).']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_international'], ['value' => 'Weltweite, uneingeschränkte räumliche Nutzung.']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_base_price'], ['value' => '50']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_hourly_rate'], ['value' => '100']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_hourly_rate'], ['value' => '80']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_images_per_hour'], ['value' => '6']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_outdoor_multiplier'], ['value' => '0.5']);
 

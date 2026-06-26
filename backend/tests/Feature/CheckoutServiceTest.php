@@ -210,23 +210,20 @@ class CheckoutServiceTest extends TestCase
     // ------------------------------------------------------------------
     // 5. IDOR: private Galerie, User ohne Zugriff -> abort(403) + Rollback
     // ------------------------------------------------------------------
-    public function test_process_checkout_idor_private_gallery_without_access_aborts_403_and_rolls_back(): void
+    public function test_process_checkout_idor_private_gallery_without_access_returns_403_json_and_rolls_back(): void
     {
         $gallery = Gallery::factory()->create(['is_public' => false]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $useCase = LicenseUseCase::create(['name' => 'Web', 'base_price' => 7500, 'flatrate_tier' => 'web']);
         $user = User::factory()->create(); // KEIN galleries()->attach
 
-        try {
-            $this->service->processCheckout(
-                $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
-                $user,
-                'stripe'
-            );
-            $this->fail('Expected HttpException(403) was not thrown.');
-        } catch (HttpException $e) {
-            $this->assertEquals(403, $e->getStatusCode());
-        }
+        $response = $this->service->processCheckout(
+            $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
+            $user,
+            'stripe'
+        );
+        $this->assertEquals(403, $response->status());
+        $this->assertSame('Zugriff verweigert', $response->getData(true)['error']);
 
         // Transaktions-Rollback
         $this->assertEquals(0, Order::count());

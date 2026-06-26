@@ -16,7 +16,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     const {isAtr} = useBrand();
     const {terms} = useLicenseTerms();
 
-    const calcMode = isAtr ? 'atr' : 'rp';
+    const [usePremium, setUsePremium] = useState(false);
+    const calcMode = (isAtr && !usePremium) ? 'atr' : 'rp';
 
     // --- RP (B2B) State ---
     const [calcDuration, setCalcDuration] = useState<number>(90);
@@ -102,6 +103,13 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                     <span className="iconify mdi--calculator text-primary"></span>
                     {calcMode === 'atr' ? 'B2C Flex-Paket Rechner' : 'B2B Shooting-Paket Kalkulator'}
                 </h3>
+
+                {isAtr && (
+                    <div className="tabs tabs-boxed mb-4 w-full flex bg-base-200">
+                        <button type="button" className={`tab flex-1 ${!usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(false)}>B2C Flex-Paket</button>
+                        <button type="button" className={`tab flex-1 ${usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(true)}>Premium Tarif</button>
+                    </div>
+                )}
 
                 {calcMode === 'atr' ? (
                     <div className="space-y-4">

@@ -1,5 +1,5 @@
 import useSWR, { mutate as globalMutate } from 'swr';
-import { useSearchParams } from 'react-router-dom';
+// import removed
 import {apiMutate, fetcher} from '../api';
 import {useAuth} from './useAuth';
 
@@ -30,6 +30,7 @@ export interface Gallery {
     default_iso_country?: string;
     gallery_group_id?: string | null;
     expires_at?: string | null;
+    tenant_id?: string | null;
 }
 
 export interface GalleryGroup {
@@ -46,6 +47,7 @@ export interface GalleryGroup {
     effective_is_free_download?: boolean;
     children?: GalleryGroup[];
     galleries?: Gallery[];
+    tenant_id?: string | null;
 }
 
 export interface GalleryTreeResponse {

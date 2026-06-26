@@ -21,7 +21,7 @@ export default function CalculatorSettingsCard() {
         resolver: zodResolver(calculatorSettingsSchema),
         defaultValues: {
             calc_base_price: 50,
-            calc_hourly_rate: 100,
+            calc_hourly_rate: 80,
             calc_images_per_hour: 6
         }
     });
@@ -30,7 +30,7 @@ export default function CalculatorSettingsCard() {
         if (terms) {
             reset({
                 calc_base_price: parseFloat(terms.calc_base_price || '50'),
-                calc_hourly_rate: parseFloat(terms.calc_hourly_rate || '100'),
+                calc_hourly_rate: parseFloat(terms.calc_hourly_rate || '80'),
                 calc_images_per_hour: parseInt(terms.calc_images_per_hour || '6', 10)
             });
         }
@@ -41,7 +41,10 @@ export default function CalculatorSettingsCard() {
             await updateTerms({
                 calc_base_price: data.calc_base_price,
                 calc_hourly_rate: data.calc_hourly_rate,
-                calc_images_per_hour: data.calc_images_per_hour
+                calc_images_per_hour: data.calc_images_per_hour,
+                mult_commercial: terms?.mult_commercial || '2.0',
+                mult_unlimited: terms?.mult_unlimited || '1.5',
+                mult_international: terms?.mult_international || '1.5'
             });
             showToast('success', 'Kalkulator-Einstellungen gespeichert.');
         } catch {
@@ -53,7 +56,7 @@ export default function CalculatorSettingsCard() {
         <div className="card bg-base-100 border border-base-300 shadow-sm">
             <div className="card-body p-6 md:p-8">
                 <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-                    <span className="iconify mdi--calculator text-primary text-3xl"></span> B2B Shooting-Paket Kalkulator
+                    <span className="iconify mdi--calculator text-primary text-3xl"></span> Premium Tarif Kalkulator
                 </h2>
                 <p className="text-sm opacity-70 mb-6">
                     Definiere die Standardwerte für den automatischen Paket-Rechner in den manuellen Angeboten und Rechnungen.

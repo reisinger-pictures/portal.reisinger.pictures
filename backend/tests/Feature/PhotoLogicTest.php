@@ -351,8 +351,8 @@ class PhotoLogicTest extends TestCase
         ]);
         $photo = Photo::factory()->for($user, 'user')->create();
 
-        // BUG-ish: '0' is falsy in PHP → falls back to name
-        $this->assertSame('Jane Doe', $photo->artist);
+        // Fixed: '0' is preserved
+        $this->assertSame('0', $photo->artist);
     }
 
     // ------------------------------------------------------------------

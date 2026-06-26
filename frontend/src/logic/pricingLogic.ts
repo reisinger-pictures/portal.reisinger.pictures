@@ -33,9 +33,6 @@ export function getRequiredMultiplier(terms: PricingTerms, key: string): number 
 }
 
 export function isCovered(
-    // `terms` wird von isCovered selbst nicht gebraucht (nur Rang-Vergleich); der Parameter bleibt
-    // aus Signatur-Symmetrie zu calculateUpgradePrice erhalten (Hook reicht `terms` einheitlich durch).
-    _terms: PricingTerms,
     userLevel: string | undefined,
     reqRes: ResolutionTier,
     reqUsage: UsageTier,
@@ -54,7 +51,7 @@ export function calculateUpgradePrice(
     reqDuration: DurationTier,
     reqTerritory: TerritoryTier = 'national',
 ): number {
-    if (isCovered(terms, userLevel, reqRes, reqUsage, reqDuration, reqTerritory)) return 0;
+    if (isCovered(userLevel, reqRes, reqUsage, reqDuration, reqTerritory)) return 0;
 
     const priceWeb = getRequiredTerm(terms, 'price_web');
     const pricePrint = getRequiredTerm(terms, 'price_print');

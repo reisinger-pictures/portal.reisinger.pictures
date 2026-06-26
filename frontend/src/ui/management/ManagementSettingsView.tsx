@@ -5,7 +5,6 @@ import {fetcher, SystemInfo} from '../../api';
 import {useBillingDetails} from '../../logic/useLicenseTerms';
 import {useAuth} from '../../logic/useAuth';
 import CalculatorSettingsCard from './components/CalculatorSettingsCard';
-import { useBrand } from '../../logic/useBrand';
 
 declare const __APP_BUILD_TIME__: string;
 
@@ -14,7 +13,6 @@ export default function ManagementSettingsView() {
     const {billingDetails, updateBillingDetails, isLoading: termsLoading} = useBillingDetails();
     const {user} = useAuth();
     const {data: sysInfo} = useSWR<SystemInfo>('/api/management/settings/system', fetcher);
-    const { isAtr } = useBrand();
 
     let reactTime = 'Unbekannt';
     if (typeof __APP_BUILD_TIME__ !== 'undefined') {
@@ -126,7 +124,7 @@ export default function ManagementSettingsView() {
             </div>
             <WatermarkSettingsCard/>
 
-            {!isAtr && <CalculatorSettingsCard/>}
+            <CalculatorSettingsCard/>
 
             <div className="mt-8 pt-8 border-t border-base-300">
                 <div

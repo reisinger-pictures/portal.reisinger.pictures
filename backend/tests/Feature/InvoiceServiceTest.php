@@ -254,10 +254,8 @@ class InvoiceServiceTest extends TestCase
         $messages = Http::get('http://127.0.0.1:8026/api/v1/messages')->json('messages');
         $this->assertSame(0, count($messages));
 
-        // REVIEW-Hinweis: mailTo=null ist über die normalen Guards nicht erreichbar —
-        // fallbackUser = tenant->users()->first() ist null iff Tenant keine User hat,
-        // dann liefert die Order-Query aber ohnehin leer → Fehler-Branch. Der Mail-null-Pfad
-        // ('if ($mailTo)') ist daher nur über die Fehler-Rückgabe erreichbar, nicht über success.
+        // REVIEW-Hinweis: Der ehemals tote mailTo=null Zweig wurde entfernt,
+        // da er über die vorherigen Guards ohnehin unerreichbar war.
     }
 
     public function test_generateForTenant_users_without_delivery_note_orders_returns_error(): void

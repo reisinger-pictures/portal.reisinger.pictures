@@ -41,7 +41,7 @@ export function calculateShootingPrice(input: ShootingPriceInput): ShootingPrice
 
 export function calculateCustomStudioPrice(input: ShootingPriceInput): ShootingPriceResult {
     const basePrice = parseFloat(input.calc_base_price || '50');
-    const hourlyRate = parseFloat(input.calc_hourly_rate || '100');
+    const hourlyRate = parseFloat(input.calc_hourly_rate || '80');
     
     const DEFAULT_IMAGES_PER_HOUR = 6;
     const parsedImagesPerHour = parseInt(input.calc_images_per_hour || String(DEFAULT_IMAGES_PER_HOUR), 10);

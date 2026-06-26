@@ -10,7 +10,7 @@ export function usePricing(terms: PricingTerms) {
         reqUsage: UsageTier,
         reqDuration: DurationTier,
         reqTerritory: TerritoryTier = 'national',
-    ) => isCovered(terms, userLevel, reqRes, reqUsage, reqDuration, reqTerritory);
+    ) => isCovered(userLevel, reqRes, reqUsage, reqDuration, reqTerritory);
 
     const calculateUpgradePriceBound = (
         userLevel: string | undefined,

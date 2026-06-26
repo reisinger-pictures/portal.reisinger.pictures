@@ -47,12 +47,12 @@ export default function ManagementOrdersView() {
         }
     };
 
-    const statusLabels: Record<string, { label: string, color: string }> = {
-        'pending': { label: 'Ausständig / Angebot', color: 'badge-neutral' },
-        'invoice_created': { label: 'Offen / Rechnung', color: 'badge-warning' },
-        'paid': { label: 'Bezahlt', color: 'badge-success text-white' },
-        'overdue': { label: 'Überfällig', color: 'badge-error text-white' },
-        'cancelled': { label: 'Storniert', color: 'badge-neutral' }
+    const statusLabels: Record<string, { label: string, color: string, textColor: string }> = {
+        'pending': { label: 'Ausständig / Angebot', color: 'badge-neutral', textColor: 'text-neutral' },
+        'invoice_created': { label: 'Offen / Rechnung', color: 'badge-warning', textColor: 'text-warning' },
+        'paid': { label: 'Bezahlt', color: 'badge-success text-white', textColor: 'text-success' },
+        'overdue': { label: 'Überfällig', color: 'badge-error text-white', textColor: 'text-error' },
+        'cancelled': { label: 'Storniert', color: 'badge-neutral', textColor: 'text-neutral' }
     };
 
     return (
@@ -86,7 +86,7 @@ export default function ManagementOrdersView() {
                                 <td>
                                     <div className="flex flex-col gap-2 items-start">
                                         <select 
-                                            className={`select select-sm select-bordered ${statusLabels[order.status]?.color?.replace('badge', 'text').replace('text-white', '')}`}
+                                            className={`select select-sm select-bordered ${statusLabels[order.status]?.textColor || ''}`}
                                             value={order.status}
                                             onChange={(e) => handleStatusChange(order.id, e.target.value)}
                                         >

@@ -44,7 +44,7 @@ export const UIProvider = ({ children }: UIProviderProps) => {
             {/* Global Toasts */}
             <div className="toast toast-top toast-center toast-global mt-12 md:mt-4 transition-all pointer-events-none z-[100]">
                 {toasts.map(toast => (
-                    <div key={toast.id} className={`alert alert-${toast.type} shadow-xl pointer-events-auto`}>
+                    <div key={toast.id} className={`alert ${toast.type === "success" ? "alert-success bg-success text-white" : toast.type === "error" ? "alert-error bg-error text-white" : "alert-info bg-info text-info-content"} shadow-xl pointer-events-auto border-none`}>
                         <span className={`iconify ${toast.type === 'error' ? 'mdi--alert-circle' : toast.type === 'success' ? 'mdi--check-circle' : 'mdi--information'} text-xl`}></span>
                         <span>{toast.text}</span>
                         <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}>✕</button>
@@ -63,7 +63,7 @@ export const UIProvider = ({ children }: UIProviderProps) => {
                             <button className="btn btn-ghost" onClick={() => handleConfirm(false)}>
                                 {confirmState.options.cancelText || 'Abbrechen'}
                             </button>
-                            <button className={`btn-${confirmState.options.confirmColor || 'primary'}`} onClick={() => handleConfirm(true)}>
+                            <button className={`btn ${{primary: 'btn-primary', error: 'btn-error', warning: 'btn-warning', info: 'btn-info', success: 'btn-success'}[confirmState.options.confirmColor || 'primary']}`} onClick={() => handleConfirm(true)}>
                                 {confirmState.options.confirmText || 'Bestätigen'}
                             </button>
                         </div>

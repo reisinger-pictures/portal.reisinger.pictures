@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { GalleryGroup, FlatGroup, GalleryGroupExtraOpts } from '../../logic/useGalleries';
+import { Tenant } from '../../logic/useTenants';
 import { useUI } from './UIContext';
 import { useForm, useWatch } from 'react-hook-form';
 import useSWR from 'swr';
-import { fetcher } from '../../logic/utils';
+import { fetcher } from '../../api';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
@@ -34,7 +35,7 @@ const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace
 
 export default function GalleryGroupModal({ isOpen, onClose, availableGroups, editingGroup, defaultParentId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
-    const { data: tenants } = useSWR<any[]>('/api/management/tenants', fetcher);
+    const { data: tenants } = useSWR<Tenant[]>('/api/management/tenants', fetcher);
 
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GroupFormValues>({
         resolver: zodResolver(groupSchema),

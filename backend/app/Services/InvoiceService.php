@@ -87,10 +87,8 @@ class InvoiceService
                 'tax_rate' => 0.00
             ]);
 
-            $mailTo = $initiator ? $initiator->email : ($fallbackUser->email ?? null);
-            if ($mailTo) {
-                Mail::to($mailTo)->send(new InvoiceMail($collectiveOrder, $snapshot));
-            }
+            $mailTo = $initiator ? $initiator->email : $fallbackUser->email;
+            Mail::to($mailTo)->queue(new InvoiceMail($collectiveOrder, $snapshot));
 
             return [
                 'success' => true, 
