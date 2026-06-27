@@ -72,7 +72,7 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                     </div>
                     <div className="form-control w-1/2">
                         <label className="label"><span className="label-text font-bold">Standard-Wert *</span></label>
-                        <input required type="number" step="any" min="0" {...register('price', { valueAsNumber: true })} className={`input input-bordered font-mono ${errors.price ? 'input-error' : ''}`} />
+                        <input required type="number" step="0.01" min="0" {...register('price', { valueAsNumber: true })} className={`input input-bordered font-mono ${errors.price ? 'input-error' : ''}`} />
                     </div>
 
                     <div className="modal-action col-span-full mt-6">

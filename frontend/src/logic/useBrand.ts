@@ -12,7 +12,11 @@ export function useBrand() {
         brand,
         isAtr,
         logoSrc: isAtr ? '/brands/atr/android-chrome-192x192.png' : '/brands/rp/android-chrome-192x192.png',
-        portalName: isAtr ? 'all-the.rest Portal' : 'Reisinger Foto Portal'
+        // NEU: Pfad zum originalen SVG-Vektorlogo
+        svgUrl: isAtr ? '/brands/atr/safari-pinned-tab.svg' : '/brands/rp/safari-pinned-tab.svg',
+        portalName: isAtr ? 'all-the.rest Portal' : 'Reisinger Foto Portal',
+        // NEU: Mandantenspezifische Impressums-Links
+        impressumUrl: isAtr ? 'https://all-the.rest/impressum/' : 'https://reisinger.pictures/impressum/'
     };
 }
 

@@ -39,11 +39,11 @@ export default function ClientDashboard() {
             </div>
 
             <main className="flex-1 overflow-y-auto flex flex-col w-full relative bg-base-200">
-                <header className="p-4 border-b border-base-300 bg-base-100 sticky top-0 z-30 flex items-center gap-3">
-                    <button className="btn btn-square btn-ghost md:hidden shrink-0" onClick={() => setIsSidebarOpen(true)}>
+                <header className="group p-4 border-b border-base-300 bg-base-100 sticky top-0 z-30 flex items-center gap-3">
+                    <button className="btn btn-square btn-ghost md:hidden shrink-0 group-focus-within:hidden" onClick={() => setIsSidebarOpen(true)}>
                         <span className="iconify mdi--menu text-2xl"></span>
                     </button>
-                    <Link to="/" className="md:hidden flex items-center gap-2 shrink-0 mr-1">
+                    <Link to="/" className="md:hidden flex items-center gap-2 shrink-0 mr-1 group-focus-within:hidden">
                         <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
                         <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
                     </Link>

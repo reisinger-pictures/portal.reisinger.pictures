@@ -1,31 +1,15 @@
 ---
 domain: infrastructure
 topic: watermark-refactoring
-status: planned
+status: active
 ---
 
-# Technical Concept: Watermark Refactoring (SVG to PNG via Frontend)
+# Technical Concept: Watermark Refactoring (Automated Startup Detection)
 
-## 1. Architectural Shift (GD Only)
-- **Backend Simplification:** The backend drops all dependencies on `Imagick`, `Ghostscript`, and `Fontconfig`. It uses the native PHP `GD` library exclusively for applying watermarks (`imagecopyresampled`).
-- **ExifTool:** Used to copy/inject IPTC metadata after the GD processing, since GD strips EXIF/IPTC data upon saving.
+## 1. Architectural Shift (No Uploads, Pure Opacity Management)
+- **Single Source of Truth:** Die SVG-Logos der Brands liegen fest im Frontend Repository (`/public/brands/.../safari-pinned-tab.svg`). Ein Dateiupload über das Admin-Dashboard ist nicht mehr möglich.
+- **Opacity Control:** Der Admin steuert über das Dashboard ausschließlich den Regler für die Deckkraft (`opacity`).
 
-## 2. Frontend Rendering & Buckets
-- To minimize backend RAM usage and scaling artifacts, the React frontend renders the uploaded SVG logo onto a `<canvas>` applying the configured opacity.
-- The frontend generates the transparent watermark in **three bucket sizes** (e.g., 500px, 1000px, 2000px) and uploads them to the API.
-
-## 3. Watermark Application Logic (Centered)
-- **Placement:** The watermark is placed exactly in the center of the image.
-- **Sizing:** The size of the watermark is dynamically calculated based on the shortest side of the target image (e.g., 1/3 of the shortest edge). This ensures consistent visual weight for both landscape and portrait orientations, even for 60MP files.
-- **Bucket Selection:** The backend automatically selects the closest available bucket size to minimize the scaling workload for the GD library.
-
-## 4. Storage & Persistence
-- The pre-rendered watermark PNG buckets are stored persistently in `/var/www/photos/_watermarks/` (the main media volume) to survive container restarts.
-
-## 5. Global Admin Warning
-- The `/api/auth/me` endpoint checks for the existence of the master watermark PNGs.
-- If missing (e.g., fresh setup), a global warning banner is displayed to `super_admin` users across all views, prompting them to upload and save the watermark settings.
-
-## 6. Docker Image Optimization
-- `Dockerfile` will be stripped of `imagemagick`, `libmagickwand-dev`, `ghostscript`, `fonts-liberation`, and `fontconfig`.
-- `pecl install imagick` will be removed.
+## 2. Server Startup & Dynamic Auto-Detection
+- **Auto-Regeneration on Boot:** Das Backend überwacht die MD5-Hashes der Quell-SVGs im Frontend-Verzeichnis. Wenn der Server neu startet oder die Einstellungsseite aufgerufen wird und eine Änderung am SVG-Inhalt detektiert wird, werden die PNG-Auflösungs-Buckets (`500.png`, `1000.png`, `2000.png`) vollautomatisch im RAM neu gerastert und im persistenten Medien-Volume abgelegt.
+- **Busting Stale Caches:** Nach jeder automatischen Regeneration werden alle gecachten Derivate in den Galerie-Unterordnern (`/_watermarked`) invalidiert.

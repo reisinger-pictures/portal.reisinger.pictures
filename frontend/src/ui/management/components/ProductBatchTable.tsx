@@ -133,7 +133,7 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                                         className="input input-sm input-bordered flex items-center gap-2 w-28 ml-auto">
                                         <input
                                             type="number"
-                                            step="any"
+                                            step="0.01"
                                             min="0"
                                             className="grow text-right font-mono min-w-0"
                                             value={batchData[p.id]?.price ?? 0}
@@ -225,7 +225,7 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                                 <label className="input input-sm input-bordered flex items-center gap-2 w-full">
                                     <input
                                         type="number"
-                                        step="any"
+                                        step="0.01"
                                         min="0"
                                         className="grow text-right font-mono min-w-0"
                                         value={batchData[p.id]?.price ?? 0}

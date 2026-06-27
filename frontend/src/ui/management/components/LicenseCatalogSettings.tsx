@@ -40,7 +40,7 @@ function UseCaseRow({ uc, onSave, onDelete }: { uc: LicenseUseCase, onSave: (id:
                 </td>
                 <td className="text-right">
                     <div className="flex justify-end items-center gap-1">
-                        <input type="number" step="any" className="input input-bordered w-24 text-right" value={data.base_price} onChange={e => setData({...data, base_price: parseFloat(e.target.value) || 0})} />
+                        <input type="number" step="0.01" className="input input-bordered w-24 text-right" value={data.base_price} onChange={e => setData({...data, base_price: parseFloat(e.target.value) || 0})} />
                         <span className="font-bold opacity-70">€</span>
                     </div>
                 </td>
@@ -106,7 +106,7 @@ function ModifierRow({ mod, onSave, onDelete }: { mod: LicenseModifier, onSave: 
                 <td className="text-right">
                     <div className="flex justify-end items-center gap-1">
                         <span className="font-bold opacity-70">+</span>
-                        <input type="number" step="any" className="input input-bordered w-20 text-right" value={data.percent_surcharge} onChange={e => setData({...data, percent_surcharge: parseFloat(e.target.value) || 0})} />
+                        <input type="number" step="0.01" className="input input-bordered w-20 text-right" value={data.percent_surcharge} onChange={e => setData({...data, percent_surcharge: parseFloat(e.target.value) || 0})} />
                         <span className="font-bold opacity-70">%</span>
                     </div>
                 </td>
@@ -243,7 +243,7 @@ export default function LicenseCatalogSettings() {
                             </div>
                             <div className="form-control w-full md:w-32">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Preis (Netto €)</span></label>
-                                <input type="number" step="any" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered w-full" />
+                                <input type="number" step="0.01" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <button onClick={handleAddUseCase} className="btn btn-primary w-full md:w-auto"><span className="iconify mdi--plus"></span> Hinzufügen</button>
                         </div>
@@ -291,7 +291,7 @@ export default function LicenseCatalogSettings() {
                             </div>
                             <div className="form-control w-full md:w-32">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Aufschlag (%)</span></label>
-                                <input type="number" step="any" placeholder="z.B. 100" value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered w-full" />
+                                <input type="number" step="0.01" placeholder="z.B. 100" value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <button onClick={handleAddModifier} className="btn btn-primary w-full md:w-auto"><span className="iconify mdi--plus"></span> Hinzufügen</button>
                         </div>

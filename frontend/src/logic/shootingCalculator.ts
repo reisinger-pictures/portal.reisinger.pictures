@@ -83,21 +83,31 @@ export interface B2CFlexInput {
     setup: 'outdoor' | 'outdoor_flash' | 'indoor';
     extraImages: number;
     isFullyPrivate: boolean;
+    // NEU: Dynamische Parameter von der API
+    atr_base_price?: string;
+    atr_setup_fee?: string;
+    atr_privacy_fee?: string;
+    atr_extra_image_fee?: string;
 }
 
 export function calculateB2CFlexPrice(input: B2CFlexInput): ShootingPriceResult {
-    const basePrice = 149;
+    // NEU: Fallback-Werte greifen nur, wenn die DB leer sein sollte (Unterstützung für Cent/Dezimal-Beträge)
+    const basePrice = parseFloat(input.atr_base_price || '149');
+    const setupCost = parseFloat(input.atr_setup_fee || '50');
+    const extraImageCost = parseFloat(input.atr_extra_image_fee || '15');
+    const privacyBase = parseFloat(input.atr_privacy_fee || '200');
+
     let setupFee = 0;
-    
     if (input.setup === 'outdoor_flash' || input.setup === 'indoor') {
-        setupFee = 50;
+        setupFee = setupCost;
     }
 
-    const extraImagesFee = input.extraImages * 15;
+    const extraImagesFee = input.extraImages * extraImageCost;
     let privacyFee = 0;
 
     if (input.type === 'nude' && input.isFullyPrivate) {
-        privacyFee = 200 + (input.extraImages * 5);
+        // Formel: Basis-Aufpreis + (Zusatzbilder * reduzierter Bildpreis-Faktor)
+        privacyFee = privacyBase + (input.extraImages * Math.round(extraImageCost / 3));
     }
 
     const total = basePrice + setupFee + extraImagesFee + privacyFee;

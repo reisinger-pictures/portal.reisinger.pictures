@@ -80,7 +80,7 @@ export default function InvoiceDiscountsSection({
                                 <input
                                     required
                                     type="number"
-                                    step="any"
+                                    step="0.01"
                                     min="0"
                                     value={discount.price}
                                     onChange={(e) => onDiscountChange(idx, 'price', parseFloat(e.target.value) || 0)}

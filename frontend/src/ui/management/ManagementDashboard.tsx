@@ -4,6 +4,7 @@ import {Link, useLocation, useNavigate} from 'react-router-dom';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import { useBillingDetails } from '../../logic/useLicenseTerms';
+import { useBrand } from '../../logic/useBrand';
 import {useSearch} from '../../logic/useSearch';
 import Sidebar from '../components/Sidebar';
 import GalleryModals from '../components/GalleryModals';
@@ -43,6 +44,7 @@ export default function ManagementDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const {results: searchResults} = useSearch(searchQuery, false, true); // Leere Query überspringen
     const {user} = useAuth();
+    const { logoSrc, portalName } = useBrand();
     const { billingDetails, isLoading: termsLoading } = useBillingDetails();
     const isImpressumMissing = user?.is_super_admin && !termsLoading && (!billingDetails?.bank_holder || !billingDetails?.company_street || !billingDetails?.company_zip || !billingDetails?.company_city || !billingDetails?.bank_iban);
     const {results: personalFeed, isLoading: feedLoading} = useSearch('', true);
@@ -125,13 +127,13 @@ export default function ManagementDashboard() {
                             </div>
                         </div>
                     )}
-                    <header className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
-                        <button className="btn btn-square btn-ghost md:hidden shrink-0" onClick={() => setIsSidebarOpen(true)}>
+                    <header className="group p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
+                        <button className="btn btn-square btn-ghost md:hidden shrink-0 group-focus-within:hidden" onClick={() => setIsSidebarOpen(true)}>
                             <span className="iconify mdi--menu text-2xl"></span>
                         </button>
-                        <Link to="/" className="md:hidden flex items-center gap-2 shrink-0 mr-1">
-                            <img src="/android-chrome-192x192.png" alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
-                            <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">Reisinger Portal</span>
+                        <Link to="/" className="md:hidden flex items-center gap-2 shrink-0 mr-1 group-focus-within:hidden">
+                            <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
+                            <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
                         </Link>
 
                         <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full">

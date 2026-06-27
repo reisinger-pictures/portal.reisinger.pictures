@@ -120,7 +120,7 @@ export default function LicenseSettingsCard() {
                     <div className="form-control w-full max-w-xs">
                         <label className="label"><span
                             className="label-text font-bold">Basispreis (Netto in €)</span></label>
-                        <input type="number" step="0.5" {...register('base_price', {valueAsNumber: true})}
+                        <input type="number" step="0.01" {...register('base_price', {valueAsNumber: true})}
                                className="input input-bordered w-full font-mono text-lg text-primary font-bold"/>
                         <div className="label"><span className="label-text-alt opacity-70">Gilt für Redaktionell, 1 Jahr, Web.</span>
                         </div>
@@ -185,20 +185,20 @@ export default function LicenseSettingsCard() {
                             <label className="label"><span
                                 className="label-text font-bold">Aufschlag: Kommerziell</span></label>
                             <label className="input input-bordered flex items-center gap-2"><input
-                                type="number" {...register('mult_commercial', {valueAsNumber: true})} className="grow"/><span>%</span></label>
+                                type="number" step="0.01" {...register('mult_commercial', {valueAsNumber: true})} className="grow"/><span>%</span></label>
                         </div>
                         <div className="form-control">
                             <label className="label"><span
                                 className="label-text font-bold">Aufschlag: Unbegrenzte Dauer</span></label>
                             <label className="input input-bordered flex items-center gap-2"><input
-                                type="number" {...register('mult_unlimited', {valueAsNumber: true})}
+                                type="number" step="0.01" {...register('mult_unlimited', {valueAsNumber: true})}
                                 className="grow"/><span>%</span></label>
                         </div>
                         <div className="form-control md:col-span-2">
                             <label className="label"><span
                                 className="label-text font-bold">Aufschlag: Weltweit</span></label>
                             <label className="input input-bordered flex items-center gap-2"><input
-                                type="number" {...register('mult_international', {valueAsNumber: true})}
+                                type="number" step="0.01" {...register('mult_international', {valueAsNumber: true})}
                                 className="grow"/><span>%</span></label>
                         </div>
 

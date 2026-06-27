@@ -93,8 +93,8 @@ export default function InvoiceItemsTable({
                             <input
                                 required
                                 type="number"
-                                step="0.01"
-                                min="0.01"
+                                step="0.25"
+                                min="0.25"
                                 value={item.qty}
                                 onChange={(e) => onItemChange(idx, 'qty', parseFloat(e.target.value) || 0)}
                                 className="input input-sm input-bordered w-full font-mono text-center"
@@ -108,7 +108,7 @@ export default function InvoiceItemsTable({
                             <input
                                 required
                                 type="number"
-                                step="any"
+                                step="0.01"
                                 value={item.price}
                                 onChange={(e) => onItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
                                 className="input input-sm input-bordered w-full font-mono text-right"

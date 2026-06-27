@@ -65,7 +65,7 @@ class ShootingCalculatorSettingsTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('base_price', '35.00')
             ->assertJsonPath('calc_base_price', '50')
-            ->assertJsonPath('calc_hourly_rate', '100')
+            ->assertJsonPath('calc_hourly_rate', '80')
             ->assertJsonPath('calc_images_per_hour', '6');
     }
 
@@ -101,6 +101,8 @@ class ShootingCalculatorSettingsTest extends TestCase
         Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Max Mustermann']);
         Setting::updateOrCreate(['key' => 'company_email'], ['value' => 'finance@reisinger.pictures']);
         Setting::updateOrCreate(['key' => 'company_city'], ['value' => 'Wien']);
+        Setting::updateOrCreate(['key' => 'mult_commercial'], ['value' => '2.0']);
+        Setting::updateOrCreate(['key' => 'calc_images_per_hour'], ['value' => '6']);
 
         // Vollständig anonymer Aufruf (kein Authorization-Header) — license-terms ist öffentlich.
         $this->getJson('/api/settings/license-terms')

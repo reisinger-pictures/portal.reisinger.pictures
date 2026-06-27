@@ -18,7 +18,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar(props: SidebarProps) {
-    const { logoSrc, portalName } = useBrand();
+    const { logoSrc, portalName, impressumUrl } = useBrand();
     const {user, logout} = useAuth();
     const navigate = useNavigate();
     const { itemCount } = useCart();
@@ -115,7 +115,7 @@ export default function Sidebar(props: SidebarProps) {
 
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">
                 <div className="p-3 text-center">
-                    <a href="https://reisinger.pictures/impressum/" target="_blank" rel="noopener noreferrer" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <a href={impressumUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                         <span className="iconify mdi--open-in-new"></span> Impressum & Datenschutz
                     </a>
                 </div>

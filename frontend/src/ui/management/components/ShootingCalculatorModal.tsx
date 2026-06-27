@@ -135,7 +135,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                         </div>
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                             <label className="label font-bold text-sm mb-1">Zusätzliche Bilder (+15€/Stk)</label>
-                            <input type="number" min="0" className="input input-bordered w-full font-mono"
+                            <input type="number" min="0" step="1" className="input input-bordered w-full font-mono"
                                    value={atrExtra} onChange={e => setAtrExtra(parseInt(e.target.value) || 0)}/>
                         </div>
                         {atrType === 'nude' && (
@@ -163,7 +163,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                             </div>
                             <div className="form-control">
                                 <label className="label font-bold text-sm mb-1"><span className="label-text font-bold">Inkl. Bilder</span></label>
-                                <input type="number" className="input input-bordered font-mono" value={calcImages}
+                                <input type="number" min="0" step="1" className="input input-bordered font-mono" value={calcImages}
                                        onChange={e => setCalcImages(parseInt(e.target.value) || 0)}/>
                             </div>
                         </div>

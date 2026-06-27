@@ -26,7 +26,7 @@ Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Absc
 | **Erledigt** | A-01 ✓, A-02 ✓                              | **Multi-Domain-Infrastruktur & B2C-Pricing (ATR) vollständig integriert** |
 | **P0**       | R-01 ✓, R-02 ✓                              | Sicherheit & Datenintegrität (Public-Endpoint, SQL-Bindings)              |
 | **P1**       | R-03 ✓, R-04 ✓, R-05 ✓                      | Schleifen- & Berechnungs-Guards (Zyklus, Div-by-0, Typ-Parsing)           |
-| **P2**       | R-06, R-11, R-13                            | Utility- & Logik-Konsistenz (Datumsformat, Nullish, Collections)          |
+| **P2**       | R-06, R-11, R-13, R-14 ✓                    | Utility- & Logik-Konsistenz (Datumsformat, Nullish, Collections)          |
 | *offen*      | R-07 ✓ (akzeptiert), R-08, R-09, R-10, R-12 | R-07 als gewollt eingefroren; Rest niedrige Code-Qualität                 |
 
 ---
@@ -307,7 +307,32 @@ pauschalen Flatrate-Aufschlägen (+20 %) und prozentualen Rabatten (33 % / 50 %)
 
 ---
 
-### 🔍 Status-Überblick der verbleibenden Code-Qualitäts-Aufgaben (Review-Backlog)
+#
+
+### 🛠️ Neue Qualitäts- & UI-Fixes (Juni 2026)
+
+#### **R-14 · 🟡 P1 · Input-Typen & Step-Inkremente im Invoicing** ☑ erledigt
+
+- [x] Alle numerischen Eingabefelder (Mengen, Preise, Stunden) in den Invoicing-Formularen (
+  `ManagementManualInvoiceView`, `InvoiceItemsTable`, `InvoiceDiscountsSection`) strikt auf `type="number"` umstellen.
+- [x] Sinnvolle `step`-Attribute hinterlegen (z. B. `step="0.25"` für Arbeitsstunden, um Viertelstunden-Schritte nativ
+  zu erlauben).
+
+#### **R-15 · 🟢 P2 · Inkonsistente Icons in der Mobile-Ansicht**
+
+- [ ] Die Header- und Sidebar-Navigation im mobilen Viewport auf Darstellungsfehler und uneinheitliche Icon-Klassen (MDI
+  vs. Custom SVGs) prüfen.
+- [ ] Lücken bei der Mandantentrennung (B2B Multi-Tenant Isolation) im Frontend restlos schließen.
+
+#### **R-16 · 🟡 P1 · Feature Gap: Multi-Tenant Support im Lightroom Plugin**
+
+- [ ] **Status-Quo Dokumentation:** Das Lightroom Classic Plugin (`admin.lrplugin`) ist aktuell als
+  *Single-Tenant-System* starr an die Hauptdomain gekoppelt. Es kann zur Laufzeit nicht dynamisch zwischen
+  `all-the.rest` und `reisinger.pictures` umschalten, wenn Kollektionen hochgeladen werden.
+- [ ] **Architektonische Lücke:** Es fehlt die Auswertung des tenant-spezifischen API-Contexts beim Metadaten-Abgleich
+  und Upload-Routing aus Lightroom heraus. (Zukünftiges Refactoring erforderlich).
+
+## 🔍 Status-Überblick der verbleibenden Code-Qualitäts-Aufgaben (Review-Backlog)
 
 Die folgenden Aufgaben aus der Qualitäts-Initiative sind weiterhin offen und müssen parallel stabil gehalten werden:
 
@@ -411,10 +436,21 @@ Paketsystem auf. **Wichtig:** Treue- und OG-Rabatte fallen für diesen Tarif kom
 Die offenen Punkte (`R-06` bis `R-13`) bleiben wie oben tabelarisch erfasst gültig und müssen parallel stabil gehalten
 werden.
 
-### Manuell und unstrukturiert (einbauen in die Struktur)
+### 🌐 Multi-Brand-Infrastruktur & Dynamic Assets (2026)
 
-- ich möchte das SVG Logo des Tenants nutzen und pro Tenant die Transparenz einstellen
-- ich möchte meinen Stundenlohn auf 80€ beim seed anpassen
-- Outdoor Faktor und Online Verbots aufpreis soll konfigurierbar sein und nicht hard coded mit geschickt werden
-- der B2b (Premium) Kalkulator ist auch bei all the rest sichtbar, das ist ok
-- weiße bei den obrigen Sachen auf Inkkonsistenzen hin und lass mich entscheiden
+- [x] **Brand-Umschaltung & Impressum:** useBrand-Hook liefert dynamisch markenspezifische Assets und korrekte
+  Impressums-URLs (https://all-the.rest/impressum/ vs https://reisinger.pictures/impressum/).
+- [x] **Preise entkoppeln & B2C-Pricing:** B2C Kalkulator-Werte (149€, 50€, 200€, 15€) dynamisch in die Settings-Tabelle
+  integriert und über das UI administrierbar gemacht.
+- [x] **Abrechnungs-Konsistenz:** Fallback im SettingsController für den Stundensatz von 100€ auf 80€ korrigiert (
+  Parität mit Seeder und Migration).
+- [x] **Watermark Auto-Detection:** Manueller Logo-Upload entfernt. System liest Quelldateien zur Laufzeit und
+  regeneriert die PNG-Buckets transparent bei Änderungen oder Server-Neustart.
+
+### 🔄 Offenes Review & Container-Isolierung (Zukunft)
+
+- [ ] **Watermark-Infrastruktur / Container-Isolierung:** Passiert die Analyse, ob sich die Wasserzeichen geändert haben
+  beim Container start und werden alle alten Bilder bei einem Update invalidiert?
+- [ ] **InvoiceItemsTable / Posten-Inkremente:** Evaluieren, ob `step="0.25"` global für alle Rechnungsposten gilt oder
+  ob differenziert zwischen "Stunden" (0.25 Inkrement) und "Artikeln/Produkten" (1.0 Inkrement) unterschieden werden
+  muss. Tendenz zu 0,25 passt
