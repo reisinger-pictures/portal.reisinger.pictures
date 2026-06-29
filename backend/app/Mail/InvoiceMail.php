@@ -2,6 +2,8 @@
 
 namespace App\Mail;
 
+use App\Services\SettingResolver;
+use App\Support\BrandRegistry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -25,17 +27,19 @@ class InvoiceMail extends Mailable implements ShouldQueue
 
     public function build()
     {
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
-        $get = fn($k) => \App\Models\Setting::where('key', $pfx . $k)->value('value') ?? \App\Models\Setting::where('key', $k)->value('value');
+        // Reconstruct brand from the persisted order column — queue workers have no HTTP host.
+        // BrandRegistry guarantees a non-null brand (legacy rows → B2B default).
+        BrandRegistry::set(BrandRegistry::resolveFromOrder($this->order));
+        $resolver = app(SettingResolver::class);
         
         // PDF on-the-fly generieren
         $pdf = Pdf::loadView('pdf.invoice', [
             'order' => $this->order,
             'snapshot' => $this->snapshot,
             'items' => $this->snapshot->customer_details['items'] ?? [],
-            'bankHolder' => $get('bank_holder'),
-            'bankIban' => $get('bank_iban'),
-            'bankBic' => $get('bank_bic')
+            'bankHolder' => $resolver->get('bank_holder'),
+            'bankIban' => $resolver->get('bank_iban'),
+            'bankBic' => $resolver->get('bank_bic'),
         ]);
 
         $mail = $this->subject('Ihre Rechnung ' . $this->snapshot->invoice_number)

@@ -7,7 +7,7 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
-import { useAuth } from '../../logic/useAuth';
+import { usePermissions } from '../../logic/usePermissions';
 import { TextSnippet } from '../../api';
 
 
@@ -33,8 +33,8 @@ export interface SlashState {
 }
 
 export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) {
-    const { user } = useAuth();
-    const { data: snippets } = useSWR<TextSnippet[]>(user?.is_super_admin ? '/api/management/text-snippets' : null, fetcher);
+    const {isSuperAdmin} = usePermissions();
+    const { data: snippets, isLoading } = useSWR<TextSnippet[]>(isSuperAdmin ? '/api/management/text-snippets' : null, fetcher);
     const snippetsRef = useRef<TextSnippet[]>([]);
 
     const [slashState, setSlashState] = useState<SlashState>({ active: false, query: '', range: { from: 0, to: 0 }, rect: null });
@@ -177,12 +177,13 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
         }
     }, [value, editor]);
 
+    if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
     if (!editor) return null;
 
     return (
         <div className="border border-base-300 rounded-box overflow-visible bg-base-100 flex flex-col focus-within:border-primary transition-colors shadow-inner relative z-10">
             <div className="bg-base-200 border-b border-base-300 p-2 flex flex-wrap gap-2 items-center rounded-t-box">
-                {user?.is_super_admin && !hideSnippets && (
+                {isSuperAdmin && !hideSnippets && (
                     <select 
                         className="select select-sm select-bordered bg-primary/10 text-primary font-bold border-primary/30 mr-1" 
                         onChange={(e) => {

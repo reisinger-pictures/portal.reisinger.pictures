@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer } from 'react';
 import { usePhoto, PhotoVersion } from '../../logic/usePhoto';
 import { useUI } from './UIContext';
 
@@ -9,27 +9,27 @@ interface Props {
     onReverted: () => void;
 }
 
+type HistoryState = { status: 'loading' } | { status: 'loaded'; versions: PhotoVersion[] };
+
+function historyReducer(_state: HistoryState, action: { type: 'LOAD' } | { type: 'LOADED'; versions: PhotoVersion[] }): HistoryState {
+    switch (action.type) {
+        case 'LOAD': return { status: 'loading' };
+        case 'LOADED': return { status: 'loaded', versions: action.versions };
+    }
+}
+
 export default function PhotoHistoryModal({ photoId, isOpen, onClose, onReverted }: Props) {
-    const [history, setHistory] = useState<PhotoVersion[]>([]);
-    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [state, dispatch] = useReducer(historyReducer, { status: 'loading' });
     const { getVersions, revertMetadata } = usePhoto();
     const { showToast, confirm } = useUI();
-    const [prevIsOpen, setPrevIsOpen] = useState(false);
-
-    if (isOpen !== prevIsOpen) {
-        setPrevIsOpen(isOpen);
-        if (isOpen && photoId) {
-            setLoadingHistory(true);
-        }
-    }
 
     useEffect(() => {
         let isMounted = true;
         if (isOpen && photoId) {
+            dispatch({ type: 'LOAD' });
             getVersions(photoId)
-                .then(data => { if(isMounted) setHistory(data); })
-                .catch(() => { if(isMounted) showToast('error', 'Historie konnte nicht geladen werden.'); })
-                .finally(() => { if(isMounted) setLoadingHistory(false); });
+                .then(data => { if(isMounted) dispatch({ type: 'LOADED', versions: data }); })
+                .catch(() => { if(isMounted) { showToast('error', 'Historie konnte nicht geladen werden.'); dispatch({ type: 'LOADED', versions: [] }); } });
         }
         return () => { isMounted = false; };
     }, [isOpen, photoId, getVersions, showToast]);
@@ -57,7 +57,7 @@ export default function PhotoHistoryModal({ photoId, isOpen, onClose, onReverted
                 </h3>
                 <p className="text-sm opacity-70 mb-4">Hier werden die ursprünglichen Metadaten gespeichert, <strong>bevor</strong> ein Kunde eine Änderung vorgenommen hat.</p>
 
-                {loadingHistory ? (
+                {state.status === 'loading' ? (
                     <div className="flex justify-center p-8"><span className="loading loading-spinner"></span></div>
                 ) : (
                     <div className="overflow-x-auto border border-base-300 rounded-box">
@@ -71,7 +71,7 @@ export default function PhotoHistoryModal({ photoId, isOpen, onClose, onReverted
                             </tr>
                             </thead>
                             <tbody>
-                            {history.map(ver => (
+                            {state.versions.map(ver => (
                                 <tr key={ver.id}>
                                     <td className="whitespace-nowrap">{new Date(ver.created_at).toLocaleString('de-DE')}</td>
                                     <td>{ver.user?.name || 'Unbekannt'}</td>

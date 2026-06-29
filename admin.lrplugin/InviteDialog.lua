@@ -40,7 +40,7 @@ return function(galleryId, jwt)
             else
                 for _, item in ipairs(props.invites) do
                     if item.value == props.selectedInviteId then
-                        props.selectedInviteLink = Api.getApiUrl() .. "/invite/" .. item.token
+                        props.selectedInviteLink = Api.baseUrl .. "/invite/" .. item.token
                         break
                     end
                 end

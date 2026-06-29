@@ -8,14 +8,18 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "types": [
-      "node"
+      "node",
+      "vitest/globals",
+      "vite/client"
     ],
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "jsx": "react-jsx",
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
@@ -23,6 +27,8 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
-    "tests"
+    "tests",
+    "src/test-setup.ts",
+    "src/ui/__tests__"
   ]
 }

@@ -16,8 +16,10 @@ local MetaGalleryDialog = require "MetaGalleryDialog"
 local GalleryDialog = require "GalleryDialog"
 local InviteDialog = require "InviteDialog"
 
-return function(mode)
+return function(mode, baseUrl)
     LrTasks.startAsyncTask(function()
+        Api.setBaseUrl(baseUrl)
+        local brandName = string.find(baseUrl, "all%-the%.rest") and "ATR" or "B2B"
         local catalog = LrApplication.activeCatalog()
         local targetPhotos = catalog:getTargetPhotos()
         local photoCount = #targetPhotos
@@ -45,12 +47,11 @@ return function(mode)
                     
                     props.email = prefs.apiUser or ""
                     props.password = prefs.apiPass or ""
-                    props.useTestUrl = prefs.useTestUrl == true
 
                     local errUI = f:spacer { height = 0 }
                     if loginFailed then
                         local errText = "Fehler: " .. tostring(lastErr)
-                        if prefs.useTestUrl and lastDetail and lastDetail ~= "" then
+                        if lastDetail and lastDetail ~= "" then
                            errText = errText .. "\n\n" .. lastDetail
                         end
                         errUI = f:edit_field {
@@ -64,20 +65,18 @@ return function(mode)
                     local contents = f:column {
                         spacing = f:control_spacing(),
                         f:static_text { 
-                            title = loginFailed and "Bitte Zugangsdaten prüfen." or "Bitte für das Reisinger Foto Portal anmelden.", 
+                            title = loginFailed and ("Bitte Zugangsdaten für " .. brandName .. " Portal prüfen.") or ("Bitte für " .. brandName .. " Portal anmelden."), 
                             text_color = loginFailed and import 'LrColor'(0.8, 0, 0) or nil,
                             margin_bottom = 5 
                         },
                         errUI,
                         f:spacer { height = 5 },
                         f:row { f:static_text { title = "E-Mail:", width = 80 }, f:edit_field { value = LrView.bind{key="email", bind_to_object=props}, fill_horizontal = 1, width_in_chars = 30 } },
-                        f:row { f:static_text { title = "Passwort:", width = 80 }, f:password_field { value = LrView.bind{key="password", bind_to_object=props}, fill_horizontal = 1, width_in_chars = 30 } },
-                        f:spacer { height = 5 },
-                        f:row { f:spacer { width = 80 }, f:checkbox { title = "Lokale Test-Umgebung (portal.test) verwenden", value = LrView.bind{key="useTestUrl", bind_to_object=props} } }
+                        f:row { f:static_text { title = "Passwort:", width = 80 }, f:password_field { value = LrView.bind{key="password", bind_to_object=props}, fill_horizontal = 1, width_in_chars = 30 } }
                     }
 
                     local res = LrDialogs.presentModalDialog {
-                        title = Api.getTitle("Login erforderlich"),
+                        title = Api.getTitle("Login erforderlich (" .. brandName .. ")"),
                         contents = contents,
                         actionVerb = "Anmelden",
                         cancelVerb = "Abbrechen"
@@ -86,7 +85,6 @@ return function(mode)
                     if res == "ok" then
                         prefs.apiUser = props.email
                         prefs.apiPass = props.password
-                        prefs.useTestUrl = props.useTestUrl
                         loginFailed = true
                         success = true
                     end
@@ -275,7 +273,7 @@ return function(mode)
             end
 
             local result = LrDialogs.presentModalDialog {
-                title = Api.getTitle(mode == "selection" and "Bewertungs-Galerie Manager" or "Delivery-Galerie Manager"),
+                title = Api.getTitle((mode == "selection" and "Bewertungs-Galerie Manager" or "Delivery-Galerie Manager") .. " (" .. brandName .. ")"),
                 resizable = true,
                 contents = f:column(uiElements),
                 actionVerb = "Upload starten",
@@ -359,7 +357,7 @@ return function(mode)
 
                             logMsg("Starte Upload für UUID: " .. tostring(lrUuid) .. " (Backend generiert nun UUID-Filenames)")
                             
-                            local resBody, resHeaders = LrHttp.postMultipart(Api.getApiUrl() .. "/api/management/upload", {
+                            local resBody, resHeaders = LrHttp.postMultipart(Api.baseUrl .. "/api/management/upload", {
                                 { name = "gallery_id", value = tostring(props.selectedGalleryId) },
                                 { name = "lr_uuid",    value = lrUuid },
                                 { name = "file",       fileName = filename, filePath = path, contentType = "image/jpeg" }
@@ -413,7 +411,7 @@ return function(mode)
                             "Schließen"
                         )
                         if confirm == "ok" and selectedGalPath ~= "" then
-                            local url = Api.getApiUrl() .. "/" .. selectedGalPath
+                            local url = Api.baseUrl .. "/" .. selectedGalPath
                             LrHttp.openUrlInBrowser(url)
                         end
                     else

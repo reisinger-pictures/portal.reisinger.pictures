@@ -29,6 +29,7 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
     }
 
     if (!isOpen || !item) return null;
+    if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
     const photographers = users?.filter(u => u.is_photographer && !u.is_super_admin) || [];
     const isEffectivelyRestricted = status === 'true' || (status === 'null' && item.effective_restricted_photographers);

@@ -6,6 +6,7 @@ import {useNavigate, useParams} from 'react-router-dom';
 import {useGallery} from '../../logic/useGallery';
 import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
+import {usePermissions} from '../../logic/usePermissions';
 import EmailComposerModal from './components/EmailComposerModal';
 import InviteModal from './components/InviteModal';
 import PageLayout from '../components/PageLayout';
@@ -27,6 +28,7 @@ export default function ManagementGalleryView() {
     const { gallery, photos, downloadsCount, notified_count, isLoading, isError, size, setSize, isReachingEnd, mutate, breadcrumbs } = useGallery(slug);
     const {tree, updateGallery, deleteGallery} = useProtectedGalleries();
     const {user} = useAuth();
+    const {isAdmin, isPhotographer} = usePermissions();
 
     const [isGalleryEditModalOpen, setGalleryEditModalOpen] = useState(false);
     const availableGroups = tree ? flattenGroups(tree.groups) : [];
@@ -53,7 +55,7 @@ export default function ManagementGalleryView() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h1 className="text-3xl font-bold flex items-center gap-2">
                         {gallery.name}
-                        {user?.is_photographer && (
+                        {isPhotographer && (
                             <button onClick={() => setGalleryEditModalOpen(true)} className="btn btn-ghost btn-sm btn-circle tooltip tooltip-bottom" data-tip="Galerie bearbeiten">
                                 <span className="iconify mdi--pencil text-xl"></span>
                             </button>
@@ -64,18 +66,18 @@ export default function ManagementGalleryView() {
                         gallery={gallery}
                         canSendMail={(notified_count || 0) > 0}
                         downloadsCount={downloadsCount || 0}
-                        isPhotographer={user?.is_photographer || false}
+                        isPhotographer={isPhotographer}
                         onOpenRatings={() => setShowRatingsModal(true)}
                         onOpenMetadata={() => setIsMetadataModalOpen(true)}
                         onOpenInvite={() => setIsInviteModalOpen(true)}
-                        onOpenAccess={user?.is_admin ? () => setIsAccessModalOpen(true) : undefined}
-                        onOpenPhotographerTeam={user?.is_admin || user?.is_photographer ? () => setIsPhotographerTeamModalOpen(true) : undefined}
-                        onOpenAIBatchEdit={user?.is_photographer ? () => setIsAIBatchModalOpen(true) : undefined}
+                        onOpenAccess={isAdmin ? () => setIsAccessModalOpen(true) : undefined}
+                        onOpenPhotographerTeam={isAdmin || isPhotographer ? () => setIsPhotographerTeamModalOpen(true) : undefined}
+                        onOpenAIBatchEdit={isPhotographer && !user?.ai_is_unconfigured ? () => setIsAIBatchModalOpen(true) : undefined}
                         onOpenMail={() => setIsMailModalOpen(true)}
                     />
                 </div>
 
-                {user?.is_photographer && (
+                {isPhotographer && (
                     <UploadDropzone galleryId={gallery.id} onUploadComplete={() => mutate()} />
                 )}
 

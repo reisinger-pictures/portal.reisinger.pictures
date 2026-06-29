@@ -64,7 +64,7 @@ export default function ResetPassword() {
         <div className="flex h-screen items-center justify-center bg-base-200 p-4">
             <div className="card w-full max-w-sm bg-base-100 shadow-2xl">
                 <div className="card-body">
-                    <h2 className="card-title text-2xl font-bold mb-2 text-primary">Account Setup</h2>
+                    <h2 className="card-title text-2xl font-bold mb-2 text-primary">Konto einrichten</h2>
                     <p className="text-sm opacity-70 mb-4">Setze ein neues Passwort für den Account <strong>{email}</strong>.</p>
 
                     {globalError && <ErrorMessage message={globalError} className="mb-4" />}

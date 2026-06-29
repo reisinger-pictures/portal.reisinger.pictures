@@ -1,5 +1,6 @@
 import {Link, useNavigate} from 'react-router-dom';
 import { useBrand } from '../../logic/useBrand';
+import { usePermissions } from '../../logic/usePermissions';
 import SidebarLoginForm from './SidebarLoginForm';
 import {useAuth} from '../../logic/useAuth';
 import {Gallery, GalleryGroup, GalleryTreeResponse} from '../../logic/useGalleries';
@@ -20,6 +21,7 @@ interface SidebarProps {
 export default function Sidebar(props: SidebarProps) {
     const { logoSrc, portalName, impressumUrl } = useBrand();
     const {user, logout} = useAuth();
+    const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isCustomerManager, showTenantsSection } = usePermissions();
     const navigate = useNavigate();
     const { itemCount } = useCart();
 
@@ -28,7 +30,6 @@ export default function Sidebar(props: SidebarProps) {
         navigate('/');
     };
 
-    const isAdminOrPhotog = user?.is_super_admin || user?.is_admin || user?.is_photographer;
     const isGuest = !user;
 
     return (
@@ -52,23 +53,23 @@ export default function Sidebar(props: SidebarProps) {
 
             <div className="flex-1 overflow-y-auto w-full">
             <ul className="menu bg-base-200 w-full p-2 border-b border-base-300">
-                {isAdminOrPhotog && (
+                {isStaff && (
                     <>
                         <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-2">Übersicht</li>
                         <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-dashboard text-lg"></span> Dashboard</Link></li>
                         
                         <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Medien</li>
-                        {user?.is_photographer && (
+                        {isPhotographer && (
                             <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--folder-multiple text-lg"></span> Galerien & Ordner</Link></li>
                         )}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
 
-                        {user.is_admin && (
+                        {isAdmin && (
                             <>
                                 <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Büro & Dokumente</li>
                                 <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> Shop-Bestellungen</Link></li>
                                 <li><Link to="/admin-payouts" className={props.currentView === 'admin-payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> Payouts & Abrechnung</Link></li>
-                                {user.is_super_admin && (
+                                {isSuperAdmin && (
                                     <>
                                         <li><Link to="/admin-manual-offer" className={props.currentView === 'admin-manual-offer' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-chart-outline text-lg"></span> Manuelles Angebot</Link></li>
                                         <li><Link to="/admin-manual-invoice" className={props.currentView === 'admin-manual-invoice' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-document-edit-outline text-lg"></span> Manuelle Rechnung</Link></li>
@@ -81,14 +82,14 @@ export default function Sidebar(props: SidebarProps) {
                         )}
 
                         <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Verwaltung</li>
-                        {(user.is_admin || user.is_customer_manager) && (
+                        {(isAdmin || isCustomerManager) && showTenantsSection && (
                             <>
                                 <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Mandanten (B2B)</Link></li>
-                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {user.is_customer_manager && !user.is_admin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
+                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {isCustomerManager && !isAdmin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
                             </>
                         )}
                         <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> Auswertungen</Link></li>
-                        {user.is_admin && (
+                        {isAdmin && (
                             <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> Einstellungen</Link></li>
                         )}
                     </>
@@ -96,11 +97,11 @@ export default function Sidebar(props: SidebarProps) {
                 
                 {user && (
                     <>
-                        {isAdminOrPhotog && <div className="divider my-1 text-sm opacity-50">Dein Account</div>}
+                        {isStaff && <div className="divider my-1 text-sm opacity-50">Dein Account</div>}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
                         <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> Mein Profil</Link></li>
                         <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> Einkäufe & Anfragen</Link></li>
-                        {user.is_photographer && <li><Link to="/my-payouts" className={props.currentView === 'payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> Meine Abrechnungen</Link></li>}
+                        {isPhotographer && <li><Link to="/my-payouts" className={props.currentView === 'payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> Meine Abrechnungen</Link></li>}
                     </>
                 )}
                 

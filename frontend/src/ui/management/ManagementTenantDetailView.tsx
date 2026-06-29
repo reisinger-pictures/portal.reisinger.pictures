@@ -23,7 +23,7 @@ const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, handle
           className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4">
         <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Einstellungen</h2>
         <div className="form-control">
-            <label className="label"><span className="label-text font-bold">Mandanten-Name</span></label>
+            <label className="label"><span className="label-text font-bold">Organisations-Name</span></label>
             <input type="text" value={name} onChange={e => setName(e.target.value)} required
                    className="input input-bordered"/>
         </div>
@@ -185,7 +185,7 @@ export default function ManagementTenantDetailView() {
         e.preventDefault();
         try {
             await updateTenant(id!, {name, domain: domain || null, invoice_frequency: freq});
-            showToast('success', 'Mandant aktualisiert.');
+            showToast('success', 'Organisation aktualisiert.');
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : String(err));
         }
@@ -218,7 +218,7 @@ export default function ManagementTenantDetailView() {
 
     const handleDelete = async () => {
         if (await confirm({
-            title: 'Mandant löschen?',
+            title: 'Organisation löschen?',
             message: 'Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten).',
             confirmColor: 'error'
         })) {
@@ -254,7 +254,7 @@ export default function ManagementTenantDetailView() {
 
     if (isLoading) return <div className="p-10 flex justify-center"><span
         className="loading loading-spinner loading-lg"></span></div>;
-    if (!tenant) return <div className="p-10"><ErrorMessage message="Mandant nicht gefunden."/></div>;
+    if (!tenant) return <div className="p-10"><ErrorMessage message="Organisation nicht gefunden."/></div>;
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
 
@@ -266,7 +266,7 @@ export default function ManagementTenantDetailView() {
                         className="iconify mdi--arrow-left text-2xl"></span></button>
                     <div>
                         <h1 className="text-3xl font-bold">{tenant.name}</h1>
-                        <p className="opacity-70">Mandanten-Verwaltung</p>
+                        <p className="opacity-70">Organisations-Verwaltung</p>
                     </div>
                     <button onClick={handleDelete} className="btn btn-outline btn-error btn-sm ml-auto">Löschen</button>
                 </div>
@@ -293,9 +293,9 @@ export default function ManagementTenantDetailView() {
                         <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
                                 onClick={() => setInviteModalOpen(false)}>✕
                         </button>
-                        <h3 className="font-bold text-lg mb-4">Nutzer in Mandant einladen</h3>
+                        <h3 className="font-bold text-lg mb-4">Nutzer in Organisation einladen</h3>
                         <p className="text-sm opacity-70 mb-4">Der Nutzer erhält eine E-Mail mit einem Link, um sein
-                            Passwort festzulegen und wird automatisch diesem Mandanten zugewiesen.</p>
+                            Passwort festzulegen und wird automatisch dieser Organisation zugewiesen.</p>
                         <form onSubmit={handleInvite} className="space-y-4">
                             <div className="form-control">
                                 <label className="label"><span

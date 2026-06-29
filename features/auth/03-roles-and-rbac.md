@@ -10,6 +10,7 @@ status: planned
 To support scalable B2B governance without cluttering the `users` table with boolean flags, permissions are strictly managed via the n:m `roles` table.
 
 **Defined Roles:**
+- **Super Admin (`super_admin`):** Highest enterprise role. Full system access across all tenants including billing, payout, watermark, license catalog, and system-level configuration. Not scoped by `tenant_id` â€” operates globally. See `infrastructure/10-frontend-brand-tenant-isolation.md`.
 - **Global Admin (`admin`):** Full system access across all tenants.
 - **Photographer (`photographer`):** Operational user. Manages assigned galleries and uploads.
 - **Customer Manager (`customer_manager`):** Tenant-specific admin. Can manage users within their own organization (domain) and view tenant-wide audit logs. UI is shared with Global Admins but scoped to their `tenant_id`.
@@ -25,3 +26,7 @@ To support scalable B2B governance without cluttering the `users` table with boo
 ## 3. Self-Service Registration
 - **Double Opt-In:** Users can register themselves. The system sends a verification email.
 - **Password Assignment:** The password is only assigned *after* the email has been successfully verified via the token link.
+
+## Related
+- [Roles & Access Management](../auth/01-roles-and-access.md) — current boolean-flag role model that RBAC replaces
+- [Magic Links & Invites](../auth/02-magic-links.md) — transient access handling in the RBAC model

@@ -260,11 +260,14 @@ class GalleryTreeServiceTest extends TestCase
     // 7. Nicht-Admin ohne Rechte → alle Galerien herausgefiltert
     // =====================================================================
 
-    public function test_get_admin_tree_non_admin_without_rights_galleries_filtered_out(): void
+    // =====================================================================
+    // 7. Nicht-Admin ohne Rechte → leere Gruppen-Hüllen werden entfernt (R-10a)
+    // =====================================================================
+
+    public function test_get_admin_tree_non_admin_without_rights_empty_groups_pruned(): void
     {
-        // REVIEW: filterTreeByPermissions entfernt leere Gruppen NICHT —
-        // die Gruppenhüllen bleiben leer im Baum stehen (aktuelles Verhalten,
-        // hier eingefroren, nicht "passend gemacht").
+        // R-10(a): Gruppen ohne sichtbare Galerien/Children werden als leere
+        // Hüllen aus dem gefilterten Baum entfernt (vorher: blieben stehen).
         $user = User::factory()->create(); // plain user, keine Rollen
         $group = GalleryGroup::factory()->create();
         Gallery::factory()->create(['gallery_group_id' => $group->id, 'type' => 'delivery']);
@@ -272,11 +275,8 @@ class GalleryTreeServiceTest extends TestCase
 
         $tree = $this->service->getAdminTree($user);
 
-        // Gruppen-Hülle bleibt erhalten (aktuelles Verhalten)
-        $this->assertCount(1, $tree['groups']);
-        $this->assertSame($group->id, $tree['groups'][0]['id']);
-        // ... aber alle Galerien rausgefiltert
-        $this->assertSame([], $tree['groups'][0]['galleries']);
+        // Leere Gruppen-Hülle wurde entfernt
+        $this->assertSame([], $tree['groups']);
         $this->assertSame([], $tree['root_galleries']);
     }
 
@@ -372,5 +372,67 @@ class GalleryTreeServiceTest extends TestCase
         $this->assertSame($cachedSnapshot, Cache::get('gallery_tree_admin'));
         $this->assertCount(1, $tree1['groups']);
         $this->assertCount(1, $tree2['groups']);
+    }
+
+    // =====================================================================
+    // 11. R-10(a): filterType entfernt leere Gruppen-Hüllen
+    // =====================================================================
+
+    public function test_get_admin_tree_filter_type_prunes_groups_without_matching_galleries(): void
+    {
+        $admin = $this->makeAdmin();
+        // Gruppe enthält nur eine delivery-Galerie
+        $group = GalleryGroup::factory()->create();
+        Gallery::factory()->create(['gallery_group_id' => $group->id, 'type' => 'delivery']);
+
+        // Filter auf selection → Galerie rausgefiltert → leere Hülle muss verschwinden
+        $tree = $this->service->getAdminTree($admin, 'selection');
+
+        $this->assertSame([], $tree['groups']);
+    }
+
+    // =====================================================================
+    // 12. R-10(a): Strukturelle Elterngruppe bleibt erhalten, Child ohne
+    //     Galerien wird entfernt
+    // =====================================================================
+
+    public function test_get_admin_tree_filter_type_keeps_structural_parent_prunes_empty_child(): void
+    {
+        $admin = $this->makeAdmin();
+        $parent = GalleryGroup::factory()->create();
+        $child = GalleryGroup::factory()->create(['parent_id' => $parent->id]);
+        // Parent hat eine selection-Galerie, Child nur delivery
+        Gallery::factory()->create(['gallery_group_id' => $parent->id, 'type' => 'selection']);
+        Gallery::factory()->create(['gallery_group_id' => $child->id, 'type' => 'delivery']);
+
+        $tree = $this->service->getAdminTree($admin, 'selection');
+
+        // Parent bleibt (hat selection-Galerie), aber sein Child verschwindet (leer)
+        $this->assertCount(1, $tree['groups']);
+        $this->assertSame($parent->id, $tree['groups'][0]['id']);
+        $this->assertSame([], $tree['groups'][0]['children']);
+    }
+
+    // =====================================================================
+    // 13. R-10(a): Mehrstufige Verschachtelung — leere Hülle in der Mitte
+    //     wird entfernt, Wurzel (mit Child-Galerie) bleibt
+    // =====================================================================
+
+    public function test_get_admin_tree_filter_type_prunes_empty_intermediate_group(): void
+    {
+        $admin = $this->makeAdmin();
+        $root = GalleryGroup::factory()->create();
+        $middle = GalleryGroup::factory()->create(['parent_id' => $root->id]);
+        $leaf = GalleryGroup::factory()->create(['parent_id' => $middle->id]);
+        // Nur leaf hat eine selection-Galerie; root & middle sind leer nach Filter
+        Gallery::factory()->create(['gallery_group_id' => $leaf->id, 'type' => 'selection']);
+
+        $tree = $this->service->getAdminTree($admin, 'selection');
+
+        // Kette bleibt wegen leaf erhalten: root > middle > leaf
+        $this->assertCount(1, $tree['groups']);
+        $this->assertSame($root->id, $tree['groups'][0]['id']);
+        $this->assertSame($middle->id, $tree['groups'][0]['children'][0]['id']);
+        $this->assertSame($leaf->id, $tree['groups'][0]['children'][0]['children'][0]['id']);
     }
 }

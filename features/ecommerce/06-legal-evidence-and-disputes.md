@@ -20,3 +20,6 @@ When a Stripe webhook triggers \`charge.dispute.created\`, the system reacts imm
 - **Lockout:** The order status is changed to \`disputed\`.
 - **Download Prevention:** The \`DownloadController\` actively checks the order status. If the status is \`disputed\`, \`refunded\`, or \`cancelled\`, all ZIP and high-res single-image downloads associated with this order are blocked (HTTP 403 Forbidden).
 - **Notification:** The internal accounting team is notified via email about the dispute so they can manually gather the Evidence Package and upload it to the Stripe Dashboard.
+
+## Related
+- [Licensing, Pricing & Cart](../ecommerce/01-licensing-and-cart.md) — invoice_snapshots origin and withdrawal waiver during checkout

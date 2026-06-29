@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Brand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -18,6 +19,7 @@ class InvoiceSnapshot extends Model
     protected $fillable = [
         'order_id',
         'invoice_number',
+        'brand',
         'customer_details',
         'total_net',
         'total_gross',
@@ -29,6 +31,7 @@ class InvoiceSnapshot extends Model
         'total_net' => 'integer',
         'total_gross' => 'integer',
         'tax_rate' => 'decimal:2',
+        'brand' => Brand::class,
     ];
 
     public function order()

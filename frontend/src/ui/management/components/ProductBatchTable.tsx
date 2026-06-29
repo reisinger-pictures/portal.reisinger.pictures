@@ -1,22 +1,33 @@
 import {useState} from 'react';
 import {Product} from '../../../api';
 
-interface Props {
+export interface BatchUpdate {
+    id: string;
+    description: string;
+    price: number;
+}
+
+interface BatchData {
+    description: string;
+    price: number;
+}
+
+interface ProductBatchTableProps {
     title: string;
     products: Product[];
     onEdit: (p: Product) => void;
     onDelete: (id: string) => void;
-    onBatchSave: (updates: { id: string; description: string; price: number }[]) => Promise<void>;
+    onBatchSave: (updates: BatchUpdate[]) => Promise<void>;
 }
 
-export default function ProductBatchTable({title, products, onEdit, onDelete, onBatchSave}: Props) {
+export default function ProductBatchTable({title, products, onEdit, onDelete, onBatchSave}: ProductBatchTableProps) {
     const [isBatchMode, setIsBatchMode] = useState(false);
-    const [batchData, setBatchData] = useState<Record<string, { description: string; price: number }>>({});
+    const [batchData, setBatchData] = useState<Record<string, BatchData>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
     const handleStartBatchMode = () => {
-        const initial: Record<string, { description: string; price: number }> = {};
+        const initial: Record<string, BatchData> = {};
         products.forEach(p => {
             initial[p.id] = {description: p.description || '', price: p.price / 100};
         });

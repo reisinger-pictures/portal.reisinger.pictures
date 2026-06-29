@@ -19,10 +19,27 @@ return [
 
         'index-settings' => [
             \App\Models\Photo::class => [
+                // Explizite searchableAttributes: verhindert, dass Meilisearch die Reihenfolge
+                // nicht-deterministisch ableitet (IDs/UUIDs dominieren sonst). Textfelder zuerst.
+                'searchableAttributes' => [
+                    'title', 'keywords', 'headline', 'description', 'artist',
+                    'city', 'location', 'state', 'country',
+                ],
                 'filterableAttributes' => ['gallery_id', 'is_hidden'],
+                // Typo-Toleranz explizit aktivieren + Feinjustierung (Default: oneTypo 5 / twoTypos 9).
+                // Mit oneTypo=4 reicht bereits ein 4-Zeichen-Wort für 1 Tippfehler-Korrektur.
+                'typoTolerance' => [
+                    'enabled' => true,
+                    'minWordSizeForTypos' => ['oneTypo' => 4, 'twoTypos' => 8],
+                ],
             ],
             \App\Models\Gallery::class => [
+                'searchableAttributes' => ['name'],
                 'filterableAttributes' => ['id', 'is_hidden'],
+                'typoTolerance' => [
+                    'enabled' => true,
+                    'minWordSizeForTypos' => ['oneTypo' => 4, 'twoTypos' => 8],
+                ],
             ],
             \App\Models\Location::class => [
                 // Die Suchreihenfolge (WICHTIG! PLZ und Name zuerst, ID wird ignoriert)

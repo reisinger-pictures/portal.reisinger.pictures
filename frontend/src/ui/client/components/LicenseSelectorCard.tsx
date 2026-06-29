@@ -1,13 +1,14 @@
 import {useState} from 'react';
 import {Photo} from '../../../logic/useGallery';
 import {useAuth} from '../../../logic/useAuth';
+import {usePermissions} from '../../../logic/usePermissions';
 import {UserRole} from '../../../logic/useUsers';
 import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
 import {useLicenseCatalog} from '../../../logic/useLicenseCatalog';
 import {useSearchParams} from 'react-router-dom';
 import {formatMoney} from '../../../logic/utils';
-import {ResolutionTier} from '../../../logic/usePricing';
+import {ResolutionTier} from '../../../logic/pricingLogic';
 
 export interface LicenseSelectorCardProps {
     photo: Photo;
@@ -16,6 +17,7 @@ export interface LicenseSelectorCardProps {
 export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
     const {catalog, isLoading} = useLicenseCatalog();
     const {user} = useAuth();
+    const {isStaff} = usePermissions();
     const {showToast} = useUI();
     const {addToCart} = useCart();
     const [searchParams] = useSearchParams();
@@ -28,12 +30,11 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
 
     const isPhotoEditorialOnly = photo?.effective_is_editorial_only || photo?.is_editorial_only;
     const isClientView = searchParams.get('view') === 'client';
-    const isActuallyAdmin = user?.is_super_admin || user?.is_admin || user?.is_photographer;
-    const hasFullAccess = !!isActuallyAdmin && !isClientView;
+    const hasFullAccess = isStaff && !isClientView;
 
     let canBuy = true;
     if (user) {
-        const isNormalClient = user.roles?.includes(UserRole.CLIENT) && !user.roles?.includes(UserRole.POWER_USER) && !isActuallyAdmin;
+        const isNormalClient = user.roles?.includes(UserRole.CLIENT) && !user.roles?.includes(UserRole.POWER_USER) && !isStaff;
         if (isNormalClient) canBuy = false;
         if (isClientView && !user.roles?.includes(UserRole.POWER_USER)) canBuy = false;
     }

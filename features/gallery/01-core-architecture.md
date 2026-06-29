@@ -31,11 +31,27 @@ Galleries are strictly divided into two mutually exclusive workflows:
 - Flushed via Eloquent Model Events (`booted` -> `saved`/`deleted`).
 
 
-## 4. Role & View Preview (Tab-Switcher)
+## 4. Gallery Routing & Breadcrumbs
+- **Deep-Link Support:** Public galleries are directly addressable via their slug (e.g. `/:slug`). Breadcrumbs are rendered server-side for navigation through nested `GalleryGroup` parents.
+- **Namespace Safety:** The breadcrumb resolver MUST use the fully qualified model class `\App\Models\GalleryGroup::find()`. An unqualified `AppModelsGalleryGroup::find` call caused a fatal `HTTP 500` on deeply nested galleries during a breadcrumb render.
+- **Prevention:** Any route rendering breadcrumbs for nested galleries MUST have a PHPUnit test asserting HTTP 200 on a deep gallery URL.
+
+## 5. Role & View Preview (Tab-Switcher)
 - **Preview Capability:** Ein Tab-Switcher (implementiert √ºber den URL-Parameter `?view=client`) erlaubt den flie√üenden Wechsel zwischen der Verwaltungsansicht (`ManagementGalleryView`) und der Kundenansicht (`ClientGalleryView`).
 - **Strict Access Control:** Dieser Switcher wird **ausschlie√ülich** angezeigt, wenn der eingeloggte Nutzer f√ºr diese spezifische Galerie sowohl Verwaltungsrechte (Fotograf/Admin) als auch Kundenrechte besitzt. Hat ein Fotograf √ºber einen Gast-Link Zugriff auf eine fremde Galerie, bleibt er strikt in der Kundenansicht gefangen.
 
-## 5. Management UI Pattern
+## 6. Management UI Pattern
 - **Explorer-Ansicht:** Die Struktur- und Galerieverwaltung befindet sich nicht in der Sidebar, sondern in einer eigenen, gro√üz√ºgigen Hauptansicht (`/galleries`).
 - **Modulare Dialoge:** Um den Haupt-Erstellungsdialog f√ºr Galerien schlank zu halten, wurden die komplexen IPTC-Standard-Metadaten und Berechtigungen in einen separaten Dialog (`GalleryMetadataDefaultsModal`) ausgelagert. 
+### Tree Editing Rules (learned)
+- **Edit-Button Disambiguation:** The `TreeNode` component MUST split edit handlers into `onEditGroup` and `onEditGallery` instead of a single `onEdit` prop. A shared handler caused the parent Group's edit dialog to open when clicking "Edit" on a nested Gallery.
+- **Inline Creation:** Inline `+` buttons (Folder/Gallery) on each `TreeNode` summary reduce UX friction. They MUST pass a `defaultGroupId` to the creation modal, so the folder dropdown is pre-filled with the correct parent group.
 - **Dashboard:** Das Root-Dashboard (`/`) dient ausschlie√ülich als "Activity-Hub" (FTP-Inbox Status, die 3 neuesten Galerien und 20 neuesten Bilder).
+
+## Related
+- [Roles & Access Management](../auth/01-roles-and-access.md) ó role-based gallery visibility and permissions
+- [Magic Links & Invites](../auth/02-magic-links.md) ó transient gallery access through invite links
+- [Downloads & Leak Tracing](../delivery/01-downloads-and-injection.md) ó delivery gallery download behavior
+- [Image Upload & Processing](../photos/01-upload-and-processing.md) ó photo lifecycle tied to gallery types
+- [IPTC Metadata Versioning](../photos/02-metadata-versioning.md) ó metadata editing rules differ by gallery type
+- [Search & Discovery](../search/01-search-and-discovery.md) ó gallery discoverability and permission-filtered search

@@ -29,6 +29,7 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
     const [processingId, setProcessingId] = useState<string | null>(null);
 
     if (!isOpen) return null;
+    if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
     // Wir filtern Super-Admins raus, da die ohnehin alles sehen.
     const filteredUsers = users?.filter(u =>

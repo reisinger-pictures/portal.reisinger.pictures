@@ -1,5 +1,19 @@
 import {apiMutate, fetcher} from '../api';
-import { IptcData } from '../ui/components/IptcMetadataEditor';
+
+export interface IptcData {
+    title?: string;
+    description?: string;
+    artist?: string;
+    headline?: string;
+    keywords?: string;
+    location?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    iso_country?: string;
+    is_editorial_only?: boolean;
+    effective_is_editorial_only?: boolean;
+}
 
 export interface PhotoVersionUser {
     id: string;

@@ -101,4 +101,27 @@ class SearchTest extends TestCase {
 
         $this->assertCount(1, $response->json('photos'));
     }
+
+    /**
+     * Typo-Toleranz: ein Tippfehler im Suchbegriff (genug Zeichen) muss das gleiche
+     * Ergebnis liefern wie der korrekte Begriff. Legitimiert die typoTolerance-Settings
+     * in config/scout.php (minWordSizeForTypos oneTypo=4).
+     */
+    public function test_search_is_typo_tolerant_for_photos() {
+        $gallery = Gallery::factory()->create(['is_public' => true, 'type' => 'delivery']);
+        Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'title' => 'MountainPanorama',
+        ]);
+
+        $this->waitForSearchIndex();
+
+        // Korrekte Schreibweise
+        $correct = $this->getJson('/api/search?q=MountainPanorama');
+        $this->assertCount(1, $correct->json('photos'));
+
+        // Tippfehler (transponierter Buchstabe) — muss typo-tolerant gefunden werden
+        $typo = $this->getJson('/api/search?q=MountainPnaorama');
+        $this->assertCount(1, $typo->json('photos'), 'Typo-tolerante Suche sollte Tippfehler korrigieren');
+    }
 }

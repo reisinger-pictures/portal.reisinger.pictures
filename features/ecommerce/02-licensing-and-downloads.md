@@ -6,25 +6,25 @@ status: active
 
 # Feature: Licensing, ZIP-Downloads & Pricing UI
 
-## 1. Übersicht
-Dieses Feature definiert die Geschäftslogik für den Bild-Download (Einzelbilder vs. ZIP-Archive) sowie das Redesign des Lizenz-Auswahlprozesses. Das Ziel ist eine transparente Preisgestaltung, eine flüssigere UX ohne Modals und klare Restriktionen basierend auf dem Kundenstatus.
+## 1. Overview
+This feature defines the business logic for image downloads (single images vs. ZIP archives) and the redesign of the license selection process. The goal is transparent pricing, a smoother UX without modals, and clear restrictions based on customer status.
 
-## 2. ZIP-Download Logik & Berechtigungen
-* **Berechtigung:** ZIP-Downloads (Alle Bilder herunterladen) sind systemweit **ausschließlich** für zwei Szenarien freigeschaltet:
-    * Der Kunde hat einen aktiven "Flatrate"-Status.
-    * Die Galerie ist explizit als "Gratis Download Galerie" markiert (`is_free_download`).
-* **Restriktion:** In allen anderen Fällen ist der ZIP-Download deaktiviert oder ausgeblendet. Kunden müssen für jedes Bild einzeln eine Lizenz erwerben.
-* **Tracking & Statistik:**
-    * Wird ein ZIP heruntergeladen, erhöht sich der generelle Download-Counter der Galerie um die *Anzahl der im ZIP enthaltenen Bilder* (x).
-    * Im Audit-Log (`download_logs`) wird der Download jedoch als *ein einziger* Eintrag protokolliert (`item_type = full_zip`), welcher als Metainformation (`payload`) die Anzahl der Bilder (x) enthält.
-* **Technisches Verhalten:** Der Download-Trigger erfolgt via `<a target="_blank">` in einem neuen Tab, um die E2E-Testbarkeit (Playwright) zu verbessern und den Main-Thread nicht zu blockieren.
+## 2. ZIP-Download Logic & Permissions
+* **Permission:** ZIP downloads (Download all images) are system-wide **exclusively** enabled for two scenarios:
+    * The customer has an active flat-rate status.
+    * The gallery is explicitly marked as a free download gallery (`is_free_download`).
+* **Restriction:** In all other cases, the ZIP download is disabled or hidden. Customers must purchase a license for each image individually.
+* **Tracking & Statistics:**
+    * When a ZIP is downloaded, the gallery's download counter increases by the *number of images contained in the ZIP* (x).
+    * In the audit log (`download_logs`), the download is recorded as a *single* entry (`item_type = full_zip`), which contains the number of images (x) as meta-information (`payload`).
+* **Technical Behavior:** The download trigger uses `<a target="_blank">` in a new tab to improve E2E testability (Playwright) and avoid blocking the main thread.
 
-## 3. UI/UX Refactoring: Lizenzwahl
-* **Kein Modal mehr:** Der Dialog ("Lizenz wählen") wird entfernt. Die Auswahl der Lizenzen wird direkt in die Detailansicht des jeweiligen Bildes integriert.
-* **Dynamische Sichtbarkeit:** Nicht verfügbare (gesperrte) Auflösungen oder Lizenzarten werden im Frontend komplett ausgeblendet, anstatt sie ausgegraut/gesperrt darzustellen.
-* **Echtzeit-Preisberechnung:** Die Benutzeroberfläche berechnet den finalen Preis dynamisch und zeigt ihn direkt an. Die Berechnung basiert auf den ausgewählten Faktoren (Basispreis * Nutzungsart * Nutzungsdauer * Nutzungshäufigkeit).
+## 3. UI/UX Refactoring: License Selection
+* **No Modal Anymore:** The dialog ("Choose License") is removed. License selection is integrated directly into the detail view of each image.
+* **Dynamic Visibility:** Unavailable (locked) resolutions or license types are completely hidden in the frontend, rather than being displayed as grayed/locked out.
+* **Real-Time Price Calculation:** The UI calculates the final price dynamically and displays it directly. The calculation is based on the selected factors (base price * usage type * usage duration * usage frequency).
 
-## 4. Erweiterte Lizenzoptionen (Migration V004 Update)
-Die Lizenzmatrix wird um folgende Parameter erweitert:
-* **Verwendungshäufigkeit:** Differenzierung zwischen *Einmaliger Verwendung* und *Mehrmaliger Verwendung* (neuer Preismultiplikator in `license_options`).
-* **Custom Quote (Angebot anfordern):** Integration eines "Quote-Workflows". User können für spezielle Anforderungen ein individuelles Angebot (Quote) anfragen, statt sofort zu kaufen (`is_quote_request` in `orders`).
+## 4. Advanced License Options (Migration V004 Update)
+The license matrix is extended with the following parameters:
+* **Usage Frequency:** Differentiation between *Single Use* and *Repeated Use* (new price multiplier in `license_options`).
+* **Custom Quote (Request Quote):** Integration of a quote workflow. Users can request an individual quote for special requirements instead of purchasing immediately (`is_quote_request` in `orders`).

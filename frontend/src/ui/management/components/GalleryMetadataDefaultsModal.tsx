@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Gallery, GalleryMetadataOpts } from '../../../logic/useGalleries';
-import IptcMetadataEditor, { IptcData } from '../../components/IptcMetadataEditor';
+import IptcMetadataEditor from '../../components/IptcMetadataEditor';
+import { IptcData } from '../../../logic/usePhoto';
 import { useUI } from '../../components/UIContext';
 import { useForm, useWatch } from 'react-hook-form';
+import AIGalleryDefaultsModal from './AIGalleryDefaultsModal';
 
 interface Props {
     isOpen: boolean;
@@ -26,6 +28,7 @@ export interface MetadataDefaultsFormValues {
 
 export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery, onUpdate }: Props) {
     const { showToast } = useUI();
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting } } = useForm({
         defaultValues: {
@@ -86,6 +89,12 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
         Object.entries(newData).forEach(([key, val]) => setValue(key as Parameters<typeof setValue>[0], val));
     };
 
+    const handleAiApply = (data: Partial<IptcData>) => {
+        Object.entries(data).forEach(([key, val]) => {
+            if (val) setValue(key as Parameters<typeof setValue>[0], val);
+        });
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -127,11 +136,16 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
                     
                     <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 w-full">
                         <button type="button" className="btn btn-ghost w-full sm:w-auto" onClick={onClose}>Abbrechen</button>
+                        <button type="button" className="btn btn-outline btn-primary w-full sm:w-auto" onClick={() => setIsAiModalOpen(true)}>
+                            <span className="iconify mdi--auto-fix"></span> KI generieren
+                        </button>
                         <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isSubmitting}>
                             {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
                         </button>
                     </div>
                 </form>
+
+                <AIGalleryDefaultsModal isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} onApply={handleAiApply} />
             </div>
             <div className="modal-backdrop" onClick={onClose}></div>
         </dialog>

@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\DomainMapping;
+use App\Services\AIService;
 
 class AuthController extends Controller
 {
@@ -140,7 +141,6 @@ class AuthController extends Controller
         
         // Immer Galerien laden, da auch Admins und Fotografen spezifische Zuweisungen haben können
         $user->load(['galleries', 'roles', 'galleryGroups', 'photographerGalleries', 'photographerGalleryGroups']);
-        $user->load('roles');
 
         $missingWatermark = false;
         if ($user->is_super_admin) {
@@ -157,7 +157,10 @@ class AuthController extends Controller
             'metadata_copyright' => $user->metadata_copyright,
             'ftp_slug' => $user->ftp_slug,
             'flatrate_level' => $user->flatrate_level,
-            
+
+            'brand' => $user->brand?->value,
+            'is_cross_brand' => $user->brand === null,
+
             'is_super_admin' => $user->is_super_admin,
             'is_admin' => $user->is_admin,
             'is_photographer' => $user->is_photographer,
@@ -166,6 +169,7 @@ class AuthController extends Controller
             'is_pending' => $user->is_pending,
             'roles' => $user->roles->pluck('name'),
             'missing_watermark' => $missingWatermark,
+            'ai_is_unconfigured' => app(AIService::class)->isUnconfigured(),
             'transient_meta_galleries' => $user->transient_meta_galleries ?? [],
             'my_galleries' => $user->galleries ?? [],
             'photographer_galleries' => $user->photographerGalleries ?? [],

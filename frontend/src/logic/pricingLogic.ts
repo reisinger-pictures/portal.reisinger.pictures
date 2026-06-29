@@ -1,5 +1,4 @@
-// Pure Pricing-Logik (aus usePricing.ts extrahiert, verhaltensgleich).
-// Der Hook usePricing reicht `terms` an diese Funktionen durch.
+// Pure Pricing-Logik. isCovered und calculateUpgradePrice werden direkt aus pricingLogic bezogen.
 
 export type ResolutionTier = 'web' | 'print' | 'original';
 export type UsageTier = 'editorial' | 'commercial';

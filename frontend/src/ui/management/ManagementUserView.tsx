@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import {UserDetailed, useUsers, UserRole} from '../../logic/useUsers';
 import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
-import {useAuth} from '../../logic/useAuth';
+import {usePermissions} from '../../logic/usePermissions';
 import UserPermissionsModal from './components/UserPermissionsModal';
 import CreateUserModal from './components/CreateUserModal';
 import UserTable from './components/UserTable';
 import { useUI } from '../components/UIContext';
 
 export default function ManagementUserView() {
-    const { user: currentUser } = useAuth();
+    const {isSuperAdmin, isAdmin} = usePermissions();
     const {users, roles,  createUser, updateUser, } = useUsers();
     const {tree} = useProtectedGalleries();
     const { showToast } = useUI();
@@ -21,15 +21,15 @@ export default function ManagementUserView() {
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
     const flatGalleries = tree ? [...(tree.groups.flatMap(g => g.galleries || [])), ...(tree.root_galleries || [])] : [];
 
-    const allowedRoles = currentUser?.is_super_admin 
-        ? roles 
-        : (currentUser?.is_admin 
-            ? roles?.filter(r => r.name !== UserRole.SUPER_ADMIN) 
+    const allowedRoles = isSuperAdmin
+        ? roles
+        : (isAdmin
+            ? roles?.filter(r => r.name !== UserRole.SUPER_ADMIN)
             : roles?.filter(r => [UserRole.POWER_USER, UserRole.CLIENT, UserRole.CUSTOMER_MANAGER].includes(r.name)));
 
-    const handleSaveUser = async (id: string, selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean, flatrateLevel: string) => {
+    const handleSaveUser = async (id: string, selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'atr' | null) => {
         try {
-            await updateUser(id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel);
+            await updateUser(id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, brand);
             showToast('success', 'Nutzerrechte gespeichert.');
         } catch {
             showToast('error', 'Fehler beim Speichern der Rechte.');

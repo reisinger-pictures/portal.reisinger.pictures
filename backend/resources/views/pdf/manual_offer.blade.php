@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Angebot {{ $snapshot->invoice_number }}</title>
     @php
-        $isAtr = config('app.brand') === 'all-the.rest';
+        $isAtr = \App\Support\BrandRegistry::isAtr();
         $primaryColor = $isAtr ? '#2A9D8F' : '#1E5631';
         $secondaryColor = $isAtr ? '#2A9D8F' : '#A4B494';
     @endphp

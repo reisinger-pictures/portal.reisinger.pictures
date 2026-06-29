@@ -1,21 +1,7 @@
 import React, {useState} from 'react';
 import AutocompleteInput from './AutocompleteInput';
 import {LocationResult} from '../../logic/useLocations';
-
-export interface IptcData {
-    title?: string;
-    description?: string;
-    artist?: string;
-    headline?: string;
-    keywords?: string;
-    location?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    iso_country?: string;
-    is_editorial_only?: boolean;
-    effective_is_editorial_only?: boolean;
-}
+import {IptcData} from '../../logic/usePhoto';
 
 interface Props {
     data: IptcData;

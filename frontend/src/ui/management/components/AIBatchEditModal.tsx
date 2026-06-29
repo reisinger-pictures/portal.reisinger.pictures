@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import useSWR from 'swr';
 import { Photo } from '../../../logic/useGallery';
-import { useLMStudio } from '../../../logic/useLMStudio';
+import { useAI } from '../../../logic/useAI';
 import { usePhoto } from '../../../logic/usePhoto';
 import { useUI } from '../../components/UIContext';
 import { LocationResult } from '../../../logic/useLocations';
+import { fetcher } from '../../../api';
 
 interface Props {
     isOpen: boolean;
@@ -27,8 +29,8 @@ interface RowState {
     iso_country: string;
 }
 
-export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
-    const { isAvailable, modelId, baseUrl, updateBaseUrl, generateMetadata } = useLMStudio(isOpen);
+export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }: Props) {
+    const { isAvailable, mode, modelId, generateMetadata } = useAI();
     const { updateMetadata: updatePhotoMeta } = usePhoto();
     const { showToast } = useUI();
 
@@ -37,6 +39,20 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [progress, setProgress] = useState(0);
     const abortControllerRef = useRef<AbortController | null>(null);
+
+    interface GalleryDefaults {
+        default_title?: string;
+        default_description?: string;
+        default_keywords?: string;
+    }
+    interface GalleryResponse {
+        gallery?: GalleryDefaults;
+    }
+
+    const { data: galleryData } = useSWR<GalleryResponse>(
+        isOpen && galleryId ? `/api/management/galleries/${galleryId}` : null,
+        fetcher
+    );
 
     const [prevIsOpen, setPrevIsOpen] = useState(false);
     const [prevPhotos, setPrevPhotos] = useState<Photo[]>([]);
@@ -65,6 +81,19 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
             setIsGeneratingAll(false);
         }
     }
+
+    // Auto-fill globalContext from gallery default_* fields when data arrives
+    if (isOpen && galleryData?.gallery && !globalContext) {
+        const defaults = [
+            galleryData.gallery.default_title,
+            galleryData.gallery.default_description,
+            galleryData.gallery.default_keywords
+        ].filter(Boolean).join(' | ');
+        if (defaults) {
+            setGlobalContext(defaults);
+        }
+    }
+
 
     // Manage the AbortController lifecycle in an effect so refs are never
     // touched during render. A fresh controller is created when the modal
@@ -99,7 +128,7 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
         setRows(updatedRows);
 
         try {
-            const aiData = await generateMetadata(photo.url, globalContext, row.specificContext, signal);
+            const aiData = await generateMetadata(row.photoId, globalContext, row.specificContext, signal);
             let locData = {
                 location: aiData.location || row.location,
                 city: aiData.detected_city || row.city,
@@ -213,7 +242,7 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <div className="flex justify-between items-center mb-2 mr-8">
                     <h3 className="font-bold text-2xl flex items-center gap-2">
-                        <span className="iconify mdi--robot-outline text-primary"></span> KI Batch-Edit (Lokal)
+                        <span className="iconify mdi--robot-outline text-primary"></span> KI Batch-Edit
                     </h3>
                     <button
                         onClick={handleGenerateAll}
@@ -237,11 +266,12 @@ export default function AIBatchEditModal({ isOpen, onClose, photos }: Props) {
                         <label className="label py-0"><span className="label-text font-bold">Globaler Kontext (Für alle Bilder)</span></label>
                         <input type="text" value={globalContext} onChange={e => setGlobalContext(e.target.value)} placeholder="z.B. Sommerfest der Firma XYZ in Wien, 2026" className="input input-sm input-bordered w-full" />
                     </div>
-                    <div className="flex-1 w-full border-t lg:border-t-0 lg:border-l border-base-300 pt-2 lg:pt-0 lg:pl-4">
-                        <label className="label py-0"><span className="label-text font-bold">LM Studio API URL</span></label>
+                    <div className="shrink-0 border-t lg:border-t-0 lg:border-l border-base-300 pt-2 lg:pt-0 lg:pl-4">
+                        <label className="label py-0"><span className="label-text font-bold">KI-Modus</span></label>
                         <div className="flex gap-2 items-center">
-                            <input type="text" value={baseUrl} onChange={e => updateBaseUrl(e.target.value)} placeholder="http://127.0.0.1:1234" className="input input-sm input-bordered flex-1" />
-                            {isAvailable ? <div className="badge badge-success badge-sm shrink-0">{modelId}</div> : <div className="badge badge-error badge-sm shrink-0">Nicht erreichbar</div>}
+                            {mode === 'server' && <div className="badge badge-success badge-sm shrink-0">Server: {modelId}</div>}
+                            {mode === 'local' && <div className="badge badge-warning badge-sm shrink-0">Lokal: {modelId}</div>}
+                            {mode === 'unavailable' && <div className="badge badge-error badge-sm shrink-0">Nicht verfügbar</div>}
                         </div>
                     </div>
                 </div>

@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Gallery;
 use App\Services\ImageProcessor;
 use App\Services\PhotoProcessingService;
-use App\Services\WatermarkService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -15,7 +14,7 @@ class ImageServicesTest extends TestCase
 {
     use RefreshDatabase;
 
-    private WatermarkService $watermarkService;
+    private ImageProcessor $imageProcessor;
     private PhotoProcessingService $photoService;
 
     /**
@@ -31,7 +30,7 @@ class ImageServicesTest extends TestCase
     {
         parent::setUp();
         Cache::flush();
-        $this->watermarkService = new WatermarkService();
+        $this->imageProcessor = app(ImageProcessor::class);
         $this->photoService = new PhotoProcessingService();
     }
 
@@ -39,7 +38,7 @@ class ImageServicesTest extends TestCase
     // WatermarkService — reiner Passthrough an ImageProcessor via app(...)
     // =========================================================================
 
-    public function test_applyWatermark_uses_defaults_when_no_optional_args_passed(): void
+    public function test_applyCenteredWatermark_uses_defaults_when_no_optional_args_passed(): void
     {
         $source = '/photos/1/originals/abc.jpg';
         $dest = '/photos/1/watermarked/abc.jpg';
@@ -51,10 +50,10 @@ class ImageServicesTest extends TestCase
                 ->andReturn(true);
         });
 
-        $this->assertTrue($this->watermarkService->applyWatermark($source, $dest));
+        $this->assertTrue(app(ImageProcessor::class)->applyCenteredWatermark($source, $dest, null, 'delivery'));
     }
 
-    public function test_applyWatermark_forwards_maxWidth_argument(): void
+    public function test_applyCenteredWatermark_forwards_maxWidth_argument(): void
     {
         $source = '/src.jpg';
         $dest = '/dest.jpg';
@@ -66,10 +65,10 @@ class ImageServicesTest extends TestCase
                 ->andReturn(true);
         });
 
-        $this->assertTrue($this->watermarkService->applyWatermark($source, $dest, 800));
+        $this->assertTrue(app(ImageProcessor::class)->applyCenteredWatermark($source, $dest, 800, 'delivery'));
     }
 
-    public function test_applyWatermark_forwards_selection_gallery_type(): void
+    public function test_applyCenteredWatermark_forwards_selection_gallery_type(): void
     {
         $source = '/src.webp';
         $dest = '/dest.webp';
@@ -81,10 +80,10 @@ class ImageServicesTest extends TestCase
                 ->andReturn(false);
         });
 
-        $this->assertFalse($this->watermarkService->applyWatermark($source, $dest, 1024, 'selection'));
+        $this->assertFalse(app(ImageProcessor::class)->applyCenteredWatermark($source, $dest, 1024, 'selection'));
     }
 
-    public function test_applyWatermark_returns_processor_result_verbatim(): void
+    public function test_applyCenteredWatermark_returns_processor_result_verbatim(): void
     {
         $this->mock(ImageProcessor::class, function ($mock) {
             $mock->shouldReceive('applyCenteredWatermark')->once()->andReturn('STUB_RESULT');
@@ -92,11 +91,11 @@ class ImageServicesTest extends TestCase
 
         $this->assertSame(
             'STUB_RESULT',
-            $this->watermarkService->applyWatermark('/s', '/d', 500, 'delivery')
+            app(ImageProcessor::class)->applyCenteredWatermark('/s', '/d', 500, 'delivery')
         );
     }
 
-    public function test_applyWatermark_resolves_processor_from_container_each_call(): void
+    public function test_applyCenteredWatermark_resolves_from_container(): void
     {
         $source = '/s.jpg';
         $dest = '/d.jpg';
@@ -108,8 +107,7 @@ class ImageServicesTest extends TestCase
                 ->andReturn(true);
         });
 
-        $service = new WatermarkService();
-        $this->assertTrue($service->applyWatermark($source, $dest));
+        $this->assertTrue(app(ImageProcessor::class)->applyCenteredWatermark($source, $dest, null, 'delivery'));
     }
 
     // =========================================================================

@@ -137,7 +137,6 @@ class SearchController extends Controller
         return response()->json([
             'photo' => $photo,
             'breadcrumbs' => $breadcrumbs,
-            'downloads_count' => 0 // Altlast entfernt: Einzelbild-Tracking via item_identifier wurde in V004 gedroppt
         ]);
     }
 }

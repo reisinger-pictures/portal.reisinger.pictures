@@ -1,9 +1,9 @@
 <?php
 
+use App\Http\Controllers\AIController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DownloadController;
-use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\GalleryController;
@@ -112,6 +112,11 @@ Route::middleware('auth:api')->group(function () {
     Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip']);
     Route::delete('/photos/{id}', [PhotoController::class, 'destroy']);
     Route::get('/payouts/my-statements', [\App\Http\Controllers\PayoutController::class, 'myStatements']);
+
+    // AI Metadata Generation
+    Route::get('/ai/status', [AIController::class, 'status']);
+    Route::post('/ai/generate-metadata', [AIController::class, 'generateMetadata']);
+    Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText']);
 });
 
 Route::middleware(['auth:api', 'management'])->group(function () {
@@ -192,19 +197,21 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/orders/{id}/send-quote', [OrderController::class, 'sendQuote']);
     Route::post('/management/invoices/manual', [OrderController::class, 'generateManualInvoice']);
     Route::post('/management/invoices/extract-offer', [OrderController::class, 'extractOffer']);
-    Route::get('/management/products', [ProductController::class, 'index']);
-    Route::post('/management/products', [ProductController::class, 'store']);
-    Route::put('/management/products/{id}', [ProductController::class, 'update']);
-    Route::delete('/management/products/{id}', [ProductController::class, 'destroy']);
-    Route::get('/management/customers', [CustomerController::class, 'index']);
-    Route::post('/management/customers', [CustomerController::class, 'store']);
-    Route::put('/management/customers/{id}', [CustomerController::class, 'update']);
-    Route::delete('/management/customers/{id}', [CustomerController::class, 'destroy']);
+    Route::middleware(['super_admin'])->group(function () {
+        Route::get('/management/products', [ProductController::class, 'index']);
+        Route::post('/management/products', [ProductController::class, 'store']);
+        Route::put('/management/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/management/products/{id}', [ProductController::class, 'destroy']);
+        Route::get('/management/customers', [CustomerController::class, 'index']);
+        Route::post('/management/customers', [CustomerController::class, 'store']);
+        Route::put('/management/customers/{id}', [CustomerController::class, 'update']);
+        Route::delete('/management/customers/{id}', [CustomerController::class, 'destroy']);
 
-    Route::get('/management/text-snippets', [TextSnippetController::class, 'index']);
-    Route::post('/management/text-snippets', [TextSnippetController::class, 'store']);
-    Route::put('/management/text-snippets/{id}', [TextSnippetController::class, 'update']);
-    Route::delete('/management/text-snippets/{id}', [TextSnippetController::class, 'destroy']);
+        Route::get('/management/text-snippets', [TextSnippetController::class, 'index']);
+        Route::post('/management/text-snippets', [TextSnippetController::class, 'store']);
+        Route::put('/management/text-snippets/{id}', [TextSnippetController::class, 'update']);
+        Route::delete('/management/text-snippets/{id}', [TextSnippetController::class, 'destroy']);
+    });
 
     Route::get('/management/stats', [StatsController::class, 'index']);
     Route::get('/management/logs', [StatsController::class, 'logs']);

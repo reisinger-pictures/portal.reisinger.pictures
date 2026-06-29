@@ -17,7 +17,8 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
     const [linkType, setLinkType] = useState<'mass' | 'personal'>('mass');
     const {showToast, confirm} = useUI();
 
-    const {data: invites, mutate} = useSWR<InviteData[]>(`/api/management/galleries/${galleryId}/invites`, fetcher);
+    const {data: invites, isLoading, mutate} = useSWR<InviteData[]>(`/api/management/galleries/${galleryId}/invites`, fetcher);
+    if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
     const handleGenerate = async () => {
         setLoading(true);

@@ -1,4 +1,4 @@
-import {DocumentFormData} from '../ManagementManualInvoiceView';
+import {DocumentFormData} from '../../../api';
 
 interface Props {
     docType: 'invoice' | 'offer';

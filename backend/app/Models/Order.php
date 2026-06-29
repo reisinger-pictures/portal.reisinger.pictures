@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Brand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ class Order extends Model
     protected $fillable = [
         'user_id',
         'status',
+        'brand',
         'total_amount',
         'stripe_fee_cents',
         'is_quote_request',
@@ -27,6 +29,7 @@ class Order extends Model
         'total_amount' => 'integer',
         'stripe_fee_cents' => 'integer',
         'is_quote_request' => 'boolean',
+        'brand' => Brand::class,
     ];
 
     protected static function booted()

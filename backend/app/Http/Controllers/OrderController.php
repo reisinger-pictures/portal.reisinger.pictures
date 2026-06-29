@@ -13,6 +13,7 @@ use App\Services\QuoteLinkService;
 use App\Http\Requests\CheckoutRequest;
 use App\Http\Requests\SendQuoteRequest;
 use App\Http\Requests\GenerateManualInvoiceRequest;
+use App\Services\SettingResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\InvoiceMail;
@@ -34,15 +35,13 @@ class OrderController extends Controller
         return response()->json($orders);
     }
 
-    public function checkout(CheckoutRequest $request, \App\Services\CheckoutService $checkoutService)
+    public function checkout(CheckoutRequest $request, \App\Services\CheckoutService $checkoutService, SettingResolver $resolver)
     {
         $user = auth('api')->user();
 
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
-        $get = fn($k) => \App\Models\Setting::where('key', $pfx . $k)->value('value') ?? \App\Models\Setting::where('key', $k)->value('value');
-        $holder = $get('bank_holder');
-        $iban = $get('bank_iban');
-        $street = $get('company_street');
+        $holder = $resolver->get('bank_holder');
+        $iban = $resolver->get('bank_iban');
+        $street = $resolver->get('company_street');
         if (empty($holder) || empty($iban) || empty($street)) {
             return response()->json(['error' => 'Der Betreiber hat noch keine vollständigen Rechnungsdaten (Impressum & Bank) hinterlegt. Kauf derzeit nicht möglich.'], 400);
         }
@@ -121,16 +120,22 @@ class OrderController extends Controller
         return response()->json($data);
     }
 
-    public function downloadInvoice($id) {
+    public function downloadInvoice($id, SettingResolver $resolver) {
         $order = Order::where('id', $id)->where('user_id', auth()->id())->with('invoiceSnapshot')->firstOrFail();
         if ($order->is_quote_request && $order->status === 'pending') abort(403, 'Angebot noch nicht abgerechnet.');
+
+        // Reconstruct brand from the persisted order, not from the current request host, so an
+        // ATR order always renders with ATR branding/bank details even when downloaded via a B2B
+        // link (B-01 F2). SettingResolver reads the brand via BrandRegistry afterwards.
+        \App\Support\BrandRegistry::set(\App\Support\BrandRegistry::resolveFromOrder($order));
+
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', [
-            'order' => $order, 
-            'snapshot' => $order->invoiceSnapshot, 
+            'order' => $order,
+            'snapshot' => $order->invoiceSnapshot,
             'items' => $order->invoiceSnapshot->customer_details['items'] ?? [],
-            'bankHolder' => $get('bank_holder'),
-            'bankIban' => $get('bank_iban'),
-            'bankBic' => $get('bank_bic')
+            'bankHolder' => $resolver->get('bank_holder'),
+            'bankIban' => $resolver->get('bank_iban'),
+            'bankBic' => $resolver->get('bank_bic')
         ])->download($order->invoiceSnapshot->invoice_number . '.pdf');
     }
 

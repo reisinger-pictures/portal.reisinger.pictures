@@ -5,11 +5,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
 import GalleryHeader from '../components/GalleryHeader';
 import { useAuth } from '../../logic/useAuth';
-
+import { usePermissions } from '../../logic/usePermissions';
 
 import { useGallery } from '../../logic/useGallery';
-import { usePricing, ResolutionTier } from '../../logic/usePricing';
-import { useLicenseTerms } from '../../logic/useLicenseTerms';
+import { isCovered, ResolutionTier } from '../../logic/pricingLogic';
 export interface DeliveryViewProps {
     galleryData: ReturnType<typeof useGallery>;
 }
@@ -19,10 +18,9 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
-    const { terms } = useLicenseTerms();
-    const { isCovered } = usePricing(terms);
     const isClientView = searchParams.get('view') === 'client';
-    const hasFullAccess = (user?.is_admin || user?.is_photographer || user?.is_super_admin) && !isClientView;
+    const {isStaff} = usePermissions();
+    const hasFullAccess = isStaff && !isClientView;
 
     /* moved early return */
     const galleryRef = useRef<HTMLDivElement>(null);

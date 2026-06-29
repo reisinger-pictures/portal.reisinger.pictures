@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Role, UserDetailed} from '../../../logic/useUsers';
+import {Role, UserDetailed, UserRole} from '../../../logic/useUsers';
 import {FlatGroup, Gallery} from '../../../logic/useGalleries';
 
 interface UserPermissionsModalProps {
@@ -8,8 +8,12 @@ interface UserPermissionsModalProps {
     flatGroups: FlatGroup[];
     flatGalleries: Gallery[];
     onClose: () => void;
-    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string) => Promise<void>;
+    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'atr' | null) => Promise<void>;
 }
+
+// Policy A (A-01): staff roles are always cross-brand. The brand-select is only relevant for
+// non-staff / client-type accounts.
+const STAFF_ROLE_NAMES: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PHOTOGRAPHER];
 
 export default function UserPermissionsModal({
                                                  user,
@@ -25,13 +29,22 @@ export default function UserPermissionsModal({
 
     const [canEditMeta, setCanEditMeta] = useState<boolean>(user.can_edit_metadata || false);
     const [flatrateLevel, setFlatrateLevel] = useState<string>(user.flatrate_level || 'none');
+    const [brand, setBrand] = useState<'rp' | 'atr' | null>(user.brand ?? null);
+
+    // A staff account (any staff role selected) is cross-brand per Policy A; brand is forced to
+    // null and the select is disabled so the editor cannot accidentally scope a staff member.
+    const selectedRoleNames = (roles ?? [])
+        .filter(r => selRoles.includes(r.id))
+        .map(r => r.name);
+    const isStaffAccount = selectedRoleNames.some(name => STAFF_ROLE_NAMES.includes(name));
+    const effectiveBrand: 'rp' | 'atr' | null = isStaffAccount ? null : brand;
 
     const toggleItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
         setArr(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
     };
 
     const handleSave = () => {
-        onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel);
+        onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand);
     };
 
     return (
@@ -43,7 +56,7 @@ export default function UserPermissionsModal({
                     <span className="iconify mdi--email-outline"></span> {user.email}
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="form-control bg-base-200 p-4 rounded-box border border-base-300">
                         <label className="cursor-pointer label justify-start gap-4">
                             <input type="checkbox" checked={canEditMeta}
@@ -68,6 +81,25 @@ export default function UserPermissionsModal({
                         </select>
                         <span className="label-text-alt opacity-70 mt-1 pl-1">Bestimmt, welche Auflösungen direkt ohne Checkout geladen werden können.</span>
                     </div>
+                </div>
+
+                <div className="form-control bg-base-200 p-4 rounded-box border border-base-300">
+                    <label className="label"><span className="label-text font-bold">Brand-Zuweisung</span></label>
+                    <select
+                        className="select select-bordered w-full"
+                        value={effectiveBrand ?? ''}
+                        disabled={isStaffAccount}
+                        onChange={e => setBrand((e.target.value || null) as 'rp' | 'atr' | null)}
+                    >
+                        <option value="">Übergreifend (cross-brand)</option>
+                        <option value="rp">B2B (reisinger.pictures)</option>
+                        <option value="atr">ATR (all-the.rest)</option>
+                    </select>
+                    <span className="label-text-alt opacity-70 mt-1 pl-1">
+                        {isStaffAccount
+                            ? 'Staff-Rollen (Admin/Fotograf/Super-Admin) sind immer übergreifend (Policy A).'
+                            : 'Bestimmt, auf welche Brand dieser Client-Zugang beschränkt ist.'}
+                    </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

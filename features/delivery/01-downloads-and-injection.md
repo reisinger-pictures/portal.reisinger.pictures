@@ -13,4 +13,4 @@ status: active
 
 ## 2. Watermarking (Fallback)
 - If an unprivileged user (guest) accesses a public gallery, a visible SVG watermark is rasterized and stamped onto the image (via `Imagick`).
-- To prevent heavy CPU load during mass-downloads, the rasterized SVG is cached in resolution "buckets" (`watermark_master_*.png`).
+- To prevent heavy CPU load during mass-downloads, the rasterized SVG is cached in resolution "buckets" (`master_{width}.png`, e.g., `master_500.png`).

@@ -30,6 +30,12 @@ This directory serves as the single source of truth for all technical concepts, 
 * [02-email-system.md](infrastructure/02-email-system.md) - Mailpit, Custom Mails, and Opt-ins.
 * [03-accounting-and-lifecycle.md](infrastructure/03-accounting-and-lifecycle.md) - Invoicing, PDFs, and storage cleanup.
 * [04-payout-system.md](infrastructure/04-payout-system.md) - Weighted share pool model, deduplication and statements.
+* [05-watermark-refactoring.md](infrastructure/05-watermark-refactoring.md) - Auto-generation of watermark PNGs and SVG rasterization.
+* [06-multi-domain-branding.md](infrastructure/06-multi-domain-branding.md) - Tailwind theming and brand switch per domain.
+* [07-lightroom-multi-tenant-gap.md](infrastructure/07-lightroom-multi-tenant-gap.md) - Lightroom plugin single-tenant gap analysis.
+* [08-tenant-brand-concept.md](infrastructure/08-tenant-brand-concept.md) - Tenant vs. Brand terminology and concept.
+* [09-brand-context-queue-cli.md](infrastructure/09-brand-context-queue-cli.md) - Brand leaks in queue/CLI contexts (SOLL).
+* [10-frontend-brand-tenant-isolation.md](infrastructure/10-frontend-brand-tenant-isolation.md) - Frontend brand/tenant isolation for B2C clients.
 
 ### 📷 Photos & Metadata
 * [01-upload-and-processing.md](photos/01-upload-and-processing.md) - Lightroom UUIDs and ImageProcessor.
@@ -39,11 +45,11 @@ This directory serves as the single source of truth for all technical concepts, 
 ### 🔍 Search & Discovery
 * [01-search-and-discovery.md](search/01-search-and-discovery.md) - Meilisearch integration.
 * [02-smart-assistance.md](search/02-smart-assistance.md) - GeoNames autocomplete.
+* [03-meilisearch-typo-tolerance.md](search/03-meilisearch-typo-tolerance.md) - Typo-tolerance configuration and sync.
 
 ### 💻 Tech & Architecture
 * [01-database-schema.md](tech/01-database-schema.md) - UUIDs and migration strategy.
-* [03-backend-architecture.md](tech/03-backend-architecture.md) - Stateless API and ZIP streaming.
-* [04-frontend-architecture.md](tech/04-frontend-architecture.md) - React, Vite, SWR, and UI rules.
-* [05-testing-guidelines.md](tech/05-testing-guidelines.md) - Strict UI-first testing rules.
-* [06-post-mortem-gallery-bugs.md](tech/06-post-mortem-gallery-bugs.md) - Bug tracking and prevention.
-* [07-security-and-perf-refinement.md](tech/07-security-and-perf-refinement.md) - Security and performance hardening.
+* [02-backend-architecture.md](tech/02-backend-architecture.md) - Stateless API and ZIP streaming.
+* [03-frontend-architecture.md](tech/03-frontend-architecture.md) - React, Vite, SWR, and UI rules.
+* [04-testing-guidelines.md](tech/04-testing-guidelines.md) - Strict UI-first testing rules.
+* [05-security-and-perf-refinement.md](tech/05-security-and-perf-refinement.md) - Security and performance hardening.

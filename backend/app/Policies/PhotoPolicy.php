@@ -7,6 +7,12 @@ use App\Models\Photo;
 
 class PhotoPolicy
 {
+    public function view(?User $user, Photo $photo): bool
+    {
+        if (!$user) return false;
+        return $user->canAccessGallery($photo->gallery_id);
+    }
+
     public function updateMetadata(?User $user, Photo $photo): bool
     {
         if (!$user) return false;

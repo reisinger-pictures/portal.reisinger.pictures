@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Constants\TierRanks;
 use App\Models\Gallery;
 use App\Models\Photo;
 use Illuminate\Http\Request;
-use App\Services\WatermarkService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -31,15 +31,14 @@ class FileDeliveryController extends Controller
 
         $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/\\');
         $processor = app(\App\Services\ImageProcessor::class);
-        $watermarkService = app(WatermarkService::class);
+        $watermarkService = app(\App\Services\ImageProcessor::class);
         
         // 1. Konzeptueller Check: Hat der User das Recht auf die cleane Originaldatei?
         $logicalNeedsWatermark = true;
         if ($gallery->effective_is_free_download) $logicalNeedsWatermark = false;
         elseif ($user && ($user->is_admin || $user->is_photographer)) $logicalNeedsWatermark = false;
         elseif ($user && $user->canAccessGallery($gallery->id)) {
-            $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
-            if (($ranks[$user->flatrate_level ?? 'none'] ?? 0) >= 1) $logicalNeedsWatermark = false;
+            if ((TierRanks::RANKS[$user->flatrate_level ?? 'none'] ?? 0) >= 1) $logicalNeedsWatermark = false;
         }
 
         // 2. Pfad-Prüfung und HTTP 403 Schutz
@@ -86,7 +85,7 @@ class FileDeliveryController extends Controller
                 if (!file_exists($wmPath)) {
                     if (!is_dir(dirname($wmPath))) @mkdir(dirname($wmPath), 0755, true);
                     try {
-                        $watermarkService->applyWatermark($path, $wmPath, null, $gallery->type);
+                        $watermarkService->applyCenteredWatermark($path, $wmPath, null, $gallery->type);
                         if (!file_exists($wmPath)) throw new \Exception("Watermark file missing.");
                     } catch (\Exception $e) {
                         return response()->json(['error' => 'SECURITY: Watermark-Fail.'], 500);
@@ -115,7 +114,7 @@ class FileDeliveryController extends Controller
                 if (!file_exists($wmPath)) {
                     if (!is_dir(dirname($wmPath))) @mkdir(dirname($wmPath), 0755, true);
                     try {
-                        $watermarkService->applyWatermark($path, $wmPath, 2000, $gallery->type);
+                        $watermarkService->applyCenteredWatermark($path, $wmPath, 2000, $gallery->type);
                         if (!file_exists($wmPath)) throw new \Exception("Watermark file missing.");
                     } catch (\Exception $e) {
                         return response()->json(['error' => 'SECURITY: Watermark-Fail.'], 500);

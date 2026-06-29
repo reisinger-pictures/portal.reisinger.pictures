@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Constants\TierRanks;
 use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\Photo;
-use App\Services\WatermarkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
@@ -118,9 +118,8 @@ class DownloadController extends Controller
         $user = $this->authorizeGalleryAccess($gallery);
 
         $tier = $request->query('tier', 'original');
-        $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
-        $userRank = $user && $user->flatrate_level ? ($ranks[$user->flatrate_level] ?? 0) : 0;
-        $reqRank = $ranks[$tier] ?? 3;
+        $userRank = $user && $user->flatrate_level ? (TierRanks::RANKS[$user->flatrate_level] ?? 0) : 0;
+        $reqRank = TierRanks::RANKS[$tier] ?? 3;
 
         $hasFullAccess = $user && ($user->is_admin || $user->is_photographer);
         $isCoveredByFlatrate = $userRank >= $reqRank;
@@ -177,9 +176,8 @@ class DownloadController extends Controller
         $user = $this->authorizeGalleryAccess($gallery);
 
         $tier = $request->query('tier', 'original');
-        $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
-        $userRank = $user && $user->flatrate_level ? ($ranks[$user->flatrate_level] ?? 0) : 0;
-        $reqRank = $ranks[$tier] ?? 3;
+        $userRank = $user && $user->flatrate_level ? (TierRanks::RANKS[$user->flatrate_level] ?? 0) : 0;
+        $reqRank = TierRanks::RANKS[$tier] ?? 3;
 
         $hasFullAccess = $user && ($user->is_admin || $user->is_photographer);
         $isCoveredByFlatrate = $userRank >= $reqRank;
@@ -206,7 +204,7 @@ class DownloadController extends Controller
 
         return response()->streamDownload(function () use ($gallery, $baseStoragePath, $userName, $user, $tier, $hasFullAccess) {
             $zip = new ZipStream(sendHttpHeaders: false);
-            $watermarkService = app(WatermarkService::class);
+            $watermarkService = app(\App\Services\ImageProcessor::class);
             $processor = app(\App\Services\ImageProcessor::class);
             $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
 
@@ -222,7 +220,7 @@ class DownloadController extends Controller
                     if (!file_exists($wmPath)) {
                         if (!is_dir(dirname($wmPath)))
                             mkdir(dirname($wmPath), 0755, true);
-                        $watermarkService->applyWatermark($sourcePath, $wmPath, 2000);
+                        $watermarkService->applyCenteredWatermark($sourcePath, $wmPath, 2000);
                     }
                     $sourcePath = $wmPath;
                 }

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from '../../../logic/useAuth';
+import { usePermissions } from '../../../logic/usePermissions';
 import { apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
 import { useForm } from 'react-hook-form';
@@ -15,6 +16,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfileSettingsCard() {
     const { user, mutate: mutateUser } = useAuth();
+    const { isPhotographer } = usePermissions();
     const { showToast } = useUI();
 
     const profileForm = useForm<ProfileFormValues>({
@@ -35,7 +37,7 @@ export default function ProfileSettingsCard() {
     const onSubmit = async (data: ProfileFormValues) => {
         try {
             const payload: Record<string, string | undefined> = { name: data.name, metadata_copyright: data.metadata_copyright };
-            if (user?.is_photographer) payload.ftp_slug = data.ftp_slug;
+            if (isPhotographer) payload.ftp_slug = data.ftp_slug;
             
             await apiMutate('/api/auth/profile', 'PUT', payload);
             await mutateUser();
@@ -60,7 +62,7 @@ export default function ProfileSettingsCard() {
                         />
                     </div>
                     
-                    {user?.is_photographer && (
+                    {isPhotographer && (
                         <div className="form-control">
                             <label className="label">
                                 <span className="label-text font-bold">FTP Upload Ordner (Slug)</span>

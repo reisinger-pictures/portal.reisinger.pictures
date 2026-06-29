@@ -8,20 +8,27 @@ return {
     sectionsForTopOfDialog = function(f, propertyTable)
         local prefs = LrPrefs.prefsForPlugin()
         
-        local function getTitle(title)
-            return prefs.useTestUrl and ("[TEST] " .. title) or title
-        end
-        
         return {
             {
-                title = getTitle("portal.reisinger.pictures API Einstellungen"),
+                title = "Portal API Einstellungen (B2B & ATR)",
                 
                 f:row {
-                    f:checkbox {
-                        title = "Lokale Test-Umgebung (portal.test) verwenden",
-                        value = LrView.bind { key = "useTestUrl", bind_to_object = prefs }
+                    f:static_text { title = "B2B (reisinger.pictures):", width = 150 },
+                    f:edit_field {
+                        value = LrView.bind { key = "baseUrlRp", bind_to_object = prefs },
+                        fill_horizontal = 1
                     }
                 },
+
+                f:row {
+                    f:static_text { title = "ATR (all-the.rest):", width = 150 },
+                    f:edit_field {
+                        value = LrView.bind { key = "baseUrlAtr", bind_to_object = prefs },
+                        fill_horizontal = 1
+                    }
+                },
+
+                f:separator { fill_horizontal = 1 },
 
                 f:row {
                     f:static_text { title = "E-Mail:", width = 150 },
@@ -42,14 +49,33 @@ return {
                 f:row {
                     f:spacer { width = 150 },
                     f:push_button {
-                        title = "Login testen",
+                        title = "Login testen (B2B)",
                         action = function()
                             LrTasks.startAsyncTask(function()
-                                local token, err, detail = Api.login()
+                                local url = (prefs.baseUrlRp and #prefs.baseUrlRp > 0) and prefs.baseUrlRp or "https://portal.reisinger.pictures"
+                                local token, err, detail = Api.login(url)
                                 if token then
-                                    LrDialogs.message(getTitle("Erfolg!"), "Verbindung zum Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")
+                                    LrDialogs.message("Erfolg!", "Verbindung zum B2B-Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")
                                 else
-                                    LrDialogs.message(getTitle("Fehlgeschlagen"), "Fehler: " .. tostring(err) .. "\n\n" .. tostring(detail), "critical")
+                                    LrDialogs.message("Fehlgeschlagen", "Fehler: " .. tostring(err) .. "\n\n" .. tostring(detail), "critical")
+                                end
+                            end)
+                        end
+                    }
+                },
+                
+                f:row {
+                    f:spacer { width = 150 },
+                    f:push_button {
+                        title = "Login testen (ATR)",
+                        action = function()
+                            LrTasks.startAsyncTask(function()
+                                local url = (prefs.baseUrlAtr and #prefs.baseUrlAtr > 0) and prefs.baseUrlAtr or "https://portal.all-the.rest"
+                                local token, err, detail = Api.login(url)
+                                if token then
+                                    LrDialogs.message("Erfolg!", "Verbindung zum ATR-Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")
+                                else
+                                    LrDialogs.message("Fehlgeschlagen", "Fehler: " .. tostring(err) .. "\n\n" .. tostring(detail), "critical")
                                 end
                             end)
                         end
@@ -58,7 +84,7 @@ return {
                 
                 f:row {
                     f:static_text { title = "Hinweis:", width = 150 },
-                    f:static_text { title = "Deine Fotografen-Zugangsdaten für das Web-Portal." }
+                    f:static_text { title = "Deine Fotografen-Zugangsdaten. Gleiche Credentials für beide Portale." }
                 }
             }
         }

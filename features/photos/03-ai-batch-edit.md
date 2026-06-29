@@ -18,3 +18,7 @@ status: active
 ## 3. Fallback & UX
 - **Meilisearch Integration:** If the AI detects a city from the image context (e.g., landmarks), the frontend queries the local Meilisearch index (`/api/search/locations`) to automatically resolve and populate the corresponding state, country, and ISO codes.
 - **Row-level State:** The UI manages generation and saving states per image row to allow partial batch processing without locking the entire table.
+
+## Related
+- [IPTC Metadata Versioning](../photos/02-metadata-versioning.md) — AI-edited metadata follows the same versioning rules
+- [Search & Discovery](../search/01-search-and-discovery.md) — AI-detected locations are resolved via the search index

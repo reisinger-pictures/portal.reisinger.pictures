@@ -1,6 +1,6 @@
 import useSWR from 'swr';
-import {apiMutate, fetcher} from '../api';
-import {Gallery, GalleryGroup} from './useGalleries';
+import {apiMutate, fetcher, Gallery, User} from '../api';
+import {GalleryGroup} from './useGalleries';
 
 export enum UserRole {
     SUPER_ADMIN = 'super_admin',
@@ -16,14 +16,16 @@ export interface Role {
     name: UserRole;
 }
 
-export interface UserDetailed {
-    id: string;
-    name: string;
-    email: string;
-    is_photographer?: boolean;
-    is_super_admin?: boolean;
+// Management-endpoint user shape. Extends the canonical auth `User` but overrides
+// `roles` (rich `Role[]` objects here vs. role-name strings on the auth endpoint).
+export interface UserDetailed extends Omit<User, 'roles'> {
+    is_photographer: boolean;
+    is_super_admin: boolean;
     can_edit_metadata: boolean;
     flatrate_level: 'none' | 'web' | 'print' | 'original';
+    // Brand assignment per Policy A (A-01): 'rp' | 'atr' for client-type accounts, null for
+    // staff (super_admin/admin/photographer = cross-brand).
+    brand?: 'rp' | 'atr' | null;
     roles: Role[];
     gallery_groups: GalleryGroup[];
     galleries: Gallery[];
@@ -48,13 +50,14 @@ export function useUsers() {
         await mutateUsers();
     };
 
-    const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string) => {
+    const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string, brand: 'rp' | 'atr' | null) => {
         await apiMutate(`/api/management/users/${id}`, 'PUT', {
             role_ids,
             gallery_group_ids,
             gallery_ids,
             can_edit_metadata,
-            flatrate_level
+            flatrate_level,
+            brand
         });
         await mutateUsers();
     };

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 
-test.describe('AIBatchEditModal Abort & Progress Workflow', () => {
+test.describe('AI Batch Edit Modal (Server-Side)', () => {
     let helper: E2ESessionHelper;
     let testUser = { email: '', password: '' };
 
@@ -15,34 +15,100 @@ test.describe('AIBatchEditModal Abort & Progress Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Closing modal aborts AI generation gracefully', async ({ page }) => {
-        // Mock LM Studio API to delay response heavily, allowing us to abort it
-        await page.route('**/v1/chat/completions', async route => {
-            await new Promise(f => setTimeout(f, 3000));
-            await route.fulfill({ json: { choices: [{ message: { content: '{"title": "Mocked Title"}' } }] } });
+    test('shows AI Batch-Edit button for photographer in delivery gallery', async ({ page }) => {
+        await page.route('**/api/ai/status', async route => {
+            await route.fulfill({ json: { enabled: true, model: 'gpt-4o' } });
         });
 
-        // Mock LM Studio Model list check
-        await page.route('**/v1/models', async route => {
-            await route.fulfill({ json: { data: [{ id: 'mock-vision-model' }] } });
+        await page.route('**/api/auth/me', async (route) => {
+            await route.fulfill({
+                json: {
+                    id: 'test-id',
+                    name: 'Test Photographer',
+                    email: testUser.email,
+                    is_super_admin: false,
+                    is_admin: false,
+                    is_photographer: true,
+                    can_edit_metadata: false,
+                    ai_is_unconfigured: false,
+                    roles: ['photographer'],
+                    missing_watermark: false,
+                }
+            });
         });
 
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
-        
-        // Setup Note: In a real test, we would navigate to the gallery and click the "Batch Edit" button.
-        // Assuming we are on the modal UI now:
-        // await page.getByRole('button', { name: 'Alle generieren (leere)' }).click();
-        
-        // Check if progress bar gets visible
-        // await expect(page.locator('progress')).toBeVisible();
 
-        // Close the modal during generation
-        // await page.getByRole('button', { name: '✕' }).click();
+        await page.goto('/test-gallery-slug');
+        await page.waitForLoadState('networkidle');
 
-        // Verify that UI has cleared and no unexpected errors or toasts appear
-        // await expect(page.locator('.toast.alert-error')).toBeHidden();
-        
-        expect(true).toBeTruthy(); // Placeholder assert to validate structural setup
+        const aiButton = page.getByRole('button', { name: 'KI Batch-Edit' });
+        await expect(aiButton).toBeVisible();
+    });
+
+    test('opens AI Batch-Edit modal when button is clicked', async ({ page }) => {
+        await page.route('**/api/ai/status', async route => {
+            await route.fulfill({ json: { enabled: true, model: 'gpt-4o' } });
+        });
+
+        await page.route('**/api/auth/me', async (route) => {
+            await route.fulfill({
+                json: {
+                    id: 'test-id',
+                    name: 'Test Photographer',
+                    email: testUser.email,
+                    is_super_admin: false,
+                    is_admin: false,
+                    is_photographer: true,
+                    can_edit_metadata: false,
+                    ai_is_unconfigured: false,
+                    roles: ['photographer'],
+                    missing_watermark: false,
+                }
+            });
+        });
+
+        const auth = new AuthHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        await page.goto('/test-gallery-slug');
+        await page.waitForLoadState('networkidle');
+
+        const aiButton = page.getByRole('button', { name: 'KI Batch-Edit' });
+        await aiButton.click();
+
+        await expect(page.getByText('KI Batch-Edit')).toBeVisible();
+    });
+
+    test('hides AI button when AI is unconfigured', async ({ page }) => {
+        await page.route('**/api/ai/status', async route => {
+            await route.fulfill({ json: { enabled: false, model: '' } });
+        });
+
+        await page.route('**/api/auth/me', async (route) => {
+            await route.fulfill({
+                json: {
+                    id: 'test-id',
+                    name: 'Test Photographer',
+                    email: testUser.email,
+                    is_super_admin: false,
+                    is_admin: false,
+                    is_photographer: true,
+                    can_edit_metadata: false,
+                    ai_is_unconfigured: true,
+                    roles: ['photographer'],
+                    missing_watermark: false,
+                }
+            });
+        });
+
+        const auth = new AuthHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        await page.goto('/test-gallery-slug');
+        await page.waitForLoadState('networkidle');
+
+        await expect(page.getByRole('button', { name: 'KI Batch-Edit' })).toBeHidden();
     });
 });

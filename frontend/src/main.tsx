@@ -1,5 +1,5 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import {BrowserRouter} from 'react-router-dom';
 import { SWRConfig } from 'swr';
 import App from './App';
@@ -8,8 +8,8 @@ import { applyTheme } from './logic/useBrand';
 
 applyTheme();
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
+createRoot(document.getElementById('root')!).render(
+    <StrictMode>
         <SWRConfig value={{
             shouldRetryOnError: false
         }}>
@@ -17,5 +17,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 <App/>
             </BrowserRouter>
         </SWRConfig>
-    </React.StrictMode>
+    </StrictMode>
 );

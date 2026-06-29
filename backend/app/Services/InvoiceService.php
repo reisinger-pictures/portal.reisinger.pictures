@@ -59,9 +59,12 @@ class InvoiceService
             $billingZip = $initiator ? $initiator->billing_zip : ($fallbackUser->billing_zip ?? '0000');
             $billingCity = $initiator ? $initiator->billing_city : ($fallbackUser->billing_city ?? 'Unbekannt');
 
+            $brand = $openOrders->first()->brand ?? \App\Enums\Brand::B2B->value;
+
             $collectiveOrder = Order::create([
                 'user_id' => $initiator ? $initiator->id : ($fallbackUser->id ?? null),
                 'status' => 'invoice_created',
+                'brand' => $brand,
                 'total_amount' => $totalGross
             ]);
 
@@ -70,6 +73,7 @@ class InvoiceService
             $snapshot = InvoiceSnapshot::create([
                 'order_id' => $collectiveOrder->id,
                 'invoice_number' => $invoiceNumber,
+                'brand' => $brand,
                 'customer_details' => [
                     'name' => $tenant->name,
                     'email' => $initiator ? $initiator->email : ($fallbackUser->email ?? config('mail.from.address')),

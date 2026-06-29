@@ -131,7 +131,7 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
                 </div>
                 
                 <div className="form-control w-full md:w-72">
-                    <label className="label py-1"><span className="label-text font-bold opacity-70">Mandanten-Filter</span></label>
+                    <label className="label py-1"><span className="label-text font-bold opacity-70">Organisations-Filter</span></label>
                     <select 
                         className="select select-bordered select-sm w-full" 
                         value={currentTenantFilter} 
@@ -143,7 +143,7 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
                             });
                         }}
                     >
-                        <option value="">-- Alle Mandanten / Eigene --</option>
+                        <option value="">-- Alle Organisationen / Eigene --</option>
                         {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                 </div>

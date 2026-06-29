@@ -4,7 +4,7 @@ import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import ProductModal from './components/ProductModal';
-import ProductBatchTable from './components/ProductBatchTable';
+import ProductBatchTable, { BatchUpdate } from './components/ProductBatchTable';
 import { Product } from '../../api';
 
 export default function ManagementProductsView() {
@@ -28,7 +28,7 @@ export default function ManagementProductsView() {
         }
     };
 
-    const handleBatchSave = async (updates: { id: string; description: string; price: number }[]) => {
+    const handleBatchSave = async (updates: BatchUpdate[]) => {
         try {
             await Promise.all(updates.map(u => {
                 const original = products?.find(p => p.id === u.id);

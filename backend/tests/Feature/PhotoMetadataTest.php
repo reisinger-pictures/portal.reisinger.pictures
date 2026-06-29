@@ -114,6 +114,46 @@ class PhotoMetadataTest extends TestCase {
         $this->assertEquals('Original Photographer', $photo->fresh()->artist);
     }
 
+    public function test_photographer_update_metadata_creates_version() {
+        $photographer = User::factory()->create();
+        $photographer->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+
+        $gallery = Gallery::factory()->create(['type' => 'delivery']);
+        $photographer->photographerGalleries()->attach($gallery);
+
+        $photo = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $photographer->id,
+            'title' => 'Original Photographer Title',
+            'headline' => 'Original Headline',
+            'description' => 'Original Description',
+        ]);
+
+        $token = auth('api')->login($photographer);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+                         ->putJson("/api/photos/{$photo->id}/meta", [
+                             'title' => 'Updated by Photographer',
+                             'headline' => 'Updated Headline',
+                             'description' => 'Updated by Photographer',
+                         ]);
+
+        $response->assertStatus(200);
+
+        $this->assertDatabaseHas('photos', [
+            'id' => $photo->id,
+            'title' => 'Updated by Photographer',
+        ]);
+
+        $this->assertDatabaseHas('photo_metadata_versions', [
+            'photo_id' => $photo->id,
+            'user_id' => $photographer->id,
+            'title' => 'Original Photographer Title',
+            'headline' => 'Original Headline',
+            'description' => 'Original Description',
+        ]);
+    }
+
     public function test_photographer_cannot_update_or_delete_other_photographers_photo() {
         $photog1 = User::factory()->create();
         $photog1->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));

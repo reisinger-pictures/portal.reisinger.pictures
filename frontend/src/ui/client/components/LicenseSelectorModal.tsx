@@ -1,28 +1,33 @@
 import {Photo} from '../../../logic/useGallery';
 import {useAuth} from '../../../logic/useAuth';
-import {DurationTier, ResolutionTier, UsageTier, usePricing} from '../../../logic/usePricing';
+import {calculateUpgradePrice, DurationTier, isCovered, ResolutionTier, UsageTier} from '../../../logic/pricingLogic';
 import {useState} from 'react';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
 
-interface Props {
+interface LicenseSelectorModalProps {
     photo: Photo | null;
     onClose: () => void;
 }
 
-export default function LicenseSelectorModal({photo, onClose}: Props) {
+interface TierOption {
+    id: ResolutionTier;
+    label: string;
+    desc: string;
+}
+
+export default function LicenseSelectorModal({photo, onClose}: LicenseSelectorModalProps) {
     const [usage, setUsage] = useState<UsageTier>('editorial');
     const [duration, setDuration] = useState<DurationTier>('1_year');
     const {terms} = useLicenseTerms();
     const {user} = useAuth();
     const {showToast} = useUI();
-    const {isCovered, calculateUpgradePrice} = usePricing(terms);
     const {addToCart} = useCart(); // Dynamischer Preis
 
     if (!photo) return null;
 
-    const tiers: { id: ResolutionTier, label: string, desc: string }[] = [
+    const tiers: TierOption[] = [
         {id: 'web', label: 'Web & Social Media', desc: 'Längste Kante max. 2560px'},
         {id: 'print', label: 'Print (bis A4)', desc: 'Längste Kante max. 4000px'},
         {id: 'original', label: 'Original (Cover)', desc: 'Maximale Originalauflösung'}
@@ -121,7 +126,7 @@ export default function LicenseSelectorModal({photo, onClose}: Props) {
                 <div className="space-y-4">
                     {tiers.map(tier => {
                         const covered = isCovered(user?.flatrate_level, tier.id, usage, duration) || photo?.gallery?.effective_is_free_download;
-                        const upgradePrice = calculateUpgradePrice(user?.flatrate_level, tier.id, usage, duration);
+                        const upgradePrice = calculateUpgradePrice(terms, user?.flatrate_level, tier.id, usage, duration);
                         const canBuy = true; // Stripe-Käufe sind für jeden angemeldeten User erlaubt
 
                         return (

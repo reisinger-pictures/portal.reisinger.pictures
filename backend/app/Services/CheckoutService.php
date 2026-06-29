@@ -84,7 +84,7 @@ class CheckoutService {
             $isLieferschein = $tenant && $tenant->invoice_frequency !== 'immediate';
             $orderStatus = $isQuoteRequest ? 'pending' : ($isLieferschein ? 'delivery_note' : ($paymentMethod === 'invoice' ? 'invoice_created' : 'pending_payment'));
 
-            $order = Order::create(['user_id' => $user->id, 'status' => $orderStatus, 'total_amount' => $totalNetCents, 'is_quote_request' => $isQuoteRequest]);
+            $order = Order::create(['user_id' => $user->id, 'status' => $orderStatus, 'brand' => config('app.brand'), 'total_amount' => $totalNetCents, 'is_quote_request' => $isQuoteRequest]);
 
             $prefix = $isLieferschein ? 'L-' : 'P-';
             $invoiceNumber = \App\Models\InvoiceSequence::getNextInvoiceNumber($prefix);
@@ -92,6 +92,7 @@ class CheckoutService {
             $snapshot = InvoiceSnapshot::create([
                 'order_id' => $order->id,
                 'invoice_number' => $invoiceNumber,
+                'brand' => $order->brand,
                 'customer_details' => [
                     'name' => $request->billing_name, 'company' => $request->billing_company, 'street' => $request->billing_street,
                     'zip' => $request->billing_zip, 'city' => $request->billing_city, 'email' => $user->email,

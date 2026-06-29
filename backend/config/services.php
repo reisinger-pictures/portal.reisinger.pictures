@@ -41,4 +41,11 @@ return [
         'secret' => env('STRIPE_SECRET', env('APP_ENV') === 'production' ? null : 'sk_test_REDACTED'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
+
+    'ai' => [
+        'enabled' => env('AI_ENABLED', 'DISABLED'),
+        'base_url' => env('AI_BASE_URL', 'https://api.openai.com/v1'),
+        'api_key' => env('AI_API_KEY'),
+        'model' => env('AI_MODEL', 'gpt-4o'),
+    ],
 ];

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { GalleryGroup, FlatGroup, GalleryGroupExtraOpts } from '../../logic/useGalleries';
 import { Tenant } from '../../logic/useTenants';
 import { useUI } from './UIContext';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,9 +35,9 @@ const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace
 
 export default function GalleryGroupModal({ isOpen, onClose, availableGroups, editingGroup, defaultParentId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
-    const { data: tenants } = useSWR<Tenant[]>('/api/management/tenants', fetcher);
+    const { data: tenants, isLoading } = useSWR<Tenant[]>('/api/management/tenants', fetcher);
 
-    const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GroupFormValues>({
+    const { register, handleSubmit, reset, setValue, formState: { isSubmitting, dirtyFields } } = useForm<GroupFormValues>({
         resolver: zodResolver(groupSchema),
         defaultValues: { name: '', slug: '', is_public: 'null', parent_id: '', is_free_download: false, is_editorial_only: false, is_hidden: false }
     });
@@ -56,15 +56,6 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
             });
         }
     }, [isOpen, editingGroup, reset, defaultParentId]);
-
-    const watchName = useWatch({ control, name: 'name' });
-
-    // ✨ FIX: Slug folgt dem Namen nur, wenn das Slug-Feld noch nicht manuell editiert wurde
-    useEffect(() => {
-        if (!editingGroup && !dirtyFields.slug && watchName) {
-            setValue('slug', toSlug(watchName));
-        }
-    }, [watchName, editingGroup, dirtyFields.slug, setValue]);
 
     const onSubmit = async (data: GroupFormValues) => {
         const isPub = data.is_public === 'null' ? null : data.is_public === 'true';
@@ -98,6 +89,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
     };
 
     if (!isOpen) return null;
+    if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
     return (
         <dialog className="modal modal-open z-[60]">
@@ -109,7 +101,15 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Name</span></label>
-                            <input type="text" {...register('name')} className="input input-bordered w-full" />
+                            <input type="text" {...register('name')}
+                                   onChange={(e) => {
+                                       setValue('name', e.target.value, { shouldDirty: true });
+                                       if (!editingGroup && !dirtyFields.slug && e.target.value) {
+                                           setValue('slug', toSlug(e.target.value));
+                                       }
+                                   }}
+                                   className="input input-bordered w-full"
+                            />
                         </div>
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">URL Slug</span></label>
@@ -157,9 +157,9 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
 
                     
                     <div className="form-control w-full mb-4">
-                        <label className="label"><span className="label-text font-bold">Zugeordneter Mandant (Verschieben)</span></label>
+                        <label className="label"><span className="label-text font-bold">Zugeordnete Organisation (Verschieben)</span></label>
                         <select {...register('tenant_id')} className="select select-bordered w-full">
-                            <option value="">-- Kein spezifischer Mandant --</option>
+                            <option value="">-- Keine spezifische Organisation --</option>
                             {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                     </div>

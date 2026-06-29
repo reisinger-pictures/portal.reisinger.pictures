@@ -45,12 +45,34 @@ export function useLicenseTerms() {
  * (IBAN, BIC, Empfänger, Firmenadresse, company_email). Authentifiziert (GET hinter auth:api).
  * Lizenztexte + Preisfaktoren liefert useLicenseTerms() (public-safe).
  */
+export interface BillingDetails {
+    bank_holder: string;
+    bank_iban: string;
+    bank_bic: string;
+    company_street: string;
+    company_zip: string;
+    company_city: string;
+    company_country: string;
+    company_email: string;
+}
+
+export interface BillingDetailsPayload {
+    bank_holder?: string;
+    bank_iban?: string;
+    bank_bic?: string;
+    company_street?: string;
+    company_zip?: string;
+    company_city?: string;
+    company_country?: string;
+    company_email?: string;
+}
+
 export function useBillingDetails() {
-    const {data, isLoading, mutate} = useSWR<LicenseTerms>('/api/settings/billing-details', fetcher, {
+    const {data, isLoading, mutate} = useSWR<BillingDetails>('/api/settings/billing-details', fetcher, {
         revalidateOnFocus: false
     });
 
-    const updateBillingDetails = async (payload: LicenseTermsPayload) => {
+    const updateBillingDetails = async (payload: BillingDetailsPayload) => {
         await apiMutate('/api/management/settings/billing-details', 'PUT', payload);
         await mutate();
     };

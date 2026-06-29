@@ -24,6 +24,15 @@ class DatabaseSeeder extends Seeder
         // Admin-User erhält alle verfügbaren Rollen
         $adminUser->roles()->sync(\App\Models\Role::pluck('id')->toArray());
 
+        // ATR brand tenant (all-the.rest) — B2C counterpart to the B2B portal.
+        \App\Models\Tenant::firstOrCreate(
+            ['domain' => 'all-the.rest'],
+            [
+                'name' => 'all-the.rest',
+                'brand' => \App\Enums\Brand::ATR,
+            ]
+        );
+
         // 1. Root-Gruppe "Privat" (strikt privat)
         $privatGroup = GalleryGroup::firstOrCreate(
             ['slug' => 'privat'],

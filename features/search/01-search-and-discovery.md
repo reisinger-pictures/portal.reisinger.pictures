@@ -16,3 +16,6 @@ status: active
 ## 3. Search Modes
 - **Discovery:** Empty queries return a "Latest Discoveries" feed containing only public galleries.
 - **Personal Feed:** Requested via `?personal=true`. Bypasses Meilisearch entirely and returns an Eloquent-based feed of a photographer's own recently uploaded galleries/photos.
+
+## Related
+- [Meilisearch Typo-Tolerance](../search/03-meilisearch-typo-tolerance.md) — typo-tolerant search configuration and index settings

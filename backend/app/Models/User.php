@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Constants\TierRanks;
+use App\Enums\Brand;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -25,14 +27,14 @@ class User extends Authenticatable implements JWTSubject
     }
 
     protected $visible = [
-        'id', 'name', 'email', 'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
+        'id', 'name', 'email', 'brand', 'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
         'current_ftp_gallery_id', 'ftp_slug',
         'created_at', 'is_admin', 'is_photographer',
         'is_pending', 'is_customer_manager', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
     ];
 
     protected $fillable = [
-        'name', 'email', 'password', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
+        'name', 'email', 'password', 'brand', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
         'can_purchase_upgrades', 'current_ftp_gallery_id', 'ftp_slug', 'tenant_id',
         'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city'
     ];
@@ -54,7 +56,8 @@ class User extends Authenticatable implements JWTSubject
     }
 
     protected $casts = [
-        'can_edit_metadata' => 'boolean'
+        'can_edit_metadata' => 'boolean',
+        'brand' => Brand::class,
     ];
 
     public function getJWTIdentifier() { return $this->getKey(); }
@@ -80,88 +83,9 @@ class User extends Authenticatable implements JWTSubject
     public function getIsCustomerManagerAttribute(): bool { return $this->roles()->where('name', UserRole::CUSTOMER_MANAGER->value)->exists(); }
     public function getIsPowerUserAttribute(): bool { return $this->roles()->where('name', UserRole::POWER_USER->value)->exists(); }
 
-    private function getSubGroupIds($parentIds)
-    {
-        if (empty($parentIds)) return [];
-
-        $parentIds = array_values($parentIds);
-        $placeholders = implode(', ', array_fill(0, count($parentIds), '?'));
-
-        $query = "
-            WITH RECURSIVE child_groups AS (
-                SELECT id, parent_id FROM gallery_groups WHERE id IN ($placeholders)
-                UNION ALL
-                SELECT g.id, g.parent_id FROM gallery_groups g
-                INNER JOIN child_groups cg ON g.parent_id = cg.id
-            )
-            SELECT id FROM child_groups
-        ";
-
-        $result = \Illuminate\Support\Facades\DB::select($query, $parentIds);
-        return array_values(array_unique(array_column($result, 'id')));
-    }
-
     public function getAllowedGalleryIds(): array
     {
-        if ($this->guest_id) {
-            return $this->transient_galleries ?? [];
-        }
-
-        // 1. Direct assignments
-        $galleryIds = $this->galleries()->pluck('galleries.id')->toArray();
-
-        // 2. Group assignments (recursive)
-        $groupIds = $this->galleryGroups()->pluck('gallery_groups.id')->toArray();
-        $allGroupIds = $this->getSubGroupIds($groupIds);
-
-        if (!empty($allGroupIds)) {
-            $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allGroupIds)->pluck('id')->toArray();
-            $galleryIds = array_unique(array_merge($galleryIds, $groupGalleryIds));
-        }
-
-        // 3. Tenant Integration (Direct column assignments + Pivot group assignments)
-        $tenantIds = $this->tenants()->pluck('tenants.id')->toArray();
-        if (!empty($tenantIds)) {
-            // Direct column assignments (New feature)
-            $tenantGalleryIds = Gallery::whereIn('tenant_id', $tenantIds)->where('type', 'delivery')->pluck('id')->toArray();
-            $directGroupIds = GalleryGroup::whereIn('tenant_id', $tenantIds)->pluck('id')->toArray();
-
-            // Pivot table group assignments (Existing B2B setup)
-            $pivotGroupIds = \Illuminate\Support\Facades\DB::table('gallery_group_tenant')->whereIn('tenant_id', $tenantIds)->pluck('gallery_group_id')->toArray();
-            
-            $combinedGroupIds = array_unique(array_merge($directGroupIds, $pivotGroupIds));
-            $allTenantGroupIds = $this->getSubGroupIds($combinedGroupIds);
-
-            if (!empty($allTenantGroupIds)) {
-                $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allTenantGroupIds)->where('type', 'delivery')->pluck('id')->toArray();
-                $tenantGalleryIds = array_unique(array_merge($tenantGalleryIds, $groupGalleryIds));
-            }
-            $galleryIds = array_unique(array_merge($galleryIds, $tenantGalleryIds));
-        }
-
-        if (!empty($this->transient_galleries)) {
-            $galleryIds = array_unique(array_merge($galleryIds, $this->transient_galleries));
-        }
-
-        if ($this->is_photographer) {
-            $unrestrictedIds = \Illuminate\Support\Facades\Cache::rememberForever('unrestricted_photographer_gallery_ids', function () {
-                $allGalleries = Gallery::with('galleryGroup')->get();
-                return $allGalleries->filter(fn($g) => !$g->effective_restricted_photographers)->pluck('id')->toArray();
-            });
-            $galleryIds = array_merge($galleryIds, $unrestrictedIds);
-
-            $photogGalleryIds = $this->photographerGalleries()->pluck('galleries.id')->toArray();
-            $galleryIds = array_merge($galleryIds, $photogGalleryIds);
-
-            $photogGroupIds = $this->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
-            $allPhotogGroupIds = $this->getSubGroupIds($photogGroupIds);
-            
-            $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allPhotogGroupIds)->pluck('id')->toArray();
-            $galleryIds = array_merge($galleryIds, $groupGalleryIds);
-        }
-
-        $galleryIds = array_values(array_unique($galleryIds));
-        return $galleryIds;
+        return app(\App\Services\AccessControlService::class)->getAllowedGalleryIds($this);
     }
 
     public function canPhotographerAccessGallery($galleryId): bool
@@ -178,7 +102,7 @@ class User extends Authenticatable implements JWTSubject
 
         $groupIds = $this->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
         if (!empty($groupIds)) {
-            $allGroupIds = $this->getSubGroupIds($groupIds);
+            $allGroupIds = app(\App\Services\AccessControlService::class)->getSubGroupIds($groupIds);
             if (in_array($gallery->gallery_group_id, $allGroupIds)) return true;
         }
 
@@ -204,8 +128,7 @@ class User extends Authenticatable implements JWTSubject
                 $q->where('is_quote_request', false)
                     ->orWhere('status', '!=', 'pending');
             })->with('invoiceSnapshot')->get();
-        $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
-        $reqRank = $ranks[$requestedTier] ?? 3;
+        $reqRank = TierRanks::RANKS[$requestedTier] ?? 3;
 
         foreach ($orders as $order) {
             $snapshot = $order->invoiceSnapshot;
@@ -214,7 +137,7 @@ class User extends Authenticatable implements JWTSubject
             $items = $snapshot->customer_details['items'] ?? [];
             foreach ($items as $item) {
                 if (($item['photoId'] ?? '') === $photoId) {
-                    $itemRank = $ranks[$item['tier'] ?? 'none'] ?? 0;
+                    $itemRank = TierRanks::RANKS[$item['tier'] ?? 'none'] ?? 0;
                     if ($itemRank >= $reqRank) return true;
                 }
             }

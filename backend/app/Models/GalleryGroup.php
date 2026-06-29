@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\Brand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Facades\Cache;
 
 class GalleryGroup extends Model
 {
@@ -22,7 +22,8 @@ class GalleryGroup extends Model
         'is_editorial_only',
         'is_hidden',
         'restricted_photographers',
-        'tenant_id'
+        'tenant_id',
+        'brand'
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class GalleryGroup extends Model
         'is_editorial_only' => 'boolean',
         'is_hidden' => 'boolean',
         'restricted_photographers' => 'boolean',
+        'brand' => Brand::class,
     ];
 
     protected static function booted()
@@ -72,15 +74,13 @@ class GalleryGroup extends Model
 
         static::saved(function () {
             \Illuminate\Support\Facades\DB::afterCommit(function() {
-            Cache::forget('gallery_tree_admin');
-            Cache::forget('unrestricted_photographer_gallery_ids');
-        });
+                app(\App\Services\GalleryTreeService::class)->clearCache();
+            });
         });
         static::deleted(function () {
             \Illuminate\Support\Facades\DB::afterCommit(function() {
-            Cache::forget('gallery_tree_admin');
-            Cache::forget('unrestricted_photographer_gallery_ids');
-        });
+                app(\App\Services\GalleryTreeService::class)->clearCache();
+            });
         });
     }
 

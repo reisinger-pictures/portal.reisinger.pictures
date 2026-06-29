@@ -125,6 +125,18 @@ class UserController extends Controller
         if ($request->has('flatrate_level')) {
             $user->update(['flatrate_level' => $request->flatrate_level]);
         }
+        if ($request->has('brand')) {
+            // Policy A (A-01): staff roles are cross-brand. Force brand=null whenever any staff
+            // role (super_admin/admin/photographer) is present, so an admin can never accidentally
+            // scope a staff member to one brand (which would silently strip their cross-brand
+            // gallery access in User::getAllowedGalleryIds()).
+            $staffRoles = ['super_admin', 'admin', 'photographer'];
+            $selectedRoleNames = Role::whereIn('id', $request->role_ids ?? [])->pluck('name')->all();
+            $isStaffAccount = !empty(array_intersect($staffRoles, $selectedRoleNames));
+
+            // null = cross-brand (staff); 'rp'/'atr' = brand-bound (client-type accounts).
+            $user->update(['brand' => $isStaffAccount ? null : $request->brand]);
+        }
 
         return response()->json(['success' => true]);
     }

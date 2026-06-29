@@ -316,51 +316,52 @@ class UserPermissionLogicTest extends TestCase
 
     // =====================================================================
     // 2. getSubGroupIds() — direkt (via Reflection, private Methode)
+    //    Die Methode lebt jetzt im AccessControlService.
     // =====================================================================
 
     public function test_get_sub_group_ids_empty_input_returns_empty_array(): void
     {
-        $user = User::factory()->create();
-        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $service = new \App\Services\AccessControlService();
+        $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
-        $this->assertSame([], $method->invoke($user, []));
+        $this->assertSame([], $method->invoke($service, []));
     }
 
     public function test_get_sub_group_ids_single_id_returns_self(): void
     {
-        $user = User::factory()->create();
+        $service = new \App\Services\AccessControlService();
         $group = GalleryGroup::factory()->create();
-        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
-        $result = $method->invoke($user, [$group->id]);
+        $result = $method->invoke($service, [$group->id]);
 
         $this->assertSame([$group->id], $result);
     }
 
     public function test_get_sub_group_ids_with_nonexistent_id_returns_empty(): void
     {
-        $user = User::factory()->create();
-        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $service = new \App\Services\AccessControlService();
+        $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
-        $result = $method->invoke($user, ['nonexistent-uuid']);
+        $result = $method->invoke($service, ['nonexistent-uuid']);
 
         $this->assertSame([], $result);
     }
 
     public function test_get_sub_group_ids_recursive_deep_chain(): void
     {
-        $user = User::factory()->create();
+        $service = new \App\Services\AccessControlService();
         $g1 = GalleryGroup::factory()->create();
         $g2 = GalleryGroup::factory()->create(['parent_id' => $g1->id]);
         $g3 = GalleryGroup::factory()->create(['parent_id' => $g2->id]);
         $g4 = GalleryGroup::factory()->create(['parent_id' => $g3->id]);
-        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
-        $result = $method->invoke($user, [$g1->id]);
+        $result = $method->invoke($service, [$g1->id]);
 
         $this->assertEqualsCanonicalizing([$g1->id, $g2->id, $g3->id, $g4->id], $result);
     }
@@ -372,7 +373,7 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_handles_large_uuid_list(): void
     {
-        $user = User::factory()->create();
+        $service = new \App\Services\AccessControlService();
         // 50 separate Gruppen testen.
         $root1 = GalleryGroup::factory()->create();
         $root2 = GalleryGroup::factory()->create();
@@ -381,10 +382,10 @@ class UserPermissionLogicTest extends TestCase
             $allIds[] = GalleryGroup::factory()->create()->id;
         }
 
-        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
-        $result = $method->invoke($user, $allIds);
+        $result = $method->invoke($service, $allIds);
 
         // Alle eingegebenen IDs müssen enthalten sein, Dedup sichergestellt
         foreach ($allIds as $id) {
@@ -401,11 +402,11 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_with_quote_in_id_uses_bound_parameters(): void
     {
-        $user = User::factory()->create();
-        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $service = new \App\Services\AccessControlService();
+        $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
-        $result = $method->invoke($user, ["x'-- OR 1=1 --"]);
+        $result = $method->invoke($service, ["x'-- OR 1=1 --"]);
 
         $this->assertSame([], $result);
     }
@@ -416,11 +417,11 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_empty_after_filter_returns_empty_array(): void
     {
-        $user = User::factory()->create();
-        $method = new \ReflectionMethod($user, 'getSubGroupIds');
+        $service = new \App\Services\AccessControlService();
+        $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
-        $result = $method->invoke($user, array_values(array_filter([], fn($id) => $id !== null)));
+        $result = $method->invoke($service, array_values(array_filter([], fn($id) => $id !== null)));
 
         $this->assertSame([], $result);
     }

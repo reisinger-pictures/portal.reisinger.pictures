@@ -31,7 +31,7 @@ export default function ManagementGalleryActions({ gallery, canSendMail, downloa
                         </button>
                     )}
                     {onOpenAccess && <button onClick={onOpenAccess} className="btn btn-outline btn-sm"><span className="iconify mdi--account-key"></span> Zugriff...</button>}
-                    {gallery.type === 'delivery' && isPhotographer && onOpenAIBatchEdit && <button onClick={onOpenAIBatchEdit} className="btn btn-outline btn-sm"><span className="iconify mdi--robot-outline"></span> KI Batch-Edit</button>}
+                    {gallery.type === 'delivery' && onOpenAIBatchEdit && <button onClick={onOpenAIBatchEdit} className="btn btn-outline btn-sm"><span className="iconify mdi--robot-outline"></span> KI Batch-Edit</button>}
                     {onOpenPhotographerTeam && <button onClick={onOpenPhotographerTeam} className="btn btn-outline btn-sm"><span className="iconify mdi--camera-account"></span> Fotografen...</button>}
                     <button onClick={onOpenInvite} className="btn btn-outline btn-sm">
                         <span className="iconify mdi--link"></span> Einladungslink...

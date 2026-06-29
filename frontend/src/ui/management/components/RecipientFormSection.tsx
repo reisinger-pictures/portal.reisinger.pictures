@@ -1,7 +1,7 @@
 import AutocompleteInput from '../../components/AutocompleteInput';
 import { Customer } from '../../../api';
 import { LocationResult } from '../../../logic/useLocations';
-import { DocumentFormData } from '../ManagementManualInvoiceView';
+import { DocumentFormData } from '../../../api';
 
 interface Props {
     formData: DocumentFormData;

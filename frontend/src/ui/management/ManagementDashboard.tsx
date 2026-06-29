@@ -1,10 +1,11 @@
 import ResponsiveImage from '../components/ResponsiveImage';
 import { useState } from 'react';
-import {Link, useLocation, useNavigate} from 'react-router-dom';
+import {Link, Navigate, useLocation, useNavigate} from 'react-router-dom';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import { useBillingDetails } from '../../logic/useLicenseTerms';
 import { useBrand } from '../../logic/useBrand';
+import { usePermissions } from '../../logic/usePermissions';
 import {useSearch} from '../../logic/useSearch';
 import Sidebar from '../components/Sidebar';
 import GalleryModals from '../components/GalleryModals';
@@ -28,6 +29,8 @@ export default function ManagementDashboard() {
     const location = useLocation();
     const pathView = location.pathname.replace('/', '');
     const currentView = pathView || 'structure';
+    const { canAccessB2BFeatures, isSuperAdmin, isPhotographer } = usePermissions();
+    const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts'].includes(currentView);
 
     const {
         tree,
@@ -42,11 +45,11 @@ export default function ManagementDashboard() {
         deleteGallery
     } = useProtectedGalleries();
     const [searchQuery, setSearchQuery] = useState('');
-    const {results: searchResults} = useSearch(searchQuery, false, true); // Leere Query überspringen
+    const {results: searchResults} = useSearch(searchQuery, false, true);
     const {user} = useAuth();
     const { logoSrc, portalName } = useBrand();
     const { billingDetails, isLoading: termsLoading } = useBillingDetails();
-    const isImpressumMissing = user?.is_super_admin && !termsLoading && (!billingDetails?.bank_holder || !billingDetails?.company_street || !billingDetails?.company_zip || !billingDetails?.company_city || !billingDetails?.bank_iban);
+    const isImpressumMissing = isSuperAdmin && !termsLoading && (!billingDetails?.bank_holder || !billingDetails?.company_street || !billingDetails?.company_zip || !billingDetails?.company_city || !billingDetails?.bank_iban);
     const {results: personalFeed, isLoading: feedLoading} = useSearch('', true);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -54,10 +57,13 @@ export default function ManagementDashboard() {
     const [isGalleryModalOpen, setGalleryModalOpen] = useState(false);
     const [prefillGroupId, setPrefillGroupId] = useState<string | null>(null);
 
-    // Neu: State für das aktuell zu bearbeitende Element
     const [editingGroup, setEditingGroup] = useState<GalleryGroup | null>(null);
     const [editingGallery, setEditingGallery] = useState<Gallery | null>(null);
     const [teamModalNode, setTeamModalNode] = useState<Gallery | GalleryGroup | null>(null);
+
+    if (isB2BView && !canAccessB2BFeatures) {
+        return <Navigate to="/" replace />;
+    }
 
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
 
@@ -109,12 +115,12 @@ export default function ManagementDashboard() {
                 </div>
 
                 <main className="flex-1 overflow-y-auto flex flex-col w-full relative">
-                    {user?.missing_watermark && currentView !== 'settings' && (
+                    {user?.ai_is_unconfigured && currentView !== 'settings' && (
                         <div className="m-4 md:m-6 mb-0 alert alert-warning shadow-sm">
-                            <span className="iconify mdi--watermark text-xl"></span>
+                            <span className="iconify mdi--robot-off-outline text-xl"></span>
                             <div>
-                                <h3 className="font-bold">Bildschutz konfigurieren</h3>
-                                <p className="text-sm">Bitte lade in den <Link to="/settings" className="underline font-bold">Einstellungen</Link> ein SVG-Logo als Wasserzeichen hoch.</p>
+                                <h3 className="font-bold">KI-Bildbeschreibung nicht konfiguriert</h3>
+                                <p className="text-sm">Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert. Setze <code className="bg-base-300 px-1 rounded">AI_ENABLED=true</code> und <code className="bg-base-300 px-1 rounded">AI_API_KEY</code> als Umgebungsvariablen.</p>
                             </div>
                         </div>
                     )}
@@ -198,8 +204,8 @@ export default function ManagementDashboard() {
                         {currentView === 'my-payouts' && <PhotographerPayoutsView/>}
                                                 {currentView === 'structure' && (
                             <div className="p-6 md:p-10">
-                                {user?.is_photographer && <ManagementFtpInbox/>}
-                                {user?.is_photographer && (
+                                {isPhotographer && <ManagementFtpInbox/>}
+                                {isPhotographer && (
                                     <div className="mt-12 border-t border-base-300 pt-8">
                                         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
                                             <span className="iconify mdi--history text-primary"></span> Deine neuesten

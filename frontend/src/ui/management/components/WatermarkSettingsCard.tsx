@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {useSettings} from '../../../logic/useSettings';
-import {useAuth} from '../../../logic/useAuth';
+import {usePermissions} from '../../../logic/usePermissions';
 import {useUI} from '../../components/UIContext';
 import {useForm, useWatch} from 'react-hook-form';
 import {useBrand} from '../../../logic/useBrand';
@@ -90,7 +90,7 @@ const renderSvgToCanvas = async (blob: Blob, opacity: number, size: number): Pro
 
 export default function WatermarkSettingsCard() {
     const {watermark, updateWatermark} = useSettings();
-    const {user, mutate: mutateUser} = useAuth();
+    const {isAdmin} = usePermissions();
     const {showToast} = useUI();
     const {svgUrl} = useBrand();
     
@@ -98,34 +98,36 @@ export default function WatermarkSettingsCard() {
     const [previewRenderedUrl, setPreviewRenderedUrl] = useState<string | null>(null);
     const [isGenerating, setGenerating] = useState(false);
 
-    const {register, handleSubmit, reset, control, formState} = useForm<WatermarkFormValues>({
+    const {register, handleSubmit, reset, control, setValue, getValues, formState} = useForm<WatermarkFormValues>({
         resolver: zodResolver(watermarkSchema),
         defaultValues: { opacity: 0.15 }
     });
 
+    // Sync server-side watermark opacity into the form (state sync, no side effects).
     useEffect(() => {
         if (watermark) reset({ opacity: watermark.opacity || 0.15 });
+    }, [watermark, reset]);
 
+    // Initial data load: fetch the brand SVG blob once and render the initial preview.
+    // Preview updates on opacity-change are driven by the slider's onChange handler below.
+    useEffect(() => {
         let isActive = true;
         fetch(svgUrl)
             .then(res => res.ok ? res.blob() : null)
-            .then(blob => { if (isActive && blob) setServerSvgBlob(blob); })
-            .catch(() => {});
-            
+            .then(blob => {
+                if (isActive && blob) {
+                    setServerSvgBlob(blob);
+                    renderSvgToDataUrl(blob, getValues('opacity'), 500).then(dataUrl => {
+                        if (isActive) setPreviewRenderedUrl(dataUrl);
+                    });
+                }
+            })
+            .catch((err) => { console.error('Watermark settings update failed', err); });
+
         return () => { isActive = false; };
-    }, [watermark, reset, svgUrl]);
+    }, [svgUrl, getValues]);
 
     const watchOpacity = useWatch({control, name: 'opacity', defaultValue: 0.15});
-
-    useEffect(() => {
-        let isActive = true;
-        if (serverSvgBlob) {
-            renderSvgToDataUrl(serverSvgBlob, watchOpacity, 500).then(dataUrl => {
-                if (isActive) setPreviewRenderedUrl(dataUrl);
-            });
-        }
-        return () => { isActive = false; };
-    }, [serverSvgBlob, watchOpacity]);
 
     const onSubmit = async (data: WatermarkFormValues) => {
         setGenerating(true);
@@ -156,14 +158,13 @@ export default function WatermarkSettingsCard() {
         try {
             await updateWatermark(fd);
             showToast('success', 'Wasserzeichen erfolgreich generiert und gespeichert!');
-            await mutateUser();
         } catch {
             showToast('error', 'Fehler beim Speichern');
         }
         setGenerating(false);
     };
 
-    if (!user?.is_admin) return null;
+    if (!isAdmin) return null;
 
     return (
         <div className="card bg-base-200 border border-base-300 shadow-sm">
@@ -187,7 +188,19 @@ export default function WatermarkSettingsCard() {
                             <span className="label-text font-bold">Sichtbarkeit (Deckkraft)</span>
                             <span className="label-text-alt font-mono">{Math.round(watchOpacity * 100)} %</span>
                         </label>
-                        <input type="range" min="0.05" max="1.0" step="0.05" {...register('opacity', {valueAsNumber: true})} className="range range-primary"/>
+                        <input type="range" min="0.05" max="1.0" step="0.05"
+                               {...register('opacity', {valueAsNumber: true})}
+                               onChange={(e) => {
+                                   const nextOpacity = parseFloat(e.target.value);
+                                   setValue('opacity', nextOpacity, {shouldDirty: true});
+                                   // Re-render the preview as a direct response to the user dragging the slider.
+                                   if (serverSvgBlob) {
+                                       renderSvgToDataUrl(serverSvgBlob, nextOpacity, 500).then(dataUrl => {
+                                           setPreviewRenderedUrl(dataUrl);
+                                       });
+                                   }
+                               }}
+                               className="range range-primary"/>
                     </div>
 
                     <div className="mt-8 border border-base-300 rounded-box overflow-hidden relative h-48 bg-base-300 flex items-center justify-center select-none shadow-inner">

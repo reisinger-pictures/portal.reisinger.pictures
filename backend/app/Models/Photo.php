@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Constants\TierRanks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -69,8 +70,7 @@ class Photo extends Model
         $user = auth('api')->user();
         if ($user && ($user->is_admin || $user->is_photographer)) return false;
         if ($user && $user->canAccessGallery($this->gallery_id)) {
-            $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
-            if (($ranks[$user->flatrate_level ?? 'none'] ?? 0) >= 1) return false;
+            if ((TierRanks::RANKS[$user->flatrate_level ?? 'none'] ?? 0) >= 1) return false;
         }
         return true;
     }

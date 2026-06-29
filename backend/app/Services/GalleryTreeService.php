@@ -43,33 +43,30 @@ class GalleryTreeService
     }
 
 
-    private function filterTreeByTenant(array $treeArray, string $tenantId): array
-    {
-        $filterNode = function($groups) use (&$filterNode, $tenantId) {
-            $result = [];
-            foreach ($groups as $group) {
-                if ($group['tenant_id'] === $tenantId) {
-                    if (isset($group['children'])) $group['children'] = $filterNode($group['children']);
-                    $result[] = $group;
-                }
-            }
-            return $result;
-        };
-        $treeArray['groups'] = $filterNode($treeArray['groups']);
-        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], fn($g) => $g['tenant_id'] === $tenantId));
-        return $treeArray;
-    }
-
     /**
-     * Filter tree by user permissions
+     * Generic tree filter using Higher-Order Functions.
+     *
+     * @param  callable(array): bool  $galleryPredicate   Filter for galleries inside groups and root galleries (unless overridden).
+     * @param  callable(array): bool  $groupPredicate     Filter for groups themselves (default: all pass).
+     * @param  callable(array): bool  $rootGalleryPredicate  Filter for root galleries (default: same as $galleryPredicate).
      */
-    private function filterTreeByPermissions(array $treeArray, array $allowedGalleryIds): array
-    {
-        $filterNode = function($groups) use (&$filterNode, $allowedGalleryIds) {
+    private function filterTree(
+        array $treeArray,
+        callable $galleryPredicate,
+        ?callable $groupPredicate = null,
+        ?callable $rootGalleryPredicate = null,
+    ): array {
+        $groupPredicate = $groupPredicate ?? fn(array $node): bool => true;
+        $rootGalleryPredicate = $rootGalleryPredicate ?? $galleryPredicate;
+
+        $filterNode = function (array $groups) use (&$filterNode, $galleryPredicate, $groupPredicate): array {
             $result = [];
             foreach ($groups as $group) {
+                if (!$groupPredicate($group)) {
+                    continue;
+                }
                 if (isset($group['galleries'])) {
-                    $group['galleries'] = array_values(array_filter($group['galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
+                    $group['galleries'] = array_values(array_filter($group['galleries'], $galleryPredicate));
                 }
                 if (isset($group['children'])) {
                     $group['children'] = $filterNode($group['children']);
@@ -79,10 +76,21 @@ class GalleryTreeService
             return $result;
         };
 
-        $treeArray['groups'] = $filterNode($treeArray['groups']);
-        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], fn($g) => in_array($g['id'], $allowedGalleryIds)));
+        $treeArray['groups'] = $this->pruneEmptyGroups($filterNode($treeArray['groups']));
+        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], $rootGalleryPredicate));
 
         return $treeArray;
+    }
+
+    /**
+     * Filter tree by user permissions
+     */
+    private function filterTreeByPermissions(array $treeArray, array $allowedGalleryIds): array
+    {
+        return $this->filterTree(
+            $treeArray,
+            fn(array $g): bool => in_array($g['id'], $allowedGalleryIds),
+        );
     }
 
     /**
@@ -90,28 +98,41 @@ class GalleryTreeService
      */
     private function filterTreeByType(array $treeArray, string $filterType): array
     {
-        $filterByType = function($groups) use (&$filterByType, $filterType) {
-            $result = [];
-            foreach ($groups as $group) {
-                if (isset($group['galleries'])) {
-                    $group['galleries'] = array_values(array_filter($group['galleries'], function($g) use ($filterType) {
-                        return $g['type'] === $filterType;
-                    }));
-                }
-                if (isset($group['children'])) {
-                    $group['children'] = $filterByType($group['children']);
-                }
+        return $this->filterTree(
+            $treeArray,
+            fn(array $g): bool => $g['type'] === $filterType,
+        );
+    }
+
+    /**
+     * Filter tree by tenant
+     */
+    private function filterTreeByTenant(array $treeArray, string $tenantId): array
+    {
+        return $this->filterTree(
+            $treeArray,
+            fn(array $g): bool => true,
+            fn(array $node): bool => ($node['tenant_id'] ?? null) === $tenantId,
+            fn(array $g): bool => ($g['tenant_id'] ?? null) === $tenantId,
+        );
+    }
+
+    /**
+     * Remove group husks that have neither galleries nor surviving children.
+     * A structural parent (galleries empty but children non-empty) is preserved.
+     */
+    private function pruneEmptyGroups(array $groups): array
+    {
+        $result = [];
+        foreach ($groups as $group) {
+            $children = isset($group['children']) ? $this->pruneEmptyGroups($group['children']) : [];
+            $galleries = $group['galleries'] ?? [];
+            if (!empty($galleries) || !empty($children)) {
+                $group['children'] = $children;
                 $result[] = $group;
             }
-            return $result;
-        };
-
-        $treeArray['groups'] = $filterByType($treeArray['groups']);
-        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], function($g) use ($filterType) {
-            return $g['type'] === $filterType;
-        }));
-
-        return $treeArray;
+        }
+        return $result;
     }
 
     /**
@@ -128,10 +149,11 @@ class GalleryTreeService
     }
 
     /**
-     * Clear the cached gallery tree
+     * Clear the cached gallery tree and related caches.
      */
     public function clearCache(): void
     {
         Cache::forget('gallery_tree_admin');
+        Cache::forget('unrestricted_photographer_gallery_ids');
     }
 }

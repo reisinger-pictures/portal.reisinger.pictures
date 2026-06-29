@@ -1,8 +1,9 @@
-import React, {useEffect, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {CartItem, useCart} from '../../logic/CartContext';
 import {useUI} from '../components/UIContext';
-import {apiMutate, CheckoutResponse, Order} from '../../api';
+import {apiMutate, CheckoutResponse} from '../../api';
 import {useAuth} from '../../logic/useAuth';
+import {usePermissions} from '../../logic/usePermissions';
 import {UserRole} from '../../logic/useUsers';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -10,83 +11,14 @@ import {z} from 'zod';
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 
 import {loadStripe} from '@stripe/stripe-js';
-import {Elements, PaymentElement, useElements, useStripe} from '@stripe/react-stripe-js';
+import {Elements} from '@stripe/react-stripe-js';
 import PageLayout from '../components/PageLayout';
-import {formatMoney} from '../../logic/utils';
+
+import {StripeCheckoutForm} from './components/StripeCheckoutForm';
+import {CartItemList} from './components/CartItemList';
 
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 const stripePromise = loadStripe(stripePublicKey);
-
-export interface StripeCheckoutFormProps {
-    orderId: string;
-    defaultEmail?: string;
-    defaultName?: string;
-    onSuccess: (webhookSuccess: boolean) => void;
-}
-
-function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSuccess}: StripeCheckoutFormProps) {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [isProcessing, setIsProcessing] = useState(false);
-    const {showToast} = useUI();
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!stripe || !elements) return;
-        setIsProcessing(true);
-        const {error, paymentIntent} = await stripe.confirmPayment({
-            elements,
-            redirect: 'if_required',
-        });
-
-        if (error) {
-            setIsProcessing(false);
-            showToast('error', error.message || 'Zahlung fehlgeschlagen.');
-        } else if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
-            let attempts = 0;
-            const pollInterval = setInterval(async () => {
-                attempts++;
-                try {
-                    const res = await fetch('/api/orders', {
-                        headers: {'Accept': 'application/json'},
-                        credentials: 'include'
-                    });
-                    const orders = await res.json();
-                    const currentOrder = orders.find((o: Order) => o.id === orderId);
-
-                    if (currentOrder && currentOrder.status === 'paid') {
-                        clearInterval(pollInterval);
-                        setIsProcessing(false);
-                        onSuccess(true);
-                    } else if (attempts >= 15) {
-                        clearInterval(pollInterval);
-                        setIsProcessing(false);
-                        onSuccess(false);
-                    }
-                } catch {
-                    if (attempts >= 15) {
-                        clearInterval(pollInterval);
-                        setIsProcessing(false);
-                        onSuccess(false);
-                    }
-                }
-            }, 2000);
-        } else {
-            setIsProcessing(false);
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <PaymentElement options={{defaultValues: {billingDetails: {name: defaultName, email: defaultEmail}}}}/>
-            <button type="submit" disabled={isProcessing || !stripe} className="btn btn-primary w-full btn-lg">
-                {isProcessing ? <span className="loading loading-spinner"></span> : 'Jetzt bezahlen'}
-            </button>
-            {isProcessing &&
-                <p className="text-sm text-center opacity-70 mt-2">Bitte warten, Zahlung wird verifiziert...</p>}
-        </form>
-    );
-}
 
 const checkoutSchema = z.object({
     billing_name: z.string().min(2, 'Name ist erforderlich'),
@@ -101,93 +33,11 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
-interface CartItemListProps {
-    items: CartItem[];
-    handleUpdateItem: (item: CartItem, field: string, value: string) => void;
-    removeFromCart: (photoId: string) => void;
-    hasQuotes: boolean;
-    totalAmount: number;
-}
-
-const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes, totalAmount}: CartItemListProps) => (
-    <div className="lg:col-span-3">
-        <h2 className="font-bold text-xl mb-4 flex items-center gap-2">
-            <span
-                className="iconify mdi--format-list-checks text-primary"></span> {hasQuotes ? 'Deine Lizenzen & Anfragen' : 'Deine Lizenzen'}
-        </h2>
-        <div className="space-y-4">
-            {items.map((item: CartItem, idx: number) => (
-                <div key={item.photoId + idx}
-                     className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-base-100 p-4 rounded-box border border-base-300 shadow-sm gap-4">
-                    <div className="flex-1 min-w-0 w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
-                        {item.thumb_url && (
-                            <img src={item.thumb_url}
-                                 className="w-24 h-24 object-cover rounded shadow-sm shrink-0 border border-base-200"
-                                 alt="Vorschau"/>
-                        )}
-                        <div className="w-full">
-                            {item.isQuote ? (
-                                <div className="w-full">
-                                    <div className="font-bold text-sm text-primary mb-2 flex items-center gap-1"><span
-                                        className="iconify mdi--file-document-edit-outline"></span> Individuelles
-                                        Angebot
-                                    </div>
-                                    <textarea
-                                        className="textarea textarea-bordered w-full h-16 text-sm resize-none"
-                                        placeholder="Beschreibe deine speziellen Nutzungsanforderungen (z.B. Weltweite Rechte, Exklusivität)..."
-                                        value={item.notes || ''}
-                                        onChange={(e) => handleUpdateItem(item, 'notes', e.target.value)}
-                                    />
-                                </div>
-                            ) : (
-                                <div className="flex flex-col gap-1">
-                                    <div className="font-bold text-sm">{item.useCaseName || 'Standard Lizenz'}</div>
-                                    {item.modifierNames && item.modifierNames.length > 0 && (
-                                        <div className="text-sm opacity-80 text-warning flex items-center gap-1">
-                                            <span
-                                                className="iconify mdi--plus-circle-outline"></span> {item.modifierNames.join(', ')}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <div
-                        className="flex items-center gap-4 shrink-0 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-0 border-base-300 pt-3 sm:pt-0 mt-3 sm:mt-0">
-                        {item.isQuote ? (
-                            <div className="text-right">
-                                <span
-                                    className="font-mono font-bold text-lg whitespace-nowrap text-warning">--- €</span>
-                                <span className="text-sm font-sans opacity-70 block">(Preis auf Anfrage)</span>
-                            </div>
-                        ) : (
-                            <span
-                                className="font-mono font-bold text-lg whitespace-nowrap">{formatMoney(item.price)}</span>
-                        )}
-                        <button onClick={() => removeFromCart(item.photoId)}
-                                className="btn btn-ghost btn-sm btn-square text-error" title="Entfernen">
-                            <span className="iconify mdi--trash-can text-lg"></span>
-                        </button>
-                    </div>
-                </div>
-            ))}
-        </div>
-
-        <div
-            className="mt-6 flex justify-between items-center bg-base-100 p-6 rounded-box border border-primary shadow-sm">
-            <span className="font-bold text-lg">Gesamtsumme</span>
-            <span
-                className="text-3xl font-mono font-bold text-primary">{hasQuotes ? '--- €' : formatMoney(totalAmount)}</span>
-        </div>
-        <p className="text-sm opacity-60 text-right mt-2">Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27
-            UStG.</p>
-    </div>
-);
-
 export default function ClientCartView() {
     const {items, removeFromCart, totalAmount, clearCart, addToCart} = useCart();
     const {showToast} = useUI();
     const {user, mutate: mutateUser} = useAuth();
+    const {isPowerUser, isAdmin} = usePermissions();
     const navigate = useNavigate();
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
@@ -223,8 +73,7 @@ export default function ClientCartView() {
                     window.history.replaceState(null, '', cleanPath);
                 }
             }).catch(err => console.error('Token Decode Error:', err));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [incomingToken]);
+    }, [incomingToken, clearCart, addToCart, showToast]);
 
     const {register, handleSubmit, reset, setError, formState: {errors, isSubmitting}} = useForm<CheckoutFormValues>({
         resolver: zodResolver(checkoutSchema),
@@ -417,7 +266,7 @@ export default function ClientCartView() {
                                                     <span className="font-bold flex items-center gap-2"><span
                                                         className="iconify mdi--credit-card"></span> Kreditkarte (Stripe)</span>
                                                 </label>
-                                                {(user?.roles?.includes(UserRole.CLIENT) || user?.is_power_user || user?.is_admin) && (
+                                                {(user?.roles?.includes(UserRole.CLIENT) || isPowerUser || isAdmin) && (
                                                     <label className="cursor-pointer flex items-center gap-3">
                                                         <input type="radio" name="payment_method" value="invoice"
                                                                className="radio radio-primary"

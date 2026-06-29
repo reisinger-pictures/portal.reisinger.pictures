@@ -82,7 +82,9 @@ export default function AutocompleteInput<T>({
     }, []);
 
     // Ergänze Padding rechts (pr-8), damit der Text nicht in den Spinner läuft
-    const inputClassName = (className || "input input-bordered w-full") + " pr-8";
+    const inputClassName = className
+        ? `${className} pr-8`
+        : "input input-bordered w-full pr-8";
 
     return (
         <div className="relative flex-1 w-full form-control" ref={wrapperRef}>

@@ -1,8 +1,9 @@
 import useSWRInfinite from 'swr/infinite';
 import {fetcher} from '../api';
 import {Gallery} from './useGalleries';
+import {IptcData} from './usePhoto';
 
-export interface Photo {
+export interface Photo extends IptcData {
     id: string;
     gallery_id: string;
     filename: string;
@@ -15,18 +16,6 @@ export interface Photo {
     rating: number;
     comment: string;
     gallery?: Gallery;
-    title?: string;
-    description?: string;
-    artist?: string;
-    headline?: string;
-    keywords?: string;
-    location?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    iso_country?: string;
-    is_editorial_only?: boolean;
-    effective_is_editorial_only?: boolean;
     is_hidden?: boolean;
     effective_is_hidden?: boolean;
     captured_at?: string;

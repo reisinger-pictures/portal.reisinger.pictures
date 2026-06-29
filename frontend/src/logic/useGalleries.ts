@@ -1,37 +1,10 @@
 import useSWR, { mutate as globalMutate } from 'swr';
 // import removed
-import {apiMutate, fetcher} from '../api';
-import {useAuth} from './useAuth';
+import {apiMutate, fetcher, Gallery} from '../api';
+import {usePermissions} from './usePermissions';
 
-export interface Gallery {
-    id: string;
-    name: string;
-    slug: string;
-    full_path: string;
-    type: 'selection' | 'delivery';
-    is_live: boolean;
-    is_public: boolean;
-    is_free_download?: boolean | null;
-    is_editorial_only?: boolean | null;
-    is_hidden?: boolean | null;
-    restricted_photographers?: boolean | null;
-    effective_restricted_photographers?: boolean;
-    effective_is_free_download?: boolean;
-    allow_client_metadata_edit?: boolean;
-    apply_metadata_to_photos?: boolean;
-    allow_custom_quotes?: boolean;
-    default_title?: string;
-    default_description?: string;
-    default_keywords?: string;
-    default_location?: string;
-    default_city?: string;
-    default_state?: string;
-    default_country?: string;
-    default_iso_country?: string;
-    gallery_group_id?: string | null;
-    expires_at?: string | null;
-    tenant_id?: string | null;
-}
+// Re-export the canonical `Gallery` type so existing imports from this module keep working.
+export type {Gallery};
 
 export interface GalleryGroup {
     id: string;
@@ -95,8 +68,8 @@ export interface GalleryMetadataOpts {
 }
 
 export function useProtectedGalleries() {
-    const {user} = useAuth();
-    const canFetch = user?.is_admin || user?.is_photographer;
+    const {isAdmin, isPhotographer} = usePermissions();
+    const canFetch = isAdmin || isPhotographer;
 
     const {data, error, isLoading, mutate} = useSWR<GalleryTreeResponse>(
         canFetch ? '/api/management/galleries' : null,

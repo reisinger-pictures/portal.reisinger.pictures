@@ -13,11 +13,6 @@ class ManagementMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Prüfen, ob ein validierter User existiert und er ein Admin ist
-        if (!auth()->check()) {
-            return response()->json(['error' => 'Unauthenticated.'], 401);
-        }
-
         $user = auth()->user();
 
         if ($user->is_admin || $user->is_super_admin) {

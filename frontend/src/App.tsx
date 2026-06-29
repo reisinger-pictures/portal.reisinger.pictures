@@ -1,8 +1,9 @@
 import {Navigate, Route, Routes} from 'react-router-dom';
 import ErrorMessage from './ui/components/ErrorMessage';
 import {useAuth} from './logic/useAuth';
+import {usePermissions} from './logic/usePermissions';
 import ErrorBoundary from './ui/components/ErrorBoundary';
-import { UIProvider } from './ui/components/UIProvider';
+import UIProvider from './ui/components/UIProvider';
 import { useUI } from './ui/components/UIContext';
 import { lazy, Suspense, useEffect } from 'react';
 import { SWRConfig } from 'swr';
@@ -21,21 +22,28 @@ const ManagementTenantsView = lazy(() => import('./ui/management/ManagementTenan
 const ManagementTenantDetailView = lazy(() => import('./ui/management/ManagementTenantDetailView'));
 const UserProfileView = lazy(() => import('./ui/UserProfileView'));
 const Privacy = lazy(() => import('./ui/Privacy'));
+const Impressum = lazy(() => import('./ui/Impressum'));
 const ClientNotificationsView = lazy(() => import('./ui/client/ClientNotificationsView'));
 const ClientCartView = lazy(() => import('./ui/client/ClientCartView'));
 const ClientOrdersView = lazy(() => import('./ui/client/ClientOrdersView'));
 
-function ProtectedRoute({children}: { children: React.ReactNode }) {
+interface ProtectedRouteProps { children: React.ReactNode; requiredFeature?: 'b2b' }
+
+function ProtectedRoute({children, requiredFeature}: ProtectedRouteProps) {
     const {user, isLoading, isError} = useAuth();
+    const {canAccessB2BFeatures} = usePermissions();
     if (isLoading) return <div className="flex h-screen items-center justify-center"><span
         data-testid="app-loader" className="loading loading-spinner loading-lg text-primary"></span></div>;
     if (isError || !user) return <Navigate to="/" replace/>;
+    if (requiredFeature === 'b2b' && !canAccessB2BFeatures) return <Navigate to="/" replace/>;
     return <>{children}</>;
 }
 
 const SuspenseFallback = () => <div className="flex h-screen items-center justify-center"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
 
-const GlobalSWRConfig = ({ children }: { children: React.ReactNode }) => {
+interface GlobalSWRConfigProps { children: React.ReactNode }
+
+const GlobalSWRConfig = ({ children }: GlobalSWRConfigProps) => {
     const { showToast } = useUI();
 
     useEffect(() => {
@@ -91,18 +99,19 @@ export default function App() {
                             <Route path="/stats"
                                 element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                                             <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
+                            <Route path="/impressum" element={<ErrorBoundary><Impressum/></ErrorBoundary>}/>
                             <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/cart" element={<ProtectedRoute><ErrorBoundary><ClientCartView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/orders" element={<ProtectedRoute><ErrorBoundary><ClientOrdersView/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/tenants" element={<ProtectedRoute><ErrorBoundary><ManagementTenantsView/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/tenants/:id" element={<ProtectedRoute><ErrorBoundary><ManagementTenantDetailView/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/admin-orders" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/admin-manual-invoice" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/admin-manual-offer" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/admin-customers" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/admin-products" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/admin-snippets" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/admin-payouts" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/tenants" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementTenantsView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/tenants/:id" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementTenantDetailView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-orders" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-manual-invoice" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-manual-offer" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-customers" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-products" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-snippets" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-payouts" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/my-payouts" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="*" element={<Navigate to="/" replace/>}/>
                         </Routes>

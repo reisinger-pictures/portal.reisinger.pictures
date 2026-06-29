@@ -1,8 +1,11 @@
 ---
 domain: ecommerce
 topic: licensing-and-cart
-status: active
+status: deprecated
+superseded_by: ecommerce/02-licensing-and-downloads.md
 ---
+
+> **Deprecated:** Der LicenseSelectorModal-Ansatz (3 Dropdowns) wurde zugunsten der direkten Lizenzauswahl in der Detailansicht aufgegeben. Siehe `02-licensing-and-downloads.md`.
 
 # Technical Concept: Licensing, Pricing & Cart
 

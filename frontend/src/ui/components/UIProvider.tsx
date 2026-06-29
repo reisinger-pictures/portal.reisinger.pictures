@@ -12,7 +12,7 @@ export interface ConfirmState {
     resolve: (value: boolean) => void;
 }
 
-export const UIProvider = ({ children }: UIProviderProps) => {
+export default function UIProvider({ children }: UIProviderProps) {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 

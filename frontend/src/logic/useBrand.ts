@@ -1,21 +1,18 @@
-export type Brand = 'reisinger.pictures' | 'all-the.rest';
+import {getBrandFromHostname, isAtrBrand, type Brand} from './brandRegistry';
 
-export function getBrandFromHostname(hostname: string): Brand {
-    if (hostname.includes('all-the.rest')) return 'all-the.rest';
-    return 'reisinger.pictures';
-}
+// Re-export the type and primitives so existing consumers keep working through a single import.
+export type {Brand} from './brandRegistry';
+export {BRAND_B2B, BRAND_ATR, getBrandFromHostname, isAtrBrand, brandPrefix} from './brandRegistry';
 
 export function useBrand() {
-    const brand = getBrandFromHostname(window.location.hostname);
-    const isAtr = brand === 'all-the.rest';
+    const brand: Brand = getBrandFromHostname(window.location.hostname);
+    const isAtr = isAtrBrand(brand);
     return {
         brand,
         isAtr,
         logoSrc: isAtr ? '/brands/atr/android-chrome-192x192.png' : '/brands/rp/android-chrome-192x192.png',
-        // NEU: Pfad zum originalen SVG-Vektorlogo
         svgUrl: isAtr ? '/brands/atr/safari-pinned-tab.svg' : '/brands/rp/safari-pinned-tab.svg',
         portalName: isAtr ? 'all-the.rest Portal' : 'Reisinger Foto Portal',
-        // NEU: Mandantenspezifische Impressums-Links
         impressumUrl: isAtr ? 'https://all-the.rest/impressum/' : 'https://reisinger.pictures/impressum/'
     };
 }
@@ -25,12 +22,9 @@ export function applyTheme() {
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
     const setTheme = (dark: boolean) => {
-        let theme: string;
-        if (brand === 'all-the.rest') {
-            theme = dark ? 'atr-dark' : 'atr-light';
-        } else {
-            theme = dark ? 'b2b-dark' : 'reisinger-light';
-        }
+        const theme = isAtrBrand(brand)
+            ? (dark ? 'atr-dark' : 'atr-light')
+            : (dark ? 'b2b-dark' : 'reisinger-light');
         document.documentElement.setAttribute('data-theme', theme);
         document.documentElement.setAttribute('data-brand', brand);
     };

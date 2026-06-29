@@ -19,8 +19,6 @@ class PhotoController extends Controller
             return response()->json(['error' => 'Keine Berechtigung, Metadaten zu bearbeiten.'], 403);
         }
 
-        $isClient = !($user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($photo->gallery_id)));
-
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'headline' => 'nullable|string|max:255',
@@ -35,27 +33,22 @@ class PhotoController extends Controller
             'is_editorial_only' => 'nullable|boolean',
         ]);
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($photo, $user, $isClient, $validated) {
-            // Versionierung: Nur wenn ein Kunde ändert, speichern wir den Vorzustand
-            if ($isClient) {
-                PhotoMetadataVersion::create([
-                    'photo_id' => $photo->id,
-                    'user_id' => $user->id,
-                    'title' => $photo->title,
-                    'headline' => $photo->headline,
-                    'description' => $photo->description,
-                    
-                    'keywords' => $photo->keywords,
-                    'location' => $photo->location,
-                    'city' => $photo->city,
-                    'state' => $photo->state,
-                    'country' => $photo->country,
-                    'iso_country' => $photo->iso_country,
-                ]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($photo, $user, $validated) {
+            // Versionierung: Vorzustand für alle Rollen speichern (vollständiges Audit-Trail)
+            PhotoMetadataVersion::create([
+                'photo_id' => $photo->id,
+                'user_id' => $user->id,
+                'title' => $photo->title,
+                'headline' => $photo->headline,
+                'description' => $photo->description,
                 
-                // SECURITY: Kunden dürfen niemals den Urheber (Artist) überschreiben
-                
-            }
+                'keywords' => $photo->keywords,
+                'location' => $photo->location,
+                'city' => $photo->city,
+                'state' => $photo->state,
+                'country' => $photo->country,
+                'iso_country' => $photo->iso_country,
+            ]);
 
             $photo->update($validated);
 

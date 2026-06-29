@@ -4,7 +4,7 @@ import {useRef, useState} from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams} from 'react-router-dom';
 import {flattenGroups, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
-import {useAuth} from '../../logic/useAuth';
+import {usePermissions} from '../../logic/usePermissions';
 import {useMetaGallery} from '../../logic/useMetaGallery';
 import PageLayout from '../components/PageLayout';
 import GalleryModals from '../components/GalleryModals';
@@ -12,7 +12,7 @@ import GalleryModals from '../components/GalleryModals';
 export default function ManagementMetaGalleryView() {
     const {id} = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const {user} = useAuth();
+    const {isAdmin} = usePermissions();
     const {tree, updateGroup, deleteGroup} = useProtectedGalleries();
     const {
         group,
@@ -45,7 +45,7 @@ export default function ManagementMetaGalleryView() {
                     <div>
                         <h1 className="text-3xl font-bold flex flex-wrap items-center gap-2">
                             Meta-Galerie: {group.name}
-                            {user?.is_admin && (
+                            {isAdmin && (
                                 <button onClick={() => setGroupEditModalOpen(true)}
                                         className="btn btn-ghost btn-sm btn-circle tooltip tooltip-bottom"
                                         data-tip="Meta-Galerie bearbeiten">

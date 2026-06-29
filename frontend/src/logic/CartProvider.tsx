@@ -1,4 +1,4 @@
-import {useState, useEffect, ReactNode} from 'react';
+import {useState, useEffect, useCallback, useMemo, ReactNode} from 'react';
 import {CartItem, CartContext} from './CartContext';
 import {useAuth} from './useAuth';
 import {useUI} from '../ui/components/UIContext';
@@ -39,21 +39,23 @@ export function CartProvider({children}: CartProviderProps) {
         }
     }, [items, cartKey, showToast, isLoaded]);
 
-    const addToCart = (item: CartItem) => {
+    const addToCart = useCallback((item: CartItem) => {
         setItems(prev => addToCartPure(prev, item));
-    };
+    }, []);
 
-    const removeFromCart = (photoId: string) => {
+    const removeFromCart = useCallback((photoId: string) => {
         setItems(prev => removeFromCartPure(prev, photoId));
-    };
+    }, []);
 
-    const clearCart = () => setItems([]);
+    const clearCart = useCallback(() => setItems([]), []);
 
     const totalAmount = calculateTotalAmount(items);
     const itemCount = items.length;
 
+    const contextValue = useMemo(() => ({items, addToCart, removeFromCart, clearCart, totalAmount, itemCount}), [items, addToCart, removeFromCart, clearCart, totalAmount, itemCount]);
+
     return (
-        <CartContext.Provider value={{items, addToCart, removeFromCart, clearCart, totalAmount, itemCount}}>
+        <CartContext.Provider value={contextValue}>
             {children}
         </CartContext.Provider>
     );

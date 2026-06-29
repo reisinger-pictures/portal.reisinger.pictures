@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Constants\TierRanks;
 use App\Models\LicenseUseCase;
 use App\Models\LicenseModifier;
 
@@ -13,7 +14,7 @@ class PricingService
         $basePriceCents = (int) $useCase->base_price;
         $tier = $useCase->flatrate_tier ?? 'web';
         
-        $ranks = ['none' => 0, 'web' => 1, 'print' => 2, 'original' => 3];
+        $ranks = TierRanks::RANKS;
         $userRank = $ranks[$userFlatrateLevel] ?? 0;
         $reqRank = $ranks[$tier] ?? 0;
         

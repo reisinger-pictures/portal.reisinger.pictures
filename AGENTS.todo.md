@@ -1,456 +1,470 @@
-# 📝 Review-Backlog — Test- & Qualitäts-Initiative
+# Task & Bugfix Backlog
 
-> Ergebnis der **abgeschlossenen** Test- & Qualitäts-Initiative (alle Pakete **BK-00…10, FE-00…04, E2E-01**
-> umgesetzt und grün). Dieses Dokument fasst die dabei gefundenen **REVIEW-Marker** als einzeln angehbare
-> Aufgaben (`R-NN`) zusammen. Die jeweiligen Tests frieren das **aktuelle** Verhalten ein; diese Marker sind
-> Abweichungen/Bugs, die bewusst **nicht** „passend gemacht" wurden — jede Aufgabe ist unabhängig bearbeitbar.
+> **Regel:** `features/` enthält NUR den Soll-Zustand (Spezifikation).
+> Umsetzungspläne, Tasks, Bugfixes gehören ausschließlich hierher.
+> Getroffene Entscheidungen werden in `features/` persistiert.
 >
-> **Status:** ☐ offen · 🔄 in Arbeit · ☑ erledigt. **Schwere:** 🔴 kritisch · 🟡 mittel · 🟢 niedrig.
-> **Herkunft** verweist auf das Ursprungs-Paket. Alle `file:line` gegen den aktuellen Stand verifiziert (2026-06-23).
+> **Konventionen:** Code & Docs englisch, UI deutsch.
+> Backend-Tests via `php artisan test`, Frontend via `vitest run` + `build` + `lint:fix`,
+> E2E via `node ai_test_runner.mjs`.
 >
-> Ursprüngliche Initiative-Spec (Paket-Spezifikationen §6/§7, Backend-/Frontend-Patterns, Workflow) ist in der
-> Git-Historie von `AGENTS.todo.md` konserviert; der verbindliche Paket-Workflow + Lessons Learned auch in `CLAUDE.md`.
-
-**Bearbeitungs-Regel pro Fix:** zugehörigen einfrierenden Test anpassen (bzw. `_review`-Suffix/`markTestSkipped`
-entfernen), Bugfix-Test ergänzen und **gesamte Suite grün** halten (`backend`: phpunit, `frontend`: `vitest run` +
-`build` + `lint:fix` + betroffene E2E).
+> Stand: 2026-06-30 — 19/19 + 7 neue Code-Review-TODOs.
+> Offen: T-09/FT-01 (E2E/FTP) + 7 neue Items (Details unten).
 
 ---
 
-## 🎯 Priorisierung (Stand: 2026-06-25)
+## Übersicht — Offene Tasks
 
-Umsetzungs-Reihenfolge der verbleibenden `R-NN`-Aufgaben nach erfolgreichem Abschluss der Multi-Brand-Infrastruktur.
+| Domäne | ID | Prio | Status |
+|--------|-----|------|--------|
+| 🤖 AI/ML | AI-01 | 🔴 P1 | ✅ Gallery `default_*` als AI-Kontext (Batch-Edit + PhotoDetailView) |
+| 🤖 AI/ML | AI-02 | 🔴 P1 | ✅ AI-Button + Kontext-Eingabe in PhotoDetailView |
+| 🤖 AI/ML | AI-03 | 🔴 P1 | ✅ AI nur Frontend — Text-only (useAI.ts, kein Bild) |
+| 🤖 AI/ML | AI-04 | 🟡 P2 | ✅ Gallery-Kontext automatisch in AI Batch-Edit vorausfüllen |
+| 🤖 AI/ML | AI-05 | 🟡 P2 | ✅ Backend AI-Code deaktiviert (Vision-Route + Controller entfernt) |
+| 🤖 AI/ML | AI-06 | 🟡 P2 | ✅ Tests angepasst (9 Vision-Tests entfernt, Text-Tests behalten) |
+| 🤖 AI/ML | AI-07 | 🟡 P2 | ✅ Dediziertes AI-Modal für Gallery-Vorgaben (text-only) |
 
-| Prio         | Aufgaben                                    | Fokus                                                                     |
-|--------------|---------------------------------------------|---------------------------------------------------------------------------|
-| **Erledigt** | A-01 ✓, A-02 ✓                              | **Multi-Domain-Infrastruktur & B2C-Pricing (ATR) vollständig integriert** |
-| **P0**       | R-01 ✓, R-02 ✓                              | Sicherheit & Datenintegrität (Public-Endpoint, SQL-Bindings)              |
-| **P1**       | R-03 ✓, R-04 ✓, R-05 ✓                      | Schleifen- & Berechnungs-Guards (Zyklus, Div-by-0, Typ-Parsing)           |
-| **P2**       | R-06, R-11, R-13, R-14 ✓                    | Utility- & Logik-Konsistenz (Datumsformat, Nullish, Collections)          |
-| *offen*      | R-07 ✓ (akzeptiert), R-08, R-09, R-10, R-12 | R-07 als gewollt eingefroren; Rest niedrige Code-Qualität                 |
+| Domäne | ID | Prio | Status |
+|--------|-----|------|--------|
+| 🏛️ Architecture | A-02 | 🟡 P2 | ✅ GalleryController → Service-Layer (GalleryService/RatingService) |
+| 🏛️ Architektur | A-03 | 🟡 P2 | ✅ User Model → AccessControlService |
+| 🏛️ Architektur | A-04 | 🟡 P2 | ✅ GalleryTreeService Higher-Order (`filterTree(callable)`) |
+| 🏛️ Architektur | A-05 | 🟡 P2 | ✅ ClientCartView → StripeCheckoutForm + CartItemList separiert |
+| 🏛️ Architektur | A-06 | 🟡 P2 | ✅ ManagementManualInvoiceView → useInvoiceDraft + useInvoiceDragDrop + usePdfExtraction |
+| 🏛️ Architektur | A-07 | 🟡 P2 | ✅ LicenseCatalogSettings → EditableTableRow generic |
+| 🏛️ Architektur | A-08 | 🟡 P2 | 🆕 BrandRegistry State-Resetter bei Queue-Workern prüfen |
+| 🟡 React | R-01 | 🟡 P2 | ✅ useEffect für derived state (GalleryModal, GalleryGroupModal) — Import-Fix |
+| 🟡 React | R-02 | 🟡 P2 | ✅ useEffect für user event side effects (WatermarkSettingsCard) |
+| 🟡 React | R-03 | 🟡 P2 | 🆕 Performance-Regression-Check Slider (Profiler DevTools) |
+| 🟡 Frontend | F-05 | 🟡 P2 | ✅ Duplizierte Interfaces konsolidiert (kanonisch in api.ts) |
+| 🟡 Frontend | F-10 | 🟡 P2 | ✅ usePricing Hook entfernt |
+| 🟡 Frontend | F-11 | 🟡 P2 | 🆕 Props-Validierung CartItemList + StripeCheckoutForm (TS-Typen) |
+| 🟡 Backend | B-03 | 🟡 P2 | ✅ Slug-Generierung → SlugService::makeUnique() |
+| 🟡 Backend | B-05 | 🟡 P2 | ✅ Form-Requests → GroupRequest/GalleryRequest Base Class |
+| 🟡 Backend | B-06 | 🟡 P2 | ✅ Auth-Gates via super_admin Middleware (routes/api.php) |
+| 🟡 Backend | B-09 | 🟡 P2 | ✅ Redundantes $user->load('roles') entfernt |
+| 🟡 Backend | B-11 | 🟡 P2 | ✅ Cache-Clearing zentral in GalleryTreeService::clearCache() |
+| 🟡 Backend | B-12 | 🟡 P2 | 🆕 Service-Unittests: GalleryService + RatingService isoliert |
+| 🟡 Backend | B-13 | 🟡 P2 | 🆕 Rollen-Abweisung Integrationstest (403 Forbidden erwartet) |
+| 🟡 Backend | B-14 | 🟡 P2 | 🆕 Migration V018 Rollback testen |
+| 🟡 Backend | B-15 | 🟡 P2 | 🆕 Datenkonsistenz Audit-Snapshots (PhotoMetadataVersion) |
+| 🟡 Tests | T-11 | 🟡 P2 | ✅ Vitest+jsdom configured, 15 tests for ClientCartView + Sidebar |
+| ⚙️ Infrastructure | T-09 | 🟡 P2 | 🏗️ Restpunkte (E2E) |
+| ⚙️ Brand-Infra | FT-01 | 🟡 P2 | 🏗️ FTP-Upload: Brand-Isolation & Defense-in-Depth |
+| 🖼️ Gallery/Legal | L-01 | 🟡 P2 | ✅ Impressum interne Route + Component (analog Privacy.tsx) |
+| 🚀 Pre-Deployment | D-01 | 🔴 P1 | 🆕 Full Test-Suite Backend + Frontend + E2E vor Deployment |
 
----
-
-## 🌐 Multi-Domain-Architektur & Pricing-Strategie (Zweigleisigkeit 2026)
-
-### Brand-Infrastruktur & B2C-Erweiterung
-
-#### **A-01 · 🔴 P0 · Multi-Domain-Infrastruktur & Theme-Weiche** ☑ erledigt (2026-06-25)
-
-- **Zentrale Datenhaltung & Backend-Context:** Middleware zur dynamischen Erkennung des Brands (`all-the.rest` vs
-  `reisinger.pictures`) via Host/Referer implementiert. Settings-Abfragen greifen im ATR-Kontext linter- und typsicher
-  auf das `atr_`-Präfix zu.
-- **Frontend-Theme-Switch (Tailwind v4):** Pre-Boot-Skript in `index.html` implementiert, das Favicons, Webmanifests und
-  Metas flackerfrei zur Laufzeit tauscht. Tailwind v4 Themes (`b2b-light`, `b2b-dark`, `atr-light`, `atr-dark`)
-  formvollendet mit harmonischen OKLCH-Werten und markenspezifischen Rahmenkonturen definiert.
-- **Backend-PDF-Invoicing:** Dynamische Farbanpassungen und Logo-Vererbung aus dem photos-Storage direkt in den
-  Blade-Templates verankert.
-
-#### **A-02 · 🔴 P0 · `ShootingCalculatorModal.tsx` Rewrite & B2C-Pricing** ☑ erledigt (2026-06-25)
-
-- **Logik-Implementierung (`shootingCalculator.ts`):** Mathematisch exakte `calculateB2CFlexPrice()` Formel für den
-  B2C-Tarif implementiert (149€ Basis, Setup-Fee, Privacy-Fee für Akt). Vollständige Linter-konforme Typisierung der
-  Select-Literale etabliert.
-- **UI-Weiche & Entfesselung:** Das Modal steuert die Rechner-Inhalte vollautomatisch zur Laufzeit. Die
-  Einstellungskarte für den B2B-Kalkulator wird auf `all-the.rest` konsequent ausgeblendet, bleibt aber auf dem
-  Hauptportal voll administrierbar.
-
-## 🔁 Rekursion / Endlosschleife
-
-### R-03 · 🟡 **P1** · Kein Schutz gegen `parent_id`-Zyklus → Endlosrekursion ☑ erledigt (2026-06-23)
-
-- **Resolution:** Kombinierter Schutz (defensiv + DB-Schicht).
-    - `GalleryGroup`: 4 `effective_*`-Accessoren rekursiv → **iterativ** (`walkParentChain`-Generator mit
-      Visited-Set); `Gallery::getFullPathAttribute` While-Schleife mit Visited-Set. Terminieren bei Zyklus/
-      Selbstreferenz (kein Stack-Overflow), verhaltensgleich für azyklische Bäume.
-    - `GalleryGroup::booted()`: neuer `saving`-Hook lehnt selbstreferenzierende/zyklische `parent_id` ab
-      (`InvalidArgumentException`).
-    - Tests: `EffectiveAttributesTest` — 2 übersprungene `_review`/`markTestSkipped` durch 7 gehärtete Tests
-      ersetzt (Terminierung + true-Propagation + saving-Rejektion + deep-acyclic OK).
-
-- **Symptom:** Ein zirkulärer (`A → B → A`) oder selbstreferenzieller `parent_id` führt in der `effective_*`-Kaskade
-  und in `getFullPath` zu Endlosrekursion (Timeout / Stack-Overflow möglich).
-- **Ursache:** While-Schleife ohne Visited-Set — `backend/app/Models/Gallery.php:90-101` (`getFullPathAttribute`)
-  ```php
-  while ($group) { $path = $group->slug . '/' . $path; $group = $group->parent; }
-  ```
-  sowie rekursive `effective_*`-Attribute — `backend/app/Models/GalleryGroup.php:53-73`, z. B.
-  `return $this->is_editorial_only || ($this->parent ? $this->parent->effective_is_editorial_only : false);`
-- **Vorschlag:** Visited-Set / Besuchs-Limit in der Schleife; **oder** DB-Seitige Validierung beim Speichern, die
-  Zyklen verbietet (sicherer). BK-03 hat die beiden Zyklus-Fälle derzeit `markTestSkipped`.
-- **Herkunft:** BK-03.
+> **Resolviert & entfernt (2026-06-30):** C-01, C-03, R-03, R-04, R-05, R-06, R-07, R-08,
+> F-01, F-02, F-03, F-09, B-01, B-02, B-04, B-08, B-10, T-10, **A-05, A-06, A-07, L-01**.
+> Zuvor resolviert (2026-06-29): A-01, C-02, C-04, F-04, F-06, F-07, F-08, T-12, B-07,
+> AI-DISABLED, BFIX-01, INTELLIJ.
+> Deren Specs in `features/` bleiben Source-of-Truth.
 
 ---
 
-## ➗ Numerik / Division durch null
+# 🏛️ Architecture
 
-### R-04 · 🟡 **P1** · Shooting Calculator: `calc_images_per_hour = 0` → `Infinity` ☑ erledigt (2026-06-23)
+### A-02 · 🟡 P2 · GalleryController (426 Zeilen) → Service-Layer extrahieren ✅
+- **File:** `backend/app/Http/Controllers/GalleryController.php`
+- Mischt Validation (inline $request->validate), Business Logic (Rating, Metadata) und Response-Formatierung.
+- **Fix:** GalleryService, RatingService auslagern.
+- **Checkliste:**
+  - [x] Business-Logik (Rating, Metadaten) aus Controller in GalleryService/RatingService auslagern
+  - [x] Inline-Validierungen über dedizierte Form-Requests abwickeln
+  - [x] Überprüfung: Code-Review des schlanken Controllers; Sicherstellen, dass Routen-Zuweisungen und HTTP-Responses intakt sind
 
-- **Resolution:** Guard in `calculateShootingPrice` (`shootingCalculator.ts`): `parsedImagesPerHour < 1` oder
-  nicht-finite → Fallback auf dokumentierten Default `6`. Psycholog. Rundung unangetastet. Tests:
-  `shootingCalculator.test.ts` — `_review` ersetzt + 2 Regressionstests (`'0'`/`'abc'`/`'-5'` → finite).
+### A-03 · 🟡 P2 · User Model (239 Zeilen) → PermissionService auslagern ✅
+- **File:** `backend/app/Models/User.php`
+- `getAllowedGalleryIds()` (74 Zeilen) mit Tenant-Integration, Brand-Scoping, rekursiver Gruppen-Traversierung.
+- **Fix:** In AccessControlService auslagern.
+- **Checkliste:**
+  - [x] `getAllowedGalleryIds()` (74 Zeilen) inklusive rekursiver Gruppen-Traversierung und Brand-Scoping in neuen AccessControlService verschieben
+  - [x] Struktur-Check des User-Models; Code-Prüfung auf korrekte Service-Instanziierung und unveränderte Berechtigungslogik
 
-- **Symptom:** `calculateShootingPrice({calc_images_per_hour: '0', …})` liefert `packagePrice`/`finalPrice = Infinity`
-  (UI würde „Infinity €" anzeigen). Settings-Eingabefeld hat nur clientseitiges `min="1"`, kein Server-/Logik-Guard.
-- **Ursache:** `frontend/src/logic/shootingCalculator.ts` in `calculateShootingPrice`:
-  `imagesPrice = (hourlyRate / imagesPerHourPackage) * input.images` — keine Guard gegen
-  `imagesPerHourPackage === 0` (parseInt('0') = 0).
-- **Vorschlag:** Guard: `imagesPerHourPackage < 1` (oder `NaN`) → Fallback `6` (Default) bzw. deterministischer
-  Wert. Hintergrund siehe `features/ecommerce/07-psychological-pricing.md` (Kante).
-- **Herkunft:** FE-04 (auch §1).
+### A-04 · 🟡 P2 · GalleryTreeService: 3 fast identische Filter → Higher-Order Function ✅
+- **File:** `backend/app/Services/GalleryTreeService.php`
+- `filterTreeByPermissions`, `filterTreeByType`, `filterTreeByTenant` share dasselbe Struktur mit nur anderem Prädikat.
+- **Fix:** Gemeinsame Higher-Order `filterTree(callable $predicate)`.
+- **Checkliste:**
+  - [x] Drei redundante Filter-Funktionen in eine einzelne Higher-Order-Function `filterTree(callable $predicate)` zusammenführen
+  - [x] Baum-Struktur-Vergleich vor/nach dem Refactoring, um sicherzustellen, dass die Filter-Prädikate identisch greifen
 
-## 🧮 Parsing & Berechnungslogik
+### A-05 · 🟡 P2 · ClientCartView (471→319 Zeilen) → StripeCheckoutForm + CartItemList separiert ✅
+- **Files:**
+  - `frontend/src/ui/client/ClientCartView.tsx` — 152 Zeilen reduziert, nutzt jetzt Import
+  - `frontend/src/ui/client/components/StripeCheckoutForm.tsx` — neu (75 Zeilen, named export)
+  - `frontend/src/ui/client/components/CartItemList.tsx` — neu (85 Zeilen, named export)
+- **Checkliste:**
+  - [x] Inline definierte Sub-Komponenten `StripeCheckoutForm` und `CartItemList` in separate Dateien unter `ui/client/components/` ausgelagert
+  - [x] Validierung: build ✅, lint ✅, unverändertes Rendering durch identische Props
 
-### R-05 · 🟡 **P1** · Pricing: `parseInt` trunciert dezimale Multiplikatoren ☑ erledigt (2026-06-23)
+### A-06 · 🟡 P2 · ManagementManualInvoiceView (358→145 Zeilen) → 3 Hooks extrahiert ✅
+- **Files:**
+  - `frontend/src/ui/management/ManagementManualInvoiceView.tsx` — 213 Zeilen reduziert
+  - `frontend/src/logic/useInvoiceDraft.ts` — neu (239 Zeilen, State + CRUD + Submit)
+  - `frontend/src/logic/useInvoiceDragDrop.ts` — neu (32 Zeilen)
+  - `frontend/src/logic/usePdfExtraction.ts` — neu (82 Zeilen)
+  - `frontend/src/api.ts` — `DocumentFormData` Interface hinzugefügt
+- **Checkliste:**
+  - [x] Inline-Handler, Drag-and-Drop-Logik sowie PDF-Extraktionen in dedizierte Hooks (`useInvoiceDraft`, `useInvoiceDragDrop`, `usePdfExtraction`) überführt
+  - [x] Validierung: build ✅, lint ✅, View-State via Hook synchronisiert
 
-- **Resolution:** Parsing aufgeteilt — `getRequiredTerm` (`parseInt`) für Cent-Preise (`price_*`), neuer
-  `getRequiredMultiplier` (`parseFloat`, Fallback `1`) für `mult_*`. 3 Caller umgestellt + Re-Export.
-  Backend validiert `mult_*` als `numeric|min:1` (Dezimal erlaubt/Default). Tests: `pricingLogic.test.ts` —
-  neuer `getRequiredMultiplier`-Block + End-to-End-Bugfix (dezimaler Multiplikator `1.5` bleibt erhalten).
+### A-07 · 🟡 P2 · LicenseCatalogSettings → Generic EditableTableRow ✅
+- **Files:**
+  - `frontend/src/ui/management/components/EditableTableRow.tsx` — neu (79 Zeilen, generische Row)
+  - `frontend/src/ui/management/components/LicenseCatalogSettings.tsx` — UseCaseRow + ModifierRow nutzen jetzt EditableTableRow
+- **Checkliste:**
+  - [x] Strukturell identische Zeilen-Logiken (`UseCaseRow` und `ModifierRow`) in eine generische `EditableTableRow` Komponente überführt
+  - [x] Typsicherheit: build ✅, In-Cell-Edit-Funktionalitäten identisch
 
-- **Symptom:** `getRequiredTerm` parst **alle** Preisfaktoren via `parseInt` → dezimale Multiplikatoren wie
-  `mult_commercial = '1.5'` werden zu `1` (stille Preisverfälschung). Preise selbst sind Integer-Cents (unkritisch),
-  Multiplikatoren aber potenziell dezimal.
-- **Ursache:** `frontend/src/logic/pricingLogic.ts` in `getRequiredTerm` (~Zeile 16):
-  `const val = parseInt(terms[key] || '', 10);`
-- **Vorschlag:** Für Multiplikatoren `parseFloat` verwenden (z. B. eigenes `getRequiredMultiplier`) **oder** die
-  erlaubten Wertebereiche in `SettingsController` klären (Integer erzwingen ↔ Dezimal zulassen) und dort
-  validieren. Test friert aktuelles Verhalten ein.
-- **Konkret (Review):** Parsing aufteilen — `parseInt` für Cent-Preise (`price_*`), `parseFloat` für Multiplikatoren
-  (`mult_*`), z. B. via separates `getRequiredMultiplier()`.
-- **Herkunft:** FE-02.
-
-### R-06 · 🟢 **P2** · `formatDateToDE` zerfällt ISO-Datum-mit-Uhrzeit ☑ erledigt (2026-06-26)
-
-- **Symptom:** `formatDateToDE('2024-06-22T12:00:00Z')` → `'22T12:00:00Z.06.2024'` (falsch).
-- **Ursache:** `frontend/src/logic/utils.ts` `formatDateToDE` (~Zeile 49): `iso.split('-')` nimmt genau 3 Teile an;
-  bei ISO-Datetime landet die Uhrzeit im 3. Teil.
-- **Vorschlag:** Nur den Datumsanteil verwenden (`iso.slice(0, 10)`) **oder** robust via `Date` parsen und
-  `formatLocaleDate` nutzen. Test mit `_review`-Suffix existiert.
-- **Konkret (Review):** `.slice(0, 10)` vor dem Split (Zeitanteil abschneiden); danach den `_review`-Test
-  bereinigen/umschreiben.
-- **Herkunft:** FE-01 (auch §1).
-
-### R-07 · 🟡 PricingService: Modifier-Surcharge auf vollem Basispreis ☑ akzeptiert als GEWOLLT (2026-06-23)
-
-- **Entscheidung (Stakeholder):** Das Verhalten ist **gewollt** und bleibt unverändert. Modell: die Flatrate
-  deckt die Basis-Lizenz; Premium-Modifier (nicht in Flatrate enthalten) sind kostenpflichtige Add-ons, ihr
-  `%`-Aufschlag wird auf dem **vollen** `basePriceCents` berechnet — unabhängig von der Deckung. Alternative
-  (Surcharge nur auf ungedecktem Anteil = 0 bei Deckung → Modifier gratis) wurde bewusst verworfen.
-- **Eingefroren durch:**
-  `tests/Feature/PricingServiceTest.php::test_modifier_surcharge_added_even_when_base_covered_if_not_included_in_flatrate`
-  (mit R-07-Kommentar). Keine Code-Änderung.
-- **Herkunft:** BK-04.
-
----
-
-## 🧹 Code-Qualität, Konsistenz & Kanten
-
-### R-08 · 🟢 `CheckoutService`: inkonsistente 403-Behandlung ☑ erledigt (2026-06-26)
-
-- **Symptom:** Zugriffsschutz teils via `abort(403)` (→ leere 403-Seite/Exception), teils via
-  `response()->json([...], 403)` (→ strukturierte JSON-Antwort) — inkonsistent für Frontend-Caller.
-- **Ursache:** `backend/app/Services/CheckoutService.php:27` `abort(403, 'Zugriff verweigert');` vs. `:36`
-  `return response()->json(['error' => "…nur für redaktionelle Nutzung…"], 403);`
-- **Vorschlag:** Einheitliche JSON-403-Antwort einführen; Frontend-Fehlerbehandlung prüfen.
-- **Herkunft:** BK-06. *(Hinweis: die ursprünglich vermutete Redundanz `effective||is_editorial_only` existiert im
-  Code nicht — verworfen.)*
-
-### R-09 · 🟢 `InvoiceService`: `mailTo = null`-Zweig ist praktisch tot ☑ erledigt (2026-06-26)
-
-- **Symptom:** Der `if ($mailTo)`-Guard schützt einen `null`-Fall, der über die Fallback-Kette (Initiator →
-  Fallback-User → `mail.from.address`) nicht erreicht wird.
-- **Ursache:** `backend/app/Services/InvoiceService.php:90-93`
-  ```php
-  $mailTo = $initiator ? $initiator->email : ($fallbackUser->email ?? null);
-  if ($mailTo) { Mail::to($mailTo)->send(new InvoiceMail(...)); }
-  ```
-- **Vorschlag:** Entweder den `null`-Fall wirklich erreichbar machen + testen, **oder** den Guard/den toten Zweig
-  entfernen. (Existenz eines Users ohne E-Mail verifizieren.)
-- **Herkunft:** BK-07.
-
-### R-10 · 🟡 `GalleryTreeService`: drei Detail-Probleme ☐
-
-- **(a) Leere Gruppen-Hüllen:** Nach dem Filtern bleiben Gruppen ohne Galerien/Children als leere Hüllen im Baum
-  (`backend/app/Services/GalleryTreeService.php:47-59`). → Hüllen herausfiltern.
-- **(b) `getAllSubgroupIds` schließt eigene ID aus:** Sammelt nur `children`-IDs, nie die Gruppen-ID selbst (`:102`).
-  → Semantik klären (aufrufende Stellen prüfen) und ggf. inkludieren.
-- **(c) Admin-Cache ist user-unabhängig:** `Cache::rememberForever('gallery_tree_admin', …)` (`:17`) teilt sich
-  einen Key über alle Admins/Rollen → inkorrekt, falls der (gefilterte) Teilbaum rollenabhängig ist.
-  → Cache-Key um User/Role ergänzen oder absichern, dass der Admin-Baum wirklich für alle Admins identisch ist.
-- **Herkunft:** BK-08.
-
-### R-11 · 🟢 **P2** · `Photo::getArtistAttribute`: Copyright `'0'` fällt auf `name` zurück ☑ erledigt (2026-06-26)
-
-- **Symptom:** Ein Copyright-Wert `'0'` (String) ist für `?:` falsy → fällt fälschlich auf `name` zurück statt `'0'`
-  zu respektieren.
-- **Ursache:** `backend/app/Models/Photo.php:54` `return $this->user->metadata_copyright ?: $this->user->name;`
-- **Vorschlag:** Expliziten Null-Check statt `?:`, z. B. `$this->user->metadata_copyright ?? $this->user->name`
-  (respektiert `'0'`).
-- **Konkret (Review):** `?:` → `??` (Nullish Coalescing), damit der legitime String `'0'` erhalten bleibt.
-- **Herkunft:** BK-02.
-
-### R-12 · 🟢 `pricingLogic.isCovered`: ungenutzter `terms`-Parameter ☑ erledigt (2026-06-26)
-
-- **Symptom:** Die extrahierte Funktion `isCovered` nimmt `terms` (als `_terms`) entgegen, nutzt es im Body aber
-  nicht (nur Rang-Vergleich). Rein kosmetisch.
-- **Ursache:** `frontend/src/logic/pricingLogic.ts` `isCovered`.
-- **Vorschlag:** Parameter entfernen (Signatur-Vereinheitlichung mit `calculateUpgradePrice` aufgeben) **oder**
-  bewusst als Platzhalter dokumentiert lassen.
-- **Herkunft:** FE-02.
-
-### R-13 · 🟢 **P2** · `utils.isEmpty` behandelt RegExp/Map/Set als „leer" ☑ erledigt (2026-06-26)
-
-- **Symptom:** `isEmpty(/regex/)`, `isEmpty(new Map())`, `isEmpty(new Set())` → `true`, weil sie keine aufzählbaren
-  Eigen-Keys besitzen.
-- **Ursache:** `frontend/src/logic/utils.ts` `isEmpty` (~Zeile 87): `Object.keys(value).length === 0` für Objekte.
-- **Vorschlag:** Klären, ob Collections berücksichtigt werden sollen (dann `size`/`Map.size`/`Set.size` prüfen);
-  falls ja, erweitern. Aktuelles Verhalten eingefroren.
-- **Konkret (Review):** `Map`/`Set` anhand ihrer `.size`-Eigenschaft validieren (statt `Object.keys`).
-- **Herkunft:** FE-01.
+### A-08 · 🟡 P2 · BrandRegistry State-Resetter bei Queue-Workern prüfen 🆕
+- **Hintergrund:** BrandRegistry hält zur Laufzeit einen Cache (State) über verfügbare Brands. Beim Start/Neustart von Queue-Workern (CLI-Umgebung) wird derselbe PHP-Prozess ggf. nicht neu initialisiert.
+- **Ziel:** Memory Leaks oder State Pollution bei langlebigen Queue-Prozessen ausschließen.
+- **Checkliste:**
+  - [ ] Prüfen, ob BrandRegistry beim Bootstrapping von Queue-Workern sauber resettet wird
+  - [ ] Ggf. `app()->booted()`-Hook oder `ServiceProvider::register()`-Reset ergänzen
+  - [ ] Spec in `features/` dokumentieren falls Änderung nötig
 
 ---
 
-## ✅ Akzeptiert / verifiziert sicher — KEINE Aktion
+# 🟡 React (P2)
 
-- **Psychologische Preis-Rundung** (Shooting Calculator): angezeigte `-50 %`/`-33 %` Rabatte sind bewusst
-  mathematisch ungenau — **gewünschtes** Verhalten. Siehe `features/ecommerce/07-psychological-pricing.md`.
-  Nicht „korrigieren". (FE-04.)
-- **Frontend-IDOR-Defense** via `ProtectedDashboard`-Rollenweiche: ein Client bekommt bei Admin-Routen das
-  `ClientDashboard`, keine eigene 403-Seite (Backend verteidigt zusätzlich). Bewusst akzeptiert. (E2E-01.)
-- **Payout `totalShares = 0`** ist **tatsächlich guarded** — `PayoutCalculationService.php:92`
-  `(float)$totalShares > 0 ? … : 0`. Keine Division-durch-Null; Verhalten durch BK-05 eingefroren. *(Ursprünglich
-  als REVIEW markiert, bei Verifikation als sicher bestätigt.)*
-- **PHPUnit 12 Data-Provider** als `#[DataProvider]`-Attribut statt Annotation — Konventions-Hinweis, keine Aufgabe. (
-  BK-04.)
+### R-01 · 🟡 P2 · useEffect für derived state (GalleryModal, GalleryGroupModal) ✅
+- **Files:**
+  - `frontend/src/ui/components/GalleryGroupModal.tsx:63-67` — slug aus name per useEffect
+  - `frontend/src/ui/components/GalleryModal.tsx:72-76` — slug aus name per useEffect
+  - `frontend/src/ui/components/GalleryModal.tsx:82-87` — is_live/is_public aus type per useEffect
+- **Fix:** Werte inline ableiten, nicht im useEffect setzen.
+- **Checkliste:**
+  - [x] Automatische Slug-Generierung sowie Status-Ableitungen (`is_live`) direkt während des Renders berechnen, statt via useEffect-State-Synchronisation
+  - [x] SWR- und Render-Tracing im Browser; Sicherstellen, dass keine unnötigen Re-Renders oder State-Verzögerungen auftreten
+- **Hinweis:** Das verbleibende `useEffect` in beiden Modals ist eine legitime Form-Initialisierung (reset) beim Öffnen — kein derived-state-Sync. Der akute Runtime-Bug (`useEffect is not defined`) war ein fehlender Import in GalleryModal, der behoben wurde.
 
-### Hinweise (nicht-aktionabel — Testbarkeit)
+### R-03 · 🟡 P2 · Performance-Regression-Check Slider (Profiler DevTools) 🆕
+- **Hintergrund:** In R-02 wurde das `useEffect` für das Preview-Rendering in `WatermarkSettingsCard` entfernt und in den `onChange`-Handler des Sliders verlegt.
+- **Ziel:** Mit den React DevTools (Profiler) bestätigen, dass keine "double mutations" oder Frame-Drops in der `renderSvgToDataUrl`-Pipeline mehr auftreten.
+- **Checkliste:**
+  - [ ] Slider-Interaktion im Profiler aufzeichnen
+  - [ ] Anzahl Re-Renders pro Slider-Event dokumentieren (sollte 1 sein)
+  - [ ] Frame-Drops ausschließen
 
-- Einige Null-Pfade (`gallery_id`, `flatrate_level`, `created_at` etc.) sind über die echte DB wegen
-  NOT-NULL-Constraints
-    + Timestamp-Trait nicht erreichbar und nur via `setRelation`/Speicher-Zuweisung ohne `save()` bzw. Query-Builder-
-      `update()` testbar (BK-02, BK-05). Keine Code-Änderung nötig — dokumentierte Test-Technik.
-
----
-
-## 🌐 Multi-Domain-Architektur & Pricing-Strategie (Zweigleisigkeit 2026)
-
-Basierend auf den Entscheidungen zur Systemarchitektur wird das Portal-Backend zu einem **schlanken
-Multi-Tenant-System (Single-Codebase)** ausgebaut. Es gibt keine getrennten Builds oder Deployments. Die Steuerung
-erfolgt dynamisch zur Laufzeit über den Hostnamen (Domain).
-
-### 🛠️ Kernkomponenten der Infrastruktur
-
-1. **Zentrale Datenhaltung:** Eine gemeinsame Datenbank für beide Brands. Rechnungen, Bestellungen und Konfigurationen
-   erhalten eine string-basierte Unterscheidung via `brand`-Flag (`all-the.rest` oder `reisinger.pictures`).
-2. **Frontend-Theme-Switch (Tailwind v4):** Die Erkennung erfolgt im Client über `window.location.hostname`. Das Skript
-   injiziert ein `data-theme`-Attribut in das `<html>`-Tag. Die Steuerung nutzt die neue Tailwind CSS v4 `@theme`
-   -Direktive und native CSS-Variablen:
-    * `all-the.rest` $\rightarrow$ B2C-Theme (dynamischer Dark-/Light-Mode-Wechsel).
-    * `reisinger.pictures` $\rightarrow$ Premium-/B2B-Theme (Ausrichtung noch offen).
-3. **Backend-PDF-Invoicing:** Um Rendering-Fehler moderner CSS-Compiler in PDF-Engines zu vermeiden, werden die
-   Markenfarben (HEX) im Backend (z.B. PHP-Match-Query) für den Rechnungskopf pragmatisch hardcodiert.
+### R-02 · 🟡 P2 · useEffect für user event side effects (WatermarkSettingsCard) ✅
+- **File:** `frontend/src/ui/management/components/WatermarkSettingsCard.tsx:122-130`
+- Preview-Rendering via useEffect auf opacity-change. Sollte im onChange-Handler passieren.
+- **Fix:** In den Slider-onChange-Handler verschieben.
+- **Checkliste:**
+  - [x] Preview-Rendering bei Opacity-Änderungen direkt in den `onChange`-Handler des Sliders verlegen, anstatt über ein useEffect
+  - [x] Code-Inspektion der Slider-Komponente; Prüfung auf unmittelbare, flüssige UI-Reaktion bei Interaktion
 
 ---
 
-### 📊 Der neue Pricing-Algorithmus (`all-the.rest` · B2C Flex-Tarif)
+# 🟡 Frontend (P2)
 
-Das neue `ShootingCalculatorModal.tsx` für **all-the.rest** bricht die historische Komplexität in ein modulares
-Paketsystem auf. **Wichtig:** Treue- und OG-Rabatte fallen für diesen Tarif komplett weg.
+### F-05 · 🟡 P2 · Duplizierte Interfaces konsolidieren ✅
+- `Gallery` in `api.ts` (loose: `boolean | number`, `type: string`) vs `useGalleries.ts` (strict: `'selection'|'delivery'`)
+- `User` in `api.ts` (loose) vs `useAuth.ts` (strict) vs `useUsers.ts` (UserDetailed)
+- **Fix:** Ein kanonisches Interface pro Entity in `api.ts` definieren, von dort importieren.
+- **Checkliste:**
+  - [x] Lose, verstreute Kontrakte für `Gallery` und `User` in `api.ts` vereinheitlichen und als kanonische Definitionen zentral bereitstellen
+  - [x] Typprüfung via TypeScript-Compiler (`tsc --noEmit`)
+- **Umsetzung:** `api.ts` hält nun das strikte Superset-`Gallery` (inkl. `default_*`, `type: 'selection'|'delivery'`); `useGalleries.ts`/`useAuth.ts` importieren + re-exportieren kanonisch; `useUsers.ts` definiert `UserDetailed extends Omit<User,'roles'>`.
 
-#### 1. Basiswerte & Konstanten
+### F-10 · 🟡 P2 · usePricing Hook abschaffen ✅
+- **File:** `frontend/src/logic/usePricing.ts` (24 Zeilen)
+- Reiner Re-export von `pricingLogic.ts`. Hook bietet keine React-spezifische Funktionalität.
+- **Fix:** Konsumenten direkt auf `pricingLogic.ts` umleiten, Hook löschen.
+- **Checkliste:**
+  - [x] Redundanten Hook entfernen und alle Konsumenten direkt auf die zustandslose `pricingLogic.ts` umleiten
+  - [x] Globale Code-Suche nach `usePricing` umgebucht auf direkten Funktionsaufruf kontrollieren
+- **Umsetzung:** Datei gelöscht; keine Konsumenten vorhanden (war bereits verwaist). `grep usePricing src/` = 0 Treffer.
 
-* **Grundpreis:** 149 € (Inklusive 20 Bilder, fixer Zeitrahmen von 1,5 bis 2 Stunden).
-* **Zusätzliche Bilder:** 15 € pro Bild.
-
-#### 2. Die mathematische Formel
-
-Das finale Honorar berechnet sich nach folgender Struktur:
-
-$$FinalPrice = 149 + SetupFee + (ExtraImages \times 15) + PrivacyFee$$
-
-Wobei die einzelnen Faktoren folgenden festen Regeln unterliegen:
-
-* **Setup-Aufschlag (`SetupFee`):**
-    * `outdoor` (Natürliches Licht): **0 €**
-    * `outdoor_flash` (Mobiles Blitz-Setup): **+50 €**
-    * `indoor` (Fotostudio): **+50 €**
-
-* **Schutzraum-Aufschlag (`PrivacyFee`):**
-  Greift exklusiv, wenn der Bereich `akt` (Akt & Boudoir) gewählt wurde **und** das absolute Online-Verbot (
-  `isFullyPrivate`) aktiv ist:
-  $$\text{PrivacyFee} = 100 + (TotalImages \times 5)$$
-  Da $TotalImages = 20 + ExtraImages$, reduziert sich die Formel für den Aufschlag auf:
-  $$\text{PrivacyFee} = 200 + (ExtraImages \times 5)$$
-  *In allen anderen Bereichen oder Konfigurationen ist die $\text{PrivacyFee} = 0$.*
-
-#### 3. Super-Admin Cheat-Sheet für manuelle Kontrollen
-
-| Bereich (`type`) | Setup (`setup`) | Zusätzliche Bilder | Online-Verbot  | Berechnungsschritte                                 | Endpreis  |
-|:-----------------|:----------------|:-------------------|:---------------|:----------------------------------------------------|:----------|
-| **Portrait**     | Outdoor (Natur) | 0                  | Nicht relevant | $149 + 0 + 0 + 0$                                   | **149 €** |
-| **Pärchen**      | Indoor (Studio) | 5                  | Nicht relevant | $149 + 50 + (5 \times 15) + 0$                      | **274 €** |
-| **Akt**          | Outdoor (Natur) | 0                  | Ja (Aktiv)     | $149 + 0 + 0 + [100 + (20 \times 5)]$               | **349 €** |
-| **Akt**          | Indoor (Studio) | 10                 | Ja (Aktiv)     | $149 + 50 + (10 \times 15) + [100 + (30 \times 5)]$ | **599 €** |
+### F-11 · 🟡 P2 · Props-Validierung für extrahierte Komponenten 🆕
+- **Files:**
+  - `frontend/src/ui/client/components/CartItemList.tsx`
+  - `frontend/src/ui/client/components/StripeCheckoutForm.tsx`
+- **Ziel:** TypeScript-Typen für beide Komponenten explizit definieren und prüfen, dass optionale Props sauber abgefangen werden (z. B. `clientSecret?: string | null`).
+- **Checkliste:**
+  - [ ] Interface `CartItemListProps` / `StripeCheckoutFormProps` definieren (oder existierende Typen verifizieren)
+  - [ ] Optionale Props auf Null-Sicherheit prüfen
+  - [ ] build ✅ + lint ✅
 
 ---
 
-### 🔄 Refactoring-Fahrplan `ShootingCalculatorModal.tsx` (`reisinger.pictures`)
+# 🟡 Backend (P2)
 
-Das bestehende Modal im Portal nutzt bisher ein System aus Stundensätzen, halbierten Bild-Stückpreisen bei Outdoor,
-pauschalen Flatrate-Aufschlägen (+20 %) und prozentualen Rabatten (33 % / 50 %).
+### B-03 · 🟡 P2 · Duplizierte Slug-Generierung → SlugService ✅
+- **File:** `backend/app/Http/Controllers/GalleryController.php`
+- Gleicher `Str::slug()` + Unique-Check an 4 Stellen (storeGroup, updateGroup, storeGallery, updateGallery).
+- **Fix:** Zentrale `SlugService::makeUnique()` Methode.
+- **Checkliste:**
+  - [x] 4 identische `Str::slug()` Blöcke mitsamt Unique-Checks aus dem GalleryController extrahieren und in `SlugService::makeUnique()` bündeln
+  - [x] Code-Review des Controllers auf Nutzung des neuen Zentral-Service
 
-* **To-Do:** Die Berechnungslogiken im Code sauber in zwei getrennte Strategien kapseln: `calculateB2CFlexPrice()` (
-  `all-the.rest`) und `calculateCustomStudioPrice()` (`reisinger.pictures`).
-* **UI-Weiche:** Sobald im Super-Admin-Portal das Paket für `all-the.rest` kalkuliert wird, sperrt das UI die
-  Rabatt-Auswahl, da dieser Tarif starr bleibt.
 
----
+### B-05 · 🟡 P2 · Form-Request-Duplikation → Base Class ✅
+- **Files:**
+  - `StoreGroupRequest.php` vs `UpdateGroupRequest.php` — identisch
+  - `StoreGalleryRequest.php` vs `UpdateGalleryRequest.php` — 80% identisch
+- **Fix:** Shared `GroupRequest` / `GalleryRequest` Base Class.
+- **Checkliste:**
+  - [x] Strukturelle Identitäten zwischen StoreGroupRequest/UpdateGroupRequest und StoreGalleryRequest/UpdateGalleryRequest über eine gemeinsame abstrakte Request-Basisklasse bereinigen
+  - [x] PHP-Kompilierungsprüfung der neuen Request-Klassen
 
-#
+### B-06 · 🟡 P2 · Inline Auth-Gates in CRUD-Controllern → Middleware/Gate ✅
+- **Files:** CustomerController, ProductController, TextSnippetController (alle prüfen `$user->is_super_admin` inline)
+- **Fix:** Über `SuperAdminMiddleware` oder `Gate::authorize()` abwickeln.
+- **Checkliste:**
+  - [x] In CRUD-Controllern händische `$user->is_super_admin` Abfragen durch `Gate::authorize()` oder dedizierte Routen-Middlewares ablösen
+  - [x] Routen- und Policy-Review auf saubere Deklaration
+- **Umsetzung:** Alle Admin-CRUD-Routen in `routes/api.php` via `Route::middleware(['super_admin'])->group(...)` geschützt (Middleware-Alias registriert in `bootstrap/app.php`). Keine inline `is_super_admin`-Checks mehr in den 3 Controllern.
 
-### 🛠️ Neue Qualitäts- & UI-Fixes (Juni 2026)
+### B-09 · 🟡 P2 · Redundantes `$user->load('roles')` in AuthController::me() ✅
+- **File:** `backend/app/Http/Controllers/AuthController.php:143-144`
+- `roles` wird in Zeile 143 (`$user->load(['galleries', 'roles', ...])`) bereits geladen, Zeile 144 (`$user->load('roles')`) lädt es erneut.
+- **Fix:** Doppelten load-Aufruf entfernen — entweder `'roles'` aus dem Array nehmen ODER Zeile 144 löschen.
+- **Checkliste:**
+  - [x] Redundantes `$user->load('roles')` in Zeilen 143/144 bereinigt (ein Aufruf genügt)
+  - [x] Code-Inspektion der `me()` Methode im AuthController
+- **Umsetzung:** Der doppelte Aufruf existierte im aktuellen Stand nicht mehr — `'roles'` wird einmalig im `load([...])`-Array geladen.
 
-#### **R-14 · 🟡 P1 · Input-Typen & Step-Inkremente im Invoicing** ☑ erledigt
+### B-11 · 🟡 P2 · Duplizierte Cache-Clearing-Logik ✅
+- **Files:**
+  - `app/Models/Gallery.php:120-131` — saved/deleted Events clearen `gallery_tree_admin`
+  - `app/Models/GalleryGroup.php:76-87` — saved/deleted Events clearen `gallery_tree_admin`
+  - `app/Services/GalleryTreeService.php:151-154` — manuelles `clearCache()`
+- **Fix:** Zentrales Cache-Clearing in GalleryTreeService, Models rufen Service auf.
+- **Checkliste:**
+  - [x] Händische `gallery_tree_admin` Cache-Sprengungen aus Eloquent-Modellen entfernt und gebündelt an `GalleryTreeService::clearCache()` übertragen
+  - [x] Modell-Event-Überwachung; Sicherstellen, dass Caches bei Mutationen weiterhin zuverlässig invalidiert werden
+- **Umsetzung:** Beide Models rufen `app(GalleryTreeService::class)->clearCache()` in ihren `saved`/`deleted` Events auf; der Service clobbert zusätzlich `unrestricted_photographer_gallery_ids`.
 
-- [x] Alle numerischen Eingabefelder (Mengen, Preise, Stunden) in den Invoicing-Formularen (
-  `ManagementManualInvoiceView`, `InvoiceItemsTable`, `InvoiceDiscountsSection`) strikt auf `type="number"` umstellen.
-- [x] Sinnvolle `step`-Attribute hinterlegen (z. B. `step="0.25"` für Arbeitsstunden, um Viertelstunden-Schritte nativ
-  zu erlauben).
+### B-12 · 🟡 P2 · Service-Unittests: GalleryService + RatingService isoliert 🆕
+- **Hintergrund:** Business-Logik aus GalleryController in GalleryService/RatingService extrahiert (A-02). Bestehende Integrationstests decken indirekt ab, aber isolierte Unit-Tests fehlen.
+- **Ziel:** Dedizierte Unit-Tests für beide Services, die nur den Service + Mocks testen (keine HTTP-Requests).
+- **Checkliste:**
+  - [ ] `tests/Unit/Services/GalleryServiceTest.php` — create/update-Gallery, Rating-Berechnung
+  - [ ] `tests/Unit/Services/RatingServiceTest.php` — Rating-Logik isoliert
+  - [ ] `php artisan test` ✅
 
-#### **R-15 · 🟢 P2 · Inkonsistente Icons in der Mobile-Ansicht**
+### B-13 · 🟡 P2 · Rollen-Abweisung Integrationstest (403 Forbidden) 🆕
+- **Hintergrund:** Auth-Gates via `super_admin` Middleware (B-06). Expliziter Test, dass ein Low-Privilege-User 403 erhält.
+- **Ziel:** Integrationstest, der 403 Forbidden erwartet, wenn ein nicht-privilegierter User geschützte Admin-Routen aufruft.
+- **Checkliste:**
+  - [ ] `tests/Feature/Authorization/RoleAbortTest.php` — 1 Test pro geschützter Route
+  - [ ] `php artisan test` ✅
 
-- [ ] Die Header- und Sidebar-Navigation im mobilen Viewport auf Darstellungsfehler und uneinheitliche Icon-Klassen (MDI
-  vs. Custom SVGs) prüfen.
-- [ ] Lücken bei der Mandantentrennung (B2B Multi-Tenant Isolation) im Frontend restlos schließen.
+### B-14 · 🟡 P2 · Migration V018 Rollback testen 🆕
+- **Hintergrund:** Migration V018 könnte Constraints oder Daten-Symmetrie verletzen, wenn `migrate:rollback` ausgeführt wird.
+- **Ziel:** Lokal `php artisan migrate:rollback` für V018 ausführen und sicherstellen, dass DB-Symmetrie erhalten bleibt.
+- **Checkliste:**
+  - [ ] `php artisan migrate:rollback` auf development-DB ausführen
+  - [ ] Forward/Backward-Migration auf Konsistenz prüfen
+  - [ ] Migration ggf. korrigieren falls verwaiste Constraints
 
-#### **R-16 · 🟡 P1 · Feature Gap: Multi-Tenant Support im Lightroom Plugin**
-
-- [ ] **Status-Quo Dokumentation:** Das Lightroom Classic Plugin (`admin.lrplugin`) ist aktuell als
-  *Single-Tenant-System* starr an die Hauptdomain gekoppelt. Es kann zur Laufzeit nicht dynamisch zwischen
-  `all-the.rest` und `reisinger.pictures` umschalten, wenn Kollektionen hochgeladen werden.
-- [ ] **Architektonische Lücke:** Es fehlt die Auswertung des tenant-spezifischen API-Contexts beim Metadaten-Abgleich
-  und Upload-Routing aus Lightroom heraus. (Zukünftiges Refactoring erforderlich).
-
-## 🔍 Status-Überblick der verbleibenden Code-Qualitäts-Aufgaben (Review-Backlog)
-
-Die folgenden Aufgaben aus der Qualitäts-Initiative sind weiterhin offen und müssen parallel stabil gehalten werden:
-
-* **`R-06` (P2 - Utility):** Datums-Parsing-Fehler in `formatDateToDE` bei ISO-Strings beheben (`.slice(0, 10)` vor
-  Split nutzen).
-* **`R-08` (Qualität):** Inkonsistente 403-Fehlerbehandlung im `CheckoutService` auf einheitliches JSON umstellen.
-* **`R-09` (Qualität):** Toten `null`-Zweig im `InvoiceService` für Mail-Empfänger bereinigen.
-* **`R-10` (Mittel):** `GalleryTreeService` logisch nachbessern (Leere Gruppen-Hüllen entfernen, eigene ID in Subgroups
-  inkludieren, Admin-Cache benutzerabhängig scope-en).
-* **`R-11` (P2 - Logik):** `Photo::getArtistAttribute` von `?:` auf Nullish Coalescing `??` umstellen, damit der
-  Copyright-String `'0'` nicht überschrieben wird.
-* **`R-12` (Qualität):** Ungenutzten `terms`-Parameter aus `pricingLogic.isCovered` entfernen.
-* **`R-13` (P2 - Utility):** `utils.isEmpty` so erweitern, dass `Map`- und `Set`-Strukturen anhand ihrer `.size` korrekt
-  validiert werden.
-
----
-
-## 🌐 Multi-Domain-Architektur & Pricing-Strategie (Zweigleisigkeit 2026)
-
-Basierend auf den Entscheidungen zur Systemarchitektur wird das Portal-Backend zu einem **schlanken
-Multi-Tenant-System (Single-Codebase)** ausgebaut. Es gibt keine getrennten Builds oder Deployments. Die Steuerung
-erfolgt dynamisch zur Laufzeit über den Hostnamen (Domain).
-
-### 🛠️ Aufgaben-Spezifikation
-
-#### **A-01 · 🔴 P0 · Multi-Domain-Infrastruktur & Theme-Weiche**
-
-* **Zentrale Datenhaltung & Backend-Context:**
-    * [ ] Backend-Middleware (`BrandContextMiddleware`) zur Erkennung des Brands (`all-the.rest` vs
-      `reisinger.pictures`) anhand des Host-Headers implementieren.
-    * [ ] Settings-Controller/-Logik erweitern, um markenspezifische Bank-/Firmendaten auszuliefern (z.B.
-      `atr_bank_iban` vs `rp_bank_iban`).
-    * [ ] PHPUnit Tests für die Brand-Erkennung und Settings-Trennung schreiben.
-* **Frontend-Theme-Switch (Tailwind v4):**
-    * [ ] Logik in `main.tsx` implementieren, die `window.location.hostname` auswertet und das `data-theme` Attribut
-      dynamisch im `<html>`-Tag setzt.
-    * [ ] Tailwind v4 Themes in `index.css` final definieren (ATR = B2C, RP = B2B).
-    * [ ] Playwright E2E Test für den Theme-Switch basierend auf origin/hostname schreiben.
-* **Backend-PDF-Invoicing:**
-    * [ ] `header.blade.php`, `footer.blade.php` und `invoice.blade.php` anpassen, sodass Farben (HEX) und Logos
-      dynamisch via PHP-Match-Query aus dem Brand-Context geladen werden.
-    * [ ] PHPUnit Tests für die PDF-Generierung unter beiden Brand-Kontexten ergänzen.
-
-#### **A-02 · 🔴 P0 · `ShootingCalculatorModal.tsx` Rewrite & B2C-Pricing (`all-the.rest`)**
-
-Das neue `ShootingCalculatorModal.tsx` für **all-the.rest** bricht die historische Komplexität in ein modulares
-Paketsystem auf. **Wichtig:** Treue- und OG-Rabatte fallen für diesen Tarif komplett weg.
-
-* **Logik-Implementierung (`shootingCalculator.ts`):**
-    * [ ] Funktion `calculateB2CFlexPrice()` für `all-the.rest` implementieren (Formel: 149 + SetupFee + (ExtraImages *
-        15)
-            + PrivacyFee).
-    * [ ] Funktion `calculateCustomStudioPrice()` für `reisinger.pictures` kapseln (bestehende Logik).
-    * [ ] Ausführliche Unit-Tests (Vitest) für beide Berechnungsstrategien schreiben.
-* **UI-Weiche (`ShootingCalculatorModal.tsx`):**
-    * [ ] Hostname/Brand-Context im Frontend auslesen (`useBrand` Hook).
-    * [ ] UI dynamisch anpassen: Rabatt-Auswahl bei `all-the.rest` sperren/ausblenden, spezifische Toggles für Setup (
-      Indoor/Outdoor/Flash) und Privacy einblenden.
-    * [ ] Playwright E2E Tests für beide Ausprägungen des Kalkulator-Modals schreiben.
-
-* **Basiswerte & Konstanten:**
-    * **Grundpreis:** 149 € (Inklusive 20 Bilder, fixer Zeitrahmen von 1,5 bis 2 Stunden).
-    * **Zusätzliche Bilder:** 15 € pro Bild.
-
-* **Die mathematische Formel:**
-  Das finale Honorar berechnet sich nach folgender Struktur:
-  $$FinalPrice = 149 + SetupFee + (ExtraImages \times 15) + PrivacyFee$$
-
-* **Setup-Aufschlag (`SetupFee`):**
-    * `outdoor` (Natürliches Licht): **0 €**
-    * `outdoor_flash` (Mobiles Blitz-Setup): **+50 €**
-    * `indoor` (Fotostudio): **+50 €**
-
-* **Schutzraum-Aufschlag (`PrivacyFee`):**
-  Greift exklusiv, wenn der Bereich `akt` (Akt & Boudoir) gewählt wurde **und** das absolute Online-Verbot (
-  `isFullyPrivate`) aktiv ist:
-  $$\text{PrivacyFee} = 100 + (TotalImages \times 5)$$
-  Da $TotalImages = 20 + ExtraImages$, reduziert sich die Formel für den Aufschlag auf:
-  $$\text{PrivacyFee} = 200 + (ExtraImages \times 5)$$
-  *In allen anderen Bereichen oder Konfigurationen ist die $\text{PrivacyFee} = 0$.*
-
-* **UI-Weiche im Portal:** Sobald im Super-Admin-Portal das Paket für `all-the.rest` kalkuliert wird, sperrt das UI die
-  Rabatt-Auswahl, da dieser Tarif starr bleibt. Für `reisinger.pictures` bleibt die alte Logik vorerst aktiv (
-  `calculateCustomStudioPrice()`).
+### B-15 · 🟡 P2 · Datenkonsistenz bei Audit-Snapshots (PhotoMetadataVersion) 🆕
+- **Hintergrund:** Bei Erstellung einer `PhotoMetadataVersion` (Audit-Snapshot) könnte das System mit alten Einträgen inkompatibel sein, die dieses Feature noch nicht kannten.
+- **Ziel:** Prüfen, ob historische Daten migriert werden müssen oder ob das System sauber mit alten Einträgen umgeht (Fallback).
+- **Checkliste:**
+  - [ ] Datenbank nach alten Einträgen ohne `PhotoMetadataVersion` durchsuchen
+  - [ ] Ggf. Migration für historische Snapshots erstellen
+  - [ ] Fallback-Logik im Code validieren (`??` / `optional()`)
 
 ---
 
-### 📊 Super-Admin Cheat-Sheet für manuelle Kontrollen (ATR)
+# 🟡 Architektur (P2)
 
-| Bereich (`type`) | Setup (`setup`) | Zusätzliche Bilder | Online-Verbot  | Berechnungsschritte                                 | Endpreis  |
-|:-----------------|:----------------|:-------------------|:---------------|:----------------------------------------------------|:----------|
-| **Portrait**     | Outdoor (Natur) | 0                  | Nicht relevant | $149 + 0 + 0 + 0$                                   | **149 €** |
-| **Pärchen**      | Indoor (Studio) | 5                  | Nicht relevant | $149 + 50 + (5 \times 15) + 0$                      | **274 €** |
-| **Akt**          | Outdoor (Natur) | 0                  | Ja (Aktiv)     | $149 + 0 + 0 + [100 + (20 \times 5)]$               | **349 €** |
-| **Akt**          | Indoor (Studio) | 10                 | Ja (Aktiv)     | $149 + 50 + (10 \times 15) + [100 + (30 \times 5)]$ | **599 €** |
+> Siehe A-02 bis A-07 oben im Architecture-Abschnitt.
 
 ---
 
-### 🔍 Status-Überblick der verbleibenden Code-Qualitäts-Aufgaben (Review-Backlog)
+# 🟡 Tests (P2)
 
-Die offenen Punkte (`R-06` bis `R-13`) bleiben wie oben tabelarisch erfasst gültig und müssen parallel stabil gehalten
-werden.
+### T-11 · 🟡 P2 · Frontend-Komponententests fehlen komplett (0% Coverage)
+- **IST (2026-06-30):** 127 Tests in `src/logic/__tests__/` ✅ (pure Logic). **0 Tests in `src/ui/`** — 79 Komponenten völlig ungetestet. 14/20 Hooks ungetestet (70%).
+- **Infrastruktur-Blocker:** ✅ **Resolved 2026-06-30:** vitest auf `environment: 'jsdom'` umgestellt, `@testing-library/react` + `@testing-library/jest-dom` + `@testing-library/user-event` installiert. Globales Setup via `src/test-setup.ts`.
+- **Done (2026-06-30):** 15 component tests created: `ClientCartView` (5 Tests) + `Sidebar` (10 Tests). Infrastructure unblocked for further test expansion.
+- **P1 (MUSS):** ProtectedDashboard, SidebarLoginForm, ResetPassword, DeliveryView, GalleryView — ~20–30 Tests.
+- **P2:** ManagementOrdersView, ManagementManualInvoiceView, ErrorBoundary, ManagementGalleryView — ~18–22 Tests.
+- **P3:** LicenseSelectorCard, LicenseCatalogSettings, WysiwygEditor, IptcMetadataEditor — ~14–18 Tests.
+- **P4 Hooks:** useAuth (~8), useGallery (~6), CartContext (~5), usePhoto (~4), useSearch (~3) — ~19–23 Tests.
+- **Gesamtaufwand:** ~90–110 neue Tests in ~20–25 Testdateien.
 
-### 🌐 Multi-Brand-Infrastruktur & Dynamic Assets (2026)
+### T-13 · 🟡 P2 · Backend-Test-Lücken schließen
+- **IST (2026-06-30):** 537 Tests ✅ (1265 assertions). 67 Testdateien (4 Unit + 63 Feature).
+- **Abdeckung:** 16/26 Controller (62%) getestet, 9/13 Services (69%) mit dedizierten Tests.
+- **P1:** FileDeliveryController (0 Tests — Media-Serving, kritischster Pfad).
+- **P2:** Webhook/Stripe Payment-Flow (nur 2 Tests), OrderController Admin-Routen (0 Tests für Admin-Funktionen), ImageController::upload (nur Upload-Pfad getestet).
+- **P3:** QuoteLinkService (nur indirekt), TenantController CRUD, SettingsController Schreib-Operationen, TenantInviteController.
 
-- [x] **Brand-Umschaltung & Impressum:** useBrand-Hook liefert dynamisch markenspezifische Assets und korrekte
-  Impressums-URLs (https://all-the.rest/impressum/ vs https://reisinger.pictures/impressum/).
-- [x] **Preise entkoppeln & B2C-Pricing:** B2C Kalkulator-Werte (149€, 50€, 200€, 15€) dynamisch in die Settings-Tabelle
-  integriert und über das UI administrierbar gemacht.
-- [x] **Abrechnungs-Konsistenz:** Fallback im SettingsController für den Stundensatz von 100€ auf 80€ korrigiert (
-  Parität mit Seeder und Migration).
-- [x] **Watermark Auto-Detection:** Manueller Logo-Upload entfernt. System liest Quelldateien zur Laufzeit und
-  regeneriert die PNG-Buckets transparent bei Änderungen oder Server-Neustart.
+---
 
-### 🔄 Offenes Review & Container-Isolierung (Zukunft)
+# ⚙️ Infrastructure
 
-- [ ] **Watermark-Infrastruktur / Container-Isolierung:** Passiert die Analyse, ob sich die Wasserzeichen geändert haben
-  beim Container start und werden alle alten Bilder bei einem Update invalidiert?
-- [ ] **InvoiceItemsTable / Posten-Inkremente:** Evaluieren, ob `step="0.25"` global für alle Rechnungsposten gilt oder
-  ob differenziert zwischen "Stunden" (0.25 Inkrement) und "Artikeln/Produkten" (1.0 Inkrement) unterschieden werden
-  muss. Tendenz zu 0,25 passt
+## T-09 · 🟡 P2 · Lightroom Plugin Multi-Brand / Tenant Scoping (Restpunkte)
+> **Ref:** `features/infrastructure/07-lightroom-multi-tenant-gap.md`, `features/infrastructure/10-frontend-brand-tenant-isolation.md`
+> P1 (Plugin + Backend-Erkennung) ✅, P2 (Schema) ✅, P3 (Scoping) teils ✅ — siehe Specs.
+
+- [x] **Seed: ATR-Tenant** (`domain='all-the.rest'`, `brand='atr'`) im `DatabaseSeeder` ergänzt (2026-06-29).
+- [x] **Admin-UI: Brand-Zuweisung in User-Bearbeitung** (2026-06-29) — `UserPermissionsModal.tsx`
+  hat ein Brand-Select, das **nur für Client-Accounts** aktiv ist (Staff → disabled, `brand=null`).
+  Backend (`UpdateUserRequest` + `UserController::update`) akzeptiert & erzwingt Policy A.
+- [ ] **E2E-Tests:** Plugin-Menüs, Brand-Header (`X-Brand`) — **offen**.
+- [x] **E2E Gallery-Scoping** (`getAllowedGalleryIds`) — Spec erstellt.
+
+## FT-01 · 🟡 P2 · FTP-Upload: Brand-Isolation & Defense-in-Depth
+> **Analyse:** `backend/app/Http/Controllers/FtpController.php` ist komplett brand-blind.
+> Unter Policy A (Staff cross-brand) kein akuter Datenleak, aber Defense-in-Depth-Lücken.
+
+**Soll-Zustand:**
+- `FtpController::setTarget()` prüft `$user->canAccessGallery($galleryId)` via `getAllowedGalleryIds()`
+- `FtpController::process()` validiert Ziel-Galerie vor Photo-Import
+- Gallery-Dropdown in `ManagementFtpInbox.tsx` zeigt Brand-Badge pro Gallery
+- Optional: FTP-Inbox-Struktur um Brand-Präfix ergänzt (`ftp/<brand>/<slug>/`)
+- Backend-Test: `FtpImportTest.php` deckt Brand-Szenarien ab
+
+**Umsetzungsidee:**
+1. **Backend Guard (`setTarget`):** Intersect `$request->gallery_id` mit `$user->getAllowedGalleryIds()` — falls nicht enthalten → 403.
+2. **Backend Guard (`process`):** Gleiche Prüfung auf `$user->current_ftp_gallery_id` vor Import.
+3. **Frontend Brand-Label:** In `ManagementFtpInbox.tsx` bei Zielgalerie-Auswahl `gallery.brand` als Badge anzeigen.
+4. **E2E-Tests:** Photographer brand A kann nicht in brand-B-Gallery importieren (via API-Direktaufruf).
+5. **Spec-Dokumentation:** `features/infrastructure/13-ftp-brand-isolation.md`
+
+---
+
+# 🚀 Pre-Deployment
+
+### D-01 · 🔴 P1 · Full Test-Suite vor Deployment ausführen 🆕
+- **Ziel:** Sicherstellen, dass die gesamte Codebase vor dem Deployment in Produktion grün ist.
+- **Checkliste:**
+  - [ ] **Backend:** `php artisan test` — alle Tests ✅
+  - [ ] **Frontend:** `pnpm tsc -b` — 0 errors ✅
+  - [ ] **Frontend:** `pnpm lint:fix` — clean ✅
+  - [ ] **Frontend:** `pnpm build` — exit 0 ✅
+  - [ ] **Frontend:** `pnpm vitest run` — 142+ Tests ✅
+  - [ ] **E2E:** `node ai_test_runner.mjs brand` — pass ✅
+  - [ ] **E2E:** Alle relevanten E2E-Suites (Download, Checkout, etc.)
+
+---
+
+# 🖼️ Gallery / Legal
+
+### L-01 · 🟡 P2 · Impressum als interne Portal-Seite ✅
+- **Files:**
+  - `frontend/src/ui/Impressum.tsx` — neu (analog Privacy.tsx, PageLayout + prose)
+  - `frontend/src/App.tsx` — Route `/impressum` hinzugefügt (public, kein ProtectedRoute)
+- **Checkliste:**
+  - [x] Native, interne Route `/impressum` mitsamt dazugehöriger React-Komponente (analog `Privacy.tsx`) implementiert
+  - [x] Routen-Aufruf via build ✅ validiert
+
+
+
+
+
+
+---
+# 🤖 AI/ML — Metadaten-Generierung (Refactoring)
+
+## IST-Zustand (2026-06-30)
+- **Backend:** AIService mit OpenAI Vision API (Bild-Analyse), AIController mit 3 Endpoints (`status`, `generate-metadata`, `generate-metadata-text`)
+- **Frontend:** useAI.ts im Dual-Mode (Server/Local LM Studio), AIBatchEditModal (Batch-Edit mit Vorschlag→Speichern), **keine AI in PhotoDetailView**
+- **Galerien:** Haben `default_*` Felder (`default_title`, `default_description`, `default_keywords`, etc.) — diese sind die **Vorlage** für Foto-Metadaten
+- **Kontext:** Gallery-`default_*` werden aktuell NICHT automatisch als AI-Kontext übernommen
+- **Bild-Analyse:** Aktiv (Vision API Server / Base64 Local) — soll weg
+
+## SOLL (User-Vorgabe)
+1. AI ausschließlich Frontend — Ergebnisse als **Vorschlag** für Menschen (nicht automatisch speichern)
+2. Text-Kontext-Eingabe bei Batch-Edit **und** Einzelfoto
+3. Gallery-`default_*` Felder automatisch als AI-Kontext mitsenden
+4. Bild-Analyse bleibt für Fotos — Gallery-Vorgaben separat textbasiert
+5. Unterschied: Gallery-Vorlage (`default_*`) vs. Foto-Metadaten — das existiert bereits
+
+---
+
+### AI-01 · 🔴 P1 · Gallery-`default_*` als AI-Kontext einbinden ✅
+- **✅ Done (2026-06-30):**
+  - PhotoDetailView: `galleryDefaults` aus `data.photo.gallery.default_title/description/keywords` extrahiert und als Kontext an `generateMetadata` übergeben
+  - AIBatchEditModal: Gallery via SWR geladen, `default_*` automatisch in `globalContext` vorausgefüllt (überschreibbar)
+
+### AI-02 · 🔴 P1 · AI-Button + Kontext-Eingabe in PhotoDetailView ✅
+- **✅ Done (2026-06-30):** `frontend/src/ui/PhotoDetailView.tsx`
+  - `useAI()` Hook-Instanz + `generateMetadata` importiert
+  - Kontext-Eingabe-Feld + "KI generieren" Button vor "Speichern"
+  - Gallery-`default_*` als Kontext automatisch übernommen
+  - Ergebnisse in `iptcData` geschrieben (Vorschau, nicht gespeichert)
+  - Gleiches Pattern wie AIBatchEditModal (Vorschlag → manuelles Speichern)
+
+### AI-03 · 🔴 P1 · Bild-Analyse bleibt — Gallery-Vorgaben text-only ✅
+- **✅ Korrigiert (2026-06-30):**
+  - Batch-Edit + Einzelfoto: **Bild-Analyse via Vision API/LM Studio bleibt erhalten** (JPEG, 80%)
+  - Gallery-Vorgaben (AI-07): separat, **rein textbasiert** via `generateMetadataFromText`
+  - `VITE_LMSTUDIO_URL` als env-Override für Local-Mode-URL ergänzt
+  - Resultate sind immer Vorschläge → User speichert manuell
+
+### AI-04 · 🟡 P2 · Gallery-Kontext automatisch in AI Batch-Edit vorausfüllen ✅
+- **✅ Done (2026-06-30):** `frontend/src/ui/management/components/AIBatchEditModal.tsx`
+  - `useSWR` + `fetcher` importiert
+  - Gallery via `/api/management/galleries/{galleryId}` geladen
+  - `default_title/description/keywords` automatisch in `globalContext` vorausgefüllt
+  - `!globalContext`-Guard: User-Änderungen werden nicht überschrieben
+
+### AI-05 · 🟡 P2 · Backend AI-Code deaktivieren ✅
+- **✅ Done (2026-06-30):**
+  - `backend/routes/api.php`: Route `POST /ai/generate-metadata` entfernt
+  - `backend/app/Http/Controllers/AIController.php`: `generateMetadata()`-Methode entfernt, unused Imports bereinigt
+  - `backend/app/Services/AIService.php`: unverändert (nicht mehr aufgerufen, deaktiviert)
+
+### AI-06 · 🟡 P2 · Tests anpassen ✅
+- **✅ Done (2026-06-30):**
+  - `backend/tests/Feature/AIMetadataTest.php`: 7 Vision-Tests entfernt, 4 Text-Tests behalten
+  - `backend/tests/Unit/AIServiceTest.php`: 2 Vision-Tests entfernt, 6 Tests behalten
+  - **Verifikation:** Backend 528/528 ✅, Frontend 127/127 ✅, lint ✅, tsc ✅
+
+### AI-07 · 🟡 P2 · Dediziertes AI-Modal für Gallery-Vorgaben (text-only) ✅
+- **✅ Done (2026-06-30):**
+  - `frontend/src/ui/management/components/AIGalleryDefaultsModal.tsx` — neues eigenständiges Modal
+  - Textarea für Gallery-Beschreibung → `generateMetadataFromText(text)` → Vorschau der Ergebnisse
+  - "Vorschlag übernehmen" kopiert Titel/Beschreibung/Keywords/Ort via `onApply`-Callback ins Eltern-Formular
+  - `GalleryMetadataDefaultsModal.tsx` — "KI generieren" Button öffnet das AI-Modal als Sub-Modal (stacking mit z-index)
+  - Ergebnisse sind Vorschläge → User speichert separat aus dem Eltern-Modal
+
+---
+
+# Git-Hygiene (Cleanup)
+- [x] 5 Phantom-`AD`-Dateien aufgeräumt (`git rm --cached`, 2026-06-29):
+  - `admin.lrplugin/Atre*.lua` (2×) → korrekterweise gelöscht (Rename → `Atr*.lua` existiert).
+  - `features/tech/05|06|09-*.md` (3×) → waren staged-as-added aber von Platte gelöscht. Index bereinigt.
+
+---
+
+# Test-Status (2026-06-30, PHP 8.5 via Herd)
+
+- **Backend:** **537 passed ✅** (1265 assertions) — alle grün. Neu hinzugekommen: Service-Unittests (B-12), Authorization-Integrationstests (B-13) — siehe TODOs.
+- **Frontend tsc:** ✅ exit 0 (A-05/A-06/A-07/L-01 Typfixes + build).
+- **Frontend lint:** ✅ Clean (`pnpm lint:fix`).
+- **Frontend build:** ✅ (`pnpm build` — inkl. Impressum-Chunk).
+- **Frontend vitest:** 142 passed ✅ (+15 UI component tests).
+- **E2E:** Siehe ai_test_runner — offene Brand-E2E-Restpunkte unter T-09.
+
+---
+
+# Test-Befehle
+
+```bash
+# Backend (PHP via Herd: PATH muss php85 enthalten)
+export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
+cd backend && php artisan test
+
+# Frontend Unit (pnpm, NICHT npm)
+cd frontend && pnpm vitest run
+
+# Frontend Lint + Build (pnpm, NICHT npm)
+cd frontend && pnpm lint:fix && pnpm build
+
+# E2E (via ai_test_runner, NIE direkt npx playwright)
+cd frontend
+node ai_test_runner.mjs brand/download-invoice-brand-leak
+node ai_test_runner.mjs brand/gallery-brand-scoping
+node ai_test_runner.mjs brand/brand-e2e-infra
+node ai_test_runner.mjs brand
+```

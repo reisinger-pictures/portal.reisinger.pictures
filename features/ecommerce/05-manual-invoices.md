@@ -6,7 +6,7 @@ status: active
 
 # Feature: Manual Invoices (Stateless PDF Tool)
 
-Dieses Modul ermöglicht es Super-Admins, individuelle PDF-Dokumente für B2B-Sonderfälle zu generieren, ohne das System-Audit (Bestellungen/Statistiken) zu belasten.
+This module enables Super-Admins to generate individual PDF documents for B2B special cases without affecting the system audit (orders/statistics).
 
 ## 1. Stateless PDF Generation
 - Dokumente werden "on-the-fly" im RAM des Backends generiert und direkt als Stream-Download an den Browser gesendet.

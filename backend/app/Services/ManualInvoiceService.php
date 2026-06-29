@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
-use App\Models\Setting;
 
 class ManualInvoiceService
 {
@@ -86,12 +85,11 @@ class ManualInvoiceService
      */
     public function getBankDetails(): array
     {
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
-        $get = fn($k) => Setting::where('key', $pfx . $k)->value('value') ?? Setting::where('key', $k)->value('value');
+        $resolver = app(SettingResolver::class);
         return [
-            'holder' => $get('bank_holder'),
-            'iban' => $get('bank_iban'),
-            'bic' => $get('bank_bic')
+            'holder' => $resolver->get('bank_holder'),
+            'iban' => $resolver->get('bank_iban'),
+            'bic' => $resolver->get('bank_bic'),
         ];
     }
 

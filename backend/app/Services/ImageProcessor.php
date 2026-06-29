@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
@@ -102,7 +103,7 @@ class ImageProcessor
         elseif ($targetWmSize <= 1000) $bucket = 1000;
 
         $prefix = $galleryType === 'selection' ? 'master_selection_' : 'master_';
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $pfx = BrandRegistry::prefix();
         $wmPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $pfx . $prefix . $bucket . '.png');
         if (!file_exists($wmPath)) {
             $wmPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $prefix . $bucket . '.png');

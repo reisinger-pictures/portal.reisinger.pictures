@@ -2,7 +2,7 @@ import {useEffect} from 'react';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
 import {useForm, useWatch} from 'react-hook-form';
-import {usePricing} from '../../../logic/usePricing';
+import {calculateUpgradePrice} from '../../../logic/pricingLogic';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 
@@ -80,14 +80,14 @@ export default function LicenseSettingsCard() {
     const watchMultUnl = useWatch({control, name: 'mult_unlimited', defaultValue: 50});
     const watchMultInt = useWatch({control, name: 'mult_international', defaultValue: 50});
 
-    const {calculateUpgradePrice} = usePricing({
+    const previewTerms = {
         price_web: String(watchPriceWeb),
         price_print: String(watchPricePrint),
         price_original: String(watchPriceOriginal),
         mult_commercial: String((watchMultCom / 100) + 1),
         mult_unlimited: String((watchMultUnl / 100) + 1),
         mult_international: String((watchMultInt / 100) + 1)
-    });
+    };
 
     if (isLoading) return <div
         className="card bg-base-200 border border-base-300 p-10 flex items-center justify-center min-h-[300px]"><span
@@ -132,13 +132,13 @@ export default function LicenseSettingsCard() {
                             ohne Flatrate
                         </div>
                         <div className="text-sm">Web + Redaktionell + 1 Jahr: <strong
-                            className="font-mono text-primary">{calculateUpgradePrice('none', 'web', 'editorial', '1_year').toFixed(2)} €</strong>
+                            className="font-mono text-primary">{calculateUpgradePrice(previewTerms, 'none', 'web', 'editorial', '1_year').toFixed(2)} €</strong>
                         </div>
                         <div className="text-sm">Print + Kommerziell + 1 Jahr: <strong
-                            className="font-mono text-primary">{calculateUpgradePrice('none', 'print', 'commercial', '1_year').toFixed(2)} €</strong>
+                            className="font-mono text-primary">{calculateUpgradePrice(previewTerms, 'none', 'print', 'commercial', '1_year').toFixed(2)} €</strong>
                         </div>
                         <div className="text-sm">Original + Kommerziell + Unbegrenzt + Weltweit: <strong
-                            className="font-mono text-primary">{calculateUpgradePrice('none', 'original', 'commercial', 'unlimited', 'international').toFixed(2)} €</strong>
+                            className="font-mono text-primary">{calculateUpgradePrice(previewTerms, 'none', 'original', 'commercial', 'unlimited', 'international').toFixed(2)} €</strong>
                         </div>
                     </div>
 

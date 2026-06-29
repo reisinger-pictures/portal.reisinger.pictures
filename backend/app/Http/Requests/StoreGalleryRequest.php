@@ -2,9 +2,7 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class StoreGalleryRequest extends FormRequest
+class StoreGalleryRequest extends GalleryRequest
 {
     public function authorize(): bool
     {

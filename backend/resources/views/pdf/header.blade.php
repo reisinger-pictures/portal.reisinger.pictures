@@ -1,12 +1,12 @@
 <div style="text-align: center; margin-bottom: 20px;">
-    @php 
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+    @php
+        $pfx = \App\Support\BrandRegistry::prefix();
         $logoPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $pfx . 'watermark.svg');
         if (!file_exists($logoPath)) {
             $logoPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/watermark.svg');
         }
-        
-        $isAtr = config('app.brand') === 'all-the.rest';
+
+        $isAtr = \App\Support\BrandRegistry::isAtr();
         $primaryColor = $isAtr ? '#2A9D8F' : '#1E5631'; // Einheitliches Petrol für Rechnungen laut Vorgabe
         $secondaryColor = $isAtr ? '#2A9D8F' : '#A4B494';
     @endphp

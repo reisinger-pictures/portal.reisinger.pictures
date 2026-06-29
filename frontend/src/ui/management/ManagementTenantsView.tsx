@@ -19,7 +19,7 @@ export default function ManagementTenantsView() {
         setIsCreating(true);
         try {
             await createTenant({ name: newName, domain: newDomain || null, invoice_frequency: 'immediate' });
-            showToast('success', 'Mandant erstellt');
+            showToast('success', 'Organisation erstellt');
             setCreateOpen(false);
             setNewName('');
             setNewDomain('');
@@ -37,10 +37,10 @@ export default function ManagementTenantsView() {
         <div className="p-6 md:p-10 max-w-6xl mx-auto w-full relative">
             <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-4xl font-bold mb-2">Mandanten (B2B)</h1>
+                    <h1 className="text-4xl font-bold mb-2">Organisationen (B2B)</h1>
                     <p className="opacity-70">Verwalte Organisationen, deren Mitarbeiter und Sammelrechnungen.</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>+ Neuer Mandant</button>
+                <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>+ Neue Organisation</button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -60,7 +60,7 @@ export default function ManagementTenantsView() {
                 {tenants?.length === 0 && (
                     <div className="col-span-full py-12 text-center opacity-50 bg-base-200 rounded-box border border-base-300">
                         <span className="iconify mdi--domain text-4xl mb-2"></span>
-                        <p>Noch keine Mandanten angelegt.</p>
+                        <p>Noch keine Organisationen angelegt.</p>
                     </div>
                 )}
             </div>
@@ -69,7 +69,7 @@ export default function ManagementTenantsView() {
                 <div className="modal modal-open">
                     <div className="modal-box relative">
                         <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setCreateOpen(false)}>✕</button>
-                        <h3 className="font-bold text-lg mb-4">Neuen Mandanten anlegen</h3>
+                        <h3 className="font-bold text-lg mb-4">Neue Organisation anlegen</h3>
                         <form onSubmit={handleCreate} className="space-y-4">
                             <div className="form-control">
                                 <label className="label"><span className="label-text font-bold">Name (z.B. Firma XYZ)</span></label>

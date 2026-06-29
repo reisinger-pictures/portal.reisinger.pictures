@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\Brand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Facades\Cache;
 use Laravel\Scout\Searchable;
 
 class Gallery extends Model
@@ -17,11 +17,11 @@ class Gallery extends Model
     public const UPDATED_AT = null;
     
     protected $visible = [
-        'id', 'gallery_group_id', 'name', 'slug', 'type', 'is_live', 
-        'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos', 
-        'default_title', 'default_description', 'default_keywords', 
+        'id', 'gallery_group_id', 'name', 'slug', 'type', 'is_live',
+        'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos',
+        'default_title', 'default_description', 'default_keywords',
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
-        'tenant_id',
+        'tenant_id', 'brand',
         'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers'
     ];
 
@@ -48,6 +48,8 @@ class Gallery extends Model
         'default_state',
         'default_country',
         'default_iso_country',
+        'tenant_id',
+        'brand',
         'expires_at'
     ];
 
@@ -55,6 +57,7 @@ class Gallery extends Model
         'is_public' => 'boolean',
         'is_live' => 'boolean',
         'allow_client_metadata_edit' => 'boolean',
+        'brand' => Brand::class,
         'apply_metadata_to_photos' => 'boolean',
         'expires_at' => 'datetime',
         'tenant_id' => 'string',
@@ -113,17 +116,15 @@ class Gallery extends Model
 
     protected static function booted()
     {
-        static::saved(function () { 
+        static::saved(function () {
             \Illuminate\Support\Facades\DB::afterCommit(function() {
-            Cache::forget('gallery_tree_admin');
-            Cache::forget('unrestricted_photographer_gallery_ids');
-        }); 
+                app(\App\Services\GalleryTreeService::class)->clearCache();
+            });
         });
-        static::deleted(function () { 
+        static::deleted(function () {
             \Illuminate\Support\Facades\DB::afterCommit(function() {
-            Cache::forget('gallery_tree_admin');
-            Cache::forget('unrestricted_photographer_gallery_ids');
-        }); 
+                app(\App\Services\GalleryTreeService::class)->clearCache();
+            });
         });
     }
 

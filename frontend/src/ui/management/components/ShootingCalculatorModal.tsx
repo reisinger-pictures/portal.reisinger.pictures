@@ -1,10 +1,8 @@
 import {useState} from 'react';
 import {InvoiceDiscount, InvoiceItem} from '../../../api';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
-import {calculateB2CFlexPrice, calculateShootingPrice} from '../../../logic/shootingCalculator';
+import {calculateB2CFlexPrice, calculateShootingPrice, ShootingDiscount} from '../../../logic/shootingCalculator';
 import {useBrand} from '../../../logic/useBrand';
-
-type DiscountOption = '0' | '33' | '50';
 
 interface ShootingCalculatorModalProps {
     isOpen: boolean;
@@ -17,6 +15,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     const {terms} = useLicenseTerms();
 
     const [usePremium, setUsePremium] = useState(false);
+    // calcMode is derived from the current brand (via useBrand() / hostname), not from a
+    // brand-ID, so it stays in sync with the domain automatically.
     const calcMode = (isAtr && !usePremium) ? 'atr' : 'rp';
 
     // --- RP (B2B) State ---
@@ -24,7 +24,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     const [calcImages, setCalcImages] = useState<number>(15);
     const [calcIsFlatrate, setCalcIsFlatrate] = useState<boolean>(false);
     const [calcIsOutdoor, setCalcIsOutdoor] = useState<boolean>(false);
-    const [calcDiscount, setCalcDiscount] = useState<DiscountOption>('0');
+    const [calcDiscount, setCalcDiscount] = useState<ShootingDiscount>('0');
 
     // --- ATR (B2C) State ---
     const [atrType, setAtrType] = useState<'portrait' | 'couple' | 'nude'>('portrait');
@@ -184,7 +184,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                             <label className="label font-bold text-sm mb-1">Rabatt-Stufe</label>
                             <select className="select select-bordered w-full" value={calcDiscount}
-                                    onChange={e => setCalcDiscount(e.target.value as DiscountOption)}>
+                                    onChange={e => setCalcDiscount(e.target.value as ShootingDiscount)}>
                                 <option value="0">Kein Rabatt (0%)</option>
                                 <option value="33">Studenten Rabatt (~33%)</option>
                                 <option value="50">Special Deal OGs (~50%)</option>

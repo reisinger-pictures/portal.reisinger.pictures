@@ -4,14 +4,14 @@ local json = require "json"
 
 local Api = {}
 
-function Api.getApiUrl()
-    local prefs = LrPrefs.prefsForPlugin()
-    return prefs.useTestUrl and "https://portal.test" or "https://portal.reisinger.pictures"
+Api.baseUrl = "https://portal.reisinger.pictures"
+
+function Api.setBaseUrl(url)
+    Api.baseUrl = url
 end
 
 function Api.getTitle(title)
-    local prefs = LrPrefs.prefsForPlugin()
-    return prefs.useTestUrl and ("[TEST] " .. title) or title
+    return title
 end
 
 function Api.call(endpoint, method, payload, jwt)
@@ -24,7 +24,7 @@ function Api.call(endpoint, method, payload, jwt)
     end
     
     local resBody, resHeaders
-    local fullUrl = Api.getApiUrl() .. endpoint
+    local fullUrl = Api.baseUrl .. endpoint
     
     if method == "GET" then
         resBody, resHeaders = LrHttp.get(fullUrl, headers)
@@ -44,11 +44,20 @@ function Api.call(endpoint, method, payload, jwt)
     return data, status, resBody, resHeaders
 end
 
-function Api.login()
+function Api.login(overrideBaseUrl)
     local prefs = LrPrefs.prefsForPlugin()
     if not prefs.apiUser or not prefs.apiPass then return nil, "Keine Zugangsdaten eingegeben.", "" end
     local payload = { email = prefs.apiUser, password = prefs.apiPass }
-    local data, status, resBody, resHeaders = Api.call("/api/auth/login", "POST", payload, nil)
+    local data, status, resBody, resHeaders
+
+    if overrideBaseUrl then
+        local saved = Api.baseUrl
+        Api.baseUrl = overrideBaseUrl
+        data, status, resBody, resHeaders = Api.call("/api/auth/login", "POST", payload, nil)
+        Api.baseUrl = saved
+    else
+        data, status, resBody, resHeaders = Api.call("/api/auth/login", "POST", payload, nil)
+    end
     
     local token = data and data.access_token
     
@@ -69,7 +78,8 @@ function Api.login()
     if status == 200 and token then return token, nil, nil end
     
     local err = (data and data.error) or "Unbekannter API Fehler"
-    local detail = "Status: " .. tostring(status) .. "\nURL: " .. Api.getApiUrl() .. "/api/auth/login\n"
+    local effectiveUrl = overrideBaseUrl or Api.baseUrl
+    local detail = "Status: " .. tostring(status) .. "\nURL: " .. effectiveUrl .. "/api/auth/login\n"
     if resBody and resBody ~= "" then detail = detail .. "Body: " .. string.sub(resBody, 1, 300) end
     if resHeaders and resHeaders.error then detail = detail .. "\nCurl Error: " .. tostring(resHeaders.error.localizedMessage) end
     

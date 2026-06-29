@@ -15,7 +15,7 @@ e.g. `.claude/plans/`), which is invisible to other sessions and to the user.
 - **Test-Initiative (abgeschlossen):** alle Pakete umgesetzt — Backend PHPUnit (`tests/Feature/` + `tests/Unit/`),
   Frontend Vitest (`src/logic/__tests__/`), Playwright E2E (`tests/e2e/`). Verbleibende Arbeit = die einzeln
   angehbaren **REVIEW-Aufgaben (`R-NN`)** in `AGENTS.todo.md` (gefundene Bugs/Kanten, gruppiert nach Schwere).
-  Verbindliche Test-Regeln in `features/tech/05-testing-guidelines.md`.
+  Verbindliche Test-Regeln in `features/tech/04-testing-guidelines.md`.
 
 ## Project Overview
 
@@ -281,11 +281,11 @@ pnpm run test:e2e -- tests/e2e/path/to/test.spec.ts       # Playwright E2E
 
 Wiederverwendbarer Prozess für systematische Test-Arbeit (Spec → Implement → Review → Fix). Backlog in
 `AGENTS.todo.md` (Review-Aufgaben `R-NN`), Specs/SOLL-ZUSTAND in `features/`, Test-Regelwerk in
-`features/tech/05-testing-guidelines.md`. **Pro Batch ein Freigabe-Loop:**
+`features/tech/04-testing-guidelines.md`. **Pro Batch ein Freigabe-Loop:**
 
 1. **Aufgaben ermitteln.** Haupt-Agent liest `AGENTS.todo.md`, wählt die nächsten offenen Aufgaben (Abhängige zuerst).
 2. **Subagenten parallel starten („interne Absprache").** Pro Paket ein Subagent (`general-purpose`) mit
-   **selbst-contained Prompt**: vollständige Spec, das jeweilige Pattern aus `features/tech/05-testing-guidelines.md`,
+   **selbst-contained Prompt**: vollständige Spec, das jeweilige Pattern aus `features/tech/04-testing-guidelines.md`,
    Liste der zu lesenden Dateien (Target-Model/Service + abhängige Models + Factories + Vorbild-Test, z. B.
    `StatsCalculationServiceTest.php`) und **strikter Anweisung: nur fertigen Test-Code als Text zurückliefern —
    NICHTS schreiben, NICHTS ausführen** (Main Agent führt nach Freigabe selbst aus).

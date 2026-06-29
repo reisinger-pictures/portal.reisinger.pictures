@@ -1,0 +1,230 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\Brand;
+use App\Models\InvoiceSnapshot;
+use App\Models\Order;
+use App\Models\Setting;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Services\InvoiceService;
+use App\Services\SettingResolver;
+use App\Mail\InvoiceMail;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class BrandLeakTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Http::delete('http://127.0.0.1:8026/api/v1/messages');
+        Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'B2B Holder']);
+        Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'B2B123']);
+        Setting::updateOrCreate(['key' => 'bank_bic'], ['value' => 'B2BBIC']);
+        Setting::updateOrCreate(['key' => 'atr_bank_holder'], ['value' => 'ATR Holder']);
+        Setting::updateOrCreate(['key' => 'atr_bank_iban'], ['value' => 'ATR987']);
+        Setting::updateOrCreate(['key' => 'atr_bank_bic'], ['value' => 'ATRBIC']);
+    }
+
+    public function test_order_creation_persists_brand_from_config(): void
+    {
+        config(['app.brand' => Brand::B2B->value]);
+        $order = Order::create([
+            'user_id' => User::factory()->create()->id,
+            'status' => 'pending',
+            'brand' => config('app.brand'),
+            'total_amount' => 1000,
+        ]);
+        $this->assertSame(Brand::B2B, $order->brand);
+    }
+
+    public function test_invoice_snapshot_creation_persists_brand_from_order(): void
+    {
+        $order = Order::create([
+            'user_id' => User::factory()->create()->id,
+            'status' => 'pending',
+            'brand' => Brand::ATR->value,
+            'total_amount' => 1000,
+        ]);
+
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'P-2026-0001',
+            'brand' => $order->brand,
+            'customer_details' => ['name' => 'Test', 'items' => []],
+            'total_net' => 1000,
+            'total_gross' => 1000,
+            'tax_rate' => 0,
+        ]);
+
+        $this->assertDatabaseHas('invoice_snapshots', [
+            'invoice_number' => 'P-2026-0001',
+            'brand' => Brand::ATR->value,
+        ]);
+    }
+
+    public function test_invoice_mail_reconstructs_brand_from_order(): void
+    {
+        $order = Order::create([
+            'user_id' => User::factory()->create()->id,
+            'status' => 'invoice_created',
+            'brand' => Brand::ATR->value,
+            'total_amount' => 1000,
+        ]);
+
+        $snapshot = InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'P-2026-0002',
+            'brand' => Brand::ATR->value,
+            'customer_details' => ['name' => 'Test', 'items' => []],
+            'total_net' => 1000,
+            'total_gross' => 1000,
+            'tax_rate' => 0,
+        ]);
+
+        config(['app.brand' => null]);
+
+        $mailable = new InvoiceMail($order, $snapshot);
+        $mailable->build();
+
+        // Queue worker had no HTTP host; brand must be reconstructed from the order → ATR.
+        $this->assertSame(Brand::ATR->value, config('app.brand'));
+        $this->assertTrue(app(SettingResolver::class)->isAtr());
+    }
+
+    public function test_invoice_mail_fallback_when_order_has_no_brand(): void
+    {
+        $order = Order::create([
+            'user_id' => User::factory()->create()->id,
+            'status' => 'invoice_created',
+            'brand' => null,
+            'total_amount' => 1000,
+        ]);
+
+        $snapshot = InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'P-2026-0003',
+            'brand' => null,
+            'customer_details' => ['name' => 'Test', 'items' => []],
+            'total_net' => 1000,
+            'total_gross' => 1000,
+            'tax_rate' => 0,
+        ]);
+
+        config(['app.brand' => null]);
+
+        $mailable = new InvoiceMail($order, $snapshot);
+        $mailable->build();
+
+        // Legacy order without brand → safe B2B default, never empty branding.
+        $this->assertSame(Brand::B2B->value, config('app.brand'));
+        $this->assertFalse(app(SettingResolver::class)->isAtr());
+    }
+
+    public function test_invoice_service_persists_brand_on_collective_orders(): void
+    {
+        $tenant = Tenant::create(['name' => 'Brand Tenant', 'invoice_frequency' => 'monthly']);
+        $user = User::factory()->create(['email' => 'brand-tenant@example.com']);
+        $user->tenants()->attach($tenant);
+
+        $order = Order::create([
+            'user_id' => $user->id,
+            'status' => 'delivery_note',
+            'brand' => Brand::ATR->value,
+            'total_amount' => 5000,
+        ]);
+
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'L-2026-0001',
+            'brand' => Brand::ATR->value,
+            'customer_details' => ['name' => 'Brand Kunde', 'items' => [['photoId' => 'p1', 'price' => 5000, 'tier' => 'web']]],
+            'total_net' => 5000,
+            'total_gross' => 5000,
+            'tax_rate' => 0,
+        ]);
+
+        $service = new InvoiceService();
+        $result = $service->generateForTenant($tenant);
+        $this->assertTrue($result['success']);
+
+        $this->assertDatabaseHas('orders', [
+            'status' => 'invoice_created',
+            'brand' => Brand::ATR->value,
+        ]);
+
+        $collectiveOrder = Order::where('status', 'invoice_created')->first();
+        $snapshot = InvoiceSnapshot::where('order_id', $collectiveOrder->id)->first();
+        $this->assertSame(Brand::ATR, $snapshot->brand);
+    }
+
+    /**
+     * B-01 F2: an ATR order downloaded via a B2B request host must still render ATR bank
+     * details. Also covers the $get regression (downloadInvoice must not 500).
+     */
+    public function test_download_invoice_uses_order_brand_not_request_host(): void
+    {
+        $user = User::factory()->create();
+        $order = Order::create([
+            'user_id' => $user->id,
+            'status' => 'invoice_created',
+            'brand' => Brand::ATR->value,
+            'total_amount' => 1000,
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'P-2026-0010',
+            'brand' => Brand::ATR->value,
+            'customer_details' => ['name' => 'Test', 'items' => []],
+            'total_net' => 1000,
+            'total_gross' => 1000,
+            'tax_rate' => 0,
+        ]);
+
+        // Simulate a B2B request host while the order is ATR.
+        config(['app.brand' => Brand::B2B->value]);
+
+        $response = $this->actingAs($user, 'api')
+            ->getJson("/api/orders/{$order->id}/invoice");
+
+        $response->assertOk();
+        // Brand must be reconstructed to ATR from the persisted order.
+        $this->assertSame(Brand::ATR->value, config('app.brand'));
+        $this->assertTrue(app(SettingResolver::class)->isAtr());
+    }
+
+    /**
+     * Inverse case: B2B order rendered through any host stays B2B.
+     */
+    public function test_download_invoice_b2b_order_renders_b2b(): void
+    {
+        $user = User::factory()->create();
+        $order = Order::create([
+            'user_id' => $user->id,
+            'status' => 'invoice_created',
+            'brand' => Brand::B2B->value,
+            'total_amount' => 1000,
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'P-2026-0011',
+            'brand' => Brand::B2B->value,
+            'customer_details' => ['name' => 'Test', 'items' => []],
+            'total_net' => 1000,
+            'total_gross' => 1000,
+            'tax_rate' => 0,
+        ]);
+
+        $response = $this->actingAs($user, 'api')
+            ->getJson("/api/orders/{$order->id}/invoice");
+
+        $response->assertOk();
+        $this->assertSame(Brand::B2B->value, config('app.brand'));
+        $this->assertFalse(app(SettingResolver::class)->isAtr());
+    }
+}

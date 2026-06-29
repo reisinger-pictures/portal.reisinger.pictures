@@ -5,12 +5,15 @@ import useSWR from 'swr';
 import {fetcher} from '../api';
 import {Photo} from '../logic/useGallery';
 import {useAuth} from '../logic/useAuth';
+import {usePermissions} from '../logic/usePermissions';
 import {usePhoto} from '../logic/usePhoto';
 import PageLayout from './components/PageLayout';
-import IptcMetadataEditor, { IptcData } from './components/IptcMetadataEditor';
+import IptcMetadataEditor from './components/IptcMetadataEditor';
+import { IptcData } from '../logic/usePhoto';
 import ResponsiveImage from './components/ResponsiveImage';
 import PhotoHistoryModal from './components/PhotoHistoryModal';
 import { useUI } from './components/UIContext';
+import { useAI } from '../logic/useAI';
 import LicenseSelectorCard from './client/components/LicenseSelectorCard';
 import { BreadcrumbItem } from '../api';
 
@@ -24,7 +27,9 @@ export default function PhotoDetailView() {
     const {id} = useParams<{ id: string }>();
     const navigate = useNavigate();
     const {user} = useAuth();
+    const {isSuperAdmin, isAdmin, isPhotographer, canEditMetadata} = usePermissions();
     const {updateMetadata, deletePhoto} = usePhoto();
+    const { isAvailable, generateMetadata } = useAI();
     const { showToast, confirm } = useUI();
     const {data, error, isLoading, mutate} = useSWR<PhotoContextData>(id ? '/api/photos/' + id + '/context' : null, fetcher);
 
@@ -32,6 +37,8 @@ export default function PhotoDetailView() {
     const [saving, setSaving] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [prevPhotoId, setPrevPhotoId] = useState<string | undefined>(undefined);
+    const [aiContext, setAiContext] = useState('');
+    const [isAiGenerating, setIsAiGenerating] = useState(false);
 
     if (data?.photo && data.photo.id !== prevPhotoId) {
         setPrevPhotoId(data.photo.id);
@@ -55,8 +62,14 @@ export default function PhotoDetailView() {
     if (error || !data) return <PageLayout><div className="p-8"><ErrorMessage message="Foto konnte nicht geladen werden oder keine Berechtigung." /></div></PageLayout>;
 
     const {photo, breadcrumbs} = data;
-    const isPhotographer = user?.is_super_admin || user?.is_admin || (user?.is_photographer && data?.photo && (user?.my_galleries?.some(g => g.id === data.photo.gallery_id) || user?.photographer_galleries?.some(g => g.id === data.photo.gallery_id)));
-    const canEdit = isPhotographer || ((user?.can_edit_metadata || user?.transient_meta_galleries?.includes(data?.photo?.gallery_id)) && data?.photo?.gallery?.allow_client_metadata_edit);
+    const isPhotographerUser = isSuperAdmin || isAdmin || (isPhotographer && data?.photo && (user?.my_galleries?.some(g => g.id === data.photo.gallery_id) || user?.photographer_galleries?.some(g => g.id === data.photo.gallery_id)));
+    const canEdit = isPhotographerUser || ((canEditMetadata || user?.transient_meta_galleries?.includes(data?.photo?.gallery_id)) && data?.photo?.gallery?.allow_client_metadata_edit);
+
+    const galleryDefaults = data?.photo?.gallery
+        ? [data.photo.gallery.default_title, data.photo.gallery.default_description, data.photo.gallery.default_keywords]
+            .filter(Boolean)
+            .join(' | ')
+        : '';
 
     const handleSaveMeta = async () => {
         setSaving(true);
@@ -78,6 +91,24 @@ export default function PhotoDetailView() {
         } catch {
             showToast('error', 'Fehler beim Löschen');
         }
+    };
+
+    const handleAiGenerate = async () => {
+        setIsAiGenerating(true);
+        try {
+            const result = await generateMetadata(photo.id, galleryDefaults, aiContext);
+            setIptcData(prev => ({
+                ...prev,
+                title: result.title || prev.title,
+                description: result.description || prev.description,
+                keywords: result.keywords || prev.keywords,
+                location: result.location || prev.location
+            }));
+            showToast('success', 'KI-Vorschlag geladen — jetzt prüfen und speichern.');
+        } catch {
+            showToast('error', 'KI-Generierung fehlgeschlagen.');
+        }
+        setIsAiGenerating(false);
     };
 
     return (
@@ -103,19 +134,46 @@ export default function PhotoDetailView() {
                         <div className="bg-base-200 rounded-box flex items-center justify-center p-4 min-h-[40vh] overflow-hidden">
                             <ResponsiveImage src={photo.url} alt={photo.title || 'Bild'} containerClassName="flex items-center justify-center w-full h-full min-h-[40vh] bg-transparent" className="max-w-full h-auto max-h-[70vh] object-contain rounded drop-shadow-xl" />
                         </div>
-                        {isPhotographer && (<div className="flex justify-end w-full bg-base-100 p-4 rounded-box border border-base-300 shadow-sm mt-2"><button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap"><span className="iconify mdi--trash-can"></span> Bild löschen</button></div>)}
+                        {isPhotographerUser && (<div className="flex justify-end w-full bg-base-100 p-4 rounded-box border border-base-300 shadow-sm mt-2"><button onClick={handleDelete} className="btn btn-outline btn-error shrink-0 w-full sm:w-auto whitespace-nowrap"><span className="iconify mdi--trash-can"></span> Bild löschen</button></div>)}
                     </div>
 
                     <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                         {data.photo.gallery?.type === 'delivery' && (
                             <LicenseSelectorCard photo={data.photo} />
                         )}
-                        <IptcMetadataEditor data={iptcData} onChange={setIptcData} disabled={!canEdit} showArtist={isPhotographer} showEditorialFlag={true} capturedAt={data.photo.captured_at}>
+                        <IptcMetadataEditor data={iptcData} onChange={setIptcData} disabled={!canEdit} showArtist={isPhotographerUser} showEditorialFlag={true} capturedAt={data.photo.captured_at}>
                             {canEdit && (
-                                <div className="flex flex-col sm:flex-row gap-2 mt-6 pt-4 border-t border-base-300">
-                                    <button onClick={handleSaveMeta} disabled={saving} className="btn btn-primary flex-1 w-full">{saving ? <span className="loading loading-spinner"></span> : 'Speichern'}</button>
-                                    {isPhotographer && (<button onClick={() => setIsHistoryOpen(true)} className="btn btn-outline w-full sm:w-auto" title="Änderungshistorie anzeigen"><span className="iconify mdi--history"></span> Historie</button>)}
-                                </div>
+                                <>
+                                    <div className="mt-4 p-3 bg-base-200 rounded-box border border-base-300">
+                                        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                                            <input
+                                                type="text"
+                                                value={aiContext}
+                                                onChange={e => setAiContext(e.target.value)}
+                                                placeholder="Zusätzlicher Kontext für KI (optional)"
+                                                className="input input-sm input-bordered flex-1 w-full"
+                                            />
+                                            <button
+                                                onClick={handleAiGenerate}
+                                                disabled={!isAvailable || isAiGenerating}
+                                                className="btn btn-sm btn-primary w-full sm:w-auto"
+                                            >
+                                                {isAiGenerating ? (
+                                                    <span className="loading loading-spinner loading-xs"></span>
+                                                ) : (
+                                                    <><span className="iconify mdi--auto-fix"></span> KI generieren</>
+                                                )}
+                                            </button>
+                                        </div>
+                                        {galleryDefaults && (
+                                            <p className="text-xs opacity-50 mt-1">Gallery-Kontext: {galleryDefaults}</p>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-2 mt-6 pt-4 border-t border-base-300">
+                                        <button onClick={handleSaveMeta} disabled={saving} className="btn btn-primary flex-1 w-full">{saving ? <span className="loading loading-spinner"></span> : 'Speichern'}</button>
+                                        {isPhotographerUser && (<button onClick={() => setIsHistoryOpen(true)} className="btn btn-outline w-full sm:w-auto" title="Änderungshistorie anzeigen"><span className="iconify mdi--history"></span> Historie</button>)}
+                                    </div>
+                                </>
                             )}
                         </IptcMetadataEditor>
                     </div>

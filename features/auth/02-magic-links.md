@@ -24,3 +24,7 @@ status: active
 - **Target State (Transient Access):** - When an anonymous link is redeemed, we generate a custom JWT containing transient claims: `transient_galleries: [gallery_id]` and a `guest_id` (UUID). We do **not** insert a row into the `users` table.
   - If a logged-in user redeems a link, we reissue their JWT to append the `transient_galleries` claim. The gallery is **not** saved to `user_galleries`, keeping their dashboard clean.
 - **Database Schema Clash:** To implement this, the `ratings` table must be migrated. The `user_id` foreign key must become `nullable`, and a new `guest_id` (string) column must be added to associate ratings with the transient JWT claim.
+
+## Related
+- [Roles & Access Management](../auth/01-roles-and-access.md) — role-based access model that magic links complement
+- [Roles & Access Management (Single Tenant)](../auth/03-roles-and-rbac.md) — enterprise RBAC alignment with transient access

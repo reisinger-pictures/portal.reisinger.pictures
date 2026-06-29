@@ -1,7 +1,7 @@
 # Index: TECH
 
 * [Database schema](01-database-schema.md)
-* [Backend architecture](03-backend-architecture.md)
-* [Frontend architecture](04-frontend-architecture.md)
-* [Testing guidelines](05-testing-guidelines.md)
-* [Post mortem gallery bugs](06-post-mortem-gallery-bugs.md)
+* [Backend architecture](02-backend-architecture.md)
+* [Frontend architecture](03-frontend-architecture.md)
+* [Testing guidelines](04-testing-guidelines.md)
+* [Security and perf refinement](05-security-and-perf-refinement.md)

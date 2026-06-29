@@ -3,6 +3,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Setting;
+use App\Services\SettingResolver;
+use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Cache;
 
@@ -40,7 +42,7 @@ class SettingsController extends Controller
 
     public function getWatermarkSvg()
     {
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $pfx = BrandRegistry::prefix();
         $path = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $pfx . 'watermark.svg');
         if (!file_exists($path)) {
             $path = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/watermark.svg');
@@ -49,17 +51,17 @@ class SettingsController extends Controller
         return response()->file($path, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'no-cache, no-store, must-revalidate']);
     }
 
-    public function getWatermark()
+    public function getWatermark(SettingResolver $resolver)
     {
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $pfx = BrandRegistry::prefix();
         $disk = \Illuminate\Support\Facades\Storage::disk('photos');
         return response()->json([
             'has_svg' => $disk->exists('_watermarks/' . $pfx . 'watermark.svg'),
-            'opacity' => (float) (Setting::where('key', $pfx . 'watermark_opacity')->value('value') ?? Setting::where('key', 'watermark_opacity')->value('value') ?? 0.15)
+            'opacity' => (float) $resolver->get('watermark_opacity', 0.15),
         ]);
     }
 
-    public function updateWatermark(Request $request)
+    public function updateWatermark(Request $request, SettingResolver $resolver)
     {
         $request->validate([
             'opacity' => 'nullable|numeric|min:0.05|max:1.0',
@@ -72,13 +74,13 @@ class SettingsController extends Controller
             'bucket_2000_sel' => 'nullable|file',
         ]);
 
-        if ($request->has('opacity')) Setting::updateOrCreate(['key' => 'watermark_opacity'], ['value' => $request->opacity]);
+        if ($request->has('opacity')) $resolver->set('watermark_opacity', $request->opacity);
         
         $disk = \Illuminate\Support\Facades\Storage::disk('photos');
         $dir = '_watermarks';
         if (!$disk->exists($dir)) $disk->makeDirectory($dir);
 
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
+        $pfx = BrandRegistry::prefix();
         if ($request->hasFile('svg')) $disk->putFileAs($dir, $request->file('svg'), $pfx . 'watermark.svg');
         if ($request->hasFile('bucket_500')) $disk->putFileAs($dir, $request->file('bucket_500'), $pfx . 'master_500.png');
         if ($request->hasFile('bucket_1000')) $disk->putFileAs($dir, $request->file('bucket_1000'), $pfx . 'master_1000.png');
@@ -140,21 +142,21 @@ class SettingsController extends Controller
      * Getrennt von den Lizenzbedingungen: Lizenztexte sind public-safe, Billing-/Firmendaten
      * sind sensibel und dürfen anonym nicht exponiert werden.
      */
-    public function getBillingDetails()
+    public function getBillingDetails(SettingResolver $resolver)
     {
         return response()->json([
-            'bank_iban' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_bank_iban' : 'bank_iban')->value('value') ?? Setting::where('key', 'bank_iban')->value('value') ?? '',
-            'bank_bic' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_bank_bic' : 'bank_bic')->value('value') ?? Setting::where('key', 'bank_bic')->value('value') ?? '',
-            'bank_holder' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_bank_holder' : 'bank_holder')->value('value') ?? Setting::where('key', 'bank_holder')->value('value') ?? '',
-            'company_street' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_street' : 'company_street')->value('value') ?? Setting::where('key', 'company_street')->value('value') ?? '',
-            'company_zip' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_zip' : 'company_zip')->value('value') ?? Setting::where('key', 'company_zip')->value('value') ?? '',
-            'company_city' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_city' : 'company_city')->value('value') ?? Setting::where('key', 'company_city')->value('value') ?? '',
-            'company_country' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_country' : 'company_country')->value('value') ?? Setting::where('key', 'company_country')->value('value') ?? '',
-            'company_email' => Setting::where('key', config('app.brand') === 'all-the.rest' ? 'atr_company_email' : 'company_email')->value('value') ?? Setting::where('key', 'company_email')->value('value') ?? 'hello@reisinger.pictures',
+            'bank_iban' => $resolver->get('bank_iban', ''),
+            'bank_bic' => $resolver->get('bank_bic', ''),
+            'bank_holder' => $resolver->get('bank_holder', ''),
+            'company_street' => $resolver->get('company_street', ''),
+            'company_zip' => $resolver->get('company_zip', ''),
+            'company_city' => $resolver->get('company_city', ''),
+            'company_country' => $resolver->get('company_country', ''),
+            'company_email' => $resolver->get('company_email', 'hello@reisinger.pictures'),
         ]);
     }
 
-    public function updateLicenseTerms(Request $request)
+    public function updateLicenseTerms(Request $request, SettingResolver $resolver)
     {
         // R-01 (naming/SRP): nur Lizenzbedingungen + Preisfaktoren. Bank-/Firmendaten gehören
         // in updateBillingDetails() (separater Endpunkt).
@@ -182,10 +184,9 @@ class SettingsController extends Controller
             'term_original' => 'nullable|string',
         ]);
 
-        $pfx = config('app.brand') === 'all-the.rest' ? 'atr_' : '';
         foreach ($validated as $key => $value) {
             if ($value !== null) {
-                Setting::updateOrCreate(['key' => $pfx . $key], ['value' => $value]);
+                $resolver->set($key, $value);
             }
         }
         return response()->json(['success' => true]);
@@ -194,7 +195,7 @@ class SettingsController extends Controller
     /**
      * R-01: Bankverbindung & Impressum speichern (nur Lizenzbedingungen-unabhängige Felder).
      */
-    public function updateBillingDetails(Request $request)
+    public function updateBillingDetails(Request $request, SettingResolver $resolver)
     {
         $validated = $request->validate([
             'bank_holder' => 'nullable|string',
@@ -209,7 +210,7 @@ class SettingsController extends Controller
 
         foreach ($validated as $key => $value) {
             if ($value !== null) {
-                Setting::updateOrCreate(['key' => $key], ['value' => $value]);
+                $resolver->set($key, $value);
             }
         }
         return response()->json(['success' => true]);

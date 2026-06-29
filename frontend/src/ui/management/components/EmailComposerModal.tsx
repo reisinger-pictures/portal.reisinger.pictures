@@ -29,7 +29,7 @@ export default function EmailComposerModal({ isOpen, onClose, galleryId }: Email
             showToast('success', 'Erfolg! ' + data.notified_count + ' E-Mails versendet.');
             onClose();
         } catch (err: unknown) {
-            showToast('error', 'Fehler: ' + (err instanceof Error ? (err as Error).message : 'Unknown error'));
+            showToast('error', 'Fehler: ' + (err instanceof Error ? (err as Error).message : 'Unbekannter Fehler'));
         }
         setSendingMail(false);
     };

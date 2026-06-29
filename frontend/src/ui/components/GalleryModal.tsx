@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
 import { Gallery, FlatGroup, GalleryMetadataOpts } from '../../logic/useGalleries';
 import { Tenant } from '../../logic/useTenants';
 import { useUI } from './UIContext';
+import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
@@ -40,7 +40,7 @@ const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace
 
 export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
-    const { data: tenants } = useSWR<Tenant[]>('/api/management/tenants', fetcher);
+    const { data: tenants, isLoading } = useSWR<Tenant[]>('/api/management/tenants', fetcher);
 
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
@@ -68,23 +68,9 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);
 
-    const watchName = useWatch({ control, name: 'name' });
-    useEffect(() => {
-        if (!editingGallery && !dirtyFields.slug && watchName) {
-            setValue('slug', toSlug(watchName));
-        }
-    }, [watchName, editingGallery, dirtyFields.slug, setValue]);
-
     const watchType = useWatch({ control, name: 'type' });
     const watchGroupId = useWatch({ control, name: 'gallery_group_id' });
     const watchIsPublic = useWatch({ control, name: 'is_public' });
-
-    useEffect(() => {
-        if (watchType === 'selection') {
-            setValue('is_live', false);
-            setValue('is_public', false);
-        }
-    }, [watchType, setValue]);
 
     const selectedParent = availableGroups.find(g => g.id === (watchGroupId === '' ? null : watchGroupId));
     let isVisibilityForced = selectedParent?.is_public !== undefined && selectedParent?.is_public !== null;
@@ -131,6 +117,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     };
 
     if (!isOpen) return null;
+    if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
     return (
         <dialog className="modal modal-open z-[60]">
@@ -153,7 +140,14 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Name der Galerie</span></label>
-                            <input type="text" {...register('name')} className="input input-bordered w-full" />
+                            <input type="text" {...register('name')}
+                                   onChange={(e) => {
+                                       setValue('name', e.target.value, { shouldDirty: true });
+                                       if (!editingGallery && !dirtyFields.slug && e.target.value) {
+                                           setValue('slug', toSlug(e.target.value));
+                                       }
+                                   }}
+                                   className="input input-bordered w-full" />
                         </div>
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">URL Slug</span></label>
@@ -164,7 +158,15 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text font-bold">Galerie-Typ</span></label>
-                            <select {...register('type')} className="select select-bordered w-full">
+                            <select {...register('type')}
+                                    onChange={(e) => {
+                                        setValue('type', e.target.value as 'delivery' | 'selection', { shouldDirty: true });
+                                        if (e.target.value === 'selection') {
+                                            setValue('is_live', false);
+                                            setValue('is_public', false);
+                                        }
+                                    }}
+                                    className="select select-bordered w-full">
                                 <option value="delivery">Delivery (Downloads)</option>
                                 <option value="selection">Auswahl (Ratings)</option>
                             </select>
@@ -187,9 +189,9 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
                     
                     <div className="form-control w-full mb-4">
-                        <label className="label"><span className="label-text font-bold">Zugeordneter Mandant (Verschieben)</span></label>
+                        <label className="label"><span className="label-text font-bold">Zugeordnete Organisation (Verschieben)</span></label>
                         <select {...register('tenant_id')} className="select select-bordered w-full">
-                            <option value="">-- Kein spezifischer Mandant --</option>
+                            <option value="">-- Keine spezifische Organisation --</option>
                             {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                     </div>

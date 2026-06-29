@@ -1,6 +1,6 @@
 import useSWR from 'swr';
 import {fetcher} from '../api';
-import {useAuth} from './useAuth';
+import {usePermissions} from './usePermissions';
 
 export interface WatermarkSettings {
     text: string;
@@ -9,8 +9,8 @@ export interface WatermarkSettings {
 }
 
 export function useSettings() {
-    const {user} = useAuth();
-    const canFetch = user?.is_admin;
+    const {isAdmin} = usePermissions();
+    const canFetch = isAdmin;
 
     const {data: watermark, mutate} = useSWR<WatermarkSettings>(
         canFetch ? '/api/management/settings/watermark' : null,

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { ResolutionTier } from './usePricing';
+import { ResolutionTier } from './pricingLogic';
 
 export interface CartItem {
     photoId: string;
