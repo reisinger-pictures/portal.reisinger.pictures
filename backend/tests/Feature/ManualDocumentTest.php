@@ -15,9 +15,9 @@ class ManualDocumentTest extends TestCase
     {
         parent::setUp();
         // Erforderliche Stammdaten für den PDF-Header/Footer
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_bic'], ['value' => 'TESTAT11']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'TESTAT11']);
     }
 
     public function test_super_admin_can_generate_manual_document_with_discounts()

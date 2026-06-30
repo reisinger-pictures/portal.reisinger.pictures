@@ -6,19 +6,17 @@ import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 
-
-
 test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
     let helper: E2ESessionHelper;
-    let adminUser = { email: '', password: '' };
     let photogUser = { email: '', password: '' };
     let clientUser = { email: '', password: '' };
+    let adminUser = { email: '', password: '' };
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
-        adminUser = await helper.createIsolatedUser( 'admin');
-        photogUser = await helper.createIsolatedUser( 'photographer');
-        clientUser = await helper.createIsolatedUser( 'client');
+        adminUser = await helper.createIsolatedUser('admin');
+        photogUser = await helper.createIsolatedUser('photographer');
+        clientUser = await helper.createIsolatedUser('client');
     });
 
     test.afterEach(async () => {
@@ -44,7 +42,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await expect(page.locator('h4:has-text("IPTC Metadaten")')).toBeVisible();
 
         await page.getByRole('button', { name: 'Bild löschen' }).click();
-        
+
         const confirmModal = page.locator('.modal-global');
         await expect(confirmModal).toBeVisible();
 
@@ -75,18 +73,18 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
         await page.locator('button[title="Details & Metadaten"]').first().click();
         await expect(page.locator('h4:has-text("IPTC Metadaten")')).toBeVisible();
-        
+
         const titleInput = page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input');
         await titleInput.fill('Originaler Titel vom Fotografen');
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page.locator('.toast')).toContainText('Metadaten gespeichert');
-        
+
         await page.locator('button.btn-ghost:has(.mdi--arrow-left)').click();
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
-        
+
         await modal.toggleCheckboxByLabel('Gast darf Metadaten bearbeiten', true);
         await modal.clickButton('Generieren');
-        
+
         await expect(page.locator('text=Erfolgreich generiert!')).toBeVisible();
         const magicLink = await modal.activeModal.locator('input[readonly]').inputValue();
         await auth.logout();
@@ -94,12 +92,12 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         // === PHASE 2: GUEST EDITS VIA MAGIC LINK ===
         await page.goto(magicLink);
         await expect(page.locator('h2:has-text("Willkommen")')).toBeVisible();
-        
+
         await page.getByPlaceholder('z.B. Maria Muster').fill('Test Gast Bewerter');
         await page.getByPlaceholder('maria@beispiel.de').fill('gast@example.com');
         await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
         await page.getByRole('button', { name: 'Galerie öffnen' }).click();
-        
+
         await expect(page.locator(`h1:has-text("${galleryNameA}")`)).toBeVisible();
 
         await page.locator('button[title="Details & Metadaten"]').first().click();
@@ -107,7 +105,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
         const clientTitleInput = page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input');
         await expect(clientTitleInput).toHaveValue('Originaler Titel vom Fotografen');
-        
+
         await clientTitleInput.fill('Titel geändert durch den Kunden');
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page.locator('.toast')).toContainText('Metadaten gespeichert');
@@ -120,6 +118,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
         await page.locator('button[title="Details & Metadaten"]').first().click();
         await expect(page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input')).toHaveValue('Titel geändert durch den Kunden');
+        await page.waitForTimeout(500);
 
         await page.getByRole('button', { name: 'Historie' }).click();
         const historyModal = page.locator('.modal-open');
@@ -127,7 +126,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
         await expect(historyModal.locator('td').filter({ hasText: 'Originaler Titel vom Fotografen' })).toBeVisible();
 
-        await historyModal.getByRole('button', { name: 'Wiederherstellen' }).click();
+        await historyModal.getByRole('button', { name: 'Wiederherstellen' }).first().click();
         const confirmGlobal = page.locator('.modal-global');
         await expect(confirmGlobal).toBeVisible();
         await confirmGlobal.getByRole('button', { name: 'Wiederherstellen' }).click();
@@ -148,11 +147,11 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await modal.fillInputByLabel('Name der Galerie', galleryNameK);
         await modal.selectByLabel('Galerie-Typ', 'Delivery (Downloads)');
         await modal.selectByLabel('Sichtbarkeit', 'Öffentlich (Für alle sichtbar)');
-        
+
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const dateString = yesterday.toISOString().split('T')[0];
-        
+
         await modal.fillInputByLabel('Ablaufdatum', dateString);
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
@@ -175,7 +174,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
     test('Flow L: Invalid magic link does not destroy active user session', async ({ page }) => {
         const auth = new AuthHelper(page);
-        
+
         await auth.login(clientUser.email, clientUser.password);
 
         await page.goto('/invite/this-is-a-totally-invalid-token-that-does-not-exist');
@@ -188,12 +187,12 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
     test('Flow M: Admin cannot see management buttons or delete photos', async ({ page }) => {
         const auth = new AuthHelper(page);
-        
+
         await auth.login(adminUser.email, adminUser.password);
 
         const galleryLink = page.locator('ul.menu').getByText('Galerien');
         await expect(galleryLink).toBeHidden();
-        
+
         await auth.logout();
     });
 });

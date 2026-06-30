@@ -20,9 +20,9 @@ class UpdateUserRequest extends FormRequest
             'gallery_ids' => 'array',
             'can_edit_metadata' => 'boolean',
             'flatrate_level' => 'nullable|string|in:none,web,print,original',
-            // Brand: 'rp', 'atr', or null (cross-brand). Policy A (A-01): staff accounts are
+            // Brand: 'rp', 'srp', or null (cross-brand). Policy A (A-01): staff accounts are
             // always cross-brand; the controller enforces null for staff role selections.
-            'brand' => 'nullable|string|in:rp,atr'
+            'brand' => 'nullable|string|in:rp,srp'
         ];
     }
 }

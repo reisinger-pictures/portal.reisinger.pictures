@@ -23,13 +23,13 @@ test.describe('Brand Tenant Isolation', () => {
             const sidebar = new SidebarHelper(page);
 
             await auth.login(adminUser.email, adminUser.password);
-            await sidebar.navigateTo('Mandanten (B2B)');
+            await sidebar.navigateTo('Organisationen (B2B)');
 
             await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
         });
     });
 
-    test.describe('ATR brand (all-the.rest) - mocked hostname', () => {
+    test.describe('SRP brand (story.reisinger.pictures) - mocked hostname', () => {
         let adminUser: { email: string; password: string; id: string };
 
         test.beforeEach(async ({ request }) => {
@@ -37,10 +37,10 @@ test.describe('Brand Tenant Isolation', () => {
             adminUser = await helper.createIsolatedUser('admin');
         });
 
-        test('Admin on ATR brand can still access B2B route /tenants', async ({ page }) => {
+        test('Admin on SRP brand can still access B2B route /tenants', async ({ page }) => {
             await page.addInitScript(() => {
                 Object.defineProperty(window.location, 'hostname', {
-                    get: () => 'all-the.rest',
+                    get: () => 'story.reisinger.pictures',
                     configurable: true,
                 });
             });
@@ -52,10 +52,10 @@ test.describe('Brand Tenant Isolation', () => {
             await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
         });
 
-        test('Admin on ATR brand sees B2B Mandanten link in sidebar', async ({ page }) => {
+        test('Admin on SRP brand sees B2B Mandanten link in sidebar', async ({ page }) => {
             await page.addInitScript(() => {
                 Object.defineProperty(window.location, 'hostname', {
-                    get: () => 'all-the.rest',
+                    get: () => 'story.reisinger.pictures',
                     configurable: true,
                 });
             });
@@ -64,14 +64,14 @@ test.describe('Brand Tenant Isolation', () => {
             await auth.login(adminUser.email, adminUser.password);
 
             const sidebar = page.locator('aside');
-            const mandantenLink = sidebar.getByText('Mandanten (B2B)');
+            const mandantenLink = sidebar.getByText('Organisationen (B2B)');
             await expect(mandantenLink).toBeVisible({ timeout: 10000 });
         });
 
-        test('Client on ATR brand is redirected away from /tenants', async ({ page }) => {
+        test('Client on SRP brand is redirected away from /tenants', async ({ page }) => {
             await page.addInitScript(() => {
                 Object.defineProperty(window.location, 'hostname', {
-                    get: () => 'all-the.rest',
+                    get: () => 'story.reisinger.pictures',
                     configurable: true,
                 });
             });
@@ -85,10 +85,10 @@ test.describe('Brand Tenant Isolation', () => {
             await expect(page.getByRole('heading', { name: /^Willkommen zurück/ })).toBeVisible({ timeout: 15000 });
         });
 
-        test('Client on ATR brand does not see B2B Mandanten in sidebar', async ({ page }) => {
+        test('Client on SRP brand does not see B2B Mandanten in sidebar', async ({ page }) => {
             await page.addInitScript(() => {
                 Object.defineProperty(window.location, 'hostname', {
-                    get: () => 'all-the.rest',
+                    get: () => 'story.reisinger.pictures',
                     configurable: true,
                 });
             });
@@ -98,7 +98,7 @@ test.describe('Brand Tenant Isolation', () => {
             await auth.login(clientUser.email, clientUser.password);
 
             const sidebar = page.locator('aside');
-            await expect(sidebar.getByText('Mandanten (B2B)')).toHaveCount(0);
+            await expect(sidebar.getByText('Organisationen (B2B)')).toHaveCount(0);
         });
     });
 });

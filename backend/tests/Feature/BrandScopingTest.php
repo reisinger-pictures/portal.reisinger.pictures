@@ -16,15 +16,15 @@ class BrandScopingTest extends TestCase
      */
     public function test_brand_bound_user_only_sees_own_brand_galleries(): void
     {
-        $user = User::factory()->create(['brand' => Brand::ATR]);
+        $user = User::factory()->create(['brand' => Brand::SRP]);
 
-        $atrGallery = Gallery::factory()->create(['brand' => Brand::ATR->value]);
+        $srpGallery = Gallery::factory()->create(['brand' => Brand::SRP->value]);
         $b2bGallery = Gallery::factory()->create(['brand' => Brand::B2B->value]);
-        $user->galleries()->attach([$atrGallery->id, $b2bGallery->id]);
+        $user->galleries()->attach([$srpGallery->id, $b2bGallery->id]);
 
         $allowed = $user->getAllowedGalleryIds();
 
-        $this->assertContains($atrGallery->id, $allowed);
+        $this->assertContains($srpGallery->id, $allowed);
         $this->assertNotContains($b2bGallery->id, $allowed);
     }
 
@@ -35,13 +35,13 @@ class BrandScopingTest extends TestCase
     {
         $user = User::factory()->create(['brand' => null]);
 
-        $atrGallery = Gallery::factory()->create(['brand' => Brand::ATR->value]);
+        $srpGallery = Gallery::factory()->create(['brand' => Brand::SRP->value]);
         $b2bGallery = Gallery::factory()->create(['brand' => Brand::B2B->value]);
-        $user->galleries()->attach([$atrGallery->id, $b2bGallery->id]);
+        $user->galleries()->attach([$srpGallery->id, $b2bGallery->id]);
 
         $allowed = $user->getAllowedGalleryIds();
 
-        $this->assertContains($atrGallery->id, $allowed);
+        $this->assertContains($srpGallery->id, $allowed);
         $this->assertContains($b2bGallery->id, $allowed);
     }
 
@@ -51,7 +51,7 @@ class BrandScopingTest extends TestCase
      */
     public function test_legacy_null_brand_gallery_is_reachable_for_brand_bound_user(): void
     {
-        $user = User::factory()->create(['brand' => Brand::ATR]);
+        $user = User::factory()->create(['brand' => Brand::SRP]);
         $legacyGallery = Gallery::factory()->create(['brand' => null]);
         $user->galleries()->attach($legacyGallery->id);
 
@@ -63,11 +63,11 @@ class BrandScopingTest extends TestCase
      */
     public function test_me_endpoint_exposes_brand_and_cross_brand_flag(): void
     {
-        $user = User::factory()->create(['brand' => Brand::ATR]);
+        $user = User::factory()->create(['brand' => Brand::SRP]);
 
         $response = $this->actingAs($user, 'api')->getJson('/api/auth/me');
         $response->assertOk();
-        $response->assertJsonPath('brand', Brand::ATR->value);
+        $response->assertJsonPath('brand', Brand::SRP->value);
         $response->assertJsonPath('is_cross_brand', false);
     }
 

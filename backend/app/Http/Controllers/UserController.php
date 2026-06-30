@@ -134,7 +134,7 @@ class UserController extends Controller
             $selectedRoleNames = Role::whereIn('id', $request->role_ids ?? [])->pluck('name')->all();
             $isStaffAccount = !empty(array_intersect($staffRoles, $selectedRoleNames));
 
-            // null = cross-brand (staff); 'rp'/'atr' = brand-bound (client-type accounts).
+            // null = cross-brand (staff); 'rp'/'srp' = brand-bound (client-type accounts).
             $user->update(['brand' => $isStaffAccount ? null : $request->brand]);
         }
 

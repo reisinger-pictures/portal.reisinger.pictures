@@ -19,7 +19,7 @@ local InviteDialog = require "InviteDialog"
 return function(mode, baseUrl)
     LrTasks.startAsyncTask(function()
         Api.setBaseUrl(baseUrl)
-        local brandName = string.find(baseUrl, "all%-the%.rest") and "ATR" or "B2B"
+        local brandName = string.find(baseUrl, "story%.reisinger%.pictures") and "SRP" or "B2B"
         local catalog = LrApplication.activeCatalog()
         local targetPhotos = catalog:getTargetPhotos()
         local photoCount = #targetPhotos

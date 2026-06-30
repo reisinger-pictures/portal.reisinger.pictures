@@ -8,9 +8,9 @@
 ## 1. Kontext
 
 Das Portal unterscheidet zur Laufzeit zwei White-Label-Brands über den HTTP-Host
-(`BrandContextMiddleware`): `reisinger.pictures` (B2B) und `all-the.rest` (B2C/ATR). Der Brand
+(`BrandContextMiddleware`): `reisinger.pictures` (B2B) und `story.reisinger.pictures` (B2C/SRP). Der Brand
 steuert Branding (Theme, Logo, Wasserzeichen) und insbesondere **markenspezifische Bank-/Firmendaten**
-im Rechnungs-PDF (ATR = `atr_`-Präfix in den Settings, B2B = kein Präfix).
+im Rechnungs-PDF (SRP = `srp_`-Präfix in den Settings, B2B = kein Präfix).
 
 ## 2. Ist-Stand — Das Problem (Brand-Leck in Queue/CLI)
 
@@ -22,13 +22,13 @@ Konkret betroffen:
 
 | Stelle | Auswirkung |
 |--------|------------|
-| `backend/app/Mail/InvoiceMail.php:28` (`build()`) | `ShouldQueue`-Mail liest `config('app.brand')` → leer im Worker → ATR-Rechnungen erhalten **B2B**-Branding und B2B-Bankdaten im PDF |
-| `backend/app/Services/InvoiceService.php:68` | Sammelrechnung: Invoice-Nummer fest `P-` (B2B), kein ATR-Nummernkreis |
+| `backend/app/Mail/InvoiceMail.php:28` (`build()`) | `ShouldQueue`-Mail liest `config('app.brand')` → leer im Worker → SRP-Rechnungen erhalten **B2B**-Branding und B2B-Bankdaten im PDF |
+| `backend/app/Services/InvoiceService.php:68` | Sammelrechnung: Invoice-Nummer fest `P-` (B2B), kein SRP-Nummernkreis |
 | `backend/app/Console/Commands/ProcessCollectiveInvoices.php:33-34` | Cron triggert `generateForTenant()` → dasselbe Leck |
 
-**Folge (kundenwirksam):** Eine über `all-the.rest` getätigte Bestellung erhält per Mail ein
+**Folge (kundenwirksam):** Eine über `story.reisinger.pictures` getätigte Bestellung erhält per Mail ein
 Rechnungs-PDF mit falschem Logo, falschen Farben und — kritisch — **falschen Bankdaten**
-(B2B- statt ATR-Konto). Überweisungen landen auf dem falschen Konto.
+(B2B- statt SRP-Konto). Überweisungen landen auf dem falschen Konto.
 
 ## 3. Soll-Zustand
 
@@ -48,15 +48,15 @@ Queue vs. CLI) rekonstruierbar bleibt.
 - `InvoiceMail::build()` liest den Brand **nicht** mehr aus `config('app.brand')`, sondern
   rekonstruiert ihn aus den persistierten Daten:
   `$snapshot->brand ?? $order->brand ?? 'reisinger.pictures'`.
-- Damit sind Theme (Blade-Templates), Bankdaten (Settings mit `atr_`-Präfix) und bcc-Adresse
+- Damit sind Theme (Blade-Templates), Bankdaten (Settings mit `srp_`-Präfix) und bcc-Adresse
   im Worker korrekt markenspezifisch.
 
 ### 3.3 Markenspezifische Suffixe/Adressen
 
-- **Invoice-Nummernkreis** pro Marke getrennt (z. B. B2B `P-`, ATR `AR-`), damit Nummern nicht
+- **Invoice-Nummernkreis** pro Marke getrennt (z. B. B2B `P-`, SRP `AR-`), damit Nummern nicht
   zwischen Marken kollidieren.
-- **bcc-Empfänger** brandabhängig: B2B `accounting@reisinger.pictures`, ATR über Setting
-  `atr_accounting_email` (Default B2B-Adresse).
+- **bcc-Empfänger** brandabhängig: B2B `accounting@reisinger.pictures`, SRP über Setting
+  `srp_accounting_email` (Default B2B-Adresse).
 
 ## 4. Abgrenzung
 
@@ -68,6 +68,6 @@ Queue vs. CLI) rekonstruierbar bleibt.
 
 ## 5. Verifikation (später)
 
-- Test: ATR-Order → im Queue-Pfad gerendertes PDF enthält ATR-Branding und ATR-Bankdaten
+- Test: SRP-Order → im Queue-Pfad gerendertes PDF enthält SRP-Branding und SRP-Bankdaten
   (via `Bus::fake` oder direkter `InvoiceMail::build()`-Aufruf ohne Request-Kontext).
 - Bestands-Backfill: Migration ist deterministisch testbar (`RefreshDatabase` + Assertions).

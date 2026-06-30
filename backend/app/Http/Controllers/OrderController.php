@@ -125,7 +125,7 @@ class OrderController extends Controller
         if ($order->is_quote_request && $order->status === 'pending') abort(403, 'Angebot noch nicht abgerechnet.');
 
         // Reconstruct brand from the persisted order, not from the current request host, so an
-        // ATR order always renders with ATR branding/bank details even when downloaded via a B2B
+        // SRP order always renders with SRP branding/bank details even when downloaded via a B2B
         // link (B-01 F2). SettingResolver reads the brand via BrandRegistry afterwards.
         \App\Support\BrandRegistry::set(\App\Support\BrandRegistry::resolveFromOrder($order));
 

@@ -1,11 +1,11 @@
 import ResponsiveImage from '../components/ResponsiveImage';
-import { useState } from 'react';
+import {useState} from 'react';
 import {Link, Navigate, useLocation, useNavigate} from 'react-router-dom';
 import {flattenGroups, Gallery, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
-import { useBillingDetails } from '../../logic/useLicenseTerms';
-import { useBrand } from '../../logic/useBrand';
-import { usePermissions } from '../../logic/usePermissions';
+import {useBillingDetails} from '../../logic/useLicenseTerms';
+import {useBrand} from '../../logic/useBrand';
+import {usePermissions} from '../../logic/usePermissions';
 import {useSearch} from '../../logic/useSearch';
 import Sidebar from '../components/Sidebar';
 import GalleryModals from '../components/GalleryModals';
@@ -29,7 +29,7 @@ export default function ManagementDashboard() {
     const location = useLocation();
     const pathView = location.pathname.replace('/', '');
     const currentView = pathView || 'structure';
-    const { canAccessB2BFeatures, isSuperAdmin, isPhotographer } = usePermissions();
+    const {canAccessB2BFeatures, isSuperAdmin, isPhotographer} = usePermissions();
     const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts'].includes(currentView);
 
     const {
@@ -45,10 +45,11 @@ export default function ManagementDashboard() {
         deleteGallery
     } = useProtectedGalleries();
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const {results: searchResults} = useSearch(searchQuery, false, true);
     const {user} = useAuth();
-    const { logoSrc, portalName } = useBrand();
-    const { billingDetails, isLoading: termsLoading } = useBillingDetails();
+    const {logoSrc, portalName} = useBrand();
+    const {billingDetails, isLoading: termsLoading} = useBillingDetails();
     const isImpressumMissing = isSuperAdmin && !termsLoading && (!billingDetails?.bank_holder || !billingDetails?.company_street || !billingDetails?.company_zip || !billingDetails?.company_city || !billingDetails?.bank_iban);
     const {results: personalFeed, isLoading: feedLoading} = useSearch('', true);
 
@@ -62,7 +63,7 @@ export default function ManagementDashboard() {
     const [teamModalNode, setTeamModalNode] = useState<Gallery | GalleryGroup | null>(null);
 
     if (isB2BView && !canAccessB2BFeatures) {
-        return <Navigate to="/" replace />;
+        return <Navigate to="/" replace/>;
     }
 
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
@@ -77,7 +78,7 @@ export default function ManagementDashboard() {
 
     return (
         <div className="flex flex-col h-screen">
-                        <div className="flex flex-1 bg-base-100 overflow-hidden relative">
+            <div className="flex flex-1 bg-base-100 overflow-hidden relative">
                 {isSidebarOpen && (
                     <div className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
                          onClick={() => setIsSidebarOpen(false)}></div>
@@ -86,7 +87,8 @@ export default function ManagementDashboard() {
                 <div
                     className={`fixed inset-y-0 left-0 z-50 w-full md:w-72 2xl:w-80 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                     <ErrorBoundary
-                        fallback={<div className="w-72 2xl:w-80 p-4 text-error border-r border-base-300">Fehler beim Laden der
+                        fallback={<div className="w-72 2xl:w-80 p-4 text-error border-r border-base-300">Fehler beim
+                            Laden der
                             Sidebar.</div>}>
                         <Sidebar
                             tree={tree} isLoading={isLoading} isError={isError}
@@ -120,7 +122,10 @@ export default function ManagementDashboard() {
                             <span className="iconify mdi--robot-off-outline text-xl"></span>
                             <div>
                                 <h3 className="font-bold">KI-Bildbeschreibung nicht konfiguriert</h3>
-                                <p className="text-sm">Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert. Setze <code className="bg-base-300 px-1 rounded">AI_ENABLED=true</code> und <code className="bg-base-300 px-1 rounded">AI_API_KEY</code> als Umgebungsvariablen.</p>
+                                <p className="text-sm">Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert.
+                                    Setze <code className="bg-base-300 px-1 rounded">AI_ENABLED=true</code> und <code
+                                        className="bg-base-300 px-1 rounded">AI_API_KEY</code> als Umgebungsvariablen.
+                                </p>
                             </div>
                         </div>
                     )}
@@ -129,17 +134,24 @@ export default function ManagementDashboard() {
                             <span className="iconify mdi--alert-circle text-xl"></span>
                             <div>
                                 <h3 className="font-bold">Impressum & Bankdaten unvollständig!</h3>
-                                <p className="text-sm">Bitte hinterlege deine Firmendaten in den <Link to="/settings" className="underline font-bold">Einstellungen</Link>, um den Rechnungs- und Bestellprozess zu aktivieren.</p>
+                                <p className="text-sm">Bitte hinterlege deine Firmendaten in den <Link to="/settings"
+                                                                                                       className="underline font-bold">Einstellungen</Link>,
+                                    um den Rechnungs- und Bestellprozess zu aktivieren.</p>
                             </div>
                         </div>
                     )}
-                    <header className="group p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
-                        <button className="btn btn-square btn-ghost md:hidden shrink-0 group-focus-within:hidden" onClick={() => setIsSidebarOpen(true)}>
+                    <header
+                        className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
+                        <button type="button"
+                                className={`btn btn-square btn-ghost md:hidden shrink-0 ${isSearchFocused ? 'hidden' : ''}`}
+                                onClick={() => setIsSidebarOpen(true)}>
                             <span className="iconify mdi--menu text-2xl"></span>
                         </button>
-                        <Link to="/" className="md:hidden flex items-center gap-2 shrink-0 mr-1 group-focus-within:hidden">
-                            <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
-                            <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
+                        <Link to="/"
+                              className={`md:hidden flex items-center gap-2 shrink-0 mr-1 ${isSearchFocused ? 'hidden' : ''}`}>
+                            <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100"/>
+                            <span
+                                className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
                         </Link>
 
                         <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full">
@@ -150,6 +162,8 @@ export default function ManagementDashboard() {
                                     className="input input-bordered join-item w-full"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
+                                    onFocus={() => setIsSearchFocused(true)}
+                                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                                 />
                                 <button type="submit" className="btn btn-primary join-item">
                                     <span className="iconify mdi--magnify text-xl"></span>
@@ -163,7 +177,8 @@ export default function ManagementDashboard() {
                                         <li>
                                             <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`}
                                                   onClick={() => setSearchQuery('')} className="text-primary font-bold">
-                                                <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach "{searchQuery}"
+                                                <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach
+                                                "{searchQuery}"
                                             </Link>
                                         </li>
                                         <div className="divider my-0"></div>
@@ -190,19 +205,35 @@ export default function ManagementDashboard() {
                     </header>
 
                     <ErrorBoundary>
-                        {currentView === 'galleries' && <ManagementStructureView tree={tree} onOpenPhotographerTeam={(node) => setTeamModalNode(node)} onOpenGroupModal={(id) => {setPrefillGroupId(id || null); setEditingGroup(null); setGroupModalOpen(true);}} onOpenGalleryModal={(id) => {setPrefillGroupId(id || null); setEditingGallery(null); setGalleryModalOpen(true);}} onEditGroup={g => {setEditingGroup(g); setGroupModalOpen(true);}} onEditGallery={g => {setEditingGallery(g); setGalleryModalOpen(true);}} />}
+                        {currentView === 'galleries' && <ManagementStructureView tree={tree}
+                                                                                 onOpenPhotographerTeam={(node) => setTeamModalNode(node)}
+                                                                                 onOpenGroupModal={(id) => {
+                                                                                     setPrefillGroupId(id || null);
+                                                                                     setEditingGroup(null);
+                                                                                     setGroupModalOpen(true);
+                                                                                 }} onOpenGalleryModal={(id) => {
+                            setPrefillGroupId(id || null);
+                            setEditingGallery(null);
+                            setGalleryModalOpen(true);
+                        }} onEditGroup={g => {
+                            setEditingGroup(g);
+                            setGroupModalOpen(true);
+                        }} onEditGallery={g => {
+                            setEditingGallery(g);
+                            setGalleryModalOpen(true);
+                        }}/>}
                         {currentView === 'users' && <ManagementUserView/>}
                         {currentView === 'settings' && <ManagementSettingsView/>}
                         {currentView === 'stats' && <ManagementStatsView/>}
                         {currentView === 'admin-orders' && <ManagementOrdersView/>}
-                        {currentView === 'admin-manual-invoice' && <ManagementManualInvoiceView type="invoice" />}
-                        {currentView === 'admin-manual-offer' && <ManagementManualInvoiceView type="offer" />}
+                        {currentView === 'admin-manual-invoice' && <ManagementManualInvoiceView type="invoice"/>}
+                        {currentView === 'admin-manual-offer' && <ManagementManualInvoiceView type="offer"/>}
                         {currentView === 'admin-customers' && <ManagementCustomersView/>}
                         {currentView === 'admin-products' && <ManagementProductsView/>}
                         {currentView === 'admin-snippets' && <ManagementTextSnippetsView/>}
                         {currentView === 'admin-payouts' && <ManagementPayoutsView/>}
                         {currentView === 'my-payouts' && <PhotographerPayoutsView/>}
-                                                {currentView === 'structure' && (
+                        {currentView === 'structure' && (
                             <div className="p-6 md:p-10">
                                 {isPhotographer && <ManagementFtpInbox/>}
                                 {isPhotographer && (
@@ -216,7 +247,8 @@ export default function ManagementDashboard() {
                                         ) : (
                                             <div className="space-y-8">
                                                 {personalFeed?.galleries && personalFeed.galleries.length > 0 && (
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                    <div
+                                                        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                                                         {personalFeed.galleries.slice(0, 3).map(g => (
                                                             <Link key={g.id} to={'/' + g.full_path}
                                                                   className="card bg-base-100 shadow-sm hover:shadow-xl transition-shadow transition-transform border border-base-300">
@@ -235,7 +267,10 @@ export default function ManagementDashboard() {
                                                         {personalFeed.photos.slice(0, 20).map(p => (
                                                             <Link key={p.id} to={'/photos/' + p.id}
                                                                   className="block relative aspect-square bg-base-300 rounded overflow-hidden group shadow-sm hover:shadow-md">
-                                                                <ResponsiveImage src={p.thumb_url} srcSet={p.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full group-hover:scale-105 transition-transform" alt={p.title || 'Bild'} />
+                                                                <ResponsiveImage src={p.thumb_url} srcSet={p.srcset}
+                                                                                 containerClassName="absolute inset-0 w-full h-full"
+                                                                                 className="object-cover w-full h-full group-hover:scale-105 transition-transform"
+                                                                                 alt={p.title || 'Bild'}/>
                                                             </Link>
                                                         ))}
                                                     </div>
@@ -251,7 +286,13 @@ export default function ManagementDashboard() {
                             </div>
                         )}
                     </ErrorBoundary>
-                    <PhotographerTeamModal isOpen={!!teamModalNode} onClose={() => setTeamModalNode(null)} item={teamModalNode} isGroup={teamModalNode && !('type' in teamModalNode) ? true : false} onUpdateState={() => { setTeamModalNode(null); mutate(); }} />
+                    <PhotographerTeamModal isOpen={!!teamModalNode} onClose={() => setTeamModalNode(null)}
+                                           item={teamModalNode}
+                                           isGroup={teamModalNode && !('type' in teamModalNode) ? true : false}
+                                           onUpdateState={() => {
+                                               setTeamModalNode(null);
+                                               mutate();
+                                           }}/>
                 </main>
 
                 <ErrorBoundary>

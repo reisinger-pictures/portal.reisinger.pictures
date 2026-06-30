@@ -14,12 +14,12 @@ Im System existieren **zwei klar getrennte** Konzepte, die beide umgangssprachli
 ### 1.1 White-Label-Brand (Portal-Marke)
 
 - **Bedeutung:** Das Portal läuft unter zwei öffentlichen Domains mit unterschiedlichem Branding:
-  `reisinger.pictures` (B2B) und `all-the.rest` (B2C/ATR). Siehe
+  `reisinger.pictures` (B2B) und `story.reisinger.pictures` (B2C/SRP). Siehe
   `06-multi-domain-branding.md`.
 - **Technischer Begriff:** `Brand` — Implementiert in `frontend/src/logic/useBrand.ts`,
   `backend/app/Http/Middleware/BrandContextMiddleware.php` (Host→Brand), markenspezifische
-  Settings über das `atr_`-Präfix (ATR) vs. kein Präfix (B2B).
-- **Werte:** `reisinger.pictures` | `all-the.rest`.
+  Settings über das `srp_`-Präfix (SRP) vs. kein Präfix (B2B).
+- **Werte:** `reisinger.pictures` | `story.reisinger.pictures`.
 - **Gültigkeitsbereich:** Request-global (Host-basiert), wirkt auf Branding (Theme, Logo,
   Wasserzeichen, Bankdaten, Impressum).
 
@@ -56,7 +56,7 @@ Code-intern bleibt der Begriff `Tenant`/`tenant_id` unverändert — nur die deu
 White-Label-Brand (Host-basiert)         Tenant (Daten-basiert)
 ───────────────────────────────          ───────────────────────
 reisinger.pictures (B2B)        ─┐       Tenant A (Firma X)
-all-the.rest (B2C/ATR)          ┘       Tenant B (Firma Y)
+story.reisinger.pictures (B2C/SRP) ┘     Tenant B (Firma Y)
                                        (jeder Tenant hat eigene User,
                                         Galerien, Sammelrechnungen)
 ```
@@ -75,10 +75,10 @@ Die folgenden Punkte sind **bekannte Lücken**, nicht in diesem Konzept-Doc zu l
 - **T-01 UI-Begriff-Entscheidung:** Wahl des treffenden UI-Begriffs (siehe §3) + optionelle
   Anpassung der ~21 UI-Strings.
 - **T-02 Queue/CLI-Brand-Leck:** `InvoiceMail` (ShouldQueue) und Cron-Jobs laufen ohne
-  HTTP-Host → `config('app.brand')` ist dort leer → ATR-Rechnungen erhalten B2B-Branding im PDF.
+  HTTP-Host → `config('app.brand')` ist dort leer → SRP-Rechnungen erhalten B2B-Branding im PDF.
 - **T-03 Frontend Mandanten-Isolation:** B2B-Kacheln (Mandanten/CRM/Invoicing) werden auf
-  `all-the.rest` für Kunden-Logins nicht ausgeblendet (rein rollenbasierte Steuerung).
-- **T-04 Settings-Trennung Bugfixes:** `updateBillingDetails` speichert ungeprefixt (ATR-Daten
-  unbrauchbar), `atr_*`-Dopplung in `updateLicenseTerms`, Watermark-Opacity asymmetrisch.
+  `story.reisinger.pictures` für Kunden-Logins nicht ausgeblendet (rein rollenbasierte Steuerung).
+- **T-04 Settings-Trennung Bugfixes:** `updateBillingDetails` speichert ungeprefixt (SRP-Daten
+  unbrauchbar), `srp_*`-Dopplung in `updateLicenseTerms`, Watermark-Opacity asymmetrisch.
 
 Dieses Doc dokumentiert nur den Stand; es enthält keine Lösungsschritte für T-01…T-04.

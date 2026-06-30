@@ -6,7 +6,7 @@
 ## 1. Kontext
 
 Das Portal-Backend wurde zu einem **Multi-Brand-/Single-Codebase-System** ausgebaut (Domains
-`all-the.rest` = B2C und `reisinger.pictures` = B2B). Die Steuerung erfolgt zur Laufzeit über den
+`story.reisinger.pictures` = B2C und `reisinger.pictures` = B2B). Die Steuerung erfolgt zur Laufzeit über den
 Hostnamen (siehe `06-multi-domain-branding.md`).
 
 Das **Lightroom Classic Plugin** (`admin.lrplugin/`) ist an dieser Stelle **nicht** mitgewachsen:
@@ -25,7 +25,7 @@ Es existiert exakt eine Produktionsdomain; der einzige Umschalter ist Prod/Test:
 | `PluginInfoProvider.lua:17,21-22`   | UI-Toggle „portal.test" vs. „portal.reisinger.pictures"           |
 | `ManagerCore.lua:76,89`             | derselbe Toggle im Login-Dialog                                   |
 
-Ein Treffer für `all-the.rest` / `atr` / `brand` / `tenant` existiert im gesamten Plugin **nicht**.
+Ein Treffer für `story.reisinger.pictures` / `srp` / `brand` / `tenant` existiert im gesamten Plugin **nicht**.
 
 ### 2.2 Upload- & Metadata-Payload — ohne Brand-Context
 
@@ -68,7 +68,7 @@ Sowie flankierend:
 ## 4. Risiko & Abhängigkeit
 
 Solange das Backend Brand-Context aus dem **Host-/Origin-Header** ableitet (siehe
-`06-multi-domain-branding.md`), kann das Plugin das B2C-Segment (`all-the.rest`) **nicht**
+`06-multi-domain-branding.md`), kann das Plugin das B2C-Segment (`story.reisinger.pictures`) **nicht**
 erreichen — Uploads landen immer im `reisinger.pictures`-Kontext. Für B2B-only-Workflows ist das
 akzeptabel; für cross-brand Workflows ist das Plugin derzeit ungeeignet.
 

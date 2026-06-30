@@ -12,10 +12,10 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
  *
  * HOSTNAME-MOCK NOTE:
  * These tests use the page.addInitScript hostname-mock pattern from brand-isolation.spec.ts to
- * flip the FRONTEND brand (window.location.hostname -> 'all-the.rest'). This drives React-side
+ * flip the FRONTEND brand (window.location.hostname -> 'story.reisinger.pictures'). This drives React-side
  * gating (sidebar visibility, route guards). It does NOT change the backend brand, which
  * BrandContextMiddleware derives from the request host (always localhost = B2B on the single dev
- * instance). Deep cross-brand gallery ACCESS (an ATR user blocked from a B2B-only gallery at the
+ * instance). Deep cross-brand gallery ACCESS (an SRP user blocked from a B2B-only gallery at the
  * data layer) therefore needs brand-bound fixtures + the 2-Vite setup — see the .fixme spec.
  * Here we assert the observable navigation/sidebar outcomes (URL redirects, absent links) per
  * AGENTS.md, never brittle CSS classes.
@@ -31,12 +31,12 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('client on ATR brand is redirected away from the B2B-only /tenants area', async ({ page }) => {
+    test('client on SRP brand is redirected away from the B2B-only /tenants area', async ({ page }) => {
         // Frontend brand gating mirrors the backend scoping contract: a non-admin client must be
         // kept out of B2B-only areas. We assert the redirect outcome, not a CSS class.
         await page.addInitScript(() => {
             Object.defineProperty(window.location, 'hostname', {
-                get: () => 'all-the.rest',
+                get: () => 'story.reisinger.pictures',
                 configurable: true,
             });
         });
@@ -51,13 +51,13 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
         await expect(page.getByRole('heading', { name: /^Willkommen zurück/ })).toBeVisible({ timeout: 15000 });
     });
 
-    test('client on ATR brand does not see the B2B Mandanten entry in the sidebar', async ({ page }) => {
+    test('client on SRP brand does not see the B2B Mandanten entry in the sidebar', async ({ page }) => {
         // The sidebar only lists galleries/areas the user is allowed to reach. A client scoped to
-        // ATR must not be offered the B2B tenants entry. Asserting link absence (count 0) inside
+        // SRP must not be offered the B2B tenants entry. Asserting link absence (count 0) inside
         // the aside landmark is stable against layout shifts.
         await page.addInitScript(() => {
             Object.defineProperty(window.location, 'hostname', {
-                get: () => 'all-the.rest',
+                get: () => 'story.reisinger.pictures',
                 configurable: true,
             });
         });
@@ -67,14 +67,14 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
         await auth.login(clientUser.email, clientUser.password);
 
         const sidebar = page.locator('aside');
-        await expect(sidebar.getByText('Mandanten (B2B)')).toHaveCount(0);
+        await expect(sidebar.getByText('Organisationen (B2B)')).toHaveCount(0);
     });
 
     test('cross-brand admin (super_admin) sees the management area regardless of mocked brand', async ({ page }) => {
         // A super_admin has brand = null (cross-brand) and must reach management from either host.
         await page.addInitScript(() => {
             Object.defineProperty(window.location, 'hostname', {
-                get: () => 'all-the.rest',
+                get: () => 'story.reisinger.pictures',
                 configurable: true,
             });
         });
@@ -84,7 +84,7 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
         await auth.login(adminUser.email, adminUser.password);
 
         const sidebar = new SidebarHelper(page);
-        await sidebar.navigateTo('Mandanten (B2B)');
+        await sidebar.navigateTo('Organisationen (B2B)');
         await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
     });
 });

@@ -9,22 +9,22 @@ use App\Models\Order;
  * Central authority for brand resolution and `config('app.brand')` access.
  *
  * The brand identifier is the short enum code (`Brand::B2B->value` = 'rp',
- * `Brand::ATR->value` = 'atr'); `null` means explicitly cross-brand. All Host→brand mapping,
+ * `Brand::SRP->value` = 'srp'); `null` means explicitly cross-brand. All Host→brand mapping,
  * prefix logic, and persisted-brand reconstruction MUST go through this class so there is a
  * single source of truth (see features/infrastructure/12-brand-registry-and-settings-fixes.md).
  */
 class BrandRegistry
 {
-    /** Local dev host that maps to the ATR brand (Vite ATR proxy target). */
-    public const ATR_DEV_HOST = 'portal-atr.test';
+    /** Local dev host that maps to the SRP brand (Vite SRP proxy target). */
+    public const SRP_DEV_HOST = 'portal-srp.test';
 
     /**
      * Resolve the brand from an HTTP host (production domain or local dev host).
      */
     public static function fromHost(string $host): Brand
     {
-        if (str_contains($host, Brand::ATR->domain()) || $host === self::ATR_DEV_HOST) {
-            return Brand::ATR;
+        if (str_contains($host, Brand::SRP->domain()) || $host === self::SRP_DEV_HOST) {
+            return Brand::SRP;
         }
         return Brand::B2B;
     }
@@ -45,13 +45,13 @@ class BrandRegistry
         return self::current() ?? Brand::B2B;
     }
 
-    public static function isAtr(): bool
+    public static function isSrp(): bool
     {
-        return self::current() === Brand::ATR;
+        return self::current() === Brand::SRP;
     }
 
     /**
-     * Setting/asset key prefix for the current brand ('' for B2B, 'atr_' for ATR).
+     * Setting/asset key prefix for the current brand ('' for B2B, 'srp_' for SRP).
      */
     public static function prefix(): string
     {

@@ -9,7 +9,7 @@
 ## 1. Kontext
 
 Das Portal läuft unter zwei White-Label-Brands: `reisinger.pictures` (B2B, vollständiges
-Admin-/Mandanten-/CRM-/Invoicing-Portal) und `all-the.rest` (B2C, reduziertes Kunden-Portal).
+Admin-/Mandanten-/CRM-/Invoicing-Portal) und `story.reisinger.pictures` (B2C, reduziertes Kunden-Portal).
 Die Brand-Erkennung im Frontend erfolgt rein clientseitig via Hostname
 (`frontend/src/logic/useBrand.ts:3-6`).
 
@@ -24,7 +24,7 @@ Die UI-Steuerung ist **rein rollenbasiert, nicht brandbasiert**. Das hat zwei Ko
 if (user.is_super_admin || user.is_admin || user.is_photographer) return <ManagementDashboard/>;
 return <ClientDashboard/>;
 ```
-Ein Admin/Super-Admin landet auch auf `all-the.rest` im **vollen B2B-ManagementDashboard**
+Ein Admin/Super-Admin landet auch auf `story.reisinger.pictures` im **vollen B2B-ManagementDashboard**
 (Mandanten, CRM, Invoicing) — ungeachtet der Marke.
 
 ### 2.2 B2B-Routen ohne Brand-Guard
@@ -38,7 +38,7 @@ direkt ansteuerbar, unabhängig vom Brand.
 
 `frontend/src/ui/components/Sidebar.tsx:86` blendet „Mandanten (B2B)" ein, sobald
 `user.is_admin || user.is_customer_manager` — unabhängig vom Hostnamen. Die Mandanten-Liste ist
-auf `all-the.rest` direkt navigierbar.
+auf `story.reisinger.pictures` direkt navigierbar.
 
 ### 2.4 Keine Backend-gestützte Brand-Assertion
 
@@ -70,7 +70,7 @@ cross-brand.**
 This was evaluated and **rejected**. Reasons:
 
 1. **Business correctness / least surprise:** A photographer shooting for both B2B (`rp`) and
-   ATR (`atr`), and an admin managing the whole portal, must see both brands' galleries. The
+   SRP (`srp`), and an admin managing the whole portal, must see both brands' galleries. The
    role definitions in `features/auth/01-roles-and-access.md` already promise cross-system
    access (Photographer: "across the system"; Admin: "statistics for ALL galleries across the
    system"). Per-brand isolation would break their core workflows.
@@ -87,7 +87,7 @@ client-type accounts ever carry a non-null `brand`.
 
 > Note on terminology: the binding criterion is the **account type** (external vs. staff),
 > not the role label. In practice: `is_super_admin | is_admin | is_photographer` ⟹
-> `brand = null`; `is_client` (and any non-staff external account) ⟹ `brand ∈ {rp, atr}`.
+> `brand = null`; `is_client` (and any non-staff external account) ⟹ `brand ∈ {rp, srp}`.
 
 ## 4. Ziel-Architektur (Konzept)
 
@@ -123,7 +123,7 @@ Ein neuer pure-Logic-Hook (z. B. `frontend/src/logic/useBrandAccess.ts`) kapselt
 ## 6. Verifikation (später)
 
 - Frontend-Unit-Tests (`brand.test.ts`): `getBrandFromHostname`, `useBrandAccess` für alle
-  Rollen×Brand-Kombinationen, Theme-Werte (`b2b-light`/`atr-light`).
+  Rollen×Brand-Kombinationen, Theme-Werte (`b2b-light`/`srp-light`).
 - E2E (Playwright via `ai_test_runner.mjs`): Kunde auf fremdem Brand sieht keine B2B-Kacheln;
   Admin sieht beide.
 

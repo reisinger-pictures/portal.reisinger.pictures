@@ -6,10 +6,10 @@ export interface LicenseTerms {
     calc_hourly_rate?: string;
     calc_images_per_hour?: string;
     // NEU: B2C Flex-Faktoren
-    atr_base_price?: string;
-    atr_setup_fee?: string;
-    atr_privacy_fee?: string;
-    atr_extra_image_fee?: string;
+    srp_base_price?: string;
+    srp_setup_fee?: string;
+    srp_privacy_fee?: string;
+    srp_extra_image_fee?: string;
 
     [key: string]: string | undefined;
 }
@@ -19,10 +19,10 @@ export interface LicenseTermsPayload {
     calc_hourly_rate?: string | number;
     calc_images_per_hour?: string | number;
     // NEU: B2C Flex-Faktoren Payloads
-    atr_base_price?: string | number;
-    atr_setup_fee?: string | number;
-    atr_privacy_fee?: string | number;
-    atr_extra_image_fee?: string | number;
+    srp_base_price?: string | number;
+    srp_setup_fee?: string | number;
+    srp_privacy_fee?: string | number;
+    srp_extra_image_fee?: string | number;
 
     [key: string]: string | number | undefined;
 }

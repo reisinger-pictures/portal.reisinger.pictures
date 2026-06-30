@@ -1,45 +1,47 @@
 <?php
 namespace App\Services;
 
+use App\Enums\Brand;
 use App\Models\Setting;
 use App\Support\BrandRegistry;
 
+/**
+ * Brand-scoped settings resolver.
+ *
+ * Settings isolation now uses the `brand` column on the `settings` table instead
+ * of a key-prefix (`srp_*`). Reads scope by (key, brand), falling back to the
+ * canonical B2B ('rp') row when no brand-specific row exists. See spec §3.2
+ * (features/infrastructure/14-per-brand-catalog.md).
+ */
 class SettingResolver
 {
-    public function isAtr(): bool
+    public function isSrp(): bool
     {
-        return BrandRegistry::isAtr();
-    }
-
-    public function prefix(string $key): string
-    {
-        if (!$this->isAtr()) {
-            return $key;
-        }
-        if (str_starts_with($key, 'atr_')) {
-            return $key;
-        }
-        return 'atr_' . $key;
+        return BrandRegistry::isSrp();
     }
 
     public function get(string $key, mixed $default = null): mixed
     {
-        $prefixed = $this->prefix($key);
-        $value = Setting::where('key', $prefixed)->value('value');
+        $brand = BrandRegistry::currentOrDefault()->value;
+
+        $value = Setting::where('key', $key)->where('brand', $brand)->value('value');
         if ($value !== null) {
             return $value;
         }
-        if ($prefixed !== $key) {
-            $fallback = Setting::where('key', $key)->value('value');
-            if ($fallback !== null) {
-                return $fallback;
+
+        // Fallback: B2B row ('rp' is the canonical/default brand for shared keys).
+        if ($brand !== Brand::B2B->value) {
+            $value = Setting::where('key', $key)->where('brand', Brand::B2B->value)->value('value');
+            if ($value !== null) {
+                return $value;
             }
         }
+
         return $default;
     }
 
     /**
-     * Read a setting value WITHOUT applying the brand prefix — i.e. the raw key as stored.
+     * Read a setting value WITHOUT applying the brand scope — i.e. the raw key as stored.
      * Used for keys that are intentionally global (not brand-scoped).
      */
     public function getRaw(string $key): mixed
@@ -49,14 +51,20 @@ class SettingResolver
 
     public function set(string $key, mixed $value): void
     {
-        $prefixed = $this->prefix($key);
+        $brand = BrandRegistry::currentOrDefault()->value;
         Setting::updateOrCreate(
-            ['key' => $prefixed],
+            ['key' => $key, 'brand' => $brand],
             ['value' => $value]
         );
-        if ($prefixed !== $key) {
-            Setting::where('key', $key)->delete();
-        }
     }
 
+    /**
+     * @deprecated Brand scoping is now column-based (settings.brand); settings keys are
+     * no longer prefixed. Kept as a no-op shim so legacy call sites/tests keep working.
+     * Do NOT use for new code — keys are stored unprefixed.
+     */
+    public function prefix(string $key): string
+    {
+        return $key;
+    }
 }

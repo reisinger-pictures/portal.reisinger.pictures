@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Brand;
 use Illuminate\Database\Seeder;
 use App\Models\GalleryGroup;
 use Illuminate\Support\Str;
@@ -10,7 +11,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        
+
         // Admin-User seeden, um Race-Conditions in parallelen E2E-Tests zu vermeiden
         $adminUser = \App\Models\User::firstOrCreate(
             ['email' => env('ADMIN_EMAIL', 'florian@reisinger.pictures')],
@@ -24,12 +25,12 @@ class DatabaseSeeder extends Seeder
         // Admin-User erhält alle verfügbaren Rollen
         $adminUser->roles()->sync(\App\Models\Role::pluck('id')->toArray());
 
-        // ATR brand tenant (all-the.rest) — B2C counterpart to the B2B portal.
+        // SRP brand tenant (story.reisinger.pictures) — B2C counterpart to the B2B portal.
         \App\Models\Tenant::firstOrCreate(
-            ['domain' => 'all-the.rest'],
+            ['domain' => 'story.reisinger.pictures'],
             [
-                'name' => 'all-the.rest',
-                'brand' => \App\Enums\Brand::ATR,
+                'name' => 'story.reisinger.pictures',
+                'brand' => \App\Enums\Brand::SRP,
             ]
         );
 
@@ -77,42 +78,67 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Sport', 'parent_id' => $wien->id, 'is_public' => true]
         );
 
-        // Standard-Lizenzen & Preise
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_web'], ['value' => '7500']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_print'], ['value' => '14500']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_original'], ['value' => '45000']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_commercial'], ['value' => '2.0']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_unlimited'], ['value' => '1.5']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_international'], ['value' => '1.5']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_web'], ['value' => 'Web & Social Media (PR & Redaktionell). Längste Kante max. 2560px.']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_print'], ['value' => 'Print & Editorial (bis A4). Längste Kante max. 4000px.']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_original'], ['value' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_national'], ['value' => 'Nutzung nur im Inland (national).']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_international'], ['value' => 'Weltweite, uneingeschränkte räumliche Nutzung.']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_base_price'], ['value' => '50']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_hourly_rate'], ['value' => '80']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_images_per_hour'], ['value' => '6']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_outdoor_multiplier'], ['value' => '0.5']);
+        // --- Per-brand catalog, settings, CRM seed (spec §5) ---
+        // B2B ('rp') = canonical/existing data; SRP ('srp') = placeholder copy
+        // (concrete SRP dataset arrives via T-18).
+        $this->seedCatalogForBrand(Brand::B2B);
+        $this->seedCatalogForBrand(Brand::SRP);
+
+        // Neu: Trigger den Location Import direkt im Seed
+        $this->command->info('Starte Smart Assistance Import...');
+        \Illuminate\Support\Facades\Artisan::call('app:import-locations', [], $this->command->getOutput());
+    }
+
+    /**
+     * Seed catalog, settings and CRM rows for a single brand (spec §5).
+     * Each row carries the brand explicitly. SRP currently receives a placeholder
+     * copy of the rp dataset; the concrete SRP catalog/prices are delivered via T-18.
+     */
+    private function seedCatalogForBrand(Brand $brand): void
+    {
+        $brandCode = $brand->value;
+        $this->command->info("Seede Katalog/Settings für Brand '{$brandCode}'...");
+
+        // --- Standard-Lizenzen & Preise (brand-scoped via the brand column) ---
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_web', 'brand' => $brandCode], ['value' => '7500']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_print', 'brand' => $brandCode], ['value' => '14500']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_original', 'brand' => $brandCode], ['value' => '45000']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_commercial', 'brand' => $brandCode], ['value' => '2.0']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_unlimited', 'brand' => $brandCode], ['value' => '1.5']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_international', 'brand' => $brandCode], ['value' => '1.5']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_web', 'brand' => $brandCode], ['value' => 'Web & Social Media (PR & Redaktionell). Längste Kante max. 2560px.']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_print', 'brand' => $brandCode], ['value' => 'Print & Editorial (bis A4). Längste Kante max. 4000px.']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_original', 'brand' => $brandCode], ['value' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_national', 'brand' => $brandCode], ['value' => 'Nutzung nur im Inland (national).']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_international', 'brand' => $brandCode], ['value' => 'Weltweite, uneingeschränkte räumliche Nutzung.']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_base_price', 'brand' => $brandCode], ['value' => '50']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_hourly_rate', 'brand' => $brandCode], ['value' => '80']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_images_per_hour', 'brand' => $brandCode], ['value' => '6']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_outdoor_multiplier', 'brand' => $brandCode], ['value' => '0.5']);
+        // Per-image license base prices (used by SRP/Calculator; defaults match V010 comments).
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'base_price', 'brand' => $brandCode], ['value' => '8000']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'setup_fee', 'brand' => $brandCode], ['value' => '5000']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'privacy_fee', 'brand' => $brandCode], ['value' => '20000']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'extra_image_fee', 'brand' => $brandCode], ['value' => '1500']);
 
         // Reale Impressums- und Bankdaten für den Checkout seeden
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_holder'], ['value' => 'Florian Reisinger']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_street'], ['value' => 'Robert-Stolz-Straße 8']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_zip'], ['value' => '4020']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_city'], ['value' => 'Linz']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_country'], ['value' => 'Österreich']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_email'], ['value' => 'florian@reisinger.pictures']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_iban'], ['value' => 'DE96100110012179986174']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_bic'], ['value' => 'NTSBDEB1XXX']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_holder', 'brand' => $brandCode], ['value' => 'Florian Reisinger']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_street', 'brand' => $brandCode], ['value' => 'Robert-Stolz-Straße 8']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_zip', 'brand' => $brandCode], ['value' => '4020']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_city', 'brand' => $brandCode], ['value' => 'Linz']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_country', 'brand' => $brandCode], ['value' => 'Österreich']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_email', 'brand' => $brandCode], ['value' => 'florian@reisinger.pictures']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_iban', 'brand' => $brandCode], ['value' => 'DE96100110012179986174']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_bic', 'brand' => $brandCode], ['value' => 'NTSBDEB1XXX']);
 
         // --- Produkte & Katalog (Preise, Pakete, Rabatte) ---
-        $this->command->info('Seede Produkt-Katalog...');
         $products = [
             // Pakete (Fixpreise)
             ['type' => 'item', 'name' => 'Dein (Mini) Shooting', 'description' => 'Bis zu 60 Min. | 3 Bilder', 'price' => 19900],
             ['type' => 'item', 'name' => 'n*xt Creative Special', 'description' => 'Bis zu 90 Min. | 15 Bilder | Nur 18-25 J. inkl. Veröffentlichung', 'price' => 30000],
             ['type' => 'item', 'name' => 'Dein Shooting', 'description' => 'Bis zu 150 Min. | 15 Bilder', 'price' => 49900],
             ['type' => 'item', 'name' => 'N*xt Image (Social Media Special)', 'description' => '30 Min. | 2 Bilder', 'price' => 9900],
-            
+
             // Stundensätze & B2B
             ['type' => 'item', 'name' => 'B2B Business-Shooting', 'description' => 'Professionelle Bildbearbeitung, Volle Nutzungsrechte (Presse & PR)', 'price' => 15000],
             ['type' => 'item', 'name' => 'Privat-Shooting', 'description' => 'Zusätzliche Zeit / Individuelle Verlängerung', 'price' => 10000],
@@ -136,13 +162,47 @@ class DatabaseSeeder extends Seeder
 
         foreach ($products as $product) {
             \App\Models\Product::firstOrCreate(
-                ['name' => $product['name']],
-                $product
+                ['name' => $product['name'], 'brand' => $brandCode],
+                array_merge($product, ['brand' => $brandCode])
             );
         }
 
-        // Neu: Trigger den Location Import direkt im Seed
-        $this->command->info('Starte Smart Assistance Import...');
-        \Illuminate\Support\Facades\Artisan::call('app:import-locations', [], $this->command->getOutput());
+        // --- License use cases & modifiers (per-image licensing) ---
+        // Defaults reflect V010 seed comments (Tageszeitungen, Corporate Publishing,
+        // Web & Social, Werbung/Kampagne). base_price values in cents.
+        $useCases = [
+            ['name' => 'Tageszeitungen', 'description' => 'Print-Nutzung in Tageszeitungen (redaktionell).', 'base_price' => 8000, 'flatrate_tier' => 'print', 'sort_order' => 10, 'is_commercial' => false],
+            ['name' => 'Corporate Publishing', 'description' => 'Print-Nutzung kommerziell (Geschäftsberichte, Broschüren).', 'base_price' => 15000, 'flatrate_tier' => 'print', 'sort_order' => 20, 'is_commercial' => true],
+            ['name' => 'Web & Social', 'description' => 'Digitale Nutzung (Web, Social Media, PR).', 'base_price' => 4500, 'flatrate_tier' => 'web', 'sort_order' => 30, 'is_commercial' => false],
+            ['name' => 'Werbung / Kampagne', 'description' => 'Kommerzielle Werbung & Kampagnen (Originalauflösung).', 'base_price' => 45000, 'flatrate_tier' => 'original', 'sort_order' => 40, 'is_commercial' => true],
+        ];
+        foreach ($useCases as $uc) {
+            \App\Models\LicenseUseCase::firstOrCreate(
+                ['name' => $uc['name'], 'brand' => $brandCode],
+                array_merge($uc, ['brand' => $brandCode])
+            );
+        }
+
+        $modifiers = [
+            ['name' => 'Erweiterte Nutzungsrechte', 'description' => 'Erweiterung der Nutzungsrechte.', 'percent_surcharge' => 50.0, 'is_included_in_flatrate' => false, 'sort_order' => 10],
+            ['name' => 'Exklusivnutzung', 'description' => 'Ausschließliche Nutzung (keine Mitbewerber).', 'percent_surcharge' => 100.0, 'is_included_in_flatrate' => false, 'sort_order' => 20],
+            ['name' => 'Eilzuschlag', 'description' => 'Express-Bearbeitung.', 'percent_surcharge' => 25.0, 'is_included_in_flatrate' => false, 'sort_order' => 30],
+        ];
+        foreach ($modifiers as $mod) {
+            \App\Models\LicenseModifier::firstOrCreate(
+                ['name' => $mod['name'], 'brand' => $brandCode],
+                array_merge($mod, ['brand' => $brandCode])
+            );
+        }
+
+        // --- CRM: placeholder customer + text snippet so the brand is not empty ---
+        \App\Models\Customer::firstOrCreate(
+            ['email' => 'beispiel-' . $brandCode . '@reisinger.pictures', 'brand' => $brandCode],
+            ['name' => 'Beispiel-Kunde (' . strtoupper($brandCode) . ')', 'company' => 'Reisinger Pictures', 'brand' => $brandCode]
+        );
+        \App\Models\TextSnippet::firstOrCreate(
+            ['shortcut' => 'begr-' . $brandCode, 'brand' => $brandCode],
+            ['title' => 'Begrüßung (' . strtoupper($brandCode) . ')', 'content_html' => '<p>Hallo und willkommen!</p>', 'brand' => $brandCode]
+        );
     }
 }

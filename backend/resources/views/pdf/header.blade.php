@@ -6,9 +6,9 @@
             $logoPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/watermark.svg');
         }
 
-        $isAtr = \App\Support\BrandRegistry::isAtr();
-        $primaryColor = $isAtr ? '#2A9D8F' : '#1E5631'; // Einheitliches Petrol für Rechnungen laut Vorgabe
-        $secondaryColor = $isAtr ? '#2A9D8F' : '#A4B494';
+        $isSrp = \App\Support\BrandRegistry::isSrp();
+        $primaryColor = $isSrp ? '#2A9D8F' : '#1E5631'; // Einheitliches Petrol für Rechnungen laut Vorgabe
+        $secondaryColor = $isSrp ? '#2A9D8F' : '#A4B494';
     @endphp
     @if(file_exists($logoPath))
         <img src="data:image/svg+xml;base64,{{ base64_encode(file_get_contents($logoPath)) }}" style="max-height: 96px; max-width: 100%;">

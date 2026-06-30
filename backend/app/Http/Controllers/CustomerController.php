@@ -4,17 +4,26 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Customer;
+use App\Support\BrandRegistry;
 
 class CustomerController extends Controller
 {
     public function index(Request $request)
     {
+        $brand = BrandRegistry::currentOrDefault()->value;
+
         $q = $request->query('q');
         if ($q && strlen($q) >= 2) {
-            return response()->json(Customer::search($q)->orderBy('created_at', 'desc')->take(20)->get());
+            return response()->json(
+                Customer::search($q)
+                    ->query(fn($query) => $query->where('brand', $brand))
+                    ->orderBy('created_at', 'desc')
+                    ->take(20)
+                    ->get()
+            );
         }
 
-        return response()->json(Customer::orderBy('created_at', 'desc')->get());
+        return response()->json(Customer::where('brand', $brand)->orderBy('created_at', 'desc')->get());
     }
 
     public function store(Request $request)
@@ -30,13 +39,14 @@ class CustomerController extends Controller
             'uid' => 'nullable|string|max:100',
         ]);
 
+        $validated['brand'] = BrandRegistry::currentOrDefault()->value;
         $customer = Customer::create($validated);
         return response()->json(['success' => true, 'customer' => $customer]);
     }
 
     public function update(Request $request, $id)
     {
-        $customer = Customer::findOrFail($id);
+        $customer = Customer::forCurrentBrand()->findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
@@ -55,7 +65,7 @@ class CustomerController extends Controller
 
     public function destroy($id)
     {
-        Customer::findOrFail($id)->delete();
+        Customer::forCurrentBrand()->findOrFail($id)->delete();
         return response()->json(['success' => true]);
     }
 }

@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <title>@if(str_starts_with($snapshot->invoice_number, 'L-')) Lieferschein @else Rechnung @endif {{ $snapshot->invoice_number }}</title>
     @php
-        $isAtr = \App\Support\BrandRegistry::isAtr();
-        $primaryColor = $isAtr ? '#2A9D8F' : '#1E5631';
-        $secondaryColor = $isAtr ? '#2A9D8F' : '#A4B494';
+        $isSrp = \App\Support\BrandRegistry::isSrp();
+        $primaryColor = $isSrp ? '#2A9D8F' : '#1E5631';
+        $secondaryColor = $isSrp ? '#2A9D8F' : '#A4B494';
     @endphp
     <style>
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; font-size: 13px; line-height: 1.5; }

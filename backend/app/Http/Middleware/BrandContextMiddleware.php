@@ -20,7 +20,7 @@ class BrandContextMiddleware
 
         // Dev-Fallback: Da der Vite-Proxy API-Calls umschreibt und das Backend
         // lokal immer 'portal.test' sieht, lesen wir im lokalen Modus den Host
-        // zusätzlich aus dem Referer-Header aus, um den ATR-Brand emulieren zu können.
+        // zusätzlich aus dem Referer-Header aus, um den SRP-Brand emulieren zu können.
         // (Mit dem 2-Instanzen-Vite-Setup hat jedes Proxy-Target den korrekten Host;
         // der Referer-Backstop bleibt als Safety-Net für gemischte Setups.)
         if (app()->environment('local') && $request->headers->has('referer')) {

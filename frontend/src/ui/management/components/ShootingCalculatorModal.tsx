@@ -11,13 +11,13 @@ interface ShootingCalculatorModalProps {
 }
 
 export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}: ShootingCalculatorModalProps) {
-    const {isAtr} = useBrand();
+    const {isSrp} = useBrand();
     const {terms} = useLicenseTerms();
 
     const [usePremium, setUsePremium] = useState(false);
     // calcMode is derived from the current brand (via useBrand() / hostname), not from a
     // brand-ID, so it stays in sync with the domain automatically.
-    const calcMode = (isAtr && !usePremium) ? 'atr' : 'rp';
+    const calcMode = (isSrp && !usePremium) ? 'srp' : 'rp';
 
     // --- RP (B2B) State ---
     const [calcDuration, setCalcDuration] = useState<number>(90);
@@ -26,11 +26,11 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     const [calcIsOutdoor, setCalcIsOutdoor] = useState<boolean>(false);
     const [calcDiscount, setCalcDiscount] = useState<ShootingDiscount>('0');
 
-    // --- ATR (B2C) State ---
-    const [atrType, setAtrType] = useState<'portrait' | 'couple' | 'nude'>('portrait');
-    const [atrSetup, setAtrSetup] = useState<'outdoor' | 'outdoor_flash' | 'indoor'>('outdoor');
-    const [atrExtra, setAtrExtra] = useState<number>(0);
-    const [atrPrivate, setAtrPrivate] = useState<boolean>(false);
+    // --- SRP (B2C) State ---
+    const [srpType, setSrpType] = useState<'portrait' | 'couple' | 'nude'>('portrait');
+    const [srpSetup, setSrpSetup] = useState<'outdoor' | 'outdoor_flash' | 'indoor'>('outdoor');
+    const [srpExtra, setSrpExtra] = useState<number>(0);
+    const [srpPrivate, setSrpPrivate] = useState<boolean>(false);
 
     if (!isOpen) return null;
 
@@ -38,12 +38,12 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     let finalPriceEuro = 0;
     let discountAbsolute = 0;
 
-    if (calcMode === 'atr') {
+    if (calcMode === 'srp') {
         const res = calculateB2CFlexPrice({
-            type: atrType,
-            setup: atrSetup,
-            extraImages: atrExtra,
-            isFullyPrivate: atrPrivate
+            type: srpType,
+            setup: srpSetup,
+            extraImages: srpExtra,
+            isFullyPrivate: srpPrivate
         });
         packagePriceEuro = res.packagePrice;
         finalPriceEuro = res.finalPrice;
@@ -69,11 +69,11 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
         let desc: string;
         let notes: string;
 
-        if (calcMode === 'atr') {
+        if (calcMode === 'srp') {
             const types = {portrait: 'Portrait', couple: 'Pärchen', nude: 'Akt & Boudoir'};
             const setups = {outdoor: 'Outdoor (Natur)', outdoor_flash: 'Mobiles Blitz-Setup', indoor: 'Fotostudio'};
-            desc = `B2C Flex-Shooting (${types[atrType]})`;
-            notes = `Setup: ${setups[atrSetup]} | Zusätzliche Bilder: ${atrExtra} | Online-Verbot: ${atrPrivate ? 'Ja' : 'Nein'}`;
+            desc = `B2C Flex-Shooting (${types[srpType]})`;
+            notes = `Setup: ${setups[srpSetup]} | Zusätzliche Bilder: ${srpExtra} | Online-Verbot: ${srpPrivate ? 'Ja' : 'Nein'}`;
         } else {
             desc = calcIsFlatrate ? 'Reportage / Flatrate-Shooting' : 'Individuelles Shooting-Paket';
             notes = `Custom Shooting Paket | ${calcIsOutdoor ? 'Outdoor' : 'Indoor'} | Dauer: ${calcDuration} Minuten | Inkludierte Bilder: ${calcImages} Stück.`;
@@ -101,23 +101,23 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                 </button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--calculator text-primary"></span>
-                    {calcMode === 'atr' ? 'B2C Flex-Paket Rechner' : 'B2B Shooting-Paket Kalkulator'}
+                    {calcMode === 'srp' ? 'B2C Flex-Paket Rechner' : 'B2B Shooting-Paket Kalkulator'}
                 </h3>
 
-                {isAtr && (
+                {isSrp && (
                     <div className="tabs tabs-boxed mb-4 w-full flex bg-base-200">
                         <button type="button" className={`tab flex-1 ${!usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(false)}>B2C Flex-Paket</button>
                         <button type="button" className={`tab flex-1 ${usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(true)}>Premium Tarif</button>
                     </div>
                 )}
 
-                {calcMode === 'atr' ? (
+                {calcMode === 'srp' ? (
                     <div className="space-y-4">
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                             <label className="label font-bold text-sm mb-1">Bereich</label>
-                            <select className="select select-bordered w-full" value={atrType} onChange={e => {
-                                setAtrType(e.target.value as 'portrait' | 'couple' | 'nude');
-                                if (e.target.value !== 'nude') setAtrPrivate(false);
+                            <select className="select select-bordered w-full" value={srpType} onChange={e => {
+                                setSrpType(e.target.value as 'portrait' | 'couple' | 'nude');
+                                if (e.target.value !== 'nude') setSrpPrivate(false);
                             }}>
                                 <option value="portrait">Portrait</option>
                                 <option value="couple">Pärchen</option>
@@ -126,8 +126,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                         </div>
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                             <label className="label font-bold text-sm mb-1">Setup</label>
-                            <select className="select select-bordered w-full" value={atrSetup}
-                                    onChange={e => setAtrSetup(e.target.value as 'outdoor' | 'outdoor_flash' | 'indoor')}>
+                            <select className="select select-bordered w-full" value={srpSetup}
+                                    onChange={e => setSrpSetup(e.target.value as 'outdoor' | 'outdoor_flash' | 'indoor')}>
                                 <option value="outdoor">Outdoor (Natur)</option>
                                 <option value="outdoor_flash">Mobiles Blitz-Setup (+50€)</option>
                                 <option value="indoor">Fotostudio (+50€)</option>
@@ -136,13 +136,13 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                             <label className="label font-bold text-sm mb-1">Zusätzliche Bilder (+15€/Stk)</label>
                             <input type="number" min="0" step="1" className="input input-bordered w-full font-mono"
-                                   value={atrExtra} onChange={e => setAtrExtra(parseInt(e.target.value) || 0)}/>
+                                   value={srpExtra} onChange={e => setSrpExtra(parseInt(e.target.value) || 0)}/>
                         </div>
-                        {atrType === 'nude' && (
+                        {srpType === 'nude' && (
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <label className="cursor-pointer label justify-start gap-4 m-0 p-1">
                                     <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                           checked={atrPrivate} onChange={e => setAtrPrivate(e.target.checked)}/>
+                                           checked={srpPrivate} onChange={e => setSrpPrivate(e.target.checked)}/>
                                     <div>
                                         <span className="label-text font-bold block">Online-Verbot (Privacy Fee)</span>
                                         <span className="label-text-alt opacity-70 block mt-1 leading-tight text-wrap">Absolutes Veröffentlichungsverbot (+200€ zzgl. 5€/Extra-Bild)</span>

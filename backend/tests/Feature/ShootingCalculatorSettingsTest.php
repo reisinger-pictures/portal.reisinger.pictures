@@ -97,12 +97,14 @@ class ShootingCalculatorSettingsTest extends TestCase
     public function test_license_terms_is_public_and_omits_billing_data(): void
     {
         // Sensible Werte persistieren, damit ein Leak erkannt würde (nicht nur leere Defaults).
-        Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'AT99 9999 9999 9999 9999']);
-        Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Max Mustermann']);
-        Setting::updateOrCreate(['key' => 'company_email'], ['value' => 'finance@reisinger.pictures']);
-        Setting::updateOrCreate(['key' => 'company_city'], ['value' => 'Wien']);
-        Setting::updateOrCreate(['key' => 'mult_commercial'], ['value' => '2.0']);
-        Setting::updateOrCreate(['key' => 'calc_images_per_hour'], ['value' => '6']);
+        // Settings werden brand-scoped gelesen (resolver scope nach brand='rp' im Default-B2B-Kontext),
+        // daher wird hier explizit die B2B-Brand mitgegeben.
+        Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT99 9999 9999 9999 9999']);
+        Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Max Mustermann']);
+        Setting::updateOrCreate(['key' => 'company_email', 'brand' => 'rp'], ['value' => 'finance@reisinger.pictures']);
+        Setting::updateOrCreate(['key' => 'company_city', 'brand' => 'rp'], ['value' => 'Wien']);
+        Setting::updateOrCreate(['key' => 'mult_commercial', 'brand' => 'rp'], ['value' => '2.0']);
+        Setting::updateOrCreate(['key' => 'calc_images_per_hour', 'brand' => 'rp'], ['value' => '6']);
 
         // Vollständig anonymer Aufruf (kein Authorization-Header) — license-terms ist öffentlich.
         $this->getJson('/api/settings/license-terms')

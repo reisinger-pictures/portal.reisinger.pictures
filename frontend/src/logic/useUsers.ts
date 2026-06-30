@@ -23,9 +23,9 @@ export interface UserDetailed extends Omit<User, 'roles'> {
     is_super_admin: boolean;
     can_edit_metadata: boolean;
     flatrate_level: 'none' | 'web' | 'print' | 'original';
-    // Brand assignment per Policy A (A-01): 'rp' | 'atr' for client-type accounts, null for
+    // Brand assignment per Policy A (A-01): 'rp' | 'srp' for client-type accounts, null for
     // staff (super_admin/admin/photographer = cross-brand).
-    brand?: 'rp' | 'atr' | null;
+    brand?: 'rp' | 'srp' | null;
     roles: Role[];
     gallery_groups: GalleryGroup[];
     galleries: Gallery[];
@@ -50,7 +50,7 @@ export function useUsers() {
         await mutateUsers();
     };
 
-    const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string, brand: 'rp' | 'atr' | null) => {
+    const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string, brand: 'rp' | 'srp' | null) => {
         await apiMutate(`/api/management/users/${id}`, 'PUT', {
             role_ids,
             gallery_group_ids,

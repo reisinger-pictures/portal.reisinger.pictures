@@ -30,26 +30,28 @@ class SettingsBrandPrefixTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // Bug (a): updateBillingDetails() — ATR prefix missing on write
+    // Bug (a): updateBillingDetails() — SRP prefix missing on write
     // ------------------------------------------------------------------
 
-    public function test_billing_details_update_uses_atr_prefix_for_atr_brand(): void
+    public function test_billing_details_update_stores_brand_scoped_for_srp_brand(): void
     {
-        config(['app.brand' => 'atr']);
+        config(['app.brand' => 'srp']);
         $token = $this->superAdminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/management/settings/billing-details', [
-                'bank_holder' => 'ATR Fotografie GmbH',
+                'bank_holder' => 'SRP Fotografie GmbH',
                 'bank_iban' => 'AT11 2222 3333 4444 5555',
                 'company_city' => 'Graz',
             ])
             ->assertStatus(200);
 
-        $this->assertNull(Setting::where('key', 'bank_holder')->value('value'));
-        $this->assertSame('ATR Fotografie GmbH', Setting::where('key', 'atr_bank_holder')->value('value'));
-        $this->assertSame('AT11 2222 3333 4444 5555', Setting::where('key', 'atr_bank_iban')->value('value'));
-        $this->assertSame('Graz', Setting::where('key', 'atr_company_city')->value('value'));
+        // SRP brand: stored unprefixed under the srp brand column (no srp_ key prefixing).
+        $this->assertSame('SRP Fotografie GmbH', Setting::where('key', 'bank_holder')->where('brand', 'srp')->value('value'));
+        $this->assertSame('AT11 2222 3333 4444 5555', Setting::where('key', 'bank_iban')->where('brand', 'srp')->value('value'));
+        $this->assertSame('Graz', Setting::where('key', 'company_city')->where('brand', 'srp')->value('value'));
+        // The rp row is untouched by the SRP write (brand isolation).
+        $this->assertNotSame('SRP Fotografie GmbH', Setting::where('key', 'bank_holder')->where('brand', 'rp')->value('value'));
     }
 
     public function test_billing_details_update_uses_unprefixed_for_b2b_brand(): void
@@ -68,23 +70,34 @@ class SettingsBrandPrefixTest extends TestCase
         $this->assertSame('AT99 8888 7777 6666 5555', Setting::where('key', 'bank_iban')->value('value'));
     }
 
-    public function test_billing_details_read_returns_prefixed_for_atr_brand(): void
+    public function test_billing_details_read_returns_brand_scoped_for_srp_brand(): void
     {
-        config(['app.brand' => 'atr']);
-        Setting::updateOrCreate(['key' => 'atr_bank_holder'], ['value' => 'ATR GmbH']);
-        Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'B2B GmbH']);
+        config(['app.brand' => 'srp']);
+        // Use raw writes so both brand rows coexist independently (Setting's
+        // primary key is `key`, so Eloquent updateOrCreate would cross-update rows).
+        $db = \Illuminate\Support\Facades\DB::table('settings');
+        $db->where('key', 'bank_holder')->delete();
+        $db->insert([
+            ['key' => 'bank_holder', 'brand' => 'srp', 'value' => 'SRP GmbH'],
+            ['key' => 'bank_holder', 'brand' => 'rp', 'value' => 'B2B GmbH'],
+        ]);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/settings/billing-details')
             ->assertStatus(200)
-            ->assertJsonPath('bank_holder', 'ATR GmbH');
+            ->assertJsonPath('bank_holder', 'SRP GmbH');
     }
 
-    public function test_billing_details_read_falls_back_to_unprefixed_for_atr(): void
+    public function test_billing_details_read_falls_back_to_b2b_brand_for_srp(): void
     {
-        config(['app.brand' => 'atr']);
-        Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Shared GmbH']);
+        config(['app.brand' => 'srp']);
+        // Only a B2B ('rp') row exists → SRP read falls back to it.
+        $db = \Illuminate\Support\Facades\DB::table('settings');
+        $db->where('key', 'bank_holder')->delete();
+        $db->insert([
+            'key' => 'bank_holder', 'brand' => 'rp', 'value' => 'Shared GmbH',
+        ]);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -94,12 +107,12 @@ class SettingsBrandPrefixTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // Bug (b): updateLicenseTerms() — double prefix atr_atr_*
+    // Bug (b): updateLicenseTerms() — double prefix srp_srp_*
     // ------------------------------------------------------------------
 
-    public function test_license_terms_update_avoids_double_prefix_for_atr(): void
+    public function test_license_terms_update_maps_srp_keys_brand_scoped_for_srp(): void
     {
-        config(['app.brand' => 'atr']);
+        config(['app.brand' => 'srp']);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -107,20 +120,21 @@ class SettingsBrandPrefixTest extends TestCase
                 'mult_commercial' => '2.0',
                 'mult_unlimited' => '1.5',
                 'mult_international' => '1.5',
-                'atr_base_price' => '500',
-                'atr_setup_fee' => '100',
+                'srp_base_price' => '500',
+                'srp_setup_fee' => '100',
             ])
             ->assertStatus(200);
 
-        $this->assertSame('500', Setting::where('key', 'atr_base_price')->value('value'));
-        $this->assertNull(Setting::where('key', 'atr_atr_base_price')->value('value'));
-        $this->assertSame('100', Setting::where('key', 'atr_setup_fee')->value('value'));
-        $this->assertNull(Setting::where('key', 'atr_atr_setup_fee')->value('value'));
+        // Legacy srp_* request keys are mapped to unprefixed brand-scoped settings keys.
+        $this->assertSame('500', Setting::where('key', 'base_price')->where('brand', 'srp')->value('value'));
+        $this->assertSame('100', Setting::where('key', 'setup_fee')->where('brand', 'srp')->value('value'));
+        $this->assertNull(Setting::where('key', 'srp_base_price')->value('value'));
+        $this->assertNull(Setting::where('key', 'srp_srp_base_price')->value('value'));
     }
 
-    public function test_license_terms_update_prefixes_unprefixed_keys_for_atr(): void
+    public function test_license_terms_update_stores_unprefixed_keys_brand_scoped_for_srp(): void
     {
-        config(['app.brand' => 'atr']);
+        config(['app.brand' => 'srp']);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -132,11 +146,14 @@ class SettingsBrandPrefixTest extends TestCase
             ])
             ->assertStatus(200);
 
-        $this->assertSame('75', Setting::where('key', 'atr_calc_base_price')->value('value'));
-        $this->assertNull(Setting::where('key', 'calc_base_price')->value('value'));
+        // Unprefixed request key stored under the SRP brand column (no key prefixing).
+        $this->assertSame('75', Setting::where('key', 'calc_base_price')->where('brand', 'srp')->value('value'));
+        $this->assertNull(Setting::where('key', 'srp_calc_base_price')->value('value'));
+        // The rp row is untouched by the SRP write (brand isolation).
+        $this->assertNotSame('75', Setting::where('key', 'calc_base_price')->where('brand', 'rp')->value('value'));
     }
 
-    public function test_license_terms_update_does_not_prefix_for_b2b(): void
+    public function test_license_terms_update_stores_brand_scoped_for_b2b(): void
     {
         config(['app.brand' => 'rp']);
         $token = $this->adminToken();
@@ -146,21 +163,23 @@ class SettingsBrandPrefixTest extends TestCase
                 'mult_commercial' => '2.0',
                 'mult_unlimited' => '1.5',
                 'mult_international' => '1.5',
-                'atr_base_price' => '500',
+                'srp_base_price' => '500',
             ])
             ->assertStatus(200);
 
-        $this->assertSame('500', Setting::where('key', 'atr_base_price')->value('value'));
-        $this->assertNull(Setting::where('key', 'atr_atr_base_price')->value('value'));
+        // Legacy srp_* request key maps to base_price, stored under the rp brand column.
+        $this->assertSame('500', Setting::where('key', 'base_price')->where('brand', 'rp')->value('value'));
+        $this->assertNull(Setting::where('key', 'srp_base_price')->value('value'));
+        $this->assertNull(Setting::where('key', 'srp_srp_base_price')->value('value'));
     }
 
     // ------------------------------------------------------------------
     // Bug (c): updateWatermark() — watermark_opacity asymmetrical
     // ------------------------------------------------------------------
 
-    public function test_watermark_opacity_write_uses_prefix_for_atr(): void
+    public function test_watermark_opacity_write_is_brand_scoped_for_srp(): void
     {
-        config(['app.brand' => 'atr']);
+        config(['app.brand' => 'srp']);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -169,14 +188,16 @@ class SettingsBrandPrefixTest extends TestCase
             ])
             ->assertStatus(200);
 
-        $this->assertNull(Setting::where('key', 'watermark_opacity')->value('value'));
-        $this->assertSame('0.75', Setting::where('key', 'atr_watermark_opacity')->value('value'));
+        // Stored unprefixed under the SRP brand column (no srp_ key prefixing).
+        $this->assertSame('0.75', Setting::where('key', 'watermark_opacity')->where('brand', 'srp')->value('value'));
+        $this->assertNull(Setting::where('key', 'watermark_opacity')->where('brand', 'rp')->value('value'));
+        $this->assertNull(Setting::where('key', 'srp_watermark_opacity')->value('value'));
     }
 
-    public function test_watermark_opacity_read_after_write_is_symmetrical_for_atr(): void
+    public function test_watermark_opacity_read_after_write_is_brand_scoped_for_srp(): void
     {
-        config(['app.brand' => 'atr']);
-        Setting::updateOrCreate(['key' => 'atr_watermark_opacity'], ['value' => '0.60']);
+        config(['app.brand' => 'srp']);
+        Setting::updateOrCreate(['key' => 'watermark_opacity', 'brand' => 'srp'], ['value' => '0.60']);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -185,10 +206,11 @@ class SettingsBrandPrefixTest extends TestCase
             ->assertJsonPath('opacity', 0.6);
     }
 
-    public function test_watermark_opacity_read_falls_back_to_global_for_atr(): void
+    public function test_watermark_opacity_read_falls_back_to_b2b_brand_for_srp(): void
     {
-        config(['app.brand' => 'atr']);
-        Setting::updateOrCreate(['key' => 'watermark_opacity'], ['value' => '0.30']);
+        config(['app.brand' => 'srp']);
+        // Only a B2B ('rp') row exists → SRP read falls back to it.
+        Setting::updateOrCreate(['key' => 'watermark_opacity', 'brand' => 'rp'], ['value' => '0.30']);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -209,14 +231,14 @@ class SettingsBrandPrefixTest extends TestCase
             ->assertStatus(200);
 
         $this->assertSame('0.50', Setting::where('key', 'watermark_opacity')->value('value'));
-        $this->assertNull(Setting::where('key', 'atr_watermark_opacity')->value('value'));
+        $this->assertNull(Setting::where('key', 'srp_watermark_opacity')->value('value'));
     }
 
     public function test_watermark_opacity_default_is_015(): void
     {
-        config(['app.brand' => 'atr']);
+        config(['app.brand' => 'srp']);
         Setting::where('key', 'watermark_opacity')->delete();
-        Setting::where('key', 'atr_watermark_opacity')->delete();
+        Setting::where('key', 'srp_watermark_opacity')->delete();
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])

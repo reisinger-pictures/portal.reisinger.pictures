@@ -1,14 +1,14 @@
 {
-    "name": "all-the.rest by Florian Reisinger",
-    "short_name": "all the rest",
+    "name": "story.reisinger.pictures by Florian Reisinger",
+    "short_name": "story.reisinger.pictures",
     "icons": [
         {
-            "src": "/brands/atr/android-chrome-192x192.png",
+            "src": "/brands/srp/android-chrome-192x192.png",
             "sizes": "192x192",
             "type": "image/png"
         },
         {
-            "src": "/brands/atr/android-chrome-512x512.png",
+            "src": "/brands/srp/android-chrome-512x512.png",
             "sizes": "512x512",
             "type": "image/png"
         }

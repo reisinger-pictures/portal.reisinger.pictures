@@ -26,7 +26,7 @@ Falls du das Projekt neu eingerichtet hast oder sich die Datenbankstruktur geän
 2. `🔑 [Setup] Backend: JWT Secret generieren`
 3. `💾 [Setup] Backend: DB Migration (Update)`
 
-*(Tipp: Vergiss nicht, lokal `herd secure portal.test` auszuführen, falls du Laravel Herd nutzt!)*
+*(Tipp: Vergiss nicht, lokal sowohl `herd secure portal.test` als auch `herd secure portal-srp.test` auszuführen, falls du Laravel Herd nutzt!)*
 
 ### 3. Wartung & Herunterfahren
 * **Index aktualisieren:** Wenn du Probleme mit der Suche hast, führe `🔍 [Wartung] Meilisearch Sync & Import` aus.

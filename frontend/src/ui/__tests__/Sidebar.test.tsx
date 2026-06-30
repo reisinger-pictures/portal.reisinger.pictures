@@ -291,7 +291,7 @@ describe('Sidebar', () => {
             });
             renderSidebar();
 
-            expect(screen.getByText('Mandanten (B2B)')).toBeInTheDocument();
+            expect(screen.getByText('Organisationen (B2B)')).toBeInTheDocument();
             // Customer-manager sees "Mein Team" instead of "Benutzer & Rechte"
             expect(screen.getByText('Mein Team')).toBeInTheDocument();
 

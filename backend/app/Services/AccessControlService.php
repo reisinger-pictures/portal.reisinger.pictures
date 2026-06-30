@@ -60,10 +60,11 @@ class AccessControlService
         }
 
         if ($user->is_photographer) {
-            $unrestrictedIds = Cache::rememberForever('unrestricted_photographer_gallery_ids', function () {
+            $buildUnrestricted = function () {
                 $allGalleries = Gallery::with('galleryGroup')->get();
                 return $allGalleries->filter(fn($g) => !$g->effective_restricted_photographers)->pluck('id')->toArray();
-            });
+            };
+            $unrestrictedIds = Cache::rememberForever('unrestricted_photographer_gallery_ids', $buildUnrestricted);
             $galleryIds = array_merge($galleryIds, $unrestrictedIds);
 
             $photogGalleryIds = $user->photographerGalleries()->pluck('galleries.id')->toArray();
@@ -80,7 +81,7 @@ class AccessControlService
 
         // Brand scoping: brand-bound users (brand != null) see only galleries of their own brand.
         // Cross-brand users (brand = null, e.g. Super-Admin) see all brands. Guest/tenant gallery
-        // assignments are also filtered so an ATR user can never reach a B2B gallery via stale links.
+        // assignments are also filtered so an SRP user can never reach a B2B gallery via stale links.
         if ($user->brand !== null) {
             $galleryIds = Gallery::whereIn('id', $galleryIds)
                 ->where(function ($q) use ($user) {

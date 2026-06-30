@@ -34,6 +34,11 @@ class CheckoutService {
                 if (!$isItemQuote && !empty($item['useCaseId'])) {
                     $useCase = \App\Models\LicenseUseCase::find($item['useCaseId']);
                     if ($useCase) {
+                        // Defense-in-depth (spec §3.6): reject cross-brand use case ids.
+                        $currentBrand = \App\Support\BrandRegistry::current();
+                        if ($currentBrand !== null && $useCase->brand !== null && $useCase->brand !== $currentBrand) {
+                            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => 'Ungültige Lizenz-Auswahl.'], 422));
+                        }
                         $isCommercial = $useCase->is_commercial || preg_match('/werbung|kampagne|kommerziell/i', $useCase->name . ' ' . $useCase->description);
                         if ($isCommercial && ($photo->effective_is_editorial_only || $photo->is_editorial_only)) {
                             throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."], 403));

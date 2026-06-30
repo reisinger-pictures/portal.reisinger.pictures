@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Product;
+use App\Support\BrandRegistry;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query();
+        $query = Product::forCurrentBrand();
 
         if ($request->query('type')) {
             $query->whereIn('type', explode(',', $request->query('type')));
@@ -33,13 +34,14 @@ class ProductController extends Controller
             'price' => 'required|integer|min:0',
         ]);
 
+        $validated['brand'] = BrandRegistry::currentOrDefault()->value;
         $product = Product::create($validated);
         return response()->json(['success' => true, 'product' => $product]);
     }
 
     public function update(Request $request, $id)
     {
-        $product = Product::findOrFail($id);
+        $product = Product::forCurrentBrand()->findOrFail($id);
 
         $validated = $request->validate([
             'type' => 'required|string|in:item,discount_fixed,discount_percent',
@@ -54,7 +56,7 @@ class ProductController extends Controller
 
     public function destroy($id)
     {
-        Product::findOrFail($id)->delete();
+        Product::forCurrentBrand()->findOrFail($id)->delete();
         return response()->json(['success' => true]);
     }
 }

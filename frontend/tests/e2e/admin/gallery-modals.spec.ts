@@ -47,7 +47,7 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
         await page.goto('/galleries');
         await page.waitForLoadState('networkidle');
         await page.locator('h1:has-text("Galerien")').waitFor({ state: 'visible', timeout: 10000 });
-        await page.locator('summary').filter({ hasText: uniqueName }).locator('button[data-tip="Ordner bearbeiten"]').click();
+        await page.locator('summary').filter({ hasText: uniqueName }).locator('button').filter({ has: page.locator('.mdi--pencil') }).click();
         
         // Assert Modal UI is populated
         await modal.assertCheckboxByLabel('Im Frontend verstecken', true);

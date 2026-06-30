@@ -9,10 +9,10 @@ const calculatorSettingsSchema = z.object({
     calc_base_price: z.number().min(0, 'Muss positiv sein'),
     calc_hourly_rate: z.number().min(0, 'Muss positiv sein'),
     calc_images_per_hour: z.number().int('Muss eine ganze Zahl sein').min(1, 'Mindestens 1 Bild'),
-    atr_base_price: z.number().min(0, 'Muss positiv sein'),
-    atr_setup_fee: z.number().min(0, 'Muss positiv sein'),
-    atr_privacy_fee: z.number().min(0, 'Muss positiv sein'),
-    atr_extra_image_fee: z.number().min(0, 'Muss positiv sein')
+    srp_base_price: z.number().min(0, 'Muss positiv sein'),
+    srp_setup_fee: z.number().min(0, 'Muss positiv sein'),
+    srp_privacy_fee: z.number().min(0, 'Muss positiv sein'),
+    srp_extra_image_fee: z.number().min(0, 'Muss positiv sein')
 });
 
 type CalculatorSettingsFormValues = z.infer<typeof calculatorSettingsSchema>;
@@ -25,7 +25,7 @@ export default function CalculatorSettingsCard() {
         resolver: zodResolver(calculatorSettingsSchema),
         defaultValues: {
             calc_base_price: 50, calc_hourly_rate: 80, calc_images_per_hour: 6,
-            atr_base_price: 149, atr_setup_fee: 50, atr_privacy_fee: 200, atr_extra_image_fee: 15
+            srp_base_price: 149, srp_setup_fee: 50, srp_privacy_fee: 200, srp_extra_image_fee: 15
         }
     });
 
@@ -35,10 +35,10 @@ export default function CalculatorSettingsCard() {
                 calc_base_price: parseFloat(terms.calc_base_price || '50'),
                 calc_hourly_rate: parseFloat(terms.calc_hourly_rate || '80'),
                 calc_images_per_hour: parseInt(terms.calc_images_per_hour || '6', 10),
-                atr_base_price: parseFloat(terms.atr_base_price || '149'),
-                atr_setup_fee: parseFloat(terms.atr_setup_fee || '50'),
-                atr_privacy_fee: parseFloat(terms.atr_privacy_fee || '200'),
-                atr_extra_image_fee: parseFloat(terms.atr_extra_image_fee || '15')
+                srp_base_price: parseFloat(terms.srp_base_price || '149'),
+                srp_setup_fee: parseFloat(terms.srp_setup_fee || '50'),
+                srp_privacy_fee: parseFloat(terms.srp_privacy_fee || '200'),
+                srp_extra_image_fee: parseFloat(terms.srp_extra_image_fee || '15')
             });
         }
     }, [terms, reset]);
@@ -49,10 +49,10 @@ export default function CalculatorSettingsCard() {
                 calc_base_price: data.calc_base_price,
                 calc_hourly_rate: data.calc_hourly_rate,
                 calc_images_per_hour: data.calc_images_per_hour,
-                atr_base_price: data.atr_base_price,
-                atr_setup_fee: data.atr_setup_fee,
-                atr_privacy_fee: data.atr_privacy_fee,
-                atr_extra_image_fee: data.atr_extra_image_fee,
+                srp_base_price: data.srp_base_price,
+                srp_setup_fee: data.srp_setup_fee,
+                srp_privacy_fee: data.srp_privacy_fee,
+                srp_extra_image_fee: data.srp_extra_image_fee,
                 mult_commercial: terms?.mult_commercial || '2.0',
                 mult_unlimited: terms?.mult_unlimited || '1.5',
                 mult_international: terms?.mult_international || '1.5'
@@ -101,24 +101,24 @@ export default function CalculatorSettingsCard() {
                             <label className="label"><span
                                 className="label-text font-bold">Basispreis (€)</span></label>
                             <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('atr_base_price', {valueAsNumber: true})} />
+                                   className="input input-bordered" {...register('srp_base_price', {valueAsNumber: true})} />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Setup-Fee (€)</span></label>
                             <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('atr_setup_fee', {valueAsNumber: true})} />
+                                   className="input input-bordered" {...register('srp_setup_fee', {valueAsNumber: true})} />
                         </div>
                         <div className="form-control">
                             <label className="label"><span
                                 className="label-text font-bold">Extra-Bild (€)</span></label>
                             <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('atr_extra_image_fee', {valueAsNumber: true})} />
+                                   className="input input-bordered" {...register('srp_extra_image_fee', {valueAsNumber: true})} />
                         </div>
                         <div className="form-control">
                             <label className="label"><span
                                 className="label-text font-bold">Privacy-Fee (€)</span></label>
                             <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('atr_privacy_fee', {valueAsNumber: true})} />
+                                   className="input input-bordered" {...register('srp_privacy_fee', {valueAsNumber: true})} />
                         </div>
                     </div>
 

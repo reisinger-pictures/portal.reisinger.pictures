@@ -9,7 +9,7 @@ import { UserDetailed } from '../../../src/logic/useUsers';
 
 test.describe('Tenant Management & Invoicing Workflow', () => {
     let helper: E2ESessionHelper;
-    let adminUser: { email: string; password: string; id: string };
+    let adminUser = { email: '', password: '', id: '' };
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
@@ -30,7 +30,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         const guestEmail = `tenant-guest-${Math.random().toString(36).substring(2, 10)}@example.com`;
 
         await auth.login(adminUser.email, adminUser.password);
-        await sidebar.navigateTo('Mandanten');
+        await sidebar.navigateTo('Organisationen (B2B)');
 
         await page.getByRole('button', { name: '+ Neue Organisation' }).click();
         const form = new FormHelper(page, modal);
@@ -63,7 +63,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         await auth.logout();
 
         await auth.login(adminUser.email, adminUser.password);
-        await sidebar.navigateTo('Mandanten');
+        await sidebar.navigateTo('Organisationen (B2B)');
         await page.locator('.card-title', { hasText: tenantName }).click();
         
         const invBtn = page.getByRole('button', { name: 'Sammelrechnung erstellen' });

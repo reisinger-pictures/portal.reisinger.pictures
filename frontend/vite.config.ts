@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig(({mode}) => {
-    // Load .env, .env.[mode] (e.g. .env.b2b / .env.atr) so the proxy target/port can differ
+    // Load .env, .env.[mode] (e.g. .env.b2b / .env.srp) so the proxy target/port can differ
     // per brand instance without extra dependencies. Two Vite instances distinguish the brand
-    // locally: B2B (port 4321 → portal.test) and ATR (port 4322 → portal-atr.test). The proxy
+    // locally: B2B (port 4321 → portal.test) and SRP (port 4322 → portal-srp.test). The proxy
     // target decides which host the backend sees, so BrandRegistry::fromHost() resolves correctly
     // while all frontend URLs stay relative. See features/infrastructure/12-brand-registry...md.
     const env = loadEnv(mode, process.cwd(), '')

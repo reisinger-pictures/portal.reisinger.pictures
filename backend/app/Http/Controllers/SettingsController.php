@@ -2,7 +2,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Setting;
 use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\File;
@@ -110,30 +109,33 @@ class SettingsController extends Controller
      * Öffentlich (Gallery-/License-Selector-/Calculator-Flows). Sensible Billing-/Impressum-Daten
      * liegen bewusst im separaten, auth-geschützten Endpunkt getBillingDetails() (SRP-Trennung).
      */
-    public function getLicenseTerms()
+    public function getLicenseTerms(SettingResolver $resolver)
     {
+        // R-01 (naming/SRP): values are read brand-scoped via the resolver (spec §3.2/§6).
+        // Response JSON key names are preserved (incl. `srp_*`) for frontend backward-compat;
+        // the DATA SOURCE is now the resolver with unprefixed keys + the brand column.
         return response()->json([
-            'editorial' => Setting::where('key', 'term_editorial')->value('value'),
-            'commercial' => Setting::where('key', 'term_commercial')->value('value'),
-            '1_year' => Setting::where('key', 'term_1_year')->value('value'),
-            'unlimited' => Setting::where('key', 'term_unlimited')->value('value'),
-            'territory_national' => Setting::where('key', 'term_territory_national')->value('value'),
-            'territory_international' => Setting::where('key', 'term_territory_international')->value('value'),
-            'mult_commercial' => Setting::where('key', 'mult_commercial')->value('value'),
-            'mult_unlimited' => Setting::where('key', 'mult_unlimited')->value('value'),
-            'mult_international' => Setting::where('key', 'mult_international')->value('value'),
-            'web' => Setting::where('key', 'term_web')->value('value'),
-            'print' => Setting::where('key', 'term_print')->value('value'),
-            'original' => Setting::where('key', 'term_original')->value('value'),
-            'base_price' => Setting::where('key', 'base_price')->value('value'),
-            'calc_base_price' => Setting::where('key', 'calc_base_price')->value('value'),
-            'calc_hourly_rate' => Setting::where('key', 'calc_hourly_rate')->value('value'),
-            'calc_images_per_hour' => Setting::where('key', 'calc_images_per_hour')->value('value'),
-            'calc_outdoor_multiplier' => Setting::where('key', 'calc_outdoor_multiplier')->value('value'),
-            'atr_base_price' => Setting::where('key', 'atr_base_price')->value('value'),
-            'atr_setup_fee' => Setting::where('key', 'atr_setup_fee')->value('value'),
-            'atr_privacy_fee' => Setting::where('key', 'atr_privacy_fee')->value('value'),
-            'atr_extra_image_fee' => Setting::where('key', 'atr_extra_image_fee')->value('value'),
+            'editorial' => $resolver->get('term_editorial'),
+            'commercial' => $resolver->get('term_commercial'),
+            '1_year' => $resolver->get('term_1_year'),
+            'unlimited' => $resolver->get('term_unlimited'),
+            'territory_national' => $resolver->get('term_territory_national'),
+            'territory_international' => $resolver->get('term_territory_international'),
+            'mult_commercial' => $resolver->get('mult_commercial'),
+            'mult_unlimited' => $resolver->get('mult_unlimited'),
+            'mult_international' => $resolver->get('mult_international'),
+            'web' => $resolver->get('term_web'),
+            'print' => $resolver->get('term_print'),
+            'original' => $resolver->get('term_original'),
+            'base_price' => $resolver->get('base_price'),
+            'calc_base_price' => $resolver->get('calc_base_price'),
+            'calc_hourly_rate' => $resolver->get('calc_hourly_rate'),
+            'calc_images_per_hour' => $resolver->get('calc_images_per_hour'),
+            'calc_outdoor_multiplier' => $resolver->get('calc_outdoor_multiplier'),
+            'srp_base_price' => $resolver->get('base_price'),
+            'srp_setup_fee' => $resolver->get('setup_fee'),
+            'srp_privacy_fee' => $resolver->get('privacy_fee'),
+            'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
         ]);
     }
 
@@ -160,16 +162,18 @@ class SettingsController extends Controller
     {
         // R-01 (naming/SRP): nur Lizenzbedingungen + Preisfaktoren. Bank-/Firmendaten gehören
         // in updateBillingDetails() (separater Endpunkt).
+        // `srp_*` request keys are kept for frontend backward-compat but mapped to unprefixed,
+        // brand-scoped settings keys on write (spec §3.2/§6).
         $validated = $request->validate([
             'base_price' => 'nullable|integer|min:500',
             'calc_base_price' => 'nullable|numeric|min:0',
             'calc_hourly_rate' => 'nullable|numeric|min:0',
             'calc_images_per_hour' => 'nullable|integer|min:1',
             'calc_outdoor_multiplier' => 'nullable|numeric|min:0.1|max:1',
-            'atr_base_price' => 'nullable|numeric|min:0',
-            'atr_setup_fee' => 'nullable|numeric|min:0',
-            'atr_privacy_fee' => 'nullable|numeric|min:0',
-            'atr_extra_image_fee' => 'nullable|numeric|min:0',
+            'srp_base_price' => 'nullable|numeric|min:0',
+            'srp_setup_fee' => 'nullable|numeric|min:0',
+            'srp_privacy_fee' => 'nullable|numeric|min:0',
+            'srp_extra_image_fee' => 'nullable|numeric|min:0',
             'term_editorial' => 'nullable|string',
             'term_commercial' => 'nullable|string',
             'term_1_year' => 'nullable|string',
@@ -184,10 +188,20 @@ class SettingsController extends Controller
             'term_original' => 'nullable|string',
         ]);
 
+        // Map legacy `srp_*` request keys to unprefixed brand-scoped settings keys.
+        $srpKeyMap = [
+            'srp_base_price' => 'base_price',
+            'srp_setup_fee' => 'setup_fee',
+            'srp_privacy_fee' => 'privacy_fee',
+            'srp_extra_image_fee' => 'extra_image_fee',
+        ];
+
         foreach ($validated as $key => $value) {
-            if ($value !== null) {
-                $resolver->set($key, $value);
+            if ($value === null) {
+                continue;
             }
+            $settingsKey = $srpKeyMap[$key] ?? $key;
+            $resolver->set($settingsKey, $value);
         }
         return response()->json(['success' => true]);
     }

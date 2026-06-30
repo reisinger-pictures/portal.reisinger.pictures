@@ -11,22 +11,22 @@ class StripeIdempotencyTest extends TestCase {
     use RefreshDatabase;
 
     public function test_checkout_sends_idempotency_key_to_stripe() {
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'company_street'], ['value' => 'Teststreet 1']);
-        \App\Models\Setting::updateOrCreate(['key' => 'price_web'], ['value' => '75.00']);
-        \App\Models\Setting::updateOrCreate(['key' => 'price_print'], ['value' => '145.00']);
-        \App\Models\Setting::updateOrCreate(['key' => 'price_original'], ['value' => '450.00']);
-        \App\Models\Setting::updateOrCreate(['key' => 'mult_commercial'], ['value' => '2.0']);
-        \App\Models\Setting::updateOrCreate(['key' => 'mult_unlimited'], ['value' => '1.5']);
-        \App\Models\Setting::updateOrCreate(['key' => 'mult_international'], ['value' => '1.5']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        \App\Models\Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
+        \App\Models\Setting::updateOrCreate(['key' => 'price_web', 'brand' => 'rp'], ['value' => '75.00']);
+        \App\Models\Setting::updateOrCreate(['key' => 'price_print', 'brand' => 'rp'], ['value' => '145.00']);
+        \App\Models\Setting::updateOrCreate(['key' => 'price_original', 'brand' => 'rp'], ['value' => '450.00']);
+        \App\Models\Setting::updateOrCreate(['key' => 'mult_commercial', 'brand' => 'rp'], ['value' => '2.0']);
+        \App\Models\Setting::updateOrCreate(['key' => 'mult_unlimited', 'brand' => 'rp'], ['value' => '1.5']);
+        \App\Models\Setting::updateOrCreate(['key' => 'mult_international', 'brand' => 'rp'], ['value' => '1.5']);
 
         $user = User::factory()->create();
         $token = auth('api')->login($user);
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
-        $useCase = \App\Models\LicenseUseCase::create(['name' => 'Test License', 'base_price' => 45000, 'flatrate_tier' => 'original']);
+        $useCase = \App\Models\LicenseUseCase::create(['name' => 'Test License', 'base_price' => 45000, 'flatrate_tier' => 'original', 'brand' => 'rp']);
 
         // Wir injizieren einen Mock für den Stripe HTTP Client, um echte Netzwerkanfragen 
         // zu blockieren und stattdessen den Idempotency-Key Header abzufangen.

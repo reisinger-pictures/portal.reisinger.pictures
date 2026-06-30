@@ -8,7 +8,7 @@ interface UserPermissionsModalProps {
     flatGroups: FlatGroup[];
     flatGalleries: Gallery[];
     onClose: () => void;
-    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'atr' | null) => Promise<void>;
+    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'srp' | null) => Promise<void>;
 }
 
 // Policy A (A-01): staff roles are always cross-brand. The brand-select is only relevant for
@@ -29,7 +29,7 @@ export default function UserPermissionsModal({
 
     const [canEditMeta, setCanEditMeta] = useState<boolean>(user.can_edit_metadata || false);
     const [flatrateLevel, setFlatrateLevel] = useState<string>(user.flatrate_level || 'none');
-    const [brand, setBrand] = useState<'rp' | 'atr' | null>(user.brand ?? null);
+    const [brand, setBrand] = useState<'rp' | 'srp' | null>(user.brand ?? null);
 
     // A staff account (any staff role selected) is cross-brand per Policy A; brand is forced to
     // null and the select is disabled so the editor cannot accidentally scope a staff member.
@@ -37,7 +37,7 @@ export default function UserPermissionsModal({
         .filter(r => selRoles.includes(r.id))
         .map(r => r.name);
     const isStaffAccount = selectedRoleNames.some(name => STAFF_ROLE_NAMES.includes(name));
-    const effectiveBrand: 'rp' | 'atr' | null = isStaffAccount ? null : brand;
+    const effectiveBrand: 'rp' | 'srp' | null = isStaffAccount ? null : brand;
 
     const toggleItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
         setArr(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
@@ -89,11 +89,11 @@ export default function UserPermissionsModal({
                         className="select select-bordered w-full"
                         value={effectiveBrand ?? ''}
                         disabled={isStaffAccount}
-                        onChange={e => setBrand((e.target.value || null) as 'rp' | 'atr' | null)}
+                        onChange={e => setBrand((e.target.value || null) as 'rp' | 'srp' | null)}
                     >
                         <option value="">Übergreifend (cross-brand)</option>
                         <option value="rp">B2B (reisinger.pictures)</option>
-                        <option value="atr">ATR (all-the.rest)</option>
+                        <option value="srp">SRP (story.reisinger.pictures)</option>
                     </select>
                     <span className="label-text-alt opacity-70 mt-1 pl-1">
                         {isStaffAccount

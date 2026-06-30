@@ -12,16 +12,16 @@ class OrderCheckoutTest extends TestCase {
 
     protected function setUp(): void {
         parent::setUp();
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'company_street'], ['value' => 'Teststreet 1']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        \App\Models\Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
         
         \Illuminate\Support\Facades\DB::table('license_use_cases')->insert([
-            ['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print']
+            ['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']
         ]);
         \Illuminate\Support\Facades\DB::table('license_modifiers')->insert([
-            ['id' => '22222222-2222-2222-2222-222222222222', 'name' => 'Titelseite', 'percent_surcharge' => 100.00, 'is_included_in_flatrate' => true],
-            ['id' => '33333333-3333-3333-3333-333333333333', 'name' => 'Weltweit', 'percent_surcharge' => 50.00, 'is_included_in_flatrate' => false]
+            ['id' => '22222222-2222-2222-2222-222222222222', 'name' => 'Titelseite', 'percent_surcharge' => 100.00, 'is_included_in_flatrate' => true, 'brand' => 'rp'],
+            ['id' => '33333333-3333-3333-3333-333333333333', 'name' => 'Weltweit', 'percent_surcharge' => 50.00, 'is_included_in_flatrate' => false, 'brand' => 'rp']
         ]);
     }
 
@@ -47,10 +47,10 @@ class OrderCheckoutTest extends TestCase {
                              'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true
                          ]);
 
+        dump($response->status(), $response->json());
         $response->assertStatus(200);
         $orderId = $response->json('order_id');
-        
-        // Berechnung:
+
         // Use Case = 80€ (Flatrate 'print' >= 'print', also Basis = 0€)
         // Mod 1 (Titel) = +100% (80€). Da is_included_in_flatrate = true, bleibt es 0€.
         // Mod 2 (Weltweit) = +50% (40€). is_included_in_flatrate = false, also +40€.

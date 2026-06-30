@@ -84,7 +84,7 @@ describe('WatermarkSettingsCard', () => {
             impressumUrl: '',
             svgUrl: '/brand.svg',
             brand: 'rp' as const,
-            isAtr: false,
+            isSrp: false,
         });
 
         // --- default fetch: return a valid SVG blob ---

@@ -27,9 +27,9 @@ class InvoiceServiceTest extends TestCase
         Http::delete('http://127.0.0.1:8026/api/v1/messages');
 
         // Bankdaten für den InvoiceMail-PDF-Build
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_bic'], ['value' => 'BIC']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
     }
 
     /**

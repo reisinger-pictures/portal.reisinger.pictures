@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="all-the.rest (B2C Emulation)" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="start http://all-the.rest.localhost:4321" />
+  <configuration default="false" name="story.reisinger.pictures (B2C Emulation)" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="start http://story.reisinger.pictures.localhost:4322" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

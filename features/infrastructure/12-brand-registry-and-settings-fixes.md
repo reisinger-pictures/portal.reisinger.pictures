@@ -14,9 +14,9 @@
 Das Portal betreibt zwei White-Label-Brands:
 
 - **B2B** (`rp`): `reisinger.pictures` — vollständiges Admin-/Mandanten-/CRM-/Invoicing-Portal.
-- **ATR** (`atr`): `all-the.rest` — reduziertes B2C-Kunden-Portal.
+- **SRP** (`srp`): `story.reisinger.pictures` — reduziertes B2C-Kunden-Portal.
 
-Bisher wird die Brand als **freier String** (`'reisinger.pictures'` / `'all-the.rest'`) behandelt,
+Bisher wird die Brand als **freier String** (`'reisinger.pictures'` / `'story.reisinger.pictures'`) behandelt,
 und die Host→Brand-Map ist **doppelt** gepflegt (Backend `BrandContextMiddleware` und Frontend
 `useBrand.ts`). Zudem ist `Brand` auf DB-Ebene **nicht** als echtes Unterscheidungsmerkmal
 modelliert — nur `orders.brand`/`invoice_snapshots.brand` (V018, VARCHAR) existieren. Eine
@@ -38,7 +38,7 @@ Settings-/PDF-Pfaden.
 
 ### 2.2 Brand-Werte unhandlich & Mapping dupliziert
 
-- Die Werte `'reisinger.pictures'`/`'all-the.rest'` sind in ~8 Backend-Stellen + Frontend verstreut.
+- Die Werte `'reisinger.pictures'`/`'story.reisinger.pictures'` sind in ~8 Backend-Stellen + Frontend verstreut.
 - Die Host→Brand-Map steht identisch in `BrandContextMiddleware.php:30-32` **und**
   `useBrand.ts:3-6` — zwei Quellen, die auseinanderlaufen können.
 
@@ -52,7 +52,7 @@ deckt das ab.
 ### 2.4 `downloadInvoice` ignoriert persistierte Brand (B-01 F2, Critical)
 
 Die Methode rendert das PDF aus `config('app.brand')` (Request-Host), nicht aus
-`$order->brand`. Ein ATR-Kunde, der über einen B2B-Link lädt, bekommt B2B-Branding/-Bankdaten —
+`$order->brand`. Ein SRP-Kunde, der über einen B2B-Link lädt, bekommt B2B-Branding/-Bankdaten —
 genau das Symptom, das B-01 beheben sollte.
 
 ### 2.5 `BackfillBrand` ist CLI-sabotierend (B-01 F1, Critical)
@@ -77,11 +77,11 @@ repariert.
 
 ## 3. Soll-Zustand
 
-### 3.1 Brand als ENUM `rp | atr` (`null` = cross-brand)
+### 3.1 Brand als ENUM `rp | srp` (`null` = cross-brand)
 
-- **ENUM** `App\Enums\Brand` mit Werten `'rp'` (B2B) und `'atr'` (ATR); `null` bedeutet
+- **ENUM** `App\Enums\Brand` mit Werten `'rp'` (B2B) und `'srp'` (SRP); `null` bedeutet
   bewusst cross-brand (Super-Admin).
-- `Brand`-Methoden: `label()`, `domain()` (prod), `prefix()` (`'atr_'` | `''`).
+- `Brand`-Methoden: `label()`, `domain()` (prod), `prefix()` (`'srp_'` | `''`).
 
 ### 3.2 `brand`-Spalte als ENUM-Fremdschlüssel auf 6 Tabellen
 
@@ -92,11 +92,11 @@ vorhandene Bestandsdaten auf `'rp'`. Index je Spalte für Brand-Scoping-Queries.
 ### 3.3 Zentrale `BrandRegistry`
 
 - **Backend** `App\Support\BrandRegistry`: `fromHost()`, `current()`, `currentOrDefault()`,
-  `isAtr()`, `prefix()`, `set()`, `resolveFromOrder()`. Einzige Autorität für Host→Brand und
-  `config('app.brand')`-Zugriff. Alle inline-Checks (`=== 'all-the.rest'`, `$pfx = …`) werden
+  `isSrp()`, `prefix()`, `set()`, `resolveFromOrder()`. Einzige Autorität für Host→Brand und
+  `config('app.brand')`-Zugriff. Alle inline-Checks (`=== 'story.reisinger.pictures'`, `$pfx = …`) werden
   darauf umgestellt.
 - **Frontend** `frontend/src/logic/brandRegistry.ts`: typsichere Konstanten + reine Funktionen
-  `getBrandFromHostname()`, `isAtrBrand()`, `brandPrefix()`. `useBrand.ts` delegiert dorthin
+  `getBrandFromHostname()`, `isSrpBrand()`, `brandPrefix()`. `useBrand.ts` delegiert dorthin
   (Asset-/Portal-Logik bleibt UI-spezifisch in `useBrand`).
 
 ### 3.4 Brand-Scoping in `getAllowedGalleryIds()` (T-09 P3)
@@ -125,9 +125,9 @@ Hostname vertrauen muss.
 
 ### 3.8 Lokale Brand-Unterscheidung via Proxy (relative URLs)
 
-- Prod: domain-basiert (`portal.reisinger.pictures` vs `portal.all-the.rest`).
-- Lokal: **zwei Vite-Instanzen** — Port 4321 = B2B (`portal.test`), Port 4322 = ATR
-  (`portal-atr.test`), jeweils eigenes Proxy-Target. Frontend-URLs bleiben **relativ**
+- Prod: domain-basiert (`portal.reisinger.pictures` vs `portal.story.reisinger.pictures`).
+- Lokal: **zwei Vite-Instanzen** — Port 4321 = B2B (`portal.test`), Port 4322 = SRP
+  (`portal-srp.test`), jeweils eigenes Proxy-Target. Frontend-URLs bleiben **relativ**
   (`/api/...`); das Proxy-Target entscheidet, welchen Host das Backend sieht, sodass
   `BrandRegistry::fromHost()` korrekt greift. Keine IntelliJ-Run-Configs für Brand nötig.
 
@@ -147,13 +147,13 @@ sticky Tabellen-Header. Statische Tailwind-Klassen (AGENTS.md-konform).
 
 ## 5. Verifikation
 
-- `BrandRegistryTest`: `fromHost` für prod/dev/leer, `current(OrDefault)`, `isAtr`, `prefix`,
+- `BrandRegistryTest`: `fromHost` für prod/dev/leer, `current(OrDefault)`, `isSrp`, `prefix`,
   `resolveFromOrder` mit/ohne persistierte Brand.
-- `BrandLeakTest` erweitert: ATR-Order über B2B-Host geladen → ATR-Branding im PDF (F2);
+- `BrandLeakTest` erweitert: SRP-Order über B2B-Host geladen → SRP-Branding im PDF (F2);
   Inversfall B2B; `downloadInvoice` wirft keinen 500er mehr (`$get`-Regression).
 - `BackfillBrandTest`: CLI-Kontext, `config('app.brand')=null`, Backfill setzt `'rp'`.
-- Brand-Scoping-Test: ATR-User sieht nur ATR-Galerien; Super-Admin (`brand=null`) sieht alle.
-- Vitest `brandRegistry.test.ts`: `getBrandFromHostname` für alle Hosts, `isAtrBrand`,
+- Brand-Scoping-Test: SRP-User sieht nur SRP-Galerien; Super-Admin (`brand=null`) sieht alle.
+- Vitest `brandRegistry.test.ts`: `getBrandFromHostname` für alle Hosts, `isSrpBrand`,
   `brandPrefix`.
 - Playwright (`ai_test_runner.mjs`, input `billing-details-save`): Bankdaten eingeben →
   Speichern → Reload → persistiert (kein Race).

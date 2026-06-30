@@ -13,15 +13,15 @@ enum Brand: string
 {
     /** B2B portal — reisinger.pictures (full admin/CRM/invoicing). */
     case B2B = 'rp';
-    /** ATR portal — all-the.rest (reduced B2C). */
-    case ATR = 'atr';
+    /** SRP portal — story.reisinger.pictures (reduced B2C). */
+    case SRP = 'srp';
 
     /** Human-readable label (German UI / docs). */
     public function label(): string
     {
         return match ($this) {
             self::B2B => 'Reisinger Pictures',
-            self::ATR => 'all-the.rest',
+            self::SRP => 'story.reisinger.pictures',
         };
     }
 
@@ -30,16 +30,16 @@ enum Brand: string
     {
         return match ($this) {
             self::B2B => 'reisinger.pictures',
-            self::ATR => 'all-the.rest',
+            self::SRP => 'story.reisinger.pictures',
         };
     }
 
-    /** Setting/asset key prefix ('' for B2B, 'atr_' for ATR). */
+    /** Setting/asset key prefix ('' for B2B, 'srp_' for SRP). */
     public function prefix(): string
     {
         return match ($this) {
             self::B2B => '',
-            self::ATR => 'atr_',
+            self::SRP => 'srp_',
         };
     }
 }

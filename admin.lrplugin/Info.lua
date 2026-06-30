@@ -16,12 +16,12 @@ return {
             file = "RpDeliveryManager.lua",
         },
         {
-            title = "Bewertungs-Galerien verwalten (ATR)...",
-            file = "AtrSelectionManager.lua",
+            title = "Bewertungs-Galerien verwalten (SRP)...",
+            file = "SrpSelectionManager.lua",
         },
         {
-            title = "Delivery-Galerien verwalten (ATR)...",
-            file = "AtrDeliveryManager.lua",
+            title = "Delivery-Galerien verwalten (SRP)...",
+            file = "SrpDeliveryManager.lua",
         }
     }
 }

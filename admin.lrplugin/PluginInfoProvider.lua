@@ -10,7 +10,7 @@ return {
         
         return {
             {
-                title = "Portal API Einstellungen (B2B & ATR)",
+                title = "Portal API Einstellungen (B2B & SRP)",
                 
                 f:row {
                     f:static_text { title = "B2B (reisinger.pictures):", width = 150 },
@@ -21,9 +21,9 @@ return {
                 },
 
                 f:row {
-                    f:static_text { title = "ATR (all-the.rest):", width = 150 },
+                    f:static_text { title = "SRP (story.reisinger.pictures):", width = 150 },
                     f:edit_field {
-                        value = LrView.bind { key = "baseUrlAtr", bind_to_object = prefs },
+                        value = LrView.bind { key = "baseUrlSrp", bind_to_object = prefs },
                         fill_horizontal = 1
                     }
                 },
@@ -67,13 +67,13 @@ return {
                 f:row {
                     f:spacer { width = 150 },
                     f:push_button {
-                        title = "Login testen (ATR)",
+                        title = "Login testen (SRP)",
                         action = function()
                             LrTasks.startAsyncTask(function()
-                                local url = (prefs.baseUrlAtr and #prefs.baseUrlAtr > 0) and prefs.baseUrlAtr or "https://portal.all-the.rest"
+                                local url = (prefs.baseUrlSrp and #prefs.baseUrlSrp > 0) and prefs.baseUrlSrp or "https://portal.story.reisinger.pictures"
                                 local token, err, detail = Api.login(url)
                                 if token then
-                                    LrDialogs.message("Erfolg!", "Verbindung zum ATR-Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")
+                                    LrDialogs.message("Erfolg!", "Verbindung zum SRP-Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")
                                 else
                                     LrDialogs.message("Fehlgeschlagen", "Fehler: " .. tostring(err) .. "\n\n" .. tostring(detail), "critical")
                                 end

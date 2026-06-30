@@ -19,7 +19,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar(props: SidebarProps) {
-    const { logoSrc, portalName, impressumUrl } = useBrand();
+    const { logoSrc, portalName, impressumUrl, isSrp } = useBrand();
     const {user, logout} = useAuth();
     const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isCustomerManager, showTenantsSection } = usePermissions();
     const navigate = useNavigate();
@@ -64,7 +64,7 @@ export default function Sidebar(props: SidebarProps) {
                         )}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
 
-                        {isAdmin && (
+                        {isAdmin && !isSrp && (
                             <>
                                 <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Büro & Dokumente</li>
                                 <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> Shop-Bestellungen</Link></li>
@@ -82,9 +82,9 @@ export default function Sidebar(props: SidebarProps) {
                         )}
 
                         <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Verwaltung</li>
-                        {(isAdmin || isCustomerManager) && showTenantsSection && (
+                        {(isAdmin || isCustomerManager) && showTenantsSection && !isSrp && (
                             <>
-                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Mandanten (B2B)</Link></li>
+                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Organisationen (B2B)</Link></li>
                                 <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {isCustomerManager && !isAdmin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
                             </>
                         )}

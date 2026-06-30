@@ -60,7 +60,7 @@
 }
 
 @plugin "daisyui/theme" {
-    name: "atr-light";
+    name: "srp-light";
     prefersdark: false;
     --color-base-100: oklch(100% 0 0);
     --color-base-200: oklch(98% 0.003 285.885);
@@ -93,7 +93,7 @@
 }
 
 @plugin "daisyui/theme" {
-    name: "atr-dark";
+    name: "srp-dark";
     prefersdark: true;
     --color-base-100: oklch(20% 0.008 285.885);
     --color-base-200: oklch(25% 0.008 285.885);
@@ -114,7 +114,7 @@
 }
 
 @plugin "daisyui" {
-    themes: b2b-light --default, b2b-dark --prefers-dark, atr-light, atr-dark --prefers-dark;
+    themes: b2b-light --default, b2b-dark --prefers-dark, srp-light, srp-dark --prefers-dark;
 }
 
 @plugin "@iconify/tailwind4" {

@@ -14,21 +14,22 @@ class GalleryTreeService
      */
     public function getAdminTree(User $user, ?string $filterType = null, ?string $tenantId = null): array
     {
-        $tree = Cache::rememberForever('gallery_tree_admin', function () {
-            $groups = GalleryGroup::whereNull('parent_id')->with(['children', 'galleries'])->get();
-            $rootGalleries = Gallery::whereNull('gallery_group_id')->get();
+        $buildTree = function () {
+            $groups = GalleryGroup::query()->whereNull('parent_id')->with(['children', 'galleries'])->get();
+            $rootGalleries = Gallery::query()->whereNull('gallery_group_id')->get();
             return [
                 'groups' => $groups->toArray(),
                 'root_galleries' => $rootGalleries->toArray()
             ];
-        });
+        };
+        $tree = Cache::rememberForever('gallery_tree_admin', $buildTree);
 
         $treeArray = json_decode(json_encode($tree), true);
 
         // Apply permission filter for non-admin users
         if (!$user->is_admin) {
             $allowedGalleryIds = $user->getAllowedGalleryIds();
-            $treeArray = $this->filterTreeByPermissions($treeArray, $allowedGalleryIds);
+            $treeArray = $this->filterTreeByPermissions($treeArray, $user, $allowedGalleryIds);
         }
 
         // Apply type filter if specified
@@ -55,6 +56,7 @@ class GalleryTreeService
         callable $galleryPredicate,
         ?callable $groupPredicate = null,
         ?callable $rootGalleryPredicate = null,
+        array $explicitGroupIds = []
     ): array {
         $groupPredicate = $groupPredicate ?? fn(array $node): bool => true;
         $rootGalleryPredicate = $rootGalleryPredicate ?? $galleryPredicate;
@@ -76,7 +78,7 @@ class GalleryTreeService
             return $result;
         };
 
-        $treeArray['groups'] = $this->pruneEmptyGroups($filterNode($treeArray['groups']));
+        $treeArray['groups'] = $this->pruneEmptyGroups($filterNode($treeArray['groups']), $explicitGroupIds);
         $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], $rootGalleryPredicate));
 
         return $treeArray;
@@ -85,11 +87,27 @@ class GalleryTreeService
     /**
      * Filter tree by user permissions
      */
-    private function filterTreeByPermissions(array $treeArray, array $allowedGalleryIds): array
+    private function filterTreeByPermissions(array $treeArray, User $user, array $allowedGalleryIds): array
     {
+        $explicitGroupIds = [];
+        if ($user->is_photographer) {
+            $unrestrictedGroups = \App\Models\GalleryGroup::query()->where('restricted_photographers', false)->orWhereNull('restricted_photographers')->pluck('id')->toArray();
+            $assignedGroups = $user->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
+            $explicitGroupIds = array_unique(array_merge($unrestrictedGroups, $assignedGroups));
+        } else {
+            $explicitGroupIds = $user->galleryGroups()->pluck('gallery_groups.id')->toArray();
+        }
+        
+        if (!empty($explicitGroupIds)) {
+            $explicitGroupIds = array_unique(array_merge($explicitGroupIds, app(\App\Services\AccessControlService::class)->getSubGroupIds($explicitGroupIds)));
+        }
+
         return $this->filterTree(
             $treeArray,
             fn(array $g): bool => in_array($g['id'], $allowedGalleryIds),
+            null,
+            null,
+            $explicitGroupIds
         );
     }
 
@@ -121,13 +139,13 @@ class GalleryTreeService
      * Remove group husks that have neither galleries nor surviving children.
      * A structural parent (galleries empty but children non-empty) is preserved.
      */
-    private function pruneEmptyGroups(array $groups): array
+    private function pruneEmptyGroups(array $groups, array $explicitGroupIds = []): array
     {
         $result = [];
         foreach ($groups as $group) {
-            $children = isset($group['children']) ? $this->pruneEmptyGroups($group['children']) : [];
+            $children = isset($group['children']) ? $this->pruneEmptyGroups($group['children'], $explicitGroupIds) : [];
             $galleries = $group['galleries'] ?? [];
-            if (!empty($galleries) || !empty($children)) {
+            if (!empty($galleries) || !empty($children) || in_array($group['id'], $explicitGroupIds)) {
                 $group['children'] = $children;
                 $result[] = $group;
             }

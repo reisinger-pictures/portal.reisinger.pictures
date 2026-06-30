@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import {apiMutate, fetcher} from '../api';
 
 export interface IptcData {
@@ -31,23 +32,23 @@ export interface UpdateMetadataResponse {
 }
 
 export function usePhoto() {
-    const updateMetadata = async (id: string, data: IptcData) => {
-        const res = await apiMutate<UpdateMetadataResponse>( `/api/photos/${id}/meta`, 'PUT', data);
-                return res;
-    };
+    const updateMetadata = useCallback(async (id: string, data: IptcData) => {
+        const res = await apiMutate<UpdateMetadataResponse>(`/api/photos/${id}/meta`, 'PUT', data);
+        return res;
+    }, []);
 
-    const getVersions = async (id: string) => {
-        return await fetcher<PhotoVersion[]>( `/api/photos/${id}/versions`);
-    };
+    const getVersions = useCallback(async (id: string) => {
+        return await fetcher<PhotoVersion[]>(`/api/photos/${id}/versions`);
+    }, []);
 
-    const revertMetadata = async (id: string, versionId: string) => {
-        const res = await apiMutate( `/api/photos/${id}/revert/${versionId}`, 'POST');
-                return res;
-    };
+    const revertMetadata = useCallback(async (id: string, versionId: string) => {
+        const res = await apiMutate(`/api/photos/${id}/revert/${versionId}`, 'POST');
+        return res;
+    }, []);
 
-    const deletePhoto = async (id: string) => {
+    const deletePhoto = useCallback(async (id: string) => {
         await apiMutate(`/api/photos/${id}`, 'DELETE');
-            };
+    }, []);
 
     return {updateMetadata, getVersions, revertMetadata, deletePhoto};
 }

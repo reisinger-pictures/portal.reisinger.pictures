@@ -84,18 +84,18 @@ export interface B2CFlexInput {
     extraImages: number;
     isFullyPrivate: boolean;
     // NEU: Dynamische Parameter von der API
-    atr_base_price?: string;
-    atr_setup_fee?: string;
-    atr_privacy_fee?: string;
-    atr_extra_image_fee?: string;
+    srp_base_price?: string;
+    srp_setup_fee?: string;
+    srp_privacy_fee?: string;
+    srp_extra_image_fee?: string;
 }
 
 export function calculateB2CFlexPrice(input: B2CFlexInput): ShootingPriceResult {
     // NEU: Fallback-Werte greifen nur, wenn die DB leer sein sollte (Unterstützung für Cent/Dezimal-Beträge)
-    const basePrice = parseFloat(input.atr_base_price || '149');
-    const setupCost = parseFloat(input.atr_setup_fee || '50');
-    const extraImageCost = parseFloat(input.atr_extra_image_fee || '15');
-    const privacyBase = parseFloat(input.atr_privacy_fee || '200');
+    const basePrice = parseFloat(input.srp_base_price || '149');
+    const setupCost = parseFloat(input.srp_setup_fee || '50');
+    const extraImageCost = parseFloat(input.srp_extra_image_fee || '15');
+    const privacyBase = parseFloat(input.srp_privacy_fee || '200');
 
     let setupFee = 0;
     if (input.setup === 'outdoor_flash' || input.setup === 'indoor') {
