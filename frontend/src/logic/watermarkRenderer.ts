@@ -11,7 +11,10 @@ export const renderSvgToDataUrl = async (blob: Blob, opacity: number, size: numb
             canvas.width = size;
             canvas.height = size;
             const ctx = canvas.getContext('2d');
-            if (!ctx) return resolve(null);
+            if (!ctx) {
+                URL.revokeObjectURL(url); // Clean up memory leak before exit
+                return resolve(null);
+            }
 
             const scale = Math.min(size / img.width, size / img.height);
             const w = img.width * scale;
@@ -35,7 +38,11 @@ export const renderSvgToDataUrl = async (blob: Blob, opacity: number, size: numb
             resolve(canvas.toDataURL('image/png'));
             URL.revokeObjectURL(url);
         };
-        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.onerror = (err) => {
+            console.error("Error loading SVG image for data URL rendering:", err);
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
         img.src = url;
     });
 };
@@ -53,7 +60,10 @@ export const renderSvgToCanvas = async (blob: Blob, opacity: number, size: numbe
             canvas.width = size;
             canvas.height = size;
             const ctx = canvas.getContext('2d');
-            if (!ctx) return resolve(null);
+            if (!ctx) {
+                URL.revokeObjectURL(url); // Clean up memory leak before exit
+                return resolve(null);
+            }
 
             const scale = Math.min(size / img.width, size / img.height);
             const w = img.width * scale;
@@ -76,7 +86,11 @@ export const renderSvgToCanvas = async (blob: Blob, opacity: number, size: numbe
 
             canvas.toBlob(resBlob => { resolve(resBlob); URL.revokeObjectURL(url); }, 'image/png');
         };
-        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.onerror = (err) => {
+            console.error("Error loading SVG image for canvas rendering:", err);
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
         img.src = url;
     });
 };
