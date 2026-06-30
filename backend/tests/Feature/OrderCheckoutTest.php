@@ -16,13 +16,9 @@ class OrderCheckoutTest extends TestCase {
         \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
         \App\Models\Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
         
-        \Illuminate\Support\Facades\DB::table('license_use_cases')->insert([
-            ['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']
-        ]);
-        \Illuminate\Support\Facades\DB::table('license_modifiers')->insert([
-            ['id' => '22222222-2222-2222-2222-222222222222', 'name' => 'Titelseite', 'percent_surcharge' => 100.00, 'is_included_in_flatrate' => true, 'brand' => 'rp'],
-            ['id' => '33333333-3333-3333-3333-333333333333', 'name' => 'Weltweit', 'percent_surcharge' => 50.00, 'is_included_in_flatrate' => false, 'brand' => 'rp']
-        ]);
+        \App\Models\LicenseUseCase::forceCreate(['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']);
+        \App\Models\LicenseModifier::forceCreate(['id' => '22222222-2222-2222-2222-222222222222', 'name' => 'Titelseite', 'percent_surcharge' => 100.00, 'is_included_in_flatrate' => true, 'brand' => 'rp']);
+        \App\Models\LicenseModifier::forceCreate(['id' => '33333333-3333-3333-3333-333333333333', 'name' => 'Weltweit', 'percent_surcharge' => 50.00, 'is_included_in_flatrate' => false, 'brand' => 'rp']);
     }
 
     public function test_checkout_calculates_delta_pricing_with_flatrate_and_modifiers() {

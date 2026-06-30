@@ -58,7 +58,10 @@
             </td>
             <td style="width: 50%; text-align: right;">
                 <strong>Belegnummer:</strong> {{ $snapshot->invoice_number }}<br>
-                <strong>Leistungsdatum:</strong> {{ \Carbon\Carbon::parse($snapshot->created_at)->format('d.m.Y') }}<br>
+                <strong>Rechnungsdatum:</strong> {{ \Carbon\Carbon::parse($snapshot->created_at)->format('d.m.Y') }}<br>
+                @if(!empty($snapshot->customer_details['service_date']))
+                    <strong>Leistungsdatum:</strong> {{ $snapshot->customer_details['service_date'] }}<br>
+                @endif
                 <strong>Fälligkeit:</strong> {{ $snapshot->customer_details['due_date'] ?? 'Zahlbar sofort.' }}
             </td>
         </tr>
