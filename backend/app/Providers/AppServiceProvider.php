@@ -4,7 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use App\Mail\Transports\GmailRestTransport;
+use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
@@ -69,6 +71,14 @@ class AppServiceProvider extends ServiceProvider
                 $config['client_secret'] ?? env('OAUTH_CLIENT_SECRET'),
                 $config['refresh_token'] ?? env('OAUTH_REFRESH_TOKEN')
             );
+        });
+
+        // Reset brand state before each queue job to prevent stale config carrying over
+        // between jobs in long-running queue workers (php artisan queue:work).
+        // Consumers like InvoiceMail::build() call BrandRegistry::set() explicitly, so they
+        // remain unaffected.
+        Queue::before(function () {
+            BrandRegistry::set(null);
         });
     }
 }

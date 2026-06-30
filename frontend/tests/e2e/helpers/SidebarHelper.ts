@@ -6,22 +6,23 @@ export class SidebarHelper {
     async navigateTo(menuText: string) {
         // Anti-Flakiness: Sicherstellen, dass keine Fade-Out Animationen von Modals den Klick blockieren
         await expect(this.page.locator('.modal-open')).toHaveCount(0, { timeout: 5000 });
-        const menuBtn = this.page.locator('header button.btn-square').filter({ has: this.page.locator('.mdi--menu') }).first();
-        const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
+        
+        // Prüfe ob der Link bereits sichtbar ist (Desktop Sidebar oder geöffneter Mobile Drawer)
+        const link = this.page.locator('ul.menu').getByText(menuText).first();
+        if (await link.isVisible().catch(() => false)) {
+            await link.scrollIntoViewIfNeeded();
+            await link.click();
+            return;
+        }
 
+        // Mobile: Hamburger-Menü öffnen
+        const menuBtn = this.page.locator('header button.btn-square').filter({ has: this.page.locator('.mdi--menu') }).first();
         if (await menuBtn.isVisible()) {
-            // Ist das Menü ZU?
-            if (await backdrop.count() === 0 || !(await backdrop.isVisible())) {
-                await menuBtn.click();
-                await backdrop.waitFor({ state: 'visible', timeout: 5000 });
-                // WICHTIG: Warte, bis die 300ms CSS Slide-In Animation abgeschlossen ist
-                await this.page.waitForTimeout(400);
-            }
+            await menuBtn.click();
+            // Warte kurz auf die Slide-In Animation
+            await this.page.waitForTimeout(600);
         }
         
-        // Da der AuthHelper jetzt garantiert, dass wir eingeloggt sind, 
-        // ist der Link auch wirklich im DOM. Wir nutzen einen sauberen, nativen Klick!
-        const link = this.page.locator('ul.menu').getByText(menuText).first();
         await link.waitFor({ state: 'visible', timeout: 5000 });
         await link.scrollIntoViewIfNeeded();
         await link.click();

@@ -15,6 +15,22 @@ test.describe('AI Batch Edit Modal (Server-Side)', () => {
         if (helper) await helper.teardown();
     });
 
+    async function createDeliveryGallery(page: any): Promise<string> {
+        const createRes = await page.request.post('/api/management/galleries', {
+            data: {
+                name: `AI Test Gallery ${Math.random().toString(36).substring(2, 8)}`,
+                type: 'delivery',
+            },
+            headers: { 'Accept': 'application/json' }
+        });
+        const createData = await createRes.json();
+        const gallery = createData.gallery ?? createData.data ?? createData;
+        const galleryId = gallery.id;
+        const gallerySlug = gallery.slug;
+        if (galleryId) helper.trackGallery(galleryId);
+        return gallerySlug;
+    }
+
     test('shows AI Batch-Edit button for photographer in delivery gallery', async ({ page }) => {
         await page.route('**/api/ai/status', async route => {
             await route.fulfill({ json: { enabled: true, model: 'gpt-4o' } });
@@ -40,7 +56,8 @@ test.describe('AI Batch Edit Modal (Server-Side)', () => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 
-        await page.goto('/test-gallery-slug');
+        const slug = await createDeliveryGallery(page);
+        await page.goto(`/galleries/${slug}`);
         await page.waitForLoadState('networkidle');
 
         const aiButton = page.getByRole('button', { name: 'KI Batch-Edit' });
@@ -72,7 +89,8 @@ test.describe('AI Batch Edit Modal (Server-Side)', () => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 
-        await page.goto('/test-gallery-slug');
+        const slug = await createDeliveryGallery(page);
+        await page.goto(`/galleries/${slug}`);
         await page.waitForLoadState('networkidle');
 
         const aiButton = page.getByRole('button', { name: 'KI Batch-Edit' });
@@ -106,7 +124,8 @@ test.describe('AI Batch Edit Modal (Server-Side)', () => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 
-        await page.goto('/test-gallery-slug');
+        const slug = await createDeliveryGallery(page);
+        await page.goto(`/galleries/${slug}`);
         await page.waitForLoadState('networkidle');
 
         await expect(page.getByRole('button', { name: 'KI Batch-Edit' })).toBeHidden();

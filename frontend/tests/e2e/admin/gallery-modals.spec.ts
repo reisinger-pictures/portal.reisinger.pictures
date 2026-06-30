@@ -43,8 +43,10 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
 
         await expect(page.locator('.toast')).toContainText('Ordner erfolgreich erstellt');
 
-        // 2. Roundtrip Check
-        await page.reload();
+        // 2. Roundtrip Check: Reload, wait for tree, then find the group
+        await page.goto('/galleries');
+        await page.waitForLoadState('networkidle');
+        await page.locator('h1:has-text("Galerien")').waitFor({ state: 'visible', timeout: 10000 });
         await page.locator('summary').filter({ hasText: uniqueName }).locator('button[data-tip="Ordner bearbeiten"]').click();
         
         // Assert Modal UI is populated

@@ -25,7 +25,7 @@ test.describe('Brand Tenant Isolation', () => {
             await auth.login(adminUser.email, adminUser.password);
             await sidebar.navigateTo('Mandanten (B2B)');
 
-            await expect(page.locator('h1:has-text("Mandanten")').first()).toBeVisible({ timeout: 10000 });
+            await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
         });
     });
 
@@ -49,7 +49,7 @@ test.describe('Brand Tenant Isolation', () => {
             await auth.login(adminUser.email, adminUser.password);
 
             await page.goto('/tenants');
-            await expect(page.locator('h1:has-text("Mandanten")').first()).toBeVisible({ timeout: 10000 });
+            await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
         });
 
         test('Admin on ATR brand sees B2B Mandanten link in sidebar', async ({ page }) => {

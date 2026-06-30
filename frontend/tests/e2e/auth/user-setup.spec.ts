@@ -54,7 +54,7 @@ test.describe('User Setup via Mailpit Workflow', () => {
         const setupLink = `http://localhost:4321/reset-password?token=${token}&email=${encodeURIComponent(newUserEmail)}`;
 
         await page.goto(setupLink);
-        await expect(page.locator('h2:has-text("Account Setup")')).toBeVisible();
+        await expect(page.locator('h2:has-text("Konto einrichten")')).toBeVisible();
 
         await page.fill('input[type="password"]', 'SecurePassword123!');
         await page.locator('input[type="password"]').nth(1).fill('SecurePassword123!'); 

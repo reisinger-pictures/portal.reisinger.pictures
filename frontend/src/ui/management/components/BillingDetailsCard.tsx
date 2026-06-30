@@ -7,7 +7,7 @@ import {usePermissions} from '../../../logic/usePermissions';
 import {useUI} from '../../components/UIContext';
 
 // IBAN: AT/DE format, basic structural check (country + checksum + alphanumerics), spaces allowed.
-const ibanRegex = /^(AT|DE)\d{2}[ ]?(\d{4}[ ]?){4,7}\d{1,4}$/i;
+const ibanRegex = /^(AT|DE)\d{2}[ ]?(\d{4}[ ]?){4,7}\d{0,4}$/i;
 
 const billingDetailsSchema = z.object({
     bank_holder: z.string().min(2, 'Mindestens 2 Zeichen'),

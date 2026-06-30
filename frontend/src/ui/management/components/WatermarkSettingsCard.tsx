@@ -6,87 +6,13 @@ import {useForm, useWatch} from 'react-hook-form';
 import {useBrand} from '../../../logic/useBrand';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
+import {renderSvgToDataUrl, renderSvgToCanvas} from '../../../logic/watermarkRenderer';
 
 const watermarkSchema = z.object({
     opacity: z.number().min(0.05).max(1.0)
 });
 
 export type WatermarkFormValues = z.infer<typeof watermarkSchema>;
-
-const renderSvgToDataUrl = async (blob: Blob, opacity: number, size: number): Promise<string | null> => {
-    return new Promise((resolve) => {
-        const img = new Image();
-        const url = URL.createObjectURL(blob);
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return resolve(null);
-            
-            const scale = Math.min(size / img.width, size / img.height);
-            const w = img.width * scale;
-            const h = img.height * scale;
-            const x = (size - w) / 2;
-            const y = (size - h) / 2;
-            
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = w;
-            tempCanvas.height = h;
-            const tempCtx = tempCanvas.getContext('2d');
-            if (tempCtx) {
-                tempCtx.fillStyle = '#ffffff';
-                tempCtx.fillRect(0, 0, w, h);
-                tempCtx.drawImage(img, 0, 0, w, h);
-            }
-            
-            ctx.globalAlpha = opacity;
-            ctx.drawImage(tempCanvas, x, y, w, h);
-            
-            resolve(canvas.toDataURL('image/png'));
-            URL.revokeObjectURL(url);
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-        img.src = url;
-    });
-};
-
-const renderSvgToCanvas = async (blob: Blob, opacity: number, size: number): Promise<Blob | null> => {
-    return new Promise((resolve) => {
-        const img = new Image();
-        const url = URL.createObjectURL(blob);
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return resolve(null);
-            
-            const scale = Math.min(size / img.width, size / img.height);
-            const w = img.width * scale;
-            const h = img.height * scale;
-            const x = (size - w) / 2;
-            const y = (size - h) / 2;
-            
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = w;
-            tempCanvas.height = h;
-            const tempCtx = tempCanvas.getContext('2d');
-            if (tempCtx) {
-                tempCtx.fillStyle = '#ffffff';
-                tempCtx.fillRect(0, 0, w, h);
-                tempCtx.drawImage(img, 0, 0, w, h);
-            }
-            
-            ctx.globalAlpha = opacity;
-            ctx.drawImage(tempCanvas, x, y, w, h);
-            
-            canvas.toBlob(resBlob => { resolve(resBlob); URL.revokeObjectURL(url); }, 'image/png');
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-        img.src = url;
-    });
-};
 
 export default function WatermarkSettingsCard() {
     const {watermark, updateWatermark} = useSettings();

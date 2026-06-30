@@ -86,7 +86,7 @@ export default function PhotoHistoryModal({ photoId, isOpen, onClose, onReverted
                                     </td>
                                 </tr>
                             ))}
-                            {history.length === 0 && (
+                            {state.versions.length === 0 && (
                                 <tr>
                                     <td colSpan={4} className="text-center py-6 opacity-50">Keine vorherigen Versionen gefunden.</td>
                                 </tr>

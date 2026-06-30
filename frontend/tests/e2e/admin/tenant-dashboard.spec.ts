@@ -32,7 +32,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         await auth.login(adminUser.email, adminUser.password);
         await sidebar.navigateTo('Mandanten');
 
-        await page.getByRole('button', { name: '+ Neuer Mandant' }).click();
+        await page.getByRole('button', { name: '+ Neue Organisation' }).click();
         const form = new FormHelper(page, modal);
         await form.fillTenantModal({ name: tenantName });
         const resData = await modal.submitModal('Speichern');

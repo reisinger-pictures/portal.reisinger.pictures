@@ -239,13 +239,13 @@
   - [x] Modell-Event-Überwachung; Sicherstellen, dass Caches bei Mutationen weiterhin zuverlässig invalidiert werden
 - **Umsetzung:** Beide Models rufen `app(GalleryTreeService::class)->clearCache()` in ihren `saved`/`deleted` Events auf; der Service clobbert zusätzlich `unrestricted_photographer_gallery_ids`.
 
-### B-12 · 🟡 P2 · Service-Unittests: GalleryService + RatingService isoliert 🆕
+### B-12 · 🟡 P2 · Service-Unittests: GalleryService + RatingService isoliert ✅
 - **Hintergrund:** Business-Logik aus GalleryController in GalleryService/RatingService extrahiert (A-02). Bestehende Integrationstests decken indirekt ab, aber isolierte Unit-Tests fehlen.
 - **Ziel:** Dedizierte Unit-Tests für beide Services, die nur den Service + Mocks testen (keine HTTP-Requests).
 - **Checkliste:**
-  - [ ] `tests/Unit/Services/GalleryServiceTest.php` — create/update-Gallery, Rating-Berechnung
-  - [ ] `tests/Unit/Services/RatingServiceTest.php` — Rating-Logik isoliert
-  - [ ] `php artisan test` ✅
+  - [x] `tests/Unit/Services/GalleryServiceTest.php` — create/update-Gallery, Metadaten-Anwendung, Slug-Uniqueness (20 Tests)
+  - [x] `tests/Unit/Services/RatingServiceTest.php` — ratingStatus (6 Tests) + exportRatings (8 Tests), insgesamt 14 Tests
+  - [ ] `php artisan test` — **manuelle Ausführung erforderlich** (kein Shell-Zugriff)
 
 ### B-13 · 🟡 P2 · Rollen-Abweisung Integrationstest (403 Forbidden) 🆕
 - **Hintergrund:** Auth-Gates via `super_admin` Middleware (B-06). Expliziter Test, dass ein Low-Privilege-User 403 erhält.
