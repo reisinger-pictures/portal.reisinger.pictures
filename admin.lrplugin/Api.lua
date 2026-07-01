@@ -16,6 +16,7 @@ end
 
 function Api.call(endpoint, method, payload, jwt)
     local headers = {}
+    table.insert(headers, { field = "Referer", value = Api.baseUrl })
     if jwt then table.insert(headers, { field = "Authorization", value = "Bearer " .. jwt }) end
     local payloadStr = ""
     if payload then

@@ -42,6 +42,11 @@ class FtpController extends Controller
             return response()->json(['error' => 'Keine Rechte für diese Aktion.'], 403);
         }
 
+        $allowedIds = $user->getAllowedGalleryIds();
+        if ($request->gallery_id && !in_array($request->gallery_id, $allowedIds)) {
+            return response()->json(['error' => 'Diese Galerie gehört nicht zu deiner Marke.'], 403);
+        }
+
         $user->update(['current_ftp_gallery_id' => $request->gallery_id]);
         return response()->json(['success' => true]);
     }
@@ -54,6 +59,11 @@ class FtpController extends Controller
         }
         if (!$user->current_ftp_gallery_id) {
             return response()->json(['error' => 'Keine Ziel-Galerie ausgewählt.'], 400);
+        }
+
+        $allowedIds = $user->getAllowedGalleryIds();
+        if (!in_array($user->current_ftp_gallery_id, $allowedIds)) {
+            return response()->json(['error' => 'Die Ziel-Galerie gehört nicht zu deiner Marke.'], 403);
         }
 
         $gallery = Gallery::find($user->current_ftp_gallery_id);

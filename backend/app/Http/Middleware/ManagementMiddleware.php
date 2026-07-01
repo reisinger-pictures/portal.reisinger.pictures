@@ -23,7 +23,7 @@ class ManagementMiddleware
         $path = $request->path();
 
         if ($user->is_photographer) {
-            $allowedPrefixes = ['api/management/galleries*', 'api/management/gallery-groups*', 'api/management/upload*', 'api/management/ftp*', 'api/management/invites*', 'api/management/stats*', 'api/management/logs*', 'api/management/orders/quote-link*'];
+            $allowedPrefixes = ['api/management/galleries*', 'api/management/gallery-groups*', 'api/management/upload*', 'api/management/ftp*', 'api/management/invites*', 'api/management/stats*', 'api/management/logs*', 'api/management/orders/quote-link*', 'api/management/coupons*'];
             foreach ($allowedPrefixes as $prefix) {
                 if ($request->is($prefix)) {
                     $isAllowed = true; break;

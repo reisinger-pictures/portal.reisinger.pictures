@@ -1,4 +1,4 @@
-import { useState, ReactNode, useCallback } from 'react';
+import { useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { UIContext, Toast, ConfirmOptions } from './UIContext';
 
 let toastIdCounter = 0;
@@ -12,9 +12,17 @@ export interface ConfirmState {
     resolve: (value: boolean) => void;
 }
 
+const UNSAVED_CHANGES_MESSAGE = 'Ungespeicherte Änderungen gehen verloren. Trotzdem fortfahren?';
+
 export default function UIProvider({ children }: UIProviderProps) {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const hasUnsavedRef = useRef(false);
+
+    useEffect(() => {
+        hasUnsavedRef.current = hasUnsavedChanges;
+    }, [hasUnsavedChanges]);
 
     const showToast = useCallback((type: 'success' | 'error' | 'info', text: string) => {
         const id = ++toastIdCounter;
@@ -22,6 +30,10 @@ export default function UIProvider({ children }: UIProviderProps) {
         setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== id));
         }, 4000);
+    }, []);
+
+    const setUnsavedChanges = useCallback((value: boolean) => {
+        setHasUnsavedChanges(value);
     }, []);
 
     const confirm = useCallback((options: ConfirmOptions) => {
@@ -37,8 +49,24 @@ export default function UIProvider({ children }: UIProviderProps) {
         }
     };
 
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (!hasUnsavedRef.current) return;
+            const target = (e.target as HTMLElement).closest('a');
+            if (!target) return;
+            if (!target.href || target.hostname !== window.location.hostname) return;
+            if (target.getAttribute('target') === '_blank') return;
+            if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        document.addEventListener('click', handler, { capture: true });
+        return () => document.removeEventListener('click', handler, { capture: true });
+    }, []);
+
     return (
-        <UIContext.Provider value={{ showToast, confirm }}>
+        <UIContext.Provider value={{ showToast, confirm, hasUnsavedChanges, setUnsavedChanges }}>
             {children}
 
             {/* Global Toasts */}

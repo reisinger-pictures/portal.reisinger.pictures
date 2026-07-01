@@ -14,18 +14,19 @@ class BrandRegistryTest extends TestCase
 
     public function test_fromHost_resolves_srp_production_domain(): void
     {
-        $this->assertSame(Brand::SRP, BrandRegistry::fromHost('portal.story.reisinger.pictures'));
-        $this->assertSame(Brand::SRP, BrandRegistry::fromHost('story.reisinger.pictures'));
+        $this->assertSame(Brand::SRP, BrandRegistry::fromHost('buy.reisinger.pictures'));
+        $this->assertSame(Brand::SRP, BrandRegistry::fromHost('buy.reisinger.pictures'));
     }
 
     public function test_fromHost_resolves_srp_local_dev_host(): void
     {
-        $this->assertSame(Brand::SRP, BrandRegistry::fromHost(BrandRegistry::SRP_DEV_HOST));
+        $this->assertSame(Brand::SRP, BrandRegistry::fromHost('buy.localhost'));
     }
 
     public function test_fromHost_defaults_to_b2b_for_unknown_hosts(): void
     {
         $this->assertSame(Brand::B2B, BrandRegistry::fromHost('portal.reisinger.pictures'));
+        $this->assertSame(Brand::B2B, BrandRegistry::fromHost('portal.localhost'));
         $this->assertSame(Brand::B2B, BrandRegistry::fromHost('portal.test'));
         $this->assertSame(Brand::B2B, BrandRegistry::fromHost('example.com'));
     }
@@ -73,6 +74,17 @@ class BrandRegistryTest extends TestCase
         $this->assertNull(config('app.brand'));
     }
 
+    public function test_reset_clears_brand_to_null(): void
+    {
+        BrandRegistry::set(Brand::SRP);
+        BrandRegistry::reset();
+        $this->assertNull(BrandRegistry::current());
+
+        BrandRegistry::set(Brand::B2B);
+        BrandRegistry::reset();
+        $this->assertNull(BrandRegistry::current());
+    }
+
     public function test_resolveFromOrder_uses_persisted_brand(): void
     {
         $order = Order::create([
@@ -97,7 +109,7 @@ class BrandRegistryTest extends TestCase
 
     public function test_enum_label_and_domain_and_prefix(): void
     {
-        $this->assertSame('story.reisinger.pictures', Brand::SRP->domain());
+        $this->assertSame('buy.reisinger.pictures', Brand::SRP->domain());
         $this->assertSame('reisinger.pictures', Brand::B2B->domain());
         $this->assertSame('srp_', Brand::SRP->prefix());
         $this->assertSame('', Brand::B2B->prefix());

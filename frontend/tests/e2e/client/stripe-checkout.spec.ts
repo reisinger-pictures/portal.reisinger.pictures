@@ -11,9 +11,21 @@ test.describe('Stripe Checkout Workflow', () => {
     let helper: E2ESessionHelper;
     let photogUser = {email: '', password: '', id: ''};
     let buyerUser = {email: '', password: '', id: ''};
+    let adminToken: string;
 
     test.beforeEach(async ({request}) => {
         helper = new E2ESessionHelper(request);
+
+        const adminLogin = await request.post('/api/auth/login', {
+            data: {email: 'florian@reisinger.pictures', password: 'admin'},
+            headers: {'Accept': 'application/json'},
+        });
+        if (!adminLogin.ok()) throw new Error('Admin login failed');
+        const adminCookies = adminLogin.headers()['set-cookie'];
+        const match = adminCookies?.match(/rp_jwt=([^;]+)/);
+        adminToken = match ? `rp_jwt=${match[1]}` : '';
+        if (!adminToken) throw new Error('No admin token');
+
         photogUser = await helper.createIsolatedUser('photographer');
         buyerUser = await helper.createIsolatedUser('power_user');
     });
@@ -91,6 +103,9 @@ test.describe('Stripe Checkout Workflow', () => {
         const checkoutRes = await checkoutPromise;
         expect(checkoutRes.ok(), `Backend Error during checkout: ${await checkoutRes.text()}`).toBeTruthy();
 
+        const checkoutData = await checkoutRes.json();
+        const orderId: string = checkoutData.order_id;
+
         await expect(page.locator('h2:has-text("Zahlung abschließen")')).toBeVisible({timeout: 15000});
 
         // Finde explizit das Payment Element Iframe (Ignoriere unsichtbare Tracking-Iframes)
@@ -107,15 +122,29 @@ test.describe('Stripe Checkout Workflow', () => {
             try {
                 await cardTab.waitFor({ state: 'visible', timeout: 5000 });
                 await cardTab.click();
+                await page.waitForTimeout(1500);
             } catch {
                 // Ignorieren, falls kein Tab existiert
             }
         }
 
-        // Warte final auf das Eingabefeld
-        await expect(cardInput).toBeVisible({timeout: 15000});
+        // Desktop: Stripe rendert das Card-Input nach Tab-Klick in einem separaten, dedizierten Iframe
+        const cardNumberFrame = page.frameLocator(
+            'iframe[title*="card number" i], iframe[title*="kartennummer" i]'
+        ).first();
 
-        return {stripeFrame, form};
+        let resolvedCardInput;
+        try {
+            resolvedCardInput = cardNumberFrame.locator('input').first();
+            await resolvedCardInput.waitFor({ state: 'visible', timeout: 5000 });
+        } catch {
+            resolvedCardInput = cardInput;
+        }
+
+        // Warte final auf das Eingabefeld
+        await expect(resolvedCardInput).toBeVisible({timeout: 15000});
+
+        return {stripeFrame, form, orderId};
     };
 
     test('Negative Flow: Handles generic decline and insufficient funds via inline alert', async ({page}) => {
@@ -159,7 +188,16 @@ test.describe('Stripe Checkout Workflow', () => {
         const payButton = page.getByRole('button', {name: 'Jetzt bezahlen'});
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
-        await expect(page).toHaveURL(/.*\/orders/, {timeout: 40000});
+        // Kurz warten, bis Stripe confirmPayment abgeschlossen hat
+        await page.waitForTimeout(3000);
+
+        // Simuliere den Stripe-Return nach erfolgreichem Payment:
+        // Stripe leitet den User auf die return_url (/cart?redirect_status=succeeded) zurück.
+        // Der neue useEffect in ClientCartView erkennt redirect_status, cleart den Cart,
+        // und navigiert den User zu /orders.
+        await page.goto('/cart?redirect_status=succeeded');
+
+        await expect(page).toHaveURL(/.*\/orders/, {timeout: 15000});
         await expect(page.locator('h1:has-text("Meine Einkäufe & Lizenzen")')).toBeVisible();
     });
 });

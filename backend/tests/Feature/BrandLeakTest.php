@@ -3,13 +3,17 @@
 namespace Tests\Feature;
 
 use App\Enums\Brand;
+use App\Enums\UserRole;
+use App\Models\Coupon;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
+use App\Models\Role;
 use App\Models\Setting;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\InvoiceService;
 use App\Services\SettingResolver;
+use App\Support\BrandRegistry;
 use App\Mail\InvoiceMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -226,5 +230,59 @@ class BrandLeakTest extends TestCase
         $response->assertOk();
         $this->assertSame(Brand::B2B->value, config('app.brand'));
         $this->assertFalse(app(SettingResolver::class)->isSrp());
+    }
+
+    // ──────────────────────────────────────────────
+    //  SRP-01 C-3: Coupon Brand Isolation
+    // ──────────────────────────────────────────────
+
+    /**
+     * Super Admin on SRP URL must only see SRP coupons, never RP coupons.
+     */
+    public function test_super_admin_on_srp_url_sees_srp_coupons_not_rp(): void
+    {
+        BrandRegistry::set(Brand::SRP);
+
+        $admin = User::factory()->create();
+        $admin->roles()->attach(
+            Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value])
+        );
+
+        Coupon::factory()->create(['brand' => 'srp', 'code' => 'SRP-COUPON']);
+        Coupon::factory()->create(['brand' => 'rp', 'code' => 'RP-COUPON']);
+
+        $response = $this->actingAs($admin, 'api')
+            ->getJson('/api/management/coupons');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $this->assertSame('SRP-COUPON', $response->json('data.0.code'));
+
+        BrandRegistry::set(null);
+    }
+
+    /**
+     * Super Admin on RP URL must only see RP coupons, never SRP coupons.
+     */
+    public function test_super_admin_on_rp_url_sees_rp_coupons_not_srp(): void
+    {
+        BrandRegistry::set(Brand::B2B);
+
+        $admin = User::factory()->create();
+        $admin->roles()->attach(
+            Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value])
+        );
+
+        Coupon::factory()->create(['brand' => 'srp', 'code' => 'SRP-COUPON']);
+        Coupon::factory()->create(['brand' => 'rp', 'code' => 'RP-COUPON']);
+
+        $response = $this->actingAs($admin, 'api')
+            ->getJson('/api/management/coupons');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $this->assertSame('RP-COUPON', $response->json('data.0.code'));
+
+        BrandRegistry::set(null);
     }
 }

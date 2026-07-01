@@ -12,8 +12,8 @@ export function useBrand() {
         isSrp,
         logoSrc: isSrp ? '/brands/srp/android-chrome-192x192.png' : '/brands/rp/android-chrome-192x192.png',
         svgUrl: isSrp ? '/brands/srp/safari-pinned-tab.svg' : '/brands/rp/safari-pinned-tab.svg',
-        portalName: isSrp ? 'story.reisinger.pictures Portal' : 'Reisinger Foto Portal',
-        impressumUrl: isSrp ? 'https://story.reisinger.pictures/impressum/' : 'https://reisinger.pictures/impressum/'
+        portalName: 'Reisinger Foto Portal',
+        impressumUrl: isSrp ? 'https://buy.reisinger.pictures/impressum/' : 'https://reisinger.pictures/impressum/'
     };
 }
 

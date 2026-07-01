@@ -18,41 +18,13 @@ verteilte Muster `$pfx = config('app.brand') === 'story.reisinger.pictures' ? 's
 
 ## 2. Ist-Stand — Die Probleme
 
-Drei konkrete Defekte in `backend/app/Http/Controllers/SettingsController.php`, bei denen
-Lesen und Schreiben der markenspezifischen Settings **asymmetrisch** sind:
+Drei Defekte in `SettingsController.php`, bei denen Lesen und Schreiben asymmetrisch sind:
 
-### 2.1 (a) `updateBillingDetails()` — SRP-Bankdaten unbrauchbar
+- **`updateBillingDetails()`:** Liest brand-präfixiert (`srp_bank_iban`), speichert ungeprefixt → SRP-Bankdaten nicht persistierbar
+- **`updateLicenseTerms()`:** Doppelte Prefixung (`srp_srp_base_price`) → Datenmüll-Keys
+- **`updateWatermark()`:** Liest brand-präfixiert, speichert ungeprefixt → nur globaler Opacity-Wert
 
-- **Lesen** (`getBillingDetails()`, `:146-153`): fragt für SRP `srp_bank_iban` etc. ab (mit Fallback
-  auf ungeprefixten B2B-Key).
-- **Schreiben** (`updateBillingDetails()`, `:210-213`): speichert **ungeprefixt** (`Setting::updateOrCreate(['key' => $key], …)`),
-  unabhängig vom Brand.
-- **Folge:** Im SRP-Kontext werden die Bankdaten **nie** unter `srp_*` gespeichert. `getBillingDetails()`
-  findet den SRP-Key nicht → fällt auf B2B-Werte zurück. SRP-spezifische Bankdaten sind über die
-  API **nicht persistierbar**; in T-02 (Queue-Leck) führt das zusätzlich zu falschen Bankdaten im PDF.
-
-### 2.2 (b) `updateLicenseTerms()` — `srp_srp_*`-Dopplung
-
-- `getLicenseTerms()` (`:131-134`) liefert bereits brandexplizite Keys wie `srp_base_price`.
-- `updateLicenseTerms()` (`:185-188`): `$pfx . $key` mit `$pfx='srp_'` + bereits praefixiertem
-  Key `'srp_base_price'` ergibt **`srp_srp_base_price`** — ein Schlüssel, der nie wieder gelesen wird.
-- **Folge:** SRP-Preisfaktoren werden im SRP-Kontext in einen „Datenmüll"-Key geschrieben und gehen
-  bei erneuter Abfrage verloren.
-
-### 2.3 (c) `updateWatermark()` — Opacity asymmetrisch
-
-- **Lesen** (`getWatermark()`, `:58`): fragt `$pfx . 'watermark_opacity'` ab (mit Fallback).
-- **Schreiben** (`updateWatermark()`, `:75`): speichert hart `watermark_opacity` **ungeprefixt**.
-- **Folge:** Es existiert nur ein globaler Opacity-Wert für beide Marken; die brandpräfixierte
-  Abfrage beim Lesen findet nie einen SRP-Wert und fällt stets auf denselben B2B-Wert zurück.
-  Symmetrie zwischen Lesen und Schreiben ist gebrochen.
-
-### 2.4 (übergreifend) Dupliziertes `$get()`-Lambda
-
-Das Hilfsmuster `$get = fn($k) => Setting::where('key', $pfx . $k)->value('value') ?? Setting::where('key', $k)->value('value');`
-ist in mindestens 5 Dateien dupliziert (`OrderController`, `InvoiceMail`, `ManualInvoiceService`,
-`header.blade.php`, `SettingsController`). Jede Änderung der Präfix-Logik muss an allen Stellen
-konsistent nachgezogen werden — hohes Inkonsistenz-Risiko.
+**Übergreifend:** Das `$get()`-Lambda ist in 5 Dateien dupliziert (`OrderController`, `InvoiceMail`, `ManualInvoiceService`, `header.blade.php`, `SettingsController`) — hohes Inkonsistenz-Risiko.
 
 ## 3. Soll-Zustand
 

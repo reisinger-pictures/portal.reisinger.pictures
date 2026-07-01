@@ -25,7 +25,7 @@ test.describe('Route Guards & IDOR Boundaries', () => {
                 await page.goto(route);
 
                 // ProtectedRoute → <Navigate to="/" replace/>
-                await expect(page).toHaveURL(/localhost:4321\/?$/);
+                await expect(page).toHaveURL(/portal\.localhost:4321\/?$/);
 
                 // Anonymous-Home-Oberfläche sichtbar (globale Suche im Header).
                 await expect(page.locator('input[placeholder="Galerien und Bilder suchen..."]')).toBeVisible({timeout: 10000});

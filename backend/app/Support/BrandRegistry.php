@@ -15,15 +15,14 @@ use App\Models\Order;
  */
 class BrandRegistry
 {
-    /** Local dev host that maps to the SRP brand (Vite SRP proxy target). */
-    public const SRP_DEV_HOST = 'portal-srp.test';
-
     /**
-     * Resolve the brand from an HTTP host (production domain or local dev host).
+     * Resolve the brand from an HTTP host.
+     *
+     * `portal.localhost` → B2B, `buy.localhost` → SRP.
      */
     public static function fromHost(string $host): Brand
     {
-        if (str_contains($host, Brand::SRP->domain()) || $host === self::SRP_DEV_HOST) {
+        if (str_starts_with($host, 'buy.')) {
             return Brand::SRP;
         }
         return Brand::B2B;
@@ -74,5 +73,17 @@ class BrandRegistry
     public static function resolveFromOrder(Order $order): Brand
     {
         return $order->brand ?? Brand::B2B;
+    }
+
+    /**
+     * Reset the runtime brand to null.
+     *
+     * Queue workers (php artisan queue:work) are long-lived — config persists across jobs.
+     * Call reset() before/after each job to prevent stale brand state from leaking between
+     * jobs. The reset is wired via Queue::before() in AppServiceProvider::boot().
+     */
+    public static function reset(): void
+    {
+        self::set(null);
     }
 }

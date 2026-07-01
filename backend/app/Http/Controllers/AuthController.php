@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\DomainMapping;
 use App\Services\AIService;
+use App\Enums\Brand;
+use App\Support\BrandRegistry;
 
 class AuthController extends Controller
 {
@@ -21,6 +23,13 @@ class AuthController extends Controller
 
         $user = User::where('email', $credentials['email'])->first();
         if ($user && $user->password && Hash::check($credentials['password'], $user->password)) {
+            // U-01: Brand-Mismatch check — cross-brand only for Super-Admin (brand=null).
+            if ($user->brand !== null && $user->brand !== BrandRegistry::currentOrDefault()) {
+                return response()->json([
+                    'error' => 'Dieser Account ist für ein anderes Portal registriert.',
+                ], 403);
+            }
+
             $token = Auth::guard('api')->login($user);
             return $this->respondWithToken($token);
         }
@@ -40,6 +49,7 @@ class AuthController extends Controller
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => null, // Initial passwortlos!
+                'brand' => BrandRegistry::currentOrDefault(),
             ]);
 
             $domain = substr(strrchr($validated['email'], "@"), 1);
@@ -105,6 +115,13 @@ class AuthController extends Controller
         $user->save();
         
         DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        // U-01: Brand-Mismatch check — same as in login().
+        if ($user->brand !== null && $user->brand !== BrandRegistry::currentOrDefault()) {
+            return response()->json([
+                'error' => 'Dieser Account ist für ein anderes Portal registriert.',
+            ], 403);
+        }
         
         $token = Auth::guard('api')->login($user);
         return $this->respondWithToken($token);

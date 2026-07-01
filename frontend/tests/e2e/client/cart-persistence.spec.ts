@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
 
 test.describe('Cart Persistence & Validation Workflow', () => {
     let helper: E2ESessionHelper;
@@ -22,7 +23,8 @@ test.describe('Cart Persistence & Validation Workflow', () => {
         const cartKey = `rp_cart_${testUser.id}`;
 
         // Einmal initial zum Cart navigieren
-        await page.goto('/cart');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateTo('Warenkorb');
         await expect(page.locator('text=Dein Warenkorb ist leer.')).toBeVisible();
 
         // 1. Inject completely corrupted JSON

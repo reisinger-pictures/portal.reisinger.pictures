@@ -2,39 +2,23 @@
 namespace App\Services;
 
 use App\Models\Photo;
+use App\Services\AIProviderFactory;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class AIService
 {
-    /**
-     * Sentinel value for AI_ENABLED that turns the feature OFF *and* suppresses the
-     * "unconfigured" admin banner — i.e. AI is intentionally absent, not misconfigured.
-     * Deployment uses environment variables (no .env file), so this sentinel lets operators
-     * express "deliberately off" distinctly from "not yet set up".
-     */
-    private const DISABLED_SENTINEL = 'DISABLED';
-
-    /**
-     * True when AI is deliberately turned off via AI_ENABLED=DISABLED.
-     * The feature is hidden entirely (buttons blended out, no admin warning banner).
-     */
     public function isDisabled(): bool
     {
-        return strtoupper((string) config('services.ai.enabled', false)) === self::DISABLED_SENTINEL;
+        return !config('services.ai.enabled');
     }
 
-    /**
-     * True when AI is neither available nor deliberately disabled — i.e. it is *unconfigured*
-     * (missing key or AI_ENABLED not truthy). This is the only state that should surface the
-     * admin "please configure" banner.
-     */
     public function isUnconfigured(): bool
     {
         if ($this->isDisabled()) {
             return false;
         }
-        return !$this->isAvailable();
+        return empty(config('services.ai.api_key'));
     }
 
     public function isAvailable(): bool
@@ -42,7 +26,10 @@ class AIService
         if ($this->isDisabled()) {
             return false;
         }
-        return (bool) config('services.ai.enabled', false) && !empty(config('services.ai.api_key'));
+        if (config('services.ai.type') === 'lmstudio') {
+            return true;
+        }
+        return !empty(config('services.ai.api_key'));
     }
 
     public function generateMetadata(Photo $photo, string $globalContext = '', ?string $specificContext = null): array
@@ -80,20 +67,19 @@ class AIService
 
     private function callAI(array $messages): array
     {
-        $baseUrl = rtrim(config('services.ai.base_url', 'https://api.openai.com/v1'), '/');
-        $apiKey = config('services.ai.api_key');
-        $model = config('services.ai.model', 'gpt-4o');
+        $provider = app(AIProviderFactory::class)->make();
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $apiKey,
-            'Content-Type' => 'application/json',
-        ])->timeout(120)->post($baseUrl . '/chat/completions', [
-            'model' => $model,
-            'messages' => $messages,
-            'response_format' => ['type' => 'json_object'],
-            'temperature' => 0.2,
-            'max_tokens' => 2000,
-        ]);
+        $requestBody = $provider->buildRequest(config('services.ai.model'), $messages);
+        $requestBody['temperature'] = 0.2;
+        $requestBody['max_tokens'] = 2000;
+
+        if ($provider->supportsJsonMode()) {
+            $requestBody['response_format'] = ['type' => 'json_object'];
+        }
+
+        $response = Http::withHeaders($provider->buildHeaders())
+            ->timeout(120)
+            ->post(rtrim(config('services.ai.base_url'), '/') . $provider->getEndpoint(), $requestBody);
 
         if (!$response->successful()) {
             Log::error('AI API call failed', [
@@ -104,9 +90,9 @@ class AIService
         }
 
         $data = $response->json();
-        $content = $data['choices'][0]['message']['content'] ?? '{}';
+        $content = $provider->parseResponse($data);
 
-        $cleanContent = preg_replace('/```(?:json)?\n?/', '', $content);
+        $cleanContent = preg_replace('/```(?:json)?\n?/', '', $content ?? '');
         $cleanContent = trim($cleanContent);
 
         $parsed = json_decode($cleanContent, true);

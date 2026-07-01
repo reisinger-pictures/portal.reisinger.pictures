@@ -13,15 +13,15 @@ enum Brand: string
 {
     /** B2B portal — reisinger.pictures (full admin/CRM/invoicing). */
     case B2B = 'rp';
-    /** SRP portal — story.reisinger.pictures (reduced B2C). */
+    /** SRP portal — buy.reisinger.pictures (reduced B2C). */
     case SRP = 'srp';
 
     /** Human-readable label (German UI / docs). */
     public function label(): string
     {
         return match ($this) {
-            self::B2B => 'Reisinger Pictures',
-            self::SRP => 'story.reisinger.pictures',
+            self::B2B => 'Reisinger Foto Portal',
+            self::SRP => 'Reisinger Foto Portal',
         };
     }
 
@@ -30,7 +30,7 @@ enum Brand: string
     {
         return match ($this) {
             self::B2B => 'reisinger.pictures',
-            self::SRP => 'story.reisinger.pictures',
+            self::SRP => 'buy.reisinger.pictures',
         };
     }
 

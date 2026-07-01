@@ -14,12 +14,11 @@
         <td style="width: 50%; text-align: right;">
             <strong>Belegnummer:</strong> {{ $snapshot->invoice_number }}<br>
             <strong>Datum:</strong> {{ \Carbon\Carbon::parse($snapshot->created_at)->format('d.m.Y') }}<br>
-            @if($title === 'ANGEBOT' && !empty($snapshot->customer_details['validity']))
-                <strong>Gültigkeit:</strong> {{ $snapshot->customer_details['validity'] }}<br>
-            @elseif($title !== 'ANGEBOT' && !empty($snapshot->customer_details['service_date']))
-                <strong>Leistungszeitraum:</strong> {{ $snapshot->customer_details['service_date'] }}<br>
+            @if($title === 'ANGEBOT')
+                <strong>Gültigkeit:</strong> {{ $snapshot->customer_details['due_date'] ?? 'Gültig bis 14 Tage nach Ausstellung' }}<br>
+            @elseif($title !== 'ANGEBOT')
+                <strong>Leistungszeitraum:</strong> {{ $snapshot->customer_details['service_date'] ?? 'nicht angegeben' }}<br>
             @endif
-            <strong>Status:</strong> {{ $snapshot->customer_details['due_date'] ?? '' }}
         </td>
     </tr>
 </table>

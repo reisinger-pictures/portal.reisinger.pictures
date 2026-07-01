@@ -44,22 +44,37 @@ class QuoteLinkTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_valid_token_decodes_successfully()
+    public function test_generated_link_decodes_via_api()
     {
-        $payload = base64_encode(json_encode([
-            'photos' => ['uuid-test'],
-            'price' => 500,
-            'exp' => time() + 86400
-        ]));
-        $signature = hash_hmac('sha256', $payload, config('app.key'));
-        $validToken = $payload . '.' . $signature;
+        $photographer = User::factory()->create();
+        $photographer->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $token = auth('api')->login($photographer);
 
-        $response = $this->getJson("/api/orders/quote-decode?token={$validToken}");
-        
-        $response->assertStatus(200)
-                 ->assertJson([
-                     'photos' => ['uuid-test'],
-                     'price' => 500
-                 ]);
+        $generate = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/orders/quote-link', [
+                'photo_ids' => ['uuid-decode-1', 'uuid-decode-2'],
+                'custom_price' => 9900
+            ]);
+
+        $generate->assertStatus(200);
+        $link = $generate->json('link');
+        parse_str(parse_url($link, PHP_URL_QUERY), $query);
+        $jwt = $query['quote_token'];
+
+        $decode = $this->getJson("/api/orders/quote-decode?token={$jwt}");
+        $decode->assertStatus(200)
+               ->assertJson([
+                   'photos' => ['uuid-decode-1', 'uuid-decode-2'],
+                   'price' => 9900,
+               ]);
+    }
+
+    public function test_expired_quote_token_is_rejected()
+    {
+        $jwt = app(\App\Services\OfferTokenService::class)
+            ->issue(['photos' => ['x'], 'price' => 1], now()->subDay());
+
+        $this->getJson("/api/orders/quote-decode?token={$jwt}")
+             ->assertStatus(410);
     }
 }

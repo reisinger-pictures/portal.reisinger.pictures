@@ -25,11 +25,11 @@ class DatabaseSeeder extends Seeder
         // Admin-User erhält alle verfügbaren Rollen
         $adminUser->roles()->sync(\App\Models\Role::pluck('id')->toArray());
 
-        // SRP brand tenant (story.reisinger.pictures) — B2C counterpart to the B2B portal.
+        // SRP brand tenant (buy.reisinger.pictures) — B2C counterpart to the B2B portal.
         \App\Models\Tenant::firstOrCreate(
-            ['domain' => 'story.reisinger.pictures'],
+            ['domain' => 'buy.reisinger.pictures'],
             [
-                'name' => 'story.reisinger.pictures',
+                'name' => 'buy.reisinger.pictures',
                 'brand' => \App\Enums\Brand::SRP,
             ]
         );
@@ -80,9 +80,11 @@ class DatabaseSeeder extends Seeder
 
         // --- Per-brand catalog, settings, CRM seed (spec §5) ---
         // B2B ('rp') = canonical/existing data; SRP ('srp') = placeholder copy
-        // (concrete SRP dataset arrives via T-18).
         $this->seedCatalogForBrand(Brand::B2B);
         $this->seedCatalogForBrand(Brand::SRP);
+
+        // T-18: SRP-spezifische Settings (Volumen-Staffel + RP-Defaults kopieren)
+        $this->call(SrpSettingsSeeder::class);
 
         // Neu: Trigger den Location Import direkt im Seed
         $this->command->info('Starte Smart Assistance Import...');

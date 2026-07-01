@@ -94,43 +94,63 @@ class ManualInvoiceService
     }
 
     /**
-     * Extract offer data from PDF content
+     * Extract offer data from PDF content.
+     *
+     * Reads the `%OFFER_JWT:{token}%` marker (clean break: the old
+     * `%SMART_DOC:payload.signature%` HMAC marker is no longer supported) and
+     * verifies the embedded JWT via OfferTokenService. Returns the offer
+     * payload array on success, or null when no marker is present or the token
+     * is invalid/expired.
      */
     public function extractOfferFromPdf(string $content): ?array
     {
-        if (preg_match('/%SMART_DOC:(.*?)\.(.*?)%/', $content, $matches)) {
-            $payload = $matches[1];
-            $signature = $matches[2];
-            $appKey = config('app.key');
+        if (!preg_match('/OFFER_JWT:([A-Za-z0-9_\.\-]+)/', $content, $matches)) {
+            return null;
+        }
 
-            if (hash_equals(hash_hmac('sha256', $payload, $appKey), $signature)) {
-                return json_decode(base64_decode($payload), true);
+        return app(OfferTokenService::class)->verify($matches[1]);
+    }
+
+    /**
+     * Generate a signed JWT offer payload and the PDF-EOF marker for embedding.
+     *
+     * The offer validity (`due_date`/`validity`) drives the JWT `exp`; on parse
+     * failure the OfferTokenService default (14 days) applies.
+     */
+    public function generateOfferPayload(array $data): array
+    {
+        $expiresAt = $this->resolveExpiry($data);
+        $token = app(OfferTokenService::class)->issue($data, $expiresAt);
+
+        return [
+            'token' => $token,
+            'marker' => "%OFFER_JWT:{$token}%",
+        ];
+    }
+
+    /**
+     * Derive the offer expiry from the form data (`due_date` / `validity`).
+     * Returns null when no usable date is present so the service default applies.
+     */
+    private function resolveExpiry(array $data): ?\Carbon\Carbon
+    {
+        foreach (['due_date', 'validity'] as $field) {
+            $value = $data[$field] ?? null;
+            if (is_string($value) && trim($value) !== '') {
+                try {
+                    return \Carbon\Carbon::parse($value);
+                } catch (\Throwable) {
+                    // Not a parseable date (e.g. free-text "14 Tage") → try next field.
+                }
             }
-
-            // Return special marker for tampered signature
-            return ['_signature_error' => true];
         }
 
         return null;
     }
 
     /**
-     * Generate smart offer payload and signature for embedding in PDF
-     */
-    public function generateOfferPayload(array $data): array
-    {
-        $payload = base64_encode(json_encode($data));
-        $signature = hash_hmac('sha256', $payload, config('app.key'));
-
-        return [
-            'payload' => $payload,
-            'signature' => $signature,
-            'marker' => "%SMART_DOC:{$payload}.{$signature}%"
-        ];
-    }
-
-    /**
-     * Prepare offer data for embedding
+     * Prepare offer data for embedding. Includes the offer validity fields so
+     * they can drive the JWT `exp` downstream.
      */
     public function prepareOfferData(array $validated): array
     {
@@ -144,7 +164,9 @@ class ManualInvoiceService
             'customer_email' => $validated['customer_email'] ?? '',
             'customer_uid' => $validated['customer_uid'] ?? '',
             'items' => $validated['items'] ?? [],
-            'terms_html' => $validated['terms_html'] ?? ''
+            'terms_html' => $validated['terms_html'] ?? '',
+            'due_date' => $validated['due_date'] ?? '',
+            'validity' => $validated['validity'] ?? '',
         ];
     }
 }

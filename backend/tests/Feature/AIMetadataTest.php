@@ -26,6 +26,7 @@ class AIMetadataTest extends TestCase
 
         config(['services.ai' => [
             'enabled' => true,
+            'type' => 'openai',
             'base_url' => 'https://api.openai.com/v1',
             'api_key' => 'test-key',
             'model' => 'gpt-4o',
@@ -67,8 +68,104 @@ class AIMetadataTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'enabled' => true,
+                'status' => 'available',
+                'type' => 'openai',
                 'model' => 'gpt-4o',
             ]);
+    }
+
+    public function test_status_returns_disabled_when_not_enabled()
+    {
+        config(['services.ai.enabled' => false]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->getJson('/api/ai/status');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'enabled' => false,
+                'status' => 'disabled',
+            ]);
+    }
+
+    public function test_status_returns_unconfigured_when_key_missing()
+    {
+        config(['services.ai.enabled' => true, 'services.ai.api_key' => '']);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->getJson('/api/ai/status');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'enabled' => false,
+                'status' => 'unconfigured',
+            ]);
+    }
+
+    public function test_status_includes_type()
+    {
+        config(['services.ai' => [
+            'enabled' => true,
+            'type' => 'openai',
+            'api_key' => 'test-key',
+            'model' => 'gpt-4o',
+        ]]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->getJson('/api/ai/status');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'type' => 'openai',
+            ]);
+    }
+
+    public function test_generate_metadata_returns_503_when_disabled()
+    {
+        config(['services.ai.enabled' => false]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata', [
+                'photo_id' => $this->photo->id,
+            ]);
+
+        $response->assertStatus(503);
+    }
+
+    public function test_generate_metadata_returns_503_when_unconfigured()
+    {
+        config(['services.ai.enabled' => true, 'services.ai.api_key' => '']);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata', [
+                'photo_id' => $this->photo->id,
+            ]);
+
+        $response->assertStatus(503);
+    }
+
+    public function test_generate_metadata_text_returns_503_when_disabled()
+    {
+        config(['services.ai.enabled' => false]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata-text', [
+                'text_input' => 'Test',
+            ]);
+
+        $response->assertStatus(503);
+    }
+
+    public function test_generate_metadata_text_returns_503_when_unconfigured()
+    {
+        config(['services.ai.enabled' => true, 'services.ai.api_key' => '']);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata-text', [
+                'text_input' => 'Test',
+            ]);
+
+        $response->assertStatus(503);
     }
 
     public function test_status_requires_auth()

@@ -59,9 +59,7 @@
             <td style="width: 50%; text-align: right;">
                 <strong>Belegnummer:</strong> {{ $snapshot->invoice_number }}<br>
                 <strong>Rechnungsdatum:</strong> {{ \Carbon\Carbon::parse($snapshot->created_at)->format('d.m.Y') }}<br>
-                @if(!empty($snapshot->customer_details['service_date']))
-                    <strong>Leistungsdatum:</strong> {{ $snapshot->customer_details['service_date'] }}<br>
-                @endif
+                <strong>Leistungsdatum:</strong> {{ $snapshot->customer_details['service_date'] ?? 'nicht angegeben' }}<br>
                 <strong>Fälligkeit:</strong> {{ $snapshot->customer_details['due_date'] ?? 'Zahlbar sofort.' }}
             </td>
         </tr>
@@ -115,32 +113,7 @@
                         <td colspan="3" class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>Zwischensumme</strong></td>
                         <td class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>{{ number_format($subtotal / 100, 2, ',', '.') }} €</strong></td>
                     </tr>
-                    @foreach($items as $item)
-                        @if(isset($item['type']) && str_starts_with($item['type'], 'discount'))
-                            <tr>
-                                <td>
-                                    <strong>{{ $item['filename'] }}</strong>
-                                    @if($item['type'] === 'discount_percent')
-                                        ({{ rtrim(rtrim(number_format($item['calculated_percentage'] ?? 0, 2, ',', '.'), '0'), ',') }}%)
-                                    @endif
-                                    @if(!empty($item['notes']))
-                                        <br><small style="color: #666;">{{ $item['notes'] }}</small>
-                                    @endif
-                                </td>
-                                <td class="text-right" style="white-space: nowrap;">1</td>
-                                <td class="text-right" style="white-space: nowrap;">
-                                    @if($item['type'] === 'discount_fixed')
-                                        {{ number_format($item['price'] / 100, 2, ',', '.') }} €
-                                    @else
-                                        -
-                                    @endif
-                                </td>
-                                <td class="text-right" style="color: {{ $primaryColor }}; white-space: nowrap;">
-                                    {{ number_format($item['row_total'] / 100, 2, ',', '.') }} €
-                                </td>
-                            </tr>
-                        @endif
-                    @endforeach
+                    @include('pdf.fragments.discount_rows', ['items' => $items])
                 @endif
                 
                 <tr class="total-row">

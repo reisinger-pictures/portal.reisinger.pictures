@@ -13,10 +13,10 @@ export class GalleryHelper {
         this.modal = new ModalHelper(page);
     }
 
-    async createAndOpenDeliveryGallery(name: string) {
+    async createAndOpenDeliveryGallery(name: string, visibility?: string): Promise<string | undefined> {
         await this.sidebar.openNewGalleryModal();
         const form = new FormHelper(this.page, this.modal);
-        await form.fillGalleryModal({ name, type: 'Delivery (Downloads)' });
+        await form.fillGalleryModal({ name, type: 'Delivery (Downloads)', visibility });
         const res = await this.modal.submitModal('Speichern');
         if (res?.gallery?.id && this.sessionHelper) {
             this.sessionHelper.trackGallery(res.gallery.id);
@@ -31,6 +31,7 @@ export class GalleryHelper {
         }).toPass({ timeout: 15000 });
 
         await expect(this.page.getByRole('heading', { name })).toBeVisible();
+        return res?.gallery?.id;
     }
 
     async setPhotographerTeamAccess(status: 'Erben' | 'Offen' | 'Restriktiv') {

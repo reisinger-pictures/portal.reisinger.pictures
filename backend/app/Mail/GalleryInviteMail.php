@@ -9,7 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 class GalleryInviteMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, BrandAwareMail;
 
     public $galleryName;
     public $inviteLink;
@@ -18,11 +18,18 @@ class GalleryInviteMail extends Mailable implements ShouldQueue
     {
         $this->galleryName = $galleryName;
         $this->inviteLink = $inviteLink;
+        $this->initializeBrand();
     }
 
     public function build()
     {
+        $this->ensureBrandContext();
+        $this->applyBrandFrom();
+
         return $this->subject('Deine Foto-Auswahl: ' . $this->galleryName)
-                    ->view('emails.invite');
+                    ->view('emails.invite')
+                    ->with([
+                        'logoUrl' => $this->brandLogoUrl(),
+                    ]);
     }
 }

@@ -30,22 +30,6 @@ class SettingResolverTest extends TestCase
         $this->assertTrue($this->resolver->isSrp());
     }
 
-    public function test_prefix_returns_key_as_is_for_b2b(): void
-    {
-        config(['app.brand' => 'rp']);
-        $this->assertSame('bank_holder', $this->resolver->prefix('bank_holder'));
-        $this->assertSame('base_price', $this->resolver->prefix('base_price'));
-        $this->assertSame('srp_base_price', $this->resolver->prefix('srp_base_price'));
-    }
-
-    public function test_prefix_avoids_double_prefixing_for_srp_brand(): void
-    {
-        config(['app.brand' => 'srp']);
-        $this->assertSame('srp_base_price', $this->resolver->prefix('srp_base_price'));
-        $this->assertSame('srp_bank_iban', $this->resolver->prefix('srp_bank_iban'));
-        $this->assertSame('srp_setup_fee', $this->resolver->prefix('srp_setup_fee'));
-    }
-
     public function test_set_stores_brand_scoped_key_for_srp(): void
     {
         config(['app.brand' => 'srp']);

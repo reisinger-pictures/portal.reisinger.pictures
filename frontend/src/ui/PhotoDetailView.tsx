@@ -15,6 +15,8 @@ import PhotoHistoryModal from './components/PhotoHistoryModal';
 import { useUI } from './components/UIContext';
 import { useAI } from '../logic/useAI';
 import LicenseSelectorCard from './client/components/LicenseSelectorCard';
+import VolumeLicensingCard from './client/components/VolumeLicensingCard';
+import {useLicensingMode} from '../logic/useLicensingMode';
 import { BreadcrumbItem } from '../api';
 
 interface PhotoContextData {
@@ -39,6 +41,7 @@ export default function PhotoDetailView() {
     const [prevPhotoId, setPrevPhotoId] = useState<string | undefined>(undefined);
     const [aiContext, setAiContext] = useState('');
     const [isAiGenerating, setIsAiGenerating] = useState(false);
+    const licensingMode = useLicensingMode();
 
     if (data?.photo && data.photo.id !== prevPhotoId) {
         setPrevPhotoId(data.photo.id);
@@ -139,7 +142,11 @@ export default function PhotoDetailView() {
 
                     <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                         {data.photo.gallery?.type === 'delivery' && (
-                            <LicenseSelectorCard photo={data.photo} />
+                            licensingMode === 'volume_licensing' ? (
+                                <VolumeLicensingCard photo={data.photo} onAddToCart={() => {}} />
+                            ) : (
+                                <LicenseSelectorCard photo={data.photo} />
+                            )
                         )}
                         <IptcMetadataEditor data={iptcData} onChange={setIptcData} disabled={!canEdit} showArtist={isPhotographerUser} showEditorialFlag={true} capturedAt={data.photo.captured_at}>
                             {canEdit && (

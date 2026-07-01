@@ -62,7 +62,7 @@ class ManualDocumentTest extends TestCase
              ->assertStatus(403);
     }
 
-    public function test_smart_document_can_be_generated_and_extracted_securely()
+    public function test_offer_jwt_can_be_generated_and_extracted()
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
@@ -71,7 +71,7 @@ class ManualDocumentTest extends TestCase
         $payload = [
             'invoice_number' => 'A-2026-999',
             'date' => '2026-04-14',
-            'due_date' => '14 Tage',
+            'due_date' => date('Y-m-d', strtotime('+30 days')),
             'type' => 'offer',
             'customer_name' => 'Smart Doc Tester',
             'customer_email' => 'smart@doc.test',
@@ -94,11 +94,12 @@ class ManualDocumentTest extends TestCase
         $res->sendContent();
         $pdfContent = ob_get_clean();
 
-        // Ensure the smart doc signature is appended
-        $this->assertStringContainsString('%SMART_DOC:', $pdfContent);
+        // Ensure the JWT marker is appended
+        $this->assertStringContainsString('%OFFER_JWT:', $pdfContent);
+        $this->assertStringNotContainsString('%SMART_DOC:', $pdfContent);
 
         // 2. Extract Offer
-        $tempPath = storage_path('app/private/temp/test_smart_doc_' . uniqid() . '.pdf');
+        $tempPath = storage_path('app/private/temp/test_offer_jwt_' . uniqid() . '.pdf');
         if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);
         file_put_contents($tempPath, $pdfContent);
 
@@ -121,25 +122,64 @@ class ManualDocumentTest extends TestCase
         $extractRes->assertJsonPath('items.0.description', 'Consulting');
         $extractRes->assertJsonPath('items.1.price', 50);
 
-        // 3. Tamper with the PDF to test signature validation
-        $tamperedContent = preg_replace('/%SMART_DOC:(.*?)\.(.*?)%/', '%SMART_DOC:$1.invalid_signature%', $pdfContent);
-        file_put_contents($tempPath, $tamperedContent);
+        @unlink($tempPath);
+    }
 
-        $tamperedFile = new \Illuminate\Http\UploadedFile(
+    public function test_expired_offer_jwt_extraction_returns_400()
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
+        $token = auth('api')->login($superAdmin);
+
+        $expiredJwt = app(\App\Services\OfferTokenService::class)
+            ->issue(['customer_name' => 'Expired'], now()->subDay());
+        $pdfContent = "DUMMY PDF\n%OFFER_JWT:{$expiredJwt}%\n";
+
+        $tempPath = storage_path('app/private/temp/test_expired_offer_' . uniqid() . '.pdf');
+        if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);
+        file_put_contents($tempPath, $pdfContent);
+
+        $uploadedFile = new \Illuminate\Http\UploadedFile(
             $tempPath,
-            'Angebot_tampered.pdf',
+            'Angebot.pdf',
             'application/pdf',
             null,
             true
         );
 
-        $tamperedRes = $this->withHeaders(['Authorization' => "Bearer $token"])
-                            ->post('/api/management/invoices/extract-offer', [
-                                'pdf' => $tamperedFile
-                            ]);
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile])
+             ->assertStatus(400)
+             ->assertJsonPath('error', 'Angebot nicht auslesbar oder abgelaufen.');
 
-        $tamperedRes->assertStatus(400);
-        $tamperedRes->assertJsonPath('error', 'Signatur ungültig oder manipuliert. Das Angebot wurde eventuell verändert.');
+        @unlink($tempPath);
+    }
+
+    public function test_old_smart_doc_marker_is_no_longer_recognised()
+    {
+        // Clean break: an old %SMART_DOC% PDF must report no embedded offer.
+        $superAdmin = User::factory()->create();
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
+        $token = auth('api')->login($superAdmin);
+
+        $pdfContent = "DUMMY PDF\n%SMART_DOC:legacy.legacy%\n";
+
+        $tempPath = storage_path('app/private/temp/test_legacy_' . uniqid() . '.pdf');
+        if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);
+        file_put_contents($tempPath, $pdfContent);
+
+        $uploadedFile = new \Illuminate\Http\UploadedFile(
+            $tempPath,
+            'Angebot.pdf',
+            'application/pdf',
+            null,
+            true
+        );
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile])
+             ->assertStatus(404)
+             ->assertJsonPath('error', 'Kein eingebettetes Angebot in diesem PDF gefunden.');
 
         @unlink($tempPath);
     }

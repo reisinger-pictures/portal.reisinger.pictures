@@ -24,6 +24,17 @@ status: active
 - Für manuelle E-Mails (z. B. der "E-Mail senden" Action-Button im Fotografen-Dashboard) existiert ein Modal, in dem der Fotograf eine individuelle HTML-Nachricht verfassen kann.
 - Dieses Modal bietet einen Live-Preview-Toggle, der die eingegebenen Variablen (z. B. `{user_name}`, `{link}`) durch Dummy-Daten ersetzt und das finale HTML rendert.
 
-## 4. Local Testing
+## 4. Brand-Aware Emails (EMAIL-01–04)
+- Alle 7 Mail-Klassen (`InvoiceMail`, `CustomMail`, `GalleryInviteMail`, `ActivateAccountMail`, `RatingFinishedMail`, `NotificationMail`, `TenantInviteMail`) nutzen das `BrandAwareMail` Trait.
+- Das Trait stellt sicher:
+  - **Brand Context Restoration:** `ensureBrandContext()` stellt den Brand bei Queue-Workern wieder her (captured via `initializeBrand()` im Konstruktor).
+  - **Frontend URL (EMAIL-01):** `brandFrontendUrl()` liefert `config('app.frontend_url_srp')` für SRP, sonst `config('app.frontend_url')`.
+  - **Logo URL (EMAIL-02):** `brandLogoUrl()` kombiniert Frontend-URL mit `/android-chrome-192x192.png`.
+  - **Sender (EMAIL-03):** `applyBrandFrom()` setzt Absender per `config('mail.from_srp.*')` für SRP.
+  - **BCC (EMAIL-04):** `brandBcc()` liest `config('services.accounting_email_srp')` oder `accounting_email_rp`.
+- Templates erhalten `$logoUrl` via `->with()` und nutzen `??=` als Fallback.
+- Siehe `backend/app/Mail/BrandAwareMail.php` und `features/infrastructure/06-multi-domain-branding.md`.
+
+## 5. Local Testing
 - Der `Mailpit` Container fängt alle ausgehenden E-Mails im lokalen Development-Modus ab.
 - E2E Tests (Playwright) und PHPUnit-Tests prüfen via Mailpit API die korrekte Zustellung und das Vorhandensein von Tokens/Links in den generierten HTML-Bodies.

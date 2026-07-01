@@ -67,18 +67,6 @@ story.reisinger.pictures (B2C/SRP) ┘     Tenant B (Firma Y)
   Brand-Spalte). Die markenspezifische Trennung von Rechnungen/Settings passiert rein über den
   Host-basierten `BrandContext` zur Request-Zeit.
 
-## 5. Bekannte offene Punkte (verweisen auf `AGENTS.todo.md`)
+## 5. Offene Punkte
 
-Die folgenden Punkte sind **bekannte Lücken**, nicht in diesem Konzept-Doc zu lösen, sondern in
-`AGENTS.todo.md` (T-01…T-04) als Aufgaben geführt:
-
-- **T-01 UI-Begriff-Entscheidung:** Wahl des treffenden UI-Begriffs (siehe §3) + optionelle
-  Anpassung der ~21 UI-Strings.
-- **T-02 Queue/CLI-Brand-Leck:** `InvoiceMail` (ShouldQueue) und Cron-Jobs laufen ohne
-  HTTP-Host → `config('app.brand')` ist dort leer → SRP-Rechnungen erhalten B2B-Branding im PDF.
-- **T-03 Frontend Mandanten-Isolation:** B2B-Kacheln (Mandanten/CRM/Invoicing) werden auf
-  `story.reisinger.pictures` für Kunden-Logins nicht ausgeblendet (rein rollenbasierte Steuerung).
-- **T-04 Settings-Trennung Bugfixes:** `updateBillingDetails` speichert ungeprefixt (SRP-Daten
-  unbrauchbar), `srp_*`-Dopplung in `updateLicenseTerms`, Watermark-Opacity asymmetrisch.
-
-Dieses Doc dokumentiert nur den Stand; es enthält keine Lösungsschritte für T-01…T-04.
+Bekannte Lücken sind in `AGENTS.todo.md` dokumentiert (UI-Begriff T-01, Queue-Brand-Leck T-02, Frontend-Isolation T-03, Settings-Trennung T-04). Dieses Doc enthält keine Lösungsschritte.

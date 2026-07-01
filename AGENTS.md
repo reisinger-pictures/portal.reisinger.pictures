@@ -16,15 +16,42 @@
 * **ESLint Auto-Fix Policy (STRICT):** Always use `npm run lint:fix` (= `eslint . --fix`) instead of plain `npm run lint`. Auto-fix handles formatting and trivial rules — never fix those by hand. The plain `lint` script (without `--fix`) is reserved for CI/PR checks only.
 * **ESLint & TypeScript:** The use of `eslint-disable`, `@ts-ignore`, or `any` is **strictly forbidden**. All typing issues must be resolved structurally using exact interfaces, `unknown`, or generic type constraints.
 * **Semantic Locator Scoping:** Agenten MÜSSEN Playwright-Locators über Landmarks (`main`, `aside`, `footer`) scopen, um Eindeutigkeit sicherzustellen und Abhängigkeiten von rein visuellen CSS-Klassen zu minimieren.
+* **No `page.goto` for SPA Navigation (STRICT):** Nach erfolgreichem Login MUSS die Navigation innerhalb der SPA via `sidebar.navigateTo()` erfolgen. `page.goto()` ist nur für externe Links (Invite, Magic-Link), initialen Seitenaufruf oder localStorage-Tests erlaubt.
 * **Testing Execution Output:** Whenever you create or modify E2E or PHPUnit tests, you MUST output the exact command to run them (and the input string for the `ai_test_runner.mjs`) in a separate code block at the end of your response.
 * **Test Debugging Transparency:** When analyzing test failure reports, you must explicitly document your debugging progress and thought process in the "Planungsphase" before proposing a fix. Explain what failed, why it failed based on the logs/DOM snapshots, and how the fix addresses the root cause.
 * **Patching & File Modification (CRITICAL):**
   * Multi-line Regex for search-and-replace in code is STRICTLY FORBIDDEN. It is too brittle.
   * Base64 output for file content is STRICTLY FORBIDDEN.
   * **Safe Patching Policy (CRITICAL):** Alle `patch.mjs` Scripts MÜSSEN den Erfolg einer Ersetzung validieren. Prüfe zwingend mit `.includes()` oder `.indexOf()`, ob der Zielstring existiert, *bevor* du `.replace()` aufrufst. Prüfe danach, ob sich der `content` tatsächlich verändert hat. Brich mit einer klaren `console.error` ab, falls der Patch ins Leere läuft. Blinde `.replace()` Aufrufe sind untersagt!
+* **Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. V017 ist die letzte deployte Migration. Vor dem Deployment werden alle Nicht-Produktions-Migrationen (≥ V018) zu EINER konsolidierten Migration zusammengefasst. Diese Regel verhindert eine übermäßig fragmentierte Migrations-Historie.
 
 ## 3. AI Agent Roles & Responsibilities
 The system and workflow are managed via a Main/Secondary Model architecture to prevent context pollution:
 * **Main Model (Planner & Reviewer):** Has the full project context. Analyzes the problem, designs the architecture, updates documentation, and reviews implementations. Delegates isolated coding tasks to the Secondary Model by providing only the necessary files and specific instructions.
 * **Secondary Model (Implementer):** Runs in a fresh, isolated context. Receives specific instructions and target files from the Main Model, implements the changes, and generates the patch script.
 * **Testing Execution Rule (STRICT):** Nie Playwright direkt aufrufen (z.B. `npx playwright test`), sondern immer zwingend via `node ai_test_runner.mjs`! Dies stellt sicher, dass Fehler-Reports für die Analyse generiert werden.
+* **Workflow-Reihenfolge für Test-Fixes (STRICT):**
+  * 1. Dokumentieren (SOLL in `features/`, Bug-Analyse)
+  * 2. Backend Unit/Integration-Tests schreiben (`php artisan test --filter`)
+  * 3. Frontend Unit-Tests schreiben (`pnpm vitest run`)
+  * 4. Erst danach: E2E-Tests fixen (`node ai_test_runner.mjs --console`)
+* **localStorage Injection (STRICT ANTI-PATTERN):** Daten via `page.evaluate()` oder `addInitScript` in `localStorage` zu injizieren ist verboten. localStorage ist ein Implementierungsdetail des Frontends. Tests MÜSSEN den User-Flow abbilden: Login → Navigation → Formular-Interaktion. Ausnahme: `E2ESessionHelper` für Test-Setup (API-basiert).
+* **Max 3 Fix-Versuche für Tests (STRICT):** Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agent an den Benutzer zurückgeben mit einer Analyse was schiefgeht. Keine Endlos-Fix-Loops.
+* **Last-Failed Tip:** `node ai_test_runner.mjs --console` reicht alle Args durch. Für Wiederholung nur der fehlgeschlagenen Tests: `node ai_test_runner.mjs --console --last-failed`. Oder via Playwright direkt: `npx playwright test --last-failed`
+
+## 4. Test Commands
+```bash
+# Backend (PHP via Herd: PATH muss php85 enthalten)
+export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
+cd backend && php artisan test
+
+# Frontend Unit (pnpm, NICHT npm)
+cd frontend && pnpm vitest run
+
+# Frontend Lint + Build (pnpm, NICHT npm)
+cd frontend && pnpm lint:fix && pnpm build
+
+# E2E (via ai_test_runner, NIE direkt npx playwright)
+cd frontend
+node ai_test_runner.mjs brand
+```

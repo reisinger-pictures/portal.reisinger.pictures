@@ -38,4 +38,9 @@ return [
         'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Reisinger Foto Portal')),
     ],
+
+    'from_srp' => [
+        'address' => env('MAIL_FROM_ADDRESS_SRP', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
+        'name' => env('MAIL_FROM_NAME_SRP', env('MAIL_FROM_NAME', env('APP_NAME', 'Reisinger Foto Portal'))),
+    ],
 ];

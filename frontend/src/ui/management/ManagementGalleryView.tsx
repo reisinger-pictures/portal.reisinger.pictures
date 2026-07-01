@@ -2,11 +2,12 @@ import GalleryAccessModal from './components/GalleryAccessModal';
 import {useRef, useState} from 'react';
 import ErrorMessage from '../components/ErrorMessage';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
-import {useNavigate, useParams} from 'react-router-dom';
+import {useNavigate, useParams, useSearchParams} from 'react-router-dom';
 import {useGallery} from '../../logic/useGallery';
 import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import {usePermissions} from '../../logic/usePermissions';
+import {useBrand} from '../../logic/useBrand';
 import EmailComposerModal from './components/EmailComposerModal';
 import InviteModal from './components/InviteModal';
 import PageLayout from '../components/PageLayout';
@@ -18,6 +19,7 @@ import GalleryModals from '../components/GalleryModals';
 import ManagementGalleryActions from './components/ManagementGalleryActions';
 import PhotographerTeamModal from './components/PhotographerTeamModal';
 import AIBatchEditModal from './components/AIBatchEditModal';
+import GalleryCouponsTab from './components/GalleryCouponsTab';
 
 export default function ManagementGalleryView() {
     const params = useParams();
@@ -29,6 +31,21 @@ export default function ManagementGalleryView() {
     const {tree, updateGallery, deleteGallery} = useProtectedGalleries();
     const {user} = useAuth();
     const {isAdmin, isPhotographer} = usePermissions();
+    const {isSrp} = useBrand();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab: 'bilder' | 'coupons' =
+        isSrp && searchParams.get('tab') === 'coupons' ? 'coupons' : 'bilder';
+    const setActiveTab = (tab: 'bilder' | 'coupons') => {
+        setSearchParams(prev => {
+            const updated = new URLSearchParams(prev);
+            if (tab === 'bilder') {
+                updated.delete('tab');
+            } else {
+                updated.set('tab', tab);
+            }
+            return updated;
+        });
+    };
 
     const [isGalleryEditModalOpen, setGalleryEditModalOpen] = useState(false);
     const availableGroups = tree ? flattenGroups(tree.groups) : [];
@@ -77,46 +94,75 @@ export default function ManagementGalleryView() {
                     />
                 </div>
 
-                {isPhotographer && (
-                    <UploadDropzone galleryId={gallery.id} onUploadComplete={() => mutate()} />
+                {isSrp && (
+                    <div role="tablist" className="tabs tabs-boxed w-full md:w-auto bg-base-200 border border-base-300 p-1 flex-wrap shadow-sm mb-6">
+                        <a
+                            role="tab"
+                            className={`tab ${activeTab === 'bilder' ? 'tab-active font-bold' : ''}`}
+                            onClick={() => setActiveTab('bilder')}
+                        >
+                            <span className="iconify mdi--image-multiple-outline mr-1"></span>
+                            Bilder
+                        </a>
+                        <a
+                            role="tab"
+                            className={`tab ${activeTab === 'coupons' ? 'tab-active font-bold' : ''}`}
+                            onClick={() => setActiveTab('coupons')}
+                        >
+                            <span className="iconify mdi--ticket-percent-outline mr-1"></span>
+                            Coupons
+                        </a>
+                    </div>
                 )}
 
-                {!isLoading && photos.length === 0 && (
-                    <div className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300">
-                        <span className="iconify mdi--image-off-outline text-6xl mb-4 text-primary"></span>
-                        <h3 className="text-2xl font-bold">Noch keine Bilder vorhanden</h3>
-                        {gallery.is_live ? (
-                            <p className="mt-2 text-warning flex items-center gap-2">
-                                <span className="iconify mdi--autorenew animate-spin"></span>
-                                Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10 Sekunden.
-                            </p>
-                        ) : (
-                            <p className="mt-2">Lade Bilder per Drag & Drop hoch oder importiere sie über die FTP-Inbox.</p>
+                {activeTab === 'bilder' && (
+                    <>
+                        {isPhotographer && (
+                            <UploadDropzone galleryId={gallery.id} onUploadComplete={() => mutate()} />
                         )}
-                    </div>
+
+                        {!isLoading && photos.length === 0 && (
+                            <div className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300">
+                                <span className="iconify mdi--image-off-outline text-6xl mb-4 text-primary"></span>
+                                <h3 className="text-2xl font-bold">Noch keine Bilder vorhanden</h3>
+                                {gallery.is_live ? (
+                                    <p className="mt-2 text-warning flex items-center gap-2">
+                                        <span className="iconify mdi--autorenew animate-spin"></span>
+                                        Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10 Sekunden.
+                                    </p>
+                                ) : (
+                                    <p className="mt-2">Lade Bilder per Drag & Drop hoch oder importiere sie über die FTP-Inbox.</p>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4" ref={galleryRef}>
+                            {photos.map(photo => (
+                                <div key={photo.id} className="relative group">
+                                    <a href={photo.url} data-pswp-width={photo.width || 2000} data-pswp-height={photo.height || 1333} data-title={photo.title} data-desc={photo.description} data-artist={photo.artist} data-photo-id={photo.id} className="pswp-item block relative aspect-square">
+                                        <img src={photo.thumb_url} className="object-cover w-full h-full rounded hover:scale-105 transition-transform duration-500" loading="lazy" alt={photo.title || 'Bild'}/>
+                                    </a>
+                                    {gallery.type === 'delivery' && (
+                                        <div className="absolute top-2 right-2 opacity-100 z-10">
+                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate('/photos/' + photo.id); }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
+                                                <span className="iconify mdi--open-in-new text-lg"></span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {!isReachingEnd && photos.length > 0 && (
+                            <div className="text-center mt-8">
+                                <button className="btn btn-outline" onClick={() => setSize(size + 1)}>Mehr laden</button>
+                            </div>
+                        )}
+                    </>
                 )}
 
-                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4" ref={galleryRef}>
-                    {photos.map(photo => (
-                        <div key={photo.id} className="relative group">
-                            <a href={photo.url} data-pswp-width={photo.width || 2000} data-pswp-height={photo.height || 1333} data-title={photo.title} data-desc={photo.description} data-artist={photo.artist} data-photo-id={photo.id} className="pswp-item block relative aspect-square">
-                                <img src={photo.thumb_url} className="object-cover w-full h-full rounded hover:scale-105 transition-transform duration-500" loading="lazy" alt={photo.title || 'Bild'}/>
-                            </a>
-                            {gallery.type === 'delivery' && (
-                                <div className="absolute top-2 right-2 opacity-100 z-10">
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate('/photos/' + photo.id); }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
-                                        <span className="iconify mdi--open-in-new text-lg"></span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-
-                {!isReachingEnd && photos.length > 0 && (
-                    <div className="text-center mt-8">
-                        <button className="btn btn-outline" onClick={() => setSize(size + 1)}>Mehr laden</button>
-                    </div>
+                {activeTab === 'coupons' && isSrp && (
+                    <GalleryCouponsTab galleryId={gallery.id} />
                 )}
 
                 <EmailComposerModal isOpen={isMailModalOpen} onClose={() => setIsMailModalOpen(false)} galleryId={gallery.id} />

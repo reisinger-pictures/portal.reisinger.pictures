@@ -23,8 +23,8 @@ export interface UserDetailed extends Omit<User, 'roles'> {
     is_super_admin: boolean;
     can_edit_metadata: boolean;
     flatrate_level: 'none' | 'web' | 'print' | 'original';
-    // Brand assignment per Policy A (A-01): 'rp' | 'srp' for client-type accounts, null for
-    // staff (super_admin/admin/photographer = cross-brand).
+    // Brand assignment per U-02: 'rp' | 'srp' for all brand-bound accounts. null is reserved
+    // exclusively for the cross-brand Super-Admin (florian@reisinger.pictures).
     brand?: 'rp' | 'srp' | null;
     roles: Role[];
     gallery_groups: GalleryGroup[];

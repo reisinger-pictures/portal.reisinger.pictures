@@ -5,6 +5,11 @@ use Tests\TestCase;
 use App\Models\Photo;
 use App\Models\Gallery;
 use App\Models\User;
+use App\AI\Contracts\AIProvider;
+use App\AI\Providers\OpenAIProvider;
+use App\AI\Providers\AnthropicProvider;
+use App\AI\Providers\LMStudioProvider;
+use App\Services\AIProviderFactory;
 use App\Services\AIService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -22,10 +27,18 @@ class AIServiceTest extends TestCase
         $this->service = app(AIService::class);
     }
 
-    public function test_is_available_returns_false_when_disabled()
+    public function test_is_disabled_returns_true_when_enabled_is_false()
     {
         config(['services.ai.enabled' => false]);
+        $this->assertTrue($this->service->isDisabled());
         $this->assertFalse($this->service->isAvailable());
+        $this->assertFalse($this->service->isUnconfigured());
+    }
+
+    public function test_is_disabled_returns_false_when_enabled()
+    {
+        config(['services.ai.enabled' => true, 'services.ai.api_key' => 'test-key']);
+        $this->assertFalse($this->service->isDisabled());
     }
 
     public function test_is_available_returns_false_when_key_missing()
@@ -40,10 +53,123 @@ class AIServiceTest extends TestCase
         $this->assertTrue($this->service->isAvailable());
     }
 
+    public function test_is_available_returns_true_when_lmstudio()
+    {
+        config(['services.ai.enabled' => true, 'services.ai.type' => 'lmstudio', 'services.ai.api_key' => '']);
+        $this->assertTrue($this->service->isAvailable());
+    }
+
+    public function test_is_unconfigured_returns_true_when_key_missing()
+    {
+        config(['services.ai.enabled' => true, 'services.ai.api_key' => '']);
+        $this->assertFalse($this->service->isDisabled());
+        $this->assertFalse($this->service->isAvailable());
+        $this->assertTrue($this->service->isUnconfigured());
+    }
+
+    public function test_is_unconfigured_returns_false_when_available()
+    {
+        config(['services.ai.enabled' => true, 'services.ai.api_key' => 'test-key']);
+        $this->assertFalse($this->service->isDisabled());
+        $this->assertTrue($this->service->isAvailable());
+        $this->assertFalse($this->service->isUnconfigured());
+    }
+
+    public function test_is_unconfigured_returns_false_when_disabled()
+    {
+        config(['services.ai.enabled' => false]);
+        $this->assertTrue($this->service->isDisabled());
+        $this->assertFalse($this->service->isUnconfigured());
+    }
+
+    public function test_factory_returns_openai_by_default()
+    {
+        config(['services.ai.type' => null]);
+        $provider = app(AIProviderFactory::class)->make();
+        $this->assertInstanceOf(OpenAIProvider::class, $provider);
+    }
+
+    public function test_factory_returns_anthropic()
+    {
+        config(['services.ai.type' => 'anthropic']);
+        $provider = app(AIProviderFactory::class)->make();
+        $this->assertInstanceOf(AnthropicProvider::class, $provider);
+    }
+
+    public function test_factory_returns_lmstudio()
+    {
+        config(['services.ai.type' => 'lmstudio']);
+        $provider = app(AIProviderFactory::class)->make();
+        $this->assertInstanceOf(LMStudioProvider::class, $provider);
+    }
+
+    public function test_openai_provider_builds_correct_request()
+    {
+        $provider = new OpenAIProvider();
+        $request = $provider->buildRequest('gpt-4o', [
+            ['role' => 'system', 'content' => 'You are a bot'],
+            ['role' => 'user', 'content' => 'Hello'],
+        ]);
+
+        $this->assertEquals('gpt-4o', $request['model']);
+        $this->assertCount(2, $request['messages']);
+        $this->assertEquals('/chat/completions', $provider->getEndpoint());
+        $this->assertTrue($provider->supportsJsonMode());
+    }
+
+    public function test_anthropic_provider_builds_correct_request()
+    {
+        $provider = new AnthropicProvider();
+        $request = $provider->buildRequest('claude-3-opus-20240229', [
+            ['role' => 'system', 'content' => 'You are a helpful assistant'],
+            ['role' => 'user', 'content' => 'Tell me a story'],
+        ]);
+
+        $this->assertEquals('claude-3-opus-20240229', $request['model']);
+        $this->assertEquals('You are a helpful assistant', $request['system']);
+        $this->assertCount(1, $request['messages']);
+        $this->assertEquals('user', $request['messages'][0]['role']);
+        $this->assertEquals('/messages', $provider->getEndpoint());
+        $this->assertFalse($provider->supportsJsonMode());
+    }
+
+    public function test_anthropic_provider_parses_response()
+    {
+        $provider = new AnthropicProvider();
+        $content = $provider->parseResponse([
+            'content' => [
+                ['text' => '{"title": "Test"}']
+            ]
+        ]);
+        $this->assertEquals('{"title": "Test"}', $content);
+    }
+
+    public function test_lmstudio_provider_omits_auth_when_no_key()
+    {
+        config(['services.ai.api_key' => '']);
+        $provider = new LMStudioProvider();
+        $headers = $provider->buildHeaders();
+
+        $this->assertArrayNotHasKey('Authorization', $headers);
+        $this->assertEquals('/chat/completions', $provider->getEndpoint());
+        $this->assertFalse($provider->supportsJsonMode());
+    }
+
+    public function test_lmstudio_provider_includes_auth_when_key_set()
+    {
+        config(['services.ai.api_key' => 'lm-key']);
+        $provider = new LMStudioProvider();
+        $headers = $provider->buildHeaders();
+
+        $this->assertArrayHasKey('Authorization', $headers);
+        $this->assertEquals('Bearer lm-key', $headers['Authorization']);
+    }
+
     public function test_generate_metadata_from_text_makes_correct_api_call()
     {
         config(['services.ai' => [
             'enabled' => true,
+            'type' => 'openai',
             'base_url' => 'https://api.openai.com/v1',
             'api_key' => 'test-key',
             'model' => 'gpt-4o',
@@ -80,6 +206,7 @@ class AIServiceTest extends TestCase
     {
         config(['services.ai' => [
             'enabled' => true,
+            'type' => 'openai',
             'base_url' => 'https://api.openai.com/v1',
             'api_key' => 'test-key',
             'model' => 'gpt-4o',
@@ -99,6 +226,7 @@ class AIServiceTest extends TestCase
     {
         config(['services.ai' => [
             'enabled' => true,
+            'type' => 'openai',
             'base_url' => 'https://api.openai.com/v1',
             'api_key' => 'test-key',
             'model' => 'gpt-4o',
@@ -122,6 +250,7 @@ class AIServiceTest extends TestCase
     {
         config(['services.ai' => [
             'enabled' => true,
+            'type' => 'openai',
             'base_url' => 'https://api.openai.com/v1',
             'api_key' => 'test-key',
             'model' => 'gpt-4o',
@@ -166,6 +295,7 @@ class AIServiceTest extends TestCase
     {
         config(['services.ai' => [
             'enabled' => true,
+            'type' => 'openai',
             'base_url' => 'https://api.openai.com/v1',
             'api_key' => 'test-key',
         ]]);

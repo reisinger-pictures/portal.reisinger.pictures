@@ -11,27 +11,26 @@ class BrandContextMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // In tests the environment controls config('app.brand') directly.
         if (app()->environment('testing')) {
             return $next($request);
         }
 
-        $host = $request->getHost();
+        BrandRegistry::set(BrandRegistry::fromHost($this->resolveHost($request)));
 
-        // Dev-Fallback: Da der Vite-Proxy API-Calls umschreibt und das Backend
-        // lokal immer 'portal.test' sieht, lesen wir im lokalen Modus den Host
-        // zusätzlich aus dem Referer-Header aus, um den SRP-Brand emulieren zu können.
-        // (Mit dem 2-Instanzen-Vite-Setup hat jedes Proxy-Target den korrekten Host;
-        // der Referer-Backstop bleibt als Safety-Net für gemischte Setups.)
-        if (app()->environment('local') && $request->headers->has('referer')) {
-            $refererHost = parse_url($request->header('referer'), PHP_URL_HOST);
+        return $next($request);
+    }
+
+    private function resolveHost(Request $request): string
+    {
+        if (app()->environment('local')) {
+            // Vite proxy rewrites Host → brand lost. The Referer header (standard HTTP,
+            // sent by browsers automatically) carries the original subdomain.
+            $refererHost = parse_url($request->header('referer', ''), PHP_URL_HOST);
             if ($refererHost) {
-                $host = $refererHost;
+                return $refererHost;
             }
         }
 
-        BrandRegistry::set(BrandRegistry::fromHost($host));
-
-        return $next($request);
+        return $request->getHost();
     }
 }

@@ -8,8 +8,8 @@ export class AuthHelper {
         this.network = new NetworkHelper(page);
     }
 
-    async login(email = 'florian@reisinger.pictures', password = 'admin') {
-        await this.page.goto('/');
+    async login(email = 'florian@reisinger.pictures', password = 'admin', loginUrl?: string) {
+        await this.page.goto(loginUrl ?? '/');
 
         await expect(this.page.getByTestId('app-loader').first()).toBeHidden({ timeout: 5000 });
         await expect(this.page.locator('main').first()).toBeVisible({ timeout: 5000 });
@@ -48,9 +48,9 @@ export class AuthHelper {
         }
     }
 
-    async logout() {
+    async logout(logoutUrl?: string) {
         await this.page.context().clearCookies();
-        await this.page.goto('/');
+        await this.page.goto(logoutUrl ?? '/');
         await expect(this.page.locator('.loading-spinner.loading-lg').first()).toBeHidden({ timeout: 5000 });
 
         const emailInput = this.page.getByPlaceholder('E-Mail Adresse').first();

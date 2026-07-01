@@ -9,7 +9,7 @@ use Illuminate\Queue\SerializesModels;
 
 class ActivateAccountMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, BrandAwareMail;
 
     public $userName;
     public $introText;
@@ -24,11 +24,18 @@ class ActivateAccountMail extends Mailable implements ShouldQueue
         $this->actionUrl = $actionUrl;
         $this->actionText = $actionText;
         $this->mailSubject = $mailSubject;
+        $this->initializeBrand();
     }
 
     public function build()
     {
+        $this->ensureBrandContext();
+        $this->applyBrandFrom();
+
         return $this->subject($this->mailSubject)
-                    ->view('emails.activate');
+                    ->view('emails.activate')
+                    ->with([
+                        'logoUrl' => $this->brandLogoUrl(),
+                    ]);
     }
 }

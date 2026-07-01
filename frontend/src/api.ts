@@ -183,6 +183,7 @@ export interface Gallery {
     expires_at?: string | null;
     created_at?: string;
     tenant_id?: string | null;
+    brand?: string | null;
 }
 
 // Canonical auth-context user (`/api/auth/me`). `roles` is the role-name list.

@@ -21,7 +21,7 @@ return {
                 },
 
                 f:row {
-                    f:static_text { title = "SRP (story.reisinger.pictures):", width = 150 },
+                    f:static_text { title = "SRP (buy.reisinger.pictures):", width = 150 },
                     f:edit_field {
                         value = LrView.bind { key = "baseUrlSrp", bind_to_object = prefs },
                         fill_horizontal = 1
@@ -70,7 +70,7 @@ return {
                         title = "Login testen (SRP)",
                         action = function()
                             LrTasks.startAsyncTask(function()
-                                local url = (prefs.baseUrlSrp and #prefs.baseUrlSrp > 0) and prefs.baseUrlSrp or "https://portal.story.reisinger.pictures"
+                                local url = (prefs.baseUrlSrp and #prefs.baseUrlSrp > 0) and prefs.baseUrlSrp or "https://buy.reisinger.pictures"
                                 local token, err, detail = Api.login(url)
                                 if token then
                                     LrDialogs.message("Erfolg!", "Verbindung zum SRP-Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")

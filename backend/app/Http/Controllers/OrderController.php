@@ -84,13 +84,7 @@ class OrderController extends Controller
         $items = $order->invoiceSnapshot->customer_details['items'] ?? [];
         $photoIds = array_column($items, 'photoId');
 
-        $payload = base64_encode(json_encode([
-            'photos' => $photoIds,
-            'price' => $request->custom_price,
-            'exp' => now()->addDays(14)->timestamp
-        ]));
-        $signature = hash_hmac('sha256', $payload, config('app.key'));
-        $link = rtrim(config('app.frontend_url', config('app.url')), '/') . '/cart?quote_token=' . $payload . '.' . $signature;
+        $link = $this->quoteLinkService->generateQuoteLink($photoIds, $request->custom_price);
 
         $subject = "Individuelles Angebot";
         $body = "<p>" . nl2br(htmlspecialchars($request->message)) . "</p><br><p><a href=\"{$link}\">Hier geht es zum Angebot und Checkout</a></p>";
@@ -112,10 +106,10 @@ class OrderController extends Controller
 
     public function decodeQuoteLink(Request $request) {
         $token = $request->query('token');
-        if (!$token) return response()->json(['error' => 'Invalid token format'], 400);
+        if (!$token) return response()->json(['error' => 'Ungültiges Token-Format.'], 400);
 
-        $data = $this->quoteLinkService->decodeQuoteToken($token);
-        if (!$data) return response()->json(['error' => 'Invalid signature or expired token'], 400);
+        $data = $this->quoteLinkService->decode($token);
+        if (!$data) return response()->json(['error' => 'Angebot abgelaufen oder ungültig.'], 410);
 
         return response()->json($data);
     }
@@ -206,14 +200,15 @@ class OrderController extends Controller
         $request->validate(['pdf' => 'required|file']);
         $content = file_get_contents($request->file('pdf')->getPathname());
 
-        $data = $this->invoiceService->extractOfferFromPdf($content);
-
-        if (!$data) {
+        // No marker at all → 404. Invalid/expired marker → 400 (null payload).
+        if (!preg_match('/OFFER_JWT:([A-Za-z0-9_\.\-]+)/', $content)) {
             return response()->json(['error' => 'Kein eingebettetes Angebot in diesem PDF gefunden.'], 404);
         }
 
-        if (isset($data['_signature_error'])) {
-            return response()->json(['error' => 'Signatur ungültig oder manipuliert. Das Angebot wurde eventuell verändert.'], 400);
+        $data = $this->invoiceService->extractOfferFromPdf($content);
+
+        if (!$data) {
+            return response()->json(['error' => 'Angebot nicht auslesbar oder abgelaufen.'], 400);
         }
 
         return response()->json($data);

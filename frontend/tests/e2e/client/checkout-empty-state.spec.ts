@@ -1,6 +1,7 @@
 import {test, expect} from '@playwright/test';
 import {AuthHelper} from '../helpers/AuthHelper';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
+import {SidebarHelper} from '../helpers/SidebarHelper';
 
 // E2E-01 §1 (Empty-Cart-UX, echt) + §5 (Accessibility-Stichprobe).
 // Grounded in `src/ui/client/ClientCartView.tsx`.
@@ -21,7 +22,8 @@ test.describe('Empty Cart — UI & Accessibility', () => {
         const auth = new AuthHelper(page);
         await auth.login(clientUser.email, clientUser.password);
 
-        await page.goto('/cart');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateTo('Warenkorb');
         await expect(page).toHaveURL(/.*\/cart/);
         await expect(page.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible();
 
@@ -35,6 +37,6 @@ test.describe('Empty Cart — UI & Accessibility', () => {
 
         // Navigation funktioniert aus dem Empty-State heraus.
         await homeLink.click();
-        await expect(page).toHaveURL(/localhost:4321\/?$/);
+        await expect(page).toHaveURL(/portal\.localhost:4321\/?$/);
     });
 });

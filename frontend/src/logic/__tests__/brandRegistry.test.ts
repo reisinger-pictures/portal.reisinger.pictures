@@ -5,22 +5,18 @@ import {
     brandPrefix,
     getBrandFromHostname,
     isSrpBrand,
-    SRP_DEV_HOST,
-    SRP_PROD_DOMAIN,
 } from '../brandRegistry';
 
 describe('brandRegistry', () => {
     describe('getBrandFromHostname', () => {
-        it('resolves SRP for the production domain', () => {
-            expect(getBrandFromHostname(`portal.${SRP_PROD_DOMAIN}`)).toBe(BRAND_SRP);
-            expect(getBrandFromHostname(SRP_PROD_DOMAIN)).toBe(BRAND_SRP);
+        it('resolves SRP for buy.* subdomains', () => {
+            expect(getBrandFromHostname('buy.localhost')).toBe(BRAND_SRP);
+            expect(getBrandFromHostname('buy.reisinger.pictures')).toBe(BRAND_SRP);
+            expect(getBrandFromHostname('BUY.EXAMPLE.COM')).toBe(BRAND_SRP);
         });
 
-        it('resolves SRP for the local dev host', () => {
-            expect(getBrandFromHostname(SRP_DEV_HOST)).toBe(BRAND_SRP);
-        });
-
-        it('defaults to B2B for unknown / B2B hosts', () => {
+        it('defaults to B2B for non-SRP hosts', () => {
+            expect(getBrandFromHostname('portal.localhost')).toBe(BRAND_B2B);
             expect(getBrandFromHostname('portal.reisinger.pictures')).toBe(BRAND_B2B);
             expect(getBrandFromHostname('portal.test')).toBe(BRAND_B2B);
             expect(getBrandFromHostname('example.com')).toBe(BRAND_B2B);

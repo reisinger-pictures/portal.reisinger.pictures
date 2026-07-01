@@ -77,6 +77,8 @@ describe('WatermarkSettingsCard', () => {
         vi.mocked(useUI).mockReturnValue({
             showToast: vi.fn(),
             confirm: vi.fn(),
+            hasUnsavedChanges: false,
+            setUnsavedChanges: vi.fn(),
         });
         vi.mocked(useBrand).mockReturnValue({
             logoSrc: '',

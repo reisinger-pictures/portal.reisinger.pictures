@@ -1,6 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="story.reisinger.pictures (B2C Emulation)" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="start http://story.reisinger.pictures.localhost:4322" />
+  <!-- DEPRECATED: Renamed to buy.reisinger.pictures. Delete this file. -->
+  <configuration default="false" name="DEPRECATED - use buy.reisinger.pictures instead" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="echo DEPRECATED - use buy.reisinger.pictures instead" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

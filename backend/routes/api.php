@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CouponController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\FileDeliveryController;
@@ -117,6 +118,9 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/ai/status', [AIController::class, 'status']);
     Route::post('/ai/generate-metadata', [AIController::class, 'generateMetadata']);
     Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText']);
+
+    // Coupon validation (public, auth-required)
+    Route::post('/coupons/validate', [CouponController::class, 'validateCoupon']);
 });
 
 Route::middleware(['auth:api', 'management'])->group(function () {
@@ -197,7 +201,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/orders/{id}/send-quote', [OrderController::class, 'sendQuote']);
     Route::post('/management/invoices/manual', [OrderController::class, 'generateManualInvoice']);
     Route::post('/management/invoices/extract-offer', [OrderController::class, 'extractOffer']);
-    Route::middleware(['super_admin'])->group(function () {
+        Route::middleware(['super_admin'])->group(function () {
         Route::get('/management/products', [ProductController::class, 'index']);
         Route::post('/management/products', [ProductController::class, 'store']);
         Route::put('/management/products/{id}', [ProductController::class, 'update']);
@@ -212,6 +216,18 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::put('/management/text-snippets/{id}', [TextSnippetController::class, 'update']);
         Route::delete('/management/text-snippets/{id}', [TextSnippetController::class, 'destroy']);
     });
+
+    // SRP-01: Coupon management (super_admin, admin, photographer)
+    Route::get('/management/coupons', [CouponController::class, 'index']);
+    Route::post('/management/coupons', [CouponController::class, 'store']);
+    Route::put('/management/coupons/{id}', [CouponController::class, 'update']);
+    Route::delete('/management/coupons/{id}', [CouponController::class, 'destroy']);
+
+    // SRP-01: Gallery/Group coupon endpoints
+    Route::get('/management/galleries/{id}/coupons', [CouponController::class, 'galleryCoupons']);
+    Route::post('/management/galleries/{id}/coupons', [CouponController::class, 'storeGalleryCoupon']);
+    Route::get('/management/gallery-groups/{id}/coupons', [CouponController::class, 'groupCoupons']);
+    Route::post('/management/gallery-groups/{id}/coupons', [CouponController::class, 'storeGroupCoupon']);
 
     Route::get('/management/stats', [StatsController::class, 'index']);
     Route::get('/management/logs', [StatsController::class, 'logs']);

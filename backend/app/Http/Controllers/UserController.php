@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Enums\UserRole;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -63,7 +64,8 @@ class UserController extends Controller
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
-                'password' => null
+                'password' => null,
+                'brand' => BrandRegistry::currentOrDefault(),
             ]);
 
             $token = Str::random(64);
@@ -126,16 +128,17 @@ class UserController extends Controller
             $user->update(['flatrate_level' => $request->flatrate_level]);
         }
         if ($request->has('brand')) {
-            // Policy A (A-01): staff roles are cross-brand. Force brand=null whenever any staff
-            // role (super_admin/admin/photographer) is present, so an admin can never accidentally
-            // scope a staff member to one brand (which would silently strip their cross-brand
-            // gallery access in User::getAllowedGalleryIds()).
-            $staffRoles = ['super_admin', 'admin', 'photographer'];
-            $selectedRoleNames = Role::whereIn('id', $request->role_ids ?? [])->pluck('name')->all();
-            $isStaffAccount = !empty(array_intersect($staffRoles, $selectedRoleNames));
+            // U-02: Staff is brand-bound (reversal of Policy A). Only Super-Admin keeps
+            // brand=null (cross-brand). All other roles (admin, photographer, etc.) are
+            // brand-bound to 'rp' or 'srp'.
+            // If role_ids is provided, use the request roles; otherwise check the user's
+            // current roles (e.g. when only the brand field is being updated).
+            $selectedRoleNames = $request->has('role_ids')
+                ? Role::whereIn('id', $request->role_ids ?? [])->pluck('name')->all()
+                : $user->roles()->pluck('name')->all();
+            $isSuperAdmin = in_array(\App\Enums\UserRole::SUPER_ADMIN->value, $selectedRoleNames, true);
 
-            // null = cross-brand (staff); 'rp'/'srp' = brand-bound (client-type accounts).
-            $user->update(['brand' => $isStaffAccount ? null : $request->brand]);
+            $user->update(['brand' => $isSuperAdmin ? null : $request->brand]);
         }
 
         return response()->json(['success' => true]);

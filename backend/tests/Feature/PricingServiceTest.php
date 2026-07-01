@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
+use App\Pricing\ScopeLicensingStrategy;
 use App\Services\PricingService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,7 +20,7 @@ class PricingServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new PricingService();
+        $this->service = new PricingService(new ScopeLicensingStrategy());
     }
 
     public function test_calculate_item_price_throws_when_use_case_missing(): void

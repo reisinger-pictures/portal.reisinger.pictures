@@ -3,13 +3,15 @@ import fs from 'fs';
 import path from 'path';
 
 // Sammelt alle Argumente (z.B. "tests/auth tests/ui" -> ["tests/auth", "tests/ui"])
-const args = process.argv.slice(2);
+const rawArgs = process.argv.slice(2);
+const consoleMode = rawArgs.includes('--console');
+const args = rawArgs.filter(a => a !== '--console');
 
 console.log('===================================================');
-console.log('🤖 AI-Optimierter Playwright Test Runner gestartet!');
+console.log(`🤖 AI-Optimierter Playwright Test Runner gestartet! (${consoleMode ? 'Console Mode' : 'File Report Mode'})`);
 console.log('===================================================');
 
-function runTests(selection) {
+function runTests(selection, consoleMode) {
     const params = '--reporter=list --workers=8';
 
     // Wir joinen die Argumente mit Leerzeichen.
@@ -19,51 +21,64 @@ function runTests(selection) {
 
     console.log(`\n🚀 Führe aus: ${cmd}\n`);
 
-    try {
-        const stdout = execSync(cmd, {
-            cwd: '.',
-            env: {...process.env, FORCE_COLOR: '0'},
-            encoding: 'utf-8',
-            stdio: 'pipe'
-        });
+    if (consoleMode) {
+        try {
+            execSync(cmd, {
+                cwd: '.',
+                env: {...process.env, FORCE_COLOR: '1'},
+                stdio: 'inherit'
+            });
+            console.log('\n✅ Alle ausgewählten Tests bestanden!');
+        } catch {
+            process.exit(1);
+        }
+    } else {
+        try {
+            const stdout = execSync(cmd, {
+                cwd: '.',
+                env: {...process.env, FORCE_COLOR: '0'},
+                encoding: 'utf-8',
+                stdio: 'pipe'
+            });
 
-        console.log('\n✅ Alle ausgewählten Tests bestanden!');
-        console.log(stdout);
-    } catch (error) {
-        console.log('\n❌ Tests fehlgeschlagen. Generiere Report...');
+            console.log('\n✅ Alle ausgewählten Tests bestanden!');
+            console.log(stdout);
+        } catch (error) {
+            console.log('\n❌ Tests fehlgeschlagen. Generiere Report...');
 
-        const rawStdout = error.stdout || '';
-        const rawStderr = error.stderr || '';
+            const rawStdout = error.stdout || '';
+            const rawStderr = error.stderr || '';
 
-        let report = "=== PLAYWRIGHT TEST FAILURE REPORT ===\n\n";
-        report += "--- STDOUT ---\n" + rawStdout + "\n\n";
-        if (rawStderr) report += "--- STDERR ---\n" + rawStderr + "\n\n";
+            let report = "=== PLAYWRIGHT TEST FAILURE REPORT ===\n\n";
+            report += "--- STDOUT ---\n" + rawStdout + "\n\n";
+            if (rawStderr) report += "--- STDERR ---\n" + rawStderr + "\n\n";
 
-        const contextRegex = /Error Context: (\S+)/g;
-        const matches = [...rawStdout.matchAll(contextRegex)];
+            const contextRegex = /Error Context: (\S+)/g;
+            const matches = [...rawStdout.matchAll(contextRegex)];
 
-        if (matches.length > 0) {
-            report += "--- INLINED ERROR CONTEXTS ---\n";
-            for (const match of matches) {
-                const relativePath = match[1];
-                const fullPath = path.join('.', relativePath);
-                if (fs.existsSync(fullPath)) {
-                    try {
-                        const content = fs.readFileSync(fullPath, 'utf8');
-                        const compressed = content.split('\n').map(line => line.trim()).filter(l => l).join('\n');
-                        report += `\n>> ORIGIN: ${relativePath}\n${compressed}\n------------------------------------------\n`;
-                    } catch (e) {
-                        report += `\n[Fehler beim Lesen von ${relativePath}]: ${e.message}\n`;
+            if (matches.length > 0) {
+                report += "--- INLINED ERROR CONTEXTS ---\n";
+                for (const match of matches) {
+                    const relativePath = match[1];
+                    const fullPath = path.join('.', relativePath);
+                    if (fs.existsSync(fullPath)) {
+                        try {
+                            const content = fs.readFileSync(fullPath, 'utf8');
+                            const compressed = content.split('\n').map(line => line.trim()).filter(l => l).join('\n');
+                            report += `\n>> ORIGIN: ${relativePath}\n${compressed}\n------------------------------------------\n`;
+                        } catch (e) {
+                            report += `\n[Fehler beim Lesen von ${relativePath}]: ${e.message}\n`;
+                        }
                     }
                 }
             }
-        }
 
-        fs.writeFileSync('ai_test_report.txt', report);
-        console.log('✅ "ai_test_report.txt" erstellt.');
-        process.exit(1);
+            fs.writeFileSync('ai_test_report.txt', report);
+            console.log('✅ "ai_test_report.txt" erstellt.');
+            process.exit(1);
+        }
     }
 }
 
 // Direkter Start ohne Nachfrage
-runTests(args.join(' '));
+runTests(args.join(' '), consoleMode);

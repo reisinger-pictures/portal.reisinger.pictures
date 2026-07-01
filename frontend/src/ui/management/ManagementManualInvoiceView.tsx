@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {usePermissions} from '../../logic/usePermissions';
 import ErrorMessage from '../components/ErrorMessage';
 import WysiwygEditor from '../components/WysiwygEditor';
@@ -29,6 +29,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
         dueDateOption,
         isGenerating,
         isOffer,
+        isDirty,
         handleUpdateField,
         handleOptionChange,
         handleServiceDateManualChange,
@@ -52,6 +53,16 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
     const {isDragging, handleDragOver, handleDragLeave, handleDrop} = useInvoiceDragDrop(isOffer, processPdfFile);
 
     const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+    useEffect(() => {
+        if (!isDirty) return;
+        const handler = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [isDirty]);
 
     if (!isSuperAdmin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung."/></div>;
 

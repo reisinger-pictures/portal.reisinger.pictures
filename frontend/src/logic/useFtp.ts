@@ -5,6 +5,7 @@ export interface FtpTargetGallery {
     id: string;
     name: string;
     slug: string;
+    brand?: string | null;
 }
 
 export interface FtpStatus {

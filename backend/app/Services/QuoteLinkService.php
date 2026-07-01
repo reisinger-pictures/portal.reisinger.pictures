@@ -5,75 +5,37 @@ namespace App\Services;
 class QuoteLinkService
 {
     /**
-     * Generate a quote link with signed token
+     * Default validity window (days) for quote links when none is requested.
      */
-    public function generateQuoteLink(array $photoIds, int $customPrice, int $validityDays = 14): string
-    {
-        $payload = $this->generatePayload($photoIds, $customPrice, $validityDays);
-        $signature = $this->generateSignature($payload);
-        $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
-
-        return $frontendUrl . '/cart?quote_token=' . $payload . '.' . $signature;
-    }
+    public const DEFAULT_VALIDITY_DAYS = 14;
 
     /**
-     * Generate payload for quote token
+     * Generate a quote link carrying a signed JWT token (`?quote_token=`).
      */
-    public function generatePayload(array $photoIds, int $customPrice, int $validityDays = 14): string
+    public function generateQuoteLink(array $photoIds, int $customPrice, int $validityDays = self::DEFAULT_VALIDITY_DAYS): string
     {
-        $data = [
+        $payload = [
             'photos' => $photoIds,
             'price' => $customPrice,
-            'exp' => now()->addDays($validityDays)->timestamp
         ];
 
-        return base64_encode(json_encode($data));
+        $token = app(OfferTokenService::class)->issue($payload, now()->addDays($validityDays));
+        $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
+
+        return $frontendUrl . '/cart?quote_token=' . $token;
     }
 
     /**
-     * Generate HMAC signature for payload
+     * Decode and validate a quote token via OfferTokenService.
+     * Returns the payload array (photos, price) on success, null on failure.
      */
-    public function generateSignature(string $payload): string
+    public function decode(string $token): ?array
     {
-        return hash_hmac('sha256', $payload, config('app.key'));
+        return app(OfferTokenService::class)->verify($token);
     }
 
     /**
-     * Decode and validate quote token
-     */
-    public function decodeQuoteToken(string $token): ?array
-    {
-        if (strpos($token, '.') === false) {
-            return null;
-        }
-
-        [$payload, $signature] = explode('.', $token, 2);
-
-        if (!$this->verifySignature($payload, $signature)) {
-            return null;
-        }
-
-        $data = json_decode(base64_decode($payload), true);
-
-        // Check expiration
-        if (isset($data['exp']) && $data['exp'] < time()) {
-            return null;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Verify HMAC signature
-     */
-    public function verifySignature(string $payload, string $signature): bool
-    {
-        $expectedSignature = $this->generateSignature($payload);
-        return hash_equals($expectedSignature, $signature);
-    }
-
-    /**
-     * Extract token from request query string
+     * Extract token from request query string.
      */
     public function extractTokenFromRequest(array $queryParams): ?string
     {

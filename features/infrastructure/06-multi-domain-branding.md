@@ -39,3 +39,28 @@ Das System nutzt Tailwind v4 `@theme` Plugins zur Laufzeit-Umschaltung:
 - **Admin-Werkzeuge:** Der Super-Admin wird durch den Hostnamen in seinen Werkzeugen nicht limitiert. So erlaubt
   beispielsweise der `ShootingCalculatorModal` die explizite Auswahl des Tarifmodells (B2C Flex vs. Studio Custom),
   unabhängig davon, über welche Domain das Dashboard gerade aufgerufen wurde.
+
+## 5. Brand-Aware Email Templates
+
+### 5.1 Config Values
+
+| Key | RP | SRP |
+|-----|----|-----|
+| `config('app.frontend_url')` | `FRONTEND_URL` | — |
+| `config('app.frontend_url_srp')` | — | `FRONTEND_URL_SRP` |
+| `config('mail.from.address')` / `config('mail.from.name')` | `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME` | — |
+| `config('mail.from_srp.address')` / `config('mail.from_srp.name')` | — | `MAIL_FROM_ADDRESS_SRP` / `MAIL_FROM_NAME_SRP` |
+| `config('services.accounting_email_rp')` | `ACCOUNTING_EMAIL_RP` | — |
+| `config('services.accounting_email_srp')` | — | `ACCOUNTING_EMAIL_SRP` |
+
+### 5.2 Trait: `BrandAwareMail`
+
+Alle 7 Mail-Klassen nutzen das `BrandAwareMail` Trait. Es bietet:
+- `initializeBrand()` — fängt den aktuellen Brand im Konstruktor (für Queue-Serialisierung)
+- `ensureBrandContext()` — stellt den Brand bei Queue-Deserialisierung wieder her
+- `brandFrontendUrl()` — liefert brand-spezifische Frontend-URL
+- `brandLogoUrl()` — liefert die korrekte Logo-URL (Frontend + `/android-chrome-192x192.png`)
+- `applyBrandFrom()` — setzt den E-Mail-Absender pro Brand
+- `brandBcc()` — liefert die BCC-Adresse pro Brand
+
+Siehe `backend/app/Mail/BrandAwareMail.php`.

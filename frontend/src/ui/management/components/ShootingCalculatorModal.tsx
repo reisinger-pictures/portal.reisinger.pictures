@@ -76,7 +76,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
             notes = `Setup: ${setups[srpSetup]} | Zusätzliche Bilder: ${srpExtra} | Online-Verbot: ${srpPrivate ? 'Ja' : 'Nein'}`;
         } else {
             desc = calcIsFlatrate ? 'Reportage / Flatrate-Shooting' : 'Individuelles Shooting-Paket';
-            notes = `Custom Shooting Paket | ${calcIsOutdoor ? 'Outdoor' : 'Indoor'} | Dauer: ${calcDuration} Minuten | Inkludierte Bilder: ${calcImages} Stück.`;
+            notes = `${calcIsOutdoor ? 'Outdoor' : 'Indoor'} | Dauer: ${calcDuration} Minuten | Inkludierte Bilder: ${calcImages} Stück.`;
         }
 
         const newItem: InvoiceItem = {type: 'item', description: desc, notes: notes, qty: 1, price: finalPriceEuro};

@@ -3,8 +3,17 @@ import {useUI} from '../ui/components/UIContext';
 import {DocumentFormData, InvoiceDiscount, InvoiceItem} from '../api';
 import {formatDateToDE, formatLocaleDate} from './utils';
 
+/**
+ * Check if an InvoiceItem is an empty placeholder row (type=item, description+notes blank,
+ * default qty=1, price=0). Used to consistently filter out leftover empty rows across
+ * multiple data-loading paths (K-01 / K-02).
+ */
+export function isEmptyRow(i: InvoiceItem): boolean {
+    return i.type === 'item' && !i.description.trim() && !i.notes.trim() && i.qty === 1 && i.price === 0;
+}
+
 export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
-    const {showToast} = useUI();
+    const {showToast, setUnsavedChanges} = useUI();
     const isOffer = type === 'offer';
 
     const getOfferValidUntil = () => {
@@ -23,7 +32,7 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
         invoice_number: (isOffer ? 'A-' : 'R-') + new Date().getFullYear() + '-' + Math.floor(100 + Math.random() * 900),
         date: new Date().toISOString().split('T')[0],
         due_date: isOffer ? getOfferValidUntil() : getInvoiceDefaultDue(),
-        service_date: '',
+        service_date: isOffer ? '' : formatDateToDE(new Date().toISOString().split('T')[0]),
         validity: '',
         customer_name: '',
         customer_company: '',
@@ -39,7 +48,16 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
     const [items, setItems] = useState<InvoiceItem[]>([{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
     const [discounts, setDiscounts] = useState<InvoiceDiscount[]>([]);
 
+    const [isDirty, setIsDirty] = useState(false);
+    const markDirty = useCallback(() => {
+        if (!isDirty) {
+            setIsDirty(true);
+            setUnsavedChanges(true);
+        }
+    }, [isDirty, setUnsavedChanges]);
+
     const handleUpdateField = useCallback((field: string, value: string) => {
+        markDirty();
         setFormData(p => {
             const next = {...p, [field]: value};
             if (field === 'date' && !isOffer && !serviceDateDirty) {
@@ -47,46 +65,53 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             }
             return next;
         });
-    }, [isOffer, serviceDateDirty]);
+    }, [isOffer, serviceDateDirty, markDirty]);
 
     const handleOptionChange = useCallback((opt: string) => {
+        markDirty();
         setDueDateOption(opt);
         if (opt === '0') {
             handleUpdateField('due_date', isOffer ? getOfferValidUntil() : getInvoiceDefaultDue());
         }
-    }, [isOffer, handleUpdateField]);
+    }, [isOffer, handleUpdateField, markDirty]);
 
     const handleServiceDateManualChange = useCallback((val: string) => {
+        markDirty();
         setServiceDateDirty(true);
         handleUpdateField('service_date', val);
-    }, [handleUpdateField]);
+    }, [handleUpdateField, markDirty]);
 
     const handleItemChange = useCallback((index: number, field: string, value: string | number) => {
+        markDirty();
         setItems(prev => {
             const newArr = [...prev];
             newArr[index] = {...newArr[index], [field]: value};
             return newArr;
         });
-    }, []);
+    }, [markDirty]);
 
     const handleDiscountChange = useCallback((index: number, field: string, value: string | number) => {
+        markDirty();
         setDiscounts(prev => {
             const newArr = [...prev];
             newArr[index] = {...newArr[index], [field]: value};
             return newArr;
         });
-    }, []);
+    }, [markDirty]);
 
     const addItem = useCallback(() => {
+        markDirty();
         setItems(prev => [...prev, {type: 'item', description: '', notes: '', qty: 1, price: 0}]);
-    }, []);
+    }, [markDirty]);
 
     const removeItem = useCallback((index: number) => {
+        markDirty();
         setItems(prev => prev.filter((_, i) => i !== index));
-    }, []);
+    }, [markDirty]);
 
     const moveItemUp = useCallback((index: number) => {
         if (index === 0) return;
+        markDirty();
         setItems(prev => {
             const newItems = [...prev];
             const temp = newItems[index - 1];
@@ -94,7 +119,7 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             newItems[index] = temp;
             return newItems;
         });
-    }, []);
+    }, [markDirty]);
 
     const moveItemDown = useCallback((index: number) => {
         setItems(prev => {
@@ -105,26 +130,31 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             newItems[index] = temp;
             return newItems;
         });
-    }, []);
+        markDirty();
+    }, [markDirty]);
 
     const addDiscount = useCallback(() => {
+        markDirty();
         setDiscounts(prev => [...prev, {type: 'discount_fixed', description: '', notes: '', price: 0}]);
-    }, []);
+    }, [markDirty]);
 
     const removeDiscount = useCallback((index: number) => {
+        markDirty();
         setDiscounts(prev => prev.filter((_, i) => i !== index));
-    }, []);
+    }, [markDirty]);
 
     const handleAddPackageFromCalculator = useCallback((newItem: InvoiceItem, newDiscount: InvoiceDiscount | null) => {
-        setItems(prev => [...prev, newItem]);
+        markDirty();
+        setItems(prev => [newItem, ...prev.filter(i => !isEmptyRow(i))]);
         if (newDiscount) {
             setDiscounts(prev => [...prev, newDiscount]);
         }
-    }, []);
+    }, [markDirty]);
 
     const handleMultiUpdate = useCallback((updates: Record<string, string>) => {
+        markDirty();
         setFormData(prev => ({...prev, ...updates}));
-    }, []);
+    }, [markDirty]);
 
     const loadExtractedData = useCallback((data: {
         customer_name?: string;
@@ -139,6 +169,7 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
         items: InvoiceItem[];
         discounts: InvoiceDiscount[];
     }) => {
+        markDirty();
         setFormData(prev => ({
             ...prev,
             customer_name: data.customer_name || '',
@@ -151,9 +182,12 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             customer_uid: data.customer_uid || '',
             terms_html: data.terms_html || '',
         }));
-        setItems(data.items.length > 0 ? data.items : [{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
+        // Consistent with handleAddPackageFromCalculator (K-01): drop empty placeholder rows.
+        // If after filtering nothing is left, provide a single empty row as fallback.
+        const filtered = data.items.filter(i => !isEmptyRow(i));
+        setItems(filtered.length > 0 ? filtered : [{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
         setDiscounts(data.discounts);
-    }, []);
+    }, [markDirty]);
 
     const handleDownload = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
@@ -189,12 +223,14 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            setIsDirty(false);
+            setUnsavedChanges(false);
             showToast('success', 'Dokument wurde erstellt.');
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : 'Fehler');
         }
         setIsGenerating(false);
-    }, [formData, items, discounts, isOffer, showToast]);
+    }, [formData, items, discounts, isOffer, showToast, setUnsavedChanges]);
 
     const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
     const total = discounts.reduce(
@@ -212,6 +248,7 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
         dueDateOption,
         isGenerating,
         isOffer,
+        isDirty,
 
         // Handlers
         handleUpdateField,

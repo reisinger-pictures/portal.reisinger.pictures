@@ -62,6 +62,8 @@ return [
     */
     'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost:4321')),
 
+    'frontend_url_srp' => env('FRONTEND_URL_SRP', 'https://buy.reisinger.pictures'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

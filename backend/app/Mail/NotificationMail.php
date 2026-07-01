@@ -9,7 +9,7 @@ use Illuminate\Queue\SerializesModels;
 
 class NotificationMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, BrandAwareMail;
 
     public $userName;
     public $messageBody;
@@ -20,12 +20,19 @@ class NotificationMail extends Mailable implements ShouldQueue
         $this->userName = $userName;
         $this->messageBody = $messageBody;
         $this->mailSubject = $mailSubject;
+        $this->initializeBrand();
     }
 
     public function build()
     {
+        $this->ensureBrandContext();
+        $this->applyBrandFrom();
+
         return $this->subject($this->mailSubject)
-                    ->bcc(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
-                    ->view('emails.notification');
+                    ->bcc($this->brandBcc())
+                    ->view('emails.notification')
+                    ->with([
+                        'logoUrl' => $this->brandLogoUrl(),
+                    ]);
     }
 }

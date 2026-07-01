@@ -34,7 +34,8 @@ class TenantIsolationTest extends TestCase
                  'role_ids' => [],
                  'gallery_group_ids' => [],
                  'gallery_ids' => [],
-                 'can_edit_metadata' => false
+                 'can_edit_metadata' => false,
+                 'brand' => 'rp'
              ])
              ->assertStatus(403);
 

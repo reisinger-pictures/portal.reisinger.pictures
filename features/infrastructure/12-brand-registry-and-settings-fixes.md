@@ -28,52 +28,13 @@ Settings-/PDF-Pfaden.
 
 ## 2. Ist-Stand — Die Probleme
 
-### 2.1 Brand ist kein DB-Primärkonzept
-
-- `users`, `galleries`, `gallery_groups`, `tenants` haben **keine** `brand`-Spalte.
-  `getAllowedGalleryIds()` kann deshalb nicht brand-gebunden filtern (T-09 P3 offen).
-- `orders.brand`/`invoice_snapshots.brand` (V018) sind **VARCHAR** ohne DB-Seitige Wertegarantie.
-  (Vor diesem Cut war V018 lokal noch nicht gelaufen; er wird daher **direkt als ENUM** angelegt —
-  kein VARCHAR-Zwischenschritt, keine Daten-Migration nötig.)
-
-### 2.2 Brand-Werte unhandlich & Mapping dupliziert
-
-- Die Werte `'reisinger.pictures'`/`'story.reisinger.pictures'` sind in ~8 Backend-Stellen + Frontend verstreut.
-- Die Host→Brand-Map steht identisch in `BrandContextMiddleware.php:30-32` **und**
-  `useBrand.ts:3-6` — zwei Quellen, die auseinanderlaufen können.
-
-### 2.3 `$get`-Bug in `OrderController::downloadInvoice` (B-02 Regression, Critical)
-
-`backend/app/Http/Controllers/OrderController.php:130-132` referenziert `$get('bank_holder')`
-usw., doch das `$get`-Lambda wurde durch die B-02 `SettingResolver`-Migration entfernt und nicht
-durch `$resolver->get(...)` ersetzt. **Jeder Rechnungs-Download wirft einen 500er.** Kein Test
-deckt das ab.
-
-### 2.4 `downloadInvoice` ignoriert persistierte Brand (B-01 F2, Critical)
-
-Die Methode rendert das PDF aus `config('app.brand')` (Request-Host), nicht aus
-`$order->brand`. Ein SRP-Kunde, der über einen B2B-Link lädt, bekommt B2B-Branding/-Bankdaten —
-genau das Symptom, das B-01 beheben sollte.
-
-### 2.5 `BackfillBrand` ist CLI-sabotierend (B-01 F1, Critical)
-
-`BackfillBrand.php:16,19` liest `config('app.brand')` — das im CLI/Queue-Kontext leer ist.
-Der Backfill schreibt `null`/Leerstring statt des B2B-Defaults. Bestandsdaten werden nicht
-repariert.
-
-### 2.6 Bankdaten-Speichern fehlerhaft (B-02 Folge)
-
-- `useBillingDetails` nutzt den recycelten Typ `LicenseTerms` (kein eigenes Interface).
-- Das Bank-Form in `ManagementSettingsView.tsx` feuert auf **jeden Tastenanschlag** einen PUT +
-  sofortiges SWR-Revalidate → Race (Felder springen zurück). Kein `react-hook-form`/Zod, kein
-  Save-Button (inkonsistent zu `CalculatorSettingsCard`).
-- Der Endpunkt ist `super_admin`-only, das Form aber für alle sichtbar → stillscheiternde PUTs.
-
-### 2.7 UI: "Kategorien (Grundhonorare)" + Layout
-
-- Sektionsheader lautet "Kategorien (Grundhonorare)" statt prägnant "Grundhonorare".
-- Leere Zustände sind nur grauer Text; Add-Row ist am Mobile-Layout drängend; Tabellen-Header
-  scrollt weg.
+- **Brand kein DB-Primärkonzept:** `users`, `galleries`, `gallery_groups`, `tenants` haben keine `brand`-Spalte → `getAllowedGalleryIds()` kann nicht brand-gebunden filtern. `orders.brand`/`invoice_snapshots.brand` sind VARCHAR ohne DB-Wertegarantie.
+- **Duplizierte Brand-Map:** Host→Brand-Map in `BrandContextMiddleware.php` und `useBrand.ts` — zwei Quellen, die auseinanderlaufen können.
+- **`$get`-Bug in `downloadInvoice`:** `SettingResolver`-Migration entfernte das `$get`-Lambda ohne Ersatz → 500er auf jedem Rechnungs-Download.
+- **`downloadInvoice` ignoriert persistierte Brand:** Rendert PDF aus `config('app.brand')` statt `$order->brand`.
+- **`BackfillBrand` CLI-sabotierend:** Liest `config('app.brand')` (im CLI-Kontext leer) → schreibt `null`.
+- **Bankdaten-Speichern:** Kein eigenes Interface (`LicenseTerms` recycelt), Per-Keystroke-PUT mit Races, Endpunkt `super_admin`-only aber Form für alle sichtbar.
+- **UI-Layout:** Header "Kategorien (Grundhonorare)" statt "Grundhonorare"; leere States, Mobile-Layout, Tabellen-Header.
 
 ## 3. Soll-Zustand
 

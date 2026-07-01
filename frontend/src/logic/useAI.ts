@@ -27,11 +27,19 @@ export function useAI() {
                 const res = await fetch('/api/ai/status', { credentials: 'include' });
                 if (!res.ok) throw new Error('Server AI unavailable');
                 const data = await res.json();
-                if (!cancelled && data.enabled) {
-                    setIsAvailable(true);
-                    setMode('server');
-                    setModelId(data.model);
-                    return;
+                if (!cancelled) {
+                    if (data.status === 'disabled') {
+                        setIsAvailable(false);
+                        setMode('unavailable');
+                        setModelId(null);
+                        return;
+                    }
+                    if (data.enabled) {
+                        setIsAvailable(true);
+                        setMode('server');
+                        setModelId(data.model);
+                        return;
+                    }
                 }
             } catch (err) { console.error('AI metadata generation failed', err); }
 

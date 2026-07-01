@@ -12,7 +12,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoiceMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, BrandAwareMail;
 
     public $order;
     public $snapshot;
@@ -23,16 +23,15 @@ class InvoiceMail extends Mailable implements ShouldQueue
         $this->order = $order;
         $this->snapshot = $snapshot;
         $this->additionalDocuments = $additionalDocuments;
+        $this->initializeBrand();
     }
 
     public function build()
     {
-        // Reconstruct brand from the persisted order column — queue workers have no HTTP host.
-        // BrandRegistry guarantees a non-null brand (legacy rows → B2B default).
         BrandRegistry::set(BrandRegistry::resolveFromOrder($this->order));
+        $this->applyBrandFrom();
         $resolver = app(SettingResolver::class);
-        
-        // PDF on-the-fly generieren
+
         $pdf = Pdf::loadView('pdf.invoice', [
             'order' => $this->order,
             'snapshot' => $this->snapshot,
@@ -43,11 +42,12 @@ class InvoiceMail extends Mailable implements ShouldQueue
         ]);
 
         $mail = $this->subject('Ihre Rechnung ' . $this->snapshot->invoice_number)
-                    ->bcc(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
+                    ->bcc($this->brandBcc())
                     ->view('emails.custom')
                     ->with([
                         'subject' => 'Ihre Rechnung ' . $this->snapshot->invoice_number,
-                        'customBody' => '<p>Guten Tag ' . $this->snapshot->customer_details['name'] . ',</p><p>vielen Dank für Ihre Bestellung im Bild-Portal. Anbei erhalten Sie Ihre Rechnung als PDF-Dokument.</p><p>Ihre Lizenzen und Downloads sind ab sofort in Ihrem Account verfügbar.</p>'
+                        'customBody' => '<p>Guten Tag ' . $this->snapshot->customer_details['name'] . ',</p><p>vielen Dank für Ihre Bestellung im Bild-Portal. Anbei erhalten Sie Ihre Rechnung als PDF-Dokument.</p><p>Ihre Lizenzen und Downloads sind ab sofort in Ihrem Account verfügbar.</p>',
+                        'logoUrl' => $this->brandLogoUrl(),
                     ])
                     ->attachData($pdf->output(), $this->snapshot->invoice_number . '.pdf', [
                         'mime' => 'application/pdf',

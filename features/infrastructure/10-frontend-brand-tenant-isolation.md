@@ -1,6 +1,11 @@
-# Frontend Mandanten-/Brand-Isolation — Konzept (entschieden, aktiv)
+# Frontend Mandanten-/Brand-Isolation — Konzept
 
-> **Status:** `active` — beschreibt den verbindlichen, entschiedenen Endzustand.
+> **⚠️ Status:** `superseded` — Policy A aus diesem Doc wurde durch U-02 ersetzt
+> (`features/infrastructure/15-strict-user-brand-isolation.md`).
+> Die Frontend-UX-Maßnahmen (§4–5) bleiben gültig; die Policy-Regeln (§3, §3a) sind durch
+> die neue Staff-Brand-Bound-Regelung ersetzt. Siehe Decision Log (§7) und `15-strict-user-brand-isolation.md`.
+>
+> Ursprünglich: `active` — beschreibt den verbindlichen, entschiedenen Endzustand.
 > Verknüpft: `AGENTS.todo.md` A-01 (aufgelöst), T-03 (ehem. R-15b), T-09,
 > `features/infrastructure/08-tenant-brand-concept.md`,
 > `features/auth/01-roles-and-access.md`.
@@ -15,37 +20,7 @@ Die Brand-Erkennung im Frontend erfolgt rein clientseitig via Hostname
 
 ## 2. Ist-Stand — Das Problem
 
-Die UI-Steuerung ist **rein rollenbasiert, nicht brandbasiert**. Das hat zwei Konsequenzen:
-
-### 2.1 Dashboard-Weiche (rollenbasiert, brandblind)
-
-`frontend/src/ui/ProtectedDashboard.tsx:16-20`:
-```
-if (user.is_super_admin || user.is_admin || user.is_photographer) return <ManagementDashboard/>;
-return <ClientDashboard/>;
-```
-Ein Admin/Super-Admin landet auch auf `story.reisinger.pictures` im **vollen B2B-ManagementDashboard**
-(Mandanten, CRM, Invoicing) — ungeachtet der Marke.
-
-### 2.2 B2B-Routen ohne Brand-Guard
-
-`frontend/src/App.tsx:97-105` schützt B2B-Admin-Routen (`/tenants`, `/tenants/:id`, `/admin-orders`,
-`/admin-manual-invoice`, `/admin-manual-offer`, `/admin-customers`, `/admin-products`,
-`/admin-snippets`, `/admin-payouts`) nur durch `ProtectedRoute` (Login-Pflicht). Die Routen sind
-direkt ansteuerbar, unabhängig vom Brand.
-
-### 2.3 Sidebar zeigt B2B-Mandanten-Link markenunabhängig
-
-`frontend/src/ui/components/Sidebar.tsx:86` blendet „Mandanten (B2B)" ein, sobald
-`user.is_admin || user.is_customer_manager` — unabhängig vom Hostnamen. Die Mandanten-Liste ist
-auf `story.reisinger.pictures` direkt navigierbar.
-
-### 2.4 Keine Backend-gestützte Brand-Assertion
-
-`useBrand.ts:9` vertraut blind auf `window.location.hostname`. Die User-/Tenancy-Daten werden
-nie gegen die Marke validiert (`useAuth.ts` kennt keine `brand`/`tenant`-Felder). Die letzte
-Verteidigungslinie muss das Backend sein (API-Filter), was aus dem Frontend-Code nicht
-verifizierbar ist.
+Die UI-Steuerung ist **rein rollenbasiert, nicht brandbasiert**: Staff-Logins auf `story.reisinger.pictures` sehen das volle B2B-ManagementDashboard; B2B-Admin-Routen haben keinen Brand-Guard; die Sidebar zeigt Mandanten-Links markenunabhängig; und `useBrand.ts` vertraut blind auf den Hostnamen ohne Backend-Validierung.
 
 ## 3. Soll-Zustand — Isolations-Regel
 
@@ -133,4 +108,5 @@ Ein neuer pure-Logic-Hook (z. B. `frontend/src/logic/useBrandAccess.ts`) kapselt
 
 | Datum | Eintrag |
 |-------|---------|
-| 2026-06-29 | **A-01 resolviert.** Konflikt zwischen T-02 (Policy A: nur Kunden brandgebunden) und T-09 (Policy B: alle Rollen außer Super-Admin brandgebunden). **Entscheidung: Policy A (T-02) ist verbindlich.** Begründung: Staff (Admin/Fotograf/Super-Admin) brauchen Cross-Brand-Zugriff laut Rollendefinition (`features/auth/01-roles-and-access.md`); Standard-Multi-Tenant-Practice (Staff = cross-tenant, Externe = tenant-scoped); einfachste korrekte Regel (`brand != null` ⟺ externer/Client-Account). T-09s "alle Rollen außer SA"-Forderung verworfen; entsprechendes TODO superseded. Code-Mechanik (`User::getAllowedGalleryIds()`) bleibt unverändert. |
+| 2026-06-29 | **A-01 resolviert.** Konflikt zwischen T-02 (Policy A: nur Kunden brandgebunden) und T-09 (Policy B: alle Rollen außer Super-Admin brandgebunden). **Entscheidung: Policy A (T-02) ist verbindlich.** |
+| 2026-07-01 | **U-02 (User-Entscheidung 2026-06-30): Policy A wird umgekehrt.** Staff (Admin, Photographer, etc.) wird brand-bound. Nur `florian@reisinger.pictures` (Super-Admin) bleibt cross-brand (`brand=null`). Policy A ist ab hier **superseded** durch `features/infrastructure/15-strict-user-brand-isolation.md`. <br><br>**Auswirkung auf dieses Dokument:**<br>Die Policy-A-Regel (Tabelle in §3, §3a) ist nicht mehr gültig. Die neue Regel:<br>`brand = null` ⟺ **ausschließlich** Super-Admin `florian@reisinger.pictures`<br>`brand = 'rp' | 'srp'` ⟺ **alle anderen** User (Staff + Clients).<br><br>Die **Frontend-UX-Maßnahmen** (§4–5) bleiben unverändert: Dashboard-Weiche, Routing, Sidebar sind rein rollenbasiert und brand-blind für Admins — das Backend (API-Filter via `getAllowedGalleryIds`) sorgt für die Daten-Isolation. |

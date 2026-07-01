@@ -3,6 +3,16 @@ import {useFtp} from '../../logic/useFtp';
 import {useProtectedGalleries} from '../../logic/useGalleries';
 import { useUI } from '../components/UIContext';
 
+const brandLabels: Record<string, string> = {
+    rp: 'Reisinger Pictures',
+    srp: 'buy.reisinger.pictures',
+};
+
+function BrandBadge({brand}: {brand?: string | null}) {
+    if (!brand) return null;
+    return <span className="badge badge-sm badge-outline ml-1">{brandLabels[brand] ?? brand}</span>;
+}
+
 export default function ManagementFtpInbox() {
     const {status, isLoading, setTargetGallery, processInbox} = useFtp();
     const {tree} = useProtectedGalleries();
@@ -12,7 +22,6 @@ export default function ManagementFtpInbox() {
 
     if (isLoading || !status) return <div className="p-4"><span className="loading loading-spinner"></span></div>;
 
-    // Robuste Fallbacks
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
     const safeRootGalleries = Array.isArray(tree?.root_galleries) ? tree.root_galleries : [];
 
@@ -62,6 +71,7 @@ export default function ManagementFtpInbox() {
                             <div
                                 className="flex items-center bg-base-100 border border-base-300 rounded-box p-3 shadow-sm">
                                 <span>{status.current_target_gallery.name}</span>
+                                <BrandBadge brand={status.current_target_gallery.brand} />
                                 <button
                                     className="btn btn-xs btn-circle btn-ghost ml-auto text-base-content/70 hover:text-error"
                                     title="Zuordnung aufheben" onClick={() => setTargetGallery(null)}><span
@@ -73,7 +83,7 @@ export default function ManagementFtpInbox() {
                                         onChange={e => setSelectedId(e.target.value)}
                                         className="select select-bordered flex-1">
                                     <option value="">-- Ziel-Galerie auswählen --</option>
-                                    {flatGalleries.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                    {flatGalleries.map(g => <option key={g.id} value={g.id}>{g.name} [{g.brand ?? 'cross-brand'}]</option>)}
                                 </select>
                                 <button onClick={handleSetTarget} disabled={selectedId === ''}
                                         className="btn btn-outline btn-primary">Setzen

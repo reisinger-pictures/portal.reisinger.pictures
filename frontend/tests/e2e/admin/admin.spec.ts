@@ -67,7 +67,7 @@ test.describe('Admin Workflow', () => {
     test('Header Live-Search dropdown appears and handles navigation', async ({ page }) => {
         await auth.login(testUser.email, testUser.password);
 
-        await page.goto('/');
+        // Nach Login bereits auf Startseite — kein page.goto('/') nötig
         const headerSearchInput = page.locator('header input[placeholder="Suche in allen Galerien..."]');
         await expect(headerSearchInput).toBeVisible();
 

@@ -1,7 +1,7 @@
 # Lightroom Plugin — Multi-Tenant Support Gap (R-16)
 
-> **Status:** 🏗️ In Arbeit (T-09). Implementierung gestartet am 2026-06-29.
-> Verknüpft mit `AGENTS.todo.md` → T-09 und `features/infrastructure/06-multi-domain-branding.md`.
+> **Status:** ✅ Gelöst (2026-07-02). Siehe Änderungen unten.
+> Verknüpft mit `AGENTS.todo.md` → L-01.
 
 ## 1. Kontext
 
@@ -12,43 +12,15 @@ Hostnamen (siehe `06-multi-domain-branding.md`).
 Das **Lightroom Classic Plugin** (`admin.lrplugin/`) ist an dieser Stelle **nicht** mitgewachsen:
 Es ist ein **starrer Single-Tenant-Client**, hart verdrahtet auf `https://portal.reisinger.pictures`.
 
-## 2. Status Quo (verifiziert 2026-06-29)
+## 2. Status Quo (zusammengefasst)
 
-### 2.1 API-Base-URL — hardcoded, kein Brand-Switch
-
-Es existiert exakt eine Produktionsdomain; der einzige Umschalter ist Prod/Test:
-
-| Stelle                              | Verhalten                                                         |
-|-------------------------------------|-------------------------------------------------------------------|
-| `admin.lrplugin/Api.lua:9`          | `prefs.useTestUrl and "https://portal.test" or "https://portal.reisinger.pictures"` |
-| `admin.lrplugin/Api.lua:27`         | `Api.getApiUrl() .. endpoint` — alle Calls laufen hier zusammen   |
-| `PluginInfoProvider.lua:17,21-22`   | UI-Toggle „portal.test" vs. „portal.reisinger.pictures"           |
-| `ManagerCore.lua:76,89`             | derselbe Toggle im Login-Dialog                                   |
+Das Plugin ist ein **Single-Tenant-Client**, hart verdrahtet auf `https://portal.reisinger.pictures`:
+- **API-Base-URL:** Hardcoded in `Api.lua:9` — nur Prod/Test-Umschalter, kein Brand-Switch
+- **Upload-Payload:** Kein `brand`/`X-Brand`-Feld — nur `gallery_id`, `lr_uuid`, `file`
+- **Galerie-Routing:** Rein `gallery_id`-basiert, kein Brand-Filter
+- **Invite-Links:** Feste Domain `portal.reisinger.pictures`
 
 Ein Treffer für `story.reisinger.pictures` / `srp` / `brand` / `tenant` existiert im gesamten Plugin **nicht**.
-
-### 2.2 Upload- & Metadata-Payload — ohne Brand-Context
-
-Der Upload-Payload (`ManagerCore.lua:362-366`, `LrHttp.postMultipart`) enthält ausschließlich:
-`gallery_id`, `lr_uuid`, `file`, `Authorization: Bearer <jwt>`. Weder ein `brand`-/`tenant`-Feld
-noch ein `X-Brand`-/`X-Tenant`-/`Origin`-Header werden gesendet.
-
-Galerie-Erstellung (`GalleryDialog.lua:180-198`) und Meta-Galerie-Anlage
-(`MetaGalleryDialog.lua:87-95`) setzen ebenfalls nur galerie-spezifische Felder — kein Brand-Feld.
-
-### 2.3 Galerie-Routing — rein `gallery_id`-basiert
-
-- `ManagerCore.lua:102` — `GET /api/management/galleries?filter_type=<mode>` (mode =
-  `selection` | `delivery`, **nicht** Brand).
-- `ManagerCore.lua:230,254,308,416` — sämtliches Routing über `selectedGalleryId`.
-- `InviteDialog.lua:43` — Invite-Link via `Api.getApiUrl() .. "/invite/" .. token` → Domain fest
-  `portal.reisinger.pictures`, kein per-Brand-Einladungslink.
-
-`DeliveryManager.lua` / `SelectionManager.lua` sind reine Dispatcher
-(`ManagerCore("delivery")` / `ManagerCore("selection")`) und enthalten kein eigenes Routing.
-
-**Fazit:** Die einzige implizite „Tenant-Auswertung" erfolgt serverseitig über die feste
-Base-URL — das Plugin ist de facto ein reines `reisinger.pictures`-Tool.
 
 ## 3. Konkrete Eingriffspunkte für ein künftiges Refactoring
 
@@ -73,3 +45,23 @@ erreichen — Uploads landen immer im `reisinger.pictures`-Kontext. Für B2B-onl
 akzeptabel; für cross-brand Workflows ist das Plugin derzeit ungeeignet.
 
 Keine Änderung am Backend erforderlich — diese Doku beschreibt ausschließlich die Plugin-Seite.
+
+## 5. Gelöste Änderungen (L-01, 2026-07-02)
+
+### 5.1 Referer-Header in Api.call
+
+In `admin.lrplugin/Api.lua` wird in der Methode `Api.call` zwingend ein `Referer`-Header injiziert,
+der den Wert von `Api.baseUrl` annimmt:
+
+```lua
+table.insert(headers, { field = "Referer", value = Api.baseUrl })
+```
+
+Damit kann die Laravel `BrandContextMiddleware` auch bei lokalen Plugin-Requests die korrekte Brand
+ableiten (der Referer-Fallback in der Middleware greift). Ohne diesen Header fällt die Erkennung auf
+Localhost immer auf B2B zurück.
+
+### 5.2 Test-Strategie
+
+Playwright-E2E-Tests für das Lightroom-Desktop-Plugin wurden gestrichen (Anti-Pattern für
+Desktop-Plugins). Die Schnittstellen-Stabilität wird durch Backend-PHPUnit-Tests abgesichert.

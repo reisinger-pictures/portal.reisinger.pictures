@@ -17,6 +17,8 @@ export interface ConfirmOptions {
 export interface UIContextType {
     showToast: (type: 'success' | 'error' | 'info', text: string) => void;
     confirm: (options: ConfirmOptions) => Promise<boolean>;
+    hasUnsavedChanges: boolean;
+    setUnsavedChanges: (value: boolean) => void;
 }
 
 export const UIContext = createContext<UIContextType | undefined>(undefined);

@@ -45,3 +45,4 @@ out/
 # AI Test Runner
 .playwright-mcp
 ai_test_report.txt
+ses_*.json

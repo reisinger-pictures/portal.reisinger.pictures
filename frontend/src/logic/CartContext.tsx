@@ -10,9 +10,19 @@ export interface CartItem {
     useCaseName?: string;
     modifierIds?: string[];
     modifierNames?: string[];
-        isQuote?: boolean;
+    isQuote?: boolean;
     notes?: string;
     price: number;
+}
+
+/** Volume licensing pricing summary derived from cart items. */
+export interface VolumeLicensingResult {
+    tier: 1 | 2 | 3;
+    pricePerItemCents: number;
+    totalCents: number;
+    nextTierCount: number;
+    nextTierLabel: string;
+    isVolumePricing: boolean;
 }
 
 export interface CartContextType {
@@ -22,6 +32,8 @@ export interface CartContextType {
     clearCart: () => void;
     totalAmount: number;
     itemCount: number;
+    /** Volume licensing pricing summary (undefined for non-volume-licensing brands). */
+    volumeLicensing?: VolumeLicensingResult;
 }
 
 export const CartContext = createContext<CartContextType | undefined>(undefined);

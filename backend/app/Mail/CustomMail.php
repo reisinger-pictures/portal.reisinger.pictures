@@ -9,7 +9,7 @@ use Illuminate\Queue\SerializesModels;
 
 class CustomMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, BrandAwareMail;
 
     public $subject;
     public $customBody;
@@ -18,12 +18,19 @@ class CustomMail extends Mailable implements ShouldQueue
     {
         $this->subject = $subject;
         $this->customBody = $customBody;
+        $this->initializeBrand();
     }
 
     public function build()
     {
+        $this->ensureBrandContext();
+        $this->applyBrandFrom();
+
         return $this->subject($this->subject)
-                    ->bcc(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
-                    ->view('emails.custom');
+                    ->bcc($this->brandBcc())
+                    ->view('emails.custom')
+                    ->with([
+                        'logoUrl' => $this->brandLogoUrl(),
+                    ]);
     }
 }

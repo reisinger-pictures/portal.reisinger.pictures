@@ -9,7 +9,7 @@ use Illuminate\Queue\SerializesModels;
 
 class TenantInviteMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, BrandAwareMail;
 
     public $tenantName;
     public $inviteLink;
@@ -18,11 +18,18 @@ class TenantInviteMail extends Mailable implements ShouldQueue
     {
         $this->tenantName = $tenantName;
         $this->inviteLink = $inviteLink;
+        $this->initializeBrand();
     }
 
     public function build()
     {
+        $this->ensureBrandContext();
+        $this->applyBrandFrom();
+
         return $this->subject("Einladung zum Portal: {$this->tenantName}")
-                    ->view('emails.tenant_invite');
+                    ->view('emails.tenant_invite')
+                    ->with([
+                        'logoUrl' => $this->brandLogoUrl(),
+                    ]);
     }
 }

@@ -58,13 +58,4 @@ class SettingResolver
         );
     }
 
-    /**
-     * @deprecated Brand scoping is now column-based (settings.brand); settings keys are
-     * no longer prefixed. Kept as a no-op shim so legacy call sites/tests keep working.
-     * Do NOT use for new code — keys are stored unprefixed.
-     */
-    public function prefix(string $key): string
-    {
-        return $key;
-    }
 }

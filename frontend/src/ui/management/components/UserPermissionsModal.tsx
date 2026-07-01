@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useCallback, useState} from 'react';
 import {Role, UserDetailed, UserRole} from '../../../logic/useUsers';
 import {FlatGroup, Gallery} from '../../../logic/useGalleries';
 
@@ -11,9 +11,8 @@ interface UserPermissionsModalProps {
     onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'srp' | null) => Promise<void>;
 }
 
-// Policy A (A-01): staff roles are always cross-brand. The brand-select is only relevant for
-// non-staff / client-type accounts.
-const STAFF_ROLE_NAMES: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PHOTOGRAPHER];
+// U-02: Only Super-Admin is cross-brand (brand=null). All other roles are brand-bound.
+const SUPER_ADMIN_ROLE_NAME = UserRole.SUPER_ADMIN;
 
 export default function UserPermissionsModal({
                                                  user,
@@ -31,17 +30,38 @@ export default function UserPermissionsModal({
     const [flatrateLevel, setFlatrateLevel] = useState<string>(user.flatrate_level || 'none');
     const [brand, setBrand] = useState<'rp' | 'srp' | null>(user.brand ?? null);
 
-    // A staff account (any staff role selected) is cross-brand per Policy A; brand is forced to
-    // null and the select is disabled so the editor cannot accidentally scope a staff member.
+    // U-02: Only Super-Admin role forces brand=null (cross-brand). All other roles are
+    // brand-bound — the user MUST pick 'rp' or 'srp'.
     const selectedRoleNames = (roles ?? [])
         .filter(r => selRoles.includes(r.id))
         .map(r => r.name);
-    const isStaffAccount = selectedRoleNames.some(name => STAFF_ROLE_NAMES.includes(name));
-    const effectiveBrand: 'rp' | 'srp' | null = isStaffAccount ? null : brand;
+    const isSuperAdmin = selectedRoleNames.includes(SUPER_ADMIN_ROLE_NAME);
+    const effectiveBrand: 'rp' | 'srp' | null = isSuperAdmin ? null : brand;
 
-    const toggleItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
-        setArr(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
-    };
+    // When toggling roles, adjust brand for the super-admin transition.
+    const toggleItem = useCallback((arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
+        const newArr = arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id];
+        setArr(newArr);
+
+        // Detect super-admin role toggle — only if we know the role names.
+        if (!roles) return;
+        const toggledRole = roles.find(r => r.id === id);
+        if (!toggledRole) return;
+
+        const wouldBeSuperAdmin = (toggledRole.name === SUPER_ADMIN_ROLE_NAME && !arr.includes(id))
+            || (toggledRole.name !== SUPER_ADMIN_ROLE_NAME && newArr.some(rId => {
+                const r = roles.find(role => role.id === rId);
+                return r?.name === SUPER_ADMIN_ROLE_NAME;
+            }));
+
+        if (wouldBeSuperAdmin) {
+            // Switching TO super-admin → force cross-brand.
+            setBrand(null);
+        } else if (toggledRole.name === SUPER_ADMIN_ROLE_NAME && arr.includes(id)) {
+            // Switching FROM super-admin → reset to default brand.
+            setBrand('rp');
+        }
+    }, [roles]);
 
     const handleSave = () => {
         onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand);
@@ -88,17 +108,17 @@ export default function UserPermissionsModal({
                     <select
                         className="select select-bordered w-full"
                         value={effectiveBrand ?? ''}
-                        disabled={isStaffAccount}
+                        disabled={isSuperAdmin}
                         onChange={e => setBrand((e.target.value || null) as 'rp' | 'srp' | null)}
                     >
-                        <option value="">Übergreifend (cross-brand)</option>
+                        <option value="">Übergreifend (cross-brand, nur Super-Admin)</option>
                         <option value="rp">B2B (reisinger.pictures)</option>
-                        <option value="srp">SRP (story.reisinger.pictures)</option>
+                        <option value="srp">SRP (buy.reisinger.pictures)</option>
                     </select>
                     <span className="label-text-alt opacity-70 mt-1 pl-1">
-                        {isStaffAccount
-                            ? 'Staff-Rollen (Admin/Fotograf/Super-Admin) sind immer übergreifend (Policy A).'
-                            : 'Bestimmt, auf welche Brand dieser Client-Zugang beschränkt ist.'}
+                        {isSuperAdmin
+                            ? 'Super-Administratoren sind immer cross-brand (keine Brand-Bindung).'
+                            : 'Jeder Account benötigt eine Brand-Zuweisung (U-02).'}
                     </span>
                 </div>
 

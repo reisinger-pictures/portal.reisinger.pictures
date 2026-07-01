@@ -1,41 +1,44 @@
 <?php
 namespace App\Services;
+use App\Contracts\PricingStrategy;
 use App\Models\Order;
 use App\Models\InvoiceSnapshot;
-use App\Models\Photo;
 use App\Models\LicenseUseCase;
-use App\Models\LicenseModifier;
+use App\Models\Photo;
+use App\Services\CouponService;
+use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\InvoiceMail;
 
 class CheckoutService {
-    protected $pricingService;
+    protected $strategy;
 
-    public function __construct(PricingService $pricingService) {
-        $this->pricingService = $pricingService;
+    public function __construct(PricingStrategy $strategy) {
+        $this->strategy = $strategy;
     }
 
     public function processCheckout($request, $user, $paymentMethod) {
         try {
             return DB::transaction(function () use ($request, $user, $paymentMethod) {
-            $totalNetCents = 0;
             $lineItems = [];
             $isQuoteRequest = false;
 
+            // Build strategy items array
+            $strategyItems = [];
             foreach ($request->items as $item) {
                 $photo = Photo::with('gallery')->findOrFail($item['photoId']);
                 if (!$photo->gallery->is_public && !$user->canAccessGallery($photo->gallery_id)) {
                     throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => 'Zugriff verweigert'], 403));
                 }
-                
+
                 $isItemQuote = isset($item['isQuote']) && $item['isQuote'];
-                
+
                 if (!$isItemQuote && !empty($item['useCaseId'])) {
-                    $useCase = \App\Models\LicenseUseCase::find($item['useCaseId']);
+                    $useCase = LicenseUseCase::find($item['useCaseId']);
                     if ($useCase) {
                         // Defense-in-depth (spec §3.6): reject cross-brand use case ids.
-                        $currentBrand = \App\Support\BrandRegistry::current();
+                        $currentBrand = BrandRegistry::current();
                         if ($currentBrand !== null && $useCase->brand !== null && $useCase->brand !== $currentBrand) {
                             throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => 'Ungültige Lizenz-Auswahl.'], 422));
                         }
@@ -46,39 +49,98 @@ class CheckoutService {
                     }
                 }
 
-                $itemCents = 0;
-                $tier = $item['tier'] ?? 'web';
-                $useCaseName = $item['useCaseName'] ?? 'Standard Lizenz';
-                $modifierNames = $item['modifierNames'] ?? [];
+                $strategyItems[] = [
+                    'id' => $photo->id,
+                    'license_use_case_id' => $item['useCaseId'] ?? '',
+                    'license_modifier_ids' => $item['modifierIds'] ?? [],
+                    'is_quote' => $isItemQuote,
+                ];
 
                 if ($isItemQuote) {
                     $isQuoteRequest = true;
-                    $itemCents = 0;
-                } else {
-                    $pricingResult = $this->pricingService->calculateItemPriceCents(
-                        $item['useCaseId'] ?? '', 
-                        $item['modifierIds'] ?? [], 
-                        $user->flatrate_level ?? 'none'
-                    );
-                    $itemCents = $pricingResult['total_cents'];
-                    $tier = $pricingResult['tier'];
-                    $useCaseName = $pricingResult['use_case_name'];
-                    $modifierNames = $pricingResult['modifier_names'];
                 }
-                
-                $totalNetCents += $itemCents;
+            }
+
+            // Extract optional coupon code from request
+            $couponCode = $request->input('coupon_code');
+
+            // Pre-validate coupon code before checkout (re-validation to prevent race conditions)
+            if ($couponCode !== null) {
+                $couponService = app(CouponService::class);
+                $brand = BrandRegistry::current();
+                if ($brand !== null) {
+                    $galleryId = null;
+                    $metaGalleryId = null;
+                    foreach ($request->items as $item) {
+                        if (empty($item['isQuote'])) {
+                            $photo = Photo::with('gallery')->find($item['photoId'] ?? 0);
+                            if ($photo && $photo->gallery) {
+                                $galleryId = $photo->gallery_id;
+                                $metaGalleryId = $photo->gallery->gallery_group_id ?? null;
+                                break;
+                            }
+                        }
+                    }
+                    [$validCoupon, $couponError] = $couponService->findValidCoupon(
+                        $couponCode,
+                        $brand,
+                        $galleryId,
+                        $metaGalleryId,
+                        $user->id,
+                    );
+                    if ($validCoupon === null) {
+                        return response()->json(['error' => 'Der Rabattcode ist nicht mehr gültig.'], 422);
+                    }
+                }
+            }
+
+            // Single pricing call via strategy (with optional coupon)
+            $pricingResult = $this->strategy->calculateCart($strategyItems, $user, $couponCode);
+            $totalNetCents = $pricingResult['totalCents'];
+            $couponDiscountCents = (int) ($pricingResult['discountCents'] ?? 0);
+            $appliedCouponId = $pricingResult['couponId'] ?? null;
+
+            // Build line items from pricing result
+            foreach ($pricingResult['items'] as $idx => $pricedItem) {
+                $item = $request->items[$idx] ?? [];
+                $photoId = $pricedItem['itemId'];
+                $photo = Photo::find($photoId);
 
                 $lineItems[] = [
-                    'photoId' => $photo->id,
-                    'filename' => $photo->title ?: 'Bild ' . substr($photo->id, 0, 8),
-                    'tier' => $tier,
+                    'photoId' => $photoId,
+                    'filename' => $photo ? ($photo->title ?: 'Bild ' . substr($photo->id, 0, 8)) : 'Unbekannt',
+                    'tier' => $pricedItem['tier'] ?? ($item['tier'] ?? 'web'),
                     'useCaseId' => $item['useCaseId'] ?? null,
-                    'useCaseName' => $useCaseName,
-                    'modifierNames' => $modifierNames,
-                    'price' => $itemCents,
-                    'isQuote' => $isItemQuote,
+                    'useCaseName' => $pricedItem['useCaseName'] ?? ($item['useCaseName'] ?? 'Standard Lizenz'),
+                    'modifierNames' => $pricedItem['modifierNames'] ?? ($item['modifierNames'] ?? []),
+                    'price' => $pricedItem['priceCents'],
+                    'isQuote' => $item['isQuote'] ?? false,
                     'notes' => $item['notes'] ?? null,
                 ];
+            }
+
+            // Add tier breakdown discount lines (volume pricing) before coupon discounts
+            $tierBreakdown = $pricingResult['tier_breakdown'] ?? [];
+            foreach ($tierBreakdown as $bd) {
+                $lineItems[] = $bd;
+            }
+
+            // Add coupon discount line item for fixed/percentage coupons
+            $couponType = $pricingResult['couponType'] ?? null;
+            if ($couponDiscountCents > 0 && $couponType !== null && $couponType !== 'free_items') {
+                $nonQuoteItems = array_filter($lineItems, fn($li) => empty($li['isQuote']));
+                $nonQuoteCount = count($nonQuoteItems);
+                if ($nonQuoteCount > 0) {
+                    $perImageCents = (int) round($couponDiscountCents / $nonQuoteCount);
+                    $lineItems[] = [
+                        'type' => 'discount_coupon',
+                        'filename' => 'Coupon-Rabatt',
+                        'notes' => sprintf('%d × %s €', $nonQuoteCount, number_format($perImageCents / 100, 2, ',', '.')),
+                        'price' => $perImageCents,
+                        'row_total' => -$couponDiscountCents,
+                        'qty' => $nonQuoteCount,
+                    ];
+                }
             }
 
             if ($totalNetCents <= 0 && !$isQuoteRequest) return response()->json(['error' => 'Warenkorb hat keinen Wert.'], 400);
@@ -89,7 +151,27 @@ class CheckoutService {
             $isLieferschein = $tenant && $tenant->invoice_frequency !== 'immediate';
             $orderStatus = $isQuoteRequest ? 'pending' : ($isLieferschein ? 'delivery_note' : ($paymentMethod === 'invoice' ? 'invoice_created' : 'pending_payment'));
 
-            $order = Order::create(['user_id' => $user->id, 'status' => $orderStatus, 'brand' => config('app.brand'), 'total_amount' => $totalNetCents, 'is_quote_request' => $isQuoteRequest]);
+            // Include coupon data when a coupon was applied
+            $orderData = [
+                'user_id' => $user->id,
+                'status' => $orderStatus,
+                'brand' => config('app.brand'),
+                'total_amount' => $totalNetCents,
+                'is_quote_request' => $isQuoteRequest,
+            ];
+            if ($appliedCouponId !== null) {
+                $orderData['coupon_id'] = $appliedCouponId;
+                $orderData['coupon_discount_cents'] = $couponDiscountCents;
+            }
+            $order = Order::create($orderData);
+
+            // Increment coupon usage counter if a coupon was applied
+            if ($appliedCouponId !== null) {
+                $coupon = \App\Models\Coupon::find($appliedCouponId);
+                if ($coupon) {
+                    app(\App\Services\CouponService::class)->incrementUsage($coupon, $user->id);
+                }
+            }
 
             $prefix = $isLieferschein ? 'L-' : 'P-';
             $invoiceNumber = \App\Models\InvoiceSequence::getNextInvoiceNumber($prefix);

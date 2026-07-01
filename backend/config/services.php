@@ -43,9 +43,13 @@ return [
     ],
 
     'ai' => [
-        'enabled' => env('AI_ENABLED', 'DISABLED'),
+        'enabled' => env('AI_ENABLED', false),
+        'type' => env('AI_TYPE', 'openai'),
         'base_url' => env('AI_BASE_URL', 'https://api.openai.com/v1'),
         'api_key' => env('AI_API_KEY'),
         'model' => env('AI_MODEL', 'gpt-4o'),
     ],
+
+    'accounting_email_rp' => env('ACCOUNTING_EMAIL_RP', env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures')),
+    'accounting_email_srp' => env('ACCOUNTING_EMAIL_SRP', env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures')),
 ];

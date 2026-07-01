@@ -2,72 +2,49 @@
 
 namespace App\Services;
 
-use App\Constants\TierRanks;
-use App\Enums\Brand;
-use App\Models\LicenseUseCase;
-use App\Models\LicenseModifier;
-use App\Support\BrandRegistry;
+use App\Contracts\PricingStrategy;
+use App\Models\User;
 
 class PricingService
 {
-    public function calculateItemPriceCents(string $useCaseId, ?array $modifierIds, string $userFlatrateLevel): array
+    private PricingStrategy $strategy;
+
+    public function __construct(PricingStrategy $strategy)
     {
-        $useCase = LicenseUseCase::findOrFail($useCaseId);
-        $this->guardBrand($useCase->brand);
-        $basePriceCents = (int) $useCase->base_price;
-        $tier = $useCase->flatrate_tier ?? 'web';
-
-        $ranks = TierRanks::RANKS;
-        $userRank = $ranks[$userFlatrateLevel] ?? 0;
-        $reqRank = $ranks[$tier] ?? 0;
-
-        $isBaseCovered = $userRank >= $reqRank;
-        $coveredBasePriceCents = $isBaseCovered ? 0 : $basePriceCents;
-
-        $surchargeAmountCents = 0;
-        $modifierNames = [];
-
-        if (!empty($modifierIds)) {
-            $modifiers = LicenseModifier::whereIn('id', $modifierIds)->get();
-            foreach ($modifiers as $mod) {
-                $this->guardBrand($mod->brand);
-                $modifierNames[] = $mod->name;
-                if ($isBaseCovered && $mod->is_included_in_flatrate) continue;
-                $surchargeAmountCents += (int) round($basePriceCents * ((float)$mod->percent_surcharge / 100));
-            }
-        }
-
-        return [
-            'total_cents' => $coveredBasePriceCents + $surchargeAmountCents,
-            'tier' => $tier,
-            'use_case_name' => $useCase->name,
-            'modifier_names' => $modifierNames
-        ];
+        $this->strategy = $strategy;
     }
 
     /**
-     * Defense-in-depth (spec §3.6): reject cross-brand price injection. Only enforced
-     * when a brand context is set (HTTP/host); in CLI/test contexts where brand is unset
-     * the guard is a no-op to avoid breaking unrelated flows.
+     * Convenience method for single-item price calculation (RP compatibility).
      *
-     * @param  \App\Enums\Brand|string|null  $rowBrand  the row's brand (enum via cast, or raw value)
-     * @throws \RuntimeException when the row's brand does not match the current brand.
+     * Delegates to the injected PricingStrategy, wrapping the call in a single-item cart.
+     *
+     * @param  string  $useCaseId
+     * @param  array|null  $modifierIds
+     * @param  string  $userFlatrateLevel
+     * @return array{total_cents: int, tier: string, use_case_name: string, modifier_names: array}
      */
-    protected function guardBrand(mixed $rowBrand): void
+    public function calculateItemPriceCents(string $useCaseId, ?array $modifierIds, string $userFlatrateLevel): array
     {
-        $current = BrandRegistry::current();
-        // No brand context (CLI/tests): allow.
-        if ($current === null) {
-            return;
-        }
-        if ($rowBrand === null) {
-            return;
-        }
-        $rowValue = $rowBrand instanceof Brand ? $rowBrand->value : (string) $rowBrand;
-        if ($rowValue !== $current->value) {
-            throw new \RuntimeException(
-                'Cross-brand access denied: row brand [' . $rowValue . '] does not match current brand [' . $current->value . '].'
-            );
-        }
+        $user = new User();
+        $user->flatrate_level = $userFlatrateLevel;
+
+        $result = $this->strategy->calculateCart([
+            [
+                'id' => 0,
+                'license_use_case_id' => $useCaseId,
+                'license_modifier_ids' => $modifierIds ?? [],
+                'is_quote' => false,
+            ],
+        ], $user);
+
+        $item = $result['items'][0] ?? [];
+
+        return [
+            'total_cents' => $item['priceCents'] ?? 0,
+            'tier' => $item['tier'] ?? '',
+            'use_case_name' => $item['useCaseName'] ?? '',
+            'modifier_names' => $item['modifierNames'] ?? [],
+        ];
     }
 }

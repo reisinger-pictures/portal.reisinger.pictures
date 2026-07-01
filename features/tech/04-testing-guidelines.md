@@ -16,6 +16,11 @@ status: active
   * Never use `page.waitForResponse()` or network status codes to verify UI updates. E2E tests must only care about what the user sees.
   * Use `expect(locator).toBeVisible({ timeout: 15000 })` for simple updates.
   * Use `await expect(async () => { ... }).toPass()` for complex SWR/React state transitions where multiple re-renders occur.
+* **No `page.goto` for SPA Navigation (STRICT):** Nach erfolgreichem Login MUSS die Seitennavigation ausschließlich über `sidebar.navigateTo()` (SPA Client-Side Routing) erfolgen. `page.goto()` ist nur in folgenden Ausnahmefällen erlaubt:
+  * Initialer Seitenaufruf vor dem Login (z.B. `page.goto('/')` im `AuthHelper`)
+  * Navigation zu externen URLs (Invite-Links, Magic-Links, Password-Reset-Tokens)
+  * Reloads nach `localStorage`-Injektion (da der App-State nur beim Bootstrap aus `localStorage` gelesen wird).
+  * Reloads zum Testen der Persistenz nach serverseitigen Änderungen (Roundtrip-Checks) — hier ist `page.reload()` dem `page.goto()` vorzuziehen.
 * **Pragmatische Reload Policy (Asynchronous Processes):** Generell sollte `page.reload()` vermieden werden, um direktes UI-State-Management (z.B. SWR Mutations nach dem Erstellen einer Entität) zu testen.
   * **Ausnahme:** Bei unabhängigen, zeitversetzten oder entkoppelten serverseitigen Prozessen (z. B. das Aktualisieren eines "E-Mail senden"-Buttons, weil ein anderer Nutzer sich im Hintergrund in die Empfängerliste eingetragen hat) ist `page.reload()` oder erneutes Hin-Navigieren ausdrücklich **erlaubt**. In solchen Fällen spiegelt das Neuladen das natürliche Nutzerverhalten wider.
 * **Fail-Fast:** Der Testlauf wird nach 2 fehlgeschlagenen Tests (z.B. `maxFailures: 2` in Playwright) sofort abgebrochen.

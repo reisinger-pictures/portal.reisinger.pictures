@@ -2,17 +2,20 @@ import ResponsiveImage from '../components/ResponsiveImage';
 import ErrorMessage from '../components/ErrorMessage';
 import {useRef, useState} from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
-import {useNavigate, useParams} from 'react-router-dom';
+import {useNavigate, useParams, useSearchParams} from 'react-router-dom';
 import {flattenGroups, GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import {usePermissions} from '../../logic/usePermissions';
 import {useMetaGallery} from '../../logic/useMetaGallery';
+import {useBrand} from '../../logic/useBrand';
 import PageLayout from '../components/PageLayout';
 import GalleryModals from '../components/GalleryModals';
+import GalleryGroupCouponsTab from './components/GalleryGroupCouponsTab';
 
 export default function ManagementMetaGalleryView() {
     const {id} = useParams<{ id: string }>();
     const navigate = useNavigate();
     const {isAdmin} = usePermissions();
+    const {isSrp} = useBrand();
     const {tree, updateGroup, deleteGroup} = useProtectedGalleries();
     const {
         group,
@@ -25,6 +28,20 @@ export default function ManagementMetaGalleryView() {
         isReachingEnd,
         mutate
     } = useMetaGallery(id);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab: 'bilder' | 'coupons' =
+        isSrp && searchParams.get('tab') === 'coupons' ? 'coupons' : 'bilder';
+    const setActiveTab = (tab: 'bilder' | 'coupons') => {
+        setSearchParams(prev => {
+            const updated = new URLSearchParams(prev);
+            if (tab === 'bilder') {
+                updated.delete('tab');
+            } else {
+                updated.set('tab', tab);
+            }
+            return updated;
+        });
+    };
     const [isGroupEditModalOpen, setGroupEditModalOpen] = useState(false);
     const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
     const galleryRef = useRef<HTMLDivElement>(null);
@@ -61,48 +78,77 @@ export default function ManagementMetaGalleryView() {
                     </div>
                 </div>
 
-                {!isLoading && photos.length === 0 && (
-                    <div
-                        className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300">
-                        <span className="iconify mdi--image-off-outline text-6xl mb-4"></span>
-                        <h3 className="text-2xl font-bold">Noch keine Bilder vorhanden</h3>
-                        <p className="mt-2">Es befinden sich noch keine Bilder in den untergeordneten Galerien.</p>
+                {isSrp && (
+                    <div role="tablist" className="tabs tabs-boxed w-full md:w-auto bg-base-200 border border-base-300 p-1 flex-wrap shadow-sm mb-6">
+                        <a
+                            role="tab"
+                            className={`tab ${activeTab === 'bilder' ? 'tab-active font-bold' : ''}`}
+                            onClick={() => setActiveTab('bilder')}
+                        >
+                            <span className="iconify mdi--image-multiple-outline mr-1"></span>
+                            Bilder
+                        </a>
+                        <a
+                            role="tab"
+                            className={`tab ${activeTab === 'coupons' ? 'tab-active font-bold' : ''}`}
+                            onClick={() => setActiveTab('coupons')}
+                        >
+                            <span className="iconify mdi--ticket-percent-outline mr-1"></span>
+                            Coupons
+                        </a>
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4" ref={galleryRef}>
-                    {photos.map(photo => (
-                        <div key={photo.id} className="relative group">
-                            <a href={photo.url} data-pswp-width={photo.width || 2000}
-                               data-pswp-height={photo.height || 1333}
-                               data-title={photo.title}
-                               data-desc={photo.description}
-                               data-artist={photo.artist}
-                               data-photo-id={photo.id}
-                               className="pswp-item block relative aspect-square">
-                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" alt={photo.title || 'Bild'} />
-                            </a>
-                            <div className="absolute top-2 right-2 opacity-100 z-10">
-                                <button onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    navigate('/photos/' + photo.id);
-                                }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
-                                    <span className="iconify mdi--open-in-new text-lg"></span>
-                                </button>
-                            </div>
+                {activeTab === 'bilder' && (
+                    <>
+                        {!isLoading && photos.length === 0 && (
                             <div
-                                className="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-br truncate max-w-full">
-                                {photo.gallery?.name}
+                                className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300">
+                                <span className="iconify mdi--image-off-outline text-6xl mb-4"></span>
+                                <h3 className="text-2xl font-bold">Noch keine Bilder vorhanden</h3>
+                                <p className="mt-2">Es befinden sich noch keine Bilder in den untergeordneten Galerien.</p>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        )}
 
-                {!isReachingEnd && photos.length > 0 && (
-                    <div className="text-center mt-8">
-                        <button className="btn btn-outline" onClick={() => setSize(size + 1)}>Mehr laden</button>
-                    </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4" ref={galleryRef}>
+                            {photos.map(photo => (
+                                <div key={photo.id} className="relative group">
+                                    <a href={photo.url} data-pswp-width={photo.width || 2000}
+                                       data-pswp-height={photo.height || 1333}
+                                       data-title={photo.title}
+                                       data-desc={photo.description}
+                                       data-artist={photo.artist}
+                                       data-photo-id={photo.id}
+                                       className="pswp-item block relative aspect-square">
+                                        <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full" className="object-cover w-full h-full rounded shadow-sm hover:shadow-md transition-shadow" alt={photo.title || 'Bild'} />
+                                    </a>
+                                    <div className="absolute top-2 right-2 opacity-100 z-10">
+                                        <button onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            navigate('/photos/' + photo.id);
+                                        }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
+                                            <span className="iconify mdi--open-in-new text-lg"></span>
+                                        </button>
+                                    </div>
+                                    <div
+                                        className="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-br truncate max-w-full">
+                                        {photo.gallery?.name}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {!isReachingEnd && photos.length > 0 && (
+                            <div className="text-center mt-8">
+                                <button className="btn btn-outline" onClick={() => setSize(size + 1)}>Mehr laden</button>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {activeTab === 'coupons' && isSrp && (
+                    <GalleryGroupCouponsTab groupId={group.id} />
                 )}
 
                 <GalleryModals

@@ -24,7 +24,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
  *   2. The authenticated billing-details JSON exposes exactly one IBAN per resolved brand and is
  *      rendered on the page — guards the brand-leak direction at the resolver level.
  *
- * True cross-host assertions (ATR IBAN served from a B2B host and vice versa) need the 2-Vite
+ * True cross-host assertions (SRP IBAN served from a B2B host and vice versa) need the 2-Vite
  * instance infrastructure (Gap 4) because BrandContextMiddleware resolves the brand from the
  * request host/Referer, which is always `localhost` (= B2B) on the single dev instance. Those
  * cases are documented in brand-e2e-infra.fixme.spec.ts.
@@ -37,6 +37,8 @@ test.describe('Download Invoice brand-leak (B-01 F2)', () => {
         helper = new E2ESessionHelper(request);
         // super_admin so the user can both own an order and read billing details.
         testUser = await helper.createIsolatedUser('super_admin');
+        // Seed billing settings so the brand resolver returns non-empty IBAN.
+        await helper.seedBillingSettings();
     });
 
     test.afterEach(async () => {
@@ -47,7 +49,7 @@ test.describe('Download Invoice brand-leak (B-01 F2)', () => {
         // The lowest-maintenance PDF guard: hit the authenticated download endpoint and assert on
         // the response shape rather than parsing the binary. The endpoint 500'd during the B-01 F2
         // regression (`$get` on null), so a clean non-500 is the meaningful guard. There is no
-        // management endpoint to mint an ATR-branded order for an arbitrary user, so we assert the
+        // management endpoint to mint an SRP-branded order for an arbitrary user, so we assert the
         // route contract: a non-existent order must yield 404 (not 500).
         const res = await request.get('/api/orders/00000000-0000-0000-0000-000000000000/invoice', {
             headers: { 'Accept': 'application/json' }

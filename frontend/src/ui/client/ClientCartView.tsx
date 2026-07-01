@@ -4,6 +4,7 @@ import {useUI} from '../components/UIContext';
 import {apiMutate, CheckoutResponse} from '../../api';
 import {useAuth} from '../../logic/useAuth';
 import {usePermissions} from '../../logic/usePermissions';
+import useCoupon from '../../logic/useCoupon';
 import {UserRole} from '../../logic/useUsers';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -16,6 +17,7 @@ import PageLayout from '../components/PageLayout';
 
 import {StripeCheckoutForm} from './components/StripeCheckoutForm';
 import {CartItemList} from './components/CartItemList';
+import CouponInput from './components/CouponInput';
 
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 const stripePromise = loadStripe(stripePublicKey);
@@ -34,16 +36,33 @@ const checkoutSchema = z.object({
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 export default function ClientCartView() {
-    const {items, removeFromCart, totalAmount, clearCart, addToCart} = useCart();
+    const {items, removeFromCart, totalAmount, clearCart, addToCart, volumeLicensing} = useCart();
     const {showToast} = useUI();
     const {user, mutate: mutateUser} = useAuth();
     const {isPowerUser, isAdmin} = usePermissions();
+    const {couponCode, isValid: isCouponValid, removeCoupon} = useCoupon();
     const navigate = useNavigate();
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
     const [searchParams] = useSearchParams();
     const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'invoice'>('stripe');
+
+    const redirectStatus = searchParams.get('redirect_status');
+    useEffect(() => {
+        if (!redirectStatus) return;
+        if (redirectStatus === 'succeeded') {
+            clearCart();
+            removeCoupon();
+            mutateUser().then(() => {
+                showToast('success', 'Zahlung erfolgreich!');
+                navigate('/orders', {replace: true});
+            });
+        } else {
+            showToast('error', 'Zahlung fehlgeschlagen — bitte versuche es erneut.');
+            navigate('/cart', {replace: true});
+        }
+    }, [redirectStatus, clearCart, removeCoupon, mutateUser, showToast, navigate]);
 
     const hasQuotes = items.some(i => i.isQuote);
 
@@ -52,26 +71,29 @@ export default function ClientCartView() {
         if (!incomingToken) return;
 
         fetch('/api/orders/quote-decode?token=' + encodeURIComponent(incomingToken))
-            .then(res => res.json())
-            .then(data => {
-                if (data.photos && data.price !== undefined) {
-                    clearCart();
-                    data.photos.forEach((pid: string) => {
-                        addToCart({
-                            photoId: pid,
-                            filename: 'Individuelles Angebot',
-                            tier: 'original',
-                            price: Math.round(data.price / data.photos.length),
-                            isQuote: false,
-                            notes: ''
-                        });
-                    });
-                    showToast('info', 'Angebot aus Link wiederhergestellt.');
-                    const newParams = new URLSearchParams(window.location.search);
-                    newParams.delete('quote_token');
-                    const cleanPath = window.location.pathname + (newParams.toString() ? '?' + newParams.toString() : '');
-                    window.history.replaceState(null, '', cleanPath);
+            .then(async res => {
+                const data = await res.json();
+                if (!res.ok || !data.photos || data.price === undefined) {
+                    // Expired / invalid / tampered token — do NOT clear the cart.
+                    showToast('error', data.error || 'Angebot ist abgelaufen — bitte kontaktieren Sie den Fotografen.');
+                    return;
                 }
+                clearCart();
+                data.photos.forEach((pid: string) => {
+                    addToCart({
+                        photoId: pid,
+                        filename: 'Individuelles Angebot',
+                        tier: 'original',
+                        price: Math.round(data.price / data.photos.length),
+                        isQuote: false,
+                        notes: ''
+                    });
+                });
+                showToast('info', 'Angebot aus Link wiederhergestellt.');
+                const newParams = new URLSearchParams(window.location.search);
+                newParams.delete('quote_token');
+                const cleanPath = window.location.pathname + (newParams.toString() ? '?' + newParams.toString() : '');
+                window.history.replaceState(null, '', cleanPath);
             }).catch(err => console.error('Token Decode Error:', err));
     }, [incomingToken, clearCart, addToCart, showToast]);
 
@@ -121,7 +143,8 @@ export default function ClientCartView() {
                 billing_city: data.billing_city,
                 payment_method: paymentMethod,
                 quote_message: data.quote_message,
-                withdrawal_waived: !!data.withdrawal_waived
+                withdrawal_waived: !!data.withdrawal_waived,
+                coupon_code: isCouponValid && couponCode ? couponCode : null
             };
 
             const response = await apiMutate<CheckoutResponse>('/api/orders/checkout', 'POST', payload);
@@ -133,6 +156,7 @@ export default function ClientCartView() {
             } else if (response.success) {
                 showToast('success', hasQuotes ? 'Angebot erfolgreich angefragt!' : `Bestellung erfolgreich! (Beleg: ${response.invoice_number})`);
                 clearCart();
+                removeCoupon();
                 await mutateUser();
                 navigate('/orders');
             }
@@ -165,8 +189,11 @@ export default function ClientCartView() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
 
-                        <CartItemList items={items} handleUpdateItem={handleUpdateItem} removeFromCart={removeFromCart}
-                                      hasQuotes={hasQuotes} totalAmount={totalAmount}/>
+                        <div className="lg:col-span-3 space-y-6">
+                            <CartItemList items={items} handleUpdateItem={handleUpdateItem} removeFromCart={removeFromCart}
+                                           hasQuotes={hasQuotes} totalAmount={totalAmount} volumeLicensing={volumeLicensing}/>
+                            <CouponInput />
+                        </div>
 
                         <div className="lg:col-span-2">
                             {clientSecret ? (

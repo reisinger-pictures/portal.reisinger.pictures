@@ -35,22 +35,47 @@
     @endif
 
     <table class="items">
-        <thead><tr><th>Position</th><th class="text-right">Menge</th><th class="text-right">Preis</th><th class="text-right">Gesamt</th></tr></thead>
-        <tbody>
-            @foreach($items as $item)
+        <thead>
             <tr>
-                <td><strong>{{ $item['filename'] }}</strong>@if(!empty($item['notes']))<br><small>{{ $item['notes'] }}</small>@endif</td>
-                <td class="text-right" style="white-space: nowrap;">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
-                <td class="text-right" style="white-space: nowrap;">
-                    @if(isset($item['type']) && $item['type'] === 'discount_percent')
-                        {{ rtrim(rtrim(number_format($item['price'] / 100, 4, ',', '.'), '0'), ',') }} %
-                    @else
-                        {{ number_format($item['price'] / 100, 2, ',', '.') }} €
-                    @endif
-                </td>
-                <td class="text-right" style="white-space: nowrap;">{{ number_format($item['row_total'] / 100, 2, ',', '.') }} €</td>
+                <th>Position</th>
+                <th class="text-right">Menge</th>
+                <th class="text-right">Preis</th>
+                <th class="text-right">Gesamt</th>
             </tr>
+        </thead>
+        <tbody>
+            @php $subtotal = 0; $hasDiscounts = false; @endphp
+            @foreach($items as $item)
+                @if(!isset($item['type']) || $item['type'] === 'item')
+                    @php $subtotal += $item['row_total']; @endphp
+                    <tr>
+                        <td>
+                            <strong>{{ $item['filename'] }}</strong>
+                            @if(!empty($item['notes']))<br><small style="color: #666;">{{ $item['notes'] }}</small>@endif
+                        </td>
+                        <td class="text-right" style="white-space: nowrap;">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
+                        <td class="text-right" style="white-space: nowrap;">
+                            @if(isset($item['type']) && $item['type'] === 'discount_percent')
+                                {{ rtrim(rtrim(number_format($item['price'] / 100, 4, ',', '.'), '0'), ',') }} %
+                            @else
+                                {{ number_format($item['price'] / 100, 2, ',', '.') }} €
+                            @endif
+                        </td>
+                        <td class="text-right" style="white-space: nowrap;">{{ number_format($item['row_total'] / 100, 2, ',', '.') }} €</td>
+                    </tr>
+                @else
+                    @php $hasDiscounts = true; @endphp
+                @endif
             @endforeach
+
+            @if($hasDiscounts)
+                <tr>
+                    <td colspan="3" class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>Zwischensumme</strong></td>
+                    <td class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>{{ number_format($subtotal / 100, 2, ',', '.') }} €</strong></td>
+                </tr>
+                @include('pdf.fragments.discount_rows', ['items' => $items])
+            @endif
+
             <tr class="total-row">
                 <td colspan="3" class="text-right">Voraussichtlicher Gesamtbetrag</td>
                 <td class="text-right">{{ number_format($snapshot->total_gross / 100, 2, ',', '.') }} €</td>

@@ -16,15 +16,14 @@ The system replaces the pure client-side LM Studio approach with a dual-mode arc
 
 > **Deployment note:** Production does NOT use a `.env` file — configuration is injected via
 > environment variables. All values below are read from the environment regardless of source.
-> The literal string `DISABLED` is a sentinel for `AI_ENABLED` that expresses "deliberately off"
-> distinctly from "not yet configured".
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AI_ENABLED` | `false` | Master switch for server-side AI. Accepts `true`/`false`, or the sentinel `DISABLED` (see below). |
-| `AI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible API base URL |
-| `AI_API_KEY` | — | API key for the AI endpoint |
-| `AI_MODEL` | `gpt-4o` | Model identifier |
+| `AI_ENABLED` | `false` | Master switch for server-side AI (boolean `true`/`false` via Laravel DotEnv). |
+| `AI_TYPE` | `openai` | Provider type: `openai`, `anthropic`, or `lmstudio`. |
+| `AI_BASE_URL` | `https://api.openai.com/v1` | API base URL for the selected provider. |
+| `AI_API_KEY` | — | API key for the AI endpoint. |
+| `AI_MODEL` | `gpt-4o` | Model identifier. |
 
 ### State model (centralised in `App\Services\AIService`)
 
@@ -32,23 +31,22 @@ The system replaces the pure client-side LM Studio approach with a dual-mode arc
 
 | Helper | Meaning | UI effect |
 |--------|---------|-----------|
-| `isAvailable()` | `AI_ENABLED` truthy **and** `AI_API_KEY` non-empty | AI buttons enabled, no banner |
-| `isUnconfigured()` | neither available nor disabled (e.g. key missing, `AI_ENABLED=false`) | AI buttons hidden, **admin warning banner shown** |
-| `isDisabled()` | `AI_ENABLED === 'DISABLED'` (case-insensitive) | AI buttons hidden, **no warning banner** |
+| `isDisabled()` | `AI_ENABLED` is falsy (`false`, empty) | AI buttons hidden, **no warning banner** |
+| `isUnconfigured()` | `AI_ENABLED=true` but `AI_API_KEY` missing (except `type=lmstudio`) | AI buttons hidden, **admin warning banner shown** |
+| `isAvailable()` | `AI_ENABLED=true` **and** (`type=lmstudio` **or** `AI_API_KEY` non-empty) | AI buttons enabled, no banner |
 
-### `AI_ENABLED=DISABLED` (intentionally off)
+### `AI_ENABLED=false` (default, disabled)
 
-When the operator sets `AI_ENABLED=DISABLED`:
-- The `/api/ai/status` endpoint returns `enabled: false` (buttons blend out).
-- `/api/me` returns `ai_is_unconfigured: false`, so the admin dashboard does **not** show the
-  "please configure AI" warning banner.
-- The feature is hidden entirely, as if it did not exist — this is for environments where AI is
-  intentionally not part of the deployment (e.g. a hardened B2B-only instance).
+When `AI_ENABLED=false`:
+- The `/api/ai/status` endpoint returns `enabled: false`, `status: 'disabled'`
+- Buttons blend out entirely, no admin warning banner.
+- The feature is hidden, as if it did not exist — for environments where AI is
+  intentionally not part of the deployment.
 
-### `AI_ENABLED=false` (default, unconfigured)
+### `AI_ENABLED=true` without key (unconfigured)
 
-When `AI_ENABLED=false` or `AI_API_KEY` is empty:
-- The `/api/ai/status` endpoint returns `enabled: false`
+When `AI_ENABLED=true` but `AI_API_KEY` is empty (and type is not `lmstudio`):
+- The `/api/ai/status` endpoint returns `enabled: false`, `status: 'unconfigured'`
 - The AI Batch-Edit button is hidden in the gallery view
 - An admin dashboard warning is displayed (similar to the impressum-missing alert)
 
@@ -56,9 +54,9 @@ When `AI_ENABLED=false` or `AI_API_KEY` is empty:
 All endpoints are under `auth:api` middleware.
 
 ### `GET /api/ai/status`
-Returns the availability status and active model.
+Returns the availability status, provider type, and active model.
 ```json
-{ "enabled": true, "model": "gpt-4o" }
+{ "enabled": true, "status": "available", "type": "openai", "model": "gpt-4o" }
 ```
 
 ### `POST /api/ai/generate-metadata`

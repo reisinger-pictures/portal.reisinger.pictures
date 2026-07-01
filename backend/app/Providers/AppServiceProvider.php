@@ -6,6 +6,12 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use App\Mail\Transports\GmailRestTransport;
+use App\Contracts\PricingStrategy;
+use App\Models\Setting;
+use App\Pricing\ScopeLicensingStrategy;
+use App\Pricing\VolumeLicensingStrategy;
+use App\Services\CouponService;
+use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
@@ -38,6 +44,20 @@ class AppServiceProvider extends ServiceProvider
                 ->allowElement('td');
             
             return new HtmlSanitizer($config);
+        });
+
+        $this->app->bind(PricingStrategy::class, function ($app) {
+            $strategy = Setting::where('key', 'pricing_strategy')
+                ->where('brand', BrandRegistry::currentOrDefault())
+                ->value('value') ?? 'scope_licensing';
+
+            return match ($strategy) {
+                'volume_licensing' => new VolumeLicensingStrategy(
+                    $app->make(SettingResolver::class),
+                    $app->make(CouponService::class)
+                ),
+                default => new ScopeLicensingStrategy(),
+            };
         });
     }
 
@@ -78,7 +98,7 @@ class AppServiceProvider extends ServiceProvider
         // Consumers like InvoiceMail::build() call BrandRegistry::set() explicitly, so they
         // remain unaffected.
         Queue::before(function () {
-            BrandRegistry::set(null);
+            BrandRegistry::reset();
         });
     }
 }

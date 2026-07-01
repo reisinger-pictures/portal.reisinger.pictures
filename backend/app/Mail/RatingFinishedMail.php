@@ -9,7 +9,7 @@ use Illuminate\Queue\SerializesModels;
 
 class RatingFinishedMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, BrandAwareMail;
 
     public $notifiedUserName;
     public $clientName;
@@ -22,11 +22,18 @@ class RatingFinishedMail extends Mailable implements ShouldQueue
         $this->clientName = $clientName;
         $this->clientEmail = $clientEmail;
         $this->galleryName = $galleryName;
+        $this->initializeBrand();
     }
 
     public function build()
     {
+        $this->ensureBrandContext();
+        $this->applyBrandFrom();
+
         return $this->subject("Auswahl abgeschlossen: {$this->galleryName}")
-                    ->view('emails.rating_finished');
+                    ->view('emails.rating_finished')
+                    ->with([
+                        'logoUrl' => $this->brandLogoUrl(),
+                    ]);
     }
 }

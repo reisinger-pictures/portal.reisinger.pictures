@@ -81,7 +81,7 @@ export default function ClientOrdersView() {
                                                 {(typeof snap?.customer_details === 'object' && snap?.customer_details?.items) ? snap?.customer_details?.items?.map((item: OrderItem, idx: number) => (
                                                     <tr key={idx}>
                                                         <td className="font-mono text-sm">{item.filename}</td>
-                                                        <td><span className="badge badge-ghost badge-sm">{item.tier.toUpperCase()}</span></td>
+                                                        <td><span className="badge badge-ghost badge-sm">{item.tier?.toUpperCase() ?? ''}</span></td>
                                                         <td className="text-right font-mono text-sm">{formatMoney(Number(item.price))}</td>
                                                     </tr>
                                                 )) : null}

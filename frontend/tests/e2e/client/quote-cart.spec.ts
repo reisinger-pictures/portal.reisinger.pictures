@@ -55,10 +55,11 @@ test.describe('Custom Quotes Full Workflow', () => {
 
         // Wir weisen dem Client die Galerie zu
         if (powerUserRoleId && galId) {
-            await page.request.put(`/api/management/users/${clientUser.id}`, {
-                data: { role_ids: [powerUserRoleId], gallery_ids: [galId], gallery_group_ids: [], can_edit_metadata: false },
+            const assignRes = await page.request.put(`/api/management/users/${clientUser.id}`, {
+                data: { role_ids: [powerUserRoleId], gallery_ids: [galId], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
                 headers: { 'Cookie': validAdminToken, 'Accept': 'application/json', 'Content-Type': 'application/json' }
             });
+            expect(assignRes.ok()).toBeTruthy();
         }
         await auth.logout();
 

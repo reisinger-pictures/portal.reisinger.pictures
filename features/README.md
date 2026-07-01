@@ -4,23 +4,29 @@ This directory serves as the single source of truth for all technical concepts, 
 
 ## Directory Index
 
+### 🤖 AI / Metadata Generation
+* [01-ai-service-architecture.md](ai/01-ai-service-architecture.md) - 3-state machine, vision/text flows, provider strategy pattern.
+* [02-testing-strategy.md](ai/02-testing-strategy.md) - Verification criteria (detailed test cases in AGENTS.todo.md).
+
 ### 🔐 Auth & Roles
 * [01-roles-and-access.md](auth/01-roles-and-access.md) - Core RBAC, JWT, and Domain Mapping.
 * [02-magic-links.md](auth/02-magic-links.md) - Transient access and anonymous invites.
 * [03-roles-and-rbac.md](auth/03-roles-and-rbac.md) - Enterprise Role Model (B2B).
+* [04-permissions-hook.md](auth/04-permissions-hook.md) - Frontend permissions hook separation.
 
 ### 📦 Delivery & Downloads
 * [01-downloads-and-injection.md](delivery/01-downloads-and-injection.md) - ExifTool injection and watermarking.
 * [02-audit-logs.md](delivery/02-audit-logs.md) - GDPR-compliant download tracking.
 
 ### 🛒 E-Commerce
-* [01-licensing-and-cart.md](ecommerce/01-licensing-and-cart.md) - Dynamic pricing, upgrades, and delta-pricing.
+* [01-licensing-and-cart.md](ecommerce/01-licensing-and-cart.md) - [deprecated] Dynamic pricing, upgrades, and delta-pricing.
 * [02-licensing-and-downloads.md](ecommerce/02-licensing-and-downloads.md) - ZIP downloads and UI refactoring.
 * [03-custom-quotes-and-stripe.md](ecommerce/03-custom-quotes-and-stripe.md) - Custom Quote Links and Stripe Payments.
 * [04-crm-and-contracts.md](ecommerce/04-crm-and-contracts.md) - CRM, Text Snippets and PDF Contracts.
 * [05-manual-invoices.md](ecommerce/05-manual-invoices.md) - Stateless PDF generation for B2B.
 * [06-legal-evidence-and-disputes.md](ecommerce/06-legal-evidence-and-disputes.md) - Dispute protection and access locking.
 * [07-psychological-pricing.md](ecommerce/07-psychological-pricing.md) - Psychological price rounding (intentionally inexact discounts) — desired-behavior invariant.
+* [08-srp-coupon-system.md](ecommerce/08-srp-coupon-system.md) - SRP coupon/discount code system, schema, API, role-based permissions.
 
 ### 🖼️ Gallery Management
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.
@@ -36,11 +42,22 @@ This directory serves as the single source of truth for all technical concepts, 
 * [08-tenant-brand-concept.md](infrastructure/08-tenant-brand-concept.md) - Tenant vs. Brand terminology and concept.
 * [09-brand-context-queue-cli.md](infrastructure/09-brand-context-queue-cli.md) - Brand leaks in queue/CLI contexts (SOLL).
 * [10-frontend-brand-tenant-isolation.md](infrastructure/10-frontend-brand-tenant-isolation.md) - Frontend brand/tenant isolation for B2C clients.
+* [11-brand-settings-separation.md](infrastructure/11-brand-settings-separation.md) - Symmetric brand-prefixed settings resolver.
+* [12-brand-registry-and-settings-fixes.md](infrastructure/12-brand-registry-and-settings-fixes.md) - Brand ENUM, BrandRegistry, per-brand DB columns.
+* [13-ftp-brand-isolation.md](infrastructure/13-ftp-brand-isolation.md) - FTP upload brand isolation and defense-in-depth.
+* [14-per-brand-catalog.md](infrastructure/14-per-brand-catalog.md) - Per-brand catalog, CRM, and settings isolation.
+* [15-strict-user-brand-isolation.md](infrastructure/15-strict-user-brand-isolation.md) - Login brand-mismatch rejection, staff brand-bound.
+* [16-srp-volume-pricing.md](infrastructure/16-srp-volume-pricing.md) - Volume pricing model for SRP (retroactive tiered pricing).
+* [17-pricing-strategy-pattern.md](infrastructure/17-pricing-strategy-pattern.md) - Strategy pattern for pricing (ScopeLicensing / VolumeLicensing).
+* [18-jwt-offer-tokens.md](infrastructure/18-jwt-offer-tokens.md) - JWT-based machine-readable offer tokens.
+* [20-setting-resolver.md](infrastructure/20-setting-resolver.md) - Brand-scoped settings resolver (get/set/getRaw, fallback chain).
 
 ### 📷 Photos & Metadata
 * [01-upload-and-processing.md](photos/01-upload-and-processing.md) - Lightroom UUIDs and ImageProcessor.
 * [02-metadata-versioning.md](photos/02-metadata-versioning.md) - Client edits and snapshot reverting.
 * [03-ai-batch-edit.md](photos/03-ai-batch-edit.md) - Local AI metadata generation via LM Studio.
+* [04-ai-server-side.md](photos/04-ai-server-side.md) - Server-side AI metadata generation with provider strategy pattern.
+* [05-photo-detail-swipe.md](photos/05-photo-detail-swipe.md) - Photo detail view, PhotoSwipe lightbox, and responsive image loading.
 
 ### 🔍 Search & Discovery
 * [01-search-and-discovery.md](search/01-search-and-discovery.md) - Meilisearch integration.

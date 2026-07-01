@@ -10,8 +10,8 @@ use App\Models\Order;
 use App\Models\Photo;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Pricing\ScopeLicensingStrategy;
 use App\Services\CheckoutService;
-use App\Services\PricingService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -28,7 +28,7 @@ class CheckoutServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new CheckoutService(new PricingService());
+        $this->service = new CheckoutService(new ScopeLicensingStrategy());
 
         // Mailpit-Postfach vor jedem Test leeren
         Http::delete('http://127.0.0.1:8026/api/v1/messages');

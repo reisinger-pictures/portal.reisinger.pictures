@@ -14,12 +14,19 @@ class AIController extends Controller
     {
         return response()->json([
             'enabled' => $this->aiService->isAvailable(),
+            'status' => $this->aiService->isDisabled() ? 'disabled'
+                : ($this->aiService->isAvailable() ? 'available' : 'unconfigured'),
+            'type' => config('services.ai.type'),
             'model' => config('services.ai.model'),
         ]);
     }
 
     public function generateMetadata(Request $request)
     {
+        if (!$this->aiService->isAvailable()) {
+            return response()->json(['error' => 'KI-Dienst ist nicht verfügbar.'], 503);
+        }
+
         $request->validate([
             'photo_id' => 'required|string|exists:photos,id',
             'global_context' => 'nullable|string|max:1000',
@@ -47,6 +54,10 @@ class AIController extends Controller
 
     public function generateMetadataText(Request $request)
     {
+        if (!$this->aiService->isAvailable()) {
+            return response()->json(['error' => 'KI-Dienst ist nicht verfügbar.'], 503);
+        }
+
         $request->validate([
             'text_input' => 'required|string|max:2000',
             'global_context' => 'nullable|string|max:1000',

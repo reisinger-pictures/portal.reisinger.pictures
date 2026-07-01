@@ -29,7 +29,7 @@ export class E2ESessionHelper {
         return this.adminToken || '';
     }
 
-    async createIsolatedUser(roleName: 'admin' | 'photographer' | 'client' | 'power_user' | 'customer_manager' | 'super_admin', options?: { assignGalleryId?: string, wantsNotifications?: boolean }) {
+    async createIsolatedUser(roleName: 'admin' | 'photographer' | 'client' | 'power_user' | 'customer_manager' | 'super_admin', options?: { assignGalleryId?: string, wantsNotifications?: boolean, brand?: 'rp' | 'srp' }) {
         await this.ensureAdminLogin();
         const uniqueId = Math.random().toString(36).substring(2, 10);
         const email = `e2e-${roleName}-${uniqueId}@example.com`;
@@ -51,19 +51,29 @@ export class E2ESessionHelper {
         const roles = await rolesRes.json();
         const roleId = roles.find((r: { name: string; id: string }) => r.name === roleName).id;
 
+        // U-02: non-super-admin users must have a brand assigned. Super-admin is cross-brand.
+        const brand = options?.brand ?? (roleName === 'super_admin' ? null : 'rp');
+
         await this.request.put(`/api/management/users/${userId}`, {
             data: {
                 role_ids: [roleId],
                 gallery_ids: options?.assignGalleryId ? [options.assignGalleryId] : [],
                 gallery_group_ids: [],
-                can_edit_metadata: false
+                can_edit_metadata: false,
+                brand,
             },
             headers
         });
 
+        // Password reset must include a Referer matching the user's brand —
+        // AuthController::resetPassword checks brand mismatch (U-01).
+        const refererBrand = options?.brand === 'srp' ? 'http://buy.localhost:4321/' : 'http://localhost:4321/';
         const mailpit = new MailpitHelper(this.request);
         const token = await mailpit.extractPasswordResetToken(email);
-        const resetRes = await this.request.post('/api/auth/reset-password', { data: { email, token, password }, headers });
+        const resetRes = await this.request.post('/api/auth/reset-password', {
+            data: { email, token, password },
+            headers: { ...headers, 'Referer': refererBrand },
+        });
         if (!resetRes.ok()) throw new Error(`Password reset failed for ${email}. Token: ${token}. Response: ${await resetRes.text()}`);
         const userCookies = resetRes.headers()['set-cookie'];
 
@@ -84,6 +94,23 @@ export class E2ESessionHelper {
     trackCustomer(id: string) { if (id) this.createdCustomerIds.push(id); }
     trackSnippet(id: string) { if (id) this.createdSnippetIds.push(id); }
     trackProduct(id: string) { if (id) this.createdProductIds.push(id); }
+
+    async seedBillingSettings() {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
+        await this.request.put('/api/management/settings/billing-details', {
+            data: {
+                bank_holder: 'Reisinger Pictures GmbH',
+                bank_iban: 'AT123456789012345678',
+                bank_bic: 'TESTBICXXX',
+                company_street: 'Teststr. 1',
+                company_zip: '1010',
+                company_city: 'Wien',
+                company_country: 'Österreich',
+            },
+            headers
+        });
+    }
 
     async teardown() {
         await this.ensureAdminLogin();

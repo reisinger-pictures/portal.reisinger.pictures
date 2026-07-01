@@ -1,73 +1,79 @@
-# Brand-Context in Queue-/CLI-Kontexten — Konzept (SOLL/Ist-Stand)
+# Brand-Context in Queue-/CLI-Kontexten — Konzept & Implementierung
 
-> **Status:** Beschreibt den **Ist-Stand** (Problem) und den **Soll-Zustand** (Ziel), keine
-> Implementierungsschritte. Verknüpft: `AGENTS.todo.md` T-02, `features/infrastructure/06-multi-domain-branding.md`,
-> `features/infrastructure/08-tenant-brand-concept.md`.
-> Erstellt 2026-06-29. **P0 — kundenwirksam.**
+> **Status:** Beschreibt den **Ist-Stand** (Implementierung) und die zugrunde liegende Problemanalyse.
+> Verknüpft: `AGENTS.todo.md` A-08, `features/infrastructure/06-multi-domain-branding.md`,
+> `features/infrastructure/08-tenant-brand-concept.md`, `features/infrastructure/12-brand-registry-and-settings-fixes.md`.
+> Erstellt 2026-06-29. Aktualisiert 2026-07-01 (A-08 Queue State-Resetter).
 
 ## 1. Kontext
 
 Das Portal unterscheidet zur Laufzeit zwei White-Label-Brands über den HTTP-Host
-(`BrandContextMiddleware`): `reisinger.pictures` (B2B) und `story.reisinger.pictures` (B2C/SRP). Der Brand
+(`BrandContextMiddleware`): `portal.reisinger.pictures` (B2B) und `buy.reisinger.pictures` (B2C/SRP). Der Brand
 steuert Branding (Theme, Logo, Wasserzeichen) und insbesondere **markenspezifische Bank-/Firmendaten**
 im Rechnungs-PDF (SRP = `srp_`-Präfix in den Settings, B2B = kein Präfix).
 
-## 2. Ist-Stand — Das Problem (Brand-Leck in Queue/CLI)
+Queue-Worker (`php artisan queue:work`) sind langlebige Prozesse — sie starten nicht neu zwischen
+Jobs. Da `BrandRegistry` den Brand über `config('app.brand')` (den process-globalen Config-Repository)
+verwaltet, würde ein Job, der `BrandRegistry::set(Brand::SRP)` aufruft, diesen Wert für den nächsten
+Job im selben Worker hinterlassen.
 
-Der Brand wird **ausschließlich** über die HTTP-Middleware gesetzt
-(`backend/app/Http/Middleware/BrandContextMiddleware.php:25` → `config(['app.brand' => $brand])`).
-In **asynchronen Kontexten existiert kein HTTP-Request** → `config('app.brand')` ist undefiniert.
+## 2. Implementierte Schutzmaßnahmen
 
-Konkret betroffen:
+### 2.1 Queue::before()-Reset (AppServiceProvider)
 
-| Stelle | Auswirkung |
-|--------|------------|
-| `backend/app/Mail/InvoiceMail.php:28` (`build()`) | `ShouldQueue`-Mail liest `config('app.brand')` → leer im Worker → SRP-Rechnungen erhalten **B2B**-Branding und B2B-Bankdaten im PDF |
-| `backend/app/Services/InvoiceService.php:68` | Sammelrechnung: Invoice-Nummer fest `P-` (B2B), kein SRP-Nummernkreis |
-| `backend/app/Console/Commands/ProcessCollectiveInvoices.php:33-34` | Cron triggert `generateForTenant()` → dasselbe Leck |
+`backend/app/Providers/AppServiceProvider.php:96-102` registriert einen `Queue::before()`-Callback:
 
-**Folge (kundenwirksam):** Eine über `story.reisinger.pictures` getätigte Bestellung erhält per Mail ein
-Rechnungs-PDF mit falschem Logo, falschen Farben und — kritisch — **falschen Bankdaten**
-(B2B- statt SRP-Konto). Überweisungen landen auf dem falschen Konto.
+```php
+Queue::before(function () {
+    BrandRegistry::reset();
+});
+```
 
-## 3. Soll-Zustand
+Dieser Callback feuert **vor jedem** Queue-Job im Worker und setzt den Brand auf `null` zurück.
+Jobs, die einen Brand benötigen (z. B. `InvoiceMail::build()`), müssen ihn daher explizit aus
+persistierten Daten rekonstruieren (via `BrandRegistry::resolveFromOrder()`).
 
-Der Brand muss **persistent** sein, damit er unabhängig vom Ausführungskontext (Request vs.
-Queue vs. CLI) rekonstruierbar bleibt.
+### 2.2 BrandRegistry::reset()-Methode
 
-### 3.1 Persistenz auf Datenebene
+`backend/app/Support/BrandRegistry.php:80-88` — formale Reset-Methode:
 
-- Neue Spalte `brand` (nullable, Default `reisinger.pictures`) auf:
-  - `orders` — Marke, in der die Bestellung getätigt wurde.
-  - `invoice_snapshots` — Marke, für die das PDF gerendert wird.
-- Die Zuweisung erfolgt **bei der Entstehung** der Entität (Checkout/Invoice-Anlage), wo der
-  Request-Brand (`config('app.brand')`) noch verfügbar ist.
+```php
+public static function reset(): void
+{
+    self::set(null);
+}
+```
 
-### 3.2 Rekonstruktion im Queue/CLI
+Erlaubt eine semantisch klare Alternative zu `BrandRegistry::set(null)` in Queue-Kontexten.
 
-- `InvoiceMail::build()` liest den Brand **nicht** mehr aus `config('app.brand')`, sondern
-  rekonstruiert ihn aus den persistierten Daten:
-  `$snapshot->brand ?? $order->brand ?? 'reisinger.pictures'`.
-- Damit sind Theme (Blade-Templates), Bankdaten (Settings mit `srp_`-Präfix) und bcc-Adresse
-  im Worker korrekt markenspezifisch.
+### 2.3 Selbstrekonstruktion in InvoiceMail
 
-### 3.3 Markenspezifische Suffixe/Adressen
+`backend/app/Mail/InvoiceMail.php:32` — `InvoiceMail::build()` setzt den Brand selbst:
 
-- **Invoice-Nummernkreis** pro Marke getrennt (z. B. B2B `P-`, SRP `AR-`), damit Nummern nicht
-  zwischen Marken kollidieren.
-- **bcc-Empfänger** brandabhängig: B2B `accounting@reisinger.pictures`, SRP über Setting
-  `srp_accounting_email` (Default B2B-Adresse).
+```php
+BrandRegistry::set(BrandRegistry::resolveFromOrder($this->order));
+```
 
-## 4. Abgrenzung
+Damit ist das PDF-Rendering unabhängig vom vorherigen Worker-State korrekt.
 
-- **Keine** Verzahnung mit dem Tenant-Konzept auf Datenebene in diesem Schritt — der Brand
-  wird aus dem Request-Kontext bzw. der Order/Snapshot gelesen. Eine optionale `tenants.brand`-
-  Spalte ist in `08-tenant-brand-concept.md` als separates Thema geführt.
-- Bestandsdaten (historische Orders/Snapshots ohne Brand) erhalten im Rahmen der Migration einen
-  Backfill (Heuristik über Tenant-Zugehörigkeit des Users, Fallback `reisinger.pictures`).
+## 3. Betroffene Code-Stellen
 
-## 5. Verifikation (später)
+| Stelle | Mechanismus |
+|--------|-------------|
+| `AppServiceProvider::boot()` | `Queue::before()` → `BrandRegistry::reset()` |
+| `BrandRegistry::reset()` | Setzt `config('app.brand')` auf `null` |
+| `InvoiceMail::build()` | Rekonstruiert Brand aus `$order->brand` |
+| `BrandContextMiddleware` | Setzt Brand aus HTTP-Host (nur Request-Kontext) |
 
-- Test: SRP-Order → im Queue-Pfad gerendertes PDF enthält SRP-Branding und SRP-Bankdaten
-  (via `Bus::fake` oder direkter `InvoiceMail::build()`-Aufruf ohne Request-Kontext).
-- Bestands-Backfill: Migration ist deterministisch testbar (`RefreshDatabase` + Assertions).
+## 4. Tests
+
+- `tests/Unit/BrandRegistryTest.php` — testet `reset()` und alle BrandRegistry-Methoden
+- `tests/Feature/BrandLeakTest.php` — testet InvoiceMail-Brand-Rekonstruktion, Coupon-Brand-Isolation
+- `tests/Feature/BrandQueueResetTest.php` — testet den Reset-Lebenszyklus zwischen Jobs
+
+## 5. Verifikation
+
+- `BrandRegistry::reset()` setzt `config('app.brand')` auf `null` nachweisbar
+- `BrandRegistry::currentOrDefault()` fällt bei `null` sicher auf `B2B` zurück
+- `InvoiceMail::build()` rekonstruiert SRP-Brand aus persistierter Order, auch wenn
+  `Queue::before()` den Brand zuvor auf `null` gesetzt hat

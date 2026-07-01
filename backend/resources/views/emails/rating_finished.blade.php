@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8"><title>Auswahl abgeschlossen</title></head>
 <body style="margin: 0; padding: 0; background-color: #f4f4f4;">
-    @php $logoUrl = rtrim(config('app.frontend_url'), '/') . '/android-chrome-192x192.png'; @endphp
+    @php $logoUrl ??= rtrim(config('app.frontend_url'), '/') . '/android-chrome-192x192.png'; @endphp
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
         <tr><td align="center">
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e0e0e0;">

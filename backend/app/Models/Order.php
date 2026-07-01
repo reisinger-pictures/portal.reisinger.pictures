@@ -19,6 +19,8 @@ class Order extends Model
         'brand',
         'total_amount',
         'stripe_fee_cents',
+        'coupon_id',
+        'coupon_discount_cents',
         'is_quote_request',
         'ip_address',
         'stripe_payment_intent_id',
@@ -28,9 +30,15 @@ class Order extends Model
     protected $casts = [
         'total_amount' => 'integer',
         'stripe_fee_cents' => 'integer',
+        'coupon_discount_cents' => 'integer',
         'is_quote_request' => 'boolean',
         'brand' => Brand::class,
     ];
+
+    public function coupon()
+    {
+        return $this->belongsTo(Coupon::class);
+    }
 
     protected static function booted()
     {

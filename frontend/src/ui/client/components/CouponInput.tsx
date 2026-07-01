@@ -1,0 +1,111 @@
+/**
+ * CouponInput – B2C coupon entry field for the SRP cart (SRP-01 / Phase F).
+ *
+ * Renders a daisyUI `join` input group for entering a coupon code, plus
+ * a result panel that reflects the validation state of `useCoupon()`.
+ *
+ * Visibility: this component is only rendered on the SRP brand
+ * (`useBrand().isSrp === true`). On RP, it short-circuits to `null`.
+ *
+ * @see features/ecommerce/08-srp-coupon-system.md
+ */
+
+import {useState, useCallback} from 'react';
+import useCoupon from '../../../logic/useCoupon';
+import {useBrand} from '../../../logic/useBrand';
+import {formatMoney} from '../../../logic/utils';
+
+export default function CouponInput() {
+    const {isSrp} = useBrand();
+    const {couponCode, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon();
+    const [inputValue, setInputValue] = useState<string>('');
+
+    const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        await applyCoupon(inputValue);
+    }, [applyCoupon, inputValue]);
+
+    const handleRemove = useCallback(() => {
+        removeCoupon();
+        setInputValue('');
+    }, [removeCoupon]);
+
+    if (!isSrp) {
+        return null;
+    }
+
+    return (
+        <div
+            data-testid="coupon-input"
+            data-state={isValid ? 'valid' : error ? 'invalid' : isLoading ? 'validating' : 'idle'}
+            className="bg-base-100 p-4 rounded-box border border-base-300 shadow-sm space-y-3"
+        >
+            <h3 className="font-bold text-sm flex items-center gap-2">
+                <span className="iconify mdi--ticket-percent-outline text-primary"></span>
+                Rabattcode
+            </h3>
+
+            {isValid && couponCode ? (
+                <div className="flex items-center justify-between gap-3 p-3 bg-success/10 border border-success/30 rounded-box">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="badge badge-success badge-sm uppercase text-[10px] tracking-wider">Aktiv</span>
+                        <span className="font-mono font-bold truncate">{couponCode}</span>
+                        {typeof discount === 'number' && discount > 0 && (
+                            <span className="text-success font-semibold whitespace-nowrap">
+                                −{formatMoney(discount)}
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleRemove}
+                        className="btn btn-ghost btn-sm text-error"
+                        aria-label="Rabattcode entfernen"
+                    >
+                        <span className="iconify mdi--close-circle-outline"></span>
+                        Entfernen
+                    </button>
+                </div>
+            ) : (
+                <form onSubmit={handleSubmit} className="space-y-2">
+                    <div className="join w-full">
+                        <input
+                            type="text"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            placeholder="Code eingeben"
+                            disabled={isLoading}
+                            aria-label="Rabattcode"
+                            className="input input-bordered join-item w-full bg-base-100"
+                        />
+                        <button
+                            type="submit"
+                            disabled={isLoading || inputValue.trim().length === 0}
+                            className="btn btn-primary join-item"
+                            aria-busy={isLoading}
+                        >
+                            {isLoading ? (
+                                <>
+                                    <span className="loading loading-spinner loading-sm"></span>
+                                    Prüfe…
+                                </>
+                            ) : (
+                                'Anwenden'
+                            )}
+                        </button>
+                    </div>
+
+                    {error && (
+                        <p
+                            role="alert"
+                            className="text-sm text-error flex items-center gap-1"
+                        >
+                            <span className="iconify mdi--alert-circle-outline"></span>
+                            {error}
+                        </p>
+                    )}
+                </form>
+            )}
+        </div>
+    );
+}

@@ -81,6 +81,13 @@ export default function Sidebar(props: SidebarProps) {
                             </>
                         )}
 
+                        {isAdmin && isSrp && (
+                            <>
+                                <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Marketing</li>
+                                <li><Link to="/admin-coupons" className={props.currentView === 'admin-coupons' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--ticket-percent text-lg"></span> Gutscheincode</Link></li>
+                            </>
+                        )}
+
                         <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Verwaltung</li>
                         {(isAdmin || isCustomerManager) && showTenantsSection && !isSrp && (
                             <>
