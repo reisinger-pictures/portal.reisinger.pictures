@@ -1,5 +1,6 @@
 import { useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { UIContext, Toast, ConfirmOptions } from './UIContext';
+import { useFocusTrap } from '../../logic/useFocusTrap';
 
 let toastIdCounter = 0;
 
@@ -65,12 +66,14 @@ export default function UIProvider({ children }: UIProviderProps) {
         return () => document.removeEventListener('click', handler, { capture: true });
     }, []);
 
+    const confirmModalRef = useFocusTrap(!!confirmState);
+
     return (
         <UIContext.Provider value={{ showToast, confirm, hasUnsavedChanges, setUnsavedChanges }}>
             {children}
 
             {/* Global Toasts */}
-            <div className="toast toast-top toast-center toast-global mt-12 md:mt-4 transition-all pointer-events-none z-[100]">
+            <div role="alert" aria-live="polite" aria-atomic="true" className="toast toast-top toast-center toast-global mt-12 md:mt-4 transition-all pointer-events-none z-[100]">
                 {toasts.map(toast => (
                     <div key={toast.id} className={`alert ${toast.type === "success" ? "alert-success bg-success text-white" : toast.type === "error" ? "alert-error bg-error text-white" : "alert-info bg-info text-info-content"} shadow-xl pointer-events-auto border-none`}>
                         <span className={`iconify ${toast.type === 'error' ? 'mdi--alert-circle' : toast.type === 'success' ? 'mdi--check-circle' : 'mdi--information'} text-xl`}></span>
@@ -82,7 +85,7 @@ export default function UIProvider({ children }: UIProviderProps) {
 
             {/* Global Confirm Modal */}
             {confirmState && (
-                <div className="modal modal-open modal-global">
+                <div ref={confirmModalRef} className="modal modal-open modal-global">
                     <div className="modal-box relative">
                         <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => handleConfirm(false)}>✕</button>
                         <h3 className="font-bold text-xl mb-4">{confirmState.options.title}</h3>

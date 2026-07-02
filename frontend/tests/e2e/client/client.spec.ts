@@ -89,7 +89,7 @@ test.describe('Client Selection Workflow', () => {
 
         // --- PHASE 3: GAST FILTERT UND NUTZT PHOTOSWIPE ---
         const ratePromise = network.waitForRating();
-        await page.locator('input.mask-star-2').nth(4).click();
+        await page.locator('main input[type="radio"]').nth(4).click();
         await ratePromise;
 
         // Filter: "Neu (Unbewertet)"
@@ -105,7 +105,7 @@ test.describe('Client Selection Workflow', () => {
         await expect(page.locator('.pswp')).toBeVisible();
         
         await expect(async () => {
-            await page.waitForTimeout(500);
+            await expect(page.locator('button.pswp__button--close')).toBeVisible({ timeout: 3000 });
             await page.locator('button.pswp__button--close').click();
             await expect(page.locator('.pswp')).toBeHidden({ timeout: 10000 });
         }).toPass({ timeout: 15000 });

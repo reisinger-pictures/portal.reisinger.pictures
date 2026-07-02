@@ -175,7 +175,19 @@ return new class extends Migration {
         });
 
         // ══════════════════════════════════════════════
-        //  Part 6: Backfill photo_metadata_versions (was V019)
+        //  Part 6: Add updated_at to users, photos, galleries (was M-08)
+        // ══════════════════════════════════════════════
+
+        foreach (['users', 'photos', 'galleries'] as $table) {
+            if (!Schema::hasColumn($table, 'updated_at')) {
+                Schema::table($table, function (Blueprint $t) {
+                    $t->timestamp('updated_at')->nullable();
+                });
+            }
+        }
+
+        // ══════════════════════════════════════════════
+        //  Part 7: Backfill photo_metadata_versions (was V019)
         // ══════════════════════════════════════════════
 
         DB::statement("
@@ -213,6 +225,13 @@ return new class extends Migration {
         }
 
         Schema::dropIfExists('coupons');
+
+        // Part 6 rollback: remove updated_at columns
+        foreach (['users', 'photos', 'galleries'] as $table) {
+            if (Schema::hasColumn($table, 'updated_at')) {
+                Schema::table($table, fn (Blueprint $t) => $t->dropColumn('updated_at'));
+            }
+        }
 
         // Revert user brand isolation
         DB::table('users')

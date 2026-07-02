@@ -4,6 +4,7 @@ namespace Tests\Feature\Coupon;
 
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\Coupon;
 use App\Models\CouponUserUsage;
 use App\Models\Gallery;
@@ -26,6 +27,7 @@ class CouponControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutMiddleware(BrandContextMiddleware::class);
         BrandRegistry::set(Brand::SRP);
 
         $this->superAdmin = User::factory()->create();

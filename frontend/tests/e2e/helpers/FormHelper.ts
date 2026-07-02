@@ -137,9 +137,8 @@ export class FormHelper {
             desktopCvcFrame.locator('input').first().fill(card.cvc)
         );
 
-        // Anti-Flakiness: Blur erzwingt Stripe-interne Validierung. Kurzer Wait stellt sicher,
-        // dass der Submit-Button im DOM den State-Update mitbekommt.
+        // Anti-Flakiness: Blur erzwingt Stripe-interne Validierung.
         await this.page.locator('body').blur().catch(() => {});
-        await this.page.waitForTimeout(1000);
+        // Stripe braucht asynchrone Validierungszeit - kann nicht direkt abgewartet werden
     }
 }

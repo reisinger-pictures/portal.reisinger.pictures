@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {useStripe, useElements, PaymentElement} from '@stripe/react-stripe-js';
 import {useUI} from '../../components/UIContext';
 import {Order} from '../../../api';
@@ -15,6 +15,19 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSucces
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
     const {showToast} = useUI();
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+        };
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,9 +41,14 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSucces
         if (error) {
             setIsProcessing(false);
             showToast('error', error.message || 'Zahlung fehlgeschlagen.');
-        } else if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
+        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+            setIsProcessing(false);
+            onSuccess(true);
+            return;
+        } else if (paymentIntent && paymentIntent.status === 'processing') {
             let attempts = 0;
-            const pollInterval = setInterval(async () => {
+            intervalRef.current = setInterval(async () => {
+                if (!mountedRef.current) return;
                 attempts++;
                 try {
                     const res = await fetch('/api/orders', {
@@ -41,22 +59,25 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSucces
                     const currentOrder = orders.find((o: Order) => o.id === orderId);
 
                     if (currentOrder && currentOrder.status === 'paid') {
-                        clearInterval(pollInterval);
-                        setIsProcessing(false);
+                        if (intervalRef.current) clearInterval(intervalRef.current);
+                        intervalRef.current = null;
+                        if (mountedRef.current) setIsProcessing(false);
                         onSuccess(true);
                     } else if (attempts >= 15) {
-                        clearInterval(pollInterval);
-                        setIsProcessing(false);
+                        if (intervalRef.current) clearInterval(intervalRef.current);
+                        intervalRef.current = null;
+                        if (mountedRef.current) setIsProcessing(false);
                         onSuccess(false);
                     }
                 } catch {
                     if (attempts >= 15) {
-                        clearInterval(pollInterval);
-                        setIsProcessing(false);
+                        if (intervalRef.current) clearInterval(intervalRef.current);
+                        intervalRef.current = null;
+                        if (mountedRef.current) setIsProcessing(false);
                         onSuccess(false);
                     }
                 }
-            }, 2000);
+            }, 1000);
         } else {
             setIsProcessing(false);
         }
@@ -69,7 +90,10 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSucces
                 {isProcessing ? <span className="loading loading-spinner"></span> : 'Jetzt bezahlen'}
             </button>
             {isProcessing &&
-                <p className="text-sm text-center opacity-70 mt-2">Bitte warten, Zahlung wird verifiziert...</p>}
+                <p className="text-sm text-center opacity-70 mt-2 flex items-center justify-center gap-2">
+                    <span className="loading loading-spinner loading-xs"></span>
+                    Zahlung wird verifiziert...
+                </p>}
         </form>
     );
 }

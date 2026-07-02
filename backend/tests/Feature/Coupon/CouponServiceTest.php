@@ -725,6 +725,196 @@ class CouponServiceTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
+    //  lockAndRevalidateCoupon
+    // ──────────────────────────────────────────────
+
+    public function test_lock_and_revalidate_success(): void
+    {
+        $coupon = Coupon::factory()->create([
+            'brand' => 'srp',
+            'code' => 'LOCKOK',
+            'active' => true,
+            'used_count' => 0,
+            'max_uses_global' => 5,
+        ]);
+
+        [$found, $error] = $this->service->lockAndRevalidateCoupon($coupon);
+
+        $this->assertNotNull($found);
+        $this->assertNull($error);
+        $this->assertSame($coupon->id, $found->id);
+    }
+
+    public function test_lock_and_revalidate_global_maxed_out(): void
+    {
+        $coupon = Coupon::factory()->create([
+            'brand' => 'srp',
+            'code' => 'LOCKMAX',
+            'active' => true,
+            'max_uses_global' => 5,
+            'used_count' => 5,
+        ]);
+
+        [$found, $error] = $this->service->lockAndRevalidateCoupon($coupon);
+
+        $this->assertNull($found);
+        $this->assertStringContainsString('usage limit', $error);
+    }
+
+    public function test_lock_and_revalidate_per_account_maxed_out(): void
+    {
+        $coupon = Coupon::factory()->create([
+            'brand' => 'srp',
+            'code' => 'LOCKPER',
+            'active' => true,
+            'max_uses_per_account' => 2,
+        ]);
+
+        $user = User::factory()->create();
+
+        CouponUserUsage::create([
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 2,
+        ]);
+
+        [$found, $error] = $this->service->lockAndRevalidateCoupon($coupon, $user->id);
+
+        $this->assertNull($found);
+        $this->assertStringContainsString('usage limit', $error);
+    }
+
+    public function test_lock_and_revalidate_ignores_per_account_when_null_user(): void
+    {
+        $coupon = Coupon::factory()->create([
+            'brand' => 'srp',
+            'code' => 'LOCKNULL',
+            'active' => true,
+            'max_uses_per_account' => 2,
+        ]);
+
+        [$found, $error] = $this->service->lockAndRevalidateCoupon($coupon, null);
+
+        $this->assertNotNull($found);
+        $this->assertNull($error);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Edge Cases
+    // ──────────────────────────────────────────────
+
+    public function test_apply_coupon_free_items_with_zero_or_negative_count(): void
+    {
+        $coupon = Coupon::factory()->freeItems(0)->create(['brand' => 'srp', 'active' => true]);
+        $items = $this->makePricedItems(3, [1000, 2000, 3000]);
+        $total = 6000;
+
+        $result = $this->service->applyCoupon($coupon, $items, $total);
+
+        $this->assertSame(6000, $result['totalCents']);
+        $this->assertSame(0, $result['discountCents']);
+    }
+
+    public function test_apply_coupon_free_items_per_sub_gallery_falls_back_to_global_when_not_meta_gallery(): void
+    {
+        $coupon = Coupon::factory()->freeItems(2)->create([
+            'brand' => 'srp',
+            'per_sub_gallery' => true,
+            'scope_type' => 'gallery',
+            'active' => true,
+        ]);
+
+        $items = [
+            ['itemId' => 'a1', 'priceCents' => 3000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+            ['itemId' => 'a2', 'priceCents' => 1000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+            ['itemId' => 'b1', 'priceCents' => 2500, 'galleryId' => 'gallery-2', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+        ];
+        $total = 6500;
+
+        $result = $this->service->applyCoupon($coupon, $items, $total);
+
+        // Global fallback: cheapest 2 across all (1000+2500=3500) free
+        $this->assertSame(3000, $result['totalCents']);
+        $this->assertSame(3500, $result['discountCents']);
+
+        $priceCents = array_map(fn ($i) => $i['priceCents'], $result['items']);
+        $this->assertSame(3000, $priceCents[0]);
+        $this->assertSame(0, $priceCents[1]);
+        $this->assertSame(0, $priceCents[2]);
+    }
+
+    public function test_lock_and_revalidate_coupon_when_coupon_deleted(): void
+    {
+        $coupon = Coupon::factory()->create([
+            'brand' => 'srp',
+            'code' => 'DELETE',
+            'active' => true,
+            'used_count' => 0,
+            'max_uses_global' => 5,
+        ]);
+
+        $coupon->delete();
+
+        [$found, $error] = $this->service->lockAndRevalidateCoupon($coupon);
+
+        $this->assertNull($found);
+        $this->assertSame('Coupon not found.', $error);
+    }
+
+    public function test_increment_usage_multiple_increments_for_same_user(): void
+    {
+        $coupon = Coupon::factory()->create([
+            'brand' => 'srp',
+            'code' => 'MULTIINC',
+            'max_uses_per_account' => 3,
+            'max_uses_global' => 100,
+            'used_count' => 0,
+        ]);
+
+        $user = User::factory()->create();
+
+        // 1st increment
+        $this->service->incrementUsage($coupon, $user->id);
+        $coupon->refresh();
+        $this->assertSame(1, $coupon->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
+
+        // 2nd increment
+        $this->service->incrementUsage($coupon, $user->id);
+        $coupon->refresh();
+        $this->assertSame(2, $coupon->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 2,
+        ]);
+
+        // 3rd increment
+        $this->service->incrementUsage($coupon, $user->id);
+        $coupon->refresh();
+        $this->assertSame(3, $coupon->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 3,
+        ]);
+
+        // 4th increment — incrementUsage itself does not enforce limits
+        $this->service->incrementUsage($coupon, $user->id);
+        $coupon->refresh();
+        $this->assertSame(4, $coupon->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 4,
+        ]);
+    }
+
+    // ──────────────────────────────────────────────
     //  Helpers
     // ──────────────────────────────────────────────
 

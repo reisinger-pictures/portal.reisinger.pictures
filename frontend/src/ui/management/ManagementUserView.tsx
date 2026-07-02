@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {UserDetailed, useUsers, UserRole} from '../../logic/useUsers';
-import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
+import {flattenGroups} from '../../logic/utils';
+import {useProtectedGalleries} from '../../logic/useGalleries';
 import {usePermissions} from '../../logic/usePermissions';
 import UserPermissionsModal from './components/UserPermissionsModal';
 import CreateUserModal from './components/CreateUserModal';

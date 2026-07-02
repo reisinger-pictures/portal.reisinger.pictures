@@ -6,10 +6,15 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class CustomMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels, BrandAwareMail;
+
+    public $tries = 3;
+
+    public $backoff = [30, 60, 120];
 
     public $subject;
     public $customBody;
@@ -23,7 +28,6 @@ class CustomMail extends Mailable implements ShouldQueue
 
     public function build()
     {
-        $this->ensureBrandContext();
         $this->applyBrandFrom();
 
         return $this->subject($this->subject)
@@ -32,5 +36,14 @@ class CustomMail extends Mailable implements ShouldQueue
                     ->with([
                         'logoUrl' => $this->brandLogoUrl(),
                     ]);
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('Queue job failed', [
+            'job' => static::class,
+            'subject' => $this->subject,
+            'exception' => $exception->getMessage(),
+        ]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Constants\TierRanks;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,8 +12,6 @@ use Laravel\Scout\Searchable;
 class Photo extends Model
 {
     use HasFactory, HasUuids, Searchable;
-
-    public const UPDATED_AT = null;
 
     public const DERIVATIVE_SIZES = [250, 400, 800, 1024, 1200, 2000];
 
@@ -63,11 +62,11 @@ class Photo extends Model
         return $this->is_hidden || ($this->gallery ? $this->gallery->effective_is_hidden : false);
     }
 
-    public function requiresWatermark(): bool {
+    public function requiresWatermark(?User $user = null): bool {
         if (!$this->gallery) return true;
         if ($this->gallery->effective_is_free_download) return false;
-        
-        $user = auth('api')->user();
+
+        $user ??= auth('api')->user();
         if ($user && ($user->is_admin || $user->is_photographer)) return false;
         if ($user && $user->canAccessGallery($this->gallery_id)) {
             if ((TierRanks::RANKS[$user->flatrate_level ?? 'none'] ?? 0) >= 1) return false;

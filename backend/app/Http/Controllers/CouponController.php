@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Brand;
+use App\Http\Requests\CouponStoreRequest;
+use App\Http\Requests\CouponUpdateRequest;
 use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
-use App\Models\Tenant;
 use App\Models\User;
 use App\Services\CouponService;
 use App\Support\BrandRegistry;
@@ -95,13 +95,10 @@ class CouponController extends Controller
     //  Admin: Create (role-aware field restrictions)
     // ──────────────────────────────────────────────
 
-    public function store(Request $request): JsonResponse
+    public function store(CouponStoreRequest $request): JsonResponse
     {
         $user = auth()->user();
-        $validated = $this->validateCouponData($request, null, $user);
-        if ($validated instanceof JsonResponse) {
-            return $validated;
-        }
+        $validated = $request->validated();
 
         $validated['brand'] = BrandRegistry::currentOrDefault()->value;
 
@@ -121,16 +118,13 @@ class CouponController extends Controller
     //  Admin: Update (role-aware)
     // ──────────────────────────────────────────────
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(CouponUpdateRequest $request, string $id): JsonResponse
     {
         $coupon = Coupon::forCurrentBrand()->findOrFail($id);
         $this->authorizeCoupon($coupon);
 
         $user = auth()->user();
-        $validated = $this->validateCouponData($request, $coupon, $user);
-        if ($validated instanceof JsonResponse) {
-            return $validated;
-        }
+        $validated = $request->validated();
 
         // Photographer restrictions
         if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
@@ -211,21 +205,12 @@ class CouponController extends Controller
     /**
      * Create a coupon pre-scoped to a specific gallery.
      */
-    public function storeGalleryCoupon(Request $request, string $galleryId): JsonResponse
+    public function storeGalleryCoupon(CouponStoreRequest $request, string $galleryId): JsonResponse
     {
         $gallery = $this->findAndVerifyGallery($galleryId);
 
         $user = auth()->user();
-        $mergedData = array_merge($request->all(), [
-            'scope_type' => 'gallery',
-            'scope_id' => $galleryId,
-        ]);
-        $mergedRequest = new Request($mergedData);
-
-        $validated = $this->validateCouponData($mergedRequest, null, $user);
-        if ($validated instanceof JsonResponse) {
-            return $validated;
-        }
+        $validated = $request->validated();
 
         $validated['brand'] = BrandRegistry::currentOrDefault()->value;
         $validated['scope_type'] = 'gallery';
@@ -292,7 +277,7 @@ class CouponController extends Controller
     /**
      * Create a coupon pre-scoped to a specific gallery group.
      */
-    public function storeGroupCoupon(Request $request, string $groupId): JsonResponse
+    public function storeGroupCoupon(CouponStoreRequest $request, string $groupId): JsonResponse
     {
         $group = GalleryGroup::findOrFail($groupId);
         $brand = BrandRegistry::currentOrDefault();
@@ -302,16 +287,7 @@ class CouponController extends Controller
         }
 
         $user = auth()->user();
-        $mergedData = array_merge($request->all(), [
-            'scope_type' => 'meta_gallery',
-            'scope_id' => $groupId,
-        ]);
-        $mergedRequest = new Request($mergedData);
-
-        $validated = $this->validateCouponData($mergedRequest, null, $user);
-        if ($validated instanceof JsonResponse) {
-            return $validated;
-        }
+        $validated = $request->validated();
 
         $validated['brand'] = BrandRegistry::currentOrDefault()->value;
         $validated['scope_type'] = 'meta_gallery';
@@ -379,86 +355,6 @@ class CouponController extends Controller
             ],
             'discount_cents' => $result['discountCents'],
         ]);
-    }
-
-    // ──────────────────────────────────────────────
-    //  Shared Validation
-    // ──────────────────────────────────────────────
-
-    /**
-     * Validate coupon input data for store/update.
-     *
-     * Role-aware: photographers have restricted scope types and forbidden fields.
-     *
-     * @param  Request       $request   Input data
-     * @param  Coupon|null   $existing  Existing coupon (null for create)
-     * @param  User|null     $user      Acting user (defaults to auth()->user())
-     * @return array|JsonResponse       Validated array on success, JsonResponse on failure.
-     */
-    private function validateCouponData(Request $request, ?Coupon $existing = null, ?User $user = null): array|JsonResponse
-    {
-        $user = $user ?? auth()->user();
-        $isPhotographer = $user->is_photographer && !$user->is_super_admin && !$user->is_admin;
-
-        $scopeTypes = $isPhotographer
-            ? 'in:gallery,meta_gallery,photographer'
-            : 'in:global,gallery,meta_gallery,photographer,organisation';
-
-        $rules = [
-            'code' => 'required|string|max:50',
-            'type' => 'required|string|in:fixed,percentage,free_items',
-            'value' => 'required|numeric|min:0|max:9999999.99',
-            'scope_type' => 'required|string|' . $scopeTypes,
-            'scope_id' => 'nullable|string|required_if:scope_type,gallery,meta_gallery',
-            'scope_gallery_id' => 'nullable|string',
-            'max_uses_global' => 'nullable|integer|min:1',
-            'max_uses_per_account' => 'nullable|integer|min:1',
-            'expires_at' => 'nullable|date',
-            'active' => 'boolean',
-        ];
-
-        // Photographer cannot set max_uses_global
-        if ($isPhotographer) {
-            $rules['max_uses_global'] = 'prohibited';
-        }
-
-        $validator = Validator::make($request->all(), $rules);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
-        }
-
-        $data = $validator->validated();
-
-        // For percentage, ensure value is 0-100
-        if ($data['type'] === 'percentage' && $data['value'] > 100) {
-            return response()->json(['success' => false, 'error' => 'Percentage value must not exceed 100.'], 422);
-        }
-
-        // For free_items, ensure value is integer
-        if ($data['type'] === 'free_items') {
-            $data['value'] = (int) $data['value'];
-        }
-
-        // Unique code check within brand
-        $brandValue = BrandRegistry::currentOrDefault()->value;
-        $uniqueQuery = Coupon::where('brand', $brandValue)->where('code', $data['code']);
-        if ($existing !== null) {
-            $uniqueQuery->where('id', '!=', $existing->id);
-        }
-        if ($uniqueQuery->exists()) {
-            return response()->json(['success' => false, 'error' => 'A coupon with this code already exists for this brand.'], 422);
-        }
-
-        // Validate organisation scope: tenant must exist in current brand
-        if (isset($data['scope_type']) && $data['scope_type'] === 'organisation') {
-            $tenantExists = Tenant::where('id', $data['scope_id'])->where('brand', $brandValue)->exists();
-            if (!$tenantExists) {
-                return response()->json(['success' => false, 'error' => 'Tenant not found for this brand.'], 422);
-            }
-        }
-
-        return $data;
     }
 
     // ──────────────────────────────────────────────

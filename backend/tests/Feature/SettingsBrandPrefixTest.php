@@ -1,15 +1,24 @@
 <?php
 namespace Tests\Feature;
 
+use App\Enums\Brand;
+use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
+use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SettingsBrandPrefixTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(BrandContextMiddleware::class);
+    }
 
     private function superAdminToken(): string
     {
@@ -35,7 +44,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_billing_details_update_stores_brand_scoped_for_srp_brand(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         $token = $this->superAdminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -56,7 +65,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_billing_details_update_uses_unprefixed_for_b2b_brand(): void
     {
-        config(['app.brand' => 'rp']);
+        BrandRegistry::set(Brand::B2B);
         $token = $this->superAdminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -72,7 +81,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_billing_details_read_returns_brand_scoped_for_srp_brand(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         // Use raw writes so both brand rows coexist independently (Setting's
         // primary key is `key`, so Eloquent updateOrCreate would cross-update rows).
         $db = \Illuminate\Support\Facades\DB::table('settings');
@@ -91,7 +100,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_billing_details_read_falls_back_to_b2b_brand_for_srp(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         // Only a B2B ('rp') row exists → SRP read falls back to it.
         $db = \Illuminate\Support\Facades\DB::table('settings');
         $db->where('key', 'bank_holder')->delete();
@@ -112,7 +121,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_license_terms_update_maps_srp_keys_brand_scoped_for_srp(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -134,7 +143,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_license_terms_update_stores_unprefixed_keys_brand_scoped_for_srp(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -155,7 +164,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_license_terms_update_stores_brand_scoped_for_b2b(): void
     {
-        config(['app.brand' => 'rp']);
+        BrandRegistry::set(Brand::B2B);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -179,7 +188,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_watermark_opacity_write_is_brand_scoped_for_srp(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -196,7 +205,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_watermark_opacity_read_after_write_is_brand_scoped_for_srp(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         Setting::updateOrCreate(['key' => 'watermark_opacity', 'brand' => 'srp'], ['value' => '0.60']);
         $token = $this->adminToken();
 
@@ -208,7 +217,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_watermark_opacity_read_falls_back_to_b2b_brand_for_srp(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         // Only a B2B ('rp') row exists → SRP read falls back to it.
         Setting::updateOrCreate(['key' => 'watermark_opacity', 'brand' => 'rp'], ['value' => '0.30']);
         $token = $this->adminToken();
@@ -221,7 +230,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_watermark_opacity_uses_unprefixed_for_b2b(): void
     {
-        config(['app.brand' => 'rp']);
+        BrandRegistry::set(Brand::B2B);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -236,7 +245,7 @@ class SettingsBrandPrefixTest extends TestCase
 
     public function test_watermark_opacity_default_is_015(): void
     {
-        config(['app.brand' => 'srp']);
+        BrandRegistry::set(Brand::SRP);
         Setting::where('key', 'watermark_opacity')->delete();
         Setting::where('key', 'srp_watermark_opacity')->delete();
         $token = $this->adminToken();

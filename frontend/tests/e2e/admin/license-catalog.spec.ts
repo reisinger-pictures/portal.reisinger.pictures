@@ -41,7 +41,7 @@ test.describe('License Catalog Admin Workflow', () => {
 
         // 2. Inline Editieren (Dies testet genau die Route, die bei dir gecrasht ist)
         const row = modContainer.locator('tr').filter({ hasText: modName });
-        await row.locator('button').filter({ has: page.locator('.mdi--pencil') }).click();
+        await row.locator('button').filter({ has: page.locator('span.mdi--pencil') }).first().click();
         
         // Checkbox im Edit-Modus DEAKTIVIEREN
         // Wenn die Zeile im Edit-Modus ist, befindet sich der Text im Input-Value, daher funktioniert "hasText" auf "row" nicht mehr.
@@ -59,7 +59,7 @@ test.describe('License Catalog Admin Workflow', () => {
         await expect(updatedRow).toContainText('Kostenpflichtig');
     
         // 3. Löschen zum Aufräumen
-        await updatedRow.locator('button').filter({ has: page.locator('.mdi--trash-can') }).click();
+        await updatedRow.locator('button').filter({ has: page.locator('span.mdi--trash-can') }).last().click();
         const confirmModal = page.locator('.modal-global');
         await expect(confirmModal).toBeVisible();
         await confirmModal.getByRole('button', { name: 'Bestätigen' }).click();

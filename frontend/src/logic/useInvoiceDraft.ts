@@ -9,7 +9,13 @@ import {formatDateToDE, formatLocaleDate} from './utils';
  * multiple data-loading paths (K-01 / K-02).
  */
 export function isEmptyRow(i: InvoiceItem): boolean {
-    return i.type === 'item' && !i.description.trim() && !i.notes.trim() && i.qty === 1 && i.price === 0;
+    if (i.type === 'item') {
+        return !i.description.trim() && !i.notes.trim() && i.qty === 1 && i.price === 0;
+    }
+    if (i.type === 'discount_fixed' || i.type === 'discount_percent') {
+        return !i.description.trim() && !i.notes.trim() && i.price === 0;
+    }
+    return false;
 }
 
 export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {

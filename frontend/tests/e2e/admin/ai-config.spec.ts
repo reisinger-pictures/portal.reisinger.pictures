@@ -34,8 +34,7 @@ test.describe('Admin AI Config Banner', () => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 
-        await page.waitForTimeout(1000);
-
+        await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
         await expect(page.locator('.alert-warning').filter({ hasText: 'KI-Bildbeschreibung' })).toBeHidden({ timeout: 5000 });
     });
 
@@ -58,8 +57,7 @@ test.describe('Admin AI Config Banner', () => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 
-        await page.waitForTimeout(1000);
-
+        await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
         await expect(page.locator('.alert-warning').filter({ hasText: 'KI-Bildbeschreibung nicht konfiguriert' })).toBeVisible({ timeout: 5000 });
     });
 
@@ -82,7 +80,7 @@ test.describe('Admin AI Config Banner', () => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 
-        await page.waitForTimeout(1000);
+        await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
 
         await expect(page.locator('.alert-warning').filter({ hasText: 'KI-Bildbeschreibung' })).toBeHidden({ timeout: 5000 });
     });

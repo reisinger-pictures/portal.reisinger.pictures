@@ -69,12 +69,25 @@ class FileDeliveryController extends Controller
 
             $thumbPath = $baseStoragePath . '/' . $gallery->id . '/_thumbs/' . $size . '/' . $photo->id . '.webp';
             
-            if (!file_exists($thumbPath)) {
-                if (!is_dir(dirname($thumbPath))) @mkdir(dirname($thumbPath), 0755, true);
+            $thumbLockKey = 'thumb_generation_' . $photo->id . '_' . $size;
+            Cache::lock($thumbLockKey, 30)->block(10, function () use ($thumbPath, $originalPath, $size, $processor) {
+                if (file_exists($thumbPath)) {
+                    return;
+                }
+                if (!is_dir(dirname($thumbPath))) {
+                    @mkdir(dirname($thumbPath), 0755, true);
+                }
                 try {
                     $processor->generateThumbnail($originalPath, $thumbPath, $size);
-                } catch (\Throwable $e) {}
-            }
+                } catch (\Throwable $e) {
+                    Log::error('Thumbnail generation failed', [
+                        'photo_id' => $photo->id,
+                        'size' => $size,
+                        'original' => $originalPath,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            });
 
             if (!file_exists($thumbPath)) return response()->json(['error' => 'Thumbnail fehlt'], 500);
 

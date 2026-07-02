@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Role;
-use App\Models\DomainMapping;
 use App\Services\AIService;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
@@ -108,7 +107,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
         if (!$user) {
-            return response()->json(['error' => 'User nicht gefunden.'], 404);
+            return response()->json(['error' => 'Der Link ist ungültig oder abgelaufen.'], 400);
         }
 
         $user->password = Hash::make($request->password);
@@ -189,8 +188,6 @@ class AuthController extends Controller
             'ai_is_unconfigured' => app(AIService::class)->isUnconfigured(),
             'transient_meta_galleries' => $user->transient_meta_galleries ?? [],
             'my_galleries' => $user->galleries ?? [],
-            'photographer_galleries' => $user->photographerGalleries ?? [],
-            'photographer_gallery_groups' => $user->photographerGalleryGroups ?? [],
             'photographer_galleries' => $user->photographerGalleries ?? [],
             'photographer_gallery_groups' => $user->photographerGalleryGroups ?? []
         ]);

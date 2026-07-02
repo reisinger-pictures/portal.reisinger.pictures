@@ -12,7 +12,7 @@ export const RES_RANKS: Record<string, number> = {none: 0, web: 1, print: 2, ori
 export function getRequiredTerm(terms: PricingTerms, key: string): number {
     if (!terms) return 0; // SWR noch nicht geladen
     const val = parseInt(terms[key] || '', 10);
-    if (isNaN(val)) {
+    if (Number.isNaN(val)) {
         throw new Error(`Kritischer Systemfehler: Preisfaktor '${key}' fehlt in der Datenbank. Bitte Administrator kontaktieren!`);
     }
     return val;
@@ -25,7 +25,7 @@ export function getRequiredTerm(terms: PricingTerms, key: string): number {
 export function getRequiredMultiplier(terms: PricingTerms, key: string): number {
     if (!terms) return 1; // SWR noch nicht geladen — neutraler Multiplikator
     const val = parseFloat(terms[key] || '');
-    if (isNaN(val)) {
+    if (Number.isNaN(val)) {
         throw new Error(`Kritischer Systemfehler: Preisfaktor '${key}' fehlt in der Datenbank. Bitte Administrator kontaktieren!`);
     }
     return val;

@@ -69,10 +69,6 @@ const handleApiError = async (res: Response) => {
     error.info = errorInfo;
     error.status = res.status;
 
-    if (globalErrorCallback && (res.status >= 500 || res.status === 0)) {
-        globalErrorCallback(res.status, errorMsg);
-    }
-
     throw error;
 };
 
@@ -83,7 +79,6 @@ export const fetcher = async <T>(url: string): Promise<T> => {
     } catch {
         const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as ApiError;
         error.status = 0;
-        if (globalErrorCallback) globalErrorCallback(0, error.message);
         throw error;
     }
 

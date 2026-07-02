@@ -10,24 +10,29 @@ export class UploadHelper {
     }
 
     async uploadSampleImage() {
-        const fileInput = this.page.locator('input[type="file"]');
+        const fileInput = this.page.locator('input[type="file"].file-input').first();
         const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
 
         // Nutzt den NetworkHelper, um auf das Ende des Upload-Requests zu warten
         const uploadPromise = this.network.waitForUpload();
 
+        await fileInput.evaluate(el => { (el as HTMLInputElement).value = ''; });
         await fileInput.setInputFiles(sampleImagePath);
         const res = await uploadPromise;
         
         let errorBody = '';
-        if (!res.ok()) {
-            errorBody = await res.text();
-            console.error('\n--- UPLOAD ERROR RESPONSE BODY ---');
-            console.error(errorBody);
-            console.error('----------------------------------\n');
+        if (!res || !res.ok()) {
+            if (res) {
+                errorBody = await res.text();
+                console.error('\n--- UPLOAD ERROR RESPONSE BODY ---');
+                console.error(errorBody);
+                console.error('----------------------------------\n');
+            } else {
+                errorBody = 'Upload request timed out (no response received)';
+            }
         }
-        
-        expect(res.ok(), `Upload API request failed with status ${res.status()}. Details: ${errorBody}`).toBeTruthy();
+
+        expect(res && res.ok(), `Upload API request failed${res ? ' with status ' + res.status() : ' (timed out)'}. Details: ${errorBody}`).toBeTruthy();
 
         // Warten, bis das Frontend den Upload-Prozess registriert hat
         const toast = this.page.locator('.toast').filter({ hasText: /hochgeladen/i }).first();

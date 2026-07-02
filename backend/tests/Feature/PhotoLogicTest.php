@@ -65,7 +65,7 @@ class PhotoLogicTest extends TestCase
 
         $this->actingAs($admin, 'api');
 
-        $this->assertFalse($photo->requiresWatermark());
+        $this->assertFalse($photo->requiresWatermark($admin));
     }
 
     public function test_requires_watermark_returns_false_for_photographer_user(): void
@@ -80,7 +80,7 @@ class PhotoLogicTest extends TestCase
 
         $this->actingAs($photographer, 'api');
 
-        $this->assertFalse($photo->requiresWatermark());
+        $this->assertFalse($photo->requiresWatermark($photographer));
     }
 
     public function test_requires_watermark_returns_false_for_user_with_web_flatrate_and_access(): void
@@ -92,7 +92,7 @@ class PhotoLogicTest extends TestCase
 
         $this->actingAs($user, 'api');
 
-        $this->assertFalse($photo->requiresWatermark());
+        $this->assertFalse($photo->requiresWatermark($user));
     }
 
     public function test_requires_watermark_returns_false_for_user_with_original_flatrate_and_access(): void
@@ -104,7 +104,7 @@ class PhotoLogicTest extends TestCase
 
         $this->actingAs($user, 'api');
 
-        $this->assertFalse($photo->requiresWatermark());
+        $this->assertFalse($photo->requiresWatermark($user));
     }
 
     public function test_requires_watermark_returns_true_when_user_has_access_but_no_flatrate(): void
@@ -116,7 +116,7 @@ class PhotoLogicTest extends TestCase
 
         $this->actingAs($user, 'api');
 
-        $this->assertTrue($photo->requiresWatermark());
+        $this->assertTrue($photo->requiresWatermark($user));
     }
 
     public function test_requires_watermark_returns_true_when_user_has_access_but_invalid_flatrate_level(): void
@@ -141,7 +141,7 @@ class PhotoLogicTest extends TestCase
         $this->actingAs($user, 'api');
 
         // No gallery assignment → canAccessGallery false → watermark
-        $this->assertTrue($photo->requiresWatermark());
+        $this->assertTrue($photo->requiresWatermark($user));
     }
 
     // ------------------------------------------------------------------

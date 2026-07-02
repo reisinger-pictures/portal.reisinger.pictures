@@ -6,7 +6,9 @@ class UpdateGalleryRequest extends GalleryRequest
 {
     public function authorize(): bool
     {
-        return true; // Berechtigungsprüfung erfolgt im Controller via Gate
+        $gallery = \App\Models\Gallery::find($this->route('id'));
+
+        return $gallery !== null && \Illuminate\Support\Facades\Gate::allows('manage', $gallery);
     }
 
     // Rules inherited from GalleryRequest

@@ -151,8 +151,12 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
         
-        // Simuliere DB-Änderung für allow_custom_quotes über Backend Setup oder UI
-        // Für diesen Test prüfen wir primär, dass die Navigation robust funktioniert.
+        // Galerie erscheint in der Sidebar-Navigation
+        await expect(page.getByRole('link', { name: galleryName })).toBeVisible({ timeout: 10000 });
+        
+        // Galerie ist klickbar und Navigation funktioniert
+        await page.getByRole('link', { name: galleryName }).click();
+        await expect(page.locator('h1:has-text("' + galleryName + '")')).toBeVisible({ timeout: 10000 });
     });
 
 });

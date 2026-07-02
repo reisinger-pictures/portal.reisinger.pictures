@@ -44,44 +44,23 @@ class GalleryTreeService
     }
 
 
-    /**
-     * Generic tree filter using Higher-Order Functions.
-     *
-     * @param  callable(array): bool  $galleryPredicate   Filter for galleries inside groups and root galleries (unless overridden).
-     * @param  callable(array): bool  $groupPredicate     Filter for groups themselves (default: all pass).
-     * @param  callable(array): bool  $rootGalleryPredicate  Filter for root galleries (default: same as $galleryPredicate).
-     */
-    private function filterTree(
-        array $treeArray,
-        callable $galleryPredicate,
-        ?callable $groupPredicate = null,
-        ?callable $rootGalleryPredicate = null,
-        array $explicitGroupIds = []
-    ): array {
+    private function filterGroupsRecursive(array $groups, callable $galleryPredicate, ?callable $groupPredicate = null): array
+    {
         $groupPredicate = $groupPredicate ?? fn(array $node): bool => true;
-        $rootGalleryPredicate = $rootGalleryPredicate ?? $galleryPredicate;
-
-        $filterNode = function (array $groups) use (&$filterNode, $galleryPredicate, $groupPredicate): array {
-            $result = [];
-            foreach ($groups as $group) {
-                if (!$groupPredicate($group)) {
-                    continue;
-                }
-                if (isset($group['galleries'])) {
-                    $group['galleries'] = array_values(array_filter($group['galleries'], $galleryPredicate));
-                }
-                if (isset($group['children'])) {
-                    $group['children'] = $filterNode($group['children']);
-                }
-                $result[] = $group;
+        $result = [];
+        foreach ($groups as $group) {
+            if (!$groupPredicate($group)) {
+                continue;
             }
-            return $result;
-        };
-
-        $treeArray['groups'] = $this->pruneEmptyGroups($filterNode($treeArray['groups']), $explicitGroupIds);
-        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], $rootGalleryPredicate));
-
-        return $treeArray;
+            if (isset($group['galleries'])) {
+                $group['galleries'] = array_values(array_filter($group['galleries'], $galleryPredicate));
+            }
+            if (isset($group['children'])) {
+                $group['children'] = $this->filterGroupsRecursive($group['children'], $galleryPredicate, $groupPredicate);
+            }
+            $result[] = $group;
+        }
+        return $result;
     }
 
     /**
@@ -102,13 +81,14 @@ class GalleryTreeService
             $explicitGroupIds = array_unique(array_merge($explicitGroupIds, app(\App\Services\AccessControlService::class)->getSubGroupIds($explicitGroupIds)));
         }
 
-        return $this->filterTree(
-            $treeArray,
-            fn(array $g): bool => in_array($g['id'], $allowedGalleryIds),
-            null,
-            null,
+        $galleryPredicate = fn(array $g): bool => in_array($g['id'], $allowedGalleryIds);
+        $treeArray['groups'] = $this->pruneEmptyGroups(
+            $this->filterGroupsRecursive($treeArray['groups'], $galleryPredicate),
             $explicitGroupIds
         );
+        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], $galleryPredicate));
+
+        return $treeArray;
     }
 
     /**
@@ -116,10 +96,11 @@ class GalleryTreeService
      */
     private function filterTreeByType(array $treeArray, string $filterType): array
     {
-        return $this->filterTree(
-            $treeArray,
-            fn(array $g): bool => $g['type'] === $filterType,
-        );
+        $galleryPredicate = fn(array $g): bool => $g['type'] === $filterType;
+        $treeArray['groups'] = $this->pruneEmptyGroups($this->filterGroupsRecursive($treeArray['groups'], $galleryPredicate));
+        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], $galleryPredicate));
+
+        return $treeArray;
     }
 
     /**
@@ -127,12 +108,14 @@ class GalleryTreeService
      */
     private function filterTreeByTenant(array $treeArray, string $tenantId): array
     {
-        return $this->filterTree(
-            $treeArray,
-            fn(array $g): bool => true,
-            fn(array $node): bool => ($node['tenant_id'] ?? null) === $tenantId,
-            fn(array $g): bool => ($g['tenant_id'] ?? null) === $tenantId,
+        $groupPredicate = fn(array $node): bool => ($node['tenant_id'] ?? null) === $tenantId;
+        $galleryPredicate = fn(array $g): bool => ($g['tenant_id'] ?? null) === $tenantId;
+        $treeArray['groups'] = $this->pruneEmptyGroups(
+            $this->filterGroupsRecursive($treeArray['groups'], $galleryPredicate, $groupPredicate)
         );
+        $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], $galleryPredicate));
+
+        return $treeArray;
     }
 
     /**

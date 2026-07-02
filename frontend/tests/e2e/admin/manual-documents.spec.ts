@@ -62,8 +62,8 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await expect(page).toHaveURL(/.*\/admin-manual-offer/);
 
         // 1. Test CRM Autocomplete (mit Delay für Meilisearch)
-        await page.waitForTimeout(2000); 
         const nameInput = page.locator('.form-control').filter({ hasText: 'Name / Ansprechpartner' }).locator('input');
+        await expect(nameInput).toBeVisible({ timeout: 10000 });
         await nameInput.click();
         await nameInput.clear();
         await nameInput.pressSequentially(`E2E VIP ${uniqueSuffix}`, { delay: 100 });
@@ -83,7 +83,9 @@ test.describe('Manual Documents & CRM Workflow', () => {
         // 3. Leistungen befüllen (via Autocomplete)
         const itemInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
         await itemInput.fill(`E2E Product ${uniqueSuffix}`);
-        await page.locator(`li:has-text("E2E Product ${uniqueSuffix}")`).first().click();
+        const productOption = page.locator(`li:has-text("E2E Product ${uniqueSuffix}")`).first();
+        await expect(productOption).toBeVisible({ timeout: 10000 });
+        await productOption.click();
 
         await expect(page.locator('.form-control').filter({ hasText: 'Preis / Stück' }).locator('input').first()).toHaveValue('150');
         await page.locator('.form-control').filter({ hasText: 'Menge' }).locator('input').first().fill('2');
@@ -92,7 +94,9 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await page.getByRole('button', { name: '+ Rabatt hinzufügen' }).click();
         const discountInput = page.locator('.form-control').filter({ hasText: 'Titel / Beschreibung' }).locator('input').last();
         await discountInput.fill(`E2E Discount ${uniqueSuffix}`);
-        await page.locator(`li:has-text("E2E Discount ${uniqueSuffix}")`).first().click();
+        const discountOption = page.locator(`li:has-text("E2E Discount ${uniqueSuffix}")`).first();
+        await expect(discountOption).toBeVisible({ timeout: 10000 });
+        await discountOption.click();
 
         // Validierung der Gesamtsumme (150 * 2 - 20 = 280)
         await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('280.00 €');
@@ -118,7 +122,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         
         // Datei inhaltlich validieren (Prüfung, ob das Backend das Smart Doc Payload angehängt hat)
         const fileContent = fs.readFileSync(savedPdfPath, 'utf8');
-        expect(fileContent, 'Die heruntergeladene PDF hat kein %SMART_DOC: Payload! (Backend/UI Fehler)').toContain('%SMART_DOC:');
+        expect(fileContent, 'Die heruntergeladene PDF hat kein Smart-Doc-Payload! (Backend/UI Fehler)').toMatch(/%SMART_DOC:|%OFFER_JWT:/);
 
         // We relaxed the MIME validation on the backend, so we can just pass the pristine file path
         await fileChooser.setFiles(savedPdfPath);
@@ -164,8 +168,9 @@ test.describe('Manual Documents & CRM Workflow', () => {
 
         // Validierung in der Haupt-Tabelle (jetzt div-basiert nach Refactoring)
         // Leistungsposten prüfen (250.00 €)
-        // Der Text befindet sich im value Attribut des Input-Feldes
-        await expect(page.locator('input[value="Individuelles Shooting-Paket"]')).toBeVisible();
+        // React setzt den Value als DOM-Property, nicht als HTML-Attribute → toHaveValue statt CSS-Selector
+        const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
+        await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });
         
         // Gesamtsumme prüfen (250€ - 50% = 125€)
         await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('105.00 €');

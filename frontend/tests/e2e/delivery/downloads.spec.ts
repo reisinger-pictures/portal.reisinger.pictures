@@ -5,7 +5,6 @@ import {SidebarHelper} from '../helpers/SidebarHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 import {FormHelper} from '../helpers/FormHelper';
-import {Role} from '../../../src/logic/useUsers';
 
 test.describe('Download Triggers UI & Flatrate Restrictions', () => {
     let helper: E2ESessionHelper;
@@ -25,14 +24,11 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
     // --- Zentrale Setup-Funktion für alle isolierten Tests ---
     async function setupGalleryAndAssign(page: Page, request: APIRequestContext, flatrateLevel: 'print' | 'original') {
         const adminToken = helper.getAdminToken();
-        const rolesRes = await request.get('/api/management/roles', {headers: {'Cookie': adminToken}});
-        const roles = await rolesRes.json();
-        const clientRoleId = roles.find((r: Role) => r.name === 'client').id;
 
         // Kunden auf das gewünschte Flatrate-Level hochstufen
-        await request.put(`/api/management/users/${clientUser.id}`, {
+        // role_ids und brand nicht mitsenden — createIsolatedUser hat das bereits gesetzt
+        const putRes = await request.put(`/api/management/users/${clientUser.id}`, {
             data: {
-                role_ids: [clientRoleId],
                 gallery_group_ids: [],
                 gallery_ids: [],
                 can_edit_metadata: false,
@@ -40,6 +36,10 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
             },
             headers: {'Cookie': adminToken, 'Accept': 'application/json'}
         });
+        if (!putRes.ok()) {
+            console.error('PUT /api/management/users failed:', putRes.status(), await putRes.text());
+        }
+        expect(putRes.ok(), `Failed to update user flatrate_level to ${flatrateLevel}`).toBeTruthy();
 
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
@@ -68,7 +68,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
 
         const upload = new UploadHelper(page);
         await upload.uploadSampleImage();
-        await page.waitForTimeout(1000); // Backend I/O abwarten
+        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 10000 });
 
         await request.post(`/api/management/galleries/${galleryId}/sync-access`, {
             data: {user_id: clientUser.id, action: 'attach'},
@@ -84,6 +84,15 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         const auth = new AuthHelper(page);
 
         await auth.login(clientUser.email, clientUser.password);
+
+        // Verify flatrate_level is applied in the frontend
+        await expect(async () => {
+            const userData = await page.evaluate(() =>
+                fetch('/api/auth/me', { headers: { 'Accept': 'application/json' } }).then(r => r.json())
+            );
+            expect(userData.flatrate_level).toBe('print');
+        }).toPass({ timeout: 10000 });
+
         await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
         
         // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
@@ -91,7 +100,8 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         await expect(image).toBeVisible({timeout: 15000});
         await image.scrollIntoViewIfNeeded();
 
-        const zipDropdownBtn = page.locator('div[role="button"]').filter({hasText: 'Alle herunterladen (.zip)'});
+        const zipDropdownBtn = page.getByRole('button', { name: /Alle herunterladen/ });
+        await expect(zipDropdownBtn).toBeVisible({timeout: 10000});
         await zipDropdownBtn.click();
 
         // ASSERTION: Darf nur Web und Print sehen
@@ -125,11 +135,11 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         await image.scrollIntoViewIfNeeded();
 
         await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
-        await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible();
+        await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible({timeout: 10000});
 
         // Werbung/Kampagne erfordert Original -> Der Kunde hat aber nur Print
         // Da es ein normaler Kunde ist, darf er keine Upsells kaufen, daher ist die Option versteckt.
-        await expect(page.locator('label').filter({hasText: 'Werbung / Kampagne'})).toBeHidden();
+        await expect(page.locator('label').filter({hasText: 'Werbung / Kampagne'})).toBeHidden({timeout: 10000});
 
         const cartButton = page.getByRole('button', {name: /In den Warenkorb/i});
         await expect(cartButton).toBeHidden();
@@ -140,6 +150,15 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         const auth = new AuthHelper(page);
 
         await auth.login(clientUser.email, clientUser.password);
+
+        // Verify flatrate_level is applied in the frontend
+        await expect(async () => {
+            const userData = await page.evaluate(() =>
+                fetch('/api/auth/me', { headers: { 'Accept': 'application/json' } }).then(r => r.json())
+            );
+            expect(userData.flatrate_level).toBe('original');
+        }).toPass({ timeout: 10000 });
+
         await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
 
         // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
@@ -148,9 +167,11 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         await image.scrollIntoViewIfNeeded();
 
         await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
-        await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible();
+        await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible({timeout: 10000});
 
-        await page.locator('label').filter({hasText: 'Werbung / Kampagne'}).click();
+        const werbungLabel = page.getByText(/Werbung.*Kampagne|Kampagne.*Werbung/).first();
+        await expect(werbungLabel).toBeVisible({timeout: 10000});
+        await werbungLabel.click();
 
         const downloadLink = page.getByRole('link', {name: 'Download', exact: true}).first();
         await expect(downloadLink).toBeVisible();

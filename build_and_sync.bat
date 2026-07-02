@@ -15,9 +15,31 @@ cd ..
 
 echo.
 echo ===================================================
-echo 🧪 Starte Frontend E2E Tests...
+echo 🧪 Starte Frontend Unit Tests...
 echo ===================================================
 cd frontend
+call pnpm vitest run
+if %errorlevel% neq 0 (
+    echo ❌ Frontend Unit Tests fehlgeschlagen! Deployment abgebrochen.
+    cd ..
+    exit /b %errorlevel%
+)
+
+echo.
+echo ===================================================
+echo 🔧 Lint Frontend...
+echo ===================================================
+call pnpm lint:fix
+if %errorlevel% neq 0 (
+    echo ❌ Frontend Lint fehlgeschlagen! Deployment abgebrochen.
+    cd ..
+    exit /b %errorlevel%
+)
+
+echo.
+echo ===================================================
+echo 🧪 Starte Frontend E2E Tests...
+echo ===================================================
 call pnpm test:e2e
 if %errorlevel% neq 0 (
     echo ❌ Frontend E2E Tests fehlgeschlagen! Deployment abgebrochen.

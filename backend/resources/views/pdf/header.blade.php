@@ -1,12 +1,10 @@
 <div style="text-align: center; margin-bottom: 20px;">
     @php
-        $pfx = \App\Support\BrandRegistry::prefix();
         $logoPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $pfx . 'watermark.svg');
         if (!file_exists($logoPath)) {
             $logoPath = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/watermark.svg');
         }
 
-        $isSrp = \App\Support\BrandRegistry::isSrp();
         $primaryColor = $isSrp ? '#2A9D8F' : '#1E5631'; // Einheitliches Petrol für Rechnungen laut Vorgabe
         $secondaryColor = $isSrp ? '#2A9D8F' : '#A4B494';
     @endphp

@@ -6,8 +6,7 @@ class StoreGalleryRequest extends GalleryRequest
 {
     public function authorize(): bool
     {
-        // Nur Fotografen dürfen Galerien erstellen
-        return $this->user()?->is_photographer ?? false;
+        return $this->user() !== null && \Illuminate\Support\Facades\Gate::allows('create', \App\Models\Gallery::class);
     }
 
     public function rules(): array

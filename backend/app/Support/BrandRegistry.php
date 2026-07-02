@@ -6,15 +6,21 @@ use App\Enums\Brand;
 use App\Models\Order;
 
 /**
- * Central authority for brand resolution and `config('app.brand')` access.
+ * Central authority for brand resolution and container-scoped brand access.
  *
  * The brand identifier is the short enum code (`Brand::B2B->value` = 'rp',
  * `Brand::SRP->value` = 'srp'); `null` means explicitly cross-brand. All Host→brand mapping,
  * prefix logic, and persisted-brand reconstruction MUST go through this class so there is a
  * single source of truth (see features/infrastructure/12-brand-registry-and-settings-fixes.md).
+ *
+ * Brand state is stored in the container as a scoped singleton (`brand.context`)
+ * instead of global `config()`. This avoids cross-request and cross-job leakage
+ * because the binding is re-bound per request via BrandContextMiddleware.
  */
 class BrandRegistry
 {
+    private const CONTAINER_KEY = 'brand.context';
+
     /**
      * Resolve the brand from an HTTP host.
      *
@@ -29,11 +35,15 @@ class BrandRegistry
     }
 
     /**
-     * Current brand from config, or null if unset (CLI/queue context before reconstruction).
+     * Current brand from the container, or null if unset (CLI/queue context before reconstruction).
      */
     public static function current(): ?Brand
     {
-        return Brand::tryFrom((string) config('app.brand'));
+        if (!app()->bound(self::CONTAINER_KEY)) {
+            return null;
+        }
+        $value = app(self::CONTAINER_KEY);
+        return $value instanceof Brand ? $value : null;
     }
 
     /**
@@ -58,12 +68,16 @@ class BrandRegistry
     }
 
     /**
-     * Persist the brand into runtime config (`config('app.brand')`).
+     * Persist the brand into the container as a scoped singleton.
      * Pass null to clear (rare; mainly for tests).
      */
     public static function set(?Brand $brand): void
     {
-        config(['app.brand' => $brand?->value]);
+        if ($brand === null) {
+            app()->offsetUnset(self::CONTAINER_KEY);
+        } else {
+            app()->instance(self::CONTAINER_KEY, $brand);
+        }
     }
 
     /**
@@ -78,8 +92,8 @@ class BrandRegistry
     /**
      * Reset the runtime brand to null.
      *
-     * Queue workers (php artisan queue:work) are long-lived — config persists across jobs.
-     * Call reset() before/after each job to prevent stale brand state from leaking between
+     * Queue workers (php artisan queue:work) are long-lived — container state persists across
+     * jobs. Call reset() before/after each job to prevent stale brand state from leaking between
      * jobs. The reset is wired via Queue::before() in AppServiceProvider::boot().
      */
     public static function reset(): void

@@ -118,19 +118,27 @@ class OrderController extends Controller
         $order = Order::where('id', $id)->where('user_id', auth()->id())->with('invoiceSnapshot')->firstOrFail();
         if ($order->is_quote_request && $order->status === 'pending') abort(403, 'Angebot noch nicht abgerechnet.');
 
-        // Reconstruct brand from the persisted order, not from the current request host, so an
-        // SRP order always renders with SRP branding/bank details even when downloaded via a B2B
-        // link (B-01 F2). SettingResolver reads the brand via BrandRegistry afterwards.
-        \App\Support\BrandRegistry::set(\App\Support\BrandRegistry::resolveFromOrder($order));
+        $brand = \App\Support\BrandRegistry::resolveFromOrder($order);
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', [
-            'order' => $order,
-            'snapshot' => $order->invoiceSnapshot,
-            'items' => $order->invoiceSnapshot->customer_details['items'] ?? [],
-            'bankHolder' => $resolver->get('bank_holder'),
-            'bankIban' => $resolver->get('bank_iban'),
-            'bankBic' => $resolver->get('bank_bic')
-        ])->download($order->invoiceSnapshot->invoice_number . '.pdf');
+        // Temporarily set brand so SettingResolver reads the correct brand scope,
+        // then restore to prevent leakage to the rest of the request.
+        $previousBrand = \App\Support\BrandRegistry::current();
+        \App\Support\BrandRegistry::set($brand);
+
+        try {
+            return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', [
+                'order' => $order,
+                'snapshot' => $order->invoiceSnapshot,
+                'items' => $order->invoiceSnapshot->customer_details['items'] ?? [],
+                'bankHolder' => $resolver->get('bank_holder'),
+                'bankIban' => $resolver->get('bank_iban'),
+                'bankBic' => $resolver->get('bank_bic'),
+                'isSrp' => $brand === \App\Enums\Brand::SRP,
+                'pfx' => $brand->prefix(),
+            ])->download($order->invoiceSnapshot->invoice_number . '.pdf');
+        } finally {
+            \App\Support\BrandRegistry::set($previousBrand);
+        }
     }
 
     
@@ -166,13 +174,18 @@ class OrderController extends Controller
         $viewName = $isOffer ? 'pdf.manual_offer' : 'pdf.invoice';
         $bankDetails = $this->invoiceService->getBankDetails();
 
+        $isSrp = \App\Support\BrandRegistry::isSrp();
+        $pfx = \App\Support\BrandRegistry::prefix();
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
             'title' => $docTitle,
             'snapshot' => $snapshot,
             'items' => $mappedItems,
             'bankHolder' => $bankDetails['holder'],
             'bankIban' => $bankDetails['iban'],
-            'bankBic' => $bankDetails['bic']
+            'bankBic' => $bankDetails['bic'],
+            'isSrp' => $isSrp,
+            'pfx' => $pfx,
         ]);
 
         $output = $pdf->output();

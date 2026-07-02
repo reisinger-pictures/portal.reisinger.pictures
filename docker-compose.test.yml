@@ -19,6 +19,7 @@ services:
       MEILI_ENV: development
       MEILI_MASTER_KEY: test_meili_secret
     ports: ["7701:7700"]
+    volumes: ["search_data_test:/meili_data"]
 
   mailpit:
     image: axllent/mailpit
@@ -30,3 +31,4 @@ services:
 
 volumes:
   db_data_test:
+  search_data_test:

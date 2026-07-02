@@ -16,6 +16,11 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: "15s"
+      timeout: 5s
+      retries: 10
     networks:
       - portal_internal
 
@@ -32,6 +37,11 @@ services:
       MEILI_ENV: production
     volumes:
       - search_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: "15s"
+      timeout: 5s
+      retries: 5
     networks:
       - portal_internal
 
@@ -48,9 +58,9 @@ services:
     restart: unless-stopped
     depends_on:
       db:
-        condition: service_started
+        condition: service_healthy
       search:
-        condition: service_started
+        condition: service_healthy
       composer_init:
         condition: service_completed_successfully
     logging:
@@ -94,10 +104,14 @@ services:
       - STRIPE_SECRET=${STRIPE_SECRET}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - PROXY_DELIVERY_HEADER=${PROXY_DELIVERY_HEADER}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/healthcheck.php"]
+      interval: "30s"
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     command: >
       sh -c "
-      echo 'Warte 10 Sekunden auf Services (MariaDB & Meilisearch)...';
-      sleep 10;
       
       if [ "$APP_ENV" = "production" ]; then
         if [ "$APP_KEY" = "base64:APP_KEY_REDACTED" ] || [ "$JWT_SECRET" = "JWT_SECRET_REDACTED" ]; then
@@ -139,6 +153,12 @@ services:
     depends_on:
       backend:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: "30s"
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     logging:
       driver: "json-file"
       options:

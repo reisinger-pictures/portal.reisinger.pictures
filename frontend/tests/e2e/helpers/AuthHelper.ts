@@ -14,9 +14,9 @@ export class AuthHelper {
         await expect(this.page.getByTestId('app-loader').first()).toBeHidden({ timeout: 5000 });
         await expect(this.page.locator('main').first()).toBeVisible({ timeout: 5000 });
 
-        const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('.mdi--menu') }).first();
+        const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('svg') }).first();
         const emailInput = this.page.locator('input[placeholder="E-Mail Adresse"]').first();
-        const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
+        const backdrop = this.page.locator('div.fixed.inset-0').first();
 
         if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
             await expect(async () => {
@@ -25,7 +25,6 @@ export class AuthHelper {
                 }
                 await expect(backdrop).toBeVisible({ timeout: 2000 });
             }).toPass({ timeout: 10000 });
-            await this.page.waitForTimeout(400);
         }
 
         if (await emailInput.isVisible()) {
@@ -35,7 +34,8 @@ export class AuthHelper {
             const loginPromise = this.network.waitForLogin();
             const mePromise = this.network.waitForMe();
 
-            await this.page.getByRole('button', { name: 'Login' }).first().click();
+            await this.page.getByRole('button', { name: 'Login' }).first().scrollIntoViewIfNeeded();
+            await this.page.keyboard.press('Enter');
             await loginPromise;
             await mePromise;
 
@@ -55,8 +55,8 @@ export class AuthHelper {
 
         const emailInput = this.page.getByPlaceholder('E-Mail Adresse').first();
         await expect(async () => {
-            const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('.mdi--menu') }).first();
-            const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
+            const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('svg') }).first();
+            const backdrop = this.page.locator('div.fixed.inset-0').first();
             
             if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
                 await expect(async () => {
@@ -65,7 +65,6 @@ export class AuthHelper {
                     }
                     await expect(backdrop).toBeVisible({ timeout: 2000 });
                 }).toPass({ timeout: 10000 });
-                await this.page.waitForTimeout(400);
             }
             await expect(emailInput).toBeVisible({ timeout: 2000 });
         }).toPass({ timeout: 5000 });

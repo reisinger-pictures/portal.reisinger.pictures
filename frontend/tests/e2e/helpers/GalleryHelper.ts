@@ -27,7 +27,7 @@ export class GalleryHelper {
         await expect(async () => {
             await expect(galLink).toBeVisible({ timeout: 2000 });
             await galLink.scrollIntoViewIfNeeded();
-            await galLink.click();
+            await galLink.evaluate(el => (el as HTMLElement).click());
         }).toPass({ timeout: 15000 });
 
         await expect(this.page.getByRole('heading', { name })).toBeVisible();

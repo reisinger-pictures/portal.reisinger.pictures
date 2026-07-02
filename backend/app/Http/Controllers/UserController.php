@@ -49,17 +49,6 @@ class UserController extends Controller
 
     public function store(StoreUserRequest $request)
     {
-        $currentUser = auth('api')->user();
-
-        $validated = $request->validated();
-
-        if (!$currentUser->is_admin) {
-            if (!$currentUser->is_customer_manager) {
-                return response()->json(['error' => 'Forbidden'], 403);
-            }
-            return response()->json(['error' => 'Not implemented for Customer Managers yet.'], 403);
-        }
-
         return \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
             $user = User::create([
                 'name' => $request->name,
@@ -117,9 +106,15 @@ class UserController extends Controller
 
         $validated = $request->validated();
 
-        $user->roles()->sync($request->role_ids ?? []);
-        $user->galleryGroups()->sync($request->gallery_group_ids ?? []);
-        $user->galleries()->sync($request->gallery_ids ?? []);
+        if ($request->has('role_ids')) {
+            $user->roles()->sync($request->role_ids);
+        }
+        if ($request->has('gallery_group_ids')) {
+            $user->galleryGroups()->sync($request->gallery_group_ids);
+        }
+        if ($request->has('gallery_ids')) {
+            $user->galleries()->sync($request->gallery_ids);
+        }
 
         if ($request->has('can_edit_metadata')) {
             $user->update(['can_edit_metadata' => $request->can_edit_metadata]);

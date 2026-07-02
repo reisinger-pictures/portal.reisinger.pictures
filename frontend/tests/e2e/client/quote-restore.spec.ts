@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
 
 test.describe('Quote Cart Restore Workflow', () => {
     let helper: E2ESessionHelper;
@@ -27,8 +28,15 @@ test.describe('Quote Cart Restore Workflow', () => {
         const quoteData = await quoteRes.json();
         const quoteToken = quoteData.link.split('quote_token=')[1];
 
-        // Simuliere den Klick auf den Link, den der Kunde vom Fotografen erhalten hat
-        await page.goto(`/cart?quote_token=${quoteToken}`);
+        // Simuliere den Klick auf den Link: SPA-navigiere zum Warenkorb, dann token per URL setzen
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateTo('Warenkorb');
+        await page.evaluate((token) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('quote_token', token);
+            window.history.pushState({}, '', url.toString());
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        }, quoteToken);
 
         // UI-First Assertions
         const toast = page.locator('.toast');

@@ -5,6 +5,7 @@ import {useState} from 'react';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
+import {useFocusTrap} from '../../../logic/useFocusTrap';
 
 interface LicenseSelectorModalProps {
     photo: Photo | null;
@@ -18,6 +19,7 @@ interface TierOption {
 }
 
 export default function LicenseSelectorModal({photo, onClose}: LicenseSelectorModalProps) {
+    const modalRef = useFocusTrap(!!photo);
     const [usage, setUsage] = useState<UsageTier>('editorial');
     const [duration, setDuration] = useState<DurationTier>('1_year');
     const {terms} = useLicenseTerms();
@@ -53,7 +55,7 @@ export default function LicenseSelectorModal({photo, onClose}: LicenseSelectorMo
     };
 
     return (
-        <div className="modal modal-open z-[70]">
+        <div ref={modalRef} className="modal modal-open z-[70]">
             <div className="modal-box relative max-w-2xl">
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-2 flex items-center gap-2">

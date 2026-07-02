@@ -20,7 +20,7 @@ test.describe('Organisation Scope Coupons', () => {
         if (helper) await helper.teardown();
     });
 
-    async function setupGalleryWithPhoto(page: Page): Promise<string> {
+    async function setupGalleryWithPhoto(page: Page): Promise<{ galleryUrl: string; galleryName: string }> {
         const auth = new AuthHelper(page);
         const upload = new UploadHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
@@ -28,17 +28,17 @@ test.describe('Organisation Scope Coupons', () => {
         await auth.login(photogUser.email, photogUser.password, 'http://buy.localhost:4321/');
 
         const galleryName = `OrgScope ${Math.random().toString(36).substring(2, 10)}`;
-        await galleryHelper.createAndOpenDeliveryGallery(galleryName);
+        await galleryHelper.createAndOpenDeliveryGallery(galleryName, 'Öffentlich (Für alle sichtbar)');
 
         await upload.uploadSampleImage();
         const galleryUrl = page.url();
         await auth.logout('http://buy.localhost:4321/');
 
-        return galleryUrl;
+        return { galleryUrl, galleryName };
     }
 
-    async function addItemToCart(page: Page, galleryUrl: string) {
-        await page.goto(galleryUrl);
+    async function addItemToCart(page: Page, galleryName: string) {
+        await page.locator('main').getByText(galleryName).first().click();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         await page.getByRole('button', { name: 'In den Warenkorb' }).click();
@@ -46,7 +46,7 @@ test.describe('Organisation Scope Coupons', () => {
     }
 
     test('User with matching tenant validates successfully', async ({ page }) => {
-        const galleryUrl = await setupGalleryWithPhoto(page);
+        const { galleryName } = await setupGalleryWithPhoto(page);
 
         await page.route('**/api/coupons/validate', async route => {
             const body = JSON.parse(route.request().postData() || '{}');
@@ -68,7 +68,7 @@ test.describe('Organisation Scope Coupons', () => {
         const auth = new AuthHelper(page);
         await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
 
-        await addItemToCart(page, galleryUrl);
+        await addItemToCart(page, galleryName);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Warenkorb');
@@ -84,7 +84,7 @@ test.describe('Organisation Scope Coupons', () => {
     });
 
     test('User without matching tenant fails validation', async ({ page }) => {
-        const galleryUrl = await setupGalleryWithPhoto(page);
+        const { galleryName } = await setupGalleryWithPhoto(page);
 
         await page.route('**/api/coupons/validate', async route => {
             const body = JSON.parse(route.request().postData() || '{}');
@@ -105,7 +105,7 @@ test.describe('Organisation Scope Coupons', () => {
         const auth = new AuthHelper(page);
         await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
 
-        await addItemToCart(page, galleryUrl);
+        await addItemToCart(page, galleryName);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Warenkorb');
@@ -116,6 +116,6 @@ test.describe('Organisation Scope Coupons', () => {
         await couponInput.fill('ORG10');
         await page.getByRole('button', { name: 'Anwenden' }).click();
 
-        await expect(page.getByRole('alert')).toContainText('Dieser Rabattcode gilt nur für berechtigte Organisationen.');
+        await expect(page.getByRole('alert').first()).toContainText('Dieser Rabattcode gilt nur für berechtigte Organisationen.');
     });
 });

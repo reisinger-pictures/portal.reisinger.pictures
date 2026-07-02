@@ -13,13 +13,6 @@ export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderPr
     const [searchParams] = useSearchParams();
     const qParam = searchParams.get('q') || '';
     const [searchQuery, setSearchQuery] = useState(qParam);
-    const [prevQParam, setPrevQParam] = useState(qParam);
-    
-    
-    if (qParam !== prevQParam) {
-        setPrevQParam(qParam);
-        setSearchQuery(qParam);
-    }
 
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const { results: searchResults } = useSearch(searchQuery, false, true);

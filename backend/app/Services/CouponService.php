@@ -138,6 +138,39 @@ class CouponService
     }
 
     /**
+     * Lock the coupon row for update within an existing transaction and re-validate usage limits.
+     * Must be called from within a DB transaction (serialisable checkpoint).
+     *
+     * @return array{0: Coupon|null, 1: string|null}
+     */
+    public function lockAndRevalidateCoupon(Coupon $coupon, int|string|null $userId = null): array
+    {
+        try {
+            /** @var Coupon|null $fresh */
+            $fresh = Coupon::where('id', $coupon->id)->lockForUpdate()->first();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
+                return [null, 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'];
+            }
+            throw $e;
+        }
+
+        if ($fresh === null) {
+            return [null, 'Coupon not found.'];
+        }
+
+        if ($fresh->isGloballyMaxedOut()) {
+            return [null, 'This coupon has reached its usage limit.'];
+        }
+
+        if ($userId !== null && $fresh->isPerAccountMaxedOut($userId)) {
+            return [null, 'You have reached the usage limit for this coupon.'];
+        }
+
+        return [$fresh, null];
+    }
+
+    /**
      * Apply a valid coupon to the cart calculation.
      *
      * @param  Coupon $coupon         The validated coupon.
@@ -217,12 +250,10 @@ class CouponService
      */
     public function incrementUsage(Coupon $coupon, int|string|null $userId = null): void
     {
-        // Global counter
         DB::table('coupons')
             ->where('id', $coupon->id)
-            ->update(['used_count' => $coupon->used_count + 1]);
+            ->increment('used_count');
 
-        // Per-account counter
         if ($userId !== null) {
             CouponUserUsage::updateOrCreate(
                 ['coupon_id' => $coupon->id, 'user_id' => $userId],

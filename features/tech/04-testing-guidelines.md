@@ -6,16 +6,18 @@ status: active
 
 # Technical Concept: Testing Guidelines
 
-* **Mocking-Verbot in E2E-Tests (STRIKT):** Das Mocking von internen API-Endpunkten (z.B. via `page.route`) in Playwright-Tests ist untersagt. E2E-Tests müssen die echte System-Integration validieren.
+* **Mocking-Verbot in E2E-Tests (STRIKT):** Das Mocking von internen CRUD-API-Endpunkten (z.B. `page.route('**/api/galleries/*')`, `page.route('**/api/photos/*')`, `page.route('**/api/auth/me')`) in Playwright-Tests ist untersagt. E2E-Tests müssen die echte System-Integration validieren.
+  * **Ausnahme 1 – Externe Integrationen:** Endpunkte, die ausschließlich als Proxy für externe Dienste fungieren (z.B. `/api/ai/*`, `/api/coupons/validate`), dürfen gemockt werden, wenn der externe Dienst in der Testumgebung nicht verfügbar ist. Dies muss im Test-Kommentar explizit dokumentiert werden.
+  * **Ausnahme 2 – Nicht steuerbarer UI-State:** `page.route('**/api/auth/me', ...)` darf verwendet werden, um UI-Entscheidungen zu testen, die auf serverseitigen Konfigurations-Flags (`ai_is_unconfigured`) basieren, die über die Test-API nicht gesetzt werden können.
 * **Golden Rule (Features First):** Der `features/`-Ordner ist die primäre Wissensbasis. Jede neue Logik muss dort im Soll-Zustand dokumentiert werden, bevor sie implementiert wird. Der Ordner ist bei jeder Änderung aktuell zu halten.
 
 ## 1. Testing Rules (UI-FIRST) & Philosophy
 * **No Test-Environment Checks in Production (STRICT):** Production code must never alter its behavior based on test environments (e.g., checking `navigator.userAgent.includes('Playwright')`). Tests must validate the genuine application behavior. If tests flake due to realistic features (like `revalidateOnFocus`), fix the test assertions, do not cripple the application UX.
 * **No Shared State / No Serial Execution (STRICT):** The use of `test.describe.serial` is strictly forbidden. Tests must be 100% isolated. Do not share variables (like URLs or IDs) across `test()` blocks. If steps depend on each other, combine them into a single, cohesive End-to-End `test()` block.
 * **UI-First Synchronization (MANDATORY):**
-  * Never use `page.waitForResponse()` or network status codes to verify UI updates. E2E tests must only care about what the user sees.
-  * Use `expect(locator).toBeVisible({ timeout: 15000 })` for simple updates.
-  * Use `await expect(async () => { ... }).toPass()` for complex SWR/React state transitions where multiple re-renders occur.
+  * Prefer `expect(locator).toBeVisible({ timeout: 15000 })` for simple UI updates.
+  * Prefer `await expect(async () => { ... }).toPass()` for complex SWR/React state transitions where multiple re-renders occur.
+  * `page.waitForResponse()` ist **ausnahmsweise erlaubt**, wenn eine Aktion keine sichtbare UI-Änderung erzeugt (z.B. Hintergrund-API-Calls beim Checkout, Locations-Suche). Der Response darf jedoch **nicht** zur Statuscode-Assertion verwendet werden — die Validierung muss immer über die sichtbare UI erfolgen. Die Nutzung muss im Test-Kommentar begründet werden.
 * **No `page.goto` for SPA Navigation (STRICT):** Nach erfolgreichem Login MUSS die Seitennavigation ausschließlich über `sidebar.navigateTo()` (SPA Client-Side Routing) erfolgen. `page.goto()` ist nur in folgenden Ausnahmefällen erlaubt:
   * Initialer Seitenaufruf vor dem Login (z.B. `page.goto('/')` im `AuthHelper`)
   * Navigation zu externen URLs (Invite-Links, Magic-Links, Password-Reset-Tokens)
@@ -80,3 +82,36 @@ status: active
 
 ## 6. Form Validation & HTML5
 - **Required Fields:** E2E Tests dürfen niemals blind auf Submit-Buttons klicken, wenn native HTML5 `required` Felder existieren. Der Browser blockiert die Navigation stumm, und Playwright läuft in Timeouts. Fülle Formulare immer vollständig aus.
+
+## 7. Brand-Switching in E2E Tests (Referer Header)
+
+* **Brand-Kontext via `Referer` Header (NICHT via `data.brand`):** Um Management-API-Calls im Kontext einer bestimmten Brand auszuführen (z.B. User anlegen, Flaterate-Level setzen), MUSS der `Referer`-Header auf die entsprechende Frontend-Domain gesetzt werden. Das direkte Setzen von `data.brand: 'srp'` im Request-Body ist **verboten**, da die Brand-Zuweisung ausschließlich über den Brand-Kontext (ermittelt via `Referer`) erfolgt und `UpdateUserRequest` keine Brand-Überschreibung via Body erlaubt.
+  * **RP (Default):** `Referer: http://localhost:4321/` oder weglassen (Default-Fallback im Backend)
+  * **SRP:** `Referer: http://buy.localhost:4321/`
+  * **Anmerkung:** `createIsolatedUser('client', { brand: 'srp' })` setzt den Referer automatisch.
+* **Verbotene Muster (anti-pattern):**
+  ```typescript
+  // NIEMALS brand direkt im data-Body setzen:
+  await request.put(`/api/management/users/${userId}`, {
+      data: { brand: 'srp', ... }  // → 422 Error
+  });
+  ```
+  ```typescript
+  // NIEMALS role_ids ohne Brand-Kontext erneut senden:
+  await request.put(`/api/management/users/${userId}`, {
+      data: { role_ids: [clientRoleId], ... }  // → 422 "Brand-Zuweisung erforderlich"
+  });
+  ```
+* **Korrektes Muster:**
+  ```typescript
+  // Brand-Kontext via Referer (wenn nicht bereits durch createIsolatedUser gesetzt):
+  await request.put(`/api/management/users/${userId}`, {
+      data: { flatrate_level: 'print' },
+      headers: {
+          'Cookie': adminToken,
+          'Accept': 'application/json',
+          'Referer': 'http://localhost:4321/'
+      }
+  });
+  // role_ids nicht erneut senden — createIsolatedUser hat sie bereits gesetzt.
+  ```

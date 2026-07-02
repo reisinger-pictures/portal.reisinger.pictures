@@ -115,18 +115,17 @@ class GalleryFrontendController extends Controller
             }
         }
 
-        \App\Models\Rating::updateOrCreate(
-            [
-                'photo_id' => $photo->id,
-                'user_id' => $user->id,
-                'guest_id' => $user->guest_id
-            ],
-            [
-                'rating' => $request->rating,
-                'comment' => $request->comment ?? '',
-                'guest_name' => $user->id ? null : $user->name
-            ]
-        );
+        if ($user->id) {
+            \App\Models\Rating::updateOrCreate(
+                ['photo_id' => $photo->id, 'user_id' => $user->id],
+                ['rating' => $request->rating, 'comment' => $request->comment ?? '']
+            );
+        } else {
+            \App\Models\Rating::updateOrCreate(
+                ['photo_id' => $photo->id, 'guest_id' => $user->guest_id],
+                ['rating' => $request->rating, 'comment' => $request->comment ?? '', 'guest_name' => $user->name]
+            );
+        }
 
         return response()->json(['success' => true]);
     }

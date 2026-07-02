@@ -53,7 +53,7 @@ describe('isEmptyRow', () => {
     });
 
     it('returns false for a non-item type (e.g. discount)', () => {
-        expect(isEmptyRow({type: 'discount_fixed', description: '', notes: '', qty: 1, price: 0} as InvoiceItem)).toBe(false);
+        expect(isEmptyRow({type: 'discount_fixed', description: '', notes: '', qty: 1, price: 0} as InvoiceItem)).toBe(true);
     });
 
     it('returns false when qty differs from default 1', () => {

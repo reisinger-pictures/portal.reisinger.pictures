@@ -12,6 +12,29 @@ export const aiResponseSchema = z.object({
 
 export type AIResponse = z.infer<typeof aiResponseSchema>;
 
+const lmStudioUrlSchema = z.string().refine(val => {
+    try {
+        const url = new URL(val);
+        return (
+            url.protocol === 'http:' &&
+            (url.hostname === '127.0.0.1' || url.hostname === 'localhost') &&
+            url.port !== ''
+        );
+    } catch {
+        return false;
+    }
+}, 'LM Studio URL must be http://127.0.0.1:PORT or http://localhost:PORT');
+
+function getLmStudioUrl(): string {
+    const raw = localStorage.getItem('lmstudio_url') || import.meta.env.VITE_LMSTUDIO_URL || 'http://127.0.0.1:1234';
+    const result = lmStudioUrlSchema.safeParse(raw);
+    if (!result.success) {
+        console.warn('Invalid LM Studio URL configured, falling back to default', result.error);
+        return 'http://127.0.0.1:1234';
+    }
+    return result.data;
+}
+
 type AIMode = 'server' | 'local' | 'unavailable';
 
 export function useAI() {
@@ -43,7 +66,7 @@ export function useAI() {
                 }
             } catch (err) { console.error('AI metadata generation failed', err); }
 
-            const localUrl = localStorage.getItem('lmstudio_url') || import.meta.env.VITE_LMSTUDIO_URL || 'http://127.0.0.1:1234';
+            const localUrl = getLmStudioUrl();
             try {
                 const res = await fetch(localUrl + '/v1/models');
                 const data = await res.json();
@@ -92,7 +115,7 @@ export function useAI() {
             return validationResult.data;
         }
 
-        const baseUrl = localStorage.getItem('lmstudio_url') || import.meta.env.VITE_LMSTUDIO_URL || 'http://127.0.0.1:1234';
+        const baseUrl = getLmStudioUrl();
         const photoResponse = await fetch(`/api/photos/${photoId}/context`, { credentials: 'include' });
         if (!photoResponse.ok) throw new Error('Could not fetch photo data');
         const photoData = await photoResponse.json();
@@ -158,7 +181,12 @@ export function useAI() {
     }, []);
 
     const updateBaseUrl = useCallback((url: string) => {
-        localStorage.setItem('lmstudio_url', url);
+        const result = lmStudioUrlSchema.safeParse(url);
+        if (result.success) {
+            localStorage.setItem('lmstudio_url', url);
+        } else {
+            console.warn('Attempted to save invalid LM Studio URL', result.error);
+        }
     }, []);
 
     return { isAvailable, mode, modelId, generateMetadata, generateMetadataFromText, updateBaseUrl };

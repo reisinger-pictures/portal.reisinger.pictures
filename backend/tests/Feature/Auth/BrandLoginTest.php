@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Enums\Brand;
+use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\User;
+use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,13 +28,10 @@ class BrandLoginTest extends TestCase
             'password' => bcrypt('secret'),
             'brand' => Brand::B2B,
         ]);
+        BrandRegistry::set(Brand::SRP);
 
-        config(['app.brand' => Brand::SRP->value]);
-
-        $response = $this->postJson('/api/auth/login', [
-            'email' => $user->email,
-            'password' => 'secret',
-        ]);
+        $response = $this->withoutMiddleware(BrandContextMiddleware::class)
+            ->postJson('/api/auth/login', $this->credentials($user));
 
         $response->assertStatus(403);
         $response->assertJsonPath('error', 'Dieser Account ist für ein anderes Portal registriert.');
@@ -45,12 +44,7 @@ class BrandLoginTest extends TestCase
             'brand' => Brand::SRP,
         ]);
 
-        config(['app.brand' => Brand::B2B->value]);
-
-        $response = $this->postJson('/api/auth/login', [
-            'email' => $user->email,
-            'password' => 'secret',
-        ]);
+        $response = $this->postJson('/api/auth/login', $this->credentials($user));
 
         $response->assertStatus(403);
         $response->assertJsonPath('error', 'Dieser Account ist für ein anderes Portal registriert.');
@@ -63,12 +57,7 @@ class BrandLoginTest extends TestCase
             'brand' => null,
         ]);
 
-        config(['app.brand' => Brand::B2B->value]);
-
-        $response = $this->postJson('/api/auth/login', [
-            'email' => $user->email,
-            'password' => 'secret',
-        ]);
+        $response = $this->postJson('/api/auth/login', $this->credentials($user));
 
         $response->assertStatus(200);
         $response->assertCookie('rp_jwt');
@@ -80,13 +69,10 @@ class BrandLoginTest extends TestCase
             'password' => bcrypt('secret'),
             'brand' => null,
         ]);
+        BrandRegistry::set(Brand::SRP);
 
-        config(['app.brand' => Brand::SRP->value]);
-
-        $response = $this->postJson('/api/auth/login', [
-            'email' => $user->email,
-            'password' => 'secret',
-        ]);
+        $response = $this->withoutMiddleware(BrandContextMiddleware::class)
+            ->postJson('/api/auth/login', $this->credentials($user));
 
         $response->assertStatus(200);
         $response->assertCookie('rp_jwt');
@@ -99,12 +85,7 @@ class BrandLoginTest extends TestCase
             'brand' => Brand::B2B,
         ]);
 
-        config(['app.brand' => Brand::B2B->value]);
-
-        $response = $this->postJson('/api/auth/login', [
-            'email' => $user->email,
-            'password' => 'secret',
-        ]);
+        $response = $this->postJson('/api/auth/login', $this->credentials($user));
 
         $response->assertStatus(200);
         $response->assertCookie('rp_jwt');
@@ -116,13 +97,10 @@ class BrandLoginTest extends TestCase
             'password' => bcrypt('secret'),
             'brand' => Brand::SRP,
         ]);
+        BrandRegistry::set(Brand::SRP);
 
-        config(['app.brand' => Brand::SRP->value]);
-
-        $response = $this->postJson('/api/auth/login', [
-            'email' => $user->email,
-            'password' => 'secret',
-        ]);
+        $response = $this->withoutMiddleware(BrandContextMiddleware::class)
+            ->postJson('/api/auth/login', $this->credentials($user));
 
         $response->assertStatus(200);
         $response->assertCookie('rp_jwt');
@@ -135,8 +113,6 @@ class BrandLoginTest extends TestCase
             'brand' => Brand::B2B,
         ]);
 
-        config(['app.brand' => Brand::SRP->value]);
-
         $response = $this->postJson('/api/auth/login', [
             'email' => $user->email,
             'password' => 'wrong-password',
@@ -144,5 +120,10 @@ class BrandLoginTest extends TestCase
 
         // Wrong password must return 401 before brand check is reached.
         $response->assertStatus(401);
+    }
+
+    private function credentials(User $user): array
+    {
+        return ['email' => $user->email, 'password' => 'secret'];
     }
 }

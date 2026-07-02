@@ -46,7 +46,7 @@ test.describe('Client Notifications Opt-In', () => {
         await page.locator('button[role="tab"]').filter({ hasText: 'Kundenansicht' }).click();
         
         // Toggle finden und klicken
-        const toggle = page.locator('input[type="checkbox"].toggle-primary');
+        const toggle = page.locator('main input[type="checkbox"]').first();
         await expect(toggle).toBeVisible();
         
         const isCheckedInitial = await toggle.isChecked();
@@ -59,7 +59,7 @@ test.describe('Client Notifications Opt-In', () => {
         
         // Neuladen um Persistenz zu verifizieren
         await page.reload();
-        const toggleAfterReload = page.locator('input[type="checkbox"].toggle-primary');
+        const toggleAfterReload = page.locator('main input[type="checkbox"]').first();
         await expect(toggleAfterReload).toBeVisible();
         expect(await toggleAfterReload.isChecked()).not.toBe(isCheckedInitial);
     });

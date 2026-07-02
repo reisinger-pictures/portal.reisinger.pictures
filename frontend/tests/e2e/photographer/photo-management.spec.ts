@@ -79,7 +79,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page.locator('.toast')).toContainText('Metadaten gespeichert');
 
-        await page.locator('button.btn-ghost:has(.mdi--arrow-left)').click();
+        await page.locator('main button:has(span.mdi--arrow-left)').click();
         await page.getByRole('button', { name: 'Einladungslink...' }).click();
 
         await modal.toggleCheckboxByLabel('Gast darf Metadaten bearbeiten', true);
@@ -118,8 +118,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
         await page.locator('button[title="Details & Metadaten"]').first().click();
         await expect(page.locator('div.form-control').filter({ hasText: 'Titel' }).locator('input')).toHaveValue('Titel geändert durch den Kunden');
-        await page.waitForTimeout(500);
-
+        await expect(page.getByRole('button', { name: 'Historie' })).toBeVisible({ timeout: 5000 });
         await page.getByRole('button', { name: 'Historie' }).click();
         const historyModal = page.locator('.modal-open');
         await expect(historyModal.locator('h3:has-text("Änderungshistorie")')).toBeVisible();
@@ -168,6 +167,8 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
         await auth.logout();
 
+        // Route-Guard: Gast kann abgelaufene Galerie nicht aufrufen
+        // page.goto() ist für diesen Route-Guard-Test nötig (direkter URL-Zugriff)
         await page.goto(href as string);
         await expect(page.locator('text=Galerie nicht gefunden oder Zugriff verweigert.')).toBeVisible();
     });
@@ -181,7 +182,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
 
         await expect(page.locator('text=Dieser Einladungslink ist ungültig oder abgelaufen.')).toBeVisible();
 
-        await page.goto('/');
+        await auth.login(clientUser.email, clientUser.password);
         await expect(page.locator('h1:has-text("Willkommen zurück")')).toBeVisible();
     });
 

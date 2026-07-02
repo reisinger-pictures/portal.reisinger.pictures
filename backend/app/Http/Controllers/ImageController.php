@@ -71,7 +71,14 @@ class ImageController extends Controller
             } else {
                 $query->where('id', 'invalid-id-to-force-create');
             }
-            $existingPhoto = $query->lockForUpdate()->first();
+            try {
+                $existingPhoto = $query->lockForUpdate()->first();
+            } catch (\Illuminate\Database\QueryException $e) {
+                if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
+                    return response()->json(['error' => 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'], 503);
+                }
+                throw $e;
+            }
 
             // Dateinamen IMMER aus UUID generieren!
             $photoId = $existingPhoto ? $existingPhoto->id : (string) Str::uuid();
@@ -87,20 +94,23 @@ class ImageController extends Controller
             $targetPath = Storage::disk('photos')->path($targetDir . '/' . $filename);
             $thumbPath = Storage::disk('photos')->path($thumbsDir . '/' . md5($filename . '1024') . '.webp');
 
+            $photoModel = new Photo();
+            $filteredMeta = array_intersect_key($meta, array_flip($photoModel->getFillable()));
+
             if ($existingPhoto) {
-                $existingPhoto->forceFill(array_merge([
+                $existingPhoto->fill(array_merge([
                     'user_id' => $user->id,
                     'lr_uuid' => $lrUuid
-                ], $meta))->save();
+                ], $filteredMeta))->save();
                 $photo = $existingPhoto;
             } else {
                 $photo = new Photo();
-                $photo->forceFill(array_merge([
+                $photo->fill(array_merge([
                     'id' => $photoId,
                     'gallery_id' => $gallery->id, 
                     'lr_uuid' => $lrUuid, 
                     'user_id' => $user->id
-                ], $meta))->save();
+                ], $filteredMeta))->save();
             }
 
             return response()->json(['success' => true, 'photo_id' => $photo->id]);

@@ -7,11 +7,16 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class DeletePhotoFilesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $tries = 3;
+
+    public $backoff = [30, 60, 120];
 
     protected $galleryId;
     protected $filename;
@@ -45,5 +50,16 @@ class DeletePhotoFilesJob implements ShouldQueue
         }
 
         Storage::disk('photos')->delete($paths);
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('Queue job failed', [
+            'job' => static::class,
+            'galleryId' => $this->galleryId,
+            'filename' => $this->filename,
+            'photoId' => $this->photoId,
+            'exception' => $exception->getMessage(),
+        ]);
     }
 }

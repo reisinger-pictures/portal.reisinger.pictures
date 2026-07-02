@@ -14,4 +14,9 @@ class GalleryPolicy
     {
         return $user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($gallery->id));
     }
+
+    public function create(User $user): bool
+    {
+        return $user->is_super_admin || $user->is_photographer;
+    }
 }

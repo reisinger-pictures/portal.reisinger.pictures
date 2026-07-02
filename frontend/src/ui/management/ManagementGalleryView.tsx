@@ -4,7 +4,8 @@ import ErrorMessage from '../components/ErrorMessage';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams, useSearchParams} from 'react-router-dom';
 import {useGallery} from '../../logic/useGallery';
-import {flattenGroups, useProtectedGalleries} from '../../logic/useGalleries';
+import {flattenGroups} from '../../logic/utils';
+import {useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import {usePermissions} from '../../logic/usePermissions';
 import {useBrand} from '../../logic/useBrand';
@@ -171,7 +172,7 @@ export default function ManagementGalleryView() {
                 <GalleryAccessModal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} galleryId={gallery.id} galleryName={gallery.name} />
                 <PhotographerTeamModal isOpen={isPhotographerTeamModalOpen} onClose={() => setIsPhotographerTeamModalOpen(false)} item={gallery} isGroup={false} onUpdateState={() => mutate()} />
                 <GalleryMetadataDefaultsModal isOpen={isMetadataModalOpen} onClose={() => setIsMetadataModalOpen(false)} gallery={gallery} onUpdate={async (...args) => { await updateGallery(...args); mutate(); }} />
-                <AIBatchEditModal isOpen={isAIBatchModalOpen} onClose={() => setIsAIBatchModalOpen(false)} photos={photos} galleryId={gallery.id} />
+                {isAIBatchModalOpen && <AIBatchEditModal isOpen={isAIBatchModalOpen} onClose={() => setIsAIBatchModalOpen(false)} photos={photos} galleryId={gallery.id} />}
 
                 <GalleryModals
                     availableGroups={availableGroups}

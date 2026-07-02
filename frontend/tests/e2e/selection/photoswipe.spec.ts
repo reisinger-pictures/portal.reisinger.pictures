@@ -69,21 +69,19 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
         const commentResp = network.waitForRating();
         await commentInput.press('Enter');
         await commentResp;
-        await page.waitForTimeout(500);
-
         const ratingBar = page.locator('#rating-portal-anchor .rating');
-        const star5 = ratingBar.locator('input.mask-star-2').nth(4);
+        await expect(ratingBar).toBeVisible({ timeout: 5000 });
+        const star5 = ratingBar.locator('input[type="radio"]').nth(4);
         const rateResponse = network.waitForRating();
         await star5.click();
         await rateResponse;
 
-        await page.waitForTimeout(500);
+        await expect(page.locator('#rating-portal-anchor .rating input[type="radio"]').nth(4)).toBeChecked({ timeout: 5000 });
         await expect(async () => {
             await page.locator('button.pswp__button--close').click();
             await expect(lightbox).toBeHidden();
         }).toPass({ timeout: 15000 });
 
-        await page.waitForTimeout(1000);
-        await expect(page.locator('.card-body input.mask-star-2').nth(4)).toBeChecked();
+        await expect(page.locator('.card-body input[type="radio"]').nth(4)).toBeChecked({ timeout: 5000 });
     });
 });

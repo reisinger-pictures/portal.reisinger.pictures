@@ -14,16 +14,9 @@ trait BrandAwareMail
         $this->brand = $brand ?? BrandRegistry::current();
     }
 
-    protected function ensureBrandContext(): void
-    {
-        if ($this->brand) {
-            BrandRegistry::set($this->brand);
-        }
-    }
-
     protected function brandFrontendUrl(): string
     {
-        if (BrandRegistry::isSrp()) {
+        if ($this->brand === Brand::SRP) {
             return rtrim(config('app.frontend_url_srp', 'https://buy.reisinger.pictures'), '/');
         }
 
@@ -37,14 +30,14 @@ trait BrandAwareMail
 
     protected function brandBcc(): string
     {
-        $key = BrandRegistry::isSrp() ? 'accounting_email_srp' : 'accounting_email_rp';
+        $key = $this->brand === Brand::SRP ? 'accounting_email_srp' : 'accounting_email_rp';
 
         return config("services.{$key}", env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'));
     }
 
     protected function applyBrandFrom(): void
     {
-        if (BrandRegistry::isSrp()) {
+        if ($this->brand === Brand::SRP) {
             $this->from(
                 config('mail.from_srp.address', config('mail.from.address')),
                 config('mail.from_srp.name', config('mail.from.name'))

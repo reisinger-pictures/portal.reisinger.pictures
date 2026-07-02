@@ -40,7 +40,7 @@ export default function BillingDetailsCard() {
 
     const canEdit = isSuperAdmin;
 
-    const {register, handleSubmit, reset, formState: {isSubmitting, errors}} = useForm<BillingFormValues>({
+    const {register, handleSubmit, reset, formState: {isSubmitting, errors, isDirty}} = useForm<BillingFormValues>({
         resolver: zodResolver(billingDetailsSchema),
         defaultValues: EMPTY_DEFAULTS,
     });
@@ -48,7 +48,7 @@ export default function BillingDetailsCard() {
     // Hydrate the form once the remote data arrives. This is a load → reset (not a derived-state
     // anti-pattern), triggered by the isLoading/data transition rather than by a user event.
     useEffect(() => {
-        if (!isLoading && billingDetails) {
+        if (!isLoading && billingDetails && !isDirty) {
             reset({
                 bank_holder: billingDetails.bank_holder ?? '',
                 bank_iban: billingDetails.bank_iban ?? '',
@@ -60,7 +60,7 @@ export default function BillingDetailsCard() {
                 company_email: billingDetails.company_email ?? '',
             });
         }
-    }, [billingDetails, isLoading, reset]);
+    }, [billingDetails, isLoading, reset, isDirty]);
 
     const onSubmit = async (data: BillingFormValues) => {
         try {

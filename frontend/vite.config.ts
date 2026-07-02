@@ -39,7 +39,7 @@ export default defineConfig(() => {
             allowedHosts: ['portal.localhost', 'buy.localhost'],
             proxy: {
                 '/api': {
-                    target: 'https://portal.test',
+                    target: process.env.VITE_API_PROXY || 'https://portal.test',
                     changeOrigin: true,
                     secure: false,
                     cookieDomainRewrite: '.localhost',

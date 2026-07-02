@@ -2,6 +2,7 @@ import { Gallery, FlatGroup, GalleryMetadataOpts } from '../../logic/useGallerie
 import { Tenant } from '../../logic/useTenants';
 import { useUI } from './UIContext';
 import { useEffect } from 'react';
+import { useFocusTrap } from '../../logic/useFocusTrap';
 import { useForm, useWatch } from 'react-hook-form';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
@@ -116,11 +117,13 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         }
     };
 
+    const modalRef = useFocusTrap<HTMLDialogElement>(isOpen && !isLoading);
+
     if (!isOpen) return null;
     if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
     return (
-        <dialog className="modal modal-open z-[60]">
+        <dialog ref={modalRef} className="modal modal-open z-[60]">
             <div className="modal-box max-w-2xl relative">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
 

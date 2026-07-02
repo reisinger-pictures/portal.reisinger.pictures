@@ -41,7 +41,10 @@ class StatsController extends Controller
             $tenantUserIds = User::where('email', 'like', '%@' . $domain)->pluck('id')->toArray();
             $query->whereIn('user_id', $tenantUserIds);
         } elseif (!$user->is_admin) {
-            $galleryIds = $user->galleries()->pluck('galleries.id')->toArray();
+            $galleryIds = array_unique(array_merge(
+                $user->galleries()->pluck('galleries.id')->toArray(),
+                $user->photographerGalleries()->pluck('galleries.id')->toArray()
+            ));
             $query->whereIn('gallery_id', $galleryIds);
         }
 

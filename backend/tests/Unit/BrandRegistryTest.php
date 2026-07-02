@@ -33,21 +33,20 @@ class BrandRegistryTest extends TestCase
 
     public function test_current_returns_null_when_unset(): void
     {
-        config(['app.brand' => null]);
+        BrandRegistry::set(null);
         $this->assertNull(BrandRegistry::current());
     }
 
     public function test_currentOrDefault_falls_back_to_b2b_when_unset(): void
     {
-        config(['app.brand' => null]);
+        BrandRegistry::set(null);
         $this->assertSame(Brand::B2B, BrandRegistry::currentOrDefault());
     }
 
-    public function test_current_returns_brand_from_config(): void
+    public function test_current_returns_brand_from_container(): void
     {
         BrandRegistry::set(Brand::SRP);
         $this->assertSame(Brand::SRP, BrandRegistry::current());
-        $this->assertSame(Brand::SRP->value, config('app.brand'));
     }
 
     public function test_isSrp_and_prefix(): void
@@ -63,15 +62,15 @@ class BrandRegistryTest extends TestCase
 
     public function test_prefix_defaults_to_empty_when_unset(): void
     {
-        config(['app.brand' => null]);
+        BrandRegistry::set(null);
         $this->assertSame('', BrandRegistry::prefix());
     }
 
-    public function test_set_with_null_clears_config(): void
+    public function test_set_with_null_clears_brand(): void
     {
         BrandRegistry::set(Brand::SRP);
         BrandRegistry::set(null);
-        $this->assertNull(config('app.brand'));
+        $this->assertNull(BrandRegistry::current());
     }
 
     public function test_reset_clears_brand_to_null(): void

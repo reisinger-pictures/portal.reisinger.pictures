@@ -15,8 +15,6 @@ class User extends Authenticatable implements JWTSubject
 {
     use HasFactory, Notifiable, HasUuids;
 
-    public const UPDATED_AT = null;
-
     public $guest_id = null;
     public $transient_galleries = [];
     public $transient_meta_galleries = [];

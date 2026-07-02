@@ -34,7 +34,7 @@ test.describe('Billing Details Save (Bankdaten)', () => {
         const city = 'Linz';
 
         // SWR Hydrierungs-Delay abwarten
-        await page.waitForTimeout(1500);
+        await expect(card.getByPlaceholder(/Name des Inhabers/).first()).toBeVisible({ timeout: 10000 });
 
         await card.getByPlaceholder(/Name des Inhabers/).fill(holder);
         await card.getByPlaceholder(/Musterstraße/).fill(street);
@@ -62,7 +62,7 @@ test.describe('Billing Details Save (Bankdaten)', () => {
         const card = page.locator('h2:has-text("Bankverbindung & Impressum")').locator('..');
 
         // SWR Hydrierungs-Delay abwarten
-        await page.waitForTimeout(1500);
+        await expect(card.getByPlaceholder(/Name des Inhabers/).first()).toBeVisible({ timeout: 10000 });
 
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         await card.getByPlaceholder(/Name des Inhabers/).fill(`E2E Inhaber ${uniqueSuffix}`);

@@ -70,6 +70,8 @@ class AppServiceProvider extends ServiceProvider
             return $user->is_super_admin;
         });
 
+        Gate::define('manage-users', fn ($user) => $user->is_admin);
+
         Gate::define('purchase-upgrades', function ($user) {
             $isClient = $user->roles()->where('name', \App\Enums\UserRole::CLIENT->value)->exists();
             $isPrivileged = $user->is_power_user || $user->is_admin || $user->is_super_admin || $user->is_photographer;

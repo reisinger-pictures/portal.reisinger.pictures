@@ -116,8 +116,14 @@ test.describe('Custom Quotes Full Workflow', () => {
         expect(token).toBeTruthy();
 
         await auth.login(clientUser.email, clientUser.password);
-        await page.goto('/cart?quote_token=' + token);
-        
+        await sidebar.navigateTo('Warenkorb');
+        await page.evaluate((t) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('quote_token', t);
+            window.history.pushState({}, '', url.toString());
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        }, token as string);
+
         await expect(async () => {
             await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.', { timeout: 1000 });
             await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1500.00 €', { timeout: 1000 });

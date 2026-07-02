@@ -62,13 +62,12 @@ test.describe('Stripe Checkout Workflow', () => {
         await expect(page.getByRole('heading', {name: galleryName})).toBeVisible();
 
         await upload.uploadSampleImage();
-        const galleryUrl = page.url();
 
         await auth.logout();
 
         // 2. Kunde loggt sich ein und geht in die Galerie
         await auth.login(buyerUser.email, buyerUser.password);
-        await page.goto(galleryUrl);
+        await page.locator('main').getByText(galleryName).first().click();
 
         const photoEl = page.locator('.pswp-item').first();
         await expect(photoEl).toBeVisible();
@@ -93,8 +92,8 @@ test.describe('Stripe Checkout Workflow', () => {
             waiveWithdrawal: true
         });
 
-        // Anti-Flakiness: Kurz warten, bis React Hook Form den State intern synchronisiert hat
-        await page.waitForTimeout(500);
+        // Anti-Flakiness: React Hook Form State-Sync abwarten
+        await expect(page.getByRole('button', {name: 'Zahlungspflichtig bestellen'})).toBeEnabled({ timeout: 5000 });
 
         // API Response abfangen, um lautstark zu scheitern, falls das Backend einen Fehler wirft (z.B. fehlende Stripe-Keys)
         const checkoutPromise = page.waitForResponse(res => res.url().includes('/api/orders/checkout') && res.request().method() === 'POST');
@@ -122,7 +121,8 @@ test.describe('Stripe Checkout Workflow', () => {
             try {
                 await cardTab.waitFor({ state: 'visible', timeout: 5000 });
                 await cardTab.click();
-                await page.waitForTimeout(1500);
+                // Nach Tab-Klick braucht Stripe einen Render-Cycle fuer das Iframe
+                await expect(cardInput).toBeVisible({ timeout: 10000 });
             } catch {
                 // Ignorieren, falls kein Tab existiert
             }
@@ -152,7 +152,7 @@ test.describe('Stripe Checkout Workflow', () => {
         const {stripeFrame, form} = await navigateToStripeIframe(page);
 
         await form.fillStripeForm(stripeFrame, CreditCardHelper.genericDecline);
-        await page.waitForTimeout(2000); // Stripe Validierung abwarten
+        await expect(page.getByRole('button', {name: 'Jetzt bezahlen'})).toBeEnabled({ timeout: 10000 });
 
         // Button direkt über JavaScript anklicken (zuverlässiger bei Desktop Layout-Problemen)
         const payButton = page.getByRole('button', {name: 'Jetzt bezahlen'});
@@ -169,7 +169,7 @@ test.describe('Stripe Checkout Workflow', () => {
         });
 
         await form.fillStripeForm(stripeFrame, CreditCardHelper.insufficientFunds);
-        await page.waitForTimeout(2000); // Stripe Validierung abwarten
+        await expect(page.getByRole('button', {name: 'Jetzt bezahlen'}).first()).toBeEnabled({ timeout: 10000 });
         const payButton2 = page.getByRole('button', {name: 'Jetzt bezahlen'});
         await payButton2.evaluate(el => (el as HTMLButtonElement).click());
         await expect(async () => {
@@ -184,11 +184,11 @@ test.describe('Stripe Checkout Workflow', () => {
         const {stripeFrame, form} = await navigateToStripeIframe(page);
 
         await form.fillStripeForm(stripeFrame, CreditCardHelper.successVisa);
-        await page.waitForTimeout(2000); // Stripe Validierung abwarten
+        await expect(page.getByRole('button', {name: 'Jetzt bezahlen'})).toBeEnabled({ timeout: 10000 });
         const payButton = page.getByRole('button', {name: 'Jetzt bezahlen'});
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
-        // Kurz warten, bis Stripe confirmPayment abgeschlossen hat
+        // Stripe confirmPayment benoetigt externe Verarbeitung - kein DOM-Element verfuegbar
         await page.waitForTimeout(3000);
 
         // Simuliere den Stripe-Return nach erfolgreichem Payment:

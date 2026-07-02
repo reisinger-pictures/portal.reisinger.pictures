@@ -43,8 +43,9 @@ export default function PhotoDetailView() {
     const [isAiGenerating, setIsAiGenerating] = useState(false);
     const licensingMode = useLicensingMode();
 
-    if (data?.photo && data.photo.id !== prevPhotoId) {
-        setPrevPhotoId(data.photo.id);
+    const photoId = data?.photo?.id;
+    if (photoId && photoId !== prevPhotoId) {
+        setPrevPhotoId(photoId);
         setIptcData({
             title: data.photo.title || '',
             description: data.photo.description || '',
@@ -115,7 +116,7 @@ export default function PhotoDetailView() {
     };
 
     return (
-        <PageLayout hideMobileHeader>
+        <PageLayout>
             <div className="container mx-auto p-4 md:p-8">
                 <div className="flex items-center mb-6 gap-4">
                     <button onClick={() => navigate(-1)} className="btn btn-circle btn-ghost shrink-0"><span className="iconify mdi--arrow-left text-2xl"></span></button>
@@ -131,6 +132,7 @@ export default function PhotoDetailView() {
                         </ul>
                     </div>
                 </div>
+                <h1 className="text-2xl font-bold mb-6">{photo.title || 'Bilddetails'}</h1>
 
                 <div className="flex flex-col gap-8 items-start">
                     <div className="w-full flex flex-col gap-4">

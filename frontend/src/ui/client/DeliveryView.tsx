@@ -17,7 +17,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
-    const { gallery, photos, isLoading, totalPhotos, size, setSize, isReachingEnd } = galleryData;
+    const { gallery, photos, isLoading, size, setSize, isReachingEnd } = galleryData;
     const isClientView = searchParams.get('view') === 'client';
     const {isStaff} = usePermissions();
     const hasFullAccess = isStaff && !isClientView;
@@ -50,7 +50,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                                 <input type="checkbox" className="toggle-primary toggle md:toggle-md" checked={galleryData.wantsNotifications} onChange={(e) => galleryData.toggleOptIn(gallery.id, e.target.checked)} />
                             </label>
                         )}
-                        {totalPhotos > 0 && (() => {
+                        {photos.length > 0 && (() => {
                             const allowedTiers = [
                                 { id: 'web', label: 'Web & Social' },
                                 { id: 'print', label: 'Print (A4)' },

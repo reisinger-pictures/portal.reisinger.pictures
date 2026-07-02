@@ -16,13 +16,6 @@ export default function SearchView() {
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    const [prevQuery, setPrevQuery] = useState(query);
-
-    if (query !== prevQuery) {
-        setPrevQuery(query);
-        setLocalQuery(query);
-    }
-
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         navigate(`/search?q=${encodeURIComponent(localQuery.trim())}`);

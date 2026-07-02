@@ -38,12 +38,32 @@ status: active
 - **Kommando:** `php artisan admin:update`
 - **Logik:** Synchronisiert beim Start des `backend-init`-Containers den Admin-Nutzer basierend auf den ENV-Variablen `ADMIN_EMAIL` und `ADMIN_PASSWORD`. Dies stellt sicher, dass ein Login auch ohne initiale Datenbank-Seeds sofort möglich ist.
 
-## 8. Produktion-Sicherheits-Gatekeeper
+## 8. Local Development Defaults (Intentional)
+
+Several config files ship with hardcoded fallback values for **zero-config local development**:
+
+| Config Key | File | Default Value |
+|---|---|---|
+| `APP_KEY` | `config/app.php` | `base64:APP_KEY_REDACTED` |
+| `JWT_SECRET` | `config/jwt.php` | `JWT_SECRET_REDACTED` |
+| `STRIPE_KEY` | `config/services.php` | `pk_test_...` (dev-mode only) |
+| `STRIPE_SECRET` | `config/services.php` | `sk_test_...` (dev-mode only) |
+| `DB_PASSWORD` | `config/database.php` | `admin` |
+
+**Policy:** These are **intentionally weak/public defaults** so that `git clone && ./vendor/bin/sail up` (or equivalent) works without any manual `.env` setup. They are **never used in production** because:
+
+- The `backend-init` container explicitly rejects them in production (see §9).
+- Production environments set real values via Portainer environment variables, which override all fallbacks.
+- `config/services.php` has a `production ? null :` guard for Stripe keys.
+
+> **Rule for contributors:** Never rely on these defaults for security. Always set real secrets in `.env` for staging/production. The defaults are for local dev only.
+
+## 9. Produktion-Sicherheits-Gatekeeper
 - **Validierung:** Der `backend-init`-Container verweigert den Start in 'production', wenn die Standard-Schlüssel (APP_KEY oder JWT_SECRET) aus der Dokumentation/Entwicklung erkannt werden.
 - **Start-Delay:** `backend-init` wartet aktiv 15 Sekunden auf die MariaDB-Bereitschaft (First-Boot), um Race-Conditions bei der Migration zu verhindern.
 
 
-## 9. OPcache & Live-Updates (Rclone Sync)
+## 10. OPcache & Live-Updates (Rclone Sync)
 - **Die Falle:** Wenn PHP-Dateien im laufenden Betrieb über `rclone` (z.B. durch die `sync.bat`) auf den Produktionsserver synchronisiert werden, greifen Backend-Änderungen unter Umständen nicht sofort.
 - **Der Grund:** In Produktionsumgebungen ist der PHP OPcache aus Performancegründen scharf geschaltet (meist `opcache.validate_timestamps=0`). PHP liest geänderte Dateien nicht neu von der Festplatte ein, sondern nutzt den alten Bytecode aus dem RAM.
 - **Die Lösung:** Nach einem Rclone-Sync von Backend-Dateien muss der Apache/PHP-Container zwingend neu gestartet werden, um den Cache zu leeren:

@@ -20,7 +20,7 @@ test.describe('Per-Sub-Gallery Coupons', () => {
         if (helper) await helper.teardown();
     });
 
-    async function setupGalleryWithPhotos(page: Page, count: number): Promise<string> {
+    async function setupGalleryWithPhotos(page: Page, count: number): Promise<{ galleryUrl: string; galleryName: string }> {
         const auth = new AuthHelper(page);
         const upload = new UploadHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
@@ -28,31 +28,35 @@ test.describe('Per-Sub-Gallery Coupons', () => {
         await auth.login(photogUser.email, photogUser.password, 'http://buy.localhost:4321/');
 
         const galleryName = `SubGal ${Math.random().toString(36).substring(2, 10)}`;
-        await galleryHelper.createAndOpenDeliveryGallery(galleryName);
+        await galleryHelper.createAndOpenDeliveryGallery(galleryName, 'Öffentlich (Für alle sichtbar)');
 
         for (let i = 0; i < count; i++) {
             await upload.uploadSampleImage();
+            if (i < count - 1) await page.waitForTimeout(500);
         }
 
         const galleryUrl = page.url();
         await auth.logout('http://buy.localhost:4321/');
 
-        return galleryUrl;
+        return { galleryUrl, galleryName };
     }
 
-    async function addItemsToCart(page: Page, galleryUrl: string, count: number) {
-        await page.goto(galleryUrl);
+    async function addItemsToCart(page: Page, galleryName: string, count: number) {
+        await page.locator('main').getByText(galleryName).first().click();
         await expect(page.locator('a.pswp-item').first()).toBeVisible({ timeout: 15000 });
 
         for (let i = 0; i < count; i++) {
-            await page.locator('a.pswp-item').nth(i).click();
+            await page.getByRole('button', { name: 'Bild öffnen' }).nth(i).click();
+            await expect(page.getByRole('button', { name: 'In den Warenkorb' })).toBeVisible({ timeout: 10000 });
             await page.getByRole('button', { name: 'In den Warenkorb' }).click();
             await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
+            await page.goBack();
+            await expect(page.locator('a.pswp-item').first()).toBeVisible({ timeout: 15000 });
         }
     }
 
     test('Per-sub-gallery free items per gallery', async ({ page }) => {
-        const galleryUrl = await setupGalleryWithPhotos(page, 3);
+        const { galleryName } = await setupGalleryWithPhotos(page, 3);
 
         await page.route('**/api/coupons/validate', async route => {
             await route.fulfill({
@@ -76,7 +80,7 @@ test.describe('Per-Sub-Gallery Coupons', () => {
         const auth = new AuthHelper(page);
         await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
 
-        await addItemsToCart(page, galleryUrl, 2);
+        await addItemsToCart(page, galleryName, 2);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Warenkorb');

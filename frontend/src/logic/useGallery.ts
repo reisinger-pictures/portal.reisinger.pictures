@@ -65,6 +65,8 @@ export function useGallery(slug: string | undefined) {
     const downloadsCount = data?.[0]?.downloads_count || 0;
 
     const ratePhoto = async (photoId: string, rating: number, comment: string = '') => {
+        const oldData = data;
+
         if (data) {
             const newData = data.map(page => ({
                 ...page,
@@ -73,19 +75,25 @@ export function useGallery(slug: string | undefined) {
             mutate(newData, { revalidate: false });
         }
 
-        const res = await fetch("/api/photos/" + photoId + "/rate", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({rating, comment}),
-            credentials: 'include'
-        });
+        try {
+            const res = await fetch("/api/photos/" + photoId + "/rate", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({rating, comment}),
+                credentials: 'include'
+            });
 
-        if (res.status === 401) {
-            window.location.href = '/login';
-            return;
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+        } catch {
+            if (oldData) {
+                mutate(oldData, { revalidate: false });
+            }
         }
     };
 

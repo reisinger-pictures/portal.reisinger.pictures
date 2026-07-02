@@ -34,8 +34,23 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
     const { updateMetadata: updatePhotoMeta } = usePhoto();
     const { showToast } = useUI();
 
-    const [globalContext, setGlobalContext] = useState('');
-    const [rows, setRows] = useState<RowState[]>([]);
+    const [globalContextOverride, setGlobalContextOverride] = useState('');
+    const [rows, setRows] = useState<RowState[]>(() =>
+        photos.map(p => ({
+            photoId: p.id,
+            specificContext: '',
+            isGenerating: false,
+            isSaving: false,
+            title: p.title || '',
+            description: p.description || '',
+            keywords: p.keywords || '',
+            location: p.location || '',
+            city: p.city || '',
+            state: p.state || '',
+            country: p.country || '',
+            iso_country: p.iso_country || ''
+        }))
+    );
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [progress, setProgress] = useState(0);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -54,45 +69,11 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
         fetcher
     );
 
-    const [prevIsOpen, setPrevIsOpen] = useState(false);
-    const [prevPhotos, setPrevPhotos] = useState<Photo[]>([]);
-
-    // Derived State Pattern: Sync props to state directly during render
-    if (isOpen !== prevIsOpen || photos !== prevPhotos) {
-        setPrevIsOpen(isOpen);
-        setPrevPhotos(photos);
-
-        if (isOpen) {
-            setRows(photos.map(p => ({
-                photoId: p.id,
-                specificContext: '',
-                isGenerating: false,
-                isSaving: false,
-                title: p.title || '',
-                description: p.description || '',
-                keywords: p.keywords || '',
-                location: p.location || '',
-                city: p.city || '',
-                state: p.state || '',
-                country: p.country || '',
-                iso_country: p.iso_country || ''
-            })));
-        } else {
-            setIsGeneratingAll(false);
-        }
-    }
-
-    // Auto-fill globalContext from gallery default_* fields when data arrives
-    if (isOpen && galleryData?.gallery && !globalContext) {
-        const defaults = [
-            galleryData.gallery.default_title,
-            galleryData.gallery.default_description,
-            galleryData.gallery.default_keywords
-        ].filter(Boolean).join(' | ');
-        if (defaults) {
-            setGlobalContext(defaults);
-        }
-    }
+    const galleryDefaults = galleryData?.gallery
+        ? [galleryData.gallery.default_title, galleryData.gallery.default_description, galleryData.gallery.default_keywords]
+            .filter(Boolean).join(' | ')
+        : '';
+    const globalContext = globalContextOverride || galleryDefaults;
 
 
     // Manage the AbortController lifecycle in an effect so refs are never
@@ -264,7 +245,7 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
                 <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 mb-4 bg-base-100 p-4 rounded-box shadow-sm border border-base-300">
                     <div className="flex-1 w-full">
                         <label className="label py-0"><span className="label-text font-bold">Globaler Kontext (Für alle Bilder)</span></label>
-                        <input type="text" value={globalContext} onChange={e => setGlobalContext(e.target.value)} placeholder="z.B. Sommerfest der Firma XYZ in Wien, 2026" className="input input-sm input-bordered w-full" />
+                        <input type="text" value={globalContext} onChange={e => setGlobalContextOverride(e.target.value)} placeholder="z.B. Sommerfest der Firma XYZ in Wien, 2026" className="input input-sm input-bordered w-full" />
                     </div>
                     <div className="shrink-0 border-t lg:border-t-0 lg:border-l border-base-300 pt-2 lg:pt-0 lg:pl-4">
                         <label className="label py-0"><span className="label-text font-bold">KI-Modus</span></label>

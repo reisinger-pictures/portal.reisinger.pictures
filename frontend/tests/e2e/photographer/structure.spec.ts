@@ -35,10 +35,7 @@ test.describe('Management Structure View (Tree)', () => {
         
         await expect(page.locator('.toast')).toContainText('erfolgreich erstellt');
 
-        // Navigate to '/galleries' to force a full page load and fresh tree data
-        await page.goto('/galleries');
-        await page.waitForLoadState('networkidle');
-        await expect(page.locator('h1:has-text("Galerien")')).toBeVisible({ timeout: 10000 });
+        await sidebar.navigateTo('Galerien');
 
         await expect(page.locator('summary').filter({ hasText: groupName }).first()).toBeVisible({ timeout: 10000 });
     });

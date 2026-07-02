@@ -19,6 +19,7 @@ services:
       MEILI_ENV: development
       MEILI_MASTER_KEY: local_meili_secret
     ports: ["7700:7700"]
+    volumes: ["search_data_local:/meili_data"]
 
   mailpit:
     image: axllent/mailpit
@@ -30,3 +31,4 @@ services:
 
 volumes:
   db_data_local:
+  search_data_local:

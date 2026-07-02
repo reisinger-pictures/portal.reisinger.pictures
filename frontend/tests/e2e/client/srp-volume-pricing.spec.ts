@@ -120,6 +120,19 @@ async function uploadMultiplePhotosViaApi(page: Page, galleryId: string, count: 
 const FORMATTED_TIER2 = '25.00\u{00A0}€';
 const FORMATTED_TIER3 = '20.00\u{00A0}€';
 
+async function addGalleryPhotosToCart(page: Page, galleryName: string, count: number) {
+    await page.locator('main').getByText(galleryName).first().click();
+    await expect(page.locator('.pswp-item').first()).toBeVisible({ timeout: 15000 });
+    for (let i = 0; i < count; i++) {
+        await page.getByRole('button', { name: 'Bild öffnen' }).nth(i).click();
+        await expect(page.getByRole('button', { name: 'In den Warenkorb' })).toBeVisible({ timeout: 10000 });
+        await page.getByRole('button', { name: 'In den Warenkorb' }).click();
+        await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
+        await page.goBack();
+        await expect(page.locator('.pswp-item').first()).toBeVisible({ timeout: 15000 });
+    }
+}
+
 test.describe('SRP Volume Pricing', () => {
 
     let helper: E2ESessionHelper;
@@ -163,12 +176,11 @@ test.describe('SRP Volume Pricing', () => {
 
         const upload = new UploadHelper(page);
         await upload.uploadSampleImage();
-        const galleryUrl = page.url();
 
         await auth.logout('http://buy.localhost:4321/');
 
         await auth.login(srpBuyer.email, srpBuyer.password, 'http://buy.localhost:4321/');
-        await page.goto(galleryUrl);
+        await page.locator('main').getByText(galleryName).first().click();
 
         const photoEl = page.locator('.pswp-item').first();
         await expect(photoEl).toBeVisible({ timeout: 15000 });
@@ -204,38 +216,15 @@ test.describe('SRP Volume Pricing', () => {
         const extraPhotoIds = await uploadMultiplePhotosViaApi(page, galleryId, 9);
         expect(extraPhotoIds).toHaveLength(9);
 
-        const galleryUrl = page.url();
         await auth.logout('http://buy.localhost:4321/');
 
-        // --- Buyer: Cart via localStorage mit echten Foto-IDs befüllen ---
+        // --- Buyer: Alle 10 Fotos via UI in den Warenkorb legen ---
         await auth.login(srpBuyer.email, srpBuyer.password, 'http://buy.localhost:4321/');
-        await page.goto(galleryUrl);
-        await expect(page.locator('.pswp-item').first()).toBeVisible({ timeout: 15000 });
-
-        // Fetch photo IDs from the gallery API (Vite proxies /api/* → backend JSON)
-        const slug = page.url().split('/').pop() || '';
-        const galleryRes = await page.request.get(`/api/galleries/${slug}?page=1`, {
-            headers: { 'Accept': 'application/json' },
-        });
-        const galleryData = await galleryRes.json() as { photos?: { id: string }[] };
-        const allPhotoIds: string[] = (galleryData.photos || []).map((p: { id: string }) => p.id);
-        expect(allPhotoIds.length).toBeGreaterThanOrEqual(10);
-
-        const cartKey = `rp_cart_${srpBuyer.id}`;
-        const cartItems = allPhotoIds.map((photoId, idx) => ({
-            photoId,
-            filename: `Photo ${idx + 1}`,
-            thumb_url: '',
-            tier: 'original' as const,
-            price: 3000,
-        }));
-
-        await page.evaluate(({ key, items }) => {
-            localStorage.setItem(key, JSON.stringify(items));
-        }, { key: cartKey, items: cartItems });
+        await addGalleryPhotosToCart(page, galleryName, 10);
 
         // --- Tier 2: 10 Fotos (25€) ---
-        await page.goto('http://buy.localhost:4321/cart');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateTo('Warenkorb');
         await expect(page.locator('h1:has-text("Dein Warenkorb")')).toBeVisible();
         await expect(page.getByText(/Mengenrabatt/i)).toBeVisible({ timeout: 5000 });
         await expect(page.getByText(/Noch 10/)).toBeVisible({ timeout: 5000 });
@@ -244,10 +233,11 @@ test.describe('SRP Volume Pricing', () => {
         await expect(page.getByText('250.00\u{00A0}€')).toBeVisible();
     });
 
-    test('Pricing-Verifikation: localStorage-Injektion für Tier-3-Rendering (20+ Bilder)', async ({ page }) => {
+    test('Pricing-Verifikation: Tier-3-Rendering via UI-Flow (20+ Bilder)', async ({ page }) => {
+        test.setTimeout(120000);
         const auth = new AuthHelper(page);
 
-        // Zuerst einen realen Upload durchführen, damit wir eine Photo-ID haben
+        // 22 Fotos via Upload (1 manuell + 21 via API)
         await auth.login(srpPhotog.email, srpPhotog.password, 'http://buy.localhost:4321/');
         const galleryName = `SRP T3 ${Math.random().toString(36).substring(2, 10)}`;
         const galleryHelper = new GalleryHelper(page, helper);
@@ -256,27 +246,15 @@ test.describe('SRP Volume Pricing', () => {
         await upload.uploadSampleImage();
         const galleryId = galleryUuid || (await resolveGalleryId(page, page.url().split('/').pop() || ''));
 
-        const photoIds = await uploadMultiplePhotosViaApi(page, galleryId, 1);
+        await uploadMultiplePhotosViaApi(page, galleryId, 21);
         await auth.logout('http://buy.localhost:4321/');
 
-        const realPhotoId = photoIds[0] || 'fallback-id';
-
-        // --- Tier 3 via localStorage-Injektion (20+ Items) ---
+        // --- Tier 3 via UI (20+ Items) ---
         await auth.login(srpBuyer.email, srpBuyer.password, 'http://buy.localhost:4321/');
-        const cartKey = `rp_cart_${srpBuyer.id}`;
-        const tier3Items = Array.from({ length: 22 }, (_, i) => ({
-            photoId: `${realPhotoId}-t3-${i}`,
-            filename: `SRP Tier3 Photo ${i + 1}`,
-            thumb_url: '',
-            tier: 'original' as const,
-            price: 2000,
-        }));
+        await addGalleryPhotosToCart(page, galleryName, 22);
 
-        await page.evaluate(({ key, items }) => {
-            localStorage.setItem(key, JSON.stringify(items));
-        }, { key: cartKey, items: tier3Items });
-
-        await page.goto('http://buy.localhost:4321/cart');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateTo('Warenkorb');
         await expect(page.locator('h1:has-text("Dein Warenkorb")')).toBeVisible();
         await expect(page.getByText(/Mengenrabatt/i)).toBeVisible({ timeout: 5000 });
         await expect(page.getByText(/Bester Rabatt aktiv/)).toBeVisible({ timeout: 5000 });
@@ -338,41 +316,17 @@ test.describe('SRP Volume Pricing', () => {
 
         // 11 weitere Fotos via API → 12 gesamt (Tier 2, 25€)
         const galleryId = galleryUuid || (await resolveGalleryId(page, page.url().split('/').pop() || ''));
-        const apiPhotoIds = await uploadMultiplePhotosViaApi(page, galleryId, 11);
-        expect(apiPhotoIds).toHaveLength(11);
+        await uploadMultiplePhotosViaApi(page, galleryId, 11);
 
-        const galleryUrl = page.url();
         await auth.logout('http://buy.localhost:4321/');
 
-        // --- Buyer: Cart via localStorage mit echten Foto-IDs befüllen ---
+        // --- Buyer: 12 Fotos via UI in den Warenkorb legen ---
         await auth.login(srpBuyer.email, srpBuyer.password, 'http://buy.localhost:4321/');
-        await page.goto(galleryUrl);
-        await expect(page.locator('.pswp-item').first()).toBeVisible({ timeout: 15000 });
-
-        // Fetch photo IDs from the gallery API (Vite proxies /api/* → backend JSON)
-        const slug = page.url().split('/').pop() || '';
-        const galleryRes = await page.request.get(`/api/galleries/${slug}?page=1`, {
-            headers: { 'Accept': 'application/json' },
-        });
-        const galleryData = await galleryRes.json() as { photos?: { id: string }[] };
-        const allPhotoIds: string[] = (galleryData.photos || []).map((p: { id: string }) => p.id);
-        expect(allPhotoIds.length).toBeGreaterThanOrEqual(12);
-
-        const cartKey = `rp_cart_${srpBuyer.id}`;
-        const cartItems = allPhotoIds.map((photoId, idx) => ({
-            photoId,
-            filename: `Photo ${idx + 1}`,
-            thumb_url: '',
-            tier: 'original' as const,
-            price: 3000,
-        }));
-
-        await page.evaluate(({ key, items }) => {
-            localStorage.setItem(key, JSON.stringify(items));
-        }, { key: cartKey, items: cartItems });
+        await addGalleryPhotosToCart(page, galleryName, 12);
 
         // --- Checkout: Formular ausfüllen ---
-        await page.goto('http://buy.localhost:4321/cart');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateTo('Warenkorb');
         await expect(page.locator('h1:has-text("Dein Warenkorb")')).toBeVisible();
         await expect(page.getByText(/Mengenrabatt/i)).toBeVisible({ timeout: 5000 });
 
@@ -386,7 +340,7 @@ test.describe('SRP Volume Pricing', () => {
             waiveWithdrawal: true,
         });
 
-        await page.waitForTimeout(500);
+        await expect(page.getByRole('button', { name: 'Zahlungspflichtig bestellen' })).toBeEnabled({ timeout: 5000 });
 
         // Checkout-API abfangen und totalCents verifizieren
         const checkoutResPromise = page.waitForResponse(
@@ -423,7 +377,7 @@ test.describe('SRP Volume Pricing', () => {
 
         await expect(cardInput).toBeVisible({ timeout: 15000 });
         await form.fillStripeForm(stripeFrame, CreditCardHelper.successVisa);
-        await page.waitForTimeout(2000);
+        await expect(page.getByRole('button', { name: 'Jetzt bezahlen' })).toBeEnabled({ timeout: 10000 });
 
         const payButton = page.getByRole('button', { name: 'Jetzt bezahlen' });
         await payButton.evaluate(el => (el as HTMLButtonElement).click());

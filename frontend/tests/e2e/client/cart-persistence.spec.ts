@@ -20,7 +20,7 @@ test.describe('Cart Persistence & Validation Workflow', () => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
         
-        const cartKey = `rp_cart_${testUser.id}`;
+        const cartKey = `rp_cart_${btoa(String(testUser.id))}`;
 
         // Einmal initial zum Cart navigieren
         const sidebar = new SidebarHelper(page);

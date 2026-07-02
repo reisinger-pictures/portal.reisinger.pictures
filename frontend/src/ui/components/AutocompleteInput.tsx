@@ -32,15 +32,15 @@ export default function AutocompleteInput<T>({
                                                  disabled,
                                                  className
                                              }: Props<T>) {
-    const [query, setQuery] = useState(value || '');
+    const [query, setQuery] = useState(() => value || '');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const [prevValue, setPrevValue] = useState(value || '');
+    const [prevValue, setPrevValue] = useState(value);
 
-    if ((value || '') !== prevValue) {
-        setPrevValue(value || '');
+    if (value !== prevValue) {
+        setPrevValue(value);
         setQuery(value || '');
     }
 
@@ -92,6 +92,11 @@ export default function AutocompleteInput<T>({
             <div className="relative w-full">
                 <input
                     type="text"
+                    role="combobox"
+                    aria-expanded={isOpen}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeIndex >= 0 ? `autocomplete-option-${activeIndex}` : undefined}
+                    aria-controls="autocomplete-listbox"
                     value={query}
                     onChange={e => {
                         setQuery(e.target.value);
@@ -113,10 +118,13 @@ export default function AutocompleteInput<T>({
                 )}
             </div>
             {isOpen && !disabled && options.length > 0 && (
-                <ul className="absolute z-50 top-full left-0 w-full mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
+                <ul id="autocomplete-listbox" role="listbox" className="absolute z-50 top-full left-0 w-full mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
                     {options.map((opt, idx) => (
                         <li
                             key={opt.id}
+                            id={`autocomplete-option-${idx}`}
+                            role="option"
+                            aria-selected={activeIndex === idx}
                             className={`px-4 py-2 cursor-pointer flex flex-col border-b border-base-200/50 last:border-0 ${activeIndex === idx ? 'bg-base-200' : 'hover:bg-base-200'}`}
                             onClick={() => {
                                 onSelect(opt.raw);

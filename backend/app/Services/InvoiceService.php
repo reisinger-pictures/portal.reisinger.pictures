@@ -17,11 +17,18 @@ class InvoiceService
         return DB::transaction(function () use ($tenant, $initiator) {
             $tenantUserIds = $tenant->users()->pluck('users.id')->toArray();
 
-            $openOrders = Order::whereIn('user_id', $tenantUserIds)
-                ->where('status', 'delivery_note')
-                ->with(['invoiceSnapshot', 'user'])
-                ->lockForUpdate()
-                ->get();
+            try {
+                $openOrders = Order::whereIn('user_id', $tenantUserIds)
+                    ->where('status', 'delivery_note')
+                    ->with(['invoiceSnapshot', 'user'])
+                    ->lockForUpdate()
+                    ->get();
+            } catch (\Illuminate\Database\QueryException $e) {
+                if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
+                    return ['success' => false, 'error' => 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'];
+                }
+                throw $e;
+            }
 
             if ($openOrders->isEmpty()) {
                 return ['success' => false, 'error' => 'Keine offenen Lieferscheine für diesen Mandanten gefunden.'];

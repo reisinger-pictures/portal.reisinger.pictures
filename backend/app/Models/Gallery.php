@@ -14,8 +14,6 @@ class Gallery extends Model
 
     use Searchable;
 
-    public const UPDATED_AT = null;
-    
     protected $visible = [
         'id', 'gallery_group_id', 'name', 'slug', 'type', 'is_live',
         'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos',

@@ -62,7 +62,7 @@ test.describe('PhotoSwipe & Lightbox UI', () => {
         await page.getByRole('button', {name: 'Speichern'}).click();
         await expect(page.getByRole('button', {name: 'Speichern'})).toBeEnabled();
 
-        await page.locator('button.btn-ghost:has(.mdi--arrow-left)').click();
+        await page.locator('main button:has(span.mdi--arrow-left)').click();
 
         // BEST PRACTICE: Authentic user behavior. Force a fresh fetch to see updated metadata.
         await page.reload();
@@ -82,7 +82,7 @@ test.describe('PhotoSwipe & Lightbox UI', () => {
         await expect(lightbox.locator('text=Dies ist eine fantastische Beschreibung für die Lightbox-Ansicht.')).toBeVisible();
         await expect(lightbox.locator('.pswp__custom-caption small')).toContainText('©');
 
-        await page.waitForTimeout(500); // Warten auf PhotoSwipe CSS-Animation
+        await expect(page.locator('button.pswp__button--close')).toBeVisible({ timeout: 5000 });
         await expect(async () => {
             await page.locator('button.pswp__button--close').click();
             await expect(lightbox).toBeHidden();

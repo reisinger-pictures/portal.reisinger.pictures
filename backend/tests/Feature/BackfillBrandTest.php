@@ -5,6 +5,7 @@ use App\Enums\Brand;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
+use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,8 +19,8 @@ class BackfillBrandTest extends TestCase
      */
     public function test_backfill_command_sets_b2b_default_in_cli_context(): void
     {
-        // Simulate the CLI/queue situation: brand config is empty.
-        config(['app.brand' => null]);
+        // Simulate the CLI/queue situation: brand context is empty.
+        BrandRegistry::set(null);
 
         // Insert rows with NULL brand (raw, to bypass the model default).
         $order = Order::create([
@@ -46,13 +47,13 @@ class BackfillBrandTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'brand' => Brand::B2B->value]);
         $this->assertDatabaseHas('invoice_snapshots', ['invoice_number' => 'P-2026-9001', 'brand' => Brand::B2B->value]);
 
-        // Crucially, the empty runtime config did NOT leak into the written rows.
-        $this->assertSame(null, config('app.brand'));
+        // Crucially, the empty runtime context did NOT leak into the written rows.
+        $this->assertNull(BrandRegistry::current());
     }
 
     public function test_backfill_command_is_idempotent(): void
     {
-        config(['app.brand' => null]);
+        BrandRegistry::set(null);
         $order = Order::create([
             'user_id' => User::factory()->create()->id,
             'status' => 'pending',

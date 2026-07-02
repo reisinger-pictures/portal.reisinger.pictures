@@ -85,10 +85,6 @@ class GalleryController extends Controller
     public function updateGallery(UpdateGalleryRequest $request, $id)
     {
         $gallery = Gallery::findOrFail($id);
-        if (Gate::denies('manage', $gallery)) {
-            return response()->json(['error' => 'Keine Berechtigung'], 403);
-        }
-
         $gallery = $this->galleryService->updateGallery($gallery, $request->validated());
 
         return response()->json(['success' => true, 'gallery' => $gallery]);
@@ -174,6 +170,11 @@ class GalleryController extends Controller
         $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
         $targetUser = \App\Models\User::findOrFail($request->user_id);
 
+        $gallery = Gallery::findOrFail($id);
+        if (Gate::denies('manage', $gallery)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         if ($request->action === 'attach') {
             $targetUser->galleries()->syncWithoutDetaching([$id]);
         } else {
@@ -187,6 +188,12 @@ class GalleryController extends Controller
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
         $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
         $targetUser = \App\Models\User::findOrFail($request->user_id);
+
+        $gallery = Gallery::findOrFail($id);
+        if (Gate::denies('manage', $gallery)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         if ($request->action === 'attach') {
             $targetUser->photographerGalleries()->syncWithoutDetaching([$id]);
         } else {
@@ -200,6 +207,12 @@ class GalleryController extends Controller
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
         $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
         $targetUser = \App\Models\User::findOrFail($request->user_id);
+
+        $group = \App\Models\GalleryGroup::findOrFail($id);
+        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->photographerGalleryGroups()->where('gallery_groups.id', $group->id)->exists())) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         if ($request->action === 'attach') {
             $targetUser->photographerGalleryGroups()->syncWithoutDetaching([$id]);
         } else {

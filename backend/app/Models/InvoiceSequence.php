@@ -22,10 +22,19 @@ class InvoiceSequence extends Model
         return DB::transaction(function () use ($prefix) {
             $year = (int) date('Y');
             
-            $sequence = self::lockForUpdate()->firstOrCreate(
-                ['year' => $year],
-                ['current_value' => 0]
-            );
+            try {
+                $sequence = self::lockForUpdate()->firstOrCreate(
+                    ['year' => $year],
+                    ['current_value' => 0]
+                );
+            } catch (\Illuminate\Database\QueryException $e) {
+                if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
+                    throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                        response()->json(['error' => 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'], 503)
+                    );
+                }
+                throw $e;
+            }
 
             $sequence->current_value += 1;
             $sequence->save();

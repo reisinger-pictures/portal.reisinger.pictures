@@ -91,6 +91,12 @@ class CheckoutService {
                     if ($validCoupon === null) {
                         return response()->json(['error' => 'Der Rabattcode ist nicht mehr gültig.'], 422);
                     }
+
+                    // Lock coupon row within the checkout transaction to prevent double-use race conditions
+                    [$validCoupon, $couponError] = $couponService->lockAndRevalidateCoupon($validCoupon, $user->id);
+                    if ($validCoupon === null) {
+                        return response()->json(['error' => $couponError], 422);
+                    }
                 }
             }
 
@@ -155,7 +161,7 @@ class CheckoutService {
             $orderData = [
                 'user_id' => $user->id,
                 'status' => $orderStatus,
-                'brand' => config('app.brand'),
+                'brand' => BrandRegistry::current()?->value,
                 'total_amount' => $totalNetCents,
                 'is_quote_request' => $isQuoteRequest,
             ];
@@ -207,6 +213,11 @@ class CheckoutService {
         });
         } catch (\Illuminate\Http\Exceptions\HttpResponseException $e) {
             return $e->getResponse();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
+                return response()->json(['error' => 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'], 503);
+            }
+            throw $e;
         }
     }
 }

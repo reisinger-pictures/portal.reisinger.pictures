@@ -126,7 +126,10 @@ class StatsCalculationService
      */
     public function getUserStats(User $user, ?string $tier = null): array
     {
-        $galleryIds = $user->galleries()->pluck('galleries.id')->toArray();
+        $galleryIds = array_unique(array_merge(
+            $user->galleries()->pluck('galleries.id')->toArray(),
+            $user->photographerGalleries()->pluck('galleries.id')->toArray()
+        ));
         $galleriesCount = count($galleryIds);
 
         $tierFilterDb = function($query) use ($tier) {

@@ -7,8 +7,8 @@ export class SidebarHelper {
         // Anti-Flakiness: Sicherstellen, dass keine Fade-Out Animationen von Modals den Klick blockieren
         await expect(this.page.locator('.modal-open')).toHaveCount(0, { timeout: 5000 });
 
-        const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('.mdi--menu') }).first();
-        const backdrop = this.page.locator('div.fixed.inset-0.z-40').first();
+        const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('svg') }).first();
+        const backdrop = this.page.locator('div.fixed.inset-0').first();
 
         if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
             await expect(async () => {
@@ -17,13 +17,12 @@ export class SidebarHelper {
                 }
                 await expect(backdrop).toBeVisible({ timeout: 2000 });
             }).toPass({ timeout: 10000 });
-            await this.page.waitForTimeout(400);
         }
 
         const link = this.page.locator('ul.menu').getByText(menuText, { exact: false }).first();
         await link.waitFor({ state: 'visible', timeout: 5000 });
         await link.scrollIntoViewIfNeeded();
-        await link.click();
+        await link.evaluate(el => (el as HTMLElement).click());
     }
 
     async openNewGalleryModal() {

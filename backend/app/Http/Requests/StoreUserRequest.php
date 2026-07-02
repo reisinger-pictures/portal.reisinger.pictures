@@ -8,9 +8,7 @@ class StoreUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $user = $this->user();
-        // Admins und Customer Manager dürfen User erstellen
-        return $user && ($user->is_admin || $user->is_customer_manager);
+        return $this->user() !== null && \Illuminate\Support\Facades\Gate::allows('manage-users');
     }
 
     public function rules(): array
@@ -24,7 +22,7 @@ class StoreUserRequest extends FormRequest
     protected function failedAuthorization()
     {
         $user = $this->user();
-        if (!$user || !$user->is_admin) {
+        if ($user && $user->is_customer_manager) {
             throw new \Illuminate\Auth\Access\AuthorizationException('Not implemented for Customer Managers yet.');
         }
         throw new \Illuminate\Auth\Access\AuthorizationException('Forbidden');

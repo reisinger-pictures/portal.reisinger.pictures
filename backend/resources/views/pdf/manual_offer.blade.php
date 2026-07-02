@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Angebot {{ $snapshot->invoice_number }}</title>
     @php
-        $isSrp = \App\Support\BrandRegistry::isSrp();
         $primaryColor = $isSrp ? '#2A9D8F' : '#1E5631';
         $secondaryColor = $isSrp ? '#2A9D8F' : '#A4B494';
     @endphp
@@ -25,7 +24,7 @@
     </style>
 </head>
 <body>
-    @include('pdf.header', ['title' => 'ANGEBOT', 'bankHolder' => $bankHolder])
+    @include('pdf.header', ['title' => 'ANGEBOT', 'bankHolder' => $bankHolder, 'isSrp' => $isSrp ?? false, 'pfx' => $pfx ?? ''])
     @include('pdf.fragments.details', ['title' => 'ANGEBOT'])
 
     @if(!empty($snapshot->customer_details['custom_html_terms']))

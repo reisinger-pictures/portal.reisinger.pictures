@@ -11,10 +11,6 @@ class BrandContextMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (app()->environment('testing')) {
-            return $next($request);
-        }
-
         BrandRegistry::set(BrandRegistry::fromHost($this->resolveHost($request)));
 
         return $next($request);

@@ -64,3 +64,13 @@ Alle 7 Mail-Klassen nutzen das `BrandAwareMail` Trait. Es bietet:
 - `brandBcc()` — liefert die BCC-Adresse pro Brand
 
 Siehe `backend/app/Mail/BrandAwareMail.php`.
+
+## 6. Hostname-Konvention (E2E Test Locators)
+
+| Hostname | Brand | Beschreibung |
+|----------|-------|-------------|
+| `localhost:4321` | B2B/RP (`rp`) | Default |
+| `portal.localhost:4321` | B2B/RP (`rp`) | Alias-Subdomain |
+| `buy.localhost:4321` | SRP (`srp`) | SRP-Subdomain für Volume-Licensing |
+
+**Regel:** URL-Assertions in E2E-Tests MÜSSEN `localhost:4321` (nicht `portal.localhost:4321`) matchen.

@@ -61,6 +61,8 @@ test.describe('Photographer Team Access Workflow', () => {
         
         await expect(page.locator('main').getByText(galleryName)).toBeHidden();
 
+        // Route-Guard: Photog B kann restricted gallery nicht via URL aufrufen
+        // page.goto() ist für diesen Route-Guard-Test nötig (direkter URL-Zugriff)
         await page.goto(galleryUrl);
         await expect(page.locator('text=Galerie nicht gefunden')).toBeVisible();
     });

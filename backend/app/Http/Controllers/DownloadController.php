@@ -33,6 +33,11 @@ class DownloadController extends Controller
         return $user;
     }
 
+    private function sanitizeExifValue($value)
+    {
+        return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value ?? '');
+    }
+
     private function injectMetadata($sourcePath, $photo, $userName)
     {
         $tempDir = storage_path('app/private/temp');
@@ -41,11 +46,20 @@ class DownloadController extends Controller
 
         $tempPath = $tempDir . '/' . uniqid('dl_') . '.jpg';
 
-        $artist = trim($photo->artist ?? config('app.name', 'Reisinger Foto Portal'), "\"\'");
+        $artist = $this->sanitizeExifValue(trim($photo->artist ?? config('app.name', 'Reisinger Foto Portal'), "\"\'"));
         $copyright = 'Copyright ' . date('Y') . ' ' . $artist;
         $editorialNotice = ($photo->effective_is_editorial_only || $photo->is_editorial_only) ? ' - EDITORIAL USE ONLY / NUR FÜR REDAKTIONELLE NUTZUNG FREIGEGEBEN' : '';
-        $instructions = 'Licensed to / Downloaded by: ' . $userName . $editorialNotice;
+        $instructions = $this->sanitizeExifValue('Licensed to / Downloaded by: ' . $userName . $editorialNotice);
         $agbUrl = 'https://reisinger.pictures/agb';
+
+        $title = $this->sanitizeExifValue($photo->title ?? '');
+        $description = $this->sanitizeExifValue($photo->description ?? '');
+        $keywords = $this->sanitizeExifValue($photo->keywords ?? '');
+        $location = $this->sanitizeExifValue($photo->location ?? '');
+        $city = $this->sanitizeExifValue($photo->city ?? '');
+        $state = $this->sanitizeExifValue($photo->state ?? '');
+        $country = $this->sanitizeExifValue($photo->country ?? '');
+        $iso_country = $this->sanitizeExifValue($photo->iso_country ?? '');
 
         $args = [
             'exiftool',
@@ -60,31 +74,31 @@ class DownloadController extends Controller
             '-IPTC:CodedCharacterSet=utf8'
         ];
 
-        if (!empty($photo->title)) {
-            $args[] = "-ObjectName={$photo->title}";
-            $args[] = "-XPTitle={$photo->title}";
+        if (!empty($title)) {
+            $args[] = "-ObjectName={$title}";
+            $args[] = "-XPTitle={$title}";
         }
-        if (!empty($photo->description)) {
-            $args[] = "-Caption-Abstract={$photo->description}";
-            $args[] = "-ImageDescription={$photo->description}";
+        if (!empty($description)) {
+            $args[] = "-Caption-Abstract={$description}";
+            $args[] = "-ImageDescription={$description}";
         }
-        if (!empty($photo->keywords)) {
-            $args[] = "-Keywords={$photo->keywords}";
+        if (!empty($keywords)) {
+            $args[] = "-Keywords={$keywords}";
         }
-        if (!empty($photo->location)) {
-            $args[] = "-Sub-location={$photo->location}";
+        if (!empty($location)) {
+            $args[] = "-Sub-location={$location}";
         }
-        if (!empty($photo->city)) {
-            $args[] = "-City={$photo->city}";
+        if (!empty($city)) {
+            $args[] = "-City={$city}";
         }
-        if (!empty($photo->state)) {
-            $args[] = "-Province-State={$photo->state}";
+        if (!empty($state)) {
+            $args[] = "-Province-State={$state}";
         }
-        if (!empty($photo->country)) {
-            $args[] = "-Country-PrimaryLocationName={$photo->country}";
+        if (!empty($country)) {
+            $args[] = "-Country-PrimaryLocationName={$country}";
         }
-        if (!empty($photo->iso_country)) {
-            $args[] = "-Country-PrimaryLocationCode={$photo->iso_country}";
+        if (!empty($iso_country)) {
+            $args[] = "-Country-PrimaryLocationCode={$iso_country}";
         }
 
         array_push(
@@ -105,6 +119,9 @@ class DownloadController extends Controller
 
         if (!$process->isSuccessful()) {
             Log::error("ExifTool failed on {$sourcePath}: " . $process->getErrorOutput());
+            if (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
             return $sourcePath;
         }
 
@@ -164,6 +181,12 @@ class DownloadController extends Controller
             }
         });
 
+        register_shutdown_function(function () use ($scaledBase) {
+            if (file_exists($scaledBase)) {
+                @unlink($scaledBase);
+            }
+        });
+
         $processedPath = $this->injectMetadata($scaledBase, $photo, $userName);
 
         $downloadName = $photo->id . '_' . $tier . '.jpg';
@@ -211,6 +234,8 @@ class DownloadController extends Controller
             $tempDir = storage_path('app/private/temp');
             if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
 
+            $tempFiles = [];
+
             foreach ($gallery->photos as $photo) {
                 $sourcePath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
                 if (!file_exists($sourcePath))
@@ -226,6 +251,7 @@ class DownloadController extends Controller
                 }
 
                 $scaledBase = $tempDir . '/base_scale_' . $photo->id . '_' . $tier . '.jpg';
+                $tempFiles[] = $scaledBase;
                 $lockKey = 'scale_' . $photo->id . '_' . $tier;
 
                 \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($processor, $sourcePath, $scaledBase, $maxWidth) {
@@ -243,6 +269,12 @@ class DownloadController extends Controller
             }
 
             $zip->finish();
+
+            foreach (array_unique($tempFiles) as $file) {
+                if (file_exists($file)) {
+                    @unlink($file);
+                }
+            }
         }, $gallery->slug . '_' . $tier . '.zip');
     }
 
@@ -282,6 +314,8 @@ class DownloadController extends Controller
             $tempDir = storage_path('app/private/temp');
             if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
 
+            $tempFiles = [];
+
             $items = $snapshot->customer_details['items'];
             foreach ($items as $item) {
                 $photoId = $item['photoId'] ?? null;
@@ -296,6 +330,7 @@ class DownloadController extends Controller
 
                 $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
                 $scaledBase = $tempDir . '/base_scale_' . $photo->id . '_' . $tier . '.jpg';
+                $tempFiles[] = $scaledBase;
                 $lockKey = 'scale_' . $photo->id . '_' . $tier;
 
                 \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($processor, $sourcePath, $scaledBase, $maxWidth) {
@@ -314,6 +349,12 @@ class DownloadController extends Controller
             }
 
             $zip->finish();
+
+            foreach (array_unique($tempFiles) as $file) {
+                if (file_exists($file)) {
+                    @unlink($file);
+                }
+            }
         }, 'Order_' . $snapshot->invoice_number . '.zip');
     }
 }
