@@ -1,9 +1,7 @@
-# Markenspezifische Settings-Trennung — Konzept (SOLL/Ist-Stand)
+# Markenspezifische Settings-Trennung — Konzept (SOLL)
 
-> **Status:** Beschreibt den **Ist-Stand** (Probleme) und den **Soll-Zustand** (Ziel), keine
-> Implementierungsschritte. Verknüpft: `AGENTS.todo.md` T-04,
-> `features/infrastructure/06-multi-domain-branding.md`, `features/infrastructure/08-tenant-brand-concept.md`.
-> Erstellt 2026-06-29.
+> **Status:** Beschreibt den Soll-Zustand (Ziel).
+> Verknüpft: `features/infrastructure/06-multi-domain-branding.md`, `features/infrastructure/08-tenant-brand-concept.md`.
 
 ## 1. Kontext
 
@@ -16,17 +14,7 @@ Das `settings`-Model (`backend/app/Models/Setting.php`) ist ein plain key/value-
 Brand-Feld, Scope oder typisierten Accessor. Die Trennung passiert verstreut in Consumern über das
 verteilte Muster `$pfx = config('app.brand') === 'story.reisinger.pictures' ? 'srp_' : ''`.
 
-## 2. Ist-Stand — Die Probleme
-
-Drei Defekte in `SettingsController.php`, bei denen Lesen und Schreiben asymmetrisch sind:
-
-- **`updateBillingDetails()`:** Liest brand-präfixiert (`srp_bank_iban`), speichert ungeprefixt → SRP-Bankdaten nicht persistierbar
-- **`updateLicenseTerms()`:** Doppelte Prefixung (`srp_srp_base_price`) → Datenmüll-Keys
-- **`updateWatermark()`:** Liest brand-präfixiert, speichert ungeprefixt → nur globaler Opacity-Wert
-
-**Übergreifend:** Das `$get()`-Lambda ist in 5 Dateien dupliziert (`OrderController`, `InvoiceMail`, `ManualInvoiceService`, `header.blade.php`, `SettingsController`) — hohes Inkonsistenz-Risiko.
-
-## 3. Soll-Zustand
+## 2. Soll-Zustand (Architektur)
 
 ### 3.1 Symmetrie Lesen ↔ Schreiben
 
@@ -52,7 +40,7 @@ Statt des verteilten `$get()`/`$pfx`-Musters ein zentraler Resolver (z. B.
 Dieser Resolver konsolidiert die Präfix-Logik an einer Stelle und wird von allen Consumern
 (Controller, Mail, Blade, Services) verwendet.
 
-## 4. Abgrenzung
+## 3. Abgrenzung
 
 - Diese Spec behandelt ausschließlich die **Konsistenz der Settings-Trennung** (Lesen/Schreiben
   symmetrisieren + zentralisieren).
@@ -61,7 +49,7 @@ Dieser Resolver konsolidiert die Präfix-Logik an einer Stelle und wird von alle
 - Die SRP-Bankdaten-Verfügbarkeit im **Queue-/CLI-Pfad** (PDF-Rendering) ist Thema von T-02
   (`09-brand-context-queue-cli.md`) und baut auf diesem Resolver auf.
 
-## 5. Verifikation (später)
+## 4. Verifikation (später)
 
 - Test: `updateBillingDetails` im SRP-Kontext speichert unter `srp_*`; Roundtrip über
   `getBillingDetails` liefert die SRP-Werte.

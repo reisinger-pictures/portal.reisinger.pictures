@@ -21,7 +21,7 @@ interface SidebarProps {
 export default function Sidebar(props: SidebarProps) {
     const { logoSrc, portalName, impressumUrl, isSrp } = useBrand();
     const {user, logout} = useAuth();
-    const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isCustomerManager, showTenantsSection } = usePermissions();
+    const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isOrgAdmin, showTenantsSection } = usePermissions();
     const navigate = useNavigate();
     const { itemCount } = useCart();
 
@@ -89,10 +89,10 @@ export default function Sidebar(props: SidebarProps) {
                         )}
 
                         <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Verwaltung</li>
-                        {(isAdmin || isCustomerManager) && showTenantsSection && !isSrp && (
+                        {(isAdmin || isOrgAdmin) && showTenantsSection && !isSrp && (
                             <>
-                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Organisationen (B2B)</Link></li>
-                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {isCustomerManager && !isAdmin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
+                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Organisationen</Link></li>
+                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {isOrgAdmin && !isAdmin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
                             </>
                         )}
                         <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> Auswertungen</Link></li>

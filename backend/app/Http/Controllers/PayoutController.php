@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\PayoutPool;
 use App\Models\PhotographerStatement;
+use App\Http\Resources\PayoutPoolResource;
+use App\Http\Resources\PhotographerStatementResource;
 use App\Services\PayoutCalculationService;
 use Illuminate\Support\Facades\DB;
 
@@ -16,7 +18,10 @@ class PayoutController extends Controller
         $statements = PhotographerStatement::with('user:id,name,email')
             ->orderBy('year', 'desc')->orderBy('month', 'desc')->get();
         
-        return response()->json(['pools' => $pools, 'statements' => $statements]);
+        return response()->json([
+            'pools' => $pools->map(fn($p) => new PayoutPoolResource($p))->values(),
+            'statements' => $statements->map(fn($s) => new PhotographerStatementResource($s))->values(),
+        ]);
     }
 
     public function calculate(Request $request, PayoutCalculationService $service)
@@ -68,6 +73,6 @@ class PayoutController extends Controller
         $statements = PhotographerStatement::where('user_id', $user->id)
             ->orderBy('year', 'desc')->orderBy('month', 'desc')->get();
             
-        return response()->json($statements);
+        return response()->json($statements->map(fn($s) => new PhotographerStatementResource($s))->values());
     }
 }

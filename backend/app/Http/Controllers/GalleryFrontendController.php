@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Http\Resources\GalleryResource;
+use App\Http\Resources\PhotoResource;
 use Illuminate\Support\Facades\DB;
 
 class GalleryFrontendController extends Controller
@@ -72,14 +74,14 @@ class GalleryFrontendController extends Controller
         }
 
         return response()->json([
-            'gallery' => $gallery,
+            'gallery' => new GalleryResource($gallery),
             'can_manage' => $canManage,
             'breadcrumbs' => $breadcrumbs,
             'downloads_count' => \App\Models\DownloadLog::where('gallery_id', $gallery->id)->count(),
             // ✨ FIX: Notified Count für den "E-Mail senden" Button im Management
             'notified_count' => DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('wants_notifications', true)->count(),
             'wants_notifications' => $user ? (bool) DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('user_id', $user->id)->value('wants_notifications') : false,
-            'photos' => $photos->items(),
+            'photos' => $photos->items() ? collect($photos->items())->map(fn($p) => new PhotoResource($p))->values() : [],
             'current_page' => $photos->currentPage(),
             'last_page' => $photos->lastPage(),
             'total' => $photos->total()

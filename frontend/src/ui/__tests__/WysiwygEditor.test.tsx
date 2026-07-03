@@ -52,7 +52,7 @@ describe('WysiwygEditor', () => {
             isSuperAdmin: true,
             isAdmin: true,
             isPhotographer: false,
-            isCustomerManager: false,
+            isOrgAdmin: false,
             showTenantsSection: false,
             canEditMetadata: false,
             isPowerUser: false,

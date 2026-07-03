@@ -36,7 +36,7 @@ test.describe('User Setup via Mailpit Workflow', () => {
         mailpit = new MailpitHelper(request);
     });
 
-    test('Admin invites a new user and user completes setup', async ({ page }) => {
+    test('Admin invites a new user and user completes setup', async ({ page, request }) => {
         // --- Phase 1: Admin lädt ein ---
         await auth.login(testUser.email, testUser.password);
         await sidebar.navigateTo('Benutzer & Rechte');
@@ -46,6 +46,15 @@ test.describe('User Setup via Mailpit Workflow', () => {
         await form.fillUserModal({ name: 'Test Mailpit User', email: newUserEmail });
         await modal.submitModal('Nutzer anlegen & Einladen');
         await expect(page.locator('.toast')).toContainText('Nutzer angelegt');
+
+        // Track user for cleanup
+        const usersRes = await request.get('/api/management/users').catch(() => null);
+        if (usersRes && usersRes.ok()) {
+            const usersData = await usersRes.json();
+            const usersList = Array.isArray(usersData) ? usersData : usersData.data;
+            const createdUser = usersList?.find((u: { email: string }) => u.email === newUserEmail);
+            if (createdUser) helper.trackUser(createdUser.id);
+        }
 
         // --- Phase 2: User setzt Passwort ---
         const token = await mailpit.extractPasswordResetToken(newUserEmail);

@@ -30,7 +30,7 @@ test.describe('Admin Workflow', () => {
         modal = new ModalHelper(page);
     });
 
-    test('Admin can manage users and roles', async ({ page }) => {
+    test('Admin can manage users and roles', async ({ page, request }) => {
         await auth.login(testUser.email, testUser.password);
 
         await sidebar.navigateTo('Benutzer & Rechte');
@@ -49,6 +49,15 @@ test.describe('Admin Workflow', () => {
         await expect(toast).toContainText('Nutzer angelegt');
         
         await expect(modal.activeModal).toBeHidden();
+
+        // Track user for cleanup
+        const usersRes = await request.get('/api/management/users').catch(() => null);
+        if (usersRes && usersRes.ok()) {
+            const usersData = await usersRes.json();
+            const usersList = Array.isArray(usersData) ? usersData : usersData.data;
+            const createdUser = usersList?.find((u: { email: string }) => u.email === uniqueEmail);
+            if (createdUser) helper.trackUser(createdUser.id);
+        }
 
         await page.fill('input[placeholder="Nutzer suchen (Name oder E-Mail)..."]', uniqueEmail);
         await expect(page.locator(`td:has-text("${uniqueEmail}")`)).toBeVisible();

@@ -23,7 +23,7 @@ class ManagementMiddleware
         $path = $request->path();
 
         if ($user->is_photographer) {
-            $allowedPrefixes = ['api/management/galleries*', 'api/management/gallery-groups*', 'api/management/upload*', 'api/management/ftp*', 'api/management/invites*', 'api/management/stats*', 'api/management/logs*', 'api/management/orders/quote-link*', 'api/management/coupons*'];
+            $allowedPrefixes = ['api/management/galleries*', 'api/management/gallery-groups*', 'api/management/upload*', 'api/management/ftp*', 'api/management/invites*', 'api/management/stats*', 'api/management/logs*', 'api/management/orders/quote-link*', 'api/management/coupons*', 'api/management/tenants*'];
             foreach ($allowedPrefixes as $prefix) {
                 if ($request->is($prefix)) {
                     $isAllowed = true; break;
@@ -31,8 +31,8 @@ class ManagementMiddleware
             }
         }
 
-        if ($user->is_customer_manager) {
-            // Customer Manager dürfen nur die User-Verwaltung und rudimentäre Analytics sehen
+        if ($user->is_org_admin) {
+            // Org Admin dürfen nur die User-Verwaltung und rudimentäre Analytics sehen
             $allowedPrefixes = ['api/management/users*', 'api/management/roles*', 'api/management/stats*', 'api/management/logs*', 'api/management/tenants*'];
             foreach ($allowedPrefixes as $prefix) {
                 if ($request->is($prefix)) {

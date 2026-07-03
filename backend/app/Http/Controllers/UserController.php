@@ -22,16 +22,13 @@ class UserController extends Controller
         $query = User::with(['roles', 'galleryGroups', 'galleries', 'photographerGalleries', 'photographerGalleryGroups']);
 
         if (!$user->is_admin) {
-            if (!$user->is_customer_manager) {
+            if (!$user->is_org_admin) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
-            $tenantIds = $user->tenants()->pluck('tenants.id')->toArray();
-            if (empty($tenantIds)) {
+            if ($user->tenant_id === null) {
                 return response()->json(['data' => []]);
             }
-            $query->whereHas('tenants', function($q) use ($tenantIds) {
-                $q->whereIn('tenants.id', $tenantIds);
-            });
+            $query->where('tenant_id', $user->tenant_id);
         }
 
         return \App\Http\Resources\UserResource::collection($query->get());
@@ -49,13 +46,48 @@ class UserController extends Controller
 
     public function store(StoreUserRequest $request)
     {
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
+        $currentUser = auth('api')->user();
+
+        // Org Admin: scope to their tenant
+        $managerTenant = null;
+        if ($currentUser && $currentUser->is_org_admin) {
+            $managerTenant = \App\Models\Tenant::find($currentUser->tenant_id);
+            if (!$managerTenant) {
+                return response()->json(['error' => 'Customer Manager hat keine Organisation.'], 422);
+            }
+        }
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $managerTenant) {
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => null,
                 'brand' => BrandRegistry::currentOrDefault(),
             ]);
+
+            // If created by a Customer Manager, assign to their tenant
+            if ($managerTenant) {
+                $user->tenant_id = $managerTenant->id;
+
+                // Inherit role from tenant's default_role_id
+                $roleId = $managerTenant->default_role_id;
+                if (!$roleId) {
+                    $clientRole = Role::where('name', UserRole::CLIENT->value)->first();
+                    $roleId = $clientRole?->id;
+                }
+                if ($roleId) {
+                    $user->roles()->attach($roleId);
+                }
+
+                // Inherit flatrate settings from tenant
+                if ($managerTenant->default_flatrate_level) {
+                    $user->flatrate_level = $managerTenant->default_flatrate_level;
+                }
+                if ($managerTenant->can_purchase_upgrades) {
+                    $user->can_purchase_upgrades = true;
+                }
+                $user->save();
+            }
 
             $token = Str::random(64);
             \Illuminate\Support\Facades\DB::table('password_reset_tokens')->updateOrInsert(
@@ -86,13 +118,10 @@ class UserController extends Controller
         $user = User::findOrFail($id);
 
         if (!$currentUser->is_admin) {
-            if (!$currentUser->is_customer_manager) {
+            if (!$currentUser->is_org_admin) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
-            $managerTenantIds = $currentUser->tenants()->pluck('tenants.id')->toArray();
-            $targetUserTenantIds = $user->tenants()->pluck('tenants.id')->toArray();
-
-            if (empty(array_intersect($managerTenantIds, $targetUserTenantIds))) {
+            if ($user->tenant_id !== $currentUser->tenant_id) {
                 return response()->json(['error' => 'Forbidden (Tenant Isolation)'], 403);
             }
         }
@@ -122,6 +151,9 @@ class UserController extends Controller
         if ($request->has('flatrate_level')) {
             $user->update(['flatrate_level' => $request->flatrate_level]);
         }
+        if ($request->has('can_purchase_upgrades')) {
+            $user->update(['can_purchase_upgrades' => $request->can_purchase_upgrades]);
+        }
         if ($request->has('brand')) {
             // U-02: Staff is brand-bound (reversal of Policy A). Only Super-Admin keeps
             // brand=null (cross-brand). All other roles (admin, photographer, etc.) are
@@ -142,11 +174,17 @@ class UserController extends Controller
     public function destroy($id)
     {
         $currentUser = auth('api')->user();
+        $user = User::findOrFail($id);
+
         if (!$currentUser->is_admin) {
-            return response()->json(['error' => 'Forbidden'], 403);
+            if (!$currentUser->is_org_admin) {
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
+            if ($user->tenant_id !== $currentUser->tenant_id) {
+                return response()->json(['error' => 'Forbidden (Tenant Isolation)'], 403);
+            }
         }
 
-        $user = User::findOrFail($id);
         $user->delete();
 
         return response()->json(['success' => true]);

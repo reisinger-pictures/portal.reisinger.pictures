@@ -56,7 +56,8 @@ class AuthorizationTest extends TestCase
             'domain' => 'firma.com',
             'invoice_frequency' => 'immediate'
         ]);
-        $user->tenants()->attach($tenant->id);
+        $user->tenant_id = $tenant->id;
+        $user->save();
         $tenant->galleryGroups()->attach($group->id);
 
         $deliveryGallery = Gallery::factory()->create([

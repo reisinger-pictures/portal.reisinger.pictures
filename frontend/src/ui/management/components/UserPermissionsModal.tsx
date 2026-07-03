@@ -8,7 +8,7 @@ interface UserPermissionsModalProps {
     flatGroups: FlatGroup[];
     flatGalleries: Gallery[];
     onClose: () => void;
-    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'srp' | null) => Promise<void>;
+    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'srp' | null, canPurchaseUpgrades: boolean) => Promise<void>;
 }
 
 // U-02: Only Super-Admin is cross-brand (brand=null). All other roles are brand-bound.
@@ -29,6 +29,7 @@ export default function UserPermissionsModal({
     const [canEditMeta, setCanEditMeta] = useState<boolean>(user.can_edit_metadata || false);
     const [flatrateLevel, setFlatrateLevel] = useState<string>(user.flatrate_level || 'none');
     const [brand, setBrand] = useState<'rp' | 'srp' | null>(user.brand ?? null);
+    const [canPurchaseUpgrades, setCanPurchaseUpgrades] = useState<boolean>(user.can_purchase_upgrades ?? false);
 
     // U-02: Only Super-Admin role forces brand=null (cross-brand). All other roles are
     // brand-bound — the user MUST pick 'rp' or 'srp'.
@@ -64,7 +65,7 @@ export default function UserPermissionsModal({
     }, [roles]);
 
     const handleSave = () => {
-        onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand);
+        onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand, canPurchaseUpgrades);
     };
 
     return (
@@ -101,6 +102,18 @@ export default function UserPermissionsModal({
                         </select>
                         <span className="label-text-alt opacity-70 mt-1 pl-1">Bestimmt, welche Auflösungen direkt ohne Checkout geladen werden können.</span>
                     </div>
+
+                    <div className="form-control bg-base-200 p-4 rounded-box border border-base-300">
+                        <label className="cursor-pointer label justify-start gap-4">
+                            <input type="checkbox" checked={canPurchaseUpgrades}
+                                   onChange={e => setCanPurchaseUpgrades(e.target.checked)}
+                                   className="checkbox checkbox-primary"/>
+                            <div>
+                                <span className="label-text font-bold block">Upgrades kaufen erlaubt</span>
+                                <span className="label-text-alt opacity-70 leading-tight block mt-1">Erlaubt dem User kostenpflichtige Upgrades (höhere Auflösungen) im Checkout zu erwerben.</span>
+                            </div>
+                        </label>
+                    </div>
                 </div>
 
                 <div className="form-control bg-base-200 p-4 rounded-box border border-base-300">
@@ -112,7 +125,7 @@ export default function UserPermissionsModal({
                         onChange={e => setBrand((e.target.value || null) as 'rp' | 'srp' | null)}
                     >
                         <option value="">Übergreifend (cross-brand, nur Super-Admin)</option>
-                        <option value="rp">B2B (reisinger.pictures)</option>
+                        <option value="rp">Portal (reisinger.pictures)</option>
                         <option value="srp">SRP (buy.reisinger.pictures)</option>
                     </select>
                     <span className="label-text-alt opacity-70 mt-1 pl-1">

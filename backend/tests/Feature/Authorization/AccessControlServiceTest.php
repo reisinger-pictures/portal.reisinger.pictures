@@ -103,7 +103,8 @@ class AccessControlServiceTest extends TestCase
         $tenant = Tenant::factory()->create();
         $gallery = Gallery::factory()->create(['tenant_id' => $tenant->id, 'type' => 'delivery']);
         $user = User::factory()->create();
-        $tenant->users()->attach($user);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $ids = $this->service->getAllowedGalleryIds($user);
 
@@ -116,7 +117,8 @@ class AccessControlServiceTest extends TestCase
         $group = GalleryGroup::factory()->create(['tenant_id' => $tenant->id]);
         $gallery = Gallery::factory()->create(['gallery_group_id' => $group->id, 'type' => 'delivery']);
         $user = User::factory()->create();
-        $tenant->users()->attach($user);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $ids = $this->service->getAllowedGalleryIds($user);
 

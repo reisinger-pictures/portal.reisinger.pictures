@@ -17,7 +17,7 @@ test.describe('Photographer Team Access Workflow', () => {
     });
 
     test.afterEach(async () => {
-        await helper.teardown();
+        if (helper) await helper.teardown();
     });
 
     test('Test 5: Photog B can access and upload to an OPEN gallery created by Photog A', async ({ page }) => {

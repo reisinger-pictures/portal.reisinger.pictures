@@ -2,19 +2,18 @@
 
 **Status:** Draft  
 **Epic:** SRP-01 / SRP-01-ext  
-**Tags:** `coupon`, `discount`, `pricing`, `srp`, `photographer`, `scope`, `tenant`, `organisation`, `per-sub-gallery`
+**Tags:** `coupon`, `discount`, `pricing`, `srp`, `photographer`, `scope`, `tenant`, `organisation`, `max-items`
 
 ## Target State (Soll-Zustand)
 
 ### 1. Coupon Types
 
-Three atomic discount types, defined by the `type` column:
+Two atomic discount types, defined by the `type` column:
 
 | Type | `value` meaning | Example |
 |---|---|---|
 | `fixed` | Fixed discount in Euro (stored as DECIMAL, converted to cents) | `value=5` → −5,00 € |
-| `percentage` | Percentage discount (0–100) | `value=10` → −10 % |
-| `free_items` | Number of items that become free (cheapest first) | `value=3` → 3 cheapest items → 0 € |
+| `percentage` | Percentage discount (0–100). When `max_items` is set, applies only to the X cheapest items. | `value=10` → −10 % (entire cart) or `value=50, max_items=3` → 50% off the 3 cheapest items |
 
 ### 2. Scope
 
@@ -30,30 +29,21 @@ Coupons can be restricted by scope:
 
 If a cart contains items from multiple galleries, a gallery-scoped coupon applies when *any* item belongs to the matching gallery.
 
-**`meta_gallery` + `scope_gallery_id` (Sub-Gallery Scoping):**
+**`percentage` + `max_items` (Limiting to Cheapest Items):**
 
-When `scope_type = 'meta_gallery'`, an optional `scope_gallery_id` narrows the scope to a single gallery within that group:
+When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits the discount to the X cheapest items in the cart:
 
-| `scope_type` | `scope_id` | `scope_gallery_id` | Behaviour |
-|---|---|---|---|
-| `meta_gallery` | group.id | **NULL** (default) | Cart must contain items from **any** gallery in the group |
-| `meta_gallery` | group.id | **gallery.id** | Cart must contain items from **that specific** gallery (within the group) |
+| `max_items` | Behaviour |
+|---|---|
+| **NULL** (default) | Percentage applies to the **entire cart** total |
+| **X** | Sort items by `priceCents` ascending, take the first X items, apply the percentage only to those items |
 
-**Use Case – Sportklub Saison A:**
+**Use Case – 50% auf die 3 günstigsten Bilder:**
 
-- Meta Gallery: "Sportklub Saison A" (GalleryGroup)
-- Sub-Gallerien: "Spiel 1", "Spiel 2", "Spiel 3"… (jeweils eine Gallery in der Gruppe)
-- Ein Photographer erstellt pro Spiel einen Coupon: `type=free_items`, `value=2`, `scope_type=meta_gallery`, `scope_id=<SaisonA-ID>`, `scope_gallery_id=<Spiel1-ID>`
-- Ergebnis: Kunde erhält **2 Gratis-Fotos pro Spiel** (ein Coupon pro Sub-Gallery, jeder separat einlösbar)
-
-**Use Case – Per-Sub-Gallery Free Items (Dynamic):**
-
-- `per_sub_gallery = true` changes the semantics of `free_items` from "X cheapest items in the entire cart" to "X free items **per unique sub-gallery** within the meta-gallery".
-- Example: `type=free_items`, `value=1`, `scope_type=meta_gallery`, `scope_id=<group>`, `per_sub_gallery=true`
-- Cart contains items from 12 different galleries within the group → **12 free items** (1 per sub-gallery, cheapest per sub-gallery).
-- If a new sub-gallery is added to the group and items are added to a cart, the coupon automatically covers it.
-- `per_sub_gallery` is only valid when `type=free_items` AND `scope_type=meta_gallery` AND `scope_gallery_id IS NULL`.
-- When `per_sub_gallery=false` (default), `free_items` apply globally to the entire cart as before.
+- `type=percentage`, `value=50`, `max_items=3`
+- Cart contains 5 items priced [3000, 2500, 2000, 1500, 1000]
+- Cheapest 3: 1000 + 1500 + 2000 = 4500 → 50% of 4500 = 2250 discount
+- Total after discount: 7750
 
 **Use Case – Mandantenweiter Organisations-Code:**
 
@@ -84,8 +74,8 @@ When `scope_type = 'meta_gallery'`, an optional `scope_gallery_id` narrows the s
    - Expiry
    - Global usage limit (`max_uses_global`)
    - Per-account usage limit (`max_uses_per_account` via `coupon_user_usage` table)
-   - Scope match (gallery / meta_gallery / meta_gallery+scope_gallery_id / photographer / organisation)
-4. Backend returns `{valid: true, coupon: {...}, discount: {...}}` or `{valid: false, error: "..."}`.
+    - Scope match (gallery / meta_gallery / photographer / organisation)
+4. Backend returns `{valid: true, coupon: {code, type, value}, discount_cents: int}` or `{valid: false, error: "..."}`. The response includes `type` and `value` (needed for frontend display) but omits internal fields `id` and `scope_type` (least-information principle).
 5. On checkout-submit (`POST /api/orders/checkout`), the coupon code is passed in the request body.
 6. **Checkout re-validation (critical):** Before applying the coupon, the backend re-validates it atomically. If the coupon is no longer valid (expired, limit reached, scope mismatch), the checkout is **rejected** with HTTP 422 and a user-facing error message. Silent fallback (ignoring the coupon) is **forbidden** — the user must be informed that their coupon became invalid between preview and checkout.
 7. `CheckoutService` → `VolumeLicensingStrategy` applies the coupon after volume pricing.
@@ -112,7 +102,7 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 |---|---|
 | `VolumeLicensingStrategy` | After `$result` is produced, apply coupon if present and valid. If coupon is requested but invalid, throw exception. |
 | `CheckoutService` | Pass coupon code from request → validate before strategy call → reject if invalid. Store `coupon_id` and `coupon_discount_cents` on order. |
-| `CouponService` | New service: find valid coupon (incl. organisation scope, per-sub-gallery logic), apply discount calculation (incl. per-sub-gallery free_items), increment usage. |
+| `CouponService` | New service: find valid coupon (incl. organisation scope), apply discount calculation (incl. percentage+max_items), increment usage. |
 | `Order` model | Add `coupon_id` (nullable FK) and `coupon_discount_cents` (integer, default 0). |
 
 ### 6. API Endpoints
@@ -138,12 +128,11 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 | `id` | BIGINT UNSIGNED AUTO_INCREMENT | Primary key |
 | `brand` | ENUM('rp','srp') NOT NULL | Brand isolation |
 | `code` | VARCHAR(50) NOT NULL | Human-readable code |
-| `type` | ENUM('fixed','percentage','free_items') NOT NULL | Discount type |
-| `value` | DECIMAL(10,2) NOT NULL | Amount / percent / count |
+| `type` | ENUM('fixed','percentage') NOT NULL | Discount type |
+| `value` | DECIMAL(10,2) NOT NULL | Amount / percent |
+| `max_items` | INT UNSIGNED NULL | When type=percentage: limit discount to X cheapest items (NULL = entire cart) |
 | `scope_type` | ENUM('global','gallery','meta_gallery','photographer','organisation') NOT NULL DEFAULT 'global' | Scope type |
 | `scope_id` | CHAR(36) NULL | Target ID (galleries / gallery_groups / tenants) |
-| `scope_gallery_id` | CHAR(36) NULL | When scope_type=meta_gallery: narrows to a specific gallery in the group (NULL = any gallery in group) |
-| `per_sub_gallery` | TINYINT(1) NOT NULL DEFAULT 0 | When type=free_items + scope_type=meta_gallery + scope_gallery_id IS NULL: apply free_items per unique sub-gallery in cart |
 | `max_uses_global` | INT UNSIGNED NULL | Global usage limit (NULL = unlimited) |
 | `max_uses_per_account` | INT UNSIGNED NULL | Per-account usage limit (NULL = unlimited) |
 | `used_count` | INT UNSIGNED NOT NULL DEFAULT 0 | Atomic counter (global) |
@@ -181,8 +170,7 @@ Unique: `(coupon_id, user_id)`
 | `type` / `value` | ✓ | ✓ | ✓ |
 | `scope_type` | alle (inkl. `organisation`) | alle (inkl. `organisation`) | `gallery`, `meta_gallery`, `photographer` (nur eigene) |
 | `scope_id` | jede ID | jede ID der Brand | nur eigene Galleries/Groups |
-| `scope_gallery_id` | jede ID | jede ID der Brand | nur eigene Galleries |
-| `per_sub_gallery` | ✓ | ✓ | ✓ (nur wenn type=free_items + scope=meta_gallery) |
+| `max_items` | ✓ | ✓ | ✓ |
 | `max_uses_global` | ✓ | ✓ | versteckt / null |
 | `max_uses_per_account` | ✓ | ✓ | ✓ |
 | `active` | ✓ | ✓ | versteckt (aktiv via expires_at + used_count) |
@@ -190,7 +178,7 @@ Unique: `(coupon_id, user_id)`
 | Löschen | immer | immer | wenn `used_count=0` + nur eigene |
 
 **Scope-Einschränkung Photographer:**
-- Darf nur `scope_id` / `scope_gallery_id` auf Galleries/Groups setzen, zu denen er via `photographer_gallery_groups` berechtigt ist
+- Darf nur `scope_id` auf Galleries/Groups setzen, zu denen er via `photographer_gallery_groups` berechtigt ist
 - Bei `scope_type = 'photographer'` wird der Coupon automatisch auf alle seine Gallerien angewandt
 - `scope_type = 'organisation'` ist für Photographer nicht erlaubt (kein Tenant-Zugriff)
 

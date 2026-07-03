@@ -23,10 +23,12 @@ export interface GalleryAccessModalProps {
 }
 
 export default function GalleryAccessModal({galleryId, galleryName, isOpen, onClose}: GalleryAccessModalProps) {
-    const {data: users, isLoading, mutate} = useSWR<UserAccess[]>('/api/management/users', fetcher);
+    const {data: response, isLoading, mutate} = useSWR<{data: UserAccess[]} | UserAccess[]>('/api/management/users', fetcher);
     const {showToast} = useUI();
     const [search, setSearch] = useState('');
     const [processingId, setProcessingId] = useState<string | null>(null);
+
+    const users = Array.isArray(response) ? response : response?.data;
 
     if (!isOpen) return null;
     if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;

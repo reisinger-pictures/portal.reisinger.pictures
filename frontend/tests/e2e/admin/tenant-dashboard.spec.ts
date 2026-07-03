@@ -30,7 +30,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         const guestEmail = `tenant-guest-${Math.random().toString(36).substring(2, 10)}@example.com`;
 
         await auth.login(adminUser.email, adminUser.password);
-        await sidebar.navigateTo('Organisationen (B2B)');
+        await sidebar.navigateTo('Organisationen');
 
         await page.getByRole('button', { name: '+ Neue Organisation' }).click();
         const form = new FormHelper(page, modal);
@@ -53,17 +53,19 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
 
         const inviteLink = `/tenant-invite/${token}`;
         await page.goto(inviteLink);
-        await expect(page.locator('h2:has-text("Unternehmens-Account")')).toBeVisible();
+        await expect(page.locator('h2:has-text("Einladung zu Organisation")')).toBeVisible();
+        await page.getByRole('button', { name: 'Beitreten & Fortfahren' }).click();
+        await expect(page.locator('h2:has-text("Account erstellen")')).toBeVisible();
         await page.getByPlaceholder('z.B. Maria Muster').fill('Tenant Angestellter');
         await page.locator('.card-body').locator('input[type="password"]').fill('SecurePass123!');
         await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
-        await page.getByRole('button', { name: 'Account aktivieren & Anmelden' }).click();
+        await page.getByRole('button', { name: 'Account aktivieren & Beitreten' }).click();
         
         await expect(page.locator('h1:has-text("Willkommen zurück")')).toBeVisible({ timeout: 15000 });
         await auth.logout();
 
         await auth.login(adminUser.email, adminUser.password);
-        await sidebar.navigateTo('Organisationen (B2B)');
+        await sidebar.navigateTo('Organisationen');
         await page.locator('.card-title', { hasText: tenantName }).click();
         
         const invBtn = page.getByRole('button', { name: 'Sammelrechnung erstellen' });

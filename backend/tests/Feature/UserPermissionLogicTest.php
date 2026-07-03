@@ -165,7 +165,8 @@ class UserPermissionLogicTest extends TestCase
         $tenant = Tenant::factory()->create();
         $group = GalleryGroup::factory()->create();
         $tenant->galleryGroups()->attach($group->id);
-        $user->tenants()->attach($tenant->id);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $deliveryGallery = Gallery::factory()->create([
             'gallery_group_id' => $group->id,
@@ -188,7 +189,8 @@ class UserPermissionLogicTest extends TestCase
         $tenant = Tenant::factory()->create();
         $group = GalleryGroup::factory()->create();
         $tenant->galleryGroups()->attach($group->id);
-        $user->tenants()->attach($tenant->id);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         // Nur selection-Galerie — darf NICHT auftauchen
         $selectionGallery = Gallery::factory()->create([
@@ -904,12 +906,13 @@ class UserPermissionLogicTest extends TestCase
         $this->assertTrue($user->is_photographer);
     }
 
-    public function test_is_customer_manager_attribute_returns_true_for_role(): void
+    public function test_is_org_admin_attribute_returns_true_for_role(): void
     {
-        $user = User::factory()->create();
-        $this->assignRole($user, UserRole::CUSTOMER_MANAGER);
+        $tenant = \App\Models\Tenant::factory()->create();
+        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        $this->assignRole($user, UserRole::ORG_ADMIN);
 
-        $this->assertTrue($user->is_customer_manager);
+        $this->assertTrue($user->is_org_admin);
     }
 
     public function test_is_power_user_attribute_returns_true_for_role(): void

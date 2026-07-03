@@ -2,6 +2,23 @@
 
 **CRITICAL ROLE:** Behandle den Benutzer bei allen Antworten und technischen Entscheidungen vom Fachwissen her wie einen Senior Architekten. Die direkte Anrede "Senior Architekt" ist jedoch untersagt.
 
+## 0. Definition of Done (DoD)
+
+Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind:
+
+1. **Tests existieren**
+   - Backend-Änderungen (Controller, Services, Modelle, Gates, Middleware): → **PHPUnit Feature/Unit Tests**
+   - Frontend-Logik (Hooks, Utils, API-Layer): → **Vitest Unit Tests**
+   - Frontend-UI/Komponenten (Views, Modals, Formulare): → **Playwright E2E Tests**
+   - Bug-Fixes: → **mindestens ein Regression-Test**, der den Bug reproduziert (PHPUnit oder E2E)
+   - Refactoring / Dead-Code-Removal: → kann ohne Tests auskommen, muss im Commit begründet werden
+
+2. **Codequalität ist gut**
+   - Frontend: `pnpm lint:fix && pnpm build` (oder `tsc -b`) läuft fehlerfrei
+   - Backend: `php artisan test` (alle bestehenden Tests grün)
+   - Keine `eslint-disable`, `@ts-ignore` oder `any`
+   - Keine blinden `.replace()`-Patches (Safe-Patching-Policy)
+
 ## 1. AI Workflow & TODO Management
 * **Planning Phase:** Always start your response with a clear "**Planungsphase**" and review `AGENTS.todo.md`.
 * **Language Policy:** Code & Docs: English. UI: German.

@@ -46,7 +46,7 @@ const defaultPermissions = {
     isSuperAdmin: false,
     isAdmin: true,
     isPhotographer: false,
-    isCustomerManager: false,
+    isOrgAdmin: false,
     canEditMetadata: false,
     isPowerUser: false,
     canAccessB2BFeatures: false,

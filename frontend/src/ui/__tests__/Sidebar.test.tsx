@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import { useAuth } from '../../logic/useAuth';
 import { usePermissions } from '../../logic/usePermissions';
 import { useCart } from '../../logic/CartContext';
+import { useBrand } from '../../logic/useBrand';
 
 // --------------------------------------------------------------------------
 // Mocks
@@ -99,7 +100,7 @@ describe('Sidebar', () => {
             isAdmin: false,
             isSuperAdmin: false,
             isPhotographer: false,
-            isCustomerManager: false,
+            isOrgAdmin: false,
             showTenantsSection: false,
             canEditMetadata: false,
             isPowerUser: false,
@@ -216,7 +217,7 @@ describe('Sidebar', () => {
                 isAdmin: false,
                 isSuperAdmin: false,
                 isPhotographer: true,
-                isCustomerManager: false,
+                isOrgAdmin: false,
                 showTenantsSection: false,
             });
             renderSidebar();
@@ -239,7 +240,7 @@ describe('Sidebar', () => {
                 isAdmin: true,
                 isSuperAdmin: false,
                 isPhotographer: true,
-                isCustomerManager: false,
+                isOrgAdmin: false,
                 showTenantsSection: false,
                 canEditMetadata: true,
                 isPowerUser: false,
@@ -267,7 +268,7 @@ describe('Sidebar', () => {
                 isAdmin: true,
                 isSuperAdmin: true,
                 isPhotographer: false,
-                isCustomerManager: false,
+                isOrgAdmin: false,
                 showTenantsSection: true,
             });
             renderSidebar();
@@ -279,20 +280,20 @@ describe('Sidebar', () => {
             expect(screen.getByText('Manuelle Rechnung')).toBeInTheDocument();
         });
 
-        it('renders customer-manager navigation with correct labels', () => {
+        it('renders org-admin navigation with correct labels', () => {
             vi.mocked(usePermissions).mockReturnValue({
                 ...defaultPermissions,
                 isStaff: true,
                 isAdmin: false,
                 isSuperAdmin: false,
                 isPhotographer: false,
-                isCustomerManager: true,
+                isOrgAdmin: true,
                 showTenantsSection: true,
             });
             renderSidebar();
 
-            expect(screen.getByText('Organisationen (B2B)')).toBeInTheDocument();
-            // Customer-manager sees "Mein Team" instead of "Benutzer & Rechte"
+            expect(screen.getByText('Organisationen')).toBeInTheDocument();
+            // Org-admin sees "Mein Team" instead of "Benutzer & Rechte"
             expect(screen.getByText('Mein Team')).toBeInTheDocument();
 
             // Admin-only must still be hidden
@@ -306,12 +307,80 @@ describe('Sidebar', () => {
                 isAdmin: false,
                 isSuperAdmin: false,
                 isPhotographer: true,
-                isCustomerManager: false,
+                isOrgAdmin: false,
                 showTenantsSection: false,
             });
             renderSidebar();
 
             expect(screen.getByText('Meine Abrechnungen')).toBeInTheDocument();
         });
+    });
+});
+
+describe('SRP admin navigation', () => {
+    beforeEach(() => {
+        vi.mocked(useAuth).mockReturnValue({
+            user: { ...mockUser, is_admin: true },
+            isLoading: false,
+            isError: undefined,
+            login: vi.fn(),
+            register: vi.fn(),
+            logout: vi.fn(),
+            mutate: vi.fn(),
+        });
+        vi.mocked(usePermissions).mockReturnValue({
+            ...defaultPermissions,
+            isStaff: true,
+            isAdmin: true,
+            isSuperAdmin: false,
+            isPhotographer: true,
+            isOrgAdmin: false,
+            showTenantsSection: false,
+            canEditMetadata: true,
+        });
+        vi.mocked(useBrand).mockReturnValue({
+            brand: 'rp',
+            logoSrc: '/brands/rp/android-chrome-192x192.png',
+            svgUrl: '/brands/rp/safari-pinned-tab.svg',
+            portalName: 'Reisinger Foto Portal',
+            impressumUrl: 'https://reisinger.pictures/impressum/',
+            isSrp: true,
+        });
+    });
+
+    it('shows "Gutscheincode" link when isStaff, isAdmin, and isSrp are true', () => {
+        renderSidebar();
+
+        expect(screen.getByText('Gutscheincode')).toBeInTheDocument();
+        expect(screen.getByText('Marketing')).toBeInTheDocument();
+    });
+
+    it('hides "Gutscheincode" link when isAdmin is false', () => {
+        vi.mocked(usePermissions).mockReturnValue({
+            ...defaultPermissions,
+            isStaff: true,
+            isSuperAdmin: false,
+            isAdmin: false,
+            isPhotographer: true,
+            isOrgAdmin: false,
+            showTenantsSection: false,
+        });
+        renderSidebar();
+
+        expect(screen.queryByText('Gutscheincode')).not.toBeInTheDocument();
+    });
+
+    it('hides "Gutscheincode" link when isSrp is false', () => {
+        vi.mocked(useBrand).mockReturnValue({
+            brand: 'rp',
+            logoSrc: '/brands/rp/android-chrome-192x192.png',
+            svgUrl: '/brands/rp/safari-pinned-tab.svg',
+            portalName: 'Reisinger Foto Portal',
+            impressumUrl: 'https://reisinger.pictures/impressum/',
+            isSrp: false,
+        });
+        renderSidebar();
+
+        expect(screen.queryByText('Gutscheincode')).not.toBeInTheDocument();
     });
 });

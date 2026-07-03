@@ -10,6 +10,9 @@ use App\Http\Requests\StoreGroupRequest;
 use App\Http\Requests\UpdateGroupRequest;
 use App\Http\Requests\StoreGalleryRequest;
 use App\Http\Requests\UpdateGalleryRequest;
+use App\Http\Resources\GalleryResource;
+use App\Http\Resources\GalleryGroupResource;
+use App\Http\Resources\PhotoResource;
 use App\Services\GalleryService;
 use App\Services\GalleryTreeService;
 use App\Services\RatingService;
@@ -30,8 +33,9 @@ class GalleryController extends Controller
     {
         $user = auth('api')->user();
         $filterType = $request->query('filter_type');
+        $tenantId = $request->query('tenant_id');
 
-        $treeArray = $this->galleryTreeService->getAdminTree($user, $filterType);
+        $treeArray = $this->galleryTreeService->getAdminTree($user, $filterType, $tenantId);
 
         return response()->json($treeArray);
     }
@@ -43,7 +47,7 @@ class GalleryController extends Controller
     {
         $group = $this->galleryService->storeGroup($request->validated());
 
-        return response()->json(['success' => true, 'group' => $group]);
+        return response()->json(['success' => true, 'group' => new GalleryGroupResource($group)]);
     }
 
     /**
@@ -54,7 +58,7 @@ class GalleryController extends Controller
         $group = GalleryGroup::findOrFail($id);
         $group = $this->galleryService->updateGroup($group, $request->validated());
 
-        return response()->json(['success' => true, 'group' => $group]);
+        return response()->json(['success' => true, 'group' => new GalleryGroupResource($group)]);
     }
 
     /**
@@ -76,7 +80,7 @@ class GalleryController extends Controller
         $user = auth('api')->user();
         $gallery = $this->galleryService->storeGallery($request->validated(), $user);
 
-        return response()->json(['success' => true, 'gallery' => $gallery]);
+        return response()->json(['success' => true, 'gallery' => new GalleryResource($gallery)]);
     }
 
     /**
@@ -87,7 +91,7 @@ class GalleryController extends Controller
         $gallery = Gallery::findOrFail($id);
         $gallery = $this->galleryService->updateGallery($gallery, $request->validated());
 
-        return response()->json(['success' => true, 'gallery' => $gallery]);
+        return response()->json(['success' => true, 'gallery' => new GalleryResource($gallery)]);
     }
 
     /**
@@ -154,9 +158,9 @@ class GalleryController extends Controller
         $photos = Photo::whereIn('gallery_id', $galleryIds)->orderBy('id', 'desc')->paginate(50);
 
         return response()->json([
-            'group' => $group,
+            'group' => new GalleryGroupResource($group),
             'downloads_count' => \App\Models\DownloadLog::whereIn('gallery_id', $galleryIds)->count(),
-            'photos' => $photos->items(),
+            'photos' => $photos->items() ? collect($photos->items())->map(fn($p) => new PhotoResource($p))->values() : [],
             'current_page' => $photos->currentPage(),
             'last_page' => $photos->lastPage(),
             'total' => $photos->total()

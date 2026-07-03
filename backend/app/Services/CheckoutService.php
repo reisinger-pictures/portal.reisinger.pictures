@@ -131,9 +131,9 @@ class CheckoutService {
                 $lineItems[] = $bd;
             }
 
-            // Add coupon discount line item for fixed/percentage coupons
+            // Add coupon discount line item
             $couponType = $pricingResult['couponType'] ?? null;
-            if ($couponDiscountCents > 0 && $couponType !== null && $couponType !== 'free_items') {
+            if ($couponDiscountCents > 0 && $couponType !== null) {
                 $nonQuoteItems = array_filter($lineItems, fn($li) => empty($li['isQuote']));
                 $nonQuoteCount = count($nonQuoteItems);
                 if ($nonQuoteCount > 0) {
@@ -153,7 +153,7 @@ class CheckoutService {
 
             $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
 
-            $tenant = $user->tenants()->first();
+            $tenant = $user->tenant;
             $isLieferschein = $tenant && $tenant->invoice_frequency !== 'immediate';
             $orderStatus = $isQuoteRequest ? 'pending' : ($isLieferschein ? 'delivery_note' : ($paymentMethod === 'invoice' ? 'invoice_created' : 'pending_payment'));
 

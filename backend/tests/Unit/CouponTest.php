@@ -153,24 +153,24 @@ class CouponTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    //  per_sub_gallery
+    //  max_items
     // ──────────────────────────────────────────────
 
-    public function test_per_sub_gallery_defaults_to_false(): void
+    public function test_max_items_defaults_to_null(): void
     {
         $coupon = Coupon::factory()->make();
-        $this->assertFalse($coupon->per_sub_gallery);
+        $this->assertNull($coupon->max_items);
     }
 
-    public function test_per_sub_gallery_casts_to_boolean(): void
+    public function test_max_items_casts_to_integer(): void
     {
-        $coupon = Coupon::factory()->make(['per_sub_gallery' => 1]);
-        $this->assertTrue($coupon->per_sub_gallery);
+        $coupon = Coupon::factory()->make(['max_items' => '5']);
+        $this->assertSame(5, $coupon->max_items);
     }
 
-    public function test_per_sub_gallery_is_fillable(): void
+    public function test_max_items_is_fillable(): void
     {
-        $coupon = Coupon::factory()->create(['per_sub_gallery' => true]);
-        $this->assertTrue($coupon->per_sub_gallery);
+        $coupon = Coupon::factory()->create(['max_items' => 3]);
+        $this->assertSame(3, $coupon->max_items);
     }
 }

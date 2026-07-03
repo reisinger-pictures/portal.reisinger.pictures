@@ -562,6 +562,10 @@ class CouponControllerTest extends TestCase
         $response->assertJsonPath('valid', true);
         $response->assertJsonPath('coupon.code', 'VALID10');
         $response->assertJsonPath('coupon.type', 'percentage');
+        $response->assertJsonPath('coupon.value', 10);
+        // LIP: id and scope_type are not returned — confirmed absent
+        $response->assertJsonMissingPath('coupon.id');
+        $response->assertJsonMissingPath('coupon.scope_type');
     }
 
     public function test_validate_coupon_returns_invalid_for_nonexistent(): void
@@ -594,18 +598,18 @@ class CouponControllerTest extends TestCase
             'brand' => 'srp',
             'code' => 'SCOPED',
             'scope_type' => 'gallery',
-            'scope_id' => 123,
+            'scope_id' => 'test-gallery-uuid',
             'active' => true,
         ]);
 
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        // Matching gallery_id
+        // Matching gallery_id (string, as all IDs are UUIDs)
         $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
             ->postJson('/api/coupons/validate', [
                 'code' => 'SCOPED',
-                'gallery_id' => 123,
+                'gallery_id' => 'test-gallery-uuid',
             ]);
 
         $response->assertStatus(200);

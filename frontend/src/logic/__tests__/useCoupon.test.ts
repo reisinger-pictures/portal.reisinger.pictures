@@ -133,7 +133,6 @@ describe('useCoupon', () => {
         const {result} = renderHook(() => useCoupon({
             galleryId: 42,
             metaGalleryId: 7,
-            scopeGalleryId: 99,
         }));
 
         await act(async () => {
@@ -145,7 +144,6 @@ describe('useCoupon', () => {
                 code: 'GALLERY10',
                 gallery_id: 42,
                 meta_gallery_id: 7,
-                scope_gallery_id: 99,
             }),
         }));
     });
@@ -189,7 +187,7 @@ describe('useCoupon', () => {
         expect(result.current.isLoading).toBe(false);
     });
 
-    it('applies coupon with scope_gallery_id and gallery_id options', async () => {
+    it('applies coupon with gallery_id options', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
             json: () => Promise.resolve(VALID_RESPONSE),
@@ -197,7 +195,6 @@ describe('useCoupon', () => {
         vi.stubGlobal('fetch', fetchMock);
         const {result} = renderHook(() => useCoupon({
             galleryId: 10,
-            scopeGalleryId: 20,
         }));
 
         await act(async () => {
@@ -208,7 +205,6 @@ describe('useCoupon', () => {
             body: JSON.stringify({
                 code: 'SCOPE10',
                 gallery_id: 10,
-                scope_gallery_id: 20,
             }),
         }));
         expect(result.current.isValid).toBe(true);

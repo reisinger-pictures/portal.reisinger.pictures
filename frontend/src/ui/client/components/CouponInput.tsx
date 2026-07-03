@@ -15,9 +15,13 @@ import useCoupon from '../../../logic/useCoupon';
 import {useBrand} from '../../../logic/useBrand';
 import {formatMoney} from '../../../logic/utils';
 
-export default function CouponInput() {
+interface CouponInputProps {
+    galleryId?: string;
+}
+
+export default function CouponInput({galleryId}: CouponInputProps) {
     const {isSrp} = useBrand();
-    const {couponCode, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon();
+    const {couponCode, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon({galleryId});
     const [inputValue, setInputValue] = useState<string>('');
 
     const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {

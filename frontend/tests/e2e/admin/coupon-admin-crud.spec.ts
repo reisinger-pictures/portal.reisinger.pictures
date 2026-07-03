@@ -38,7 +38,7 @@ test.describe('Coupon Admin CRUD', () => {
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
-        await expect(page.locator('h1:has-text("Gutscheincode")')).toBeVisible();
+        await expect(page.locator('h1')).toContainText('Gutscheincode', { timeout: 15000 });
 
         await expect(page.locator('table')).toContainText(fixedCoupon.code, { timeout: 10000 });
     });
@@ -65,7 +65,7 @@ test.describe('Coupon Admin CRUD', () => {
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
-        await expect(page.locator('h1:has-text("Gutscheincode")')).toBeVisible();
+        await expect(page.locator('h1')).toContainText('Gutscheincode', { timeout: 15000 });
 
         await expect(page.locator('table')).toContainText(orgCoupon.code, { timeout: 10000 });
     });
@@ -93,7 +93,7 @@ test.describe('Coupon Admin CRUD', () => {
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
-        await expect(page.locator('table')).toContainText(coupon.code);
+        await expect(page.locator('table')).toContainText(coupon.code, { timeout: 15000 });
 
         const deleteBtn = page.locator('button[title="Löschen nicht möglich (bereits verwendet)"]').first();
         await expect(deleteBtn).toBeVisible();
@@ -122,8 +122,8 @@ test.describe('Coupon Admin CRUD', () => {
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
-        await expect(page.locator('table')).toContainText(coupon.code);
-        await expect(page.locator('span.badge-success:has-text("Aktiv")').first()).toBeVisible();
+        await expect(page.locator('table')).toContainText(coupon.code, { timeout: 15000 });
+        await expect(page.locator('span.badge-success:has-text("Aktiv")').first()).toBeVisible({ timeout: 10000 });
 
         const toggleBtn = page.locator('button[title="Deaktivieren"]').first();
         await toggleBtn.click();

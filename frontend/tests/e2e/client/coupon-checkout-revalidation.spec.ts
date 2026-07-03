@@ -43,6 +43,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         await page.locator('main').getByText(galleryName).first().click();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
+        await expect(page).toHaveURL(/\/photos\//, { timeout: 15000 });
         await page.getByRole('button', { name: 'In den Warenkorb' }).click();
         await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
     }

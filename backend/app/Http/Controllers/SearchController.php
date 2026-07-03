@@ -7,6 +7,8 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Models\Location;
 use App\Models\GalleryGroup;
+use App\Http\Resources\GalleryResource;
+use App\Http\Resources\PhotoResource;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
@@ -31,9 +33,11 @@ class SearchController extends Controller
                 $phoQuery->whereHas('gallery', function($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); });
             }
             
+            $galResults = $galQuery->orderBy('id', 'desc')->take(12)->get();
+            $phoResults = $phoQuery->orderBy('id', 'desc')->take(24)->get();
             return response()->json([
-                'galleries' => $galQuery->orderBy('id', 'desc')->take(12)->get(),
-                'photos' => $phoQuery->orderBy('id', 'desc')->take(24)->get()
+                'galleries' => $galResults->map(fn($g) => new GalleryResource($g))->values(),
+                'photos' => $phoResults->map(fn($p) => new PhotoResource($p))->values()
             ]);
         }
 
@@ -53,7 +57,10 @@ class SearchController extends Controller
             
             $galleries = Gallery::whereIn('id', $publicGalleryIds)->orderBy('id', 'desc')->take(12)->get();
             $photos = Photo::whereIn('gallery_id', $publicGalleryIds)->orderBy('id', 'desc')->take(24)->get();
-            return response()->json(['galleries' => $galleries, 'photos' => $photos]);
+            return response()->json([
+                'galleries' => $galleries->map(fn($g) => new GalleryResource($g))->values(),
+                'photos' => $photos->map(fn($p) => new PhotoResource($p))->values()
+            ]);
         }
 
         $photoQuery = Photo::search($q);
@@ -79,9 +86,11 @@ class SearchController extends Controller
         $photoQuery->whereIn('gallery_id', $finalIds);
         $galleryQuery->whereIn('id', $finalIds);
 
+        $galResults = $galleryQuery->take(50)->get();
+        $phoResults = $photoQuery->take(100)->get();
         return response()->json([
-            'galleries' => $galleryQuery->take(50)->get(),
-            'photos' => $photoQuery->take(100)->get()
+            'galleries' => $galResults->map(fn($g) => new GalleryResource($g))->values(),
+            'photos' => $phoResults->map(fn($p) => new PhotoResource($p))->values()
         ]);
     }
 
@@ -135,7 +144,7 @@ class SearchController extends Controller
         $breadcrumbs[] = ['name' => $photo->gallery->name, 'full_path' => $photo->gallery->full_path, 'type' => 'gallery'];
 
         return response()->json([
-            'photo' => $photo,
+            'photo' => new PhotoResource($photo),
             'breadcrumbs' => $breadcrumbs,
         ]);
     }

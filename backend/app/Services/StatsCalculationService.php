@@ -77,12 +77,11 @@ class StatsCalculationService
     }
 
     /**
-     * Get statistics for customer manager users
+     * Get statistics for org admin users
      */
-    public function getCustomerManagerStats(User $user, ?string $tier = null): array
+    public function getOrgAdminStats(User $user, ?string $tier = null): array
     {
-        $domain = substr(strrchr($user->email, "@"), 1);
-        $tenantUserIds = User::where('email', 'like', '%@' . $domain)->pluck('id')->toArray();
+        $tenantUserIds = User::where('tenant_id', $user->tenant_id)->pluck('id')->toArray();
 
         $tierFilterDb = function($query) use ($tier) {
             if ($tier) $query->where('download_logs.resolution_tier', $tier);
@@ -100,7 +99,16 @@ class StatsCalculationService
 
         $guestDownloads = 0;
         $galleriesCount = 0;
-        $domainStats = [['domain' => $domain, 'count' => $totalDownloads]];
+
+        $rawDomainStats = DB::table('download_logs')
+            ->join('users', 'download_logs.user_id', '=', 'users.id')
+            ->whereIn('download_logs.user_id', $tenantUserIds)
+            ->where($tierFilterDb)
+            ->selectRaw('SUBSTRING_INDEX(users.email, "@", -1) as domain, COUNT(*) as count')
+            ->groupBy('domain')
+            ->get();
+
+        $domainStats = $this->processDomainStats($rawDomainStats);
 
         $topGalleries = DB::table('download_logs')
             ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
@@ -189,8 +197,8 @@ class StatsCalculationService
     {
         if ($user->is_admin) {
             return $this->getAdminStats($tier);
-        } elseif ($user->is_customer_manager) {
-            return $this->getCustomerManagerStats($user, $tier);
+        } elseif ($user->is_org_admin) {
+            return $this->getOrgAdminStats($user, $tier);
         } else {
             return $this->getUserStats($user, $tier);
         }

@@ -31,3 +31,32 @@ export function isSrpBrand(brand: Brand): boolean {
 export function brandPrefix(brand: Brand): 'srp_' | '' {
     return brand === BRAND_SRP ? 'srp_' : '';
 }
+
+export function useBrand() {
+    const brand: Brand = getBrandFromHostname(window.location.hostname);
+    const isSrp = isSrpBrand(brand);
+    return {
+        brand,
+        isSrp,
+        logoSrc: isSrp ? '/brands/srp/android-chrome-192x192.png' : '/brands/rp/android-chrome-192x192.png',
+        svgUrl: isSrp ? '/brands/srp/safari-pinned-tab.svg' : '/brands/rp/safari-pinned-tab.svg',
+        portalName: 'Reisinger Foto Portal',
+        impressumUrl: isSrp ? 'https://buy.reisinger.pictures/impressum/' : 'https://reisinger.pictures/impressum/'
+    };
+}
+
+export function applyTheme() {
+    const brand = getBrandFromHostname(window.location.hostname);
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    const setTheme = (dark: boolean) => {
+        const theme = isSrpBrand(brand)
+            ? (dark ? 'srp-dark' : 'srp-light')
+            : (dark ? 'b2b-dark' : 'reisinger-light');
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-brand', brand);
+    };
+
+    setTheme(isDark);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => setTheme(e.matches));
+}

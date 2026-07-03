@@ -24,7 +24,7 @@ describe('computePermissions', () => {
         expect(p.isSuperAdmin).toBe(false);
         expect(p.isAdmin).toBe(false);
         expect(p.isPhotographer).toBe(false);
-        expect(p.isCustomerManager).toBe(false);
+        expect(p.isOrgAdmin).toBe(false);
         expect(p.canEditMetadata).toBe(false);
         expect(p.isPowerUser).toBe(false);
         expect(p.canAccessB2BFeatures).toBe(false);
@@ -101,9 +101,9 @@ describe('computePermissions', () => {
             expect(computePermissions(user({ is_admin: true })).isPhotographer).toBe(false);
         });
 
-        it('isCustomerManager', () => {
-            expect(computePermissions(user({ is_customer_manager: true })).isCustomerManager).toBe(true);
-            expect(computePermissions(user({})).isCustomerManager).toBe(false);
+        it('isOrgAdmin', () => {
+            expect(computePermissions(user({ is_org_admin: true })).isOrgAdmin).toBe(true);
+            expect(computePermissions(user({})).isOrgAdmin).toBe(false);
         });
 
         it('canEditMetadata', () => {

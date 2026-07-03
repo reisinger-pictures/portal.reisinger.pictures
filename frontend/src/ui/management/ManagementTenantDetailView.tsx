@@ -17,10 +17,16 @@ interface TenantSettingsProps {
     setDomain: (v: string) => void;
     freq: 'immediate' | 'monthly' | 'quarterly';
     setFreq: (v: 'immediate' | 'monthly' | 'quarterly') => void;
+    defaultFlatrateLevel: 'none' | 'web' | 'print' | 'original';
+    setDefaultFlatrateLevel: (v: 'none' | 'web' | 'print' | 'original') => void;
+    sharedFlatrateCents: number;
+    setSharedFlatrateCents: (v: number) => void;
+    autoJoinPolicy: 'immediate' | 'requires_invite' | 'disabled';
+    setAutoJoinPolicy: (v: 'immediate' | 'requires_invite' | 'disabled') => void;
     handleSaveGeneral: (e: React.FormEvent) => void;
 }
 
-const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, handleSaveGeneral}: TenantSettingsProps) => (
+const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFlatrateLevel, setDefaultFlatrateLevel, sharedFlatrateCents, setSharedFlatrateCents, autoJoinPolicy, setAutoJoinPolicy, handleSaveGeneral}: TenantSettingsProps) => (
     <form onSubmit={handleSaveGeneral}
           className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4">
         <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Einstellungen</h2>
@@ -41,6 +47,33 @@ const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, handle
                 <option value="immediate">Sofort (Einzelrechnung)</option>
                 <option value="monthly">Monatlich (Sammelrechnung)</option>
                 <option value="quarterly">Quartal (Sammelrechnung)</option>
+            </select>
+        </div>
+        <div className="form-control">
+            <label className="label"><span className="label-text font-bold">Standard-Flatrate-Level</span></label>
+            <select value={defaultFlatrateLevel} onChange={e => setDefaultFlatrateLevel(e.target.value as 'none' | 'web' | 'print' | 'original')}
+                    className="select select-bordered">
+                <option value="none">Keine Flatrate</option>
+                <option value="web">Web</option>
+                <option value="print">Print</option>
+                <option value="original">Original</option>
+            </select>
+        </div>
+        {defaultFlatrateLevel !== 'none' && (
+            <div className="form-control">
+                <label className="label"><span className="label-text font-bold">Geteiltes Flatrate-Budget (Cent)</span></label>
+                <input type="number" min="0" value={sharedFlatrateCents || ''}
+                       onChange={e => setSharedFlatrateCents(Number(e.target.value))}
+                       className="input input-bordered" placeholder="z.B. 50000 für 500€"/>
+            </div>
+        )}
+        <div className="form-control">
+            <label className="label"><span className="label-text font-bold">Auto-Join Policy</span></label>
+            <select value={autoJoinPolicy} onChange={e => setAutoJoinPolicy(e.target.value as 'immediate' | 'requires_invite' | 'disabled')}
+                    className="select select-bordered">
+                <option value="immediate">Sofort (automatisch)</option>
+                <option value="requires_invite">Einladung erforderlich</option>
+                <option value="disabled">Deaktiviert</option>
             </select>
         </div>
         <button type="submit" className="btn btn-primary w-full mt-4">Speichern</button>
@@ -129,7 +162,7 @@ const TenantRelations = ({
 
             <div className="flex flex-col h-full border border-base-300 rounded overflow-hidden">
                 <div className="bg-base-200 p-2 font-bold text-sm shrink-0 border-b border-base-300">Zugewiesene
-                    Meta-Galerien (Ordner)
+                    Meta-Galerien
                 </div>
                 <div className="p-2 overflow-y-auto flex-1 h-64">
                     {flatGroups.map(g => (
@@ -166,6 +199,9 @@ export default function ManagementTenantDetailView() {
     const [name, setName] = useState('');
     const [domain, setDomain] = useState('');
     const [freq, setFreq] = useState<'immediate' | 'monthly' | 'quarterly'>('immediate');
+    const [defaultFlatrateLevel, setDefaultFlatrateLevel] = useState<'none' | 'web' | 'print' | 'original'>('none');
+    const [sharedFlatrateCents, setSharedFlatrateCents] = useState(0);
+    const [autoJoinPolicy, setAutoJoinPolicy] = useState<'immediate' | 'requires_invite' | 'disabled'>('immediate');
 
     const [selUsers, setSelUsers] = useState<string[]>([]);
     const [selGroups, setSelGroups] = useState<string[]>([]);
@@ -179,6 +215,9 @@ export default function ManagementTenantDetailView() {
         setName(tenant.name);
         setDomain(tenant.domain || '');
         setFreq(tenant.invoice_frequency);
+        setDefaultFlatrateLevel(tenant.default_flatrate_level || 'none');
+        setSharedFlatrateCents(tenant.shared_flatrate_cents ?? 0);
+        setAutoJoinPolicy(tenant.auto_join_policy || 'immediate');
         setSelUsers(tenant.users?.map(u => u.id) || []);
         setSelGroups(tenant.gallery_groups?.map(g => g.id) || []);
     }
@@ -186,7 +225,14 @@ export default function ManagementTenantDetailView() {
     const handleSaveGeneral = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await updateTenant(id!, {name, domain: domain || null, invoice_frequency: freq});
+            await updateTenant(id!, {
+                name,
+                domain: domain || null,
+                invoice_frequency: freq,
+                default_flatrate_level: defaultFlatrateLevel,
+                shared_flatrate_cents: sharedFlatrateCents,
+                auto_join_policy: autoJoinPolicy,
+            });
             showToast('success', 'Organisation aktualisiert.');
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : String(err));
@@ -275,8 +321,12 @@ export default function ManagementTenantDetailView() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-1 space-y-6">
-                        <TenantSettings name={name} setName={setName} domain={domain} setDomain={setDomain} freq={freq}
-                                        setFreq={setFreq} handleSaveGeneral={handleSaveGeneral}/>
+                                        <TenantSettings name={name} setName={setName} domain={domain} setDomain={setDomain} freq={freq}
+                                        setFreq={setFreq}
+                                        defaultFlatrateLevel={defaultFlatrateLevel} setDefaultFlatrateLevel={setDefaultFlatrateLevel}
+                                        sharedFlatrateCents={sharedFlatrateCents} setSharedFlatrateCents={setSharedFlatrateCents}
+                                        autoJoinPolicy={autoJoinPolicy} setAutoJoinPolicy={setAutoJoinPolicy}
+                                        handleSaveGeneral={handleSaveGeneral}/>
                         <TenantInvoicing tenant={tenant} isGenerating={isGenerating}
                                          handleGenerateInvoice={handleGenerateInvoice}/>
                     </div>

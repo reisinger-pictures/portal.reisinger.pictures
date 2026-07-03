@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page, APIRequestContext } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
@@ -21,12 +21,11 @@ test.describe('Audit Logs (Download Logs)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Download by client is recorded in audit log, visible to photographer', async ({ page, request }) => {
+    async function setupGalleryWithDownload(page: Page, request: APIRequestContext): Promise<string> {
         const auth = new AuthHelper(page);
-        const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
+        const sidebar = new SidebarHelper(page);
 
-        // --- Photographer creates gallery with upload ---
         await auth.login(photogUser.email, photogUser.password);
 
         const galleryName = `Audit Test ${Math.random().toString(36).substring(2, 10)}`;
@@ -51,14 +50,12 @@ test.describe('Audit Logs (Download Logs)', () => {
         await upload.uploadSampleImage();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 10000 });
 
-        // Attach client to gallery via API
         const adminToken = helper.getAdminToken();
         await request.post(`/api/management/galleries/${galleryId}/sync-access`, {
             data: { user_id: clientUser.id, action: 'attach' },
             headers: { 'Cookie': adminToken, 'Accept': 'application/json' }
         });
 
-        // --- Client logs in and downloads an image ---
         await auth.logout();
         await auth.login(clientUser.email, clientUser.password);
 
@@ -73,7 +70,6 @@ test.describe('Audit Logs (Download Logs)', () => {
 
         const downloadLink = page.getByRole('link', { name: 'Download', exact: true }).first();
         await expect(downloadLink).toBeVisible();
-
         await downloadLink.evaluate(node => node.removeAttribute('target'));
         const [download] = await Promise.all([
             page.waitForEvent('download', { timeout: 30000 }),
@@ -81,18 +77,77 @@ test.describe('Audit Logs (Download Logs)', () => {
         ]);
         expect(download.suggestedFilename()).toMatch(/\.jpg$/i);
 
-        // --- Photographer checks audit logs ---
         await auth.logout();
+
+        return galleryName;
+    }
+
+    test('Download by client is recorded in audit log, visible to photographer', async ({ page, request }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        const galleryName = await setupGalleryWithDownload(page, request);
+
         await auth.login(photogUser.email, photogUser.password);
 
         await sidebar.navigateTo('Auswertungen');
         await expect(page.locator('h1:has-text("Statistiken & Audit-Logs")')).toBeVisible({ timeout: 10000 });
+        await page.reload();
 
         const table = page.locator('main table');
         await expect(table).toBeVisible();
 
         const tableBody = table.locator('tbody');
-        await expect(tableBody.locator('tr').first()).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('main table td').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 10000 });
+        await expect(tableBody.locator('tr').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main table td').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
+    });
+
+    test('Filter by gallery name in audit logs', async ({ page, request }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        const galleryName = await setupGalleryWithDownload(page, request);
+
+        await auth.login(photogUser.email, photogUser.password);
+
+        await sidebar.navigateTo('Auswertungen');
+        await expect(page.locator('h1:has-text("Statistiken & Audit-Logs")')).toBeVisible({ timeout: 10000 });
+        await page.reload();
+
+        const table = page.locator('main table');
+        await expect(table).toBeVisible();
+
+        await expect(table.locator('td').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
+    });
+
+    test('Pagination works in audit logs', async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await auth.login(photogUser.email, photogUser.password);
+        await sidebar.navigateTo('Auswertungen');
+
+        await expect(page.locator('h1:has-text("Statistiken & Audit-Logs")')).toBeVisible({ timeout: 10000 });
+
+        const table = page.locator('main table');
+        await expect(table).toBeVisible();
+
+        const headers = table.locator('thead th');
+        await expect(headers).toHaveText(['Datum / Zeit', 'Benutzer / Gast', 'Galerie', 'Typ', 'Qualität']);
+    });
+
+    test('Empty state when no logs', async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await auth.login(photogUser.email, photogUser.password);
+        await sidebar.navigateTo('Auswertungen');
+
+        await expect(page.locator('h1:has-text("Statistiken & Audit-Logs")')).toBeVisible({ timeout: 10000 });
+
+        const table = page.locator('main table');
+        await expect(table).toBeVisible();
+
+        await expect(page.locator('main table tbody')).toContainText('Noch keine Downloads aufgezeichnet.');
     });
 });

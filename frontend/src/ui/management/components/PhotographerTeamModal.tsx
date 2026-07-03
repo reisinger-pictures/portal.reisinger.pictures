@@ -14,10 +14,12 @@ interface Props {
 }
 
 export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, onUpdateState }: Props) {
-    const { data: users, isLoading, mutate } = useSWR<UserDetailed[]>('/api/management/users', fetcher);
+    const { data: response, isLoading, mutate } = useSWR<{data: UserDetailed[]} | UserDetailed[]>('/api/management/users', fetcher);
     const { showToast } = useUI();
     const [status, setStatus] = useState<'null' | 'true' | 'false'>('null');
     const [isSaving, setIsSaving] = useState(false);
+
+    const users = Array.isArray(response) ? response : response?.data;
 
     const [prevItemId, setPrevItemId] = useState<string | null>(null);
 

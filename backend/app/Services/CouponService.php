@@ -75,13 +75,6 @@ class CouponService
             }
         }
 
-        // scope_gallery_id: if set on a meta_gallery coupon, restrict to a specific gallery within the group
-        if ($coupon->scope_type === 'meta_gallery' && $coupon->scope_gallery_id !== null) {
-            if ($galleryId === null || (string) $coupon->scope_gallery_id !== (string) $galleryId) {
-                return [null, 'This coupon is not valid for this specific gallery.'];
-            }
-        }
-
         // photographer scope: coupon is valid for all galleries the photographer has access to
         if ($coupon->scope_type === 'photographer') {
             if ($galleryId === null) {
@@ -124,7 +117,7 @@ class CouponService
                 return [null, 'This coupon is not valid for your account.'];
             }
 
-            $userTenant = User::find($userId)?->tenants()->first();
+            $userTenant = User::find($userId)?->tenant;
             if ($userTenant === null) {
                 return [null, 'This coupon is not valid for your account.'];
             }
@@ -193,45 +186,14 @@ class CouponService
 
             case 'percentage':
                 $percent = min(max((float) $coupon->value, 0), 100);
-                $discountCents = (int) round($currentTotalCents * $percent / 100);
-                break;
-
-            case 'free_items':
-                $freeCount = (int) $coupon->value;
-                if ($freeCount <= 0) {
-                    break;
-                }
-
-                if ($coupon->per_sub_gallery && $coupon->scope_type === 'meta_gallery') {
-                    $galleryGroups = [];
-                    foreach ($items as $idx => $item) {
-                        $gid = $item['galleryId'] ?? null;
-                        if ($gid === null) continue;
-                        $galleryGroups[$gid][] = $idx;
-                    }
-                    foreach ($galleryGroups as $gid => $indices) {
-                        usort($indices, function ($a, $b) use ($items) {
-                            return $items[$a]['priceCents'] <=> $items[$b]['priceCents'];
-                        });
-                        $freeInGallery = array_slice($indices, 0, $freeCount);
-                        foreach ($freeInGallery as $idx) {
-                            $discountCents += $items[$idx]['priceCents'];
-                            $items[$idx]['priceCents'] = 0;
-                            $items[$idx]['couponFree'] = true;
-                        }
-                    }
+                if ($coupon->max_items !== null) {
+                    $maxItems = (int) $coupon->max_items;
+                    $prices = array_map(fn ($item) => $item['priceCents'], $items);
+                    sort($prices);
+                    $cheapestSubtotal = (int) round(array_sum(array_slice($prices, 0, $maxItems)));
+                    $discountCents = (int) round($cheapestSubtotal * $percent / 100);
                 } else {
-                    $sortedIndices = array_keys($items);
-                    usort($sortedIndices, function ($a, $b) use ($items) {
-                        return $items[$a]['priceCents'] <=> $items[$b]['priceCents'];
-                    });
-
-                    $freeIndices = array_slice($sortedIndices, 0, $freeCount);
-                    foreach ($freeIndices as $idx) {
-                        $discountCents += $items[$idx]['priceCents'];
-                        $items[$idx]['priceCents'] = 0;
-                        $items[$idx]['couponFree'] = true;
-                    }
+                    $discountCents = (int) round($currentTotalCents * $percent / 100);
                 }
                 break;
         }

@@ -106,10 +106,8 @@ class BrandRegistryTest extends TestCase
         $this->assertSame(Brand::B2B, BrandRegistry::resolveFromOrder($order));
     }
 
-    public function test_enum_label_and_domain_and_prefix(): void
+    public function test_enum_label_and_prefix(): void
     {
-        $this->assertSame('buy.reisinger.pictures', Brand::SRP->domain());
-        $this->assertSame('reisinger.pictures', Brand::B2B->domain());
         $this->assertSame('srp_', Brand::SRP->prefix());
         $this->assertSame('', Brand::B2B->prefix());
     }

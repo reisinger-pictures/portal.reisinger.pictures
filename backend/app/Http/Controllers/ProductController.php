@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Product;
+use App\Http\Resources\ProductResource;
 use App\Support\BrandRegistry;
 
 class ProductController extends Controller
@@ -19,10 +20,12 @@ class ProductController extends Controller
         $q = $request->query('q');
         if ($q && strlen($q) >= 2) {
             $query->where('name', 'like', '%' . $q . '%');
-            return response()->json($query->take(20)->get());
+            $products = $query->take(20)->get();
+            return response()->json($products->map(fn($p) => new ProductResource($p))->values());
         }
 
-        return response()->json($query->orderBy('name', 'asc')->get());
+        $products = $query->orderBy('name', 'asc')->get();
+        return response()->json($products->map(fn($p) => new ProductResource($p))->values());
     }
 
     public function store(Request $request)
@@ -36,7 +39,7 @@ class ProductController extends Controller
 
         $validated['brand'] = BrandRegistry::currentOrDefault()->value;
         $product = Product::create($validated);
-        return response()->json(['success' => true, 'product' => $product]);
+        return response()->json(['success' => true, 'product' => new ProductResource($product)]);
     }
 
     public function update(Request $request, $id)
@@ -51,7 +54,7 @@ class ProductController extends Controller
         ]);
 
         $product->update($validated);
-        return response()->json(['success' => true, 'product' => $product]);
+        return response()->json(['success' => true, 'product' => new ProductResource($product)]);
     }
 
     public function destroy($id)

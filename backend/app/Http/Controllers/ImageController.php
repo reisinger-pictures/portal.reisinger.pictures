@@ -34,9 +34,14 @@ class ImageController extends Controller
         }
 
         $file = $request->file('file');
-        
-        $process = new \Symfony\Component\Process\Process(['exiftool', '-MIMEType', '-S', $file->getPathname()]);
+
+        // Exiftool on Windows can't always read PHP temp files directly (file locking).
+        // Copy to a stable path before invoking exiftool.
+        $mimeCheckPath = tempnam(sys_get_temp_dir(), 'mimecheck_') . '.' . $file->getClientOriginalExtension();
+        copy($file->getRealPath() ?: $file->getPathname(), $mimeCheckPath);
+        $process = new \Symfony\Component\Process\Process(['exiftool', '-MIMEType', '-S', $mimeCheckPath]);
         $process->run();
+        unlink($mimeCheckPath);
         if (!$process->isSuccessful() || !str_contains($process->getOutput(), 'image/')) {
             return response()->json(['error' => 'Die hochgeladene Datei ist kein gültiges oder lesbares Bild.'], 422);
         }

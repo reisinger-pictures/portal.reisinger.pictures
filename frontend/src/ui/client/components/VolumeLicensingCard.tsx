@@ -26,6 +26,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             filename: photo.title || 'Bild ' + photo.id.substring(0, 8),
             thumb_url: photo.thumb_url,
             tier: 'original',
+            galleryId: photo.gallery_id,
             price: pricePerItemCents,
         });
         showToast('success', 'In den Warenkorb gelegt');

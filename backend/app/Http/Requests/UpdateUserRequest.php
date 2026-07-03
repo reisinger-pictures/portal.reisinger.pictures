@@ -22,6 +22,7 @@ class UpdateUserRequest extends FormRequest
             'gallery_ids' => 'array',
             'can_edit_metadata' => 'boolean',
             'flatrate_level' => 'nullable|string|in:none,web,print,original',
+            'can_purchase_upgrades' => 'boolean',
             // Brand: 'rp', 'srp', or null (cross-brand only for Super-Admin).
             // U-02: non-super-admin roles MUST have a brand set; super-admin MUST have brand=null.
             'brand' => 'nullable|string|in:rp,srp'

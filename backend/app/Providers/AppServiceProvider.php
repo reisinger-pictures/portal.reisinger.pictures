@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -70,7 +73,7 @@ class AppServiceProvider extends ServiceProvider
             return $user->is_super_admin;
         });
 
-        Gate::define('manage-users', fn ($user) => $user->is_admin);
+        Gate::define('manage-users', fn ($user) => $user->is_admin || $user->is_org_admin);
 
         Gate::define('purchase-upgrades', function ($user) {
             $isClient = $user->roles()->where('name', \App\Enums\UserRole::CLIENT->value)->exists();
@@ -94,6 +97,14 @@ class AppServiceProvider extends ServiceProvider
                 $config['refresh_token'] ?? env('OAUTH_REFRESH_TOKEN')
             );
         });
+
+        RateLimiter::for('api', fn (Request $request) =>
+            Limit::perMinute((int) env('API_THROTTLE_LIMIT', 120))->by($request->user('api')?->getKey() ?? $request->ip())
+        );
+
+        RateLimiter::for('coupon-validate', fn (Request $request) =>
+            Limit::perMinute(10)->by($request->user('api')?->getKey() ?? $request->ip())
+        );
 
         // Reset brand state before each queue job to prevent stale config carrying over
         // between jobs in long-running queue workers (php artisan queue:work).

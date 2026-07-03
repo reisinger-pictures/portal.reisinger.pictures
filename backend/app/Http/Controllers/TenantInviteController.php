@@ -18,8 +18,8 @@ class TenantInviteController extends Controller
         $user = auth('api')->user();
         $tenant = Tenant::findOrFail($tenantId);
 
-        // Scoped Policy: Nur Admins oder Customer Manager DES Mandanten dürfen einladen
-        if (!$user->is_admin && !($user->is_customer_manager && $user->tenants->contains($tenantId))) {
+        // Scoped Policy: Nur Admins oder Org-Admin DES Mandanten dürfen einladen
+        if (!$user->is_admin && !($user->is_org_admin && $user->tenant_id === $tenantId)) {
             return response()->json(['error' => 'Keine Berechtigung, Nutzer in diesen Mandanten einzuladen.'], 403);
         }
 
@@ -57,46 +57,61 @@ class TenantInviteController extends Controller
 
     public function redeem(Request $request)
     {
-        $request->validate([
-            'token' => 'required|string',
-            'name' => 'required|string|max:255',
-            'password' => 'required|string|min:8',
-            'accept_privacy' => 'required|accepted'
-        ]);
+        $user = auth('api')->user();
+
+        if ($user) {
+            $request->validate([
+                'token' => 'required|string',
+                'accept_privacy' => 'required|accepted'
+            ]);
+        } else {
+            $request->validate([
+                'token' => 'required|string',
+                'name' => 'required|string|max:255',
+                'password' => 'required|string|min:8',
+                'accept_privacy' => 'required|accepted'
+            ]);
+        }
 
         $invite = TenantInvite::where('token', $request->token)
             ->where('expires_at', '>', now())
             ->firstOrFail();
 
-        return DB::transaction(function () use ($request, $invite) {
-            // User erstellen oder holen
-            $user = \App\Models\User::firstOrCreate(
-                ['email' => $invite->email],
-                ['name' => $request->name, 'password' => Hash::make($request->password)]
-            );
+        return DB::transaction(function () use ($request, $invite, $user) {
+            if (!$user) {
+                // Neuen User erstellen
+                $user = \App\Models\User::firstOrCreate(
+                    ['email' => $invite->email],
+                    ['name' => $request->name, 'password' => Hash::make($request->password)]
+                );
 
-            // Falls User existierte, aber noch kein PW hatte
-            if (empty($user->password)) {
-                $user->password = Hash::make($request->password);
-                $user->save();
+                if (empty($user->password)) {
+                    $user->password = Hash::make($request->password);
+                    $user->save();
+                }
             }
 
-            // Mandanten-Zuweisung sicherstellen
-            $user->tenants()->syncWithoutDetaching([$invite->tenant_id]);
+            // Tenant-Zuweisung sicherstellen
+            $user->tenant_id = $invite->tenant_id;
+            $user->save();
 
-            // Automatisch die Client-Rolle vergeben
+            // Client-Rolle vergeben falls noch keine
             $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
-            if ($clientRole) {
+            if ($clientRole && !$user->roles->contains($clientRole->id)) {
                 $user->roles()->syncWithoutDetaching([$clientRole->id]);
             }
 
             // Token entwerten
             $invite->delete();
 
-            // Automatisch einloggen
+            if ($user === auth('api')->user()) {
+                // Bereits eingeloggt — Session bleibt bestehen
+                return response()->json(['success' => true]);
+            }
+
+            // Neuen User einloggen
             \Illuminate\Support\Facades\Auth::guard('api')->logout();
             $token = \Illuminate\Support\Facades\Auth::guard('api')->login($user);
-            // Wir binden Controller.php Funktionalität ein
             $ttl = \Illuminate\Support\Facades\Auth::guard('api')->factory()->getTTL();
             $cookie = cookie('rp_jwt', $token, $ttl, '/', null, env('APP_ENV') !== 'local', true, false, 'Lax');
             return response()->json(['success' => true])->withCookie($cookie);

@@ -8,7 +8,10 @@ class StoreUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null && \Illuminate\Support\Facades\Gate::allows('manage-users');
+        $user = $this->user();
+        if (!$user) return false;
+        if ($user->is_org_admin) return true; // Allow — scoped in controller
+        return \Illuminate\Support\Facades\Gate::allows('manage-users');
     }
 
     public function rules(): array
@@ -21,9 +24,9 @@ class StoreUserRequest extends FormRequest
 
     protected function failedAuthorization()
     {
-        $user = $this->user();
-        if ($user && $user->is_customer_manager) {
-            throw new \Illuminate\Auth\Access\AuthorizationException('Not implemented for Customer Managers yet.');
+        if ($this->user() && $this->user()->is_org_admin) {
+            // Org Admins are now allowed — handled in UserController::store
+            return;
         }
         throw new \Illuminate\Auth\Access\AuthorizationException('Forbidden');
     }

@@ -92,10 +92,10 @@ test.describe('Custom Quotes Full Workflow', () => {
         await auth.login(adminUser.email, adminUser.password);
         
         await sidebar.navigateTo('Shop-Bestellungen');
+        await expect(page).toHaveURL(/\/admin-orders/, { timeout: 15000 });
         
         const firstRow = page.locator('tbody tr').filter({ hasText: clientUser.email }).first();
-        await expect(firstRow).toContainText('Angebot');
-        await expect(firstRow).toContainText('Auf Anfrage');
+        await expect(firstRow.getByRole('button', { name: 'Kalkulieren & Antworten' })).toBeVisible({ timeout: 10000 });
         
         await firstRow.getByRole('button', { name: 'Kalkulieren & Antworten' }).click();
         

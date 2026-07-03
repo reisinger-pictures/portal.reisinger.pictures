@@ -29,6 +29,12 @@ describe('formatMoney', () => {
         expect(formatMoney(155)).toBe('1.55 €');
         expect(formatMoney(105)).toBe('1.05 €');
     });
+
+    it('returns --- € for NaN and non-finite values', () => {
+        expect(formatMoney(NaN)).toBe('--- €');
+        expect(formatMoney(Infinity)).toBe('--- €');
+        expect(formatMoney(-Infinity)).toBe('--- €');
+    });
 });
 
 describe('formatDateToDE', () => {

@@ -91,7 +91,7 @@ Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', 
 Route::get('/orders/quote-decode', [OrderController::class, 'decodeQuoteLink']);
 Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip']);
 
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);
     Route::get('/auth/me', [AuthController::class, 'me']);
@@ -120,7 +120,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText']);
 
     // Coupon validation (public, auth-required)
-    Route::post('/coupons/validate', [CouponController::class, 'validateCoupon']);
+    Route::post('/coupons/validate', [CouponController::class, 'validateCoupon'])->middleware('throttle:coupon-validate');
 });
 
 Route::middleware(['auth:api', 'management'])->group(function () {

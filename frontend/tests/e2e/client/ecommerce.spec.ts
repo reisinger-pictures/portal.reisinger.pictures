@@ -125,7 +125,10 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         // Flow AJ: Admin prüft Order im Dashboard
         await auth.logout();
         await auth.login(adminUser.email, adminUser.password);
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
         await sidebar.navigateTo('Shop-Bestellungen');
+        await expect(page).toHaveURL(/\/admin-orders/, { timeout: 15000 });
         await expect(page.locator('h1:has-text("Bestellungen & Anfragen")')).toBeVisible();
         await expect(page.locator('td', { hasText: powerUser.email }).first()).toBeVisible();
 

@@ -305,11 +305,20 @@ class StatsCalculationServiceTest extends TestCase
         $this->assertEquals(1, $result['guest_downloads']);
     }
 
-    public function test_get_customer_manager_stats_filters_by_domain()
+    public function test_get_org_admin_stats_filters_by_tenants()
     {
-        $manager = User::factory()->create(['email' => 'manager@company.com']);
-        $user1 = User::factory()->create(['email' => 'user1@company.com']);
-        $user2 = User::factory()->create(['email' => 'user2@othercompany.com']);
+        $tenant = \App\Models\Tenant::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
+
+        $manager = User::factory()->create();
+        $manager->roles()->attach(\App\Models\Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]));
+        $manager->tenant_id = $tenant->id;
+        $manager->save();
+
+        $user1 = User::factory()->create();
+        $user1->tenant_id = $tenant->id;
+        $user1->save();
+
+        $user2 = User::factory()->create();
 
         $gallery = Gallery::factory()->create();
 
@@ -334,6 +343,7 @@ class StatsCalculationServiceTest extends TestCase
             'resolution_tier' => 'web',
         ]);
 
+        // user2 is not in the tenant — should be excluded
         \App\Models\DownloadLog::create([
             'user_id' => $user2->id,
             'gallery_id' => $gallery->id,
@@ -348,19 +358,22 @@ class StatsCalculationServiceTest extends TestCase
             'resolution_tier' => 'web',
         ]);
 
-        $result = $this->service->getCustomerManagerStats($manager);
+        $result = $this->service->getOrgAdminStats($manager);
 
-        // Only user1@company.com should be counted
+        // Only user1 (tenant member) should be counted
         $this->assertEquals(3, $result['total_downloads']);
-        $this->assertCount(1, $result['domain_stats']);
-        $this->assertEquals('company.com', $result['domain_stats'][0]['domain']);
     }
 
-    public function test_get_customer_manager_stats_guest_downloads_always_zero()
+    public function test_get_org_admin_stats_guest_downloads_always_zero()
     {
-        $manager = User::factory()->create(['email' => 'manager@company.com']);
+        $tenant = \App\Models\Tenant::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
 
-        $result = $this->service->getCustomerManagerStats($manager);
+        $manager = User::factory()->create();
+        $manager->roles()->attach(\App\Models\Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]));
+        $manager->tenant_id = $tenant->id;
+        $manager->save();
+
+        $result = $this->service->getOrgAdminStats($manager);
 
         $this->assertEquals(0, $result['guest_downloads']);
     }
@@ -379,10 +392,10 @@ class StatsCalculationServiceTest extends TestCase
         $this->assertArrayHasKey('top_galleries', $result);
     }
 
-    public function test_get_stats_for_user_delegates_to_customer_manager_stats()
+    public function test_get_stats_for_user_delegates_to_org_admin_stats()
     {
         $manager = User::factory()->create();
-        $manager->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CUSTOMER_MANAGER->value]));
+        $manager->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]));
 
         $result = $this->service->getStatsForUser($manager);
 

@@ -119,8 +119,20 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
     const currentTenantFilter = searchParams.get('tenant_id') || '';
     const [expandSignal, setExpandSignal] = useState(0);
     
-    const safeGroups = Array.isArray(tree?.groups) ? [...tree.groups].sort((a,b)=>a.name.localeCompare(b.name)) : [];
-    const safeRootGalleries = Array.isArray(tree?.root_galleries) ? [...tree.root_galleries].sort((a,b)=>a.name.localeCompare(b.name)) : [];
+    function filterTreeGroups(groups: GalleryGroup[], tenantId: string): GalleryGroup[] {
+        return groups.map(g => ({
+            ...g,
+            children: g.children ? filterTreeGroups(g.children, tenantId) : [],
+            galleries: g.galleries ? g.galleries.filter(gal => gal.tenant_id === tenantId) : [],
+        })).filter(g => g.tenant_id === tenantId || g.children?.length || g.galleries?.length);
+    }
+
+    const filteredTree = currentTenantFilter && tree
+        ? { groups: filterTreeGroups([...tree.groups], currentTenantFilter), root_galleries: (tree.root_galleries ?? []).filter(g => g.tenant_id === currentTenantFilter) }
+        : tree;
+
+    const safeGroups = Array.isArray(filteredTree?.groups) ? [...filteredTree.groups].sort((a,b)=>a.name.localeCompare(b.name)) : [];
+    const safeRootGalleries = Array.isArray(filteredTree?.root_galleries) ? [...filteredTree.root_galleries].sort((a,b)=>a.name.localeCompare(b.name)) : [];
 
     return (
         <div className="p-6 md:p-10 max-w-6xl mx-auto w-full">

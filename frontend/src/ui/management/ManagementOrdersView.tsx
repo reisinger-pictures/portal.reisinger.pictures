@@ -8,7 +8,8 @@ import { formatMoney } from '../../logic/utils';
 
 
 export default function ManagementOrdersView() {
-    const { data: orders, error, isLoading, mutate } = useSWR<Order[]>('/api/management/orders', fetcher);
+    const { data: response, error, isLoading, mutate } = useSWR<{ data: Order[] } | Order[]>('/api/management/orders', fetcher);
+    const orders = Array.isArray(response) ? response : response?.data;
     const { showToast } = useUI();
 
     const [quoteOrder, setQuoteOrder] = useState<Order | null>(null);
@@ -82,7 +83,7 @@ export default function ManagementOrdersView() {
                                     <div className="font-bold">{order.user?.name}</div>
                                     <div className="text-sm opacity-70">{order.user?.email}</div>
                                 </td>
-                                <td className="font-mono">{(order.is_quote_request ? true : false) && order.status === 'pending' ? 'Auf Anfrage' : formatMoney(Number(order.total_gross))}</td>
+                                <td className="font-mono">{order.is_quote_request && order.status === 'pending' ? 'Auf Anfrage' : formatMoney(Number(order.total_gross))}</td>
                                 <td>
                                     <div className="flex flex-col gap-2 items-start">
                                         <select 
@@ -96,7 +97,7 @@ export default function ManagementOrdersView() {
                                             <option value="overdue">Überfällig</option>
                                             <option value="cancelled">Storniert</option>
                                         </select>
-                                        {(order.is_quote_request ? true : false) && order.status === 'pending' ? (
+                                        {order.is_quote_request && order.status === 'pending' ? (
                                             <button onClick={() => { setQuoteOrder(order); setCustomPrice(''); setQuoteMessage(''); }} className="btn btn-xs btn-primary">
                                                 Kalkulieren & Antworten
                                             </button>

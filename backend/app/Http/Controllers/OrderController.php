@@ -10,6 +10,7 @@ use App\Models\Photo;
 use App\Services\PricingService;
 use App\Services\ManualInvoiceService;
 use App\Services\QuoteLinkService;
+use App\Http\Resources\OrderResource;
 use App\Http\Requests\CheckoutRequest;
 use App\Http\Requests\SendQuoteRequest;
 use App\Http\Requests\GenerateManualInvoiceRequest;
@@ -31,8 +32,8 @@ class OrderController extends Controller
             ->with('invoiceSnapshot')
             ->orderBy('created_at', 'desc')
             ->get();
-            
-        return response()->json($orders);
+
+        return response()->json(OrderResource::collection($orders)->resolve());
     }
 
     public function checkout(CheckoutRequest $request, \App\Services\CheckoutService $checkoutService, SettingResolver $resolver)
@@ -65,7 +66,7 @@ class OrderController extends Controller
         return $checkoutService->processCheckout($request, $user, $paymentMethod);
     }
 
-    public function indexAdmin() { return response()->json(Order::with(['user', 'invoiceSnapshot'])->orderBy('created_at', 'desc')->get()); }
+    public function indexAdmin() { return response()->json(\App\Http\Resources\OrderResource::collection(Order::with(['user', 'invoiceSnapshot'])->orderBy('created_at', 'desc')->get())->resolve()); }
     
     public function updateStatus(Request $request, $id) {
         $request->validate(['status' => 'required|string|in:pending,invoice_created,pending_payment,paid,overdue,cancelled,disputed,refunded,delivery_note,archived_in_collective']);

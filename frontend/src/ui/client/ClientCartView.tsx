@@ -37,6 +37,9 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 export default function ClientCartView() {
     const {items, removeFromCart, totalAmount, clearCart, addToCart, volumeLicensing} = useCart();
+    const cartGalleryId = items.length > 0 && items.every(i => i.galleryId === items[0].galleryId)
+        ? items[0].galleryId
+        : undefined;
     const {showToast} = useUI();
     const {user, mutate: mutateUser} = useAuth();
     const {isPowerUser, isAdmin} = usePermissions();
@@ -192,7 +195,7 @@ export default function ClientCartView() {
                         <div className="lg:col-span-3 space-y-6">
                             <CartItemList items={items} handleUpdateItem={handleUpdateItem} removeFromCart={removeFromCart}
                                            hasQuotes={hasQuotes} totalAmount={totalAmount} volumeLicensing={volumeLicensing}/>
-                            <CouponInput />
+                            <CouponInput galleryId={cartGalleryId} />
                         </div>
 
                         <div className="lg:col-span-2">

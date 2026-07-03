@@ -2,6 +2,7 @@
  * Format cents to Euro string
  */
 export function formatMoney(cents: number): string {
+    if (!Number.isFinite(cents)) return '--- €';
     return (cents / 100).toFixed(2) + ' €';
 }
 

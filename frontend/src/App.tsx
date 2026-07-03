@@ -26,7 +26,6 @@ const Impressum = lazy(() => import('./ui/Impressum'));
 const ClientNotificationsView = lazy(() => import('./ui/client/ClientNotificationsView'));
 const ClientCartView = lazy(() => import('./ui/client/ClientCartView'));
 const ClientOrdersView = lazy(() => import('./ui/client/ClientOrdersView'));
-const ManagementCouponsView = lazy(() => import('./ui/management/ManagementCouponsView'));
 
 interface ProtectedRouteProps { children: React.ReactNode; requiredFeature?: 'b2b' }
 
@@ -113,7 +112,7 @@ export default function App() {
                             <Route path="/admin-products" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-snippets" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-payouts" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/admin-coupons" element={<ProtectedRoute><ErrorBoundary><ManagementCouponsView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-coupons" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/my-payouts" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="*" element={<Navigate to="/" replace/>}/>
                         </Routes>

@@ -17,7 +17,7 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
     });
 
     test.afterEach(async () => {
-        await helper.teardown();
+        if (helper) await helper.teardown();
     });
 
     test('Photographer creates gallery and client interacts with PhotoSwipe', async ({ page }) => {

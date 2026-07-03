@@ -19,7 +19,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     // brand-ID, so it stays in sync with the domain automatically.
     const calcMode = (isSrp && !usePremium) ? 'srp' : 'rp';
 
-    // --- RP (B2B) State ---
+    // --- RP State ---
     const [calcDuration, setCalcDuration] = useState<number>(90);
     const [calcImages, setCalcImages] = useState<number>(15);
     const [calcIsFlatrate, setCalcIsFlatrate] = useState<boolean>(false);
@@ -101,7 +101,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                 </button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--calculator text-primary"></span>
-                    {calcMode === 'srp' ? 'B2C Flex-Paket Rechner' : 'B2B Shooting-Paket Kalkulator'}
+                    {calcMode === 'srp' ? 'B2C Flex-Paket Rechner' : 'Shooting-Paket Kalkulator'}
                 </h3>
 
                 {isSrp && (

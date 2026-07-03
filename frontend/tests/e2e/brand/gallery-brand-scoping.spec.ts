@@ -60,7 +60,7 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
         await auth.login(adminUser.email, adminUser.password);
 
         const sidebar = new SidebarHelper(page);
-        await sidebar.navigateTo('Organisationen (B2B)');
+        await sidebar.navigateTo('Organisationen');
         await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
     });
 });

@@ -26,7 +26,8 @@ class CollectiveInvoiceCronTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Test Tenant', 'invoice_frequency' => 'monthly']);
         $user = User::factory()->create(['email' => 'tenant-accounting@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $order = Order::create([
             'user_id' => $user->id, 

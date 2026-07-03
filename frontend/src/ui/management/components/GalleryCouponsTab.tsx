@@ -16,7 +16,6 @@ interface PaginatedCoupons {
 const TYPE_LABELS: Record<Coupon['type'], string> = {
     fixed: 'Festbetrag',
     percentage: 'Prozent',
-    free_items: 'Gratis-Bilder',
 };
 
 const formatValue = (coupon: Coupon): string => {
@@ -27,8 +26,6 @@ const formatValue = (coupon: Coupon): string => {
             return `${numeric.toFixed(2).replace('.', ',')} €`;
         case 'percentage':
             return `${numeric} %`;
-        case 'free_items':
-            return `${numeric} Bilder`;
         default:
             return String(coupon.value);
     }

@@ -93,6 +93,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
             filename: photo.title || 'Bild ' + photo.id.substring(0, 8),
             thumb_url: photo.thumb_url,
             tier: selectedUseCase.flatrate_tier as ResolutionTier,
+            galleryId: photo.gallery_id,
             useCaseId: selectedUseCase.id,
             useCaseName: selectedUseCase.name,
             modifierIds: selectedModifiers,

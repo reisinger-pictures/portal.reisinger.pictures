@@ -147,7 +147,7 @@ Thumbnail (thumb_url)          → Grid thumbnail (aspect-square, object-cover)
 
 The frontend does NOT generate or transform images — the backend (`FileDeliveryController`) serves pre-generated or on-the-fly WEBP thumbnails.
 
-## 6. Accessibility
+## 7. Accessibility
 
 - All images have `alt` text derived from `photo.title` (falls back to `'Bild'`)
 - The loading spinner indicates activity without relying on colour alone

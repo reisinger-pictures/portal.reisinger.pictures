@@ -18,12 +18,11 @@ class CouponFactory extends Factory
         return [
             'brand' => Brand::SRP->value,
             'code' => strtoupper($this->faker->bothify('COUPON-????-####')),
-            'type' => $this->faker->randomElement(['fixed', 'percentage', 'free_items']),
+            'type' => $this->faker->randomElement(['fixed', 'percentage']),
             'value' => $this->faker->randomFloat(2, 1, 50),
+            'max_items' => null,
             'scope_type' => 'global',
             'scope_id' => null,
-            'scope_gallery_id' => null,
-            'per_sub_gallery' => false,
             'created_by' => null,
             'max_uses_global' => null,
             'max_uses_per_account' => null,
@@ -56,13 +55,14 @@ class CouponFactory extends Factory
     }
 
     /**
-     * Set the coupon type to free items.
+     * Set the coupon type to percentage with max_items.
      */
-    public function freeItems(int $count): static
+    public function percentageWithMaxItems(float $percent, int $maxItems): static
     {
         return $this->state(fn (array $_) => [
-            'type' => 'free_items',
-            'value' => $count,
+            'type' => 'percentage',
+            'value' => $percent,
+            'max_items' => $maxItems,
         ]);
     }
 

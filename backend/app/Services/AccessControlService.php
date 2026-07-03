@@ -35,15 +35,11 @@ class AccessControlService
             $galleryIds = array_unique(array_merge($galleryIds, $groupGalleryIds));
         }
 
-        // 3. Tenant Integration (Direct column assignments + Pivot group assignments)
-        $tenantIds = $user->tenants()->pluck('tenants.id')->toArray();
-        if (!empty($tenantIds)) {
-            // Direct column assignments (New feature)
-            $tenantGalleryIds = Gallery::whereIn('tenant_id', $tenantIds)->where('type', 'delivery')->pluck('id')->toArray();
-            $directGroupIds = GalleryGroup::whereIn('tenant_id', $tenantIds)->pluck('id')->toArray();
-
-            // Pivot table group assignments (Existing B2B setup)
-            $pivotGroupIds = DB::table('gallery_group_tenant')->whereIn('tenant_id', $tenantIds)->pluck('gallery_group_id')->toArray();
+        // 3. Tenant Integration (Direct column + pivot group assignments)
+        if ($user->tenant_id) {
+            $tenantGalleryIds = Gallery::where('tenant_id', $user->tenant_id)->where('type', 'delivery')->pluck('id')->toArray();
+            $directGroupIds = GalleryGroup::where('tenant_id', $user->tenant_id)->pluck('id')->toArray();
+            $pivotGroupIds = DB::table('gallery_group_tenant')->where('tenant_id', $user->tenant_id)->pluck('gallery_group_id')->toArray();
 
             $combinedGroupIds = array_unique(array_merge($directGroupIds, $pivotGroupIds));
             $allTenantGroupIds = $this->getSubGroupIds($combinedGroupIds);

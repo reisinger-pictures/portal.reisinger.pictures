@@ -49,6 +49,7 @@ export default function LicenseSelectorModal({photo, onClose}: LicenseSelectorMo
             filename: photo.title || 'Bild ' + photo.id.substring(0, 8),
             thumb_url: photo.thumb_url,
             tier,
+            galleryId: photo.gallery_id,
             price
         });
         showToast('success', 'In den Warenkorb gelegt');

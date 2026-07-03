@@ -64,7 +64,8 @@ class InvoiceServiceTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Happy Tenant', 'invoice_frequency' => 'monthly']);
         $user = User::factory()->create(['email' => 'happy@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $order = $this->makeDeliveryNoteOrder($user, 5000, [
             ['photoId' => 'p1', 'price' => 5000, 'tier' => 'web'],
@@ -106,7 +107,8 @@ class InvoiceServiceTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Seq Tenant']);
         $user = User::factory()->create(['email' => 'seq@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
         $this->makeDeliveryNoteOrder($user, 1000);
 
         $year = (int)date('Y');
@@ -140,7 +142,8 @@ class InvoiceServiceTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Items Tenant']);
         $user = User::factory()->create(['name' => 'Maria Bestellerin', 'email' => 'items@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $this->makeDeliveryNoteOrder($user, 3000, [
             ['photoId' => 'photo-A', 'price' => 3000, 'tier' => 'web'],
@@ -164,7 +167,8 @@ class InvoiceServiceTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Terms Tenant']);
         $user = User::factory()->create(['email' => 'terms@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $this->makeDeliveryNoteOrder($user, 1000, [['photoId' => 'x1', 'price' => 1000, 'tier' => 'web']], [
             'delivery_time' => 'sofort',
@@ -192,7 +196,8 @@ class InvoiceServiceTest extends TestCase
         $tenant = Tenant::create(['name' => 'Fallback Tenant']);
         // billing_* bewusst NICHT setzen → bleiben null → Fallback greift
         $user = User::factory()->create(['email' => 'fallback@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $this->makeDeliveryNoteOrder($user, 1500);
 
@@ -212,7 +217,8 @@ class InvoiceServiceTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Initiator Tenant']);
         $user = User::factory()->create(['email' => 'tenantuser@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
         $this->makeDeliveryNoteOrder($user, 2200);
 
         // Initiator mit eigenen billing_* Werten (NICHT mass-assignment-fillable → Property + save)
@@ -221,7 +227,8 @@ class InvoiceServiceTest extends TestCase
         $initiator->billing_zip = '4020';
         $initiator->billing_city = 'Linz';
         $initiator->save();
-        $initiator->tenants()->attach($tenant);
+        $initiator->tenant_id = $tenant->id;
+        $initiator->save();
 
         $this->service->generateForTenant($tenant, $initiator);
 
@@ -262,7 +269,8 @@ class InvoiceServiceTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'NoDelivery Tenant']);
         $user = User::factory()->create(['email' => 'paid@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         // Order mit anderem Status (nicht delivery_note) → darf NICHT erfasst werden
         $paidOrder = Order::create(['user_id' => $user->id, 'status' => 'paid', 'total_amount' => 999]);
@@ -282,8 +290,10 @@ class InvoiceServiceTest extends TestCase
 
         $userA = User::factory()->create(['name' => 'Alpha', 'email' => 'alpha@example.com']);
         $userB = User::factory()->create(['name' => 'Beta', 'email' => 'beta@example.com']);
-        $userA->tenants()->attach($tenant);
-        $userB->tenants()->attach($tenant);
+        $userA->tenant_id = $tenant->id;
+        $userA->save();
+        $userB->tenant_id = $tenant->id;
+        $userB->save();
 
         // 3 delivery_note-Orders über 2 User, Summe 1000+2000+4000 = 7000
         $this->makeDeliveryNoteOrder($userA, 1000, [['photoId' => 'a1', 'price' => 1000, 'tier' => 'web']]);
@@ -326,7 +336,8 @@ class InvoiceServiceTest extends TestCase
         // status=delivery_note Filter. Andere Status werden nicht gezogen.
         $tenant = Tenant::create(['name' => 'QuoteFilter Tenant']);
         $user = User::factory()->create(['email' => 'qf@example.com']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         Order::create([
             'user_id' => $user->id,

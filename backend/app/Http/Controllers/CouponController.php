@@ -8,6 +8,7 @@ use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
+use App\Http\Resources\CouponResource;
 use App\Services\CouponService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
@@ -88,7 +89,7 @@ class CouponController extends Controller
 
         $coupons = $query->paginate($perPage);
 
-        return response()->json($coupons);
+        return CouponResource::collection($coupons)->response();
     }
 
     // ──────────────────────────────────────────────
@@ -111,7 +112,7 @@ class CouponController extends Controller
 
         $coupon = Coupon::create($validated);
 
-        return response()->json(['success' => true, 'coupon' => $coupon], 201);
+        return response()->json(['success' => true, 'coupon' => new CouponResource($coupon)], 201);
     }
 
     // ──────────────────────────────────────────────
@@ -134,7 +135,7 @@ class CouponController extends Controller
 
         $coupon->update($validated);
 
-        return response()->json(['success' => true, 'coupon' => $coupon]);
+        return response()->json(['success' => true, 'coupon' => new CouponResource($coupon)]);
     }
 
     // ──────────────────────────────────────────────
@@ -187,7 +188,7 @@ class CouponController extends Controller
                        ->where('scope_id', $galleryId);
                 })->orWhere(function ($sq) use ($galleryId) {
                     $sq->where('scope_type', 'meta_gallery')
-                       ->where('scope_gallery_id', $galleryId);
+                       ->where('scope_id', $galleryId);
                 })->orWhere(function ($sq) use ($photographerIds) {
                     if (!empty($photographerIds)) {
                         $sq->where('scope_type', 'photographer')
@@ -198,6 +199,7 @@ class CouponController extends Controller
             ->orderBy('created_at', 'desc');
 
         $coupons = $query->paginate($perPage);
+        $coupons->getCollection()->transform(fn($c) => new CouponResource($c));
 
         return response()->json($coupons);
     }
@@ -224,7 +226,7 @@ class CouponController extends Controller
 
         $coupon = Coupon::create($validated);
 
-        return response()->json(['success' => true, 'coupon' => $coupon], 201);
+        return response()->json(['success' => true, 'coupon' => new CouponResource($coupon)], 201);
     }
 
     // ──────────────────────────────────────────────
@@ -270,6 +272,7 @@ class CouponController extends Controller
             ->orderBy('created_at', 'desc');
 
         $coupons = $query->paginate($perPage);
+        $coupons->getCollection()->transform(fn($c) => new CouponResource($c));
 
         return response()->json($coupons);
     }
@@ -301,7 +304,7 @@ class CouponController extends Controller
 
         $coupon = Coupon::create($validated);
 
-        return response()->json(['success' => true, 'coupon' => $coupon], 201);
+        return response()->json(['success' => true, 'coupon' => new CouponResource($coupon)], 201);
     }
 
     // ──────────────────────────────────────────────
@@ -312,9 +315,8 @@ class CouponController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|max:50',
-            'gallery_id' => 'nullable|integer',
-            'meta_gallery_id' => 'nullable|integer',
-            'scope_gallery_id' => 'nullable|integer',
+            'gallery_id' => 'nullable|string',
+            'meta_gallery_id' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -347,11 +349,9 @@ class CouponController extends Controller
         return response()->json([
             'valid' => true,
             'coupon' => [
-                'id' => $coupon->id,
                 'code' => $coupon->code,
                 'type' => $coupon->type,
                 'value' => $coupon->value,
-                'scope_type' => $coupon->scope_type,
             ],
             'discount_cents' => $result['discountCents'],
         ]);

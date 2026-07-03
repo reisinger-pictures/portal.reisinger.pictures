@@ -162,7 +162,7 @@ describe('ManagementGalleryView', () => {
             isAdmin: true,
             isSuperAdmin: false,
             isPhotographer: true,
-            isCustomerManager: false,
+            isOrgAdmin: false,
             showTenantsSection: false,
             canEditMetadata: true,
             isPowerUser: false,

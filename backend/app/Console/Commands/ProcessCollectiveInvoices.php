@@ -5,29 +5,23 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\Tenant;
 use App\Services\InvoiceService;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class ProcessCollectiveInvoices extends Command
 {
-    protected $signature = 'app:process-collective-invoices';
+    protected $signature = 'app:process-collective-invoices {--frequency=monthly : Billing frequency (monthly|quarterly)}';
     protected $description = 'Generiert Sammelrechnungen automatisch am Monats- oder Quartalsende.';
 
     public function handle(InvoiceService $invoiceService)
     {
-        $today = Carbon::today();
-        $isEndOfMonth = $today->copy()->endOfMonth()->isToday();
-        $isEndOfQuarter = $today->copy()->endOfQuarter()->isToday();
+        $frequency = $this->option('frequency');
 
-        if (!$isEndOfMonth && !$isEndOfQuarter) {
-            $this->info('Heute ist weder Monats- noch Quartalsende. Nichts zu tun.');
-            return 0;
+        if (!in_array($frequency, ['monthly', 'quarterly'], true)) {
+            $this->error("Ungültige Frequenz: {$frequency}. Erlaubt: monthly, quarterly.");
+            return 1;
         }
 
-        $tenants = Tenant::where(function($q) use ($isEndOfMonth, $isEndOfQuarter) {
-            if ($isEndOfMonth) $q->orWhere('invoice_frequency', 'monthly');
-            if ($isEndOfQuarter) $q->orWhere('invoice_frequency', 'quarterly');
-        })->get();
+        $tenants = Tenant::where('invoice_frequency', $frequency)->get();
 
         $count = 0;
         foreach ($tenants as $tenant) {

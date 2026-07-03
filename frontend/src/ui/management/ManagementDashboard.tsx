@@ -228,7 +228,7 @@ export default function ManagementDashboard() {
                                                       className="card bg-base-100 shadow-sm hover:shadow-xl transition-shadow transition-transform border border-base-300">
                                                     <div
                                                         className="card-body p-4 flex flex-row items-center">
-                                                        <div className="text-2xl mr-2"></div>
+                                                        <div className="text-2xl mr-2"><span className="iconify mdi--image-multiple-outline text-base-content/50"></span></div>
                                                         <h3 className="card-title text-base text-primary truncate flex-1">{g.name}</h3>
                                                     </div>
                                                 </Link>

@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Constants\TierRanks;
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
@@ -28,7 +30,7 @@ class User extends Authenticatable implements JWTSubject
         'id', 'name', 'email', 'brand', 'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
         'current_ftp_gallery_id', 'ftp_slug',
         'created_at', 'is_admin', 'is_photographer',
-        'is_pending', 'is_customer_manager', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
+        'is_pending', 'is_org_admin', 'is_customer_manager', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
     ];
 
     protected $fillable = [
@@ -68,7 +70,12 @@ class User extends Authenticatable implements JWTSubject
     public function photographerGalleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'photographer_gallery_groups'); }
     public function currentFtpGallery() { return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id'); }
     public function photos() { return $this->hasMany(Photo::class); }
-    public function tenants() { return $this->belongsToMany(Tenant::class); }
+    public function tenant(): BelongsTo { return $this->belongsTo(Tenant::class); }
+
+    public function scopeByTenant(Builder $query, string $tenantId): Builder
+    {
+        return $query->where('tenant_id', $tenantId);
+    }
 
     public function getIsPendingAttribute(): bool
     {
@@ -78,7 +85,9 @@ class User extends Authenticatable implements JWTSubject
 
     public function getIsPhotographerAttribute(): bool { return $this->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists(); }
     public function getIsAdminAttribute(): bool { return $this->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists(); }
-    public function getIsCustomerManagerAttribute(): bool { return $this->roles()->where('name', UserRole::CUSTOMER_MANAGER->value)->exists(); }
+    public function getIsOrgAdminAttribute(): bool { return $this->roles()->where('name', UserRole::ORG_ADMIN->value)->exists() && $this->tenant_id !== null; }
+
+    public function getIsCustomerManagerAttribute(): bool { trigger_error('Use is_org_admin instead', E_USER_DEPRECATED); return $this->getIsOrgAdminAttribute(); }
     public function getIsPowerUserAttribute(): bool { return $this->roles()->where('name', UserRole::POWER_USER->value)->exists(); }
 
     public function getAllowedGalleryIds(): array

@@ -35,11 +35,11 @@ class CouponStoreRequest extends FormRequest
 
         $rules = [
             'code' => 'required|string|max:50',
-            'type' => 'required|string|in:fixed,percentage,free_items',
+            'type' => 'required|string|in:fixed,percentage',
             'value' => 'required|numeric|min:0|max:9999999.99',
+            'max_items' => 'nullable|integer|min:1|max:999',
             'scope_type' => 'required|string|' . $scopeTypes,
             'scope_id' => 'nullable|string|required_if:scope_type,gallery,meta_gallery',
-            'scope_gallery_id' => 'nullable|string',
             'max_uses_global' => 'nullable|integer|min:1',
             'max_uses_per_account' => 'nullable|integer|min:1',
             'expires_at' => 'nullable|date',
@@ -82,10 +82,6 @@ class CouponStoreRequest extends FormRequest
 
             if (($data['type'] ?? null) === 'percentage' && ($data['value'] ?? 0) > 100) {
                 $validator->errors()->add('value', 'Percentage value must not exceed 100.');
-            }
-
-            if (($data['type'] ?? null) === 'free_items') {
-                $req->merge(['value' => (int) ($data['value'] ?? 0)]);
             }
 
             $brandValue = BrandRegistry::currentOrDefault()->value;

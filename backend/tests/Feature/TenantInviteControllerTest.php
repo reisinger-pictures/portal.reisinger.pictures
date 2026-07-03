@@ -178,7 +178,7 @@ class TenantInviteControllerTest extends TestCase
         $user = User::where('email', 'redeem@example.com')->first();
         $this->assertNotNull($user);
         $this->assertEquals('Redeemed User', $user->name);
-        $this->assertTrue($user->tenants->contains($tenant->id));
+        $this->assertEquals($tenant->id, $user->tenant_id);
         $this->assertTrue($user->roles->contains($clientRole));
 
         $this->assertDatabaseMissing('tenant_invites', ['token' => 'redeem-token-456']);

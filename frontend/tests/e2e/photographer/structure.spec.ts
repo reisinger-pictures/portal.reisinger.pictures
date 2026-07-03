@@ -17,7 +17,7 @@ test.describe('Management Structure View (Tree)', () => {
     });
 
     test.afterEach(async () => {
-        await helper.teardown();
+        if (helper) await helper.teardown();
     });
 
     test('Photographer can create nested groups and toggle tree nodes', async ({ page }) => {

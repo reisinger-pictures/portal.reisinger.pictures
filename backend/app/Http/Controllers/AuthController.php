@@ -55,12 +55,48 @@ class AuthController extends Controller
             $tenant = \App\Models\Tenant::where('domain', $domain)->first();
 
             if ($tenant) {
-                // Auto-Join the user to the matching Tenant
-                $user->tenants()->attach($tenant->id);
-                // Assign Standard-Client Role by default to protect billing
-                $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
-                if ($clientRole) {
-                    $user->roles()->attach($clientRole->id);
+                // Brand check: tenant brand must match the current request brand
+                if ($tenant->brand !== null && $tenant->brand !== BrandRegistry::currentOrDefault()) {
+                    return response()->json(['error' => 'Registrierung für diese Domain ist auf diesem Portal nicht möglich.'], 403);
+                }
+
+                // Evaluate auto_join_policy
+                if ($tenant->auto_join_policy === \App\Enums\AutoJoinPolicy::DISABLED) {
+                    // No auto-join
+                } elseif ($tenant->auto_join_policy === \App\Enums\AutoJoinPolicy::REQUIRES_INVITE) {
+                    // No auto-join — user must be invited manually
+                    // Still attach if there's a pending invite for this email
+                    $pendingInvite = \App\Models\TenantInvite::where('email', $validated['email'])
+                        ->where('tenant_id', $tenant->id)
+                        ->where('expires_at', '>', now())
+                        ->first();
+                    if ($pendingInvite) {
+                        $user->tenant_id = $tenant->id;
+                        $user->save();
+                        $pendingInvite->delete();
+                    }
+                } else {
+                    // immediate — auto-join
+                    $user->tenant_id = $tenant->id;
+                    
+                    // Assign role from tenant's default_role_id, fallback to client
+                    $roleId = $tenant->default_role_id;
+                    if (!$roleId) {
+                        $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
+                        $roleId = $clientRole?->id;
+                    }
+                    if ($roleId) {
+                        $user->roles()->attach($roleId);
+                    }
+                    
+                    // Inherit flatrate settings from tenant
+                    if ($tenant->default_flatrate_level) {
+                        $user->flatrate_level = $tenant->default_flatrate_level;
+                    }
+                    if ($tenant->can_purchase_upgrades) {
+                        $user->can_purchase_upgrades = true;
+                    }
+                    $user->save();
                 }
             }
 
@@ -181,6 +217,7 @@ class AuthController extends Controller
             'is_admin' => $user->is_admin,
             'is_photographer' => $user->is_photographer,
             'is_customer_manager' => $user->is_customer_manager,
+            'is_org_admin' => $user->is_org_admin,
             'is_power_user' => $user->is_power_user,
             'is_pending' => $user->is_pending,
             'roles' => $user->roles->pluck('name'),

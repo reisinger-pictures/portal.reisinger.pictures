@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Http\Resources\GalleryResource;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Services\PhotoProcessingService;
@@ -29,7 +30,7 @@ class FtpController extends Controller
         return response()->json([
             'ftp_folder' => '/' . ($user->ftp_slug ?? $user->id),
             'file_count' => $fileCount,
-            'current_target_gallery' => $user->currentFtpGallery
+            'current_target_gallery' => $user->currentFtpGallery ? new GalleryResource($user->currentFtpGallery) : null
         ]);
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Customer;
+use App\Http\Resources\CustomerResource;
 use App\Support\BrandRegistry;
 
 class CustomerController extends Controller
@@ -14,16 +15,18 @@ class CustomerController extends Controller
 
         $q = $request->query('q');
         if ($q && strlen($q) >= 2) {
+            $customers = Customer::search($q)
+                ->query(fn($query) => $query->where('brand', $brand))
+                ->orderBy('created_at', 'desc')
+                ->take(20)
+                ->get();
             return response()->json(
-                Customer::search($q)
-                    ->query(fn($query) => $query->where('brand', $brand))
-                    ->orderBy('created_at', 'desc')
-                    ->take(20)
-                    ->get()
+                $customers->map(fn($c) => new CustomerResource($c))->values()
             );
         }
 
-        return response()->json(Customer::where('brand', $brand)->orderBy('created_at', 'desc')->get());
+        $customers = Customer::where('brand', $brand)->orderBy('created_at', 'desc')->get();
+        return response()->json($customers->map(fn($c) => new CustomerResource($c))->values());
     }
 
     public function store(Request $request)
@@ -41,7 +44,7 @@ class CustomerController extends Controller
 
         $validated['brand'] = BrandRegistry::currentOrDefault()->value;
         $customer = Customer::create($validated);
-        return response()->json(['success' => true, 'customer' => $customer]);
+        return response()->json(['success' => true, 'customer' => new CustomerResource($customer)]);
     }
 
     public function update(Request $request, $id)
@@ -60,7 +63,7 @@ class CustomerController extends Controller
         ]);
 
         $customer->update($validated);
-        return response()->json(['success' => true, 'customer' => $customer]);
+        return response()->json(['success' => true, 'customer' => new CustomerResource($customer)]);
     }
 
     public function destroy($id)

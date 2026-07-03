@@ -14,19 +14,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Coupon / Discount Code Model (SRP-01).
  *
- * Supports fixed-amount, percentage, and free-items discount types.
+ * Supports fixed-amount and percentage discount types.
  * Coupons are brand-isolated and can be scoped globally, to a gallery,
  * to a meta-gallery (gallery group), or to a photographer's galleries.
  *
  * @property int $id
  * @property string $brand
  * @property string $code
- * @property string $type fixed|percentage|free_items
+ * @property string $type fixed|percentage
  * @property float $value
+ * @property int|null $max_items
  * @property string $scope_type global|gallery|meta_gallery|photographer|organisation
  * @property int|null $scope_id
- * @property int|null $scope_gallery_id
- * @property bool $per_sub_gallery
  * @property int|null $max_uses_global
  * @property int|null $max_uses_per_account
  * @property int $used_count
@@ -47,10 +46,9 @@ class Coupon extends Model
         'code',
         'type',
         'value',
+        'max_items',
         'scope_type',
         'scope_id',
-        'scope_gallery_id',
-        'per_sub_gallery',
         'max_uses_global',
         'max_uses_per_account',
         'used_count',
@@ -61,9 +59,8 @@ class Coupon extends Model
 
     protected $casts = [
         'value' => 'float',
+        'max_items' => 'integer',
         'scope_id' => 'string',
-        'scope_gallery_id' => 'string',
-        'per_sub_gallery' => 'boolean',
         'max_uses_global' => 'integer',
         'max_uses_per_account' => 'integer',
         'used_count' => 'integer',

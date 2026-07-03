@@ -226,32 +226,35 @@ export default function LicenseCatalogSettings() {
                         </div>
                         
                         {/* Add New Use Case */}
-                        <div className="bg-base-200/50 p-4 rounded-box border border-base-300 flex flex-col md:flex-row gap-3 items-start md:items-end">
-                            <div className="form-control flex-1 w-full">
+                        <div className="bg-base-200/50 p-4 rounded-box border border-base-300 grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-end">
+                            <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Neuer Titel</span></label>
                                 <input type="text" placeholder="z.B. PR & Social Media" value={newUc.name} onChange={e=>setNewUc({...newUc, name: e.target.value})} className="input input-bordered w-full" />
                             </div>
-                            <div className="form-control flex-1 w-full">
+                            <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Beschreibung (Optional)</span></label>
                                 <input type="text" placeholder="Details zur Lizenz..." value={newUc.description} onChange={e=>setNewUc({...newUc, description: e.target.value})} className="input input-bordered w-full" />
                             </div>
-                            <div className="form-control w-full md:w-32">
+                            <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Flatrate-Basis</span></label>
-                                <select value={newUc.flatrate_tier} onChange={e=>setNewUc({...newUc, flatrate_tier: e.target.value})} className="select select-bordered w-full mb-2">
+                                <select value={newUc.flatrate_tier} onChange={e=>setNewUc({...newUc, flatrate_tier: e.target.value})} className="select select-bordered w-full">
                                     <option value="web">Web</option>
                                     <option value="print">Print</option>
                                     <option value="original">Original</option>
                                 </select>
-                                <label className="cursor-pointer flex items-center gap-2">
+                            </div>
+                            <div className="form-control w-full">
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Kommerziell</span></label>
+                                <label className="cursor-pointer flex items-center gap-2 h-10">
                                     <input type="checkbox" className="checkbox-primary checkbox checkbox-sm" checked={newUc.is_commercial} onChange={e=>setNewUc({...newUc, is_commercial: e.target.checked})} />
-                                    <span className="label-text text-xs leading-tight">Kommerziell</span>
+                                    <span className="label-text text-sm leading-tight">Kommerzielle Lizenz</span>
                                 </label>
                             </div>
-                            <div className="form-control w-full md:w-32">
+                            <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Preis (Netto €)</span></label>
                                 <input type="number" step="0.01" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered w-full" />
                             </div>
-                            <button onClick={handleAddUseCase} className="btn btn-primary w-full md:w-auto"><span className="iconify mdi--plus"></span> Hinzufügen</button>
+                            <button onClick={handleAddUseCase} className="btn btn-primary self-end"><span className="iconify mdi--plus"></span> Hinzufügen</button>
                         </div>
                     </div>
 
@@ -289,26 +292,27 @@ export default function LicenseCatalogSettings() {
                         </div>
 
                         {/* Add New Modifier */}
-                        <div className="bg-base-200/50 p-4 rounded-box border border-base-300 flex flex-col md:flex-row gap-3 items-start md:items-end">
-                            <div className="form-control flex-1 w-full">
+                        <div className="bg-base-200/50 p-4 rounded-box border border-base-300 grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-4 items-end">
+                            <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Neuer Zuschlag</span></label>
                                 <input type="text" placeholder="z.B. Titelseite" value={newMod.name} onChange={e=>setNewMod({...newMod, name: e.target.value})} className="input input-bordered w-full" />
                             </div>
-                            <div className="form-control flex-1 w-full">
+                            <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Beschreibung (Optional)</span></label>
                                 <input type="text" placeholder="Details..." value={newMod.description} onChange={e=>setNewMod({...newMod, description: e.target.value})} className="input input-bordered w-full" />
                             </div>
-                            <div className="form-control w-full md:w-auto self-center md:self-end mb-1">
-                                <label className="cursor-pointer flex items-center gap-2">
-                                    <input type="checkbox" className="checkbox-primary checkbox" checked={newMod.is_included_in_flatrate} onChange={e=>setNewMod({...newMod, is_included_in_flatrate: e.target.checked})} />
-                                    <span className="label-text text-sm leading-tight font-medium">In Flatrates<br/>inkludieren</span>
+                            <div className="form-control w-full">
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Flatrate</span></label>
+                                <label className="cursor-pointer flex items-center gap-2 h-10">
+                                    <input type="checkbox" className="checkbox-primary checkbox checkbox-sm" checked={newMod.is_included_in_flatrate} onChange={e=>setNewMod({...newMod, is_included_in_flatrate: e.target.checked})} />
+                                    <span className="label-text text-sm leading-tight">In Flatrates inkludieren</span>
                                 </label>
                             </div>
-                            <div className="form-control w-full md:w-32">
+                            <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Aufschlag (%)</span></label>
                                 <input type="number" step="0.01" placeholder="z.B. 100" value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered w-full" />
                             </div>
-                            <button onClick={handleAddModifier} className="btn btn-primary w-full md:w-auto"><span className="iconify mdi--plus"></span> Hinzufügen</button>
+                            <button onClick={handleAddModifier} className="btn btn-primary self-end"><span className="iconify mdi--plus"></span> Hinzufügen</button>
                         </div>
                     </div>
 

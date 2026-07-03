@@ -6,6 +6,7 @@ use App\Models\Gallery;
 use App\Models\DownloadLog;
 use App\Models\User;
 use App\Http\Requests\StatsIndexRequest;
+use App\Http\Resources\DownloadLogResource;
 use App\Services\StatsCalculationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,9 +37,8 @@ class StatsController extends Controller
             $query->where('resolution_tier', $tier);
         }
 
-        if ($user->is_customer_manager && !$user->is_admin) {
-            $domain = substr(strrchr($user->email, "@"), 1);
-            $tenantUserIds = User::where('email', 'like', '%@' . $domain)->pluck('id')->toArray();
+        if ($user->is_org_admin && !$user->is_admin) {
+            $tenantUserIds = \App\Models\User::where('tenant_id', $user->tenant_id)->pluck('id');
             $query->whereIn('user_id', $tenantUserIds);
         } elseif (!$user->is_admin) {
             $galleryIds = array_unique(array_merge(
@@ -57,6 +57,7 @@ class StatsController extends Controller
             return $log;
         });
 
+        $paginated->getCollection()->transform(fn($log) => new DownloadLogResource($log));
         return response()->json($paginated);
     }
 }

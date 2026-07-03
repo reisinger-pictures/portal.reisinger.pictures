@@ -6,6 +6,10 @@ export interface Tenant {
     name: string;
     domain: string | null;
     invoice_frequency: 'immediate' | 'monthly' | 'quarterly';
+    default_role_id?: string | null;
+    default_flatrate_level?: 'none' | 'web' | 'print' | 'original';
+    shared_flatrate_cents?: number | null;
+    auto_join_policy?: 'immediate' | 'requires_invite' | 'disabled';
     users_count?: number;
     gallery_groups_count?: number;
     open_delivery_notes_count?: number;

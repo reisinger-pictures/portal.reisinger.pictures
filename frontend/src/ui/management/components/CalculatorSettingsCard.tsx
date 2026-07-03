@@ -73,7 +73,7 @@ export default function CalculatorSettingsCard() {
                     Definiere die Parameter für den manuellen "Paket-Kalkulator" in Angeboten und Rechnungen.
                 </p>
                 <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">B2B (Premium Tarif)</div>
+                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Premium Tarif</div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                         <div className="form-control">
                             <label className="label"><span
@@ -90,12 +90,12 @@ export default function CalculatorSettingsCard() {
                         <div className="form-control">
                             <label className="label"><span
                                 className="label-text font-bold">Bilder pro Stunde</span></label>
-                            <input type="number" step="1"
-                                   className="input input-bordered" {...register('calc_images_per_hour', {valueAsNumber: true})} />
+<input type="number" step="1" min="1"
+                                    className="input input-bordered" {...register('calc_images_per_hour', {valueAsNumber: true})} />
                         </div>
                     </div>
 
-                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">B2C (Flex-Paket)</div>
+                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Standard Tarif</div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="form-control">
                             <label className="label"><span

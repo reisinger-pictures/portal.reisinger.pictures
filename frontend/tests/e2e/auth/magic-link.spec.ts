@@ -16,7 +16,7 @@ test.describe('Gallery Invite Link Workflow', () => {
     });
 
     test.afterEach(async () => {
-        await helper.teardown();
+        if (helper) await helper.teardown();
     });
 
     test('End-to-End Anonymous Magic Link Workflow', async ({ page }) => {

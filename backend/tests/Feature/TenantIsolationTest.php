@@ -12,19 +12,21 @@ class TenantIsolationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_customer_manager_cannot_update_or_delete_user_from_other_tenant()
+    public function test_org_admin_cannot_update_or_delete_user_from_other_tenant()
     {
-        $roleManager = Role::firstOrCreate(['name' => \App\Enums\UserRole::CUSTOMER_MANAGER->value]);
+        $roleManager = Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]);
         
         $tenantA = Tenant::create(['name' => 'Tenant A', 'invoice_frequency' => 'immediate']);
         $tenantB = Tenant::create(['name' => 'Tenant B', 'invoice_frequency' => 'immediate']);
 
         $managerA = User::factory()->create();
         $managerA->roles()->attach($roleManager);
-        $managerA->tenants()->attach($tenantA);
+        $managerA->tenant_id = $tenantA->id;
+        $managerA->save();
 
         $userB = User::factory()->create();
-        $userB->tenants()->attach($tenantB);
+        $userB->tenant_id = $tenantB->id;
+        $userB->save();
 
         $token = auth('api')->login($managerA);
 
@@ -53,15 +55,16 @@ class TenantIsolationTest extends TestCase
         $this->assertEmpty($usersReturned->where('id', $userB->id));
     }
 
-    public function test_customer_manager_can_only_see_own_tenants() {
-        $roleManager = Role::firstOrCreate(['name' => 'customer_manager']);
+    public function test_org_admin_can_only_see_own_tenants() {
+        $roleManager = Role::firstOrCreate(['name' => 'org_admin']);
         
         $tenantA = Tenant::create(['name' => 'Tenant A', 'invoice_frequency' => 'immediate']);
         $tenantB = Tenant::create(['name' => 'Tenant B', 'invoice_frequency' => 'immediate']);
 
         $managerA = User::factory()->create();
         $managerA->roles()->attach($roleManager);
-        $managerA->tenants()->attach($tenantA);
+        $managerA->tenant_id = $tenantA->id;
+        $managerA->save();
 
         $token = auth('api')->login($managerA);
 
@@ -90,22 +93,23 @@ class TenantIsolationTest extends TestCase
         $this->assertNotNull($user);
         
         // Prüfen, ob der User an den Tenant gebunden wurde
-        $this->assertTrue($user->tenants->contains($tenant->id));
+        $this->assertEquals($tenant->id, $user->tenant_id);
         
         // Prüfen, ob er die Client-Rolle bekommen hat
         $this->assertTrue($user->roles->contains('name', \App\Enums\UserRole::CLIENT->value));
     }
 
-    public function test_customer_manager_cannot_view_other_tenant_details()
+    public function test_org_admin_cannot_view_other_tenant_details()
     {
-        $roleManager = Role::firstOrCreate(['name' => 'customer_manager']);
+        $roleManager = Role::firstOrCreate(['name' => 'org_admin']);
         
         $tenantA = Tenant::create(['name' => 'Tenant A', 'invoice_frequency' => 'immediate']);
         $tenantB = Tenant::create(['name' => 'Tenant B', 'invoice_frequency' => 'immediate']);
 
         $managerA = User::factory()->create();
         $managerA->roles()->attach($roleManager);
-        $managerA->tenants()->attach($tenantA);
+        $managerA->tenant_id = $tenantA->id;
+        $managerA->save();
 
         $token = auth('api')->login($managerA);
 

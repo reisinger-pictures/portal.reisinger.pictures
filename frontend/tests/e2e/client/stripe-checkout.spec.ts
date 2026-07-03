@@ -11,20 +11,10 @@ test.describe('Stripe Checkout Workflow', () => {
     let helper: E2ESessionHelper;
     let photogUser = {email: '', password: '', id: ''};
     let buyerUser = {email: '', password: '', id: ''};
-    let adminToken: string;
 
     test.beforeEach(async ({request}) => {
         helper = new E2ESessionHelper(request);
-
-        const adminLogin = await request.post('/api/auth/login', {
-            data: {email: 'florian@reisinger.pictures', password: 'admin'},
-            headers: {'Accept': 'application/json'},
-        });
-        if (!adminLogin.ok()) throw new Error('Admin login failed');
-        const adminCookies = adminLogin.headers()['set-cookie'];
-        const match = adminCookies?.match(/rp_jwt=([^;]+)/);
-        adminToken = match ? `rp_jwt=${match[1]}` : '';
-        if (!adminToken) throw new Error('No admin token');
+        await helper.createIsolatedUser('super_admin');
 
         photogUser = await helper.createIsolatedUser('photographer');
         buyerUser = await helper.createIsolatedUser('power_user');

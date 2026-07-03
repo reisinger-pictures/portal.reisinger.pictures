@@ -1,10 +1,8 @@
-# Tenant- & Brand-Begriff — Konzept (SOLL/Ist-Stand)
+# Tenant- & Brand-Begriff — Konzept
 
-> **Status:** Beschreibt ausschließlich den **Stand des Systems** (Begriffe, Beziehungen,
-> Abgrenzung). **Kein** Umsetzungsplan. Offene Punkte verweisen auf `AGENTS.todo.md`.
+> **Status:** Beschreibt die Begriffe, Beziehungen und Abgrenzung von Brand und Tenant.
 > Verknüpft: `features/infrastructure/06-multi-domain-branding.md`,
 > `features/infrastructure/07-lightroom-multi-tenant-gap.md`.
-> Erstellt 2026-06-29.
 
 ## 1. Zwei unterschiedliche Konzepte
 
@@ -65,8 +63,4 @@ story.reisinger.pictures (B2C/SRP) ┘     Tenant B (Firma Y)
 - Der **Tenant** bestimmt Daten-Zugehörigkeit innerhalb des B2B-Bereichs.
 - Beide Konzepte sind aktuell **nicht** auf DB-Ebene verzahnt (Tenant hat keine
   Brand-Spalte). Die markenspezifische Trennung von Rechnungen/Settings passiert rein über den
-  Host-basierten `BrandContext` zur Request-Zeit.
-
-## 5. Offene Punkte
-
-Bekannte Lücken sind in `AGENTS.todo.md` dokumentiert (UI-Begriff T-01, Queue-Brand-Leck T-02, Frontend-Isolation T-03, Settings-Trennung T-04). Dieses Doc enthält keine Lösungsschritte.
+   Host-basierten `BrandContext` zur Request-Zeit.

@@ -17,22 +17,13 @@ class DatabaseSeeder extends Seeder
             ['email' => env('ADMIN_EMAIL', 'florian@reisinger.pictures')],
             ['name' => 'Florian Reisinger', 'password' => \Illuminate\Support\Facades\Hash::make(env('ADMIN_PASSWORD', 'admin'))]
         );
-        $roles = [\App\Enums\UserRole::SUPER_ADMIN->value, \App\Enums\UserRole::ADMIN->value, \App\Enums\UserRole::PHOTOGRAPHER->value, \App\Enums\UserRole::CLIENT->value, \App\Enums\UserRole::CUSTOMER_MANAGER->value, \App\Enums\UserRole::POWER_USER->value];
+        $roles = [\App\Enums\UserRole::SUPER_ADMIN->value, \App\Enums\UserRole::ADMIN->value, \App\Enums\UserRole::PHOTOGRAPHER->value, \App\Enums\UserRole::CLIENT->value, \App\Enums\UserRole::ORG_ADMIN->value, \App\Enums\UserRole::POWER_USER->value];
         foreach ($roles as $roleName) {
             \App\Models\Role::firstOrCreate(['name' => $roleName]);
         }
 
         // Admin-User erhält alle verfügbaren Rollen
         $adminUser->roles()->sync(\App\Models\Role::pluck('id')->toArray());
-
-        // SRP brand tenant (buy.reisinger.pictures) — B2C counterpart to the B2B portal.
-        \App\Models\Tenant::firstOrCreate(
-            ['domain' => 'buy.reisinger.pictures'],
-            [
-                'name' => 'buy.reisinger.pictures',
-                'brand' => \App\Enums\Brand::SRP,
-            ]
-        );
 
         // 1. Root-Gruppe "Privat" (strikt privat)
         $privatGroup = GalleryGroup::firstOrCreate(

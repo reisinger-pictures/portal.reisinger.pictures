@@ -7,7 +7,7 @@
  * because the user enters at most one code per checkout.
  *
  * Backend contract (POST /api/coupons/validate):
- *  - Success: { valid: true, coupon: { id, code, type, value, scope_type }, discount_cents?: number }
+ *  - Success: { valid: true, coupon: { code, type, value }, discount_cents?: number }
  *  - Failure: { valid: false, error: string }
  *  - Network/HTTP error: caught and surfaced as a German error message.
  *
@@ -21,11 +21,9 @@ import {useCallback, useState} from 'react';
 // ---------------------------------------------------------------------------
 
 export interface CouponSummary {
-    id: number | string;
     code: string;
-    type: 'fixed' | 'percentage' | 'free_items';
+    type: 'fixed' | 'percentage';
     value: number;
-    scope_type: 'global' | 'gallery' | 'meta_gallery' | 'photographer';
 }
 
 interface ValidateSuccessResponse {
@@ -45,7 +43,6 @@ type ValidateResponse = ValidateSuccessResponse | ValidateFailureResponse;
 export interface UseCouponOptions {
     galleryId?: number | string;
     metaGalleryId?: number | string;
-    scopeGalleryId?: number | string;
 }
 
 export interface UseCouponResult {
@@ -90,7 +87,7 @@ const INITIAL_STATE = {
  *   can be passed a `couponCode`/`applyCoupon` pair via props.
  */
 export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
-    const {galleryId, metaGalleryId, scopeGalleryId} = options ?? {};
+    const {galleryId, metaGalleryId} = options ?? {};
     const [couponCode, setCouponCode] = useState<string | null>(INITIAL_STATE.couponCode);
     const [isValid, setIsValid] = useState<boolean>(INITIAL_STATE.isValid);
     const [discount, setDiscount] = useState<number | null>(INITIAL_STATE.discount);
@@ -125,7 +122,6 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
                     code: trimmed,
                     ...(galleryId !== undefined && {gallery_id: galleryId}),
                     ...(metaGalleryId !== undefined && {meta_gallery_id: metaGalleryId}),
-                    ...(scopeGalleryId !== undefined && {scope_gallery_id: scopeGalleryId}),
                 }),
             });
         } catch {
@@ -164,7 +160,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
             );
         }
         setIsLoading(false);
-    }, [galleryId, metaGalleryId, scopeGalleryId]);
+    }, [galleryId, metaGalleryId]);
 
     const removeCoupon = useCallback((): void => {
         setCouponCode(INITIAL_STATE.couponCode);

@@ -171,7 +171,8 @@ class CheckoutServiceTest extends TestCase
     {
         [$user, $photo, $useCase] = $this->setupPaidItem();
         $tenant = Tenant::create(['name' => 'Firma AG', 'invoice_frequency' => 'monthly']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $response = $this->service->processCheckout(
             $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
@@ -312,7 +313,8 @@ class CheckoutServiceTest extends TestCase
     {
         [$user, $photo, $useCase] = $this->setupPaidItem();
         $tenant = Tenant::create(['name' => 'Immediate Co', 'invoice_frequency' => 'immediate']);
-        $user->tenants()->attach($tenant);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $clientMock = $this->createMock(\Stripe\HttpClient\ClientInterface::class);
         $clientMock->expects($this->once())->method('request')->willReturnCallback(function () {
@@ -517,17 +519,18 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 15. Checkout mit free_items Coupon (globale Scope)
+    // 15. Checkout mit percentage + max_items Coupon
     // ------------------------------------------------------------------
-    public function test_process_checkout_with_free_items_coupon(): void
+    public function test_process_checkout_with_percentage_max_items_coupon(): void
     {
         BrandRegistry::set(Brand::B2B);
 
         try {
             $coupon = Coupon::factory()->create([
-                'code' => 'FREE2',
-                'type' => 'free_items',
-                'value' => 2,
+                'code' => 'PCT50_2',
+                'type' => 'percentage',
+                'value' => 50,
+                'max_items' => 2,
                 'brand' => Brand::B2B->value,
                 'active' => true,
             ]);
@@ -542,13 +545,13 @@ class CheckoutServiceTest extends TestCase
             $strategy->method('calculateCart')->willReturn([
                 'items' => [
                     ['itemId' => $photo1->id, 'priceCents' => 3000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-                    ['itemId' => $photo2->id, 'priceCents' => 0, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-                    ['itemId' => $photo3->id, 'priceCents' => 0, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+                    ['itemId' => $photo2->id, 'priceCents' => 2000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+                    ['itemId' => $photo3->id, 'priceCents' => 1000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
                 ],
-                'totalCents' => 3000,
-                'discountCents' => 6000,
+                'totalCents' => 4500,
+                'discountCents' => 1500,
                 'couponId' => $coupon->id,
-                'couponType' => 'free_items',
+                'couponType' => 'percentage',
             ]);
 
             $this->service = new CheckoutService($strategy);
@@ -560,7 +563,7 @@ class CheckoutServiceTest extends TestCase
                         ['photoId' => $photo2->id, 'tier' => 'srp'],
                         ['photoId' => $photo3->id, 'tier' => 'srp'],
                     ],
-                    ['coupon_code' => 'FREE2']
+                    ['coupon_code' => 'PCT50_2']
                 ),
                 $user,
                 'invoice'
@@ -571,15 +574,10 @@ class CheckoutServiceTest extends TestCase
             $order = Order::first();
             $this->assertNotNull($order);
             $this->assertEquals($coupon->id, $order->coupon_id);
-            $this->assertSame(3000, $order->total_amount);
+            $this->assertSame(4500, $order->total_amount);
 
             $coupon->refresh();
             $this->assertSame(1, $coupon->used_count);
-
-            $snapshot = InvoiceSnapshot::first();
-            $items = $snapshot->customer_details['items'];
-            $discountItems = array_filter($items, fn($li) => ($li['type'] ?? null) === 'discount_coupon');
-            $this->assertCount(0, $discountItems, 'free_items coupons should not generate a discount line item');
         } finally {
             BrandRegistry::reset();
         }
@@ -640,77 +638,4 @@ class CheckoutServiceTest extends TestCase
         }
     }
 
-    // ------------------------------------------------------------------
-    // 17. free_items Coupon per Sub-Gallery (Meta-Gallery Scope)
-    // ------------------------------------------------------------------
-    public function test_process_checkout_with_free_items_per_sub_gallery_coupon(): void
-    {
-        BrandRegistry::set(Brand::B2B);
-
-        try {
-            $metaGallery = GalleryGroup::factory()->create();
-            $gallery1 = Gallery::factory()->create(['is_public' => true, 'gallery_group_id' => $metaGallery->id]);
-            $gallery2 = Gallery::factory()->create(['is_public' => true, 'gallery_group_id' => $metaGallery->id]);
-
-            $photo1 = Photo::factory()->create(['gallery_id' => $gallery1->id]);
-            $photo2 = Photo::factory()->create(['gallery_id' => $gallery1->id]);
-            $photo3 = Photo::factory()->create(['gallery_id' => $gallery2->id]);
-            $photo4 = Photo::factory()->create(['gallery_id' => $gallery2->id]);
-
-            $coupon = Coupon::factory()->create([
-                'code' => 'PERSG',
-                'type' => 'free_items',
-                'value' => 1,
-                'brand' => Brand::B2B->value,
-                'scope_type' => 'meta_gallery',
-                'scope_id' => $metaGallery->id,
-                'per_sub_gallery' => true,
-                'active' => true,
-            ]);
-
-            $user = User::factory()->create();
-
-            $strategy = $this->createMock(PricingStrategy::class);
-            $strategy->method('calculateCart')->willReturn([
-                'items' => [
-                    ['itemId' => $photo1->id, 'priceCents' => 3000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-                    ['itemId' => $photo2->id, 'priceCents' => 0, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-                    ['itemId' => $photo3->id, 'priceCents' => 3000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-                    ['itemId' => $photo4->id, 'priceCents' => 0, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-                ],
-                'totalCents' => 6000,
-                'discountCents' => 6000,
-                'couponId' => $coupon->id,
-                'couponType' => 'free_items',
-            ]);
-
-            $this->service = new CheckoutService($strategy);
-
-            $response = $this->service->processCheckout(
-                $this->makeRequest(
-                    [
-                        ['photoId' => $photo1->id, 'tier' => 'srp'],
-                        ['photoId' => $photo2->id, 'tier' => 'srp'],
-                        ['photoId' => $photo3->id, 'tier' => 'srp'],
-                        ['photoId' => $photo4->id, 'tier' => 'srp'],
-                    ],
-                    ['coupon_code' => 'PERSG']
-                ),
-                $user,
-                'invoice'
-            );
-
-            $this->assertEquals(200, $response->status());
-
-            $order = Order::first();
-            $this->assertNotNull($order);
-            $this->assertEquals($coupon->id, $order->coupon_id);
-            $this->assertSame(6000, $order->total_amount);
-
-            $coupon->refresh();
-            $this->assertSame(1, $coupon->used_count);
-        } finally {
-            BrandRegistry::reset();
-        }
-    }
 }

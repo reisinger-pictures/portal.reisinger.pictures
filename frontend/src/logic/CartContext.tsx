@@ -6,6 +6,7 @@ export interface CartItem {
     filename?: string;
     thumb_url?: string;
     tier: ResolutionTier;
+    galleryId?: string;
     useCaseId?: string;
     useCaseName?: string;
     modifierIds?: string[];

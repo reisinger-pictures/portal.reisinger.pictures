@@ -49,10 +49,3 @@ Das ist kein Bug, sondern der Zweck der psychologischen Preisrundung.
 | Flatrate (+20 %)      | 539     | 539   | 0                | `rawTotal=540` → 539 |
 | 33 % Rabatt           | 449     | 299   | 150              | final=round(299,33→300→299); eff. ≈ 33,4 % |
 | 50 % Rabatt           | 449     | 225   | 224              | **eff. ≈ 49,9 %** (224 statt 224,5) — *gewollt ungenau* |
-
-### Bekannte, **nicht**-gewünschte Kante (REVIEW, kein Feature-Verhalten)
-
-`calc_images_per_hour = '0'` → `parseInt('0') = 0` → `imagesPrice = rate/0 * images = Infinity` →
-`packagePrice = Infinity` (Division durch null, keine Guard im Settings-Form; das Eingabefeld hat nur
-`min="1"` clientseitig). Das ist ein echter potentieller Bug (FE-04-REVIEW), **kein** gewünschtes
-Verhalten und von der obigen Rundungs-Invariante zu trennen.

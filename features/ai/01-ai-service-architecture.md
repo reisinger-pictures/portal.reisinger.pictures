@@ -1,8 +1,6 @@
 # AI Service Architecture (Soll-Zustand)
 
-**Status:** Accepted (Option A – Vision retained)  
-**Epic:** AT-01  
-**Tags:** `ai`, `vision`, `metadata`, `lm-studio`, `3-state`
+**Status:** Accepted (Option A – Vision retained)
 
 ## 1. Overview
 
@@ -219,16 +217,3 @@ class AIProviderFactory
 ```
 
 `type` field reflects the current `AI_TYPE` value. The `status` field disambiguates disabled vs unconfigured.
-
-## 7. Existing Test Coverage
-
-| Test file | Type | Count | Tests |
-|---|---|---|---|
-| `AIServiceTest.php` | Unit | 7 | isAvailable (3), generateMetadataFromText (3), generateMetadata vision (1) with image fixture |
-| `AIMetadataTest.php` | Feature | 12 | status (2), generateMetadata vision auth/validation/permissions/API-error (6), generateMetadataText (2) |
-
-**Gaps:**
-- Frontend `useAI` hook: **0% tested** (vitest)
-- E2E generation flow: **0% tested** (only button visibility)
-- Vision path missing: HTTP error handling beyond 500 test, empty response, large image edge cases
-- Anthropic / LM Studio provider integration tests: only unit tests exist for provider request building

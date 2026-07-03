@@ -201,7 +201,7 @@ export interface User {
     can_edit_metadata: boolean;
     flatrate_level?: 'none' | 'web' | 'print' | 'original';
     can_purchase_upgrades?: boolean;
-    is_customer_manager?: boolean;
+    is_org_admin?: boolean;
     is_power_user?: boolean;
     roles: string[];
     missing_watermark?: boolean;
@@ -241,7 +241,7 @@ export interface InvoiceCustomerDetails {
 }
 
 export interface InvoiceSnapshot { id?: string; invoice_number: string; total_gross: string | number; total_net: string | number; tax_rate: number; created_at: string; customer_details: string | InvoiceCustomerDetails; }
-export interface Order { id: string; user_id?: string; status: string; is_quote_request: boolean | number; total_net: string | number; total_gross: string | number; tax_rate: number; payment_method?: string; billing_name?: string; billing_company?: string; billing_street?: string; billing_zip?: string; billing_city?: string; stripe_payment_intent_id?: string; created_at: string; updated_at: string; user?: { id?: string; name?: string; email?: string; }; invoice_snapshot?: InvoiceSnapshot; items?: OrderItem[]; }
+export interface Order { id: string; user_id?: string; status: string; is_quote_request: boolean | number; total_net?: string | number; total_gross?: string | number; tax_rate: number; payment_method?: string; billing_name?: string; billing_company?: string; billing_street?: string; billing_zip?: string; billing_city?: string; created_at: string; updated_at: string; user?: { id?: string; name?: string; email?: string; }; invoice_snapshot?: InvoiceSnapshot; items?: OrderItem[]; }
 export interface CheckoutResponse { success?: boolean; requires_action?: boolean; client_secret?: string; invoice_number: string; order_id?: string; }
 export interface RedeemInviteResponse { full_path?: string; message?: string; requires_mail_verification?: boolean; }
 export interface SendMailResponse { success: boolean; notified_count: number; }

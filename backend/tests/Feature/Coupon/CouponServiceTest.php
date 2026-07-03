@@ -225,142 +225,45 @@ class CouponServiceTest extends TestCase
         $this->assertSame(2500, $result['discountCents']);
     }
 
-    public function test_apply_free_items_discount(): void
+    public function test_apply_percentage_with_max_items_limits_to_cheapest(): void
     {
-        // 3 free items, cheapest first
-        $coupon = Coupon::factory()->freeItems(3)->create(['brand' => 'srp', 'active' => true]);
+        // 50% off the 3 cheapest items
+        $coupon = Coupon::factory()->percentageWithMaxItems(50, 3)->create(['brand' => 'srp', 'active' => true]);
         $items = $this->makePricedItems(5, [3000, 2500, 2000, 1500, 1000]);
         $total = 10000; // 3000+2500+2000+1500+1000
 
         $result = $this->service->applyCoupon($coupon, $items, $total);
 
-        // Cheapest 3 items (1000+1500+2000 = 4500) become free
-        $this->assertSame(5500, $result['totalCents']);
-        $this->assertSame(4500, $result['discountCents']);
-
-        // Verify cheapest items are free
-        $priceCents = array_map(fn ($i) => $i['priceCents'], $result['items']);
-        sort($priceCents);
-        $this->assertSame(0, $priceCents[0]);
-        $this->assertSame(0, $priceCents[1]);
-        $this->assertSame(0, $priceCents[2]);
-        $this->assertSame(2500, $priceCents[3]);
-        $this->assertSame(3000, $priceCents[4]);
+        // Cheapest 3 items: 1000+1500+2000 = 4500, 50% of that = 2250
+        $this->assertSame(7750, $result['totalCents']);
+        $this->assertSame(2250, $result['discountCents']);
     }
 
-    // ──────────────────────────────────────────────
-    //  applyCoupon — per_sub_gallery
-    // ──────────────────────────────────────────────
-
-    public function test_apply_coupon_free_items_per_sub_gallery(): void
+    public function test_apply_percentage_with_max_items_greater_than_count(): void
     {
-        $coupon = Coupon::factory()->freeItems(1)->create([
-            'brand' => 'srp',
-            'per_sub_gallery' => true,
-            'scope_type' => 'meta_gallery',
-            'active' => true,
-        ]);
-
-        $items = [
-            ['itemId' => 'a1', 'priceCents' => 3000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'a2', 'priceCents' => 1000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'b1', 'priceCents' => 2500, 'galleryId' => 'gallery-2', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'c1', 'priceCents' => 1500, 'galleryId' => 'gallery-3', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-        ];
-        $total = 8000;
+        // 50% off the 10 cheapest items, but only 3 items exist
+        $coupon = Coupon::factory()->percentageWithMaxItems(50, 10)->create(['brand' => 'srp', 'active' => true]);
+        $items = $this->makePricedItems(3, [1000, 2000, 3000]);
+        $total = 6000;
 
         $result = $this->service->applyCoupon($coupon, $items, $total);
 
-        // Cheapest from gallery-1: 1000, gallery-2: 2500, gallery-3: 1500 → 3 items free
+        // max_items > item count → apply to all items: 50% of 6000 = 3000
         $this->assertSame(3000, $result['totalCents']);
-        $this->assertSame(5000, $result['discountCents']);
-
-        $priceCents = array_map(fn ($i) => $i['priceCents'], $result['items']);
-        $this->assertSame(3000, $priceCents[0]);
-        $this->assertSame(0, $priceCents[1]);
-        $this->assertSame(0, $priceCents[2]);
-        $this->assertSame(0, $priceCents[3]);
+        $this->assertSame(3000, $result['discountCents']);
     }
 
-    public function test_apply_coupon_free_items_per_sub_gallery_multiple_free(): void
+    public function test_apply_percentage_without_max_items_applies_to_entire_cart(): void
     {
-        $coupon = Coupon::factory()->freeItems(2)->create([
-            'brand' => 'srp',
-            'per_sub_gallery' => true,
-            'scope_type' => 'meta_gallery',
-            'active' => true,
-        ]);
-
-        $items = [
-            ['itemId' => 'a1', 'priceCents' => 3000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'a2', 'priceCents' => 2000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'a3', 'priceCents' => 1000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'b1', 'priceCents' => 2500, 'galleryId' => 'gallery-2', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-        ];
-        $total = 8500;
+        $coupon = Coupon::factory()->percentage(10)->create(['brand' => 'srp', 'active' => true]);
+        $items = $this->makePricedItems(5, [3000, 2500, 2000, 1500, 1000]);
+        $total = 10000;
 
         $result = $this->service->applyCoupon($coupon, $items, $total);
 
-        // gallery-1: cheapest 2 (1000+2000=3000) free
-        // gallery-2: cheapest 1 (2500) free (only item)
-        // Total free: 5500
-        $this->assertSame(3000, $result['totalCents']);
-        $this->assertSame(5500, $result['discountCents']);
-
-        $priceCents = array_map(fn ($i) => $i['priceCents'], $result['items']);
-        $this->assertSame(3000, $priceCents[0]);
-        $this->assertSame(0, $priceCents[1]);
-        $this->assertSame(0, $priceCents[2]);
-        $this->assertSame(0, $priceCents[3]);
-    }
-
-    public function test_apply_coupon_free_items_per_sub_gallery_no_gallery_id(): void
-    {
-        $coupon = Coupon::factory()->freeItems(1)->create([
-            'brand' => 'srp',
-            'per_sub_gallery' => true,
-            'scope_type' => 'meta_gallery',
-            'active' => true,
-        ]);
-
-        $items = [
-            ['itemId' => 'a1', 'priceCents' => 3000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'a2', 'priceCents' => 1000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-        ];
-        $total = 4000;
-
-        $result = $this->service->applyCoupon($coupon, $items, $total);
-
-        // No galleryId keys → no items grouped → no free items
-        $this->assertSame(4000, $result['totalCents']);
-        $this->assertSame(0, $result['discountCents']);
-    }
-
-    public function test_apply_coupon_free_items_global_mode_unchanged(): void
-    {
-        $coupon = Coupon::factory()->freeItems(2)->create([
-            'brand' => 'srp',
-            'per_sub_gallery' => false,
-            'active' => true,
-        ]);
-
-        $items = [
-            ['itemId' => 'a1', 'priceCents' => 3000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'a2', 'priceCents' => 1000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'b1', 'priceCents' => 2500, 'galleryId' => 'gallery-2', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-        ];
-        $total = 6500;
-
-        $result = $this->service->applyCoupon($coupon, $items, $total);
-
-        // Global mode: cheapest 2 items globally (1000+2500=3500) free
-        $this->assertSame(3000, $result['totalCents']);
-        $this->assertSame(3500, $result['discountCents']);
-
-        $priceCents = array_map(fn ($i) => $i['priceCents'], $result['items']);
-        $this->assertSame(3000, $priceCents[0]);
-        $this->assertSame(0, $priceCents[1]);
-        $this->assertSame(0, $priceCents[2]);
+        // 10% of 10000 = 1000
+        $this->assertSame(9000, $result['totalCents']);
+        $this->assertSame(1000, $result['discountCents']);
     }
 
     // ──────────────────────────────────────────────
@@ -555,43 +458,6 @@ class CouponServiceTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    //  scope_gallery_id Sub-Scoping
-    // ──────────────────────────────────────────────
-
-    public function test_meta_gallery_with_scope_gallery_id_matches(): void
-    {
-        $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
-            'code' => 'MGMATCH',
-            'active' => true,
-            'scope_type' => 'meta_gallery',
-            'scope_id' => 7,
-            'scope_gallery_id' => 42,
-        ]);
-
-        [$found, $error] = $this->service->findValidCoupon('MGMATCH', Brand::SRP, 42, 7);
-
-        $this->assertNotNull($found);
-        $this->assertNull($error);
-    }
-
-    public function test_meta_gallery_with_scope_gallery_id_mismatch(): void
-    {
-        $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
-            'code' => 'MGMISMATCH',
-            'active' => true,
-            'scope_type' => 'meta_gallery',
-            'scope_id' => 7,
-            'scope_gallery_id' => 42,
-        ]);
-
-        [$found, $error] = $this->service->findValidCoupon('MGMISMATCH', Brand::SRP, 99, 7);
-
-        $this->assertNull($found);
-        $this->assertStringContainsString('not valid for this specific gallery', $error);
-    }
-
     // ──────────────────────────────────────────────
     //  Organisation Scope
     // ──────────────────────────────────────────────
@@ -600,7 +466,8 @@ class CouponServiceTest extends TestCase
     {
         $tenant = Tenant::factory()->create();
         $user = User::factory()->create();
-        $tenant->users()->attach($user->id);
+        $user->tenant_id = $tenant->id;
+        $user->save();
 
         $coupon = Coupon::factory()->create([
             'brand' => 'srp',
@@ -622,7 +489,8 @@ class CouponServiceTest extends TestCase
         $tenantA = Tenant::factory()->create();
         $tenantB = Tenant::factory()->create();
         $user = User::factory()->create();
-        $tenantB->users()->attach($user->id);
+        $user->tenant_id = $tenantB->id;
+        $user->save();
 
         Coupon::factory()->create([
             'brand' => 'srp',
@@ -802,46 +670,6 @@ class CouponServiceTest extends TestCase
     // ──────────────────────────────────────────────
     //  Edge Cases
     // ──────────────────────────────────────────────
-
-    public function test_apply_coupon_free_items_with_zero_or_negative_count(): void
-    {
-        $coupon = Coupon::factory()->freeItems(0)->create(['brand' => 'srp', 'active' => true]);
-        $items = $this->makePricedItems(3, [1000, 2000, 3000]);
-        $total = 6000;
-
-        $result = $this->service->applyCoupon($coupon, $items, $total);
-
-        $this->assertSame(6000, $result['totalCents']);
-        $this->assertSame(0, $result['discountCents']);
-    }
-
-    public function test_apply_coupon_free_items_per_sub_gallery_falls_back_to_global_when_not_meta_gallery(): void
-    {
-        $coupon = Coupon::factory()->freeItems(2)->create([
-            'brand' => 'srp',
-            'per_sub_gallery' => true,
-            'scope_type' => 'gallery',
-            'active' => true,
-        ]);
-
-        $items = [
-            ['itemId' => 'a1', 'priceCents' => 3000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'a2', 'priceCents' => 1000, 'galleryId' => 'gallery-1', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-            ['itemId' => 'b1', 'priceCents' => 2500, 'galleryId' => 'gallery-2', 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-        ];
-        $total = 6500;
-
-        $result = $this->service->applyCoupon($coupon, $items, $total);
-
-        // Global fallback: cheapest 2 across all (1000+2500=3500) free
-        $this->assertSame(3000, $result['totalCents']);
-        $this->assertSame(3500, $result['discountCents']);
-
-        $priceCents = array_map(fn ($i) => $i['priceCents'], $result['items']);
-        $this->assertSame(3000, $priceCents[0]);
-        $this->assertSame(0, $priceCents[1]);
-        $this->assertSame(0, $priceCents[2]);
-    }
 
     public function test_lock_and_revalidate_coupon_when_coupon_deleted(): void
     {

@@ -45,28 +45,26 @@ describe('CouponFormDrawer', () => {
         expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
     });
 
-    it('shows Pro Sub-Galerie toggle when type=free_items + scope=meta_gallery + no scope_id', async () => {
+    it('shows max_items input when type=percentage', async () => {
         renderDrawer();
 
         const selects = screen.getAllByRole('combobox');
         const typeSelect = selects[0];
-        const scopeSelect = selects[1];
 
-        await userEvent.selectOptions(typeSelect, 'free_items');
-        await userEvent.selectOptions(scopeSelect, 'meta_gallery');
+        await userEvent.selectOptions(typeSelect, 'percentage');
 
-        expect(screen.getByRole('checkbox', { name: /Pro Sub-Galerie/ })).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('leer = auf gesamten Warenkorb')).toBeInTheDocument();
     });
 
-    it('hides Pro Sub-Galerie toggle when type=fixed', async () => {
+    it('hides max_items input when type=fixed', async () => {
         renderDrawer();
 
         const selects = screen.getAllByRole('combobox');
-        const scopeSelect = selects[1];
+        const typeSelect = selects[0];
 
-        await userEvent.selectOptions(scopeSelect, 'meta_gallery');
+        await userEvent.selectOptions(typeSelect, 'fixed');
 
-        expect(screen.queryByRole('checkbox', { name: /Pro Sub-Galerie/ })).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('leer = auf gesamten Warenkorb')).not.toBeInTheDocument();
     });
 
     it('shows scope_id input for organisation scope', async () => {
@@ -89,25 +87,6 @@ describe('CouponFormDrawer', () => {
 
         expect(orgOption).toBeDefined();
         expect(orgOption!.textContent).toBe('Organisation');
-    });
-
-    it('hides Pro Sub-Galerie toggle when scope_gallery_id is set', async () => {
-        renderDrawer();
-
-        const selects = screen.getAllByRole('combobox');
-        const typeSelect = selects[0];
-        const scopeSelect = selects[1];
-
-        await userEvent.selectOptions(typeSelect, 'free_items');
-        await userEvent.selectOptions(scopeSelect, 'meta_gallery');
-
-        const scopeIdInput = screen.getByPlaceholderText('Galerie-Gruppen-ID');
-        expect(scopeIdInput).toBeInTheDocument();
-        expect(screen.getByRole('checkbox', { name: /Pro Sub-Galerie/ })).toBeInTheDocument();
-
-        await userEvent.type(scopeIdInput, '123');
-
-        expect(screen.queryByRole('checkbox', { name: /Pro Sub-Galerie/ })).not.toBeInTheDocument();
     });
 
     it('submit calls onSave with form data', async () => {
@@ -152,7 +131,6 @@ describe('CouponFormDrawer', () => {
                 value: 25,
                 scope_type: 'global',
                 active: true,
-                per_sub_gallery: false,
             }),
         );
 

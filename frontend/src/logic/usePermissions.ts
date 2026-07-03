@@ -5,7 +5,7 @@ export interface Permissions {
     isSuperAdmin: boolean;
     isAdmin: boolean;
     isPhotographer: boolean;
-    isCustomerManager: boolean;
+    isOrgAdmin: boolean;
     canEditMetadata: boolean;
     isPowerUser: boolean;
     canAccessB2BFeatures: boolean;
@@ -19,8 +19,8 @@ export function computePermissions(user: User | null | undefined): Permissions {
     const isSuperAdmin = !!user?.is_super_admin;
     const isAdmin = !!user?.is_admin;
     const isPhotographer = !!user?.is_photographer;
-    const isStaff = isSuperAdmin || isAdmin || isPhotographer;
-    const isCustomerManager = !!user?.is_customer_manager;
+    const isOrgAdmin = !!user?.is_org_admin;
+    const isStaff = isSuperAdmin || isAdmin || isPhotographer || isOrgAdmin;
     const canEditMetadata = !!user?.can_edit_metadata;
     const isPowerUser = !!user?.is_power_user;
     const canAccessB2BFeatures = isStaff;
@@ -30,7 +30,7 @@ export function computePermissions(user: User | null | undefined): Permissions {
         isSuperAdmin,
         isAdmin,
         isPhotographer,
-        isCustomerManager,
+        isOrgAdmin,
         canEditMetadata,
         isPowerUser,
         canAccessB2BFeatures,

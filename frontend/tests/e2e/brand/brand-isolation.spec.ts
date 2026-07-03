@@ -23,7 +23,7 @@ test.describe('Brand Tenant Isolation', () => {
             const sidebar = new SidebarHelper(page);
 
             await auth.login(adminUser.email, adminUser.password);
-            await sidebar.navigateTo('Organisationen (B2B)');
+            await sidebar.navigateTo('Organisationen');
 
             await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
         });
@@ -71,6 +71,45 @@ test.describe('Brand Tenant Isolation', () => {
 
             const sidebar = page.locator('aside');
             await expect(sidebar.getByText('Organisationen (B2B)')).toHaveCount(0);
+        });
+    });
+
+    test.describe('Brand isolation — photographer role', () => {
+        let helper: E2ESessionHelper;
+
+        test.afterEach(async () => {
+            if (helper) await helper.teardown();
+        });
+
+        test('SRP user cannot see RP data in sidebar', async ({ page, request }) => {
+            helper = new E2ESessionHelper(request);
+            const user = await helper.createIsolatedUser('photographer', { brand: 'srp' });
+            const auth = new AuthHelper(page);
+            await auth.login(user.email, user.password, 'http://buy.localhost:4321/');
+
+            const sidebar = page.locator('aside');
+            await expect(sidebar.getByText('Organisationen')).toHaveCount(0);
+            await expect(sidebar.getByText('Payouts & Abrechnung')).toHaveCount(0);
+            await expect(sidebar.getByText('Benutzer & Rechte')).toHaveCount(0);
+        });
+
+        test('RP user cannot see SRP data in sidebar', async ({ page, request }) => {
+            helper = new E2ESessionHelper(request);
+            const user = await helper.createIsolatedUser('photographer');
+            const auth = new AuthHelper(page);
+            await auth.login(user.email, user.password);
+
+            const sidebar = page.locator('aside');
+            await expect(sidebar.getByText('Dashboard')).toBeVisible({ timeout: 10000 });
+        });
+
+        test('SRP client can access gallery page', async ({ page, request }) => {
+            helper = new E2ESessionHelper(request);
+            const user = await helper.createIsolatedUser('power_user', { brand: 'srp' });
+            const auth = new AuthHelper(page);
+            await auth.login(user.email, user.password, 'http://buy.localhost:4321/');
+
+            await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
         });
     });
 });

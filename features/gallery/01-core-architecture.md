@@ -48,10 +48,10 @@ Galleries are strictly divided into two mutually exclusive workflows:
 - **Inline Creation:** Inline `+` buttons (Folder/Gallery) on each `TreeNode` summary reduce UX friction. They MUST pass a `defaultGroupId` to the creation modal, so the folder dropdown is pre-filled with the correct parent group.
 - **Dashboard:** Das Root-Dashboard (`/`) dient ausschlieÃŸlich als "Activity-Hub" (FTP-Inbox Status, die 3 neuesten Galerien und 20 neuesten Bilder).
 
-## Related
-- [Roles & Access Management](../auth/01-roles-and-access.md) — role-based gallery visibility and permissions
-- [Magic Links & Invites](../auth/02-magic-links.md) — transient gallery access through invite links
-- [Downloads & Leak Tracing](../delivery/01-downloads-and-injection.md) — delivery gallery download behavior
-- [Image Upload & Processing](../photos/01-upload-and-processing.md) — photo lifecycle tied to gallery types
-- [IPTC Metadata Versioning](../photos/02-metadata-versioning.md) — metadata editing rules differ by gallery type
-- [Search & Discovery](../search/01-search-and-discovery.md) — gallery discoverability and permission-filtered search
+- [Search & Discovery](../search/01-search-and-discovery.md) ï¿½ gallery discoverability and permission-filtered search
+- [Roles & Access Management](../auth/01-roles-and-access.md) ï¿½ role-based gallery visibility and permissions
+- [Magic Links & Invites](../auth/02-magic-links.md) ï¿½ transient gallery access through invite links
+- [Downloads & Leak Tracing](../delivery/01-downloads-and-injection.md) ï¿½ delivery gallery download behavior
+- [Image Upload & Processing](../photos/01-upload-and-processing.md) ï¿½ photo lifecycle tied to gallery types
+- [IPTC Metadata Versioning](../photos/02-metadata-versioning.md) ï¿½ metadata editing rules differ by gallery type
+- [Search & Discovery](../search/01-search-and-discovery.md) ï¿½ gallery discoverability and permission-filtered search

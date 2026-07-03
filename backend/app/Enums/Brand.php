@@ -16,24 +16,6 @@ enum Brand: string
     /** SRP portal — buy.reisinger.pictures (reduced B2C). */
     case SRP = 'srp';
 
-    /** Human-readable label (German UI / docs). */
-    public function label(): string
-    {
-        return match ($this) {
-            self::B2B => 'Reisinger Foto Portal',
-            self::SRP => 'Reisinger Foto Portal',
-        };
-    }
-
-    /** Production domain used to identify this brand from the HTTP host. */
-    public function domain(): string
-    {
-        return match ($this) {
-            self::B2B => 'reisinger.pictures',
-            self::SRP => 'buy.reisinger.pictures',
-        };
-    }
-
     /** Setting/asset key prefix ('' for B2B, 'srp_' for SRP). */
     public function prefix(): string
     {

@@ -1,4 +1,13 @@
-import { UserDetailed } from '../../../logic/useUsers';
+import { UserDetailed, UserRole } from '../../../logic/useUsers';
+
+const roleLabels: Record<UserRole, string> = {
+    [UserRole.SUPER_ADMIN]: 'Super-Admin',
+    [UserRole.ADMIN]: 'Administrator',
+    [UserRole.PHOTOGRAPHER]: 'Fotograf',
+    [UserRole.CUSTOMER_MANAGER]: 'Kundenbetreuer',
+    [UserRole.POWER_USER]: 'Power-User',
+    [UserRole.CLIENT]: 'Kunde',
+};
 
 interface UserTableProps {
     users?: UserDetailed[];
@@ -21,6 +30,7 @@ export default function UserTable({ users, searchTerm, onEdit }: UserTableProps)
                         <th>E-Mail</th>
                         <th>Rollen</th>
                         <th>Rechte (Gruppen / Galerien)</th>
+                        <th>Upgrades</th>
                         <th>Aktionen</th>
                     </tr>
                 </thead>
@@ -32,13 +42,14 @@ export default function UserTable({ users, searchTerm, onEdit }: UserTableProps)
                             <td>
                                 <div className="flex flex-wrap gap-1">
                                     {u.roles && u.roles.length > 0 ? u.roles.map(r => (
-                                        <span key={r.id} className="badge badge-primary badge-sm">{r.name}</span>
+                                        <span key={r.id} className="badge badge-primary badge-sm">{roleLabels[r.name] || r.name}</span>
                                     )) : <span className="text-sm opacity-50">Keine Rolle</span>}
                                 </div>
                             </td>
                             <td className="text-sm opacity-80">
                                 {(u.gallery_groups || []).length} Gruppen, {(u.galleries || []).length} Galerien
                             </td>
+                            <td>{u.can_purchase_upgrades ? <span className="badge badge-success badge-sm">Ja</span> : <span className="text-sm opacity-50">Nein</span>}</td>
                             <td>
                                 <button className="btn btn-xs btn-outline" onClick={() => onEdit(u)}>Bearbeiten</button>
                             </td>
@@ -46,7 +57,7 @@ export default function UserTable({ users, searchTerm, onEdit }: UserTableProps)
                     ))}
                     {filteredUsers?.length === 0 && (
                         <tr>
-                            <td colSpan={5} className="text-center py-8 opacity-50">
+                            <td colSpan={6} className="text-center py-8 opacity-50">
                                 Keine Nutzer gefunden, die"{searchTerm}" entsprechen.
                             </td>
                         </tr>

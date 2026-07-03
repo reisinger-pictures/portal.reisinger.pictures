@@ -344,4 +344,183 @@ describe('useAI — generateMetadataFromText', () => {
         await expect(result.current.generateMetadataFromText('Test', ''))
             .rejects.toThrow(/AI Error/);
     });
+
+    it('throws on network failure', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network failure')));
+
+        const { result } = renderHook(() => useAI());
+        await expect(result.current.generateMetadataFromText('Test', ''))
+            .rejects.toThrow(/Network failure/);
+    });
+
+    it('throws on empty response (null/undefined)', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(null),
+        }));
+
+        const { result } = renderHook(() => useAI());
+        await expect(result.current.generateMetadataFromText('Test', ''))
+            .rejects.toThrow('AI text response validation failed');
+    });
+
+    it('throws on non-JSON response', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.reject(new Error('Unexpected token < in JSON at position 0')),
+        }));
+
+        const { result } = renderHook(() => useAI());
+        await expect(result.current.generateMetadataFromText('Test', ''))
+            .rejects.toThrow();
+    });
+});
+
+describe('useAI — updateBaseUrl', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    it('saves a valid LM Studio URL to localStorage', () => {
+        const { result } = renderHook(() => useAI());
+        result.current.updateBaseUrl('http://127.0.0.1:8080');
+        expect(localStorage.getItem('lmstudio_url')).toBe('http://127.0.0.1:8080');
+    });
+
+    it('rejects invalid URL and does not save', () => {
+        const { result } = renderHook(() => useAI());
+        result.current.updateBaseUrl('not-a-url');
+        expect(localStorage.getItem('lmstudio_url')).toBeNull();
+    });
+
+    it('rejects URL with wrong protocol', () => {
+        const { result } = renderHook(() => useAI());
+        result.current.updateBaseUrl('https://127.0.0.1:8080');
+        expect(localStorage.getItem('lmstudio_url')).toBeNull();
+    });
+
+    it('rejects URL with non-localhost hostname', () => {
+        const { result } = renderHook(() => useAI());
+        result.current.updateBaseUrl('http://example.com:8080');
+        expect(localStorage.getItem('lmstudio_url')).toBeNull();
+    });
+
+    it('rejects URL without port', () => {
+        const { result } = renderHook(() => useAI());
+        result.current.updateBaseUrl('http://127.0.0.1');
+        expect(localStorage.getItem('lmstudio_url')).toBeNull();
+    });
+});
+
+describe('useAI — generateMetadata edge cases', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    it('network failure during server mode throws', async () => {
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
+            .mockRejectedValueOnce(new Error('Network failure')),
+        );
+
+        const { result } = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+
+        await expect(result.current.generateMetadata('photo-1', '', ''))
+            .rejects.toThrow('Network failure');
+    });
+
+    it('empty object response from server returns empty fields', async () => {
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({}),
+            }),
+        );
+
+        const { result } = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+
+        const data = await result.current.generateMetadata('photo-1', '', '');
+        expect(data.title).toBeUndefined();
+        expect(data.description).toBeUndefined();
+    });
+
+    it('abort signal causes AbortError', async () => {
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) }),
+        );
+
+        const { result } = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+
+        // We already have an abort test — add a variant with a real AbortController
+        // that aborts before the request to demonstrate both patterns
+        const controller = new AbortController();
+        controller.abort();
+
+        await expect(result.current.generateMetadata('photo-1', '', '', controller.signal))
+            .rejects.toThrow();
+    });
+});
+
+describe('useAI — getLmStudioUrl fallback', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        // Import the hook to cover the module internals indirectly
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    it('falls back to default URL when localStorage has invalid URL', async () => {
+        localStorage.setItem('lmstudio_url', 'invalid-url');
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce({ ok: false })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ data: [{ id: 'fallback-model' }] }),
+            }),
+        );
+
+        const { result } = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+
+        expect(result.current.mode).toBe('local');
+    });
+
+    it('falls back to default URL when localStorage has https URL', async () => {
+        localStorage.setItem('lmstudio_url', 'https://127.0.0.1:1234');
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce({ ok: false })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ data: [{ id: 'model-from-default' }] }),
+            }),
+        );
+
+        const { result } = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+
+        expect(result.current.mode).toBe('local');
+    });
 });

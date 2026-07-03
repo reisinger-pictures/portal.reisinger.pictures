@@ -7,12 +7,11 @@ import { useUI } from '../../components/UIContext';
 export interface Coupon {
     id?: number;
     code: string;
-    type: 'fixed' | 'percentage' | 'free_items';
+    type: 'fixed' | 'percentage';
     value: number;
+    max_items?: number;
     scope_type: 'global' | 'gallery' | 'meta_gallery' | 'photographer' | 'organisation';
     scope_id?: string;
-    scope_gallery_id?: string;
-    per_sub_gallery?: boolean;
     max_uses_global?: number;
     max_uses_per_account?: number;
     expires_at?: string;
@@ -26,14 +25,17 @@ const couponSchema = z.object({
         .string()
         .min(1, 'Code ist erforderlich')
         .max(50, 'Code darf maximal 50 Zeichen lang sein'),
-    type: z.enum(['fixed', 'percentage', 'free_items']),
+    type: z.enum(['fixed', 'percentage']),
     value: z
         .number('Wert muss eine Zahl sein')
         .min(0, 'Wert darf nicht negativ sein'),
+    max_items: z
+        .number('Muss eine Zahl sein')
+        .min(1, 'Muss mindestens 1 sein')
+        .max(999, 'Darf maximal 999 sein')
+        .optional(),
     scope_type: z.enum(['global', 'gallery', 'meta_gallery', 'photographer', 'organisation']),
     scope_id: z.string().optional(),
-    scope_gallery_id: z.string().optional(),
-    per_sub_gallery: z.boolean().optional(),
     max_uses_global: z
         .number('Muss eine Zahl sein')
         .min(1, 'Muss mindestens 1 sein')
@@ -58,7 +60,6 @@ interface Props {
 const TYPE_VALUE_LABEL: Record<CouponFormValues['type'], string> = {
     fixed: 'Betrag in €',
     percentage: 'Prozent',
-    free_items: 'Anzahl Bilder'
 };
 
 const SCOPE_REQUIRES_TARGET: ReadonlySet<CouponFormValues['scope_type']> = new Set([
@@ -72,14 +73,13 @@ function toFormValues(coupon?: Coupon | null): CouponFormValues {
         code: coupon?.code ?? '',
         type: coupon?.type ?? 'fixed',
         value: coupon?.value ?? 0,
+        max_items: coupon?.max_items,
         scope_type: coupon?.scope_type ?? 'global',
         scope_id: coupon?.scope_id ?? '',
-        scope_gallery_id: coupon?.scope_gallery_id ?? '',
         max_uses_global: coupon?.max_uses_global,
         max_uses_per_account: coupon?.max_uses_per_account,
         expires_at: coupon?.expires_at ?? '',
         active: coupon?.active ?? true,
-        per_sub_gallery: coupon?.per_sub_gallery ?? false,
     };
 }
 
@@ -115,27 +115,24 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
     const watchType = useWatch({ control, name: 'type' });
     const watchScopeType = useWatch({ control, name: 'scope_type' });
-    const watchScopeId = useWatch({ control, name: 'scope_id' });
     const watchActive = useWatch({ control, name: 'active' });
 
     const valueLabel = TYPE_VALUE_LABEL[watchType ?? 'fixed'];
     const showScopeTarget = watchScopeType !== undefined && SCOPE_REQUIRES_TARGET.has(watchScopeType);
-    const showScopeGallery = watchScopeType === 'meta_gallery';
-    const showPerSubGallery = watchType === 'free_items' && watchScopeType === 'meta_gallery' && !watchScopeId;
+    const showMaxItems = watchType === 'percentage';
 
     const onSubmit = async (data: CouponFormValues) => {
         const payload: Partial<Coupon> = {
             code: data.code.trim(),
             type: data.type,
             value: data.value,
+            max_items: data.max_items,
             scope_type: data.scope_type,
             scope_id: emptyToUndefined(data.scope_id),
-            scope_gallery_id: emptyToUndefined(data.scope_gallery_id),
             max_uses_global: data.max_uses_global,
             max_uses_per_account: data.max_uses_per_account,
             expires_at: emptyToUndefined(data.expires_at),
             active: data.active,
-            per_sub_gallery: data.per_sub_gallery ?? false,
         };
         await onSave(payload);
         onClose();
@@ -183,7 +180,6 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                             <select {...register('type')} className="select select-bordered">
                                 <option value="fixed">Festbetrag</option>
                                 <option value="percentage">Prozent</option>
-                                <option value="free_items">Gratis-Bilder</option>
                             </select>
                             {errors.type && (
                                 <span className="text-error text-xs mt-1">{errors.type.message}</span>
@@ -239,33 +235,24 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                             </div>
                         )}
 
-                        {showScopeGallery && (
+                        {showMaxItems && (
                             <div className="form-control md:col-span-2">
                                 <label className="label">
-                                    <span className="label-text font-bold">Auf Galerie beschränken (optional)</span>
+                                    <span className="label-text font-bold">Auf X günstigste Bilder beschränken</span>
+                                    <span className="label-text-alt opacity-60">(optional)</span>
                                 </label>
                                 <input
-                                    type="text"
-                                    {...register('scope_gallery_id')}
-                                    className="input input-bordered font-mono"
-                                    placeholder="Galerie-ID innerhalb der Gruppe"
+                                    type="number"
+                                    min="1"
+                                    max="999"
+                                    step="1"
+                                    {...register('max_items', { valueAsNumber: true })}
+                                    className={`input input-bordered font-mono ${errors.max_items ? 'input-error' : ''}`}
+                                    placeholder="leer = auf gesamten Warenkorb"
                                 />
-                            </div>
-                        )}
-
-                        {showPerSubGallery && (
-                            <div className="form-control md:col-span-2">
-                                <label className="label cursor-pointer justify-start gap-3">
-                                    <input
-                                        type="checkbox"
-                                        {...register('per_sub_gallery')}
-                                        className="checkbox checkbox-primary"
-                                    />
-                                    <span className="label-text font-bold">Pro Sub-Galerie</span>
-                                    <span className="label-text-alt opacity-60">
-                                        Freibilder pro Sub-Galerie (nicht global)
-                                    </span>
-                                </label>
+                                {errors.max_items && (
+                                    <span className="text-error text-xs mt-1">{errors.max_items.message}</span>
+                                )}
                             </div>
                         )}
 

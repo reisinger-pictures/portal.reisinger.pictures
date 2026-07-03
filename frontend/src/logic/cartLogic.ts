@@ -8,6 +8,7 @@ export const cartItemSchema = z.object({
     filename: z.string().optional(),
     thumb_url: z.string().optional(),
     tier: z.enum(['web', 'print', 'original']),
+    galleryId: z.string().optional(),
     useCaseId: z.string().optional(),
     useCaseName: z.string().optional(),
     modifierIds: z.array(z.string()).optional(),

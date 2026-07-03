@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\TextSnippet;
+use App\Http\Resources\TextSnippetResource;
 use App\Support\BrandRegistry;
 use Illuminate\Validation\Rule;
 
@@ -15,16 +16,18 @@ class TextSnippetController extends Controller
 
         $q = $request->query('q');
         if ($q && strlen($q) >= 2) {
+            $snippets = TextSnippet::search($q)
+                ->query(fn($query) => $query->where('brand', $brand))
+                ->orderBy('created_at', 'desc')
+                ->take(20)
+                ->get();
             return response()->json(
-                TextSnippet::search($q)
-                    ->query(fn($query) => $query->where('brand', $brand))
-                    ->orderBy('created_at', 'desc')
-                    ->take(20)
-                    ->get()
+                $snippets->map(fn($s) => new TextSnippetResource($s))->values()
             );
         }
 
-        return response()->json(TextSnippet::where('brand', $brand)->orderBy('created_at', 'desc')->get());
+        $snippets = TextSnippet::where('brand', $brand)->orderBy('created_at', 'desc')->get();
+        return response()->json($snippets->map(fn($s) => new TextSnippetResource($s))->values());
     }
 
     public function store(Request $request)
@@ -41,7 +44,7 @@ class TextSnippetController extends Controller
         $validated['content_html'] = $sanitizer->sanitize($validated['content_html'] ?? '');
         $validated['brand'] = $brand;
         $snippet = TextSnippet::create($validated);
-        return response()->json(['success' => true, 'snippet' => $snippet]);
+        return response()->json(['success' => true, 'snippet' => new TextSnippetResource($snippet)]);
     }
 
     public function update(Request $request, $id)
@@ -60,7 +63,7 @@ class TextSnippetController extends Controller
             $validated['content_html'] = $sanitizer->sanitize($validated['content_html']);
         }
         $snippet->update($validated);
-        return response()->json(['success' => true, 'snippet' => $snippet]);
+        return response()->json(['success' => true, 'snippet' => new TextSnippetResource($snippet)]);
     }
 
     public function destroy($id)
