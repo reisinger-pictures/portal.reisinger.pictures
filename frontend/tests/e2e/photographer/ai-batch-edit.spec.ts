@@ -31,7 +31,7 @@ test.describe('AI Batch Edit Modal (Server-Side)', () => {
         const galleryHelper = new GalleryHelper(page, helper);
         await galleryHelper.createAndOpenDeliveryGallery(`AI Test ${Math.random().toString(36).substring(2, 8)}`);
 
-        const aiButton = page.getByRole('button', {name: 'KI Batch-Edit'});
+        const aiButton = page.getByRole('button', {name: 'KI Beschriftung'});
         // This test validates real backend integration — AI must be enabled
         // in the test environment for the button to appear.
         await expect(aiButton).toBeVisible();
@@ -44,10 +44,10 @@ test.describe('AI Batch Edit Modal (Server-Side)', () => {
         const galleryHelper = new GalleryHelper(page, helper);
         await galleryHelper.createAndOpenDeliveryGallery(`AI Test ${Math.random().toString(36).substring(2, 8)}`);
 
-        const aiButton = page.getByRole('button', {name: 'KI Batch-Edit'});
+        const aiButton = page.getByRole('button', {name: 'KI Beschriftung'});
         await aiButton.click();
 
-        await expect(page.getByRole('heading', {name: 'KI Batch-Edit'})).toBeVisible();
+        await expect(page.getByRole('heading', {name: 'KI Beschriftung'})).toBeVisible();
     });
 
     // Test 'hides AI button when AI is unconfigured' was removed because it

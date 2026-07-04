@@ -51,8 +51,8 @@ class AuthController extends Controller
                 'brand' => BrandRegistry::currentOrDefault(),
             ]);
 
-            $domain = substr(strrchr($validated['email'], "@"), 1);
-            $tenant = \App\Models\Tenant::where('domain', $domain)->first();
+            $domain = explode('@', $validated['email'])[1] ?? null;
+            $tenant = $domain ? \App\Models\Tenant::where('domain', $domain)->first() : null;
 
             if ($tenant) {
                 // Brand check: tenant brand must match the current request brand
@@ -61,9 +61,7 @@ class AuthController extends Controller
                 }
 
                 // Evaluate auto_join_policy
-                if ($tenant->auto_join_policy === \App\Enums\AutoJoinPolicy::DISABLED) {
-                    // No auto-join
-                } elseif ($tenant->auto_join_policy === \App\Enums\AutoJoinPolicy::REQUIRES_INVITE) {
+                if ($tenant->auto_join_policy === \App\Enums\AutoJoinPolicy::REQUIRES_INVITE) {
                     // No auto-join — user must be invited manually
                     // Still attach if there's a pending invite for this email
                     $pendingInvite = \App\Models\TenantInvite::where('email', $validated['email'])
@@ -75,29 +73,8 @@ class AuthController extends Controller
                         $user->save();
                         $pendingInvite->delete();
                     }
-                } else {
-                    // immediate — auto-join
-                    $user->tenant_id = $tenant->id;
-                    
-                    // Assign role from tenant's default_role_id, fallback to client
-                    $roleId = $tenant->default_role_id;
-                    if (!$roleId) {
-                        $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
-                        $roleId = $clientRole?->id;
-                    }
-                    if ($roleId) {
-                        $user->roles()->attach($roleId);
-                    }
-                    
-                    // Inherit flatrate settings from tenant
-                    if ($tenant->default_flatrate_level) {
-                        $user->flatrate_level = $tenant->default_flatrate_level;
-                    }
-                    if ($tenant->can_purchase_upgrades) {
-                        $user->can_purchase_upgrades = true;
-                    }
-                    $user->save();
                 }
+                // DISABLED and IMMEDIATE: no auto-join at registration — deferred to password reset
             }
 
             $token = Str::random(64);
@@ -157,7 +134,36 @@ class AuthController extends Controller
                 'error' => 'Dieser Account ist für ein anderes Portal registriert.',
             ], 403);
         }
-        
+
+        // Deferred auto-join: after successful password reset (proves email ownership),
+        // re-lookup tenant by domain and apply immediate auto-join if configured.
+        $emailParts = explode('@', $user->email);
+        $domain = $emailParts[1] ?? null;
+        $tenant = $domain ? \App\Models\Tenant::where('domain', $domain)->first() : null;
+        if ($tenant && $tenant->auto_join_policy === \App\Enums\AutoJoinPolicy::IMMEDIATE && !$user->tenant_id) {
+            // Assign role from tenant's default_role_id, fallback to client
+            $roleId = $tenant->default_role_id;
+            if (!$roleId) {
+                $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
+                throw_unless($clientRole, \RuntimeException::class, 'Critical: Default CLIENT role missing in database.');
+                $roleId = $clientRole->id;
+            }
+            if ($roleId) {
+                $user->roles()->attach($roleId);
+            }
+
+            // Inherit flatrate settings from tenant
+            if ($tenant->default_flatrate_level) {
+                $user->flatrate_level = $tenant->default_flatrate_level;
+            }
+            if ($tenant->can_purchase_upgrades) {
+                $user->can_purchase_upgrades = true;
+            }
+
+            $user->tenant_id = $tenant->id;
+            $user->save();
+        }
+
         $token = Auth::guard('api')->login($user);
         return $this->respondWithToken($token);
     }

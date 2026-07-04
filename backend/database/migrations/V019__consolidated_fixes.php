@@ -175,6 +175,26 @@ return new class extends Migration {
                 $table->unsignedInteger('shared_flatrate_cents')->nullable()->after('default_flatrate_level');
             }
         });
+
+        // ══════════════════════════════════════════════
+        //  Part 10: Change galleries/gallery_groups FK from SET NULL to CASCADE
+        // ══════════════════════════════════════════════
+
+        $galleriesFk = DB::select("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'galleries' AND CONSTRAINT_NAME = 'galleries_tenant_id_foreign'");
+        if (!empty($galleriesFk) && $galleriesFk[0]->DELETE_RULE === 'SET NULL') {
+            Schema::table('galleries', function (Blueprint $table) {
+                $table->dropForeign('galleries_tenant_id_foreign');
+                $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
+            });
+        }
+
+        $groupsFk = DB::select("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'gallery_groups' AND CONSTRAINT_NAME = 'gallery_groups_tenant_id_foreign'");
+        if (!empty($groupsFk) && $groupsFk[0]->DELETE_RULE === 'SET NULL') {
+            Schema::table('gallery_groups', function (Blueprint $table) {
+                $table->dropForeign('gallery_groups_tenant_id_foreign');
+                $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
+            });
+        }
     }
 
     public function down(): void

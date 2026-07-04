@@ -223,7 +223,7 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <div className="flex justify-between items-center mb-2 mr-8">
                     <h3 className="font-bold text-2xl flex items-center gap-2">
-                        <span className="iconify mdi--robot-outline text-primary"></span> KI Batch-Edit
+                        <span className="iconify mdi--robot-outline text-primary"></span> KI Beschriftung
                     </h3>
                     <button
                         onClick={handleGenerateAll}

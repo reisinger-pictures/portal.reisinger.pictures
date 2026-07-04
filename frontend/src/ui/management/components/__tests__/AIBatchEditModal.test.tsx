@@ -61,7 +61,7 @@ describe('AIBatchEditModal', () => {
 
         render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
-        expect(screen.getByText('KI Batch-Edit')).toBeInTheDocument();
+        expect(screen.getByText('KI Beschriftung')).toBeInTheDocument();
         expect(screen.getByText('Alle generieren (leere)')).toBeInTheDocument();
     });
 

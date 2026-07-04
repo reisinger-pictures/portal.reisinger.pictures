@@ -25,7 +25,7 @@ services:
       - portal_internal
 
   search:
-    image: getmeili/meilisearch:v1.42
+    image: getmeili/meilisearch:v1.48.3
     container_name: portal_search
     restart: unless-stopped
     logging:
@@ -131,6 +131,7 @@ services:
       php artisan optimize:clear;
       php artisan migrate --force;
       php artisan scout:sync-index-settings;
+      php artisan queue:restart;
       php artisan admin:update;
       
       echo 'Starte Hintergrund-Prozesse...';

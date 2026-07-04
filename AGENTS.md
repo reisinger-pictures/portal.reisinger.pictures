@@ -22,7 +22,10 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
 ## 1. AI Workflow & TODO Management
 * **Planning Phase:** Always start your response with a clear "**Planungsphase**" and review `AGENTS.todo.md`.
 * **Language Policy:** Code & Docs: English. UI: German.
-* **Documentation (SOLL-ZUSTAND REQUIRED):** The single source of truth for all technical concepts is the `features/` directory. BEFORE implementing any new logic, the target state (Soll-Zustand) MUST be thoroughly documented in a corresponding Markdown file under `features/`.
+* **Documentation Policy (CRITICAL — features/ vs AGENTS.todo.md):**
+  * `features/` = **dauerhafter SOLL-Zustand** des Systems. Hier landen nur Architekturentscheidungen, Datenmodelle, API-Verträge und Feature-Spezifikationen, die langfristig gültig sind.
+  * `AGENTS.todo.md` = **temporäre Task-Liste** + Code-Review-Notizen + Bug-Analysen + Session-Tracking. Alles, was nur für die aktuelle Session oder den nächsten PR relevant ist, gehört hierher, **nicht** in `features/`.
+  * Code-Reviews, temporäre Analysen und Diskussionen → `AGENTS.todo.md`. Nur wenn ein neuer SOLL-Zustand definiert wird → `features/`.
 * **Task & Test Tracking:** Every feature requires actionable TODOs in `AGENTS.todo.md`. You MUST explicitly include TODOs for writing test cases (PHPUnit for backend, Playwright for E2E).
 
 ## 2. AI Operating Rules (STRICT)
@@ -40,7 +43,6 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
   * Brand-Isolation-Tests (Cross-Domain-Navigation)   
   * Stripe-Redirect-Simulation (return_url nach Zahlung)   
   * Navigation MUSS via `sidebar.navigateTo()`, Klicks im UI oder API-Aufrufe erfolgen. localStorage-Injektion + page.goto('/cart') ist verboten — Cart-Items MÜSSEN via API hinzugefügt werden.
-* **Testing Execution Output:** Whenever you create or modify E2E or PHPUnit tests, you MUST output the exact command to run them (and the input string for the `ai_test_runner.mjs`) in a separate code block at the end of your response.
 * **Test Debugging Transparency:** When analyzing test failure reports, you must explicitly document your debugging progress and thought process in the "Planungsphase" before proposing a fix. Explain what failed, why it failed based on the logs/DOM snapshots, and how the fix addresses the root cause.
 * **Patching & File Modification (CRITICAL):**
   * Multi-line Regex for search-and-replace in code is STRICTLY FORBIDDEN. It is too brittle.
@@ -52,15 +54,14 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
 The system and workflow are managed via a Main/Secondary Model architecture to prevent context pollution:
 * **Main Model (Planner & Reviewer):** Has the full project context. Analyzes the problem, designs the architecture, updates documentation, and reviews implementations. Delegates isolated coding tasks to the Secondary Model by providing only the necessary files and specific instructions.
 * **Secondary Model (Implementer):** Runs in a fresh, isolated context. Receives specific instructions and target files from the Main Model, implements the changes, and generates the patch script.
-* **Testing Execution Rule (STRICT):** Nie Playwright direkt aufrufen (z.B. `npx playwright test`), sondern immer zwingend via `node ai_test_runner.mjs`! Dies stellt sicher, dass Fehler-Reports für die Analyse generiert werden.
+* **E2E Execution (STRICT):** Playwright-Tests immer direkt via `npx playwright test` ausführen. Für Wiederholung fehlgeschlagener Tests: `npx playwright test --last-failed`.
 * **Workflow-Reihenfolge für Test-Fixes (STRICT):**
   * 1. Dokumentieren (SOLL in `features/`, Bug-Analyse)
   * 2. Backend Unit/Integration-Tests schreiben (`php artisan test --filter`)
   * 3. Frontend Unit-Tests schreiben (`pnpm vitest run`)
-  * 4. Erst danach: E2E-Tests fixen (`node ai_test_runner.mjs --console`)
+  * 4. Erst danach: E2E-Tests fixen (`npx playwright test`)
 * **localStorage Injection (STRICT ANTI-PATTERN):** Daten via `page.evaluate()` oder `addInitScript` in `localStorage` zu injizieren ist verboten. localStorage ist ein Implementierungsdetail des Frontends. Tests MÜSSEN den User-Flow abbilden: Login → Navigation → Formular-Interaktion. Ausnahme: `E2ESessionHelper` für Test-Setup (API-basiert).
 * **Max 3 Fix-Versuche für Tests (STRICT):** Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agent an den Benutzer zurückgeben mit einer Analyse was schiefgeht. Keine Endlos-Fix-Loops.
-* **Last-Failed Tip:** `node ai_test_runner.mjs --console` reicht alle Args durch. Für Wiederholung nur der fehlgeschlagenen Tests: `node ai_test_runner.mjs --console --last-failed`. Oder via Playwright direkt: `npx playwright test --last-failed`
 
 ## 4. Test Commands
 ```bash
@@ -74,7 +75,7 @@ cd frontend && pnpm vitest run
 # Frontend Lint + Build (pnpm, NICHT npm)
 cd frontend && pnpm lint:fix && pnpm build
 
-# E2E (via ai_test_runner, NIE direkt npx playwright)
+# E2E (Playwright direkt)
 cd frontend
-node ai_test_runner.mjs brand
+npx playwright test brand
 ```
