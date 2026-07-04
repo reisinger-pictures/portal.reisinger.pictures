@@ -63,7 +63,28 @@ Several config files ship with hardcoded fallback values for **zero-config local
 - **Start-Delay:** `backend-init` wartet aktiv 15 Sekunden auf die MariaDB-Bereitschaft (First-Boot), um Race-Conditions bei der Migration zu verhindern.
 
 
-## 10. OPcache & Live-Updates (Rclone Sync)
+## 10. Meilisearch Upgrade — Deployment Procedure
+
+Wenn das `search`-Image in `docker-compose.yml` auf eine neue Major/Minor-Version gehoben wird (z.B. v1.42 → v1.48):
+
+```bash
+# 1. Vor dem Deploy: Alte Suchdaten löschen (optional, aber empfohlen)
+docker volume rm portal_search_data
+
+# 2. Stack über Portainer neu deployen (oder docker stack deploy)
+#    → scout:sync-index-settings + queue:restart laufen automatisch beim Container-Start
+
+# 3. Nach erfolgreichem Start: Suchindex komplett neu aufbauen
+docker exec portal_backend php artisan app:search-rebuild
+```
+
+Das `app:search-rebuild`-Command flushed alle 5 Indizes (Photo, Gallery, Location, Customer, TextSnippet), synchronisiert die Index-Settings aus `config/scout.php`, importiert alle Daten neu und restartet die Queue-Worker.
+
+**Ohne Volume-Löschung:** Meilisearch migriert bestehende Daten automatisch — in der Praxis stabil, aber bei Major-Upgrades nicht garantiert. Bei Problemen: Volume löschen und rebuild laufen lassen.
+
+**Normale Code-Deploys (kein Meilisearch-Upgrade):** `scout:sync-index-settings` + `queue:restart` laufen bei jedem Container-Start automatisch. Kein manuelles Eingreifen nötig.
+
+## 11. OPcache & Live-Updates (Rclone Sync)
 - **Die Falle:** Wenn PHP-Dateien im laufenden Betrieb über `rclone` (z.B. durch die `sync.bat`) auf den Produktionsserver synchronisiert werden, greifen Backend-Änderungen unter Umständen nicht sofort.
 - **Der Grund:** In Produktionsumgebungen ist der PHP OPcache aus Performancegründen scharf geschaltet (meist `opcache.validate_timestamps=0`). PHP liest geänderte Dateien nicht neu von der Festplatte ein, sondern nutzt den alten Bytecode aus dem RAM.
 - **Die Lösung:** Nach einem Rclone-Sync von Backend-Dateien muss der Apache/PHP-Container zwingend neu gestartet werden, um den Cache zu leeren:

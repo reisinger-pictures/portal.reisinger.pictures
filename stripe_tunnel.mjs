@@ -7,14 +7,12 @@ console.log('🤖 Starte automatisierten Stripe Tunnel...');
 // Stripe CLI automatisch auf neueste Version aktualisieren
 console.log('🔄 Prüfe auf Stripe CLI Updates...');
 try {
-    execSync('pnpm add -g @stripe/cli', { stdio: 'inherit', shell: true });
+    execSync('pnpm add -g @stripe/cli', { stdio: 'inherit' });
 } catch (err) {
     console.warn('⚠️  Stripe CLI Update fehlgeschlagen, fahre mit vorhandener Version fort.');
 }
 
-const stripe = spawn('stripe listen --forward-to https://portal.test/api/webhooks/stripe', {
-    shell: true
-});
+const stripe = spawn('stripe', ['listen', '--forward-to', 'https://portal.test/api/webhooks/stripe']);
 
 let secretFound = false;
 // Speicherort: storage/app/private wird ohnehin von git ignoriert

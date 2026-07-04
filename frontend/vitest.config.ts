@@ -9,6 +9,7 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['src/test-setup.ts'],
     css: true,
+    // console.error aus erwarteten Fehlerpfaden in Tests unterdrücken
     printConsole: false,
   },
 });
