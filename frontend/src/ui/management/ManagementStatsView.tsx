@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import {useStats} from '../../logic/useStats';
 import {Legend, Pie, PieChart, ResponsiveContainer, Tooltip} from 'recharts';
+import Pagination from '../components/Pagination';
 
 export default function ManagementStatsView() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -127,16 +128,8 @@ export default function ManagementStatsView() {
                             </table>
                         </div>
 
-                        {logs && logs.last_page > 1 && (
-                            <div
-                                className="flex justify-between items-center p-4 border-t border-base-300 bg-base-200/50 flex-wrap gap-2">
-                                <button className="btn btn-sm btn-outline" disabled={page === 1}
-                                        onClick={() => setSearchParams(prev => { prev.set('page', String(page - 1)); return prev; })}>&larr; Zurück
-                                </button>
-                                <span className="text-sm font-semibold">Seite {page} von {logs.last_page}</span>
-                                <button className="btn btn-sm btn-outline" disabled={page === logs.last_page}
-                                        onClick={() => setSearchParams(prev => { prev.set('page', String(page + 1)); return prev; })}>Weiter &rarr;</button>
-                            </div>
+                        {logs && (
+                            <Pagination page={page} lastPage={logs.last_page} onPageChange={(next) => setSearchParams(prev => { prev.set('page', String(next)); return prev; })} className="p-4 border-t border-base-300 bg-base-200/50" />
                         )}
                     </div>
                 </div>

@@ -21,6 +21,7 @@ import ManagementGalleryActions from './components/ManagementGalleryActions';
 import PhotographerTeamModal from './components/PhotographerTeamModal';
 import AIBatchEditModal from './components/AIBatchEditModal';
 import GalleryCouponsTab from './components/GalleryCouponsTab';
+import EmptyState from '../components/EmptyState';
 
 export default function ManagementGalleryView() {
     const params = useParams();
@@ -123,9 +124,7 @@ export default function ManagementGalleryView() {
                         )}
 
                         {!isLoading && photos.length === 0 && (
-                            <div className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300">
-                                <span className="iconify mdi--image-off-outline text-6xl mb-4 text-primary"></span>
-                                <h3 className="text-2xl font-bold">Noch keine Bilder vorhanden</h3>
+                            <EmptyState icon="mdi--image-off-outline" title="Noch keine Bilder vorhanden">
                                 {gallery.is_live ? (
                                     <p className="mt-2 text-warning flex items-center gap-2">
                                         <span className="iconify mdi--autorenew animate-spin"></span>
@@ -134,7 +133,7 @@ export default function ManagementGalleryView() {
                                 ) : (
                                     <p className="mt-2">Lade Bilder per Drag & Drop hoch oder importiere sie über die FTP-Inbox.</p>
                                 )}
-                            </div>
+                            </EmptyState>
                         )}
 
                         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4" ref={galleryRef}>

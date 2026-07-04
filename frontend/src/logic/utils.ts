@@ -105,3 +105,7 @@ export function safeJsonParse<T>(json: string, fallback: T): T {
         return fallback;
     }
 }
+
+export function toSlug(text: string): string {
+    return text.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '');
+}

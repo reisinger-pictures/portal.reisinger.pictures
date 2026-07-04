@@ -37,7 +37,7 @@ test.describe('SRP Brand Dashboard (G12)', () => {
         await auth.login(adminUser.email, adminUser.password, 'http://buy.localhost:4321/');
 
         await page.goto('http://buy.localhost:4321/tenants');
-        await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 15000 });
+        await expect(page.getByRole('heading', { name: 'Organisationen', exact: true })).toBeVisible({ timeout: 15000 });
     });
 
     test('SRP client sidebar has no admin items', async ({ page }) => {

@@ -5,6 +5,7 @@ import { useUI } from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import TextSnippetModal from './components/TextSnippetModal';
 import { TextSnippet } from '../../api';
+import EmptyState from '../components/EmptyState';
 
 
 
@@ -75,9 +76,7 @@ export default function ManagementTextSnippetsView() {
                     </div>
                 ))}
                 {snippets?.length === 0 && (
-                    <div className="col-span-full py-12 text-center opacity-50 bg-base-200 rounded-box border border-base-300 border-dashed">
-                        Keine Textbausteine vorhanden.
-                    </div>
+                    <EmptyState title="Keine Textbausteine vorhanden." className="col-span-full py-12 border-dashed" />
                 )}
             </div>
             <TextSnippetModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingSnippet={editingSnippet} onSave={handleSave} />

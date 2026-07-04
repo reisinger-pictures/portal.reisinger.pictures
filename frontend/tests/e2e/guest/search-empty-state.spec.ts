@@ -6,7 +6,7 @@ test.describe('Global Search — Empty-Result State', () => {
     test('Search with no matches shows dedicated empty-state messages', async ({page}) => {
         await page.goto('/');
 
-        const searchInput = page.locator('input[placeholder="Galerien und Bilder suchen..."]');
+        const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();
 
         // Garantiert nicht existierender Begriff — keine Kollision mit realen Galerie-/Bildnamen.

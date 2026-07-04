@@ -4,6 +4,7 @@ import { useUI } from '../components/UIContext';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '../../logic/usePermissions';
 import PageLayout from '../components/PageLayout';
+import EmptyState from '../components/EmptyState';
 
 export default function ManagementTenantsView() {
     const { tenants, createTenant, isLoading } = useTenants();
@@ -74,10 +75,7 @@ export default function ManagementTenantsView() {
                     </div>
                 ))}
                 {tenants?.length === 0 && (
-                    <div className="col-span-full py-12 text-center opacity-50 bg-base-200 rounded-box border border-base-300">
-                        <span className="iconify mdi--domain text-4xl mb-2"></span>
-                        <p>Noch keine Organisationen angelegt.</p>
-                    </div>
+                    <EmptyState icon="mdi--domain" title="Noch keine Organisationen angelegt." className="col-span-full py-12" />
                 )}
             </div>
 

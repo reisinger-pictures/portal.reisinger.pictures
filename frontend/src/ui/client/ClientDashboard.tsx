@@ -5,27 +5,17 @@ import {useAuth} from '../../logic/useAuth';
 import {useSearch} from '../../logic/useSearch';
 import {Gallery} from '../../logic/useGalleries';
 import Sidebar from '../components/Sidebar';
-import HighlightText from '../components/HighlightText';
+import SearchBarWithSuggestions from '../components/SearchBarWithSuggestions';
 
 export default function ClientDashboard() {
     const { logoSrc, portalName } = useBrand();
     const {user} = useAuth();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
-    const {results: searchResults} = useSearch(searchQuery, false, true); // Leere Query überspringen
     const {results: discoveryFeed} = useSearch(''); // Öffentliche Galerien laden
 
     if (!user) return null;
-
-    const handleSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchQuery.trim().length >= 2) {
-            navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-            setSearchQuery('');
-        }
-    };
 
     return (
         <div className="flex h-screen bg-base-100 overflow-hidden relative">
@@ -49,50 +39,7 @@ export default function ClientDashboard() {
                         <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
                     </Link>
 
-                    <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full max-w-full">
-                        <div className="join w-full shadow-sm">
-                            <input
-                                type="text"
-                                placeholder="Bilder durchsuchen..."
-                                className="input input-bordered join-item w-full"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                onFocus={() => setIsSearchFocused(true)}
-                                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                            />
-                            <button type="submit" className="btn btn-primary join-item">
-                                <span className="iconify mdi--magnify text-xl"></span>
-                            </button>
-                        </div>
-
-                        {searchQuery.length >= 2 && searchResults && (
-                            <div
-                                className="absolute top-14 left-0 w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-50 max-h-[60vh] overflow-y-auto">
-                                <ul className="menu p-2">
-                                    <li>
-                                        <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`}
-                                              onClick={() => setSearchQuery('')} className="text-primary font-bold">
-                                            <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach "{searchQuery}"
-                                        </Link>
-                                    </li>
-                                    <div className="divider my-0"></div>
-                                    {searchResults.galleries.map(g => (
-                                        <li key={g.id}><Link to={'/' + g.full_path}
-                                                             onClick={() => setSearchQuery('')}>📁 <HighlightText text={g.name} highlight={searchQuery} /></Link></li>
-                                    ))}
-                                    {searchResults.photos.map(p => (
-                                        <li key={p.id}><Link to={'/photos/' + p.id} onClick={() => setSearchQuery('')}>
-                                            <span className="iconify mdi--image-outline opacity-70"></span> <HighlightText text={p.title || 'Foto'} highlight={searchQuery} />
-                                        </Link></li>
-                                    ))}
-                                    {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (
-                                        <li className="disabled"><span
-                                            className="opacity-50">Keine direkten Treffer</span></li>
-                                    )}
-                                </ul>
-                            </div>
-                        )}
-                    </form>
+                    <SearchBarWithSuggestions clearOnSubmit onFocusChange={setIsSearchFocused} />
                 </header>
 
                 <div className="container mx-auto p-8 relative z-0">

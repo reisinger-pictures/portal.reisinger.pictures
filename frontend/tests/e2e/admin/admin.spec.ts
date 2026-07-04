@@ -81,7 +81,7 @@ test.describe('Admin Workflow', () => {
         await expect(headerSearchInput).toBeVisible();
 
         await headerSearchInput.fill('A');
-        await expect(page.locator('text=Suche nach "A"')).toBeHidden();
+        await expect(page.locator('text=Suche nach "A"')).toBeVisible();
 
         await headerSearchInput.fill('Ab');
         await expect(page.locator('text=Suche nach "Ab"')).toBeVisible();
@@ -89,7 +89,7 @@ test.describe('Admin Workflow', () => {
         await page.locator('text=Suche nach "Ab"').click();
         
         await expect(page).toHaveURL(/.*\/search\?q=Ab/);
-        const searchViewInput = page.locator('input[placeholder="Galerien und Bilder suchen..."]');
+        const searchViewInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchViewInput).toHaveValue('Ab');
     });
 });

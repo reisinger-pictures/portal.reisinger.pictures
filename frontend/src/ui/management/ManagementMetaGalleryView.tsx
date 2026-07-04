@@ -11,6 +11,7 @@ import {useBrand} from '../../logic/useBrand';
 import PageLayout from '../components/PageLayout';
 import GalleryModals from '../components/GalleryModals';
 import GalleryGroupCouponsTab from './components/GalleryGroupCouponsTab';
+import EmptyState from '../components/EmptyState';
 
 export default function ManagementMetaGalleryView() {
     const {id} = useParams<{ id: string }>();
@@ -103,12 +104,7 @@ export default function ManagementMetaGalleryView() {
                 {activeTab === 'bilder' && (
                     <>
                         {!isLoading && photos.length === 0 && (
-                            <div
-                                className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300">
-                                <span className="iconify mdi--image-off-outline text-6xl mb-4"></span>
-                                <h3 className="text-2xl font-bold">Noch keine Bilder vorhanden</h3>
-                                <p className="mt-2">Es befinden sich noch keine Bilder in den untergeordneten Galerien.</p>
-                            </div>
+                            <EmptyState icon="mdi--image-off-outline" title="Noch keine Bilder vorhanden" message="Es befinden sich noch keine Bilder in den untergeordneten Galerien." />
                         )}
 
                         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4" ref={galleryRef}>

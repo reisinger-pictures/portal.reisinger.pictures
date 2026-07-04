@@ -25,7 +25,7 @@ test.describe('Brand Tenant Isolation', () => {
             await auth.login(adminUser.email, adminUser.password);
             await sidebar.navigateTo('Organisationen');
 
-            await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
+            await expect(page.getByRole('heading', { name: 'Organisationen', exact: true })).toBeVisible({ timeout: 10000 });
         });
     });
 
@@ -43,7 +43,7 @@ test.describe('Brand Tenant Isolation', () => {
             await auth.login(adminUser.email, adminUser.password, 'http://buy.localhost:4321/');
 
             await page.goto('http://buy.localhost:4321/tenants');
-            await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
+            await expect(page.getByRole('heading', { name: 'Organisationen', exact: true })).toBeVisible({ timeout: 10000 });
         });
 
         test('Admin on SRP brand does not see B2B Mandanten in sidebar', async ({ page }) => {

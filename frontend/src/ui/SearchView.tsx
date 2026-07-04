@@ -6,20 +6,16 @@ import { useBrand } from '../logic/useBrand';
 import {useSearch} from '../logic/useSearch';
 import Sidebar from './components/Sidebar';
 import HighlightText from './components/HighlightText';
+import SearchBarWithSuggestions from './components/SearchBarWithSuggestions';
 
 export default function SearchView() {
     const { logoSrc, portalName } = useBrand();
     const [searchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
-    const [localQuery, setLocalQuery] = useState(query);
     const {results, isLoading, isError} = useSearch(query);
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        navigate(`/search?q=${encodeURIComponent(localQuery.trim())}`);
-    };
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     return (
         <div className="flex flex-col h-screen">
@@ -36,31 +32,19 @@ export default function SearchView() {
 
                 <main className="flex-1 overflow-y-auto flex flex-col w-full relative bg-base-200">
                     <header className="p-4 border-b border-base-300 bg-base-100 flex items-center gap-3 md:hidden">
-                        <button className="btn btn-square btn-ghost shrink-0" onClick={() => setIsSidebarOpen(true)}>
+                        <button className={`btn btn-square btn-ghost shrink-0 ${isSearchFocused ? 'hidden' : ''}`} onClick={() => setIsSidebarOpen(true)}>
                             <span className="iconify mdi--menu text-2xl"></span>
                         </button>
-                        <Link to="/" className="flex items-center gap-2 shrink-0">
+                        <Link to="/" className={`flex items-center gap-2 shrink-0 ${isSearchFocused ? 'hidden' : ''}`}>
                             <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
                             <span className="font-bold text-base truncate">{portalName}</span>
                         </Link>
                     </header>
 
                     <div className="container mx-auto max-w-7xl p-4 md:p-8">
-                        <form onSubmit={handleSearch} className="mb-8 max-w-2xl mx-auto">
-                            <div className="join w-full shadow-sm">
-                                <input
-                                    type="text"
-                                    placeholder="Galerien und Bilder suchen..."
-                                    className="input input-bordered join-item w-full bg-base-100"
-                                    value={localQuery}
-                                    onChange={e => setLocalQuery(e.target.value)}
-                                    autoFocus
-                                />
-                                <button type="submit" className="btn btn-primary join-item">
-                                    <span className="iconify mdi--magnify text-xl"></span> Suchen
-                                </button>
-                            </div>
-                        </form>
+                        <div className="mb-8 max-w-2xl mx-auto">
+                            <SearchBarWithSuggestions autoFocus onFocusChange={setIsSearchFocused} />
+                        </div>
 
                         <h1 className="text-2xl md:text-3xl font-bold mb-8 text-center">
                             {query ? <>Suchergebnisse für <span

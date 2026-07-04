@@ -7,7 +7,7 @@ test.describe('Global Search Workflow', () => {
         // Auf Mobile das Menü öffnen, damit die Sidebar sichtbar wird
         // await sidebar.openMobileMenu(); // Search is now in header
 
-        const searchInput = page.locator('input[placeholder="Galerien und Bilder suchen..."]');
+        const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();
 
         const searchTerm = `GlobalSearch${Math.random().toString(36).substring(2, 10)}`;

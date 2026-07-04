@@ -8,8 +8,8 @@ test.describe('Guest Workflow', () => {
 
         // Suche ausführen (nach etwas, das voraussichtlich nicht da ist, um Error-States zu vermeiden)
         const randomSearchTerm = `Search-${Math.random().toString(36).substring(2, 10)}`;
-        await page.fill('input[placeholder="Galerien und Bilder suchen..."]', randomSearchTerm);
-        await page.getByRole('button', { name: 'Suchen' }).click();
+        await page.fill('input[placeholder="Suche in allen Galerien..."]', randomSearchTerm);
+        await page.locator('input[placeholder="Suche in allen Galerien..."]').press('Enter');
 
         // Die UI sollte sich zu "Suchergebnisse für X" ändern, unabhängig davon ob es Treffer gibt
         await expect(page.locator(`h1:has-text("${randomSearchTerm}")`)).toBeVisible();

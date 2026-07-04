@@ -8,6 +8,8 @@ import useSWR from 'swr';
 import { fetcher } from '../../api';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { toSlug } from '../../logic/utils';
+import CheckboxGroup from '../components/CheckboxGroup';
 
 const gallerySchema = z.object({
     name: z.string().min(1, 'Name ist erforderlich'),
@@ -36,8 +38,6 @@ interface Props {
     onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
-
-const toSlug = (text: string) => text.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '');
 
 export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
@@ -209,29 +209,11 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
                     {watchType === 'delivery' && (
                         <div className="space-y-3 mb-4">
-                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-primary/20 w-full">
-                                <input type="checkbox" {...register('is_free_download')} className="checkbox checkbox-primary" />
-                                <div>
-                                    <span className="label-text font-bold block">Kostenlosen Download erlauben</span>
-                                    <span className="label-text-alt opacity-70 leading-tight block mt-1">Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste.</span>
-                                </div>
-                            </label>
-
-                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
-                                <input type="checkbox" {...register('is_editorial_only')} className="checkbox checkbox-primary" />
-                                <div>
-                                    <span className="label-text font-bold block">Nur für redaktionelle Nutzung (Shop)</span>
-                                    <span className="label-text-alt opacity-70 leading-tight block mt-1">Sperrt kommerzielle Lizenzen im Checkout.</span>
-                                </div>
-                            </label>
-
-                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
-                                <input type="checkbox" {...register('is_hidden')} className="checkbox checkbox-primary" />
-                                <div>
-                                    <span className="label-text font-bold block">Im Frontend verstecken</span>
-                                    <span className="label-text-alt opacity-70 leading-tight block mt-1">Wird nicht in Suchergebnissen oder Feeds gelistet.</span>
-                                </div>
-                            </label>
+                            <CheckboxGroup items={[
+                                { name: 'is_free_download', label: 'Kostenlosen Download erlauben', description: 'Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste.' },
+                                { name: 'is_editorial_only', label: 'Nur für redaktionelle Nutzung (Shop)', description: 'Sperrt kommerzielle Lizenzen im Checkout.' },
+                                { name: 'is_hidden', label: 'Im Frontend verstecken', description: 'Wird nicht in Suchergebnissen oder Feeds gelistet.' },
+                            ]} register={register} />
 
                             <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
                                 <input type="checkbox" {...register('is_live')} className="checkbox checkbox-primary" />

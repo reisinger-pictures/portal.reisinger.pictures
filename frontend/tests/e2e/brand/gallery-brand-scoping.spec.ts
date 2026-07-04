@@ -61,6 +61,6 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Organisationen');
-        await expect(page.getByRole('heading', { name: /Organisationen/ })).toBeVisible({ timeout: 10000 });
+        await expect(page.getByRole('heading', { name: 'Organisationen', exact: true })).toBeVisible({ timeout: 10000 });
     });
 });

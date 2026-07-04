@@ -9,6 +9,8 @@ import { usePermissions } from '../../logic/usePermissions';
 
 import { useGallery } from '../../logic/useGallery';
 import { isCovered, ResolutionTier } from '../../logic/pricingLogic';
+import EmptyState from '../components/EmptyState';
+import NotificationsOptIn from '../components/NotificationsOptIn';
 export interface DeliveryViewProps {
     galleryData: ReturnType<typeof useGallery>;
 }
@@ -42,13 +44,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
 
                     <div className="flex flex-wrap items-center justify-end gap-3 md:gap-4">
                         {user && (
-                            <label className="cursor-pointer label gap-2 md:gap-3 bg-base-100 p-2 md:p-3 rounded-box border border-base-300 shadow-sm m-0">
-                                <span className="iconify mdi--bell-ring-outline text-xl text-primary hidden md:inline-block"></span>
-                                <div className="text-right">
-                                    <span className="font-bold text-sm block leading-none mb-1">E-Mail Updates</span>
-                                </div>
-                                <input type="checkbox" className="toggle-primary toggle md:toggle-md" checked={galleryData.wantsNotifications} onChange={(e) => galleryData.toggleOptIn(gallery.id, e.target.checked)} />
-                            </label>
+                            <NotificationsOptIn checked={galleryData.wantsNotifications} onChange={(checked) => galleryData.toggleOptIn(gallery.id, checked)} />
                         )}
                         {photos.length > 0 && (() => {
                             const allowedTiers = [
@@ -89,9 +85,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                 </div>
 
                 {!isLoading && photos.length === 0 && (
-                    <div className="py-20 text-center flex flex-col items-center justify-center opacity-70 bg-base-200 rounded-box border border-base-300 mb-8">
-                        <span className="iconify mdi--image-off-outline text-6xl mb-4 text-primary"></span>
-                        <h3 className="text-2xl font-bold">Noch keine Bilder vorhanden</h3>
+                    <EmptyState icon="mdi--image-off-outline" title="Noch keine Bilder vorhanden" className="mb-8">
                         {gallery.is_live ? (
                             <p className="mt-2 text-warning flex items-center gap-2">
                                 <span className="iconify mdi--autorenew animate-spin"></span>
@@ -100,7 +94,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                         ) : (
                             <p className="mt-2">Der Fotograf hat noch keine Bilder für diese Galerie freigegeben.</p>
                         )}
-                    </div>
+                    </EmptyState>
                 )}
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6" ref={galleryRef}>

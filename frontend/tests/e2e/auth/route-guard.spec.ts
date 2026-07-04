@@ -28,7 +28,7 @@ test.describe('Route Guards & IDOR Boundaries', () => {
                 await expect(page).toHaveURL(/localhost:4321\/?$/);
 
                 // Anonymous-Home-Oberfläche sichtbar (globale Suche im Header).
-                await expect(page.locator('input[placeholder="Galerien und Bilder suchen..."]')).toBeVisible({timeout: 10000});
+                await expect(page.locator('input[placeholder="Suche in allen Galerien..."]')).toBeVisible({timeout: 10000});
             });
         }
     });

@@ -6,7 +6,7 @@ test.describe('Guest Public Gallery Access (G5)', () => {
 
         await expect(page.getByRole('heading', { name: 'Neueste Entdeckungen' }).first()).toBeVisible({ timeout: 10000 });
 
-        const searchInput = page.locator('input[placeholder="Galerien und Bilder suchen..."]').first();
+        const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]').first();
         await expect(searchInput).toBeVisible();
 
         await expect(page.locator('main')).toBeVisible();

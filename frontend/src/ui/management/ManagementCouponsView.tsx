@@ -6,6 +6,7 @@ import { useUI } from '../components/UIContext';
 import { useBrand } from '../../logic/useBrand';
 import ErrorMessage from '../components/ErrorMessage';
 import CouponFormDrawer, { type Coupon } from './components/CouponFormDrawer';
+import Pagination from '../components/Pagination';
 
 interface PaginatedCoupons {
     data: Coupon[];
@@ -278,27 +279,7 @@ Gutscheincode
                     </table>
                 </div>
 
-                {lastPage > 1 && (
-                    <div className="flex justify-between items-center mt-6 flex-wrap gap-2">
-                        <button
-                            className="btn btn-sm btn-outline"
-                            disabled={page <= 1}
-                            onClick={() => goToPage(page - 1)}
-                        >
-                            ← Zurück
-                        </button>
-                        <span className="text-sm font-semibold">
-                            Seite {page} von {lastPage}
-                        </span>
-                        <button
-                            className="btn btn-sm btn-outline"
-                            disabled={page >= lastPage}
-                            onClick={() => goToPage(page + 1)}
-                        >
-                            Weiter →
-                        </button>
-                    </div>
-                )}
+                <Pagination page={page} lastPage={lastPage} onPageChange={goToPage} className="mt-6" />
             </div>
 
             <CouponFormDrawer
