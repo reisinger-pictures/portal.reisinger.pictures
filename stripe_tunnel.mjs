@@ -1,10 +1,18 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 console.log('🤖 Starte automatisierten Stripe Tunnel...');
 
-const stripe = spawn('stripe', ['listen', '--forward-to', 'https://portal.test/api/webhooks/stripe'], {
+// Stripe CLI automatisch auf neueste Version aktualisieren
+console.log('🔄 Prüfe auf Stripe CLI Updates...');
+try {
+    execSync('pnpm add -g @stripe/cli', { stdio: 'inherit', shell: true });
+} catch (err) {
+    console.warn('⚠️  Stripe CLI Update fehlgeschlagen, fahre mit vorhandener Version fort.');
+}
+
+const stripe = spawn('stripe listen --forward-to https://portal.test/api/webhooks/stripe', {
     shell: true
 });
 

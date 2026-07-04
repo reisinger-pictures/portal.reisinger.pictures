@@ -18,7 +18,7 @@
         "meilisearch/meilisearch-php": "^1.16",
         "php-open-source-saver/jwt-auth": "^2.9",
         "barryvdh/laravel-dompdf": "^3.0",
-        "stripe/stripe-php": "^13.0",
+        "stripe/stripe-php": "^20.3.0",
         "symfony/html-sanitizer": "^8.0",
         "ext-zip": "*"
     },
@@ -28,7 +28,7 @@
         "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^12.5.12"
+        "phpunit/phpunit": "^13.2.2"
     },
     "autoload": {
         "psr-4": {

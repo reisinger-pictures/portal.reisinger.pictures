@@ -1,6 +1,15 @@
 import {test, expect} from '@playwright/test';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {createRequire} from 'node:module';
 
+const require = createRequire(import.meta.url);
 const SRP_REFERER = 'http://buy.localhost:4321/';
+
+// Pfad zu den pdfjs-Standard-Schriftarten (unterdrückt pdf.js-Warnung)
+const standardFontDataUrl = pathToFileURL(
+    path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'standard_fonts'),
+) + '/'; // trailing slash required by pdf.js
 
 test.describe('Brand E2E — infra prerequisites (Gaps 4 & 5)', () => {
 
@@ -62,10 +71,16 @@ test.describe('Brand E2E — infra prerequisites (Gaps 4 & 5)', () => {
 
         const pdfBuffer = Buffer.from(await invoiceRes.body());
 
-        // 5. Parse PDF text
+        // 5. Parse PDF text — pass standardFontDataUrl to suppress pdf.js warning
         const pdfModule = await import('pdf-parse');
-        const PDFParseClass = pdfModule.PDFParse as unknown as new (data: Uint8Array) => { load(): Promise<void>; getText(): Promise<{ text: string }> };
-        const pdfParser = new PDFParseClass(new Uint8Array(pdfBuffer));
+        const PDFParseClass = pdfModule.PDFParse as unknown as new (options: {
+            data: Uint8Array;
+            standardFontDataUrl?: string;
+        }) => { load(): Promise<void>; getText(): Promise<{ text: string }> };
+        const pdfParser = new PDFParseClass({
+            data: new Uint8Array(pdfBuffer),
+            standardFontDataUrl,
+        });
         await pdfParser.load();
         const pdfData = await pdfParser.getText();
         const pdfText = pdfData.text;

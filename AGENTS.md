@@ -75,7 +75,19 @@ cd frontend && pnpm vitest run
 # Frontend Lint + Build (pnpm, NICHT npm)
 cd frontend && pnpm lint:fix && pnpm build
 
-# E2E (Playwright direkt)
+# E2E (Playwright — alle Tests, dann --last-failed)
 cd frontend
-npx playwright test brand
+npx playwright test
+
+# E2E (nur fehlgeschlagene wiederholen)
+cd frontend
+npx playwright test --last-failed
+
+# E2E Workflow:
+# 1. Immer ALLE Tests ausführen (nicht nur Subset per Tag)
+# 2. Bei Fehlschlägen: npx playwright test --last-failed bis alle grün
+# 3. Flaky Tests (mal grün/mal rot) in AGENTS.todo.md dokumentieren mit:
+#    - Datei + Testname
+#    - Fehlerursache (wenn bekannt)
+#    - "flaky" tag im Commit/PR
 ```
