@@ -4,6 +4,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
+import { useAuth } from '../../../logic/useAuth';
 import ErrorMessage from '../../components/ErrorMessage';
 import CouponFormDrawer, { type Coupon } from './CouponFormDrawer';
 
@@ -48,6 +49,7 @@ interface Props {
 
 export default function GalleryCouponsTab({ galleryId }: Props) {
     const { showToast, confirm } = useUI();
+    const { user } = useAuth();
     const swrKey = `/api/management/galleries/${galleryId}/coupons`;
     const { data, error, isLoading, mutate } = useSWR<PaginatedCoupons>(swrKey, fetcher);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -73,7 +75,7 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
 
     const handleDelete = async (coupon: Coupon) => {
         if (coupon.id === undefined) return;
-        if (coupon.used_count > 0) return;
+        if (!user?.is_admin && !user?.is_super_admin && coupon.used_count > 0) return;
         const couponCode = coupon.code;
         if (!(await confirm({
             title: t`Coupon löschen?`,
@@ -158,11 +160,11 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
                                     <button
                                         className="btn btn-ghost btn-xs btn-square text-error"
                                         title={
-                                            coupon.used_count > 0
+                                            !user?.is_admin && !user?.is_super_admin && coupon.used_count > 0
                                                 ? t`Löschen nicht möglich (bereits verwendet)`
                                                 : t`Löschen`
                                         }
-                                        disabled={coupon.used_count > 0}
+                                        disabled={!user?.is_admin && !user?.is_super_admin && coupon.used_count > 0}
                                         onClick={() => void handleDelete(coupon)}
                                     >
                                         <span className="iconify mdi--trash-can text-base"></span>

@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
+import { useAuth } from '../../logic/useAuth';
 import { useBrand } from '../../logic/useBrand';
 import ErrorMessage from '../components/ErrorMessage';
 import { formatMoney } from '../../logic/utils';
@@ -63,6 +64,7 @@ const formatExpiry = (iso: string | undefined): string => {
 
 export default function ManagementCouponsView() {
     const { isSrp } = useBrand();
+    const { user } = useAuth();
     const { showToast, confirm } = useUI();
     const [searchParams, setSearchParams] = useSearchParams();
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
@@ -128,7 +130,7 @@ export default function ManagementCouponsView() {
 
     const handleDelete = async (coupon: Coupon) => {
         if (coupon.id === undefined) return;
-        if (coupon.used_count > 0) return;
+        if (!user?.is_admin && !user?.is_super_admin && coupon.used_count > 0) return;
         const couponCode = coupon.code;
         if (!(await confirm({
             title: t`Gutscheincode löschen?`,
@@ -260,11 +262,11 @@ export default function ManagementCouponsView() {
                                             <button
                                                 className="btn btn-ghost btn-xs btn-square text-error"
                                                 title={
-                                                    coupon.used_count > 0
+                                                    !user?.is_admin && !user?.is_super_admin && coupon.used_count > 0
                                                         ? t`Löschen nicht möglich (bereits verwendet)`
                                                         : t`Löschen`
                                                 }
-                                                disabled={coupon.used_count > 0}
+                                                disabled={!user?.is_admin && !user?.is_super_admin && coupon.used_count > 0}
                                                 onClick={() => void handleDelete(coupon)}
                                             >
                                                 <span className="iconify mdi--trash-can text-base"></span>

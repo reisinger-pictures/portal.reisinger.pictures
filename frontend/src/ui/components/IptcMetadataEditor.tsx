@@ -253,9 +253,9 @@ export default function IptcMetadataEditor({data, onChange, showArtist = true, s
                                disabled={data.effective_is_editorial_only && !data.is_editorial_only}
                                onChange={e => handleMultiChange({ is_editorial_only: e.target.checked })} 
                                className="checkbox checkbox-primary shrink-0"/>
-                        <div>
+                        <div className="min-w-0">
                             <span className="label-text font-bold block"><Trans>Nur für redaktionelle Nutzung (Shop)</Trans></span>
-                            <span className="label-text-alt opacity-70 block mt-1">
+                            <span className="label-text-alt text-xs opacity-70 leading-tight block mt-1 break-words">
                                 {data.effective_is_editorial_only && !data.is_editorial_only 
                                     ? t`Wird durch die übergeordnete Galerie erzwungen.` 
                                     : t`Sperrt kommerzielle Lizenzen im Checkout explizit für dieses Bild.`}

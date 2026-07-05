@@ -35,6 +35,7 @@ test.describe('Coupon Admin CRUD', () => {
             });
             return res.json();
         });
+        if (fixedCoupon?.id) helper.trackCoupon(fixedCoupon.id);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
@@ -62,6 +63,7 @@ test.describe('Coupon Admin CRUD', () => {
             });
             return res.json();
         });
+        if (orgCoupon?.id) helper.trackCoupon(orgCoupon.id);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
@@ -93,11 +95,23 @@ test.describe('Coupon Admin CRUD', () => {
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
-        await expect(page.locator('table')).toContainText(coupon.code, { timeout: 15000 });
+        await expect(page.locator('h1')).toContainText('Gutscheincode', { timeout: 15000 });
 
-        const deleteBtn = page.locator('button[title="Löschen nicht möglich (bereits verwendet)"]').first();
+        const row = page.locator('tr').filter({ hasText: coupon.code });
+        await expect(row).toBeVisible({ timeout: 10000 });
+
+        const deleteBtn = row.locator('button[title="Löschen"]');
         await expect(deleteBtn).toBeVisible();
-        await expect(deleteBtn).toBeDisabled();
+        await expect(deleteBtn).toBeEnabled();
+        await deleteBtn.click();
+
+        const confirmModal = page.locator('.modal-global');
+        await expect(confirmModal).toBeVisible();
+        await confirmModal.getByRole('button', { name: 'Bestätigen' }).click();
+        await expect(confirmModal).toBeHidden();
+
+        await expect(page.locator('.toast')).toContainText('Gutscheincode gelöscht');
+        await expect(row).toBeHidden({ timeout: 10000 });
     });
 
     test('Admin can toggle coupon active/inactive', async ({ page }) => {
@@ -119,15 +133,18 @@ test.describe('Coupon Admin CRUD', () => {
             });
             return res.json();
         }, couponCode);
+        if (coupon?.id) helper.trackCoupon(coupon.id);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
-        await expect(page.locator('table')).toContainText(coupon.code, { timeout: 15000 });
-        await expect(page.locator('span.badge-success:has-text("Aktiv")').first()).toBeVisible({ timeout: 10000 });
 
-        const toggleBtn = page.locator('button[title="Deaktivieren"]').first();
+        const row = page.locator('tr').filter({ hasText: coupon.code });
+        await expect(row).toBeVisible({ timeout: 15000 });
+        await expect(row.locator('span.badge-success')).toContainText('Aktiv', { timeout: 10000 });
+
+        const toggleBtn = row.locator('button[title="Deaktivieren"]');
         await toggleBtn.click();
         await expect(page.locator('.toast')).toContainText('Gutscheincode deaktiviert');
-        await expect(page.locator('span.badge-ghost:has-text("Inaktiv")').first()).toBeVisible();
+        await expect(row.locator('span.badge-ghost')).toContainText('Inaktiv');
     });
 });

@@ -10,6 +10,7 @@ export class E2ESessionHelper {
     private createdSnippetIds: string[] = [];
     private createdProductIds: string[] = [];
     private createdContractIds: string[] = [];
+    private createdCouponIds: string[] = [];
     private adminToken: string | null = null;
 
     constructor(private request: APIRequestContext) {}
@@ -96,6 +97,7 @@ export class E2ESessionHelper {
     trackSnippet(id: string) { if (id) this.createdSnippetIds.push(id); }
     trackProduct(id: string) { if (id) this.createdProductIds.push(id); }
     trackContract(id: string) { if (id) this.createdContractIds.push(id); }
+    trackCoupon(id: string) { if (id) this.createdCouponIds.push(id); }
 
     async seedBillingSettings() {
         await this.ensureAdminLogin();
@@ -114,35 +116,27 @@ export class E2ESessionHelper {
         });
     }
 
+    private async deleteResources(ids: string[], endpoint: string, label: string) {
+        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
+        for (const id of ids) {
+            await this.request.delete(`${endpoint}/${id}`, { headers })
+                .catch((err) => console.warn(`Cleanup: Failed to delete ${label} ${id}`, err));
+        }
+    }
+
     async teardown() {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
 
         // NOTE: Contract cleanup via API would need a DELETE endpoint
         // on /api/management/contracts/{id}. Currently only tracking is supported.
-        for (const id of this.createdContractIds) {
-            await this.request.delete(`/api/management/contracts/${id}`, { headers }).catch(() => {});
-        }
-        for (const id of this.createdGalleryIds) {
-            await this.request.delete(`/api/management/galleries/${id}`, { headers }).catch(() => {});
-        }
-        for (const id of this.createdGroupIds) {
-            await this.request.delete(`/api/management/gallery-groups/${id}`, { headers }).catch(() => {});
-        }
-        for (const id of this.createdUserIds) {
-            await this.request.delete(`/api/test/cleanup-user/${id}`, { headers }).catch(() => {});
-        }
-        for (const id of this.createdTenantIds) {
-            await this.request.delete(`/api/management/tenants/${id}`, { headers }).catch(() => {});
-        }
-        for (const id of this.createdCustomerIds) {
-            await this.request.delete(`/api/management/customers/${id}`, { headers }).catch(() => {});
-        }
-        for (const id of this.createdSnippetIds) {
-            await this.request.delete(`/api/management/text-snippets/${id}`, { headers }).catch(() => {});
-        }
-        for (const id of this.createdProductIds) {
-            await this.request.delete(`/api/management/products/${id}`, { headers }).catch(() => {});
-        }
+        await this.deleteResources(this.createdContractIds, '/api/management/contracts', 'contract');
+        await this.deleteResources(this.createdGalleryIds, '/api/management/galleries', 'gallery');
+        await this.deleteResources(this.createdGroupIds, '/api/management/gallery-groups', 'gallery-group');
+        await this.deleteResources(this.createdUserIds, '/api/test/cleanup-user', 'user');
+        await this.deleteResources(this.createdTenantIds, '/api/management/tenants', 'tenant');
+        await this.deleteResources(this.createdCustomerIds, '/api/management/customers', 'customer');
+        await this.deleteResources(this.createdSnippetIds, '/api/management/text-snippets', 'text-snippet');
+        await this.deleteResources(this.createdProductIds, '/api/management/products', 'product');
+        await this.deleteResources(this.createdCouponIds, '/api/management/coupons', 'coupon');
     }
 }

@@ -29,6 +29,12 @@ class SearchController extends Controller
             $galQuery = Gallery::whereIn('id', $allowedGalleryIds);
             $phoQuery = Photo::whereIn('gallery_id', $allowedGalleryIds);
             
+            $currentBrand = BrandRegistry::current();
+            if ($currentBrand !== null) {
+                $galQuery->where('brand', $currentBrand);
+                $phoQuery->whereHas('gallery', fn($q) => $q->where('brand', $currentBrand));
+            }
+            
             if (!$canSeeExpired) {
                 $galQuery->where(function($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); });
                 $phoQuery->whereHas('gallery', function($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); });

@@ -53,6 +53,7 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
             return res.json();
         }, { code: couponCode, galleryId });
         if (!createRes?.coupon?.id) throw new Error(`Coupon creation failed: ${JSON.stringify(createRes)}`);
+        helper.trackCoupon(createRes.coupon.id);
         await auth.logout('http://buy.localhost:4321/');
 
         await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
@@ -92,8 +93,8 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
 
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
         const couponCode = `GAL-${Math.random().toString(36).substring(2, 8)}`;
-        await page.evaluate(async ({ code, galleryId }: { code: string; galleryId: string }) => {
-            await fetch('/api/management/coupons', {
+        const createRes = await page.evaluate(async ({ code, galleryId }: { code: string; galleryId: string }) => {
+            const res = await fetch('/api/management/coupons', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({
@@ -105,7 +106,9 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
                     active: true,
                 }),
             });
+            return res.json();
         }, { code: couponCode, galleryId: galleryAId });
+        if (createRes?.coupon?.id) helper.trackCoupon(createRes.coupon.id);
         await auth.logout('http://buy.localhost:4321/');
 
         await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
