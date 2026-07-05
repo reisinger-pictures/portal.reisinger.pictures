@@ -1,6 +1,7 @@
 import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 console.log('🤖 Starte automatisierten Stripe Tunnel...');
 
@@ -12,7 +13,68 @@ try {
     console.warn('⚠️  Stripe CLI Update fehlgeschlagen, fahre mit vorhandener Version fort.');
 }
 
-const stripe = spawn('stripe', ['listen', '--forward-to', 'https://portal.test/api/webhooks/stripe']);
+function findStripe() {
+    if (process.platform === 'win32') {
+        // Windows: pnpm/npm installieren .CMD-Shims
+        const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+        const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+        const candidates = [
+            path.join(localAppData, 'pnpm', 'stripe.CMD'),
+            path.join(appData, 'npm', 'stripe.CMD'),
+            path.join(localAppData, 'pnpm', 'stripe'),
+            path.join(appData, 'npm', 'stripe'),
+        ];
+        for (const c of candidates) {
+            try {
+                fs.accessSync(c);
+                return c;
+            } catch { /* nicht gefunden */ }
+        }
+        // PATH durchsuchen nach .CMD / .cmd / ohne Extension
+        const paths = (process.env.PATH || '').split(path.delimiter);
+        for (const dir of paths) {
+            for (const exe of ['stripe.CMD', 'stripe.cmd', 'stripe']) {
+                const full = path.join(dir, exe);
+                try {
+                    fs.accessSync(full);
+                    return full;
+                } catch { /* nicht gefunden */ }
+            }
+        }
+        return 'stripe';
+    }
+
+    // macOS / Linux
+    const home = os.homedir();
+    const candidates = [
+        path.join(home, '.npm-global', 'bin', 'stripe'),
+        '/usr/local/bin/stripe',
+        '/opt/homebrew/bin/stripe',
+        path.join(home, '.local', 'bin', 'stripe'),
+    ];
+    for (const c of candidates) {
+        try {
+            fs.accessSync(c, fs.constants.X_OK);
+            return c;
+        } catch { /* nicht gefunden */ }
+    }
+    // PATH durchsuchen
+    const paths = (process.env.PATH || '').split(path.delimiter);
+    for (const dir of paths) {
+        const full = path.join(dir, 'stripe');
+        try {
+            fs.accessSync(full, fs.constants.X_OK);
+            return full;
+        } catch { /* nicht gefunden */ }
+    }
+    return 'stripe';
+}
+
+const stripePath = findStripe();
+console.log(`🔧 Verwende Stripe CLI: ${stripePath}`);
+const stripe = process.platform === 'win32'
+    ? spawn('cmd.exe', ['/c', stripePath, 'listen', '--forward-to', 'https://portal.test/api/webhooks/stripe'])
+    : spawn(stripePath, ['listen', '--forward-to', 'https://portal.test/api/webhooks/stripe']);
 
 let secretFound = false;
 // Speicherort: storage/app/private wird ohnehin von git ignoriert

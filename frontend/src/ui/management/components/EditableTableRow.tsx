@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { type ReactNode } from 'react';
 
 interface EditableTableRowProps {
@@ -34,7 +35,7 @@ function EditableTableRow({
                         className="btn btn-xs btn-ghost mr-1"
                         disabled={saving}
                     >
-                        Abbrechen
+                        <Trans>Abbrechen</Trans>
                     </button>
                     <button
                         onClick={onSave}
@@ -44,7 +45,7 @@ function EditableTableRow({
                         {saving ? (
                             <span className="loading loading-spinner loading-xs" />
                         ) : (
-                            'Speichern'
+                            <Trans>Speichern</Trans>
                         )}
                     </button>
                 </td>

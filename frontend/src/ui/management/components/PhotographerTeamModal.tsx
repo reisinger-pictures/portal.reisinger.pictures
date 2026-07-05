@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../../api';
@@ -44,7 +46,7 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
         try {
             await apiMutate(endpoint, 'PUT', { name: item.name, restricted_photographers: val });
             onUpdateState();
-            showToast('success', 'Status gespeichert');
+            showToast('success', t`Status gespeichert`);
         } catch (e: unknown) {
             showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
         }
@@ -56,27 +58,27 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
         try {
             await apiMutate(endpoint, 'POST', { user_id: userId, action: hasAccess ? 'detach' : 'attach' });
             mutate();
-            showToast('success', hasAccess ? 'Zugriff entfernt' : 'Zugriff erteilt');
+            showToast('success', hasAccess ? t`Zugriff entfernt` : t`Zugriff erteilt`);
         } catch(e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
         }
     };
 
     return (
-        <div className="modal modal-open z-[80]">
-            <div className="modal-box max-w-2xl relative flex flex-col max-h-[80vh]">
+        <div className="modal modal-open">
+            <div className="modal-box max-w-2xl relative flex flex-col max-h-80vh">
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
-                    <span className="iconify mdi--camera-account text-primary"></span> Fotografen-Team
+                    <span className="iconify mdi--camera-account text-primary"></span> <Trans>Fotografen-Team</Trans>
                 </h3>
-                <p className="text-sm opacity-70 mb-4">{isGroup ? 'Ordner' : 'Galerie'}: <strong>{item.name}</strong></p>
+                <p className="text-sm opacity-70 mb-4">{isGroup ? <Trans>Ordner</Trans> : <Trans>Galerie</Trans>}: <strong>{item.name}</strong></p>
 
                 <div className="form-control w-full mb-6">
-                    <label className="label"><span className="label-text font-bold">Zugriffs-Status (Fotografen)</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Zugriffs-Status (Fotografen)</Trans></span></label>
                     <select className="select select-bordered w-full" value={status} onChange={e => handleStatusChange(e.target.value as 'null' | 'true' | 'false')} disabled={isSaving}>
-                        <option value="null">Erben (Aktuell: {item.effective_restricted_photographers ? 'Restriktiv' : 'Offen'})</option>
-                        <option value="false">Offen (Jeder Fotograf hat Zugriff)</option>
-                        <option value="true">Restriktiv (Nur zugewiesene Fotografen)</option>
+                        <option value="null">{t`Erben (Aktuell:`} {item.effective_restricted_photographers ? t`Restriktiv` : t`Offen`})</option>
+                        <option value="false"><Trans>Offen (Jeder Fotograf hat Zugriff)</Trans></option>
+                        <option value="true"><Trans>Restriktiv (Nur zugewiesene Fotografen)</Trans></option>
                     </select>
                 </div>
 
@@ -100,7 +102,7 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
                                                 className={`btn btn-sm w-28 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}
                                                 onClick={() => toggleAccess(u.id, !!hasAccess)}
                                             >
-                                                {hasAccess ? 'Entfernen' : 'Hinzufügen'}
+                                                {hasAccess ? <Trans>Entfernen</Trans> : <Trans>Hinzufügen</Trans>}
                                             </button>
                                         </div>
                                     );
@@ -111,7 +113,7 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
                 ) : (
                     <div className="alert alert-info shadow-sm mt-4">
                         <span className="iconify mdi--information text-xl"></span>
-                        <span>Dieser Bereich ist aktuell für <strong>alle Fotografen</strong> freigegeben. Du musst keine expliziten Zuweisungen vornehmen.</span>
+                        <span><Trans>Dieser Bereich ist aktuell für <strong>alle Fotografen</strong> freigegeben. Du musst keine expliziten Zuweisungen vornehmen.</Trans></span>
                     </div>
                 )}
             </div>

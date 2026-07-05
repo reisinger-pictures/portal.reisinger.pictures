@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import PageLayout from './components/PageLayout';
 import ResponsiveImage from './components/ResponsiveImage';
 import ErrorMessage from './components/ErrorMessage';
@@ -15,19 +17,19 @@ export default function SearchView() {
         <PageLayout currentView="search">
             <div className="container mx-auto max-w-7xl p-4 md:p-8">
                 <h1 className="text-2xl md:text-3xl font-bold mb-8 text-center">
-                    {query ? <>Suchergebnisse für <span
-                        className="text-primary">"{query}"</span></> : 'Neueste Entdeckungen'}
+                    {query ? <><Trans>Suchergebnisse für</Trans> <span
+                        className="text-primary">"{query}"</span></> : <Trans>Neueste Entdeckungen</Trans>}
                 </h1>
 
                 {isLoading && <div className="flex justify-center p-10"><span
                     className="loading loading-spinner loading-lg text-primary"></span></div>}
-                {isError && <ErrorMessage message="Fehler beim Laden der Ergebnisse." />}
+                {isError && <ErrorMessage message={t`Fehler beim Laden der Ergebnisse.`} />}
 
                 {!isLoading && !isError && results && (
                     <div className="space-y-12">
                         <section>
                             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-base-300 pb-2">
-                                <span className="iconify mdi--folder-multiple text-primary"></span> Galerien
+                                <span className="iconify mdi--folder-multiple text-primary"></span> <Trans>Galerien</Trans>{' '}
                                 ({results.galleries.length})
                             </h2>
                             {results.galleries.length > 0 ? (
@@ -45,12 +47,12 @@ export default function SearchView() {
                                         </div>
                                     ))}
                                 </div>
-                            ) : <p className="opacity-50">Keine passenden Galerien gefunden.</p>}
+                            ) : <p className="opacity-50"><Trans>Keine passenden Galerien gefunden.</Trans></p>}
                         </section>
 
                         <section>
                             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-base-300 pb-2">
-                                <span className="iconify mdi--image-multiple text-primary"></span> Fotos
+                                <span className="iconify mdi--image-multiple text-primary"></span> <Trans>Fotos</Trans>{' '}
                                 ({results.photos.length})
                             </h2>
                             {results.photos.length > 0 ? (
@@ -64,7 +66,7 @@ export default function SearchView() {
                                         </Link>
                                     ))}
                                 </div>
-                            ) : <p className="opacity-50">Keine passenden Fotos gefunden.</p>}
+                            ) : <p className="opacity-50"><Trans>Keine passenden Fotos gefunden.</Trans></p>}
                         </section>
                     </div>
                 )}

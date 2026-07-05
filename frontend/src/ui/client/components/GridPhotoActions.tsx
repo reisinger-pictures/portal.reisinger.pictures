@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from "@lingui/core/macro";
 import { Photo } from '../../../logic/useGallery';
 
 export interface GridPhotoActionsProps {
@@ -25,7 +26,7 @@ export default function GridPhotoActions({ photo, ratePhoto }: GridPhotoActionsP
                            onChange={() => ratePhoto(photo.id, star, comment)} />
                 ))}
             </div>
-            <input type="text" placeholder="Kommentar..."
+            <input type="text" placeholder={t`Kommentar...`}
                    value={comment}
                    onChange={e => setComment(e.target.value)}
                    onBlur={() => { if (comment !== (photo.comment || '')) ratePhoto(photo.id, Number(photo.rating || 0), comment); }}

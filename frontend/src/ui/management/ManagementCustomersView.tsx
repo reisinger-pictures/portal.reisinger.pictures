@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../api';
@@ -19,14 +21,14 @@ export default function ManagementCustomersView() {
         try {
             if (editingCustomer) {
                 await apiMutate(`/api/management/customers/${editingCustomer.id}`, 'PUT', data);
-                showToast('success', 'Kunde aktualisiert');
+                showToast('success', t`Kunde aktualisiert`);
             } else {
                 await apiMutate('/api/management/customers', 'POST', data);
-                showToast('success', 'Kunde angelegt');
+                showToast('success', t`Kunde angelegt`);
             }
             mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
         }
     };
 
@@ -36,18 +38,18 @@ export default function ManagementCustomersView() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!(await confirm({ title: 'Kunde löschen?', message: 'Möchtest du diesen Kunden wirklich aus dem CRM entfernen?', confirmColor: 'error' }))) return;
+        if (!(await confirm({ title: t`Kunde löschen?`, message: t`Möchtest du diesen Kunden wirklich aus dem CRM entfernen?`, confirmColor: 'error' }))) return;
         try {
             await apiMutate(`/api/management/customers/${id}`, 'DELETE');
             mutate();
-            showToast('success', 'Kunde gelöscht');
+            showToast('success', t`Kunde gelöscht`);
         } catch {
-            showToast('error', 'Fehler beim Löschen');
+            showToast('error', t`Fehler beim Löschen`);
         }
     };
 
     if (isLoading) return <div className="p-10 flex justify-center"><span className="loading loading-spinner loading-lg"></span></div>;
-    if (error) return <div className="p-10"><ErrorMessage message="Fehler beim Laden der Kunden." /></div>;
+    if (error) return <div className="p-10"><ErrorMessage message={t`Fehler beim Laden der Kunden.`} /></div>;
 
     const filtered = customers?.filter(c => 
         (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -59,16 +61,16 @@ export default function ManagementCustomersView() {
         <div className="p-6 md:p-10 max-w-7xl mx-auto w-full">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-4xl font-bold mb-2">Kunden (CRM)</h1>
-                    <p className="opacity-70">Verwalte deine Geschäftskontakte für Rechnungen und Angebote.</p>
+                    <h1 className="text-4xl font-bold mb-2"><Trans>Kunden (CRM)</Trans></h1>
+                    <p className="opacity-70"><Trans>Verwalte deine Geschäftskontakte für Rechnungen und Angebote.</Trans></p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }}>+ Neuer Kunde</button>
+                <button className="btn btn-primary" onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }}>+ <Trans>Neuer Kunde</Trans></button>
             </div>
 
             <div className="bg-base-100 border border-base-300 rounded-box p-6 shadow-sm">
                 <input 
                     type="text" 
-                    placeholder="Kunden suchen..." 
+                    placeholder={t`Kunden suchen...`} 
                     className="input input-bordered w-full md:w-1/2 mb-6" 
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
@@ -78,10 +80,10 @@ export default function ManagementCustomersView() {
                     <table className="table table-zebra w-full">
                         <thead>
                             <tr>
-                                <th>Name / Firma</th>
-                                <th>E-Mail</th>
-                                <th>Ort</th>
-                                <th className="text-right">Aktionen</th>
+                                <th><Trans>Name / Firma</Trans></th>
+                                <th><Trans>E-Mail</Trans></th>
+                                <th><Trans>Ort</Trans></th>
+                                <th className="text-right"><Trans>Aktionen</Trans></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -91,18 +93,18 @@ export default function ManagementCustomersView() {
                                         <div className="font-bold">{c.company || '-'}</div>
                                         <div className="text-sm opacity-70">{c.name}</div>
                                     </td>
-                                    <td>{c.email || <span className="opacity-30 italic">Keine E-Mail</span>}</td>
+                                    <td>{c.email || <span className="opacity-30 italic"><Trans>Keine E-Mail</Trans></span>}</td>
                                     <td>{c.zip} {c.city}</td>
                                     <td className="text-right">
                                         <div className="flex justify-end gap-2">
-                                            <button className="btn btn-ghost btn-xs btn-square" title="Bearbeiten" onClick={() => openEdit(c)}><span className="iconify mdi--pencil text-base"></span></button>
-                                            <button className="btn btn-ghost btn-xs btn-square text-error" onClick={() => handleDelete(c.id)} title="Löschen"><span className="iconify mdi--trash-can text-base"></span></button>
+                                            <button className="btn btn-ghost btn-xs btn-square" title={t`Bearbeiten`} onClick={() => openEdit(c)}><span className="iconify mdi--pencil text-base"></span></button>
+                                            <button className="btn btn-ghost btn-xs btn-square text-error" onClick={() => handleDelete(c.id)} title={t`Löschen`}><span className="iconify mdi--trash-can text-base"></span></button>
                                         </div>
                                     </td>
                                 </tr>
                             ))}
                             {filtered?.length === 0 && (
-                                <tr><td colSpan={4} className="text-center py-10 opacity-50">Keine Kunden gefunden.</td></tr>
+                                <tr><td colSpan={4} className="text-center py-10 opacity-50"><Trans>Keine Kunden gefunden.</Trans></td></tr>
                             )}
                         </tbody>
                     </table>

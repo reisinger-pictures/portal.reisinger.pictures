@@ -64,6 +64,16 @@ describe('calculateShootingPrice', () => {
         expect(calculateShootingPrice(defaults({discount: '50'}))).toEqual({packagePrice: 369, finalPrice: 185, discountAbsolute: 184});
     });
 
+    it('honours a custom outdoor multiplier (0.3 = 30%)', () => {
+        // Base 50 + Time 120 + (Images 200 * 0.3 = 60) = 230 -> gerundet auf 229
+        expect(calculateShootingPrice(defaults({isOutdoor: true, calc_outdoor_multiplier: '0.3'}))).toEqual({packagePrice: 229, finalPrice: 229, discountAbsolute: 0});
+    });
+
+    it('outdoor multiplier 1.0 means no reduction (100%)', () => {
+        // Base 50 + Time 120 + (Images 200 * 1.0 = 200) = 370 -> gerundet auf 369
+        expect(calculateShootingPrice(defaults({isOutdoor: true, calc_outdoor_multiplier: '1.0'}))).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
+    });
+
     it('honours a custom base price', () => {
         expect(calculateShootingPrice(defaults({calc_base_price: '100'}))).toEqual({packagePrice: 419, finalPrice: 419, discountAbsolute: 0});
     });

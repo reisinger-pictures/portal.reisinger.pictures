@@ -86,7 +86,7 @@ test.describe('Gallery Invite Link Workflow', () => {
         await sidebar.openNewGalleryModal();
         
         await form.fillGalleryModal({ name: galleryName, type: 'Auswahl (Ratings)' });
-        await modal.fillInputByLabel('Passwort (Optional)', password);
+        await modal.fillInputByLabel('Passwort', password);
         
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);

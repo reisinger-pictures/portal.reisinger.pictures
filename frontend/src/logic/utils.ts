@@ -1,8 +1,10 @@
+import {t} from "@lingui/core/macro";
+
 /**
  * Format cents to Euro string
  */
 export function formatMoney(cents: number): string {
-    if (!Number.isFinite(cents)) return '--- €';
+    if (!Number.isFinite(cents)) return t`--- €`;
     return (cents / 100).toFixed(2) + ' €';
 }
 

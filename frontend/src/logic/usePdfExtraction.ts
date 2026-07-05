@@ -1,4 +1,5 @@
 import {useState, useCallback} from 'react';
+import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
 import {InvoiceDiscount, InvoiceItem} from '../api';
 
@@ -33,7 +34,7 @@ export function usePdfExtraction(onDataExtracted: (data: ExtractedData) => void)
                 credentials: 'include',
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || 'Fehler beim Auslesen.');
+            if (!res.ok) throw new Error(data.error || data.message || t`Fehler beim Auslesen.`);
 
             const items: InvoiceItem[] = data.items
                 ?.filter((i: InvoiceItem) => i.type === 'item')
@@ -63,7 +64,7 @@ export function usePdfExtraction(onDataExtracted: (data: ExtractedData) => void)
                 discounts,
             });
 
-            showToast('success', 'Angebotsdaten erfolgreich übernommen!');
+            showToast('success', t`Angebotsdaten erfolgreich übernommen!`);
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : String(err));
         } finally {

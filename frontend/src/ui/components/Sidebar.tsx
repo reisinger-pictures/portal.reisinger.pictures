@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import {Link, useNavigate} from 'react-router-dom';
 import { useBrand } from '../../logic/useBrand';
 import { usePermissions } from '../../logic/usePermissions';
@@ -55,28 +56,28 @@ export default function Sidebar(props: SidebarProps) {
             <ul className="menu bg-base-200 w-full p-2 border-b border-base-300">
                 {isStaff && (
                     <>
-                        <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-2">Übersicht</li>
-                        <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-dashboard text-lg"></span> Dashboard</Link></li>
+                        <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-2"><Trans>Übersicht</Trans></li>
+                        <li><Link to="/" className={props.currentView === 'structure' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-dashboard text-lg"></span> <Trans>Dashboard</Trans></Link></li>
                         
-                        <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Medien</li>
+                        <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Medien</Trans></li>
                         {isPhotographer && (
-                            <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--folder-multiple text-lg"></span> Galerien & Ordner</Link></li>
+                            <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--folder-multiple text-lg"></span> <Trans>Galerien & Ordner</Trans></Link></li>
                         )}
-                        <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
+                        <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> <Trans>Suche & Entdecken</Trans></Link></li>
 
                         {isAdmin && !isSrp && (
                             <>
-                                <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Büro & Dokumente</li>
-                                <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> Shop-Bestellungen</Link></li>
-                                <li><Link to="/admin-payouts" className={props.currentView === 'admin-payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> Payouts & Abrechnung</Link></li>
+                                <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Büro & Dokumente</Trans></li>
+                                <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> <Trans>Shop-Bestellungen</Trans></Link></li>
+                                <li><Link to="/admin-payouts" className={props.currentView === 'admin-payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> <Trans>Payouts & Abrechnung</Trans></Link></li>
                                 {isSuperAdmin && (
                                     <>
-                                        <li><Link to="/admin-manual-offer" className={props.currentView === 'admin-manual-offer' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-chart-outline text-lg"></span> Manuelles Angebot</Link></li>
-                                        <li><Link to="/admin-manual-invoice" className={props.currentView === 'admin-manual-invoice' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-document-edit-outline text-lg"></span> Manuelle Rechnung</Link></li>
-                                        <li><Link to="/admin-customers" className={props.currentView === 'admin-customers' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-details text-lg"></span> Kunden (CRM)</Link></li>
-                                        <li><Link to="/admin-products" className={props.currentView === 'admin-products' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--package-variant-closed text-lg"></span> Produkte & Leistungen</Link></li>
-                                        <li><Link to="/admin-snippets" className={props.currentView === 'admin-snippets' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--text-box-multiple text-lg"></span> Textbausteine</Link></li>
-                                        <li><Link to="/admin-contracts" className={props.currentView === 'admin-contracts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-sign text-lg"></span> Verträge</Link></li>
+                                        <li><Link to="/admin-manual-offer" className={props.currentView === 'admin-manual-offer' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-chart-outline text-lg"></span> <Trans>Manuelles Angebot</Trans></Link></li>
+                                        <li><Link to="/admin-manual-invoice" className={props.currentView === 'admin-manual-invoice' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-document-edit-outline text-lg"></span> <Trans>Manuelle Rechnung</Trans></Link></li>
+                                        <li><Link to="/admin-customers" className={props.currentView === 'admin-customers' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-details text-lg"></span> <Trans>Kunden (CRM)</Trans></Link></li>
+                                        <li><Link to="/admin-products" className={props.currentView === 'admin-products' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--package-variant-closed text-lg"></span> <Trans>Produkte & Leistungen</Trans></Link></li>
+                                        <li><Link to="/admin-snippets" className={props.currentView === 'admin-snippets' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--text-box-multiple text-lg"></span> <Trans>Textbausteine</Trans></Link></li>
+                                        <li><Link to="/admin-contracts" className={props.currentView === 'admin-contracts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-sign text-lg"></span> <Trans>Verträge</Trans></Link></li>
                                     </>
                                 )}
                             </>
@@ -84,38 +85,38 @@ export default function Sidebar(props: SidebarProps) {
 
                         {isAdmin && isSrp && (
                             <>
-                                <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Marketing</li>
-                                <li><Link to="/admin-coupons" className={props.currentView === 'admin-coupons' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--ticket-percent text-lg"></span> Gutscheincode</Link></li>
+                                <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Marketing</Trans></li>
+                                <li><Link to="/admin-coupons" className={props.currentView === 'admin-coupons' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--ticket-percent text-lg"></span> <Trans>Gutscheincode</Trans></Link></li>
                             </>
                         )}
 
-                        <li className="menu-title opacity-50 text-[10px] uppercase tracking-widest mt-4">Verwaltung</li>
+                        <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Verwaltung</Trans></li>
                         {(isAdmin || isOrgAdmin) && showTenantsSection && !isSrp && (
                             <>
-                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> Organisationen</Link></li>
-                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {isOrgAdmin && !isAdmin ? 'Mein Team' : 'Benutzer & Rechte'}</Link></li>
+                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> <Trans>Organisationen</Trans></Link></li>
+                                <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {isOrgAdmin && !isAdmin ? <Trans>Mein Team</Trans> : <Trans>Benutzer & Rechte</Trans>}</Link></li>
                             </>
                         )}
-                        <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> Auswertungen</Link></li>
+                        <li><Link to="/stats" className={props.currentView === 'stats' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--chart-bar text-lg"></span> <Trans>Auswertungen</Trans></Link></li>
                         {isAdmin && (
-                            <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> Einstellungen</Link></li>
+                            <li><Link to="/settings" className={props.currentView === 'settings' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cog text-lg"></span> <Trans>Einstellungen</Trans></Link></li>
                         )}
                     </>
                 )}
                 
                 {user && (
                     <>
-                        {isStaff && <div className="divider my-1 text-sm opacity-50">Dein Account</div>}
-                        <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> Suche & Entdecken</Link></li>
-                        <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> Mein Profil</Link></li>
-                        <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> Einkäufe & Anfragen</Link></li>
-                        {isPhotographer && <li><Link to="/my-payouts" className={props.currentView === 'payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> Meine Abrechnungen</Link></li>}
+                        {isStaff && <div className="divider my-1 text-sm opacity-50"><Trans>Dein Account</Trans></div>}
+                        <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> <Trans>Suche & Entdecken</Trans></Link></li>
+                        <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> <Trans>Mein Profil</Trans></Link></li>
+                        <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> <Trans>Einkäufe & Anfragen</Trans></Link></li>
+                        {isPhotographer && <li><Link to="/my-payouts" className={props.currentView === 'payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> <Trans>Meine Abrechnungen</Trans></Link></li>}
                     </>
                 )}
                 
                 <li>
                     <a onClick={() => { props.onCloseMobile?.(); navigate('/cart'); }} className="flex justify-between items-center">
-                        <div className="flex items-center gap-2"><span className="mdi--cart text-lg"></span> Warenkorb</div>
+                        <div className="flex items-center gap-2"><span className="mdi--cart text-lg"></span> <Trans>Warenkorb</Trans></div>
                         {itemCount > 0 && <span className="badge badge-primary badge-sm">{itemCount}</span>}
                     </a>
                 </li>
@@ -125,12 +126,12 @@ export default function Sidebar(props: SidebarProps) {
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">
                 <div className="p-3 text-center">
                     <a href={impressumUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                        <span className="iconify mdi--open-in-new"></span> Impressum & Datenschutz
+                        <span className="iconify mdi--open-in-new"></span> <Trans>Impressum & Datenschutz</Trans>
                     </a>
                 </div>
                 {user && (
                     <div className="p-4 pt-0">
-                        <button onClick={handleLogout} className="btn btn-outline btn-error w-full btn-sm">Abmelden</button>
+                        <button onClick={handleLogout} className="btn btn-outline btn-error w-full btn-sm"><Trans>Abmelden</Trans></button>
                     </div>
                 )}
             </div>

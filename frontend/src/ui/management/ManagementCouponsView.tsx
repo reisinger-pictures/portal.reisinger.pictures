@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useSWR from 'swr';
@@ -18,16 +20,16 @@ interface PaginatedCoupons {
 }
 
 const TYPE_LABELS: Record<Coupon['type'], string> = {
-    fixed: 'Festbetrag',
-    percentage: 'Prozent',
+    fixed: t`Festbetrag`,
+    percentage: t`Prozent`,
 };
 
 const SCOPE_LABELS: Record<Coupon['scope_type'], string> = {
-    global: 'Global',
-    gallery: 'Galerie',
-    meta_gallery: 'Meta-Galerie',
-    photographer: 'Fotograf',
-    organisation: 'Organisation',
+    global: t`Global`,
+    gallery: t`Galerie`,
+    meta_gallery: t`Meta-Galerie`,
+    photographer: t`Fotograf`,
+    organisation: t`Organisation`,
 };
 
 const formatValue = (coupon: Coupon): string => {
@@ -74,9 +76,9 @@ export default function ManagementCouponsView() {
             <div className="p-6 md:p-10 max-w-3xl mx-auto w-full">
                 <div className="bg-base-100 border border-base-300 rounded-box p-10 shadow-sm text-center">
                     <span className="iconify mdi--ticket-percent-outline text-5xl text-primary mb-4 inline-block"></span>
-                    <h1 className="text-3xl font-bold mb-2">Gutscheincode</h1>
+                    <h1 className="text-3xl font-bold mb-2"><Trans>Gutscheincode</Trans></h1>
                     <p className="opacity-70">
-                        Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar.
+                        <Trans>Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar.</Trans>
                     </p>
                 </div>
             </div>
@@ -97,16 +99,16 @@ export default function ManagementCouponsView() {
         try {
             if (editingCoupon && editingCoupon.id !== undefined) {
                 await apiMutate(`/api/management/coupons/${editingCoupon.id}`, 'PUT', payload);
-                showToast('success', 'Gutscheincode aktualisiert');
+                showToast('success', t`Gutscheincode aktualisiert`);
             } else {
                 await apiMutate('/api/management/coupons', 'POST', payload);
-                showToast('success', 'Gutscheincode angelegt');
+                showToast('success', t`Gutscheincode angelegt`);
             }
             setIsDrawerOpen(false);
             setEditingCoupon(null);
             void mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
         }
     };
 
@@ -117,29 +119,30 @@ export default function ManagementCouponsView() {
                 ...coupon,
                 active: !coupon.active,
             });
-            showToast('success', coupon.active ? 'Gutscheincode deaktiviert' : 'Gutscheincode aktiviert');
+            showToast('success', coupon.active ? t`Gutscheincode deaktiviert` : t`Gutscheincode aktiviert`);
             void mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Umschalten');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Umschalten`);
         }
     };
 
     const handleDelete = async (coupon: Coupon) => {
         if (coupon.id === undefined) return;
         if (coupon.used_count > 0) return;
+        const couponCode = coupon.code;
         if (!(await confirm({
-title: 'Gutscheincode löschen?',
-                message: `Möchtest du den Gutscheincode "${coupon.code}" wirklich entfernen?`,
+            title: t`Gutscheincode löschen?`,
+                message: t`Möchtest du den Gutscheincode "${couponCode}" wirklich entfernen?`,
             confirmColor: 'error',
         }))) {
             return;
         }
         try {
             await apiMutate(`/api/management/coupons/${coupon.id}`, 'DELETE');
-            showToast('success', 'Gutscheincode gelöscht');
+            showToast('success', t`Gutscheincode gelöscht`);
             void mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Löschen');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Löschen`);
         }
     };
 
@@ -165,7 +168,7 @@ title: 'Gutscheincode löschen?',
     if (error) {
         return (
             <div className="p-10">
-                <ErrorMessage message="Fehler beim Laden der Gutscheincodes." />
+                    <ErrorMessage message={t`Fehler beim Laden der Gutscheincodes.`} />
             </div>
         );
     }
@@ -173,6 +176,7 @@ title: 'Gutscheincode löschen?',
     const coupons: Coupon[] = data?.data ?? [];
     const lastPage = data?.last_page ?? 1;
     const total = data?.total ?? 0;
+    const totalPlural = total === 1 ? '' : 's';
 
     return (
         <div className="p-6 md:p-10 max-w-7xl mx-auto w-full">
@@ -180,15 +184,15 @@ title: 'Gutscheincode löschen?',
                 <div>
                     <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
                         <span className="iconify mdi--ticket-percent-outline text-primary"></span>
-Gutscheincode
+<Trans>Gutscheincode</Trans>
                     </h1>
                     <p className="opacity-70">
-                        Verwalte Rabattcodes für den SRP-Shop (B2C).
+                        <Trans>Verwalte Rabattcodes für den SRP-Shop (B2C).</Trans>
                     </p>
                 </div>
                 <button className="btn btn-primary" onClick={openCreate}>
                     <span className="iconify mdi--plus"></span>
-                    Neuen Gutscheincode anlegen
+                    <Trans>Neuen Gutscheincode anlegen</Trans>
                 </button>
             </div>
 
@@ -196,8 +200,8 @@ Gutscheincode
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div className="text-sm opacity-70">
                         {total === 0
-                            ? 'Keine Gutscheincodes vorhanden.'
-                            : `${total} Gutscheincode${total === 1 ? '' : 's'} insgesamt`}
+                            ? <Trans>Keine Gutscheincodes vorhanden.</Trans>
+                            : t`${total} Gutscheincode${totalPlural} insgesamt`}
                     </div>
                 </div>
 
@@ -205,14 +209,14 @@ Gutscheincode
                     <table className="table table-zebra w-full">
                         <thead>
                             <tr>
-                                <th>Code</th>
-                                <th>Typ</th>
-                                <th>Wert</th>
-                                <th>Scope</th>
-                                <th>Verwendung</th>
-                                <th>Läuft ab</th>
-                                <th>Status</th>
-                                <th className="text-right">Aktionen</th>
+                                <th><Trans>Code</Trans></th>
+                                <th><Trans>Typ</Trans></th>
+                                <th><Trans>Wert</Trans></th>
+                                <th><Trans>Scope</Trans></th>
+                                <th><Trans>Verwendung</Trans></th>
+                                <th><Trans>Läuft ab</Trans></th>
+                                <th><Trans>Status</Trans></th>
+                                <th className="text-right"><Trans>Aktionen</Trans></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -230,23 +234,23 @@ Gutscheincode
                                     <td>{formatExpiry(coupon.expires_at)}</td>
                                     <td>
                                         {coupon.active ? (
-                                            <span className="badge badge-success font-bold">Aktiv</span>
+                                            <span className="badge badge-success font-bold"><Trans>Aktiv</Trans></span>
                                         ) : (
-                                            <span className="badge badge-ghost font-bold">Inaktiv</span>
+                                            <span className="badge badge-ghost font-bold"><Trans>Inaktiv</Trans></span>
                                         )}
                                     </td>
                                     <td className="text-right">
                                         <div className="flex justify-end gap-1">
                                             <button
                                                 className="btn btn-ghost btn-xs btn-square"
-                                                title="Bearbeiten"
+                                                title={t`Bearbeiten`}
                                                 onClick={() => openEdit(coupon)}
                                             >
                                                 <span className="iconify mdi--pencil text-base"></span>
                                             </button>
                                             <button
                                                 className="btn btn-ghost btn-xs btn-square"
-                                                title={coupon.active ? 'Deaktivieren' : 'Aktivieren'}
+                                                title={coupon.active ? t`Deaktivieren` : t`Aktivieren`}
                                                 onClick={() => void handleToggle(coupon)}
                                             >
                                                 <span
@@ -257,8 +261,8 @@ Gutscheincode
                                                 className="btn btn-ghost btn-xs btn-square text-error"
                                                 title={
                                                     coupon.used_count > 0
-                                                        ? 'Löschen nicht möglich (bereits verwendet)'
-                                                        : 'Löschen'
+                                                        ? t`Löschen nicht möglich (bereits verwendet)`
+                                                        : t`Löschen`
                                                 }
                                                 disabled={coupon.used_count > 0}
                                                 onClick={() => void handleDelete(coupon)}
@@ -272,7 +276,7 @@ Gutscheincode
                             {coupons.length === 0 && (
                                 <tr>
                                     <td colSpan={8} className="text-center py-10 opacity-50">
-                                        Keine Gutscheincodes gefunden. Lege den ersten Gutscheincode an.
+                                        <Trans>Keine Gutscheincodes gefunden. Lege den ersten Gutscheincode an.</Trans>
                                     </td>
                                 </tr>
                             )}

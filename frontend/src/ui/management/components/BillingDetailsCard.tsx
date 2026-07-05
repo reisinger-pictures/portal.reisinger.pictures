@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {useEffect} from 'react';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -10,14 +11,14 @@ import {useUI} from '../../components/UIContext';
 const ibanRegex = /^(AT|DE)\d{2}[ ]?(\d{4}[ ]?){4,7}\d{0,4}$/i;
 
 const billingDetailsSchema = z.object({
-    bank_holder: z.string().min(2, 'Mindestens 2 Zeichen'),
-    bank_iban: z.string().regex(ibanRegex, 'Ungültige IBAN (AT/DE)').max(42),
+    bank_holder: z.string().min(2, t`Mindestens 2 Zeichen`),
+    bank_iban: z.string().regex(ibanRegex, t`Ungültige IBAN (AT/DE)`).max(42),
     bank_bic: z.string().max(12).optional().or(z.literal('')),
-    company_street: z.string().min(2, 'Mindestens 2 Zeichen'),
-    company_zip: z.string().min(3, 'Mindestens 3 Zeichen'),
-    company_city: z.string().min(2, 'Mindestens 2 Zeichen'),
+    company_street: z.string().min(2, t`Mindestens 2 Zeichen`),
+    company_zip: z.string().min(3, t`Mindestens 3 Zeichen`),
+    company_city: z.string().min(2, t`Mindestens 2 Zeichen`),
     company_country: z.string().optional().or(z.literal('')),
-    company_email: z.string().email('Ungültige E-Mail').optional().or(z.literal('')),
+    company_email: z.string().email(t`Ungültige E-Mail`).optional().or(z.literal('')),
 });
 
 type BillingFormValues = z.infer<typeof billingDetailsSchema>;

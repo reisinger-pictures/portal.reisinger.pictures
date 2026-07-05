@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {useState, useCallback} from 'react';
 import {usePermissions} from '../../logic/usePermissions';
 import {useUI} from '../components/UIContext';
@@ -99,14 +101,14 @@ export default function ManagementContractView() {
                 const created = await createContract(payload);
                 setEditingContract(created);
                 setIsNew(false);
-                showToast('success', 'Vertrag wurde erstellt.');
+                showToast('success', t`Vertrag wurde erstellt.`);
             } else if (editingContract) {
                 await updateContract(editingContract.id, payload);
-                showToast('success', 'Vertrag wurde aktualisiert.');
+                showToast('success', t`Vertrag wurde aktualisiert.`);
             }
             await mutateList();
         } catch (err: unknown) {
-            showToast('error', err instanceof Error ? err.message : 'Fehler beim Speichern.');
+            showToast('error', err instanceof Error ? err.message : t`Fehler beim Speichern.`);
         }
         setIsSaving(false);
     };
@@ -114,9 +116,9 @@ export default function ManagementContractView() {
     const handleOpen = async () => {
         if (!editingContract) return;
         const ok = await confirm({
-            title: 'Vertragsperiode starten',
-            message: 'Nach dem Start kann der Vertrag nicht mehr bearbeitet werden. Der generierte Join-Link wird an die Unterzeichner weitergegeben. Fortfahren?',
-            confirmText: 'Starten',
+            title: t`Vertragsperiode starten`,
+            message: t`Nach dem Start kann der Vertrag nicht mehr bearbeitet werden. Der generierte Join-Link wird an die Unterzeichner weitergegeben. Fortfahren?`,
+            confirmText: t`Starten`,
             confirmColor: 'primary',
         });
         if (!ok) return;
@@ -125,10 +127,10 @@ export default function ManagementContractView() {
             const result = await openContract(editingContract.id);
             setJoinLink(result.join_link);
             setEditingContract(result.contract);
-            showToast('success', 'Vertragsperiode wurde gestartet.');
+            showToast('success', t`Vertragsperiode wurde gestartet.`);
             await mutateList();
         } catch (err: unknown) {
-            showToast('error', err instanceof Error ? err.message : 'Fehler beim Öffnen.');
+            showToast('error', err instanceof Error ? err.message : t`Fehler beim Öffnen.`);
         }
         setIsSaving(false);
     };
@@ -136,9 +138,9 @@ export default function ManagementContractView() {
     const handleClose = async () => {
         if (!editingContract) return;
         const ok = await confirm({
-            title: 'Vertrag schließen',
-            message: 'Nach dem Schließen können keine weiteren Unterzeichner beitreten oder unterschreiben. Fortfahren?',
-            confirmText: 'Schließen',
+            title: t`Vertrag schließen`,
+            message: t`Nach dem Schließen können keine weiteren Unterzeichner beitreten oder unterschreiben. Fortfahren?`,
+            confirmText: t`Schließen`,
             confirmColor: 'warning',
         });
         if (!ok) return;
@@ -146,10 +148,10 @@ export default function ManagementContractView() {
         try {
             const result = await closeContract(editingContract.id);
             setEditingContract(result.contract);
-            showToast('success', 'Vertrag wurde geschlossen.');
+            showToast('success', t`Vertrag wurde geschlossen.`);
             await mutateList();
         } catch (err: unknown) {
-            showToast('error', err instanceof Error ? err.message : 'Fehler beim Schließen.');
+            showToast('error', err instanceof Error ? err.message : t`Fehler beim Schließen.`);
         }
         setIsSaving(false);
     };
@@ -158,9 +160,9 @@ export default function ManagementContractView() {
         if (!joinLink) return;
         try {
             await navigator.clipboard.writeText(joinLink);
-            showToast('success', 'Link wurde kopiert.');
+            showToast('success', t`Link wurde kopiert.`);
         } catch {
-            showToast('error', 'Konnte Link nicht kopieren.');
+            showToast('error', t`Konnte Link nicht kopieren.`);
         }
     };
 
@@ -248,27 +250,27 @@ export default function ManagementContractView() {
             cancelled: 'badge-error',
         };
         const labels: Record<string, string> = {
-            draft: 'Entwurf',
-            active: 'Aktiv',
-            closed: 'Geschlossen',
-            cancelled: 'Storniert',
+            draft: t`Entwurf`,
+            active: t`Aktiv`,
+            closed: t`Geschlossen`,
+            cancelled: t`Storniert`,
         };
         return <span className={`badge ${map[s] || 'badge-ghost'} badge-sm`}>{labels[s] || s}</span>;
     };
 
-    if (!isSuperAdmin) return <div className="p-8"><ErrorMessage message="Keine Berechtigung."/></div>;
+    if (!isSuperAdmin) return <div className="p-8"><ErrorMessage message={t`Keine Berechtigung.`}/></div>;
 
     return (
         <div className="p-6 md:p-10 max-w-6xl mx-auto w-full space-y-6">
             {/* Contract list or form toggle */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <span className="iconify mdi--file-sign text-primary"></span>
-                    Vertragsmanagement
-                </h1>
-                <button onClick={handleNewContract} className="btn btn-primary btn-sm">
-                    <span className="iconify mdi--plus"></span> Neuer Vertrag
-                </button>
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <span className="iconify mdi--file-sign text-primary"></span>
+                        <Trans>Vertragsmanagement</Trans>
+                    </h1>
+                    <button onClick={handleNewContract} className="btn btn-primary btn-sm">
+                        <span className="iconify mdi--plus"></span> <Trans>Neuer Vertrag</Trans>
+                    </button>
             </div>
 
             {/* Contract list */}
@@ -279,15 +281,15 @@ export default function ManagementContractView() {
             ) : (
                 <div className="bg-base-100 p-4 rounded-box border border-base-300 shadow-sm overflow-x-auto">
                     {contracts.length === 0 ? (
-                        <p className="text-sm opacity-50 italic p-4">Noch keine Verträge vorhanden.</p>
+                        <p className="text-sm opacity-50 italic p-4"><Trans>Noch keine Verträge vorhanden.</Trans></p>
                     ) : (
                         <table className="table table-sm w-full">
                             <thead>
                             <tr>
-                                <th>Status</th>
-                                <th>Rollen</th>
-                                <th>Unterzeichner</th>
-                                <th>Erstellt</th>
+                                <th><Trans>Status</Trans></th>
+                                <th><Trans>Rollen</Trans></th>
+                                <th><Trans>Unterzeichner</Trans></th>
+                                <th><Trans>Erstellt</Trans></th>
                                 <th></th>
                             </tr>
                             </thead>
@@ -318,13 +320,13 @@ export default function ManagementContractView() {
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm flex items-center justify-between gap-4 flex-wrap">
                         <div>
                             <h2 className="font-bold text-xl">
-                                {isNew ? 'Neuen Vertrag erstellen' : 'Vertrag bearbeiten'}
+                                {isNew ? <Trans>Neuen Vertrag erstellen</Trans> : <Trans>Vertrag bearbeiten</Trans>}
                             </h2>
                             {!isNew && (
                                 <p className="text-sm opacity-60 mt-1">
                                     {statusBadge(editingContract?.status || 'draft')}
                                     {editingContract?.created_at && (
-                                        <span className="ml-3">Erstellt: {new Date(editingContract.created_at).toLocaleDateString('de-DE')}</span>
+                                        <span className="ml-3"><Trans>Erstellt:</Trans> {new Date(editingContract.created_at).toLocaleDateString('de-DE')}</span>
                                     )}
                                 </p>
                             )}
@@ -333,18 +335,18 @@ export default function ManagementContractView() {
 
                     {/* Roles section */}
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-                        <h2 className="font-bold text-xl mb-4">Rollen (verfügbar für Unterzeichner)</h2>
+                        <h2 className="font-bold text-xl mb-4"><Trans>Rollen (verfügbar für Unterzeichner)</Trans></h2>
                         <div className="flex gap-2 mb-3">
                             <input
                                 type="text"
                                 value={roleInput}
                                 onChange={e => setRoleInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddRole(); }}}
-                                placeholder="z.B. Fotograf, Model, Agentur"
+                                placeholder={t`z.B. Fotograf, Model, Agentur`}
                                 className="input input-sm input-bordered flex-1"
                             />
                             <button type="button" onClick={handleAddRole} className="btn btn-sm btn-outline btn-primary">
-                                + Hinzufügen
+                                + <Trans>Hinzufügen</Trans>
                             </button>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -358,15 +360,15 @@ export default function ManagementContractView() {
                                 </span>
                             ))}
                             {availableRoles.length === 0 && (
-                                <p className="text-sm opacity-50 italic">Keine Rollen definiert. Unterzeichner können ohne Rollenzuweisung beitreten.</p>
+                                <p className="text-sm opacity-50 italic"><Trans>Keine Rollen definiert. Unterzeichner können ohne Rollenzuweisung beitreten.</Trans></p>
                             )}
                         </div>
                         <div className="form-control mt-4">
-                            <label className="label cursor-pointer justify-start gap-3">
+                            <label className="label cursor-pointer justify-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
                                 <input type="checkbox" checked={allowMultipleRoles}
                                        onChange={e => setAllowMultipleRoles(e.target.checked)}
-                                       className="checkbox checkbox-primary checkbox-sm"/>
-                                <span className="label-text">Mehrere Rollen pro Unterzeichner erlauben</span>
+                                       className="checkbox checkbox-primary"/>
+                                <span className="label-text font-bold"><Trans>Mehrere Rollen pro Unterzeichner erlauben</Trans></span>
                             </label>
                         </div>
                     </div>
@@ -376,53 +378,53 @@ export default function ManagementContractView() {
                         <details className="group">
                             <summary className="cursor-pointer font-bold text-xl list-none flex items-center gap-2">
                                 <span className="iconify mdi--chevron-right group-open:rotate-90 transition-transform"></span>
-                                Rechnungsempfänger (optional)
+                                <Trans>Rechnungsempfänger</Trans>
                             </summary>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Name</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Name</Trans></span></label>
                                     <input type="text" value={billingDetails.name || ''}
                                            onChange={e => handleBillingField('name', e.target.value)}
                                            className="input input-sm input-bordered"/>
                                 </div>
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Firma</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Firma</Trans></span></label>
                                     <input type="text" value={billingDetails.company || ''}
                                            onChange={e => handleBillingField('company', e.target.value)}
                                            className="input input-sm input-bordered"/>
                                 </div>
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Straße</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Straße</Trans></span></label>
                                     <input type="text" value={billingDetails.street || ''}
                                            onChange={e => handleBillingField('street', e.target.value)}
                                            className="input input-sm input-bordered"/>
                                 </div>
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">PLZ</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>PLZ</Trans></span></label>
                                     <input type="text" value={billingDetails.zip || ''}
                                            onChange={e => handleBillingField('zip', e.target.value)}
                                            className="input input-sm input-bordered"/>
                                 </div>
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Stadt</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Stadt</Trans></span></label>
                                     <input type="text" value={billingDetails.city || ''}
                                            onChange={e => handleBillingField('city', e.target.value)}
                                            className="input input-sm input-bordered"/>
                                 </div>
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Land</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Land</Trans></span></label>
                                     <input type="text" value={billingDetails.country || ''}
                                            onChange={e => handleBillingField('country', e.target.value)}
                                            className="input input-sm input-bordered"/>
                                 </div>
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">E-Mail</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>E-Mail</Trans></span></label>
                                     <input type="email" value={billingDetails.email || ''}
                                            onChange={e => handleBillingField('email', e.target.value)}
                                            className="input input-sm input-bordered"/>
                                 </div>
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">UID</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>UID</Trans></span></label>
                                     <input type="text" value={billingDetails.uid || ''}
                                            onChange={e => handleBillingField('uid', e.target.value)}
                                            className="input input-sm input-bordered"/>
@@ -433,9 +435,9 @@ export default function ManagementContractView() {
 
                     {/* Closes at */}
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-                        <h2 className="font-bold text-xl mb-4">Vertragsperiode</h2>
+                        <h2 className="font-bold text-xl mb-4"><Trans>Vertragsperiode</Trans></h2>
                         <div className="form-control max-w-xs">
-                            <label className="label py-1"><span className="label-text text-sm font-bold">Gültig bis</span></label>
+                            <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Gültig bis</Trans></span></label>
                             <input type="date" value={closesAt}
                                    onChange={e => setClosesAt(e.target.value)}
                                    className="input input-sm input-bordered"/>
@@ -464,7 +466,7 @@ export default function ManagementContractView() {
 
                     {/* Terms */}
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-                        <h2 className="font-bold text-xl mb-4">Allgemeine Vertragsbedingungen</h2>
+                        <h2 className="font-bold text-xl mb-4"><Trans>Allgemeine Vertragsbedingungen</Trans></h2>
                         <WysiwygEditor value={termsHtml} onChange={setTermsHtml}/>
                     </div>
 
@@ -473,14 +475,14 @@ export default function ManagementContractView() {
                         <div className="bg-base-100 p-6 rounded-box border border-success/30 shadow-sm">
                             <h2 className="font-bold text-xl mb-2 flex items-center gap-2 text-success">
                                 <span className="iconify mdi--link-variant"></span>
-                                Join-Link
+                                <Trans>Join-Link</Trans>
                             </h2>
-                            <p className="text-sm opacity-70 mb-3">Teile diesen Link mit den Unterzeichnern:</p>
+                            <p className="text-sm opacity-70 mb-3"><Trans>Teile diesen Link mit den Unterzeichnern:</Trans></p>
                             <div className="join w-full">
                                 <input type="text" readOnly value={joinLink}
                                        className="input input-bordered join-item w-full font-mono text-sm"/>
                                 <button onClick={handleCopyLink} className="btn btn-primary join-item">
-                                    <span className="iconify mdi--clipboard-text"></span> Kopieren
+                                    <span className="iconify mdi--clipboard-text"></span> <Trans>Kopieren</Trans>
                                 </button>
                             </div>
                         </div>
@@ -489,16 +491,16 @@ export default function ManagementContractView() {
                     {/* Signers list */}
                     {editingContract?.signers && editingContract.signers.length > 0 && (
                         <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-                            <h2 className="font-bold text-xl mb-4">Unterzeichner</h2>
+                            <h2 className="font-bold text-xl mb-4"><Trans>Unterzeichner</Trans></h2>
                             <div className="overflow-x-auto">
                                 <table className="table table-sm w-full">
                                     <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>E-Mail</th>
-                                        <th>Rollen</th>
-                                        <th>Status</th>
-                                        <th>Unterschrieben am</th>
+                                        <th><Trans>Name</Trans></th>
+                                        <th><Trans>E-Mail</Trans></th>
+                                        <th><Trans>Rollen</Trans></th>
+                                        <th><Trans>Status</Trans></th>
+                                        <th><Trans>Unterschrieben am</Trans></th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -507,7 +509,7 @@ export default function ManagementContractView() {
                                             <td className="font-medium">{s.name}</td>
                                             <td className="text-sm opacity-70">{s.email}</td>
                                             <td className="text-xs">{s.roles.join(', ') || '—'}</td>
-                                            <td>{s.status === 'signed' ? <span className="badge badge-success badge-sm">Unterschrieben</span> : s.status === 'joined' ? <span className="badge badge-info badge-sm">Beigetreten</span> : <span className="badge badge-ghost badge-sm">Eingeladen</span>}</td>
+                                            <td>{s.status === 'signed' ? <span className="badge badge-success badge-sm"><Trans>Unterschrieben</Trans></span> : s.status === 'joined' ? <span className="badge badge-info badge-sm"><Trans>Beigetreten</Trans></span> : <span className="badge badge-ghost badge-sm"><Trans>Eingeladen</Trans></span>}</td>
                                             <td className="text-xs opacity-60">{s.signed_at ? new Date(s.signed_at).toLocaleDateString('de-DE') : '—'}</td>
                                         </tr>
                                     ))}
@@ -524,13 +526,13 @@ export default function ManagementContractView() {
                                 <button onClick={handleSave} disabled={isSaving}
                                         className="btn btn-primary shadow-xl">
                                     {isSaving ? <span className="loading loading-spinner"></span> : <span className="iconify mdi--content-save"></span>}
-                                    {isNew ? 'Vertrag erstellen' : 'Entwurf speichern'}
+                                    {isNew ? <Trans>Vertrag erstellen</Trans> : <Trans>Entwurf speichern</Trans>}
                                 </button>
                                 {!isNew && (
                                     <button onClick={handleOpen} disabled={isSaving}
                                             className="btn btn-success shadow-xl">
                                         <span className="iconify mdi--play-circle"></span>
-                                        Vertragsperiode starten
+                                        <Trans>Vertragsperiode starten</Trans>
                                     </button>
                                 )}
                             </>
@@ -540,12 +542,12 @@ export default function ManagementContractView() {
                                 <button onClick={handleClose} disabled={isSaving}
                                         className="btn btn-warning shadow-xl">
                                     <span className="iconify mdi--stop-circle"></span>
-                                    Vertrag schließen
-                                </button>
+                                        <Trans>Vertrag schließen</Trans>
+                                    </button>
                             </>
                         )}
                         {editingContract?.status === 'closed' && (
-                            <p className="text-sm opacity-50 italic">Dieser Vertrag ist geschlossen und kann nicht mehr bearbeitet werden.</p>
+                            <p className="text-sm opacity-50 italic"><Trans>Dieser Vertrag ist geschlossen und kann nicht mehr bearbeitet werden.</Trans></p>
                         )}
                     </div>
                 </div>

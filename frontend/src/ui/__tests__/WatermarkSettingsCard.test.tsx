@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import WatermarkSettingsCard from '../management/components/WatermarkSettingsCard';
 
 // --------------------------------------------------------------------------
@@ -116,7 +117,7 @@ describe('WatermarkSettingsCard', () => {
             isAdmin: false,
         });
 
-        const { container } = render(<WatermarkSettingsCard />);
+        const { container } = renderWithProviders(<WatermarkSettingsCard />);
         expect(container.innerHTML).toBe('');
     });
 
@@ -125,7 +126,7 @@ describe('WatermarkSettingsCard', () => {
     // ----------------------------------------------------------------------
 
     it('calls renderSvgToDataUrl once per slider change', async () => {
-        render(<WatermarkSettingsCard />);
+        renderWithProviders(<WatermarkSettingsCard />);
 
         // Wait for the initial preview image to appear (initial render completed)
         await waitFor(() => {
@@ -166,7 +167,7 @@ describe('WatermarkSettingsCard', () => {
             }),
         );
 
-        render(<WatermarkSettingsCard />);
+        renderWithProviders(<WatermarkSettingsCard />);
 
         // The loading indicator should be visible (no preview)
         await waitFor(() => {

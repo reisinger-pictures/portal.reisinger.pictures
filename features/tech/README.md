@@ -5,3 +5,4 @@
 * [Frontend architecture](03-frontend-architecture.md)
 * [Testing guidelines](04-testing-guidelines.md)
 * [Security and perf refinement](05-security-and-perf-refinement.md)
+* [Internationalisierung (i18n)](06-i18n-internationalization.md)

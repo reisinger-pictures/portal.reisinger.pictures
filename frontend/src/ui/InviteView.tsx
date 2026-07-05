@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import ErrorMessage from './components/ErrorMessage';
 import { useSWRConfig } from 'swr';
 import {useNavigate, useParams} from 'react-router-dom';
@@ -30,7 +32,7 @@ export default function InviteView() {
     useEffect(() => {
         fetch('/api/invites/' + token, {headers: {'Accept': 'application/json'}})
             .then(res => {
-                if (!res.ok) throw new Error('Dieser Einladungslink ist ungültig oder abgelaufen.');
+                if (!res.ok) throw new Error(t`Dieser Einladungslink ist ungültig oder abgelaufen.`);
                 return res.json();
             })
             .then(data => {
@@ -58,7 +60,7 @@ export default function InviteView() {
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || JSON.stringify(data) || 'Fehler beim Beitritt.');
+            if (!res.ok) throw new Error(data.error || data.message || JSON.stringify(data) || t`Fehler beim Beitritt.`);
             if (data.requires_mail_verification) {
                 setRegSuccess(data.message);
                 return;
@@ -95,7 +97,7 @@ export default function InviteView() {
                 })
                 .catch((err) => {
                     console.error("Auto-redeem failed", err);
-                    setError('Automatischer Beitritt fehlgeschlagen. Bitte manuell versuchen.');
+                    setError(t`Automatischer Beitritt fehlgeschlagen. Bitte manuell versuchen.`);
                     setAutoRedeeming(false);
                     autoRedeemStartedRef.current = false;
                 });
@@ -120,8 +122,8 @@ export default function InviteView() {
             <div className="flex h-full items-center justify-center p-4">
                 <div className="card w-full max-w-md bg-base-100 shadow-2xl">
                     <div className="card-body">
-                        <h2 className="card-title text-2xl mb-1">Willkommen zur Fotoauswahl</h2>
-                        <p className="text-base-content/70 mb-6">Galerie: <strong>{galleryName}</strong></p>
+                        <h2 className="card-title text-2xl mb-1"><Trans>Willkommen zur Fotoauswahl</Trans></h2>
+                        <p className="text-base-content/70 mb-6"><Trans>Galerie:</Trans><strong>{galleryName}</strong></p>
 
                         {error && <ErrorMessage message={error} className="mb-4" />}
 
@@ -131,67 +133,66 @@ export default function InviteView() {
                             <span>{regSuccess}</span>
                         </div>
                     )}
-                    {!regSuccess && inviteName && !requiresPassword ? (
+                                    {!regSuccess && inviteName && !requiresPassword ? (
                             <form onSubmit={handleSubmit}>
                                 <div className="form-control mt-4 mb-4">
-                                    <label className="cursor-pointer label justify-start gap-3">
-                                        <input type="checkbox" required className="checkbox checkbox-primary checkbox-sm mt-0.5" checked={acceptPrivacy} onChange={e => setAcceptPrivacy(e.target.checked)} />
-                                        <span className="label-text text-sm leading-tight">
-                                            Ich habe die <a href="/privacy" target="_blank" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.
-                                        </span>
-                                    </label>
-                                </div>
-                                <div className="form-control">
-                                    <button type="submit" className="btn btn-primary w-full text-lg">Weiter als {inviteName}</button>
-                                </div>
-                            </form>
-                        ) : (
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                {!regSuccess && !inviteName && (
-                                    <>
-                                        <div className="form-control">
-                                            <label className="label"><span
-                                                className="label-text font-bold">Dein Name</span></label>
-                                            <input type="text" required value={name}
-                                                   onChange={e => setName(e.target.value)}
-                                                   className="input input-bordered" placeholder="z.B. Maria Muster"/>
-                                        </div>
-                                        <div className="form-control">
-                                            <label className="label"><span
-                                                className="label-text font-bold">Deine E-Mail</span></label>
-                                            <input type="email" required value={email}
-                                                   onChange={e => setEmail(e.target.value)}
-                                                   className="input input-bordered" placeholder="maria@beispiel.de"/>
-                                        </div>
-                                    </>
-                                )}
-
-                                {inviteName && requiresPassword && (
-                                    <p className="text-sm opacity-70">Hallo <strong>{inviteName}</strong>, bitte gib das
-                                        Galerie-Passwort ein.</p>
-                                )}
-
-                                {requiresPassword && (
-                                    <div className="form-control pt-2">
-                                        <label className="label"><span
-                                            className="label-text font-bold text-warning">Galerie-Passwort</span></label>
-                                        <input type="password" required value={password}
-                                               onChange={e => setPassword(e.target.value)}
-                                               className="input input-bordered input-warning"/>
+                                <label className="cursor-pointer label justify-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
+                                    <input type="checkbox" required className="checkbox checkbox-primary mt-0.5 shrink-0" checked={acceptPrivacy} onChange={e => setAcceptPrivacy(e.target.checked)} />
+                                    <span className="label-text text-sm leading-tight">
+                                        <Trans>Ich habe die <a href="/privacy" target="_blank" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.</Trans>
+                                    </span>
+                                </label>
+                            </div>
+                            <div className="form-control">
+                                <button type="submit" className="btn btn-primary w-full text-lg"><Trans>Weiter als {inviteName}</Trans></button>
+                            </div>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {!regSuccess && !inviteName && (
+                                <>
+                                    <div className="form-control">
+                                        <label className="label">                                            <span
+                                            className="label-text font-bold"><Trans>Dein Name</Trans></span></label>
+                                        <input type="text" required value={name}
+                                               onChange={e => setName(e.target.value)}
+                                                className="input input-bordered" placeholder={t`z.B. Maria Muster`}/>
                                     </div>
-                                )}
+                                    <div className="form-control">
+                                        <label className="label">                                            <span
+                                            className="label-text font-bold"><Trans>Deine E-Mail</Trans></span></label>
+                                        <input type="email" required value={email}
+                                               onChange={e => setEmail(e.target.value)}
+                                                className="input input-bordered" placeholder={t`maria@beispiel.de`}/>
+                                    </div>
+                                </>
+                            )}
 
-                                <div className="form-control mt-4 mb-2">
-                                    <label className="cursor-pointer label justify-start gap-3">
-                                        <input type="checkbox" required className="checkbox checkbox-primary checkbox-sm mt-0.5" checked={acceptPrivacy} onChange={e => setAcceptPrivacy(e.target.checked)} />
-                                        <span className="label-text text-sm leading-tight">
-                                            Ich habe die <a href="/privacy" target="_blank" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.
-                                        </span>
-                                    </label>
+                            {inviteName && requiresPassword && (
+                                <p className="text-sm opacity-70"><Trans>Hallo <strong>{inviteName}</strong>, bitte gib das Galerie-Passwort ein.</Trans></p>
+                            )}
+
+                            {requiresPassword && (
+                                <div className="form-control pt-2">
+                                    <label className="label"><span
+                                        className="label-text font-bold text-warning"><Trans>Galerie-Passwort</Trans></span></label>
+                                    <input type="password" required value={password}
+                                           onChange={e => setPassword(e.target.value)}
+                                           className="input input-bordered input-warning"/>
+                                </div>
+                            )}
+
+                            <div className="form-control mt-4 mb-2">
+                                <label className="cursor-pointer label justify-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
+                                    <input type="checkbox" required className="checkbox checkbox-primary mt-0.5 shrink-0" checked={acceptPrivacy} onChange={e => setAcceptPrivacy(e.target.checked)} />
+                                    <span className="label-text text-sm leading-tight">
+                                        <Trans>Ich habe die <a href="/privacy" target="_blank" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.</Trans>
+                                    </span>
+                                </label>
                                 </div>
                                 <div className="form-control mt-6">
                                     <button type="submit" className="btn btn-primary w-full text-lg">
-                                        {inviteName ? `Weiter als ${inviteName}` : 'Galerie öffnen'}
+                                        {inviteName ? t`Weiter als ${inviteName}` : t`Galerie öffnen`}
                                     </button>
                                 </div>
                             </form>

@@ -1,5 +1,6 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import WysiwygEditor from '../components/WysiwygEditor';
 
 vi.mock('@tiptap/react', () => ({
@@ -105,23 +106,23 @@ describe('WysiwygEditor', () => {
             mutate: vi.fn(),
         } as never);
 
-        render(<WysiwygEditor value="" onChange={vi.fn()} />);
+        renderWithProviders(<WysiwygEditor value="" onChange={vi.fn()} />);
         const spinner = document.querySelector('.loading.loading-spinner');
         expect(spinner).toBeInTheDocument();
     });
 
     it('renders editor content when ready', () => {
-        render(<WysiwygEditor value="<p>Initial</p>" onChange={vi.fn()} />);
+        renderWithProviders(<WysiwygEditor value="<p>Initial</p>" onChange={vi.fn()} />);
         expect(screen.getByTestId('editor-content')).toBeInTheDocument();
     });
 
     it('renders character count footer', () => {
-        render(<WysiwygEditor value="<p>test</p>" onChange={vi.fn()} />);
+        renderWithProviders(<WysiwygEditor value="<p>test</p>" onChange={vi.fn()} />);
         expect(screen.getByText(/Zeichen \(HTML\)/)).toBeInTheDocument();
     });
 
     it('renders formatting toolbar buttons', () => {
-        render(<WysiwygEditor value="" onChange={vi.fn()} />);
+        renderWithProviders(<WysiwygEditor value="" onChange={vi.fn()} />);
         const boldButton = document.querySelector('[class*="btn"][class*="btn-sm"]');
         expect(boldButton).toBeInTheDocument();
     });
@@ -156,7 +157,7 @@ describe('WysiwygEditor', () => {
             destroy: vi.fn(),
         } as never);
 
-        render(<WysiwygEditor value="" onChange={mockOnChange} />);
+        renderWithProviders(<WysiwygEditor value="" onChange={mockOnChange} />);
         expect(screen.getByTestId('editor-content')).toBeInTheDocument();
     });
 });

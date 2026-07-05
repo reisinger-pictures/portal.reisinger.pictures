@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ResetPassword from '../ResetPassword';
@@ -22,7 +23,7 @@ vi.mock('../../api', () => ({
 }));
 
 function renderResetPassword() {
-    return render(
+    return renderWithProviders(
         <MemoryRouter>
             <ResetPassword />
         </MemoryRouter>,
@@ -52,7 +53,7 @@ describe('ResetPassword', () => {
 
     it('shows validation error for short password', async () => {
         const user = userEvent.setup();
-        const { container } = render(<MemoryRouter><ResetPassword /></MemoryRouter>);
+        const { container } = renderWithProviders(<MemoryRouter><ResetPassword /></MemoryRouter>);
 
         const passwordInput = container.querySelector('input[name="password"]')!;
         await user.type(passwordInput, 'short');
@@ -65,7 +66,7 @@ describe('ResetPassword', () => {
 
     it('shows validation error for mismatched passwords', async () => {
         const user = userEvent.setup();
-        const { container } = render(<MemoryRouter><ResetPassword /></MemoryRouter>);
+        const { container } = renderWithProviders(<MemoryRouter><ResetPassword /></MemoryRouter>);
 
         await user.type(container.querySelector('input[name="password"]')!, 'password123');
         await user.type(container.querySelector('input[name="passwordConfirm"]')!, 'different456');
@@ -79,7 +80,7 @@ describe('ResetPassword', () => {
     it('calls API on submit and navigates on success', async () => {
         vi.mocked(apiMutate).mockResolvedValue(undefined);
         const user = userEvent.setup();
-        const { container } = render(<MemoryRouter><ResetPassword /></MemoryRouter>);
+        const { container } = renderWithProviders(<MemoryRouter><ResetPassword /></MemoryRouter>);
 
         await user.type(container.querySelector('input[name="password"]')!, 'newpassword123');
         await user.type(container.querySelector('input[name="passwordConfirm"]')!, 'newpassword123');

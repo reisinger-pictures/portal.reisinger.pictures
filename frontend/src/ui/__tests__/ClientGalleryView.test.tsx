@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import { MemoryRouter } from 'react-router-dom';
 import ClientGalleryView from '../client/ClientGalleryView';
 import { useGallery } from '../../logic/useGallery';
@@ -91,7 +92,7 @@ const baseGalleryData = {
 };
 
 function renderClientGalleryView() {
-    return render(
+    return renderWithProviders(
         <MemoryRouter>
             <ClientGalleryView />
         </MemoryRouter>,

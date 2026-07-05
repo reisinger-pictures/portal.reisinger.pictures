@@ -73,7 +73,7 @@ export default function UIProvider({ children }: UIProviderProps) {
             {children}
 
             {/* Global Toasts */}
-            <div role="alert" aria-live="polite" aria-atomic="true" className="toast toast-top toast-center toast-global mt-12 md:mt-4 transition-all pointer-events-none z-[100]">
+            <div role="alert" aria-live="polite" aria-atomic="true" className="toast toast-top toast-center toast-global mt-12 md:mt-4 transition-all pointer-events-none z-50">
                 {toasts.map(toast => (
                     <div key={toast.id} className={`alert ${toast.type === "success" ? "alert-success bg-success text-white" : toast.type === "error" ? "alert-error bg-error text-white" : "alert-info bg-info text-info-content"} shadow-xl pointer-events-auto border-none`}>
                         <span className={`iconify ${toast.type === 'error' ? 'mdi--alert-circle' : toast.type === 'success' ? 'mdi--check-circle' : 'mdi--information'} text-xl`}></span>

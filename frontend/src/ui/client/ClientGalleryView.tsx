@@ -1,4 +1,5 @@
 import { Navigate, useParams } from 'react-router-dom';
+import { t } from "@lingui/core/macro";
 import ErrorMessage from '../components/ErrorMessage';
 import { useGallery } from '../../logic/useGallery';
 import PageLayout from '../components/PageLayout';
@@ -29,7 +30,7 @@ export default function ClientGalleryView() {
     if (galleryData.isError || !galleryData.gallery) {
         return (
             <PageLayout>
-                <div className="p-8"><ErrorMessage message="Galerie nicht gefunden oder Zugriff verweigert." /></div>
+                <div className="p-8"><ErrorMessage message={t`Galerie nicht gefunden oder Zugriff verweigert.`} /></div>
             </PageLayout>
         );
     }

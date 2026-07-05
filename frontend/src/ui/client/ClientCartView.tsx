@@ -11,6 +11,8 @@ import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 
+import {t} from "@lingui/core/macro";
+import {Trans} from "@lingui/react/macro";
 import {loadStripe} from '@stripe/stripe-js';
 import {Elements} from '@stripe/react-stripe-js';
 import PageLayout from '../components/PageLayout';
@@ -23,13 +25,13 @@ const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 const stripePromise = loadStripe(stripePublicKey);
 
 const checkoutSchema = z.object({
-    billing_name: z.string().min(2, 'Name ist erforderlich'),
+    billing_name: z.string().min(2, t`Name ist erforderlich`),
     billing_company: z.string().optional(),
-    billing_street: z.string().min(3, 'Straße ist erforderlich'),
-    billing_zip: z.string().min(4, 'PLZ ist erforderlich'),
-    billing_city: z.string().min(2, 'Ort ist erforderlich'),
+    billing_street: z.string().min(3, t`Straße ist erforderlich`),
+    billing_zip: z.string().min(4, t`PLZ ist erforderlich`),
+    billing_city: z.string().min(2, t`Ort ist erforderlich`),
     quote_message: z.string().optional(),
-    agb_accepted: z.literal(true, {message: 'Zustimmung erforderlich'}),
+    agb_accepted: z.literal(true, {message: t`Zustimmung erforderlich`}),
     withdrawal_waived: z.boolean().optional()
 });
 
@@ -58,11 +60,11 @@ export default function ClientCartView() {
             clearCart();
             removeCoupon();
             mutateUser().then(() => {
-                showToast('success', 'Zahlung erfolgreich!');
+                showToast('success', t`Zahlung erfolgreich!`);
                 navigate('/orders', {replace: true});
             });
         } else {
-            showToast('error', 'Zahlung fehlgeschlagen — bitte versuche es erneut.');
+            showToast('error', t`Zahlung fehlgeschlagen — bitte versuche es erneut.`);
             navigate('/cart', {replace: true});
         }
     }, [redirectStatus, clearCart, removeCoupon, mutateUser, showToast, navigate]);
@@ -78,7 +80,7 @@ export default function ClientCartView() {
                 const data = await res.json();
                 if (!res.ok || !data.photos || data.price === undefined) {
                     // Expired / invalid / tampered token — do NOT clear the cart.
-                    showToast('error', data.error || 'Angebot ist abgelaufen — bitte kontaktieren Sie den Fotografen.');
+                    showToast('error', data.error || t`Angebot ist abgelaufen — bitte kontaktieren Sie den Fotografen.`);
                     return;
                 }
                 clearCart();
@@ -92,7 +94,7 @@ export default function ClientCartView() {
                         notes: ''
                     });
                 });
-                showToast('info', 'Angebot aus Link wiederhergestellt.');
+                showToast('info', t`Angebot aus Link wiederhergestellt.`);
                 const newParams = new URLSearchParams(window.location.search);
                 newParams.delete('quote_token');
                 const cleanPath = window.location.pathname + (newParams.toString() ? '?' + newParams.toString() : '');
@@ -133,7 +135,7 @@ export default function ClientCartView() {
     const onCheckout = async (data: CheckoutFormValues) => {
         if (!hasQuotes && !data.withdrawal_waived) {
             setError('withdrawal_waived', {type: 'manual', message: 'Verzicht auf Widerruf ist zwingend erforderlich'});
-            showToast('error', 'Bitte bestätige den Verzicht auf das Widerrufsrecht.');
+            showToast('error', t`Bitte bestätige den Verzicht auf das Widerrufsrecht.`);
             return;
         }
         try {
@@ -155,16 +157,17 @@ export default function ClientCartView() {
             if (response.requires_action && response.client_secret) {
                 setClientSecret(response.client_secret);
                 if (response.order_id) setPendingOrderId(response.order_id);
-                showToast('info', 'Bitte schließe die Zahlung ab.');
+                showToast('info', t`Bitte schließe die Zahlung ab.`);
             } else if (response.success) {
-                showToast('success', hasQuotes ? 'Angebot erfolgreich angefragt!' : `Bestellung erfolgreich! (Beleg: ${response.invoice_number})`);
+                const invoiceNumber = response.invoice_number;
+                showToast('success', hasQuotes ? t`Angebot erfolgreich angefragt!` : t`Bestellung erfolgreich! (Beleg: ${invoiceNumber})`);
                 clearCart();
                 removeCoupon();
                 await mutateUser();
                 navigate('/orders');
             }
         } catch (error: unknown) {
-            showToast('error', error instanceof Error ? error.message : 'Fehler beim Checkout.');
+            showToast('error', error instanceof Error ? error.message : t`Fehler beim Checkout.`);
         }
     };
 
@@ -172,13 +175,13 @@ export default function ClientCartView() {
         <PageLayout currentView="cart">
             <div className="container mx-auto p-4 md:p-8 max-w-6xl">
                 <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
-                    <span className="iconify mdi--cart text-primary"></span> Dein Warenkorb
+                    <span className="iconify mdi--cart text-primary"></span> <Trans>Dein Warenkorb</Trans>
                 </h1>
 
                 {(!user) && (
                     <div className="alert alert-error shadow-sm mb-8">
                         <span className="iconify mdi--alert-circle text-xl"></span>
-                        <span>Lade Rechnungsdaten...</span>
+                        <span><Trans>Lade Rechnungsdaten...</Trans></span>
                     </div>
                 )}
 
@@ -186,8 +189,8 @@ export default function ClientCartView() {
                     <div
                         className="flex flex-col items-center justify-center py-20 opacity-50 bg-base-100 rounded-box border border-base-300">
                         <span className="iconify mdi--cart-off text-6xl mb-4"></span>
-                        <p className="text-xl">Dein Warenkorb ist leer.</p>
-                        <Link to="/" className="btn btn-outline mt-6">Zurück zur Startseite</Link>
+                        <p className="text-xl"><Trans>Dein Warenkorb ist leer.</Trans></p>
+                        <Link to="/" className="btn btn-outline mt-6"><Trans>Zurück zur Startseite</Trans></Link>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -203,17 +206,16 @@ export default function ClientCartView() {
                                 <div
                                     className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm sticky top-24">
                                     <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
-                                        <span className="iconify mdi--credit-card text-primary"></span> Zahlung
-                                        abschließen
+                                        <span className="iconify mdi--credit-card text-primary"></span> <Trans>Zahlung abschließen</Trans>
                                     </h2>
                                     <Elements stripe={stripePromise} options={{clientSecret}}>
                                         <StripeCheckoutForm orderId={pendingOrderId!} defaultEmail={user?.email}
                                                             defaultName={user?.billing_name || user?.name}
                                                             onSuccess={(webhookSuccess) => {
                                                                 if (webhookSuccess) {
-                                                                    showToast('success', 'Zahlung erfolgreich! Rechnung wurde versendet.');
+                                                                    showToast('success', t`Zahlung erfolgreich! Rechnung wurde versendet.`);
                                                                 } else {
-                                                                    showToast('info', 'Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt.');
+                                                                    showToast('info', t`Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt.`);
                                                                 }
                                                                 clearCart();
                                                                 mutateUser();
@@ -226,46 +228,46 @@ export default function ClientCartView() {
                                       className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm sticky top-24">
                                     <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
                                         <span
-                                            className="iconify mdi--card-account-details text-primary"></span> Rechnungsadresse
+                                            className="iconify mdi--card-account-details text-primary"></span> <Trans>Rechnungsadresse</Trans>
                                     </h2>
 
                                     <div className="space-y-4">
                                         <div className="form-control">
                                             <label className="label py-1"><span
-                                                className="label-text text-sm font-bold">Vor- & Nachname</span></label>
+                                                className="label-text text-sm font-bold"><Trans>Vor- & Nachname</Trans></span></label>
                                             <input type="text" {...register('billing_name')}
                                                    className={`input input-bordered ${errors.billing_name ? 'input-error' : ''}`}/>
                                         </div>
                                         <div className="form-control">
                                             <label className="label py-1"><span
-                                                className="label-text text-sm font-bold">Firma (Optional)</span></label>
+                                                className="label-text text-sm font-bold"><Trans>Firma</Trans></span></label>
                                             <input type="text" {...register('billing_company')}
                                                    className="input input-bordered"/>
                                         </div>
                                         <div className="form-control">
                                             <label className="label py-1"><span
-                                                className="label-text text-sm font-bold">Straße & Hausnummer</span></label>
+                                                className="label-text text-sm font-bold"><Trans>Straße & Hausnummer</Trans></span></label>
                                             <input type="text" {...register('billing_street')}
                                                    className={`input input-bordered ${errors.billing_street ? 'input-error' : ''}`}/>
                                         </div>
                                         <div className="flex gap-4">
                                             <div className="form-control w-1/3">
                                                 <label className="label py-1"><span
-                                                    className="label-text text-sm font-bold">PLZ</span></label>
+                                                    className="label-text text-sm font-bold"><Trans>PLZ</Trans></span></label>
                                                 <input type="text" {...register('billing_zip')}
                                                        className={`input input-bordered ${errors.billing_zip ? 'input-error' : ''}`}/>
                                             </div>
                                             <div className="form-control flex-1">
                                                 <label className="label py-1"><span
-                                                    className="label-text text-sm font-bold">Ort</span></label>
+                                                    className="label-text text-sm font-bold"><Trans>Ort</Trans></span></label>
                                                 <input type="text" {...register('billing_city')}
                                                        className={`input input-bordered ${errors.billing_city ? 'input-error' : ''}`}/>
                                             </div>
                                         </div>
                                         <div className="form-control">
                                             <label className="label py-1"><span
-                                                className="label-text text-sm font-bold opacity-50">Land</span></label>
-                                            <input type="text" value="Österreich" disabled
+                                                className="label-text text-sm font-bold opacity-50"><Trans>Land</Trans></span></label>
+                                            <input type="text" value={t`Österreich`} disabled
                                                    className="input input-bordered opacity-70"/>
                                         </div>
                                     </div>
@@ -275,17 +277,17 @@ export default function ClientCartView() {
                                     {hasQuotes && (
                                         <div className="form-control mb-6">
                                             <label className="label py-1"><span
-                                                className="label-text text-sm font-bold text-primary">Allgemeine Anmerkungen zum Angebot</span></label>
+                                                className="label-text text-sm font-bold text-primary"><Trans>Allgemeine Anmerkungen zum Angebot</Trans></span></label>
                                             <textarea {...register('quote_message')}
                                                       className="textarea textarea-bordered h-20 w-full resize-none"
-                                                      placeholder="Zusätzliche Infos für den Fotografen..."></textarea>
+                                                      placeholder={t`Zusätzliche Infos für den Fotografen...`}></textarea>
                                         </div>
                                     )}
 
                                     {!hasQuotes && (
                                         <div className="form-control mb-6">
                                             <label className="label py-1"><span
-                                                className="label-text text-sm font-bold">Zahlungsart</span></label>
+                                                className="label-text text-sm font-bold"><Trans>Zahlungsart</Trans></span></label>
                                             <div
                                                 className="flex flex-col gap-3 bg-base-200 p-4 rounded-box border border-base-300">
                                                 <label className="cursor-pointer flex items-center gap-3">
@@ -294,7 +296,7 @@ export default function ClientCartView() {
                                                            checked={paymentMethod === 'stripe'}
                                                            onChange={() => setPaymentMethod('stripe')}/>
                                                     <span className="font-bold flex items-center gap-2"><span
-                                                        className="iconify mdi--credit-card"></span> Kreditkarte (Stripe)</span>
+                                                        className="iconify mdi--credit-card"></span> <Trans>Kreditkarte (Stripe)</Trans></span>
                                                 </label>
                                                 {(user?.roles?.includes(UserRole.CLIENT) || isPowerUser || isAdmin) && (
                                                     <label className="cursor-pointer flex items-center gap-3">
@@ -303,7 +305,7 @@ export default function ClientCartView() {
                                                                checked={paymentMethod === 'invoice'}
                                                                onChange={() => setPaymentMethod('invoice')}/>
                                                         <span className="font-bold flex items-center gap-2"><span
-                                                            className="iconify mdi--receipt-text-outline"></span> Kauf auf Rechnung</span>
+                                                            className="iconify mdi--receipt-text-outline"></span> <Trans>Kauf auf Rechnung</Trans></span>
                                                     </label>
                                                 )}
                                             </div>
@@ -311,20 +313,20 @@ export default function ClientCartView() {
                                     )}
 
                                     <div className="space-y-4 mb-8">
-                                        <label className="cursor-pointer flex items-start gap-3">
+                                        <label className="cursor-pointer flex items-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
                                             <input type="checkbox" {...register('agb_accepted')}
-                                                   className={`checkbox mt-0.5 ${errors.agb_accepted ? 'checkbox-error' : 'checkbox-primary'}`}/>
+                                                   className={`checkbox mt-0.5 shrink-0 ${errors.agb_accepted ? 'checkbox-error' : 'checkbox-primary'}`}/>
                                             <span className="label-text text-sm leading-tight">
-                                                Ich akzeptiere die <a href="/license-terms" target="_blank"
-                                                                      className="link link-primary">Allgemeinen Geschäftsbedingungen und Lizenzvereinbarungen</a>.
+                                                <Trans>Ich akzeptiere die <a href="/license-terms" target="_blank"
+                                                                      className="link link-primary">Allgemeinen Geschäftsbedingungen und Lizenzvereinbarungen</a>.</Trans>
                                             </span>
                                         </label>
                                         {!hasQuotes && (
-                                            <label className="cursor-pointer flex items-start gap-3">
+                                            <label className="cursor-pointer flex items-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
                                                 <input type="checkbox" {...register('withdrawal_waived')}
-                                                       className={`checkbox mt-0.5 ${errors.withdrawal_waived ? 'checkbox-error' : 'checkbox-primary'}`}/>
+                                                       className={`checkbox mt-0.5 shrink-0 ${errors.withdrawal_waived ? 'checkbox-error' : 'checkbox-primary'}`}/>
                                                 <span className="label-text text-sm leading-tight">
-                                                    Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt.
+                                                    <Trans>Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt.</Trans>
                                                 </span>
                                             </label>
                                         )}
@@ -336,7 +338,7 @@ export default function ClientCartView() {
                                         disabled={items.length === 0 || isSubmitting}
                                     >
                                         {isSubmitting ? <span
-                                            className="loading loading-spinner"></span> : (hasQuotes ? 'Unverbindlich anfragen' : 'Zahlungspflichtig bestellen')}
+                                            className="loading loading-spinner"></span> : (hasQuotes ? <Trans>Unverbindlich anfragen</Trans> : <Trans>Zahlungspflichtig bestellen</Trans>)}
                                     </button>
                                 </form>
                             )}

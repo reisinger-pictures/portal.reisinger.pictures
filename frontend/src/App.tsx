@@ -9,6 +9,8 @@ import { lazy, Suspense, useEffect } from 'react';
 import { SWRConfig } from 'swr';
 import { CartProvider } from './logic/CartProvider';
 import { setGlobalErrorCallback } from './api';
+import { t } from "@lingui/core/macro";
+import { I18nProvider } from './logic/I18nProvider';
 
 const ResetPassword = lazy(() => import('./ui/ResetPassword'));
 const ProtectedDashboard = lazy(() => import('./ui/ProtectedDashboard'));
@@ -50,7 +52,7 @@ const GlobalSWRConfig = ({ children }: GlobalSWRConfigProps) => {
 
     useEffect(() => {
         setGlobalErrorCallback((_status, message) => {
-            showToast('error', message || 'Ein unerwarteter Serverfehler ist aufgetreten.');
+            showToast('error', message || t`Ein unerwarteter Serverfehler ist aufgetreten.`);
         });
     }, [showToast]);
 
@@ -59,7 +61,7 @@ const GlobalSWRConfig = ({ children }: GlobalSWRConfigProps) => {
             onError: (error) => {
                 // Fange 500er Serverfehler und Status 0 (Offline/Netzwerk) global ab
                 if (error.status >= 500 || error.status === 0) {
-                    showToast('error', error.message || 'Ein unerwarteter Serverfehler ist aufgetreten.');
+                    showToast('error', error.message || t`Ein unerwarteter Serverfehler ist aufgetreten.`);
                 }
             }
         }}>
@@ -71,8 +73,9 @@ const GlobalSWRConfig = ({ children }: GlobalSWRConfigProps) => {
 export default function App() {
     return (
         <ErrorBoundary fallback={<div className="flex h-screen items-center justify-center p-8">
-            <ErrorMessage title="Kritischer Fehler" message="Bitte Seite neu laden." />
+            <ErrorMessage title={t`Kritischer Fehler`} message={t`Bitte Seite neu laden.`} />
         </div>}>
+            <I18nProvider>
             <UIProvider>
                 <CartProvider>
                 <GlobalSWRConfig>
@@ -125,6 +128,7 @@ export default function App() {
                 </GlobalSWRConfig>
                 </CartProvider>
             </UIProvider>
+            </I18nProvider>
         </ErrorBoundary>
     );
 }

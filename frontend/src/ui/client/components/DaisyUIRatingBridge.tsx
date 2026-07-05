@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from "@lingui/core/macro";
 import { Photo } from '../../../logic/useGallery';
 
 export interface DaisyUIRatingBridgeProps {
@@ -29,7 +30,9 @@ export default function DaisyUIRatingBridge({ photo, ratePhoto }: DaisyUIRatingB
             <div className="bg-base-100/90 backdrop-blur-md px-6 py-3 rounded-full shadow-2xl pointer-events-auto border border-base-content/10 flex items-center justify-center">
                 <div className="rating rating-lg gap-1">
                     <input type="radio" name={`lightbox_rating_${photo.id}`} className="rating-hidden" checked={currentRating === 0} readOnly onClick={() => handleRatingClick(0)} />
-                    {[1, 2, 3, 4, 5].map(star => (
+                    {[1, 2, 3, 4, 5].map(star => {
+                        const starSuffix = star > 1 ? 'e' : '';
+                        return (
                         <input
                             key={star}
                             type="radio"
@@ -38,16 +41,17 @@ export default function DaisyUIRatingBridge({ photo, ratePhoto }: DaisyUIRatingB
                             checked={currentRating === star}
                             readOnly
                             onClick={() => handleRatingClick(star)}
-                            title={`${star} Stern${star > 1 ? 'e' : ''} (Shortcut: ${star})`}
+                            title={t`${star} Stern${starSuffix} (Shortcut: ${star})`}
                         />
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
             <input
                 type="text"
                 className="input input-bordered w-full bg-base-100/90 backdrop-blur-md shadow-2xl pointer-events-auto text-center placeholder-base-content/50 border-base-content/10"
-                placeholder="Kommentar hinzufügen... (Speichert automatisch)"
+                placeholder={t`Kommentar hinzufügen... (Speichert automatisch)`}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 onBlur={() => { if (comment !== (photo.comment || '')) ratePhoto(photo.id, currentRating, comment); }}

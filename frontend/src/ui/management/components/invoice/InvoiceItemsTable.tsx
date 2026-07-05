@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {InvoiceItem, Product} from '../../../../api';
 import AutocompleteInput from '../../../components/AutocompleteInput';
 
@@ -21,9 +23,9 @@ export default function InvoiceItemsTable({
     return (
         <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
             <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-                <h2 className="font-bold text-xl text-primary">Leistungen / Positionen</h2>
+                <h2 className="font-bold text-xl text-primary"><Trans>Leistungen / Positionen</Trans></h2>
                 <button type="button" onClick={onAddItem} className="btn btn-sm btn-outline btn-primary">
-                    + Leistung hinzufügen
+                    + <Trans>Leistung hinzufügen</Trans>
                 </button>
             </div>
 
@@ -51,7 +53,7 @@ export default function InvoiceItemsTable({
 
                         <div className="form-control flex-1 w-full">
                             <label className="label py-1">
-                                <span className="label-text text-sm font-bold">Titel / Name</span>
+                                <span className="label-text text-sm font-bold"><Trans>Titel / Name</Trans></span>
                             </label>
                             <AutocompleteInput<Product>
                                 value={item.description}
@@ -68,27 +70,27 @@ export default function InvoiceItemsTable({
                                     onItemChange(idx, 'notes', p.description || '');
                                     onItemChange(idx, 'price', p.price / 100);
                                 }}
-                                placeholder="z.B. Fotoshooting"
+                                placeholder={t`z.B. Fotoshooting`}
                                 className="input input-sm input-bordered w-full"
                             />
                         </div>
 
                         <div className="form-control flex-1 w-full">
                             <label className="label py-1">
-                                <span className="label-text text-sm font-bold">Zusatz (kleingedruckt)</span>
+                                <span className="label-text text-sm font-bold"><Trans>Zusatz (kleingedruckt)</Trans></span>
                             </label>
                             <input
                                 type="text"
                                 value={item.notes}
                                 onChange={(e) => onItemChange(idx, 'notes', e.target.value)}
                                 className="input input-sm input-bordered w-full"
-                                placeholder="Optional"
+                                placeholder={t`Optional`}
                             />
                         </div>
 
                         <div className="form-control w-20 shrink-0">
                             <label className="label py-1">
-                                <span className="label-text text-sm font-bold">Menge</span>
+                                <span className="label-text text-sm font-bold"><Trans>Menge</Trans></span>
                             </label>
                             <input
                                 required
@@ -103,7 +105,7 @@ export default function InvoiceItemsTable({
 
                         <div className="form-control w-full md:w-28 shrink-0">
                             <label className="label py-1">
-                                <span className="label-text text-sm font-bold">Preis / Stück</span>
+                                <span className="label-text text-sm font-bold"><Trans>Preis / Stück</Trans></span>
                             </label>
                             <input
                                 required
@@ -117,7 +119,7 @@ export default function InvoiceItemsTable({
 
                         <div className="form-control w-full md:w-28 shrink-0">
                             <label className="label py-1">
-                                <span className="label-text text-sm font-bold">Gesamt</span>
+                                <span className="label-text text-sm font-bold"><Trans>Gesamt</Trans></span>
                             </label>
                             <div className="text-right font-mono font-bold mt-1 text-base-content">
                                 {(item.price * item.qty).toFixed(2)} €

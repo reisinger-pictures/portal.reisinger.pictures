@@ -1,4 +1,6 @@
 import { useEffect, useMemo } from 'react';
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { GalleryGroup, FlatGroup, GalleryGroupExtraOpts } from '../../logic/useGalleries';
 import { Tenant } from '../../logic/useTenants';
 import { useUI } from './UIContext';
@@ -12,7 +14,7 @@ import CheckboxGroup from '../components/CheckboxGroup';
 import ModalDialogShell from './ModalDialogShell';
 
 const groupSchema = z.object({
-    name: z.string().min(1, 'Name ist erforderlich'),
+    name: z.string().min(1, t`Name ist erforderlich`),
     slug: z.string(),
     is_public: z.enum(['null', 'true', 'false']),
     parent_id: z.string(),
@@ -65,26 +67,26 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         try {
             if (editingGroup) {
                 await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download, is_editorial_only: data.is_editorial_only, is_hidden: data.is_hidden });
-                showToast('success', 'Ordner erfolgreich aktualisiert.');
+                showToast('success', t`Ordner erfolgreich aktualisiert.`);
             } else {
                 await onCreate(data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download, is_editorial_only: data.is_editorial_only, is_hidden: data.is_hidden });
-                showToast('success', 'Ordner erfolgreich erstellt.');
+                showToast('success', t`Ordner erfolgreich erstellt.`);
             }
             onClose();
         } catch (e: unknown) {
-            showToast('error', (e as Error).message || 'Fehler beim Speichern');
+            showToast('error', (e as Error).message || t`Fehler beim Speichern`);
         }
     };
 
     const handleDelete = async () => {
         if (!editingGroup) return;
-        if (await confirm({ title: 'Meta-Galerie löschen?', message: 'ACHTUNG: Alle Unterordner werden dabei in die Root-Ebene verschoben!', confirmText: 'Löschen', confirmColor: 'error' })) {
+        if (await confirm({ title: t`Meta-Galerie löschen?`, message: t`ACHTUNG: Alle Unterordner werden dabei in die Root-Ebene verschoben!`, confirmText: t`Löschen`, confirmColor: 'error' })) {
             try {
                 await onDelete(editingGroup.id);
-                showToast('success', 'Ordner erfolgreich gelöscht.');
+                showToast('success', t`Ordner erfolgreich gelöscht.`);
                 onClose();
             } catch (e: unknown) {
-                showToast('error', (e as Error).message || 'Fehler beim Löschen');
+                showToast('error', (e as Error).message || t`Fehler beim Löschen`);
             }
         }
     };
@@ -111,7 +113,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
 
     return (
         <ModalDialogShell
-            title={editingGroup ? 'Meta-Galerie bearbeiten' : 'Neue Meta-Galerie erstellen'}
+            title={editingGroup ? <Trans>Meta-Galerie bearbeiten</Trans> : <Trans>Neue Meta-Galerie erstellen</Trans>}
             onClose={onClose}
             onDelete={handleDelete}
             editing={!!editingGroup}
@@ -120,7 +122,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold">Name</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Name</Trans></span></label>
                     <input type="text" {...register('name')}
                            onChange={(e) => {
                                setValue('name', e.target.value, { shouldDirty: true });
@@ -132,7 +134,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
                     />
                 </div>
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold">URL Slug</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>URL Slug</Trans></span></label>
                     <input type="text" {...register('slug')}
                            onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true})}
                            className="input input-bordered w-full text-sm font-mono"
@@ -141,35 +143,35 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
             </div>
 
             <div className="form-control w-full mb-4">
-                <label className="label"><span className="label-text font-bold">Sichtbarkeits-Vorgabe</span></label>
+                <label className="label"><span className="label-text font-bold"><Trans>Sichtbarkeits-Vorgabe</Trans></span></label>
                 <select {...register('is_public')} className="select select-bordered w-full">
-                    <option value="null">Keine Vorgabe (Unterordner entscheiden selbst)</option>
-                    <option value="false">Privat erzwingen (Nur mit Link / Passwort)</option>
-                    <option value="true">Öffentlich erzwingen (Für alle sichtbar)</option>
+                    <option value="null"><Trans>Keine Vorgabe (Unterordner entscheiden selbst)</Trans></option>
+                    <option value="false"><Trans>Privat erzwingen (Nur mit Link / Passwort)</Trans></option>
+                    <option value="true"><Trans>Öffentlich erzwingen (Für alle sichtbar)</Trans></option>
                 </select>
             </div>
 
             <div className="space-y-3 mb-4">
                 <CheckboxGroup items={[
-                    { name: 'is_free_download', label: 'Kostenlosen Download erlauben', description: 'Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterladen.' },
-                    { name: 'is_editorial_only', label: 'Nur für redaktionelle Nutzung (Shop)', description: 'Sperrt kommerzielle Lizenzen im Checkout für diesen Ordner.' },
-                    { name: 'is_hidden', label: 'Im Frontend verstecken', description: 'Wird nicht in Suchergebnissen oder Feeds gelistet.' },
+                    { name: 'is_free_download', label: t`Kostenlosen Download erlauben`, description: t`Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterladen.` },
+                    { name: 'is_editorial_only', label: t`Nur für redaktionelle Nutzung (Shop)`, description: t`Sperrt kommerzielle Lizenzen im Checkout für diesen Ordner.` },
+                    { name: 'is_hidden', label: t`Im Frontend verstecken`, description: t`Wird nicht in Suchergebnissen oder Feeds gelistet.` },
                 ]} register={register} />
             </div>
 
             
             <div className="form-control w-full mb-4">
-                <label className="label"><span className="label-text font-bold">Zugeordnete Organisation (Verschieben)</span></label>
+                <label className="label"><span className="label-text font-bold"><Trans>Zugeordnete Organisation (Verschieben)</Trans></span></label>
                 <select {...register('tenant_id')} className="select select-bordered w-full">
-                    <option value="">-- Keine spezifische Organisation --</option>
+                    <option value="">-- <Trans>Keine spezifische Organisation</Trans> --</option>
                     {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
             </div>
 
             <div className="form-control w-full mb-6">
-                <label className="label"><span className="label-text font-bold">Übergeordnete Meta-Galerie</span></label>
+                <label className="label"><span className="label-text font-bold"><Trans>Übergeordnete Meta-Galerie</Trans></span></label>
                 <select {...register('parent_id')} className="select select-bordered w-full">
-                    <option value="">-- Keine --</option>
+                    <option value="">-- <Trans>Keine</Trans> --</option>
                     {parentGroupOptions.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
                 </select>
             </div>

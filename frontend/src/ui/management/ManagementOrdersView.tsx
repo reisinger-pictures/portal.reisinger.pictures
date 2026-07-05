@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../api';
@@ -18,15 +20,15 @@ export default function ManagementOrdersView() {
     const [isGenerating, setIsGenerating] = useState(false);
 
     if (isLoading) return <div className="p-10 flex justify-center"><span className="loading loading-spinner loading-lg"></span></div>;
-    if (error) return <div className="p-10 text-error">Fehler beim Laden der Bestellungen.</div>;
+    if (error) return <div className="p-10 text-error"><Trans>Fehler beim Laden der Bestellungen.</Trans></div>;
 
     const handleStatusChange = async (id: string, newStatus: string) => {
         try {
             await apiMutate(`/api/management/orders/${id}/status`, 'PUT', { status: newStatus });
-            showToast('success', 'Status aktualisiert');
+            showToast('success', t`Status aktualisiert`);
             mutate();
         } catch {
-            showToast('error', 'Fehler beim Speichern');
+            showToast('error', t`Fehler beim Speichern`);
         }
     };
 
@@ -38,37 +40,37 @@ export default function ManagementOrdersView() {
                 custom_price: Math.round(parseFloat(customPrice.replace(',', '.')) * 100),
                 message: quoteMessage
             });
-            showToast('success', 'Angebot per E-Mail gesendet!');
+            showToast('success', t`Angebot per E-Mail gesendet!`);
             setQuoteOrder(null);
             mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Senden');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Senden`);
         } finally {
             setIsGenerating(false);
         }
     };
 
     const statusLabels: Record<string, { label: string, color: string, textColor: string }> = {
-        'pending': { label: 'Ausständig / Angebot', color: 'badge-neutral', textColor: 'text-neutral' },
-        'invoice_created': { label: 'Offen / Rechnung', color: 'badge-warning', textColor: 'text-warning' },
-        'paid': { label: 'Bezahlt', color: 'badge-success text-white', textColor: 'text-success' },
-        'overdue': { label: 'Überfällig', color: 'badge-error text-white', textColor: 'text-error' },
-        'cancelled': { label: 'Storniert', color: 'badge-neutral', textColor: 'text-neutral' }
+        'pending': { label: t`Ausständig / Angebot`, color: 'badge-neutral', textColor: 'text-neutral' },
+        'invoice_created': { label: t`Offen / Rechnung`, color: 'badge-warning', textColor: 'text-warning' },
+        'paid': { label: t`Bezahlt`, color: 'badge-success text-white', textColor: 'text-success' },
+        'overdue': { label: t`Überfällig`, color: 'badge-error text-white', textColor: 'text-error' },
+        'cancelled': { label: t`Storniert`, color: 'badge-neutral', textColor: 'text-neutral' }
     };
 
     return (
         <div className="p-6 md:p-10 max-w-7xl mx-auto w-full relative">
-            <h1 className="text-4xl font-bold mb-8">Bestellungen & Anfragen</h1>
+            <h1 className="text-4xl font-bold mb-8"><Trans>Bestellungen & Anfragen</Trans></h1>
 
             <div className="overflow-x-auto bg-base-100 rounded-box border border-base-300 shadow-sm">
                 <table className="table table-zebra w-full">
                     <thead>
                         <tr>
-                            <th>Datum</th>
-                            <th>Beleg / Typ</th>
-                            <th>Kunde</th>
-                            <th>Betrag</th>
-                            <th>Status / Aktion</th>
+                            <th><Trans>Datum</Trans></th>
+                            <th><Trans>Beleg / Typ</Trans></th>
+                            <th><Trans>Kunde</Trans></th>
+                            <th><Trans>Betrag</Trans></th>
+                            <th><Trans>Status / Aktion</Trans></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -77,13 +79,13 @@ export default function ManagementOrdersView() {
                                 <td className="whitespace-nowrap text-sm">{new Date(order.created_at).toLocaleDateString('de-DE')}</td>
                                 <td>
                                     <div className="font-mono text-sm font-bold">{order.invoice_snapshot?.invoice_number}</div>
-                                    {order.is_quote_request ? <div className="badge badge-info badge-sm mt-1">Angebot</div> : null}
+                                    {order.is_quote_request ? <div className="badge badge-info badge-sm mt-1"><Trans>Angebot</Trans></div> : null}
                                 </td>
                                 <td>
                                     <div className="font-bold">{order.user?.name}</div>
                                     <div className="text-sm opacity-70">{order.user?.email}</div>
                                 </td>
-                                <td className="font-mono">{order.is_quote_request && order.status === 'pending' ? 'Auf Anfrage' : formatMoney(Number(order.total_gross))}</td>
+                                <td className="font-mono">{order.is_quote_request && order.status === 'pending' ? <Trans>Auf Anfrage</Trans> : formatMoney(Number(order.total_gross))}</td>
                                 <td>
                                     <div className="flex flex-col gap-2 items-start">
                                         <select 
@@ -91,22 +93,22 @@ export default function ManagementOrdersView() {
                                             value={order.status}
                                             onChange={(e) => handleStatusChange(order.id, e.target.value)}
                                         >
-                                            <option value="pending">Ausständig / Angebot</option>
-                                            <option value="invoice_created">Offen / Rechnung</option>
-                                            <option value="paid">Bezahlt</option>
-                                            <option value="overdue">Überfällig</option>
-                                            <option value="cancelled">Storniert</option>
+                                            <option value="pending"><Trans>Ausständig / Angebot</Trans></option>
+                                            <option value="invoice_created"><Trans>Offen / Rechnung</Trans></option>
+                                            <option value="paid"><Trans>Bezahlt</Trans></option>
+                                            <option value="overdue"><Trans>Überfällig</Trans></option>
+                                            <option value="cancelled"><Trans>Storniert</Trans></option>
                                         </select>
                                         {order.is_quote_request && order.status === 'pending' ? (
                                             <button onClick={() => { setQuoteOrder(order); setCustomPrice(''); setQuoteMessage(''); }} className="btn btn-xs btn-primary">
-                                                Kalkulieren & Antworten
+                                                <Trans>Kalkulieren & Antworten</Trans>
                                             </button>
                                         ) : null}
                                     </div>
                                 </td>
                             </tr>
                         ))}
-                        {orders?.length === 0 && <tr><td colSpan={5} className="text-center py-10 opacity-50">Noch keine Bestellungen im System.</td></tr>}
+                        {orders?.length === 0 && <tr><td colSpan={5} className="text-center py-10 opacity-50"><Trans>Noch keine Bestellungen im System.</Trans></td></tr>}
                     </tbody>
                 </table>
             </div>
@@ -115,12 +117,12 @@ export default function ManagementOrdersView() {
                 <div className="modal modal-open z-50">
                     <div className="modal-box relative">
                         <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setQuoteOrder(null)}>✕</button>
-                        <h3 className="font-bold text-xl mb-4">Angebot kalkulieren & senden</h3>
-                        <p className="text-sm opacity-80 mb-4">Lege einen Gesamtpreis für die angefragten Bilder fest und verfasse eine Nachricht an den Kunden.</p>
+                        <h3 className="font-bold text-xl mb-4"><Trans>Angebot kalkulieren & senden</Trans></h3>
+                        <p className="text-sm opacity-80 mb-4"><Trans>Lege einen Gesamtpreis für die angefragten Bilder fest und verfasse eine Nachricht an den Kunden.</Trans></p>
 
                         <div className="bg-base-200 p-4 rounded-box mb-4 text-sm max-h-40 overflow-y-auto">
-                            <strong className="block mb-2">Anforderungen des Kunden:</strong>
-                            <div className="opacity-70 mb-2 italic">{(typeof quoteOrder.invoice_snapshot?.customer_details === 'object' ? quoteOrder.invoice_snapshot?.customer_details?.quote_message : null) || 'Keine generelle Nachricht'}</div>
+                            <strong className="block mb-2"><Trans>Anforderungen des Kunden:</Trans></strong>
+                            <div className="opacity-70 mb-2 italic">{(typeof quoteOrder.invoice_snapshot?.customer_details === 'object' ? quoteOrder.invoice_snapshot?.customer_details?.quote_message : null) || t`Keine generelle Nachricht`}</div>
                             {(typeof quoteOrder.invoice_snapshot?.customer_details === 'object' ? (quoteOrder.invoice_snapshot?.customer_details?.items || []) : []).map((item: OrderItem, idx: number) => (
                                 <div key={idx} className="mb-2 pb-2 border-b border-base-300 last:border-0 last:mb-0 last:pb-0">
                                     <div className="font-mono font-bold">{item.filename}</div>
@@ -130,19 +132,19 @@ export default function ManagementOrdersView() {
                         </div>
 
                         <div className="form-control mb-4">
-                            <label className="label"><span className="label-text font-bold">Pauschalpreis (Netto in €)</span></label>
-                            <input type="number" step="0.01" value={customPrice} onChange={e => setCustomPrice(e.target.value)} className="input input-bordered w-full font-mono" placeholder="z.B. 450.00" autoFocus />
+                            <label className="label"><span className="label-text font-bold"><Trans>Pauschalpreis (Netto in €)</Trans></span></label>
+                            <input type="number" step="0.01" value={customPrice} onChange={e => setCustomPrice(e.target.value)} className="input input-bordered w-full font-mono"                                 placeholder={t`z.B. 450.00`} autoFocus />
                         </div>
 
                         <div className="form-control mb-4">
-                            <label className="label"><span className="label-text font-bold">Nachricht an den Kunden</span></label>
-                            <textarea value={quoteMessage} onChange={e => setQuoteMessage(e.target.value)} className="textarea textarea-bordered w-full h-24" placeholder="Hallo, hier ist mein Angebot für Ihre speziellen Rechte..."></textarea>
+                            <label className="label"><span className="label-text font-bold"><Trans>Nachricht an den Kunden</Trans></span></label>
+                            <textarea value={quoteMessage} onChange={e => setQuoteMessage(e.target.value)} className="textarea textarea-bordered w-full h-24"                                 placeholder={t`Hallo, hier ist mein Angebot für Ihre speziellen Rechte...`}></textarea>
                         </div>
 
                         <div className="modal-action col-span-full">
-                            <button className="btn btn-ghost" onClick={() => setQuoteOrder(null)}>Abbrechen</button>
+                            <button className="btn btn-ghost" onClick={() => setQuoteOrder(null)}><Trans>Abbrechen</Trans></button>
                             <button className="btn btn-primary" onClick={handleSendQuote} disabled={!customPrice || !quoteMessage || isGenerating}>
-                                {isGenerating ? <span className="loading loading-spinner"></span> : 'Kalkulieren & E-Mail senden'}
+                                {isGenerating ? <span className="loading loading-spinner"></span> : <Trans>Kalkulieren & E-Mail senden</Trans>}
                             </button>
                         </div>
                     </div>

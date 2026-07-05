@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import ResponsiveImage from '../components/ResponsiveImage';
 import {useState} from 'react';
 import {Link, Navigate, useLocation} from 'react-router-dom';
@@ -97,9 +98,9 @@ export default function ManagementDashboard() {
             currentView={currentView}
             sidebarWrapper={(children) => (
                 <ErrorBoundary
-                    fallback={<div className="w-72 2xl:w-80 p-4 text-error border-r border-base-300">Fehler beim
+                    fallback={<div className="w-72 2xl:w-80 p-4 text-error border-r border-base-300"><Trans>Fehler beim
                         Laden der
-                        Sidebar.</div>}>
+                        Sidebar.</Trans></div>}>
                     {children}
                 </ErrorBoundary>
             )}
@@ -109,10 +110,10 @@ export default function ManagementDashboard() {
                         <div className="m-4 md:m-6 mb-0 alert alert-warning shadow-sm">
                             <span className="iconify mdi--robot-off-outline text-xl"></span>
                             <div>
-                                <h3 className="font-bold">KI-Bildbeschreibung nicht konfiguriert</h3>
-                                <p className="text-sm">Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert.
+                                <h3 className="font-bold"><Trans>KI-Bildbeschreibung nicht konfiguriert</Trans></h3>
+                                <p className="text-sm"><Trans>Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert.
                                     Setze <code className="bg-base-300 px-1 rounded">AI_ENABLED=true</code> und <code
-                                        className="bg-base-300 px-1 rounded">AI_API_KEY</code> als Umgebungsvariablen.
+                                        className="bg-base-300 px-1 rounded">AI_API_KEY</code> als Umgebungsvariablen.</Trans>
                                 </p>
                             </div>
                         </div>
@@ -121,10 +122,10 @@ export default function ManagementDashboard() {
                         <div className="m-4 md:m-6 mb-0 alert alert-error shadow-sm">
                             <span className="iconify mdi--alert-circle text-xl"></span>
                             <div>
-                                <h3 className="font-bold">Impressum & Bankdaten unvollständig!</h3>
-                                <p className="text-sm">Bitte hinterlege deine Firmendaten in den <Link to="/settings"
-                                                                                                        className="underline font-bold">Einstellungen</Link>,
-                                    um den Rechnungs- und Bestellprozess zu aktivieren.</p>
+                                <h3 className="font-bold"><Trans>Impressum & Bankdaten unvollständig!</Trans></h3>
+                                <p className="text-sm"><Trans>Bitte hinterlege deine Firmendaten in den</Trans> <Link to="/settings"
+                                                                                                        className="underline font-bold"><Trans>Einstellungen</Trans></Link>,
+                                    <Trans>um den Rechnungs- und Bestellprozess zu aktivieren.</Trans></p>
                             </div>
                         </div>
                     )}
@@ -139,7 +140,7 @@ export default function ManagementDashboard() {
                               className={`md:hidden flex items-center gap-2 shrink-0 mr-1 ${isSearchFocused ? 'hidden' : ''}`}>
                             <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100"/>
                             <span
-                                className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
+                                className="font-bold text-sm truncate max-w-28 sm:max-w-48">{portalName}</span>
                         </Link>
 
                         <SearchBarWithSuggestions clearOnSubmit onFocusChange={setIsSearchFocused} />
@@ -158,8 +159,8 @@ export default function ManagementDashboard() {
                     {isPhotographer && (
                         <div className="mt-12 border-t border-base-300 pt-8">
                             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                                <span className="iconify mdi--history text-primary"></span> Deine neuesten
-                                Uploads & Galerien
+                                <span className="iconify mdi--history text-primary"></span> <Trans>Deine neuesten
+                                Uploads & Galerien</Trans>
                             </h2>
                             {feedLoading ? (
                                 <span className="loading loading-spinner text-primary"></span>
@@ -195,8 +196,8 @@ export default function ManagementDashboard() {
                                         </div>
                                     )}
                                     {(!personalFeed?.galleries?.length && !personalFeed?.photos?.length) && (
-                                        <p className="opacity-50">Du hast noch keine eigenen Galerien oder
-                                            Bilder.</p>
+                                        <p className="opacity-50"><Trans>Du hast noch keine eigenen Galerien oder
+                                            Bilder.</Trans></p>
                                     )}
                                 </div>
                             )}

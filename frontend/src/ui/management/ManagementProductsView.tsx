@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../api';
@@ -17,14 +19,14 @@ export default function ManagementProductsView() {
         try {
             if (editingProduct) {
                 await apiMutate(`/api/management/products/${editingProduct.id}`, 'PUT', data);
-                showToast('success', 'Eintrag aktualisiert');
+                showToast('success', t`Eintrag aktualisiert`);
             } else {
                 await apiMutate('/api/management/products', 'POST', data);
-                showToast('success', 'Eintrag angelegt');
+                showToast('success', t`Eintrag angelegt`);
             }
             mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
         }
     };
 
@@ -43,10 +45,10 @@ export default function ManagementProductsView() {
                     price: u.price
                 });
             }));
-            showToast('success', 'Einträge erfolgreich aktualisiert');
+            showToast('success', t`Einträge erfolgreich aktualisiert`);
             mutate();
         } catch {
-            showToast('error', 'Fehler beim Speichern einiger Einträge');
+            showToast('error', t`Fehler beim Speichern einiger Einträge`);
         }
     };
 
@@ -56,18 +58,18 @@ export default function ManagementProductsView() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!(await confirm({ title: 'Eintrag löschen?', message: 'Möchtest du diesen Eintrag wirklich entfernen?', confirmColor: 'error' }))) return;
+        if (!(await confirm({ title: t`Eintrag löschen?`, message: t`Möchtest du diesen Eintrag wirklich entfernen?`, confirmColor: 'error' }))) return;
         try {
             await apiMutate(`/api/management/products/${id}`, 'DELETE');
             mutate();
-            showToast('success', 'Eintrag gelöscht');
+            showToast('success', t`Eintrag gelöscht`);
         } catch {
-            showToast('error', 'Fehler beim Löschen');
+            showToast('error', t`Fehler beim Löschen`);
         }
     };
 
     if (isLoading) return <div className="p-10 flex justify-center"><span className="loading loading-spinner loading-lg"></span></div>;
-    if (error) return <div className="p-10"><ErrorMessage message="Fehler beim Laden." /></div>;
+    if (error) return <div className="p-10"><ErrorMessage message={t`Fehler beim Laden.`} /></div>;
 
     const items = products?.filter(p => p.type === 'item') || [];
     const discounts = products?.filter(p => p.type !== 'item') || [];
@@ -76,14 +78,14 @@ export default function ManagementProductsView() {
         <div className="p-6 md:p-10 max-w-5xl mx-auto w-full">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-4xl font-bold mb-2">Produkte & Rabatte</h1>
-                    <p className="opacity-70">Verwalte deinen Katalog für manuelle Angebote und Rechnungen.</p>
+                    <h1 className="text-4xl font-bold mb-2"><Trans>Produkte & Rabatte</Trans></h1>
+                    <p className="opacity-70"><Trans>Verwalte deinen Katalog für manuelle Angebote und Rechnungen.</Trans></p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}>+ Neuer Eintrag</button>
+                <button className="btn btn-primary" onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}>+ <Trans>Neuer Eintrag</Trans></button>
             </div>
 
-            <ProductBatchTable title="Leistungen & Produkte" products={items} onEdit={openEdit} onDelete={handleDelete} onBatchSave={handleBatchSave} />
-            <ProductBatchTable title="Rabatte & Abzüge" products={discounts} onEdit={openEdit} onDelete={handleDelete} onBatchSave={handleBatchSave} />
+            <ProductBatchTable title={t`Leistungen & Produkte`} products={items} onEdit={openEdit} onDelete={handleDelete} onBatchSave={handleBatchSave} />
+            <ProductBatchTable title={t`Rabatte & Abzüge`} products={discounts} onEdit={openEdit} onDelete={handleDelete} onBatchSave={handleBatchSave} />
             
             <ProductModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingProduct={editingProduct} onSave={handleSave} />
         </div>

@@ -1,5 +1,6 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import LicenseCatalogSettings from '../management/components/LicenseCatalogSettings';
 
@@ -59,13 +60,13 @@ describe('LicenseCatalogSettings', () => {
             deleteModifier: vi.fn(),
         });
 
-        render(<LicenseCatalogSettings />);
+        renderWithProviders(<LicenseCatalogSettings />);
         const spinner = document.querySelector('.loading.loading-spinner');
         expect(spinner).toBeInTheDocument();
     });
 
     it('renders use cases table with correct data', () => {
-        render(<LicenseCatalogSettings />);
+        renderWithProviders(<LicenseCatalogSettings />);
 
         expect(screen.getByText('Lizenz-Katalog (RSV Modell)')).toBeInTheDocument();
         expect(screen.getByText('Grundhonorare')).toBeInTheDocument();
@@ -74,7 +75,7 @@ describe('LicenseCatalogSettings', () => {
     });
 
     it('renders modifiers table with correct data', () => {
-        render(<LicenseCatalogSettings />);
+        renderWithProviders(<LicenseCatalogSettings />);
 
         expect(screen.getByText('Zuschläge (Aufschläge in %)')).toBeInTheDocument();
         expect(screen.getByText('Titelseite')).toBeInTheDocument();
@@ -93,7 +94,7 @@ describe('LicenseCatalogSettings', () => {
             deleteModifier: vi.fn(),
         });
 
-        render(<LicenseCatalogSettings />);
+        renderWithProviders(<LicenseCatalogSettings />);
         expect(screen.getByText('Noch keine Grundhonorare angelegt.')).toBeInTheDocument();
     });
 
@@ -109,7 +110,7 @@ describe('LicenseCatalogSettings', () => {
             deleteModifier: vi.fn(),
         });
 
-        render(<LicenseCatalogSettings />);
+        renderWithProviders(<LicenseCatalogSettings />);
         expect(screen.getByText('Noch keine Zuschläge angelegt.')).toBeInTheDocument();
     });
 
@@ -131,7 +132,7 @@ describe('LicenseCatalogSettings', () => {
 
         vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
 
-        render(<LicenseCatalogSettings />);
+        renderWithProviders(<LicenseCatalogSettings />);
 
         const nameInput = screen.getByPlaceholderText('z.B. PR & Social Media');
         await user.type(nameInput, 'New Use Case');
@@ -157,7 +158,7 @@ describe('LicenseCatalogSettings', () => {
 
         vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
 
-        render(<LicenseCatalogSettings />);
+        renderWithProviders(<LicenseCatalogSettings />);
 
         const addButtons = screen.getAllByText('Hinzufügen');
         await user.click(addButtons[0]);
@@ -183,7 +184,7 @@ describe('LicenseCatalogSettings', () => {
 
         vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
 
-        render(<LicenseCatalogSettings />);
+        renderWithProviders(<LicenseCatalogSettings />);
 
         const nameInputs = screen.getAllByPlaceholderText('z.B. Titelseite');
         await user.type(nameInputs[0], 'New Modifier');

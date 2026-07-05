@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import {InvoiceDiscount, InvoiceItem} from '../../../api';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
@@ -72,10 +74,10 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
         let notes: string;
 
         if (calcMode === 'srp') {
-            const types = {portrait: 'Portrait', couple: 'Pärchen', nude: 'Akt & Boudoir'};
-            const setups = {outdoor: 'Outdoor (Natur)', outdoor_flash: 'Mobiles Blitz-Setup', indoor: 'Fotostudio'};
+            const types = {portrait: t`Portrait`, couple: t`Pärchen`, nude: t`Akt & Boudoir`};
+            const setups = {outdoor: t`Outdoor (Natur)`, outdoor_flash: t`Mobiles Blitz-Setup`, indoor: t`Fotostudio`};
             desc = `B2C Flex-Shooting (${types[srpType]})`;
-            notes = `Setup: ${setups[srpSetup]} | Zusätzliche Bilder: ${srpExtra} | Online-Verbot: ${srpPrivate ? 'Ja' : 'Nein'}`;
+            notes = `${t`Setup:`} ${setups[srpSetup]} | ${t`Zusätzliche Bilder:`} ${srpExtra} | ${t`Online-Verbot:`} ${srpPrivate ? t`Ja` : t`Nein`}`;
         } else {
             const baseDesc = calcIsFlatrate ? 'Reportage / Flatrate-Shooting' : 'Individuelles Shooting-Paket';
             desc = calcIsReorder ? `${baseDesc} (Nachbestellung)` : baseDesc;
@@ -97,20 +99,20 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     };
 
     return (
-        <div className="modal modal-open z-[100]">
+        <div className="modal modal-open">
             <div className="modal-box relative max-w-lg">
                 <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
                         onClick={onClose}>✕
                 </button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--calculator text-primary"></span>
-                    {calcMode === 'srp' ? 'B2C Flex-Paket Rechner' : 'Shooting-Paket Kalkulator'}
+                    {calcMode === 'srp' ? <Trans>B2C Flex-Paket Rechner</Trans> : <Trans>Shooting-Paket Kalkulator</Trans>}
                 </h3>
 
                 {isSrp && (
                     <div className="tabs tabs-boxed mb-4 w-full flex bg-base-200">
-                        <button type="button" className={`tab flex-1 ${!usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(false)}>B2C Flex-Paket</button>
-                        <button type="button" className={`tab flex-1 ${usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(true)}>Premium Tarif</button>
+                        <button type="button" className={`tab flex-1 ${!usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(false)}><Trans>B2C Flex-Paket</Trans></button>
+                        <button type="button" className={`tab flex-1 ${usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(true)}><Trans>Premium Tarif</Trans></button>
                     </div>
                 )}
 
@@ -143,7 +145,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                         </div>
                         {srpType === 'nude' && (
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                                <label className="cursor-pointer label justify-start gap-4 m-0 p-1">
+                                <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                     <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                            checked={srpPrivate} onChange={e => setSrpPrivate(e.target.checked)}/>
                                     <div>
@@ -171,21 +173,21 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                             </div>
                         </div>
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="cursor-pointer label justify-start gap-4 m-0 p-1">
+                            <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                 <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                        checked={calcIsOutdoor} onChange={e => setCalcIsOutdoor(e.target.checked)}/>
-                                <span className="label-text font-bold">Outdoor-Shooting (Halbierter Bildpreis)</span>
+                                <span className="label-text font-bold">Outdoor-Shooting (Bildpreis-Faktor: {Math.round((parseFloat(terms?.calc_outdoor_multiplier || '0.5')) * 100)}%)</span>
                             </label>
                         </div>
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="cursor-pointer label justify-start gap-4 m-0 p-1">
+                            <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                 <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                        checked={calcIsFlatrate} onChange={e => setCalcIsFlatrate(e.target.checked)}/>
                                 <span className="label-text font-bold">Reportage-Paket (+20% Aufschlag)</span>
                             </label>
                         </div>
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="cursor-pointer label justify-start gap-4 m-0 p-1">
+                            <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                 <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                        checked={calcIsReorder} onChange={e => setCalcIsReorder(e.target.checked)}/>
                                 <span className="label-text font-bold">Nachbestellung (keine Setup-Gebühr)</span>
@@ -214,9 +216,9 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                 </div>
 
                 <div className="modal-action mt-6">
-                    <button type="button" className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
-                    <button type="button" className="btn btn-primary px-6" onClick={handleCalculate}>Berechnen &
-                        Hinzufügen
+                    <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
+                    <button type="button" className="btn btn-primary px-6" onClick={handleCalculate}><Trans>Berechnen &
+                        Hinzufügen</Trans>
                     </button>
                 </div>
             </div>

@@ -1,4 +1,5 @@
 import useSWR, {mutate as globalMutate} from 'swr';
+import {t} from "@lingui/core/macro";
 import {fetcher, User} from '../api';
 
 // Re-export the canonical `User` type so existing imports from this module keep working.
@@ -16,7 +17,7 @@ export function useAuth() {
             credentials: 'include',
             body: JSON.stringify({email, password})
         });
-        if (!response.ok) throw new Error('Login fehlgeschlagen');
+        if (!response.ok) throw new Error(t`Login fehlgeschlagen.`);
         await globalMutate(() => true, undefined, {revalidate: true});
     };
 
@@ -28,8 +29,8 @@ export function useAuth() {
             body: JSON.stringify({name, email})
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || data.error || 'Registrierung fehlgeschlagen');
-        return data.message || 'Erfolgreich registriert';
+        if (!response.ok) throw new Error(data.message || data.error || t`Registrierung fehlgeschlagen`);
+        return data.message || t`Erfolgreich registriert`;
     };
 
     const logout = async (): Promise<void> => {
@@ -40,7 +41,7 @@ export function useAuth() {
                 credentials: 'include'
             });
         } catch (e) {
-            throw new Error(e instanceof Error ? e.message : 'Logout fehlgeschlagen', {cause: e});
+            throw new Error(e instanceof Error ? e.message : t`Logout fehlgeschlagen`, {cause: e});
         }
         await globalMutate(() => true, undefined, {revalidate: true});
     };

@@ -18,7 +18,7 @@ export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderPr
             </button>
             <Link to="/" className={`md:hidden flex items-center gap-2 shrink-0 mr-1 ${isSearchFocused ? 'hidden' : ''}`}>
                 <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
-                <span className="font-bold text-sm truncate max-w-[110px] sm:max-w-[200px]">{portalName}</span>
+                <span className="font-bold text-sm truncate max-w-28 sm:max-w-48">{portalName}</span>
             </Link>
 
             <SearchBarWithSuggestions onFocusChange={setIsSearchFocused} />

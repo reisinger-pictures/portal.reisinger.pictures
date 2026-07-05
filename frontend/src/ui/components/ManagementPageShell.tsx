@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { type ReactNode } from 'react';
 import ErrorMessage from './ErrorMessage';
 
@@ -35,7 +36,7 @@ export default function ManagementPageShell({
     if (isError) {
         return (
             <div className="p-10">
-                <ErrorMessage message={errorMessage ?? 'Ein Fehler ist aufgetreten.'} />
+                <ErrorMessage message={errorMessage ?? t`Ein Fehler ist aufgetreten.`} />
             </div>
         );
     }

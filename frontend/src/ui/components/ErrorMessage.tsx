@@ -1,3 +1,6 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
+
 interface ErrorMessageProps {
     title?: string;
     message: string;
@@ -5,7 +8,7 @@ interface ErrorMessageProps {
     className?: string;
 }
 
-export default function ErrorMessage({ title = 'Ein Fehler ist aufgetreten', message, onRetry, className = '' }: ErrorMessageProps) {
+export default function ErrorMessage({ title = t`Ein Fehler ist aufgetreten.`, message, onRetry, className = '' }: ErrorMessageProps) {
     return (
         <div className={`alert alert-error shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4 ${className}`}>
             <span className="iconify mdi--alert-circle text-4xl shrink-0 opacity-80"></span>
@@ -15,7 +18,7 @@ export default function ErrorMessage({ title = 'Ein Fehler ist aufgetreten', mes
             </div>
             {onRetry && (
                 <button onClick={onRetry} className="btn btn-sm btn-ghost border-current opacity-80 hover:opacity-100 shrink-0">
-                    <span className="iconify mdi--refresh mr-1 text-lg"></span> Erneut versuchen
+                    <span className="iconify mdi--refresh mr-1 text-lg"></span> <Trans>Erneut versuchen</Trans>
                 </button>
             )}
         </div>

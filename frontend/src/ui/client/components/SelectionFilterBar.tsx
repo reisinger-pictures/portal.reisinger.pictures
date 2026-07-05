@@ -1,3 +1,5 @@
+import { Trans } from "@lingui/react/macro";
+
 interface Props {
     ratingFilter: string;
     setRatingFilter: (filter: string) => void;
@@ -9,9 +11,9 @@ export default function SelectionFilterBar({ ratingFilter, setRatingFilter }: Pr
     return (
         <div className="flex justify-center md:justify-start mb-6 overflow-x-auto pb-2">
             <div className="join shadow-sm">
-                <button className={`btn join-item btn-sm ${ratingFilter === 'all' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('all')}>Alle</button>
-                <button className={`btn join-item btn-sm ${ratingFilter === 'unrated' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('unrated')}>Neu</button>
-                <button className={`btn join-item btn-sm ${ratingFilter === 'rated' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('rated')}>Favoriten</button>
+                <button className={`btn join-item btn-sm ${ratingFilter === 'all' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('all')}><Trans>Alle</Trans></button>
+                <button className={`btn join-item btn-sm ${ratingFilter === 'unrated' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('unrated')}><Trans>Neu</Trans></button>
+                <button className={`btn join-item btn-sm ${ratingFilter === 'rated' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('rated')}><Trans>Favoriten</Trans></button>
                 
                 {starRatings.map(star => (
                     <button 
@@ -23,7 +25,7 @@ export default function SelectionFilterBar({ ratingFilter, setRatingFilter }: Pr
                     </button>
                 ))}
 
-                <button className={`btn join-item btn-sm ${ratingFilter === '0' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('0')}>Ignoriert</button>
+                <button className={`btn join-item btn-sm ${ratingFilter === '0' ? 'btn-neutral' : ''}`} onClick={() => setRatingFilter('0')}><Trans>Ignoriert</Trans></button>
             </div>
         </div>
     );

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {useEffect} from 'react';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
@@ -6,13 +7,14 @@ import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 
 const calculatorSettingsSchema = z.object({
-    calc_base_price: z.number().min(0, 'Muss positiv sein'),
-    calc_hourly_rate: z.number().min(0, 'Muss positiv sein'),
-    calc_images_per_hour: z.number().int('Muss eine ganze Zahl sein').min(1, 'Mindestens 1 Bild'),
-    srp_base_price: z.number().min(0, 'Muss positiv sein'),
-    srp_setup_fee: z.number().min(0, 'Muss positiv sein'),
-    srp_privacy_fee: z.number().min(0, 'Muss positiv sein'),
-    srp_extra_image_fee: z.number().min(0, 'Muss positiv sein')
+    calc_base_price: z.number().min(0, t`Muss positiv sein`),
+    calc_hourly_rate: z.number().min(0, t`Muss positiv sein`),
+    calc_images_per_hour: z.number().int(t`Muss eine ganze Zahl sein`).min(1, t`Mindestens 1 Bild`),
+    calc_outdoor_multiplier: z.number().min(0.1, t`Mindestens 10%`).max(1, t`Maximal 100%`),
+    srp_base_price: z.number().min(0, t`Muss positiv sein`),
+    srp_setup_fee: z.number().min(0, t`Muss positiv sein`),
+    srp_privacy_fee: z.number().min(0, t`Muss positiv sein`),
+    srp_extra_image_fee: z.number().min(0, t`Muss positiv sein`)
 });
 
 type CalculatorSettingsFormValues = z.infer<typeof calculatorSettingsSchema>;
@@ -25,6 +27,7 @@ export default function CalculatorSettingsCard() {
         resolver: zodResolver(calculatorSettingsSchema),
         defaultValues: {
             calc_base_price: 50, calc_hourly_rate: 80, calc_images_per_hour: 6,
+            calc_outdoor_multiplier: 0.5,
             srp_base_price: 149, srp_setup_fee: 50, srp_privacy_fee: 200, srp_extra_image_fee: 15
         }
     });
@@ -35,6 +38,7 @@ export default function CalculatorSettingsCard() {
                 calc_base_price: parseFloat(terms.calc_base_price || '50'),
                 calc_hourly_rate: parseFloat(terms.calc_hourly_rate || '80'),
                 calc_images_per_hour: parseInt(terms.calc_images_per_hour || '6', 10),
+                calc_outdoor_multiplier: parseFloat(terms.calc_outdoor_multiplier || '0.5'),
                 srp_base_price: parseFloat(terms.srp_base_price || '149'),
                 srp_setup_fee: parseFloat(terms.srp_setup_fee || '50'),
                 srp_privacy_fee: parseFloat(terms.srp_privacy_fee || '200'),
@@ -49,6 +53,7 @@ export default function CalculatorSettingsCard() {
                 calc_base_price: data.calc_base_price,
                 calc_hourly_rate: data.calc_hourly_rate,
                 calc_images_per_hour: data.calc_images_per_hour,
+                calc_outdoor_multiplier: data.calc_outdoor_multiplier,
                 srp_base_price: data.srp_base_price,
                 srp_setup_fee: data.srp_setup_fee,
                 srp_privacy_fee: data.srp_privacy_fee,
@@ -74,7 +79,7 @@ export default function CalculatorSettingsCard() {
                 </p>
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Premium Tarif</div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                         <div className="form-control">
                             <label className="label"><span
                                 className="label-text font-bold">Grundpreis (€)</span></label>
@@ -92,6 +97,13 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Bilder pro Stunde</span></label>
 <input type="number" step="1" min="1"
                                     className="input input-bordered" {...register('calc_images_per_hour', {valueAsNumber: true})} />
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span
+                                className="label-text font-bold">Outdoor-Faktor</span></label>
+                            <input type="number" step="0.05" min="0.1" max="1"
+                                   className="input input-bordered" {...register('calc_outdoor_multiplier', {valueAsNumber: true})} />
+                            <span className="text-xs opacity-60 mt-1">10-100% (0,5 = 50%)</span>
                         </div>
                     </div>
 

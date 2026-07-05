@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEffect, useState } from 'react';
 import { Gallery, GalleryMetadataOpts } from '../../../logic/useGalleries';
 import IptcMetadataEditor from '../../components/IptcMetadataEditor';
@@ -71,10 +73,10 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
                 gallery.gallery_group_id, undefined, gallery.expires_at ? gallery.expires_at.split('T')[0] : undefined, 
                 metaOpts
             );
-            showToast('success', 'Metadaten-Vorgaben gespeichert');
+            showToast('success', t`Metadaten-Vorgaben gespeichert`);
             onClose();
         } catch {
-            showToast('error', 'Fehler beim Speichern');
+            showToast('error', t`Fehler beim Speichern`);
         }
     };
 
@@ -98,32 +100,32 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
     if (!isOpen) return null;
 
     return (
-        <dialog className="modal modal-open z-[60]">
+        <dialog className="modal modal-open">
             <div className="modal-box max-w-2xl relative">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
-                    <span className="iconify mdi--tag-multiple text-primary"></span> Metadaten-Vorgaben
+                    <span className="iconify mdi--tag-multiple text-primary"></span> <Trans>Metadaten-Vorgaben</Trans>
                 </h3>
-                <p className="opacity-70 mb-6 text-sm">Für Galerie: <strong>{gallery.name}</strong></p>
+                <p className="opacity-70 mb-6 text-sm"><Trans>Für Galerie:</Trans> <strong>{gallery.name}</strong></p>
 
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <div className="form-control mb-4">
-                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
-                            <input type="checkbox" {...register('allow_client_metadata_edit')} className="checkbox checkbox-primary"/>
+                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full hover:bg-base-300/50 transition-colors">
+                            <input type="checkbox" {...register('allow_client_metadata_edit')} className="checkbox checkbox-primary shrink-0"/>
                             <div>
-                                <span className="label-text font-bold block">Kunden dürfen Metadaten bearbeiten</span>
-                                <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">Erlaubt Kunden mit der Rolle"Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.</span>
+                                <span className="label-text font-bold block"><Trans>Kunden dürfen Metadaten bearbeiten</Trans></span>
+                                <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1"><Trans>Erlaubt Kunden mit der Rolle "Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.</Trans></span>
                             </div>
                         </label>
                     </div>
 
                     <div className="form-control mb-4">
-                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full">
-                            <input type="checkbox" {...register('apply_metadata_to_photos')} className="checkbox checkbox-primary"/>
+                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full hover:bg-base-300/50 transition-colors">
+                            <input type="checkbox" {...register('apply_metadata_to_photos')} className="checkbox checkbox-primary shrink-0"/>
                             <div>
-                                <span className="label-text font-bold block">Standard-Metadaten beim Upload anwenden</span>
-                                <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1">Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten.</span>
+                                <span className="label-text font-bold block"><Trans>Standard-Metadaten beim Upload anwenden</Trans></span>
+                                <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1"><Trans>Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten.</Trans></span>
                             </div>
                         </label>
                     </div>
@@ -135,12 +137,12 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
                     )}
                     
                     <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 w-full">
-                        <button type="button" className="btn btn-ghost w-full sm:w-auto" onClick={onClose}>Abbrechen</button>
+                        <button type="button" className="btn btn-ghost w-full sm:w-auto" onClick={onClose}><Trans>Abbrechen</Trans></button>
                         <button type="button" className="btn btn-outline btn-primary w-full sm:w-auto" onClick={() => setIsAiModalOpen(true)}>
-                            <span className="iconify mdi--auto-fix"></span> KI generieren
+                            <span className="iconify mdi--auto-fix"></span> <Trans>KI generieren</Trans>
                         </button>
                         <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
+                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
                         </button>
                     </div>
                 </form>

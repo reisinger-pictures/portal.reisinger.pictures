@@ -7,6 +7,7 @@
  * The default configuration (30/25/20 €, thresholds 10/20) is hardcoded
  * here but is designed to be replaceable with a future settings/API source.
  */
+import {t} from "@lingui/core/macro";
 import {CartItem, VolumeLicensingResult} from './CartContext';
 import {useBrand} from './useBrand';
 
@@ -59,12 +60,17 @@ export function calculateVolumeTier(
     config: VolumePricingConfig = DEFAULT_VOLUME_PRICING,
 ): VolumeTierResult {
     if (count >= config.tier3Threshold) {
-        return {priceCents: config.tier3PriceCents, tier: 3, label: `Ab ${config.tier3Threshold} Bildern ${(config.tier3PriceCents / 100).toFixed(0)}€ pro Bild`};
+        const t3Threshold = config.tier3Threshold;
+        const t3Price = (config.tier3PriceCents / 100).toFixed(0);
+        return {priceCents: config.tier3PriceCents, tier: 3, label: t`Ab ${t3Threshold} Bildern ${t3Price}€ pro Bild`};
     }
     if (count >= config.tier2Threshold) {
-        return {priceCents: config.tier2PriceCents, tier: 2, label: `Ab ${config.tier2Threshold} Bildern ${(config.tier2PriceCents / 100).toFixed(0)}€ pro Bild`};
+        const t2Threshold = config.tier2Threshold;
+        const t2Price = (config.tier2PriceCents / 100).toFixed(0);
+        return {priceCents: config.tier2PriceCents, tier: 2, label: t`Ab ${t2Threshold} Bildern ${t2Price}€ pro Bild`};
     }
-    return {priceCents: config.tier1PriceCents, tier: 1, label: `${(config.tier1PriceCents / 100).toFixed(0)}€ pro Bild`};
+    const t1Price = (config.tier1PriceCents / 100).toFixed(0);
+    return {priceCents: config.tier1PriceCents, tier: 1, label: t`${t1Price}€ pro Bild`};
 }
 
 /**
@@ -123,10 +129,14 @@ export function useVolumeLicensing(items: CartItem[]): VolumeLicensingResult {
     let nextTierLabel = '';
     if (tier === 1) {
         nextTierCount = config.tier2Threshold - count;
-        nextTierLabel = `Ab ${config.tier2Threshold} Bildern ${(config.tier2PriceCents / 100).toFixed(0)}€ pro Bild`;
+        const nt2Threshold = config.tier2Threshold;
+        const nt2Price = (config.tier2PriceCents / 100).toFixed(0);
+        nextTierLabel = t`Ab ${nt2Threshold} Bildern ${nt2Price}€ pro Bild`;
     } else if (tier === 2) {
         nextTierCount = config.tier3Threshold - count;
-        nextTierLabel = `Ab ${config.tier3Threshold} Bildern ${(config.tier3PriceCents / 100).toFixed(0)}€ pro Bild`;
+        const nt3Threshold = config.tier3Threshold;
+        const nt3Price = (config.tier3PriceCents / 100).toFixed(0);
+        nextTierLabel = t`Ab ${nt3Threshold} Bildern ${nt3Price}€ pro Bild`;
     }
 
     return {

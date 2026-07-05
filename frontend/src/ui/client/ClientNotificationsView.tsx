@@ -1,4 +1,6 @@
 import useSWR from 'swr';
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import ErrorMessage from '../components/ErrorMessage';
 import { fetcher, apiMutate } from '../../api';
 import PageLayout from '../components/PageLayout';
@@ -39,13 +41,13 @@ export default function ClientNotificationsView() {
             await apiMutate(endpoint, 'POST', { wants_notifications: !currentValue });
             mutate();
         } catch {
-            showToast('error', 'Fehler beim Speichern der Einstellung.');
+            showToast('error', t`Fehler beim Speichern der Einstellung.`);
             mutate();
         }
     };
 
     if (isLoading) return <PageLayout><div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div></PageLayout>;
-    if (error || !data) return <PageLayout><div className="p-8"><ErrorMessage message="Daten konnten nicht geladen werden." /></div></PageLayout>;
+    if (error || !data) return <PageLayout><div className="p-8"><ErrorMessage message={t`Daten konnten nicht geladen werden.`} /></div></PageLayout>;
 
     const hasNoAccess = data.galleries.length === 0 && data.groups.length === 0;
 
@@ -53,28 +55,28 @@ export default function ClientNotificationsView() {
         <PageLayout currentView="notifications">
             <div className="container mx-auto p-4 md:p-8 max-w-4xl">
                 <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-                    <span className="iconify mdi--bell-ring text-primary"></span> Benachrichtigungen
+                    <span className="iconify mdi--bell-ring text-primary"></span> <Trans>Benachrichtigungen</Trans>
                 </h1>
-                <p className="opacity-70 mb-8">Verwalte hier, für welche Galerien und Ordner du E-Mail-Updates erhalten möchtest.</p>
+                <p className="opacity-70 mb-8"><Trans>Verwalte hier, für welche Galerien und Ordner du E-Mail-Updates erhalten möchtest.</Trans></p>
 
                 {hasNoAccess ? (
                     <div className="alert shadow-sm bg-base-100 border border-base-300">
                         <span className="iconify mdi--information text-xl"></span>
-                        <span>Du bist aktuell keinen speziellen Ordnern oder privaten Galerien zugewiesen.</span>
+                        <span><Trans>Du bist aktuell keinen speziellen Ordnern oder privaten Galerien zugewiesen.</Trans></span>
                     </div>
                 ) : (
                     <div className="space-y-8">
                         {data.groups.length > 0 && (
                             <div>
                                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-base-300 pb-2">
-                                    <span className="iconify mdi--folder-multiple text-primary"></span> Abonnierte Ordner (Meta-Galerien)
+                                    <span className="iconify mdi--folder-multiple text-primary"></span> <Trans>Abonnierte Ordner (Meta-Galerien)</Trans>
                                 </h2>
                                 <div className="bg-base-100 rounded-box border border-base-300 shadow-sm overflow-hidden">
                                     {data.groups.map(group => (
                                         <div key={group.id} className="flex justify-between items-center p-4 border-b border-base-300 last:border-b-0 hover:bg-base-200/50 transition-colors">
                                             <div>
                                                 <div className="font-bold text-lg">{group.name}</div>
-                                                <div className="text-sm opacity-70">Benachrichtigt bei neuen Galerien in diesem Ordner.</div>
+                                                <div className="text-sm opacity-70"><Trans>Benachrichtigt bei neuen Galerien in diesem Ordner.</Trans></div>
                                             </div>
                                             <input type="checkbox" className="toggle toggle-primary" checked={group.wants_notifications} onChange={() => toggleOptIn(group.id, 'group', group.wants_notifications)} />
                                         </div>
@@ -86,7 +88,7 @@ export default function ClientNotificationsView() {
                         {data.galleries.length > 0 && (
                             <div>
                                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-b border-base-300 pb-2">
-                                    <span className="iconify mdi--image-multiple text-primary"></span> Abonnierte Einzel-Galerien
+                                    <span className="iconify mdi--image-multiple text-primary"></span> <Trans>Abonnierte Einzel-Galerien</Trans>
                                 </h2>
                                 <div className="bg-base-100 rounded-box border border-base-300 shadow-sm overflow-hidden">
                                     {data.galleries.map(gallery => (
@@ -94,9 +96,9 @@ export default function ClientNotificationsView() {
                                             <div>
                                                 <div className="font-bold text-lg flex items-center gap-2">
                                                     {gallery.name}
-                                                    <span className="badge badge-sm badge-ghost">{gallery.gallery_type === 'selection' ? 'Auswahl' : 'Delivery'}</span>
+                                                    <span className="badge badge-sm badge-ghost">{gallery.gallery_type === 'selection' ? t`Auswahl` : t`Delivery`}</span>
                                                 </div>
-                                                <div className="text-sm opacity-70">Benachrichtigt bei neuen Fotos in dieser Galerie.</div>
+                                                <div className="text-sm opacity-70"><Trans>Benachrichtigt bei neuen Fotos in dieser Galerie.</Trans></div>
                                             </div>
                                             <input type="checkbox" className="toggle toggle-primary" checked={gallery.wants_notifications} onChange={() => toggleOptIn(gallery.id, 'gallery', gallery.wants_notifications)} />
                                         </div>

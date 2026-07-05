@@ -1,3 +1,5 @@
+import {t} from "@lingui/core/macro";
+import {Trans} from "@lingui/react/macro";
 import type {VolumeLicensingResult} from '../../../logic/CartContext';
 import {CartItem} from '../../../logic/CartContext';
 import {formatMoney} from '../../../logic/utils';
@@ -14,30 +16,36 @@ export interface CartItemListProps {
 
 export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes, totalAmount, volumeLicensing}: CartItemListProps) => {
     const isVolumeLicensingMode = volumeLicensing?.isVolumePricing;
+    const pricePerItemStr = isVolumeLicensingMode ? formatMoney(volumeLicensing!.pricePerItemCents) : '';
+    const tierNum = volumeLicensing?.tier ?? 0;
+    const nextCount = volumeLicensing?.nextTierCount ?? 0;
+    const nextLabel = volumeLicensing?.nextTierLabel ?? '';
+    const nextPlural = nextCount === 1 ? '' : 'er';
+    const itemCount = items.length;
 
     return (
         <div className="lg:col-span-3">
             <h2 className="font-bold text-xl mb-4 flex items-center gap-2">
                 <span
-                    className="iconify mdi--format-list-checks text-primary"></span> {hasQuotes ? 'Deine Lizenzen & Anfragen' : 'Deine Lizenzen'}
+                    className="iconify mdi--format-list-checks text-primary"></span> {hasQuotes ? <Trans>Deine Lizenzen & Anfragen</Trans> : <Trans>Deine Lizenzen</Trans>}
             </h2>
 
             {/* Volume licensing pricing banner */}
             {isVolumeLicensingMode && items.length > 0 && (
                 <div className="mb-4 p-3 bg-primary/5 rounded-box border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                        <span className="badge badge-primary badge-sm uppercase text-[10px] tracking-wider">Mengenrabatt</span>
+                        <span className="badge badge-primary badge-sm uppercase text-xs tracking-wider"><Trans>Mengenrabatt</Trans></span>
                         <span className="text-sm font-semibold">
-                            {formatMoney(volumeLicensing.pricePerItemCents)} pro Bild (Tier {volumeLicensing.tier})
+                            <Trans>{pricePerItemStr} pro Bild (Tier {tierNum})</Trans>
                         </span>
                     </div>
                     {volumeLicensing.nextTierCount > 0 && (
                         <span className="text-xs opacity-70">
-                            Noch {volumeLicensing.nextTierCount} Bild{volumeLicensing.nextTierCount === 1 ? '' : 'er'} bis {volumeLicensing.nextTierLabel}
+                            {t`Noch ${nextCount} ${nextPlural} bis ${nextLabel}`}
                         </span>
                     )}
                     {volumeLicensing.tier === 3 && (
-                        <span className="text-xs text-success font-bold">Bester Rabatt aktiv</span>
+                        <span className="text-xs text-success font-bold"><Trans>Bester Rabatt aktiv</Trans></span>
                     )}
                 </div>
             )}
@@ -50,25 +58,24 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                             {item.thumb_url && (
                                 <img src={item.thumb_url}
                                      className="w-24 h-24 object-cover rounded shadow-sm shrink-0 border border-base-200"
-                                     alt="Vorschau"/>
+                                     alt={t`Vorschau`}/>
                             )}
                             <div className="w-full">
                                 {item.isQuote ? (
                                     <div className="w-full">
                                         <div className="font-bold text-sm text-primary mb-2 flex items-center gap-1"><span
-                                            className="iconify mdi--file-document-edit-outline"></span> Individuelles
-                                            Angebot
+                                            className="iconify mdi--file-document-edit-outline"></span> <Trans>Individuelles Angebot</Trans>
                                         </div>
                                         <textarea
                                             className="textarea textarea-bordered w-full h-16 text-sm resize-none"
-                                            placeholder="Beschreibe deine speziellen Nutzungsanforderungen (z.B. Weltweite Rechte, Exklusivität)..."
+                                            placeholder={t`Beschreibe deine speziellen Nutzungsanforderungen (z.B. Weltweite Rechte, Exklusivität)...`}
                                             value={item.notes || ''}
                                             onChange={(e) => handleUpdateItem(item, 'notes', e.target.value)}
                                         />
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-1">
-                                        <div className="font-bold text-sm">{item.useCaseName || 'Standard Lizenz'}</div>
+                                        <div className="font-bold text-sm">{item.useCaseName || t`Standard Lizenz`}</div>
                                         {item.modifierNames && item.modifierNames.length > 0 && (
                                             <div className="text-sm opacity-80 text-warning flex items-center gap-1">
                                                 <span
@@ -78,7 +85,7 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                                         {isVolumeLicensingMode && (
                                             <div className="text-xs opacity-60 mt-1 flex items-center gap-1">
                                                 <span className="iconify mdi--percent text-primary"></span>
-                                                Volumenpreis (Tier {volumeLicensing.tier})
+                                                <Trans>Volumenpreis (Tier {tierNum})</Trans>
                                             </div>
                                         )}
                                     </div>
@@ -91,7 +98,7 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                                 <div className="text-right">
                                     <span
                                         className="font-mono font-bold text-lg whitespace-nowrap text-warning">--- €</span>
-                                    <span className="text-sm font-sans opacity-70 block">(Preis auf Anfrage)</span>
+                                    <span className="text-sm font-sans opacity-70 block"><Trans>(Preis auf Anfrage)</Trans></span>
                                 </div>
                                     ) : (
                                         <div className="text-right">
@@ -99,7 +106,7 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                                                 <>
                                                     <span
                                                         className="font-mono font-bold text-lg whitespace-nowrap">{formatMoney(volumeLicensing.pricePerItemCents)}</span>
-                                                    <span className="text-xs opacity-60 block">(Volumenpreis)</span>
+                                                    <span className="text-xs opacity-60 block"><Trans>(Volumenpreis)</Trans></span>
                                                 </>
                                             ) : (
                                                 <span
@@ -108,7 +115,7 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                                         </div>
                                     )}
                             <button onClick={() => removeFromCart(item.photoId)}
-                                    className="btn btn-ghost btn-sm btn-square text-error" title="Entfernen">
+                                    className="btn btn-ghost btn-sm btn-square text-error" title={t`Entfernen`}>
                                 <span className="iconify mdi--trash-can text-lg"></span>
                             </button>
                         </div>
@@ -119,18 +126,17 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
             <div
                 className="mt-6 flex justify-between items-center bg-base-100 p-6 rounded-box border border-primary shadow-sm">
                 <div className="flex flex-col gap-1">
-                    <span className="font-bold text-lg">Gesamtsumme</span>
+                    <span className="font-bold text-lg"><Trans>Gesamtsumme</Trans></span>
                     {isVolumeLicensingMode && (
                         <span className="text-xs opacity-60">
-                            {items.length} Bilder × {formatMoney(volumeLicensing.pricePerItemCents)} (Tier {volumeLicensing.tier})
+                            <Trans>{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})</Trans>
                         </span>
                     )}
                 </div>
                 <span
                     className="text-3xl font-mono font-bold text-primary">{hasQuotes ? '--- €' : formatMoney(totalAmount)}</span>
             </div>
-            <p className="text-sm opacity-60 text-right mt-2">Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27
-                UStG.</p>
+            <p className="text-sm opacity-60 text-right mt-2"><Trans>Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG.</Trans></p>
         </div>
     );
 };

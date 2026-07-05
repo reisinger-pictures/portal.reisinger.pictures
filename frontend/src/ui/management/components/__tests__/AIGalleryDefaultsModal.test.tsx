@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../../../test-setup';
 import userEvent from '@testing-library/user-event';
 import AIGalleryDefaultsModal from '../AIGalleryDefaultsModal';
 
@@ -36,7 +37,7 @@ describe('AIGalleryDefaultsModal', () => {
 
     it('renders modal with textarea and KI generieren button', () => {
         setupMocks();
-        render(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
+        renderWithProviders(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
 
         expect(screen.getByText(/KI-Vorschlag für Vorgaben/)).toBeInTheDocument();
         expect(screen.getByText(/KI generieren/)).toBeInTheDocument();
@@ -45,7 +46,7 @@ describe('AIGalleryDefaultsModal', () => {
 
     it('button disabled when textarea empty', () => {
         setupMocks();
-        render(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
+        renderWithProviders(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
 
         expect(screen.getByText(/KI generieren/)).toBeDisabled();
     });
@@ -61,7 +62,7 @@ describe('AIGalleryDefaultsModal', () => {
             detected_city: 'Vienna',
         });
 
-        render(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
+        renderWithProviders(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
 
         const textarea = screen.getByPlaceholderText(/z\.B\. Hochzeitsreportage/i);
         await user.type(textarea, 'Wedding in Vienna');
@@ -85,7 +86,7 @@ describe('AIGalleryDefaultsModal', () => {
             detected_city: 'Berlin',
         });
 
-        render(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
+        renderWithProviders(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
 
         const textarea = screen.getByPlaceholderText(/z\.B\. Hochzeitsreportage/i);
         await user.type(textarea, 'Test');
@@ -111,7 +112,7 @@ describe('AIGalleryDefaultsModal', () => {
             detected_city: 'Munich',
         });
 
-        render(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={onApply} />);
+        renderWithProviders(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={onApply} />);
 
         const textarea = screen.getByPlaceholderText(/z\.B\. Hochzeitsreportage/i);
         await user.type(textarea, 'Test');
@@ -135,7 +136,7 @@ describe('AIGalleryDefaultsModal', () => {
     it('button disabled when !isAvailable', () => {
         setupMocks({ isAvailable: false });
 
-        render(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
+        renderWithProviders(<AIGalleryDefaultsModal isOpen={true} onClose={vi.fn()} onApply={vi.fn()} />);
 
         expect(screen.getByText(/KI generieren/)).toBeDisabled();
     });

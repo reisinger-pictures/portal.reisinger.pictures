@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,26 +24,26 @@ export interface Coupon {
 const couponSchema = z.object({
     code: z
         .string()
-        .min(1, 'Code ist erforderlich')
-        .max(50, 'Code darf maximal 50 Zeichen lang sein'),
+        .min(1, t`Code ist erforderlich`)
+        .max(50, t`Code darf maximal 50 Zeichen lang sein`),
     type: z.enum(['fixed', 'percentage']),
     value: z
-        .number('Wert muss eine Zahl sein')
-        .min(0, 'Wert darf nicht negativ sein'),
+        .number(t`Wert muss eine Zahl sein`)
+        .min(0, t`Wert darf nicht negativ sein`),
     max_items: z
-        .number('Muss eine Zahl sein')
-        .min(1, 'Muss mindestens 1 sein')
-        .max(999, 'Darf maximal 999 sein')
+        .number(t`Muss eine Zahl sein`)
+        .min(1, t`Muss mindestens 1 sein`)
+        .max(999, t`Darf maximal 999 sein`)
         .optional(),
     scope_type: z.enum(['global', 'gallery', 'meta_gallery', 'photographer', 'organisation']),
     scope_id: z.string().optional(),
     max_uses_global: z
-        .number('Muss eine Zahl sein')
-        .min(1, 'Muss mindestens 1 sein')
+        .number(t`Muss eine Zahl sein`)
+        .min(1, t`Muss mindestens 1 sein`)
         .optional(),
     max_uses_per_account: z
-        .number('Muss eine Zahl sein')
-        .min(1, 'Muss mindestens 1 sein')
+        .number(t`Muss eine Zahl sein`)
+        .min(1, t`Muss mindestens 1 sein`)
         .optional(),
     expires_at: z.string().optional(),
     active: z.boolean()
@@ -239,7 +240,6 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                             <div className="form-control md:col-span-2">
                                 <label className="label">
                                     <span className="label-text font-bold">Auf X günstigste Bilder beschränken</span>
-                                    <span className="label-text-alt opacity-60">(optional)</span>
                                 </label>
                                 <input
                                     type="number"
@@ -302,7 +302,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                         </div>
 
                         <div className="form-control">
-                            <label className="label cursor-pointer justify-start gap-3">
+                            <label className="label cursor-pointer justify-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
                                 <input
                                     type="checkbox"
                                     {...register('active')}

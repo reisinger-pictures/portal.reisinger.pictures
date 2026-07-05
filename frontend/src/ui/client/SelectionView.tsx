@@ -1,6 +1,8 @@
 import { useGallery, Photo } from '../../logic/useGallery';
 import ResponsiveImage from '../components/ResponsiveImage';
 import { useEffect, useRef, useState } from 'react';
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import { createPortal } from 'react-dom';
 import DaisyUIRatingBridge from './components/DaisyUIRatingBridge';
@@ -67,7 +69,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
                         order: 10,
                         isButton: false,
                         appendTo: 'wrapper',
-                        html: '<div id="rating-portal-anchor" class="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-xl p-4 z-[1000] pointer-events-none flex flex-col justify-end"></div>',
+                        html: '<div id="rating-portal-anchor" class="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-xl p-4 z-50 pointer-events-none flex flex-col justify-end"></div>',
                     });
                 }
             });
@@ -109,13 +111,13 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
     if (!gallery) return null;
 
     const handleFinishRating = async () => {
-        if (!(await confirm({ title: 'Auswahl abschließen?', message: 'Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird benachrichtigt.', confirmText: 'Abschließen', confirmColor: 'success' }))) return;
+        if (!(await confirm({ title: t`Auswahl abschließen?`, message: t`Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird benachrichtigt.`, confirmText: t`Abschließen`, confirmColor: 'success' }))) return;
         setFinishing(true);
         try {
             await apiMutate('/api/galleries/' + gallery.id + '/finish-rating', 'POST');
-            showToast('success', 'Der Fotograf wurde erfolgreich benachrichtigt!');
+            showToast('success', t`Der Fotograf wurde erfolgreich benachrichtigt!`);
         } catch {
-            showToast('error', 'Fehler beim Senden der Benachrichtigung.');
+            showToast('error', t`Fehler beim Senden der Benachrichtigung.`);
         }
         setFinishing(false);
     };
@@ -127,7 +129,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-bold mb-2">{gallery.name}</h1>
-                        <p className="opacity-70">Wähle deine Favoriten aus.</p> 
+                        <p className="opacity-70"><Trans>Wähle deine Favoriten aus.</Trans></p> 
                     </div>
 
                     <div className="flex flex-wrap items-center justify-end gap-3 md:gap-4">
@@ -137,7 +139,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
                         {user && (
                             <button onClick={handleFinishRating} disabled={finishing} className="btn btn-success text-white">
                                 {finishing ? <span className="loading loading-spinner"></span> : <span className="iconify mdi--check-all mr-1"></span>}
-                                Auswahl abschließen
+                                <Trans>Auswahl abschließen</Trans>
                             </button>
                         )}
                     </div>
@@ -148,7 +150,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
                 )}
 
                 {!isLoading && photos.length === 0 && (
-                    <EmptyState icon="mdi--image-off-outline" title="Noch keine Bilder vorhanden" message="Der Fotograf hat noch keine Bilder für diese Galerie freigegeben." className="mb-8" />
+                    <EmptyState icon="mdi--image-off-outline" title={t`Noch keine Bilder vorhanden`} message={t`Der Fotograf hat noch keine Bilder für diese Galerie freigegeben.`} className="mb-8" />
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6" ref={galleryRef}>
@@ -162,7 +164,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
                                data-artist={photo.artist}
                                data-photo-id={photo.id}
                                className="pswp-item block relative aspect-square">
-                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="select object-cover w-full h-full select-none hover:scale-105 transition-transform duration-500" draggable={false} alt={photo.title || 'Bild'} />
+                                <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="select object-cover w-full h-full select-none hover:scale-105 transition-transform duration-500" draggable={false} alt={photo.title || t`Bild`} />
                             </a>
                             {user ? <GridPhotoActions photo={photo} ratePhoto={ratePhoto} /> : <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3"></div>}
                         </div>
@@ -171,7 +173,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
 
                 {!isReachingEnd && photos.length > 0 && (
                     <div className="text-center mt-8">
-                        <button className="btn btn-outline" onClick={() => setSize(size + 1)}>Mehr laden</button>
+                        <button className="btn btn-outline" onClick={() => setSize(size + 1)}><Trans>Mehr laden</Trans></button>
                     </div>
                 )}
             </div>

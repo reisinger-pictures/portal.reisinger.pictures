@@ -15,6 +15,7 @@
  */
 
 import {useCallback, useState} from 'react';
+import {t} from "@lingui/core/macro";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,7 +98,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
     const applyCoupon = useCallback(async (code: string): Promise<void> => {
         const trimmed = code.trim();
         if (!trimmed) {
-            setError('Bitte einen Rabattcode eingeben.');
+            setError(t`Bitte einen Rabattcode eingeben.`);
             setIsValid(false);
             setDiscount(null);
             setCouponCode(null);
@@ -126,7 +127,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
             });
         } catch {
             setIsLoading(false);
-            setError('Netzwerkfehler: Rabattcode konnte nicht geprüft werden.');
+            setError(t`Netzwerkfehler: Rabattcode konnte nicht geprüft werden.`);
             setCouponCode(null);
             setIsValid(false);
             setDiscount(null);
@@ -156,7 +157,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
             setDiscount(null);
             setError(
                 (typeof failurePayload.error === 'string' && failurePayload.error)
-                || 'Rabattcode konnte nicht angewendet werden.'
+                || t`Rabattcode konnte nicht angewendet werden.`
             );
         }
         setIsLoading(false);

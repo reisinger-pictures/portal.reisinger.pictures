@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { type ReactNode, type RefObject, useRef } from 'react';
 
 interface ModalDialogShellProps {
@@ -32,7 +33,7 @@ export default function ModalDialogShell({
     const resolvedRef: RefObject<HTMLDialogElement | null> = modalRef ?? fallbackRef;
 
     return (
-        <dialog ref={resolvedRef} className="modal modal-open z-[60]">
+        <dialog ref={resolvedRef} className="modal modal-open">
             <div className={`modal-box relative ${widthClass}`}>
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
 
@@ -49,12 +50,12 @@ export default function ModalDialogShell({
 
                     <div className="modal-action col-span-full flex justify-between mt-8">
                         {editing ? (
-                            <button type="button" className="btn btn-outline btn-error" onClick={onDelete}>Löschen</button>
+                            <button type="button" className="btn btn-outline btn-error" onClick={onDelete}><Trans>Löschen</Trans></button>
                         ) : <div></div>}
                         <div>
-                            <button type="button" className="btn btn-ghost mr-2" onClick={onClose}>Abbrechen</button>
+                            <button type="button" className="btn btn-ghost mr-2" onClick={onClose}><Trans>Abbrechen</Trans></button>
                             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
+                                {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
                             </button>
                         </div>
                     </div>

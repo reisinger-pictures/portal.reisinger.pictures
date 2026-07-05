@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,9 +8,9 @@ import AutocompleteInput from '../../components/AutocompleteInput';
 import { LocationResult } from '../../../logic/useLocations';
 
 const customerSchema = z.object({
-    name: z.string().min(1, 'Name oder Ansprechpartner ist erforderlich'),
+    name: z.string().min(1, t`Name oder Ansprechpartner ist erforderlich`),
     company: z.string().optional(),
-    email: z.string().email('Ungültige E-Mail-Adresse').or(z.literal('')),
+    email: z.string().email(t`Ungültige E-Mail-Adresse`).or(z.literal('')),
     street: z.string().optional(),
     zip: z.string().optional(),
     city: z.string().optional(),

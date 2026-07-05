@@ -11,6 +11,8 @@
  */
 
 import {useState, useCallback} from 'react';
+import {t} from "@lingui/core/macro";
+import {Trans} from "@lingui/react/macro";
 import useCoupon from '../../../logic/useCoupon';
 import {useBrand} from '../../../logic/useBrand';
 import {formatMoney} from '../../../logic/utils';
@@ -46,13 +48,13 @@ export default function CouponInput({galleryId}: CouponInputProps) {
         >
             <h3 className="font-bold text-sm flex items-center gap-2">
                 <span className="iconify mdi--ticket-percent-outline text-primary"></span>
-                Rabattcode
+                <Trans>Rabattcode</Trans>
             </h3>
 
             {isValid && couponCode ? (
                 <div className="flex items-center justify-between gap-3 p-3 bg-success/10 border border-success/30 rounded-box">
                     <div className="flex items-center gap-2 min-w-0">
-                        <span className="badge badge-success badge-sm uppercase text-[10px] tracking-wider">Aktiv</span>
+                        <span className="badge badge-success badge-sm uppercase text-xs tracking-wider"><Trans>Aktiv</Trans></span>
                         <span className="font-mono font-bold truncate">{couponCode}</span>
                         {typeof discount === 'number' && discount > 0 && (
                             <span className="text-success font-semibold whitespace-nowrap">
@@ -64,10 +66,10 @@ export default function CouponInput({galleryId}: CouponInputProps) {
                         type="button"
                         onClick={handleRemove}
                         className="btn btn-ghost btn-sm text-error"
-                        aria-label="Rabattcode entfernen"
+                        aria-label={t`Rabattcode entfernen`}
                     >
                         <span className="iconify mdi--close-circle-outline"></span>
-                        Entfernen
+                        <Trans>Entfernen</Trans>
                     </button>
                 </div>
             ) : (
@@ -77,9 +79,9 @@ export default function CouponInput({galleryId}: CouponInputProps) {
                             type="text"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="Code eingeben"
+                            placeholder={t`Code eingeben`}
                             disabled={isLoading}
-                            aria-label="Rabattcode"
+                            aria-label={t`Rabattcode`}
                             className="input input-bordered join-item w-full bg-base-100"
                         />
                         <button
@@ -91,10 +93,10 @@ export default function CouponInput({galleryId}: CouponInputProps) {
                             {isLoading ? (
                                 <>
                                     <span className="loading loading-spinner loading-sm"></span>
-                                    Prüfe…
+                                    <Trans>Prüfe…</Trans>
                                 </>
                             ) : (
-                                'Anwenden'
+                                <Trans>Anwenden</Trans>
                             )}
                         </button>
                     </div>

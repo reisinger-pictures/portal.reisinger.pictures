@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../../api';
@@ -14,8 +16,8 @@ interface PaginatedCoupons {
 }
 
 const TYPE_LABELS: Record<Coupon['type'], string> = {
-    fixed: 'Festbetrag',
-    percentage: 'Prozent',
+    fixed: t`Festbetrag`,
+    percentage: t`Prozent`,
 };
 
 const formatValue = (coupon: Coupon): string => {
@@ -61,30 +63,31 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
                 scope_type: 'gallery',
                 scope_id: galleryId,
             });
-            showToast('success', 'Coupon angelegt');
+            showToast('success', t`Coupon angelegt`);
             setIsDrawerOpen(false);
             void mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
         }
     };
 
     const handleDelete = async (coupon: Coupon) => {
         if (coupon.id === undefined) return;
         if (coupon.used_count > 0) return;
+        const couponCode = coupon.code;
         if (!(await confirm({
-            title: 'Coupon löschen?',
-            message: `Möchtest du den Coupon "${coupon.code}" wirklich entfernen?`,
+            title: t`Coupon löschen?`,
+            message: t`Möchtest du den Coupon "${couponCode}" wirklich entfernen?`,
             confirmColor: 'error',
         }))) {
             return;
         }
         try {
             await apiMutate(`/api/management/coupons/${coupon.id}`, 'DELETE');
-            showToast('success', 'Coupon gelöscht');
+            showToast('success', t`Coupon gelöscht`);
             void mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Löschen');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Löschen`);
         }
     };
 
@@ -98,24 +101,26 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
     if (error) {
         return (
             <div className="p-10">
-                <ErrorMessage message="Fehler beim Laden der Coupons." />
+                <ErrorMessage message={t`Fehler beim Laden der Coupons.`} />
             </div>
         );
     }
 
     const coupons: Coupon[] = data?.data ?? [];
+    const couponsLength = coupons.length;
+    const couponsPlural = couponsLength === 1 ? '' : 's';
 
     return (
         <div>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div className="text-sm opacity-70">
                     {coupons.length === 0
-                        ? 'Keine Coupons für diese Galerie.'
-                        : `${coupons.length} Coupon${coupons.length === 1 ? '' : 's'} für diese Galerie`}
+                        ? <Trans>Keine Coupons für diese Galerie.</Trans>
+                        : t`${couponsLength} Coupon${couponsPlural} für diese Galerie`}
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={openCreate}>
                     <span className="iconify mdi--plus"></span>
-                    Coupon hinzufügen
+                    <Trans>Coupon hinzufügen</Trans>
                 </button>
             </div>
 
@@ -123,12 +128,12 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
                 <table className="table table-zebra w-full">
                     <thead>
                         <tr>
-                            <th>Code</th>
-                            <th>Typ</th>
-                            <th>Wert</th>
-                            <th>Verwendung</th>
-                            <th>Status</th>
-                            <th className="text-right">Aktionen</th>
+                                <th><Trans>Code</Trans></th>
+                                <th><Trans>Typ</Trans></th>
+                                <th><Trans>Wert</Trans></th>
+                                <th><Trans>Verwendung</Trans></th>
+                                <th><Trans>Status</Trans></th>
+                                <th className="text-right"><Trans>Aktionen</Trans></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -144,9 +149,9 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
                                 <td className="font-mono">{formatUsage(coupon)}</td>
                                 <td>
                                     {coupon.active ? (
-                                        <span className="badge badge-success font-bold">Aktiv</span>
+                                        <span className="badge badge-success font-bold"><Trans>Aktiv</Trans></span>
                                     ) : (
-                                        <span className="badge badge-ghost font-bold">Inaktiv</span>
+                                        <span className="badge badge-ghost font-bold"><Trans>Inaktiv</Trans></span>
                                     )}
                                 </td>
                                 <td className="text-right">
@@ -154,8 +159,8 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
                                         className="btn btn-ghost btn-xs btn-square text-error"
                                         title={
                                             coupon.used_count > 0
-                                                ? 'Löschen nicht möglich (bereits verwendet)'
-                                                : 'Löschen'
+                                                ? t`Löschen nicht möglich (bereits verwendet)`
+                                                : t`Löschen`
                                         }
                                         disabled={coupon.used_count > 0}
                                         onClick={() => void handleDelete(coupon)}
@@ -168,7 +173,7 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
                         {coupons.length === 0 && (
                             <tr>
                                 <td colSpan={6} className="text-center py-10 opacity-50">
-                                    Keine Coupons für diese Galerie vorhanden.
+                                    <Trans>Keine Coupons für diese Galerie vorhanden.</Trans>
                                 </td>
                             </tr>
                         )}

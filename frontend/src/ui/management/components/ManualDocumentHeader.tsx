@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {DocumentFormData} from '../../../api';
 
 interface Props {
@@ -15,11 +17,11 @@ export default function ManualDocumentHeader({ docType, data, dueDateOption, onU
     return (
         <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
             <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">
-                {isOffer ? 'Angebotsdetails' : 'Rechnungsdetails'}
+                {isOffer ? <Trans>Angebotsdetails</Trans> : <Trans>Rechnungsdetails</Trans>}
             </h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="form-control">
-                    <label className="label"><span className="label-text font-bold">Belegnummer</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Belegnummer</Trans></span></label>
                     <input required type="text" value={data.invoice_number}
                            onChange={e => onUpdate('invoice_number', e.target.value)}
                            className="input input-bordered font-mono"/>
@@ -33,25 +35,25 @@ export default function ManualDocumentHeader({ docType, data, dueDateOption, onU
 
                 {!isOffer && (
                     <div className="form-control lg:col-span-2">
-                        <label className="label"><span className="label-text font-bold">Leistungsdatum / Zeitraum</span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Leistungsdatum / Zeitraum</Trans></span></label>
                         <input
                             type="text"
                             value={data.service_date || ''}
                             onChange={e => onServiceDateChange(e.target.value)}
                             className="input input-bordered"
-                            placeholder="Wird automatisch befüllt..."
+                            placeholder={t`Wird automatisch befüllt...`}
                         />
                     </div>
                 )}
 
                 <div className="form-control lg:col-span-2">
                     <label className="label"><span
-                        className="label-text font-bold">{isOffer ? 'Hinweistext (Gültigkeit & Annahme)' : 'Zahlungsziel / Fälligkeitstext'}</span></label>
+                        className="label-text font-bold">                        {isOffer ? <Trans>Hinweistext (Gültigkeit & Annahme)</Trans> : <Trans>Zahlungsziel / Fälligkeitstext</Trans>}</span></label>
                     <div className="flex flex-col sm:flex-row gap-2 w-full">
                         <select className="select select-bordered w-full sm:w-1/3" value={dueDateOption}
                                 onChange={e => onOptionChange(e.target.value)}>
-                            <option value="0">Standard</option>
-                            <option value="custom">Freitext...</option>
+                            <option value="0"><Trans>Standard</Trans></option>
+                            <option value="custom"><Trans>Freitext...</Trans></option>
                         </select>
                         {dueDateOption !== 'custom' ? (
                             <div
@@ -60,7 +62,7 @@ export default function ManualDocumentHeader({ docType, data, dueDateOption, onU
                         ) : (
                             <input type="text" required value={data.due_date}
                                    onChange={e => onUpdate('due_date', e.target.value)}
-                                   className="input input-bordered flex-1" placeholder="Individueller Text..."/>
+                                   className="input input-bordered flex-1"                                     placeholder={t`Individueller Text...`}/>
                         )}
                     </div>
                 </div>

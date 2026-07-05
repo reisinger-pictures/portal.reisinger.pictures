@@ -42,7 +42,7 @@ export function usePhotoSwipe({ galleryRef, trigger, onInit }: UsePhotoSwipeOpti
                                 el.innerHTML = '';
                                 if (title || desc) {
                                     const container = document.createElement('div');
-                                    container.className = 'absolute bottom-5 left-5 text-white drop-shadow-md max-w-[600px] font-sans leading-relaxed pointer-events-none p-4';
+                                    container.className = 'absolute bottom-5 left-5 text-white drop-shadow-md max-w-xl font-sans leading-relaxed pointer-events-none p-4';
 
                                     if (title) {
                                         const b = document.createElement('b');

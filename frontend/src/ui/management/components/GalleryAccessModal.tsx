@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../../../api';
@@ -45,27 +47,27 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
             await apiMutate(`/api/management/galleries/${galleryId}/sync-access`, 'POST', {
                 user_id: userId, action: hasAccess ? 'detach' : 'attach'
             });
-            showToast('success', hasAccess ? 'Zugriff entzogen' : 'Zugriff erteilt');
+            showToast('success', hasAccess ? t`Zugriff entzogen` : t`Zugriff erteilt`);
             mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
         } finally {
             setProcessingId(null);
         }
     };
 
     return (
-        <div className="modal modal-open z-[80]">
-            <div className="modal-box max-w-2xl relative flex flex-col max-h-[80vh]">
+        <div className="modal modal-open">
+            <div className="modal-box max-w-2xl relative flex flex-col max-h-80vh">
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
-                    <span className="iconify mdi--account-key text-primary"></span> Nutzer-Zugriff verwalten
+                    <span className="iconify mdi--account-key text-primary"></span> <Trans>Nutzer-Zugriff verwalten</Trans>
                 </h3>
-                <p className="text-sm opacity-70 mb-4">Galerie: <strong>{galleryName}</strong></p>
+                <p className="text-sm opacity-70 mb-4"><Trans>Galerie:</Trans> <strong>{galleryName}</strong></p>
 
                 <input
                     type="text"
-                    placeholder="Nutzer suchen..."
+                    placeholder={t`Nutzer suchen...`}
                     className="input input-bordered w-full mb-4 shrink-0"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
@@ -91,7 +93,7 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
                                             disabled={processingId === u.id}
                                         >
                                             {processingId === u.id ? <span
-                                                className="loading loading-spinner"></span> : (hasAccess ? 'Entfernen' : 'Hinzufügen')}
+                                                className="loading loading-spinner"></span> : (hasAccess ? <Trans>Entfernen</Trans> : <Trans>Hinzufügen</Trans>)}
                                         </button>
                                     </div>
                                 );

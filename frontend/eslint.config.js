@@ -3,12 +3,14 @@ import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
+import pluginLingui from 'eslint-plugin-lingui';
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules'] },
+  { ignores: ['dist', 'node_modules', 'lingui.config.ts', 'playwright.config.ts', 'tests/e2e', 'src/**/__tests__', 'src/**/*.test.ts', 'src/**/*.test.tsx'] },
+  pluginLingui.configs['flat/recommended'],
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
@@ -20,14 +22,15 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': [
-        'warn',
+        'error',
         { allowConstantExport: true },
       ],
+      'lingui/no-expression-in-message': 'error',
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+      'lingui/t-call-in-function': 'off',
     },
   },
   {
-    // QA Enforcement: Playwright Tests
     files: ['tests/e2e/**/*.ts'],
     rules: {
       'no-restricted-syntax': [

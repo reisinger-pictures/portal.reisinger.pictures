@@ -1,5 +1,6 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import { MemoryRouter } from 'react-router-dom';
 import ManagementGalleryView from '../management/ManagementGalleryView';
 
@@ -136,7 +137,7 @@ const baseGalleryData = {
 };
 
 function renderView() {
-    return render(
+    return renderWithProviders(
         <MemoryRouter initialEntries={['/admin/galleries/test-gallery']}>
             <ManagementGalleryView />
         </MemoryRouter>,

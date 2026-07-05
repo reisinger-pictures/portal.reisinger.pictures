@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import PageLayout from './components/PageLayout';
 import ErrorMessage from './components/ErrorMessage';
 import { fetchSignContract, sendPageExit, submitSign, SignContractResponse } from '../logic/useContractJoin';
@@ -75,21 +77,22 @@ export default function ContractSignView() {
         <PageLayout>
             <div className="flex h-full items-center justify-center p-4 flex-col">
                 <ErrorMessage message={error} className="max-w-md shadow-lg mx-auto" />
-                <button onClick={() => navigate('/')} className="btn btn-ghost mt-4">Zurück zur Startseite</button>
+                <button onClick={() => navigate('/')} className="btn btn-ghost mt-4"><Trans>Zurück zur Startseite</Trans></button>
             </div>
         </PageLayout>
     );
 
     if (signed) {
+        const signerName = data?.signer.name;
         return (
             <PageLayout>
                 <div className="flex h-full items-center justify-center p-4">
                     <div className="card w-full max-w-md bg-base-100 shadow-2xl">
                         <div className="card-body text-center">
                             <span className="iconify mdi--check-circle text-success text-6xl mx-auto"></span>
-                            <h2 className="card-title text-2xl justify-center mt-4">Vertrag unterschrieben!</h2>
-                            <p className="text-base-content/70">Vielen Dank, {data?.signer.name}.</p>
-                            <p className="text-base-content/70">Das unterschriebene Vertragsdokument wird dir nach Vertragsschluss per E-Mail zugesendet.</p>
+                            <h2 className="card-title text-2xl justify-center mt-4"><Trans>Vertrag unterschrieben!</Trans></h2>
+                            <p className="text-base-content/70"><Trans>Vielen Dank, {signerName}.</Trans></p>
+                            <p className="text-base-content/70"><Trans>Das unterschriebene Vertragsdokument wird dir nach Vertragsschluss per E-Mail zugesendet.</Trans></p>
                         </div>
                     </div>
                 </div>
@@ -107,16 +110,16 @@ export default function ContractSignView() {
             <div className="max-w-4xl mx-auto p-4 md:p-10 space-y-8">
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
-                        <h1 className="text-3xl font-bold">Vertrag</h1>
+                        <h1 className="text-3xl font-bold"><Trans>Vertrag</Trans></h1>
                         <div className="divider"></div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div>
-                                <p className="font-bold text-base-content/60">Unterzeichner</p>
+                                <p className="font-bold text-base-content/60"><Trans>Unterzeichner</Trans></p>
                                 <p>{data?.signer.name}</p>
                                 <p>{data?.signer.email}</p>
                             </div>
                             <div>
-                                <p className="font-bold text-base-content/60">Rolle</p>
+                                <p className="font-bold text-base-content/60"><Trans>Rolle</Trans></p>
                                 <p>{(data?.signer.roles ?? []).join(', ')}</p>
                             </div>
                         </div>
@@ -126,7 +129,7 @@ export default function ContractSignView() {
                 {data?.contract.terms_html && (
                     <div className="card bg-base-100 shadow-xl">
                         <div className="card-body">
-                            <h2 className="text-xl font-bold mb-4">Vertragsinhalt</h2>
+                            <h2 className="text-xl font-bold mb-4"><Trans>Vertragsinhalt</Trans></h2>
                             <div className="editor-content prose max-w-none" dangerouslySetInnerHTML={{ __html: data.contract.terms_html }} />
                         </div>
                     </div>
@@ -135,15 +138,15 @@ export default function ContractSignView() {
                 {items.length > 0 && (
                     <div className="card bg-base-100 shadow-xl">
                         <div className="card-body">
-                            <h2 className="text-xl font-bold mb-4">Leistungen / Positionen</h2>
+                            <h2 className="text-xl font-bold mb-4"><Trans>Leistungen / Positionen</Trans></h2>
                             <div className="overflow-x-auto">
                                 <table className="table table-zebra w-full">
                                     <thead>
                                         <tr>
-                                            <th>Position</th>
-                                            <th className="text-right">Menge</th>
-                                            <th className="text-right">Preis</th>
-                                            <th className="text-right">Gesamt</th>
+                                            <th><Trans>Position</Trans></th>
+                                            <th className="text-right"><Trans>Menge</Trans></th>
+                                            <th className="text-right"><Trans>Preis</Trans></th>
+                                            <th className="text-right"><Trans>Gesamt</Trans></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -159,7 +162,7 @@ export default function ContractSignView() {
                                             </tr>
                                         ))}
                                         {discounts.length > 0 && (
-                                            <tr><td colSpan={4} className="text-right font-bold pt-4">Zwischensumme</td></tr>
+                                            <tr><td colSpan={4} className="text-right font-bold pt-4"><Trans>Zwischensumme</Trans></td></tr>
                                         )}
                                         {discounts.map((d, i) => (
                                             <tr key={`d-${i}`}>
@@ -173,7 +176,7 @@ export default function ContractSignView() {
                                     </tbody>
                                     <tfoot>
                                         <tr className="text-lg font-bold">
-                                            <td colSpan={3} className="text-right">Gesamtbetrag</td>
+                                            <td colSpan={3} className="text-right"><Trans>Gesamtbetrag</Trans></td>
                                             <td className="text-right">{formatMoney(itemsTotal - discountFixedTotal)}</td>
                                         </tr>
                                     </tfoot>
@@ -186,14 +189,14 @@ export default function ContractSignView() {
                 {data?.contract.billing_details && Object.values(data.contract.billing_details).some(v => v) && (
                     <div className="card bg-base-100 shadow-xl">
                         <div className="card-body">
-                            <h2 className="text-xl font-bold mb-4">Rechnungsempfänger</h2>
+                            <h2 className="text-xl font-bold mb-4"><Trans>Rechnungsempfänger</Trans></h2>
                             <div className="grid grid-cols-2 gap-2 text-sm">
-                                {data.contract.billing_details.name && <><span className="font-bold">Name:</span><span>{data.contract.billing_details.name}</span></>}
-                                {data.contract.billing_details.company && <><span className="font-bold">Firma:</span><span>{data.contract.billing_details.company}</span></>}
-                                {data.contract.billing_details.street && <><span className="font-bold">Straße:</span><span>{data.contract.billing_details.street}</span></>}
-                                {data.contract.billing_details.zip && <><span className="font-bold">PLZ:</span><span>{data.contract.billing_details.zip}</span></>}
-                                {data.contract.billing_details.city && <><span className="font-bold">Ort:</span><span>{data.contract.billing_details.city}</span></>}
-                                {data.contract.billing_details.email && <><span className="font-bold">E-Mail:</span><span>{data.contract.billing_details.email}</span></>}
+                                {data.contract.billing_details.name && <><span className="font-bold"><Trans>Name:</Trans></span><span>{data.contract.billing_details.name}</span></>}
+                                {data.contract.billing_details.company && <><span className="font-bold"><Trans>Firma:</Trans></span><span>{data.contract.billing_details.company}</span></>}
+                                {data.contract.billing_details.street && <><span className="font-bold"><Trans>Straße:</Trans></span><span>{data.contract.billing_details.street}</span></>}
+                                {data.contract.billing_details.zip && <><span className="font-bold"><Trans>PLZ:</Trans></span><span>{data.contract.billing_details.zip}</span></>}
+                                {data.contract.billing_details.city && <><span className="font-bold"><Trans>Ort:</Trans></span><span>{data.contract.billing_details.city}</span></>}
+                                {data.contract.billing_details.email && <><span className="font-bold"><Trans>E-Mail:</Trans></span><span>{data.contract.billing_details.email}</span></>}
                             </div>
                         </div>
                     </div>
@@ -203,10 +206,10 @@ export default function ContractSignView() {
                     <div className="alert alert-warning shadow-xl">
                         <span className="iconify mdi--alert-circle text-xl"></span>
                         <div>
-                            <h3 className="font-bold">Vertrag wurde geändert</h3>
-                            <p className="text-sm">Dieser Vertrag wurde nach dem Öffnen bearbeitet. Bitte laden Sie die Seite neu, um die aktuelle Version zu lesen und zu unterschreiben.</p>
+                            <h3 className="font-bold"><Trans>Vertrag wurde geändert</Trans></h3>
+                            <p className="text-sm"><Trans>Dieser Vertrag wurde nach dem Öffnen bearbeitet. Bitte laden Sie die Seite neu, um die aktuelle Version zu lesen und zu unterschreiben.</Trans></p>
                             <button onClick={() => window.location.reload()} className="btn btn-warning btn-sm mt-2">
-                                Seite neu laden
+                                <Trans>Seite neu laden</Trans>
                             </button>
                         </div>
                     </div>
@@ -214,29 +217,29 @@ export default function ContractSignView() {
 
                 <div className="card bg-base-100 shadow-xl border-2 border-primary/30">
                     <div className="card-body">
-                        <h2 className="text-xl font-bold mb-4 text-primary">Verbindliche Unterzeichnung</h2>
+                        <h2 className="text-xl font-bold mb-4 text-primary"><Trans>Verbindliche Unterzeichnung</Trans></h2>
 
                         {error && <ErrorMessage message={error} className="mb-4" />}
 
                         <div className="alert alert-info mb-4">
                             <span className="iconify mdi--information-outline text-xl"></span>
-                            <span>Mit deiner Unterschrift bestätigst du, den Vertrag gelesen zu haben und akzeptierst alle Bedingungen. Deine IP-Adresse und der Zeitpunkt werden im Audit-Trail protokolliert.</span>
+                            <span><Trans>Mit deiner Unterschrift bestätigst du, den Vertrag gelesen zu haben und akzeptierst alle Bedingungen. Deine IP-Adresse und der Zeitpunkt werden im Audit-Trail protokolliert.</Trans></span>
                         </div>
 
                         <div className="form-control">
-                            <label className="cursor-pointer label justify-start gap-3">
-                                <input type="checkbox" required className="checkbox checkbox-primary checkbox-sm mt-0.5" checked={acceptContract} onChange={e => setAcceptContract(e.target.checked)} />
+                            <label className="cursor-pointer label justify-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
+                                <input type="checkbox" required className="checkbox checkbox-primary mt-0.5 shrink-0" checked={acceptContract} onChange={e => setAcceptContract(e.target.checked)} />
                                 <span className="label-text font-medium">
-                                    Ich habe den Vertrag gelesen und stimme allen Bedingungen verbindlich zu.
+                                    <Trans>Ich habe den Vertrag gelesen und stimme allen Bedingungen verbindlich zu.</Trans>
                                 </span>
                             </label>
                         </div>
 
                         <div className="mt-6 flex flex-col items-end">
-                            {isStale && <p className="text-warning text-sm text-right mb-2">Bitte Seite neu laden, um den aktualisierten Vertrag zu unterschreiben.</p>}
+                            {isStale && <p className="text-warning text-sm text-right mb-2"><Trans>Bitte Seite neu laden, um den aktualisierten Vertrag zu unterschreiben.</Trans></p>}
                             <button onClick={handleSign} disabled={isSigning || !acceptContract || isStale} className="btn btn-primary btn-lg">
                                 {isSigning ? <span className="loading loading-spinner"></span> : ''}
-                                {(data?.contract.items?.length ?? 0) > 0 ? 'Zahlungspflichtig abschließen' : 'Vertrag verbindlich abschließen'}
+                                {(data?.contract.items?.length ?? 0) > 0 ? t`Zahlungspflichtig abschließen` : t`Vertrag verbindlich abschließen`}
                             </button>
                         </div>
                     </div>

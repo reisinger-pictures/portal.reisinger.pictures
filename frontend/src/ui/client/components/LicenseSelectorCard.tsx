@@ -1,4 +1,6 @@
 import {useState} from 'react';
+import {t} from "@lingui/core/macro";
+import {Trans} from "@lingui/react/macro";
 import {Photo} from '../../../logic/useGallery';
 import {useAuth} from '../../../logic/useAuth';
 import {usePermissions} from '../../../logic/usePermissions';
@@ -86,11 +88,12 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
 
     const finalPrice = coveredBasePrice + surchargeAmount;
 
+    const photoIdShort = photo.id.substring(0, 8);
     const handleAddToCart = () => {
         if (!selectedUseCase) return;
         addToCart({
             photoId: photo.id,
-            filename: photo.title || 'Bild ' + photo.id.substring(0, 8),
+            filename: photo.title || t`Bild ${photoIdShort}`,
             thumb_url: photo.thumb_url,
             tier: selectedUseCase.flatrate_tier as ResolutionTier,
             galleryId: photo.gallery_id,
@@ -100,7 +103,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
             modifierNames: activeModifiers.map(m => m.name),
             price: finalPrice
         });
-        showToast('success', 'In den Warenkorb gelegt');
+        showToast('success', t`In den Warenkorb gelegt`);
     };
 
     const handleCustomQuote = () => {
@@ -108,18 +111,17 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
             photoId: photo.id, filename: photo.title || 'Bild ' + photo.id.substring(0, 8), thumb_url: photo.thumb_url,
             tier: 'original' as ResolutionTier, price: 0, isQuote: true, notes: quoteNote
         });
-        showToast('info', 'Angebot zum Warenkorb hinzugefügt');
+        showToast('info', t`Angebot zum Warenkorb hinzugefügt`);
         setQuoteNote('');
     };
 
     return (
         <div className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
             <h4 className="font-bold text-xl flex items-center gap-2"><span
-                className="iconify mdi--license text-primary"></span> Lizenz wählen</h4>
+                className="iconify mdi--license text-primary"></span> <Trans>Lizenz wählen</Trans></h4>
 
             <div className="space-y-2">
-                <label className="label-text font-bold text-sm opacity-70 uppercase tracking-wide">1. Typ /
-                    Grundhonorar</label>
+                    <label className="label-text font-bold text-sm opacity-70 uppercase tracking-wide"><Trans>1. Typ / Grundhonorar</Trans></label>
                 <div className="flex flex-col gap-2">
                     {displayedUseCases.map(uc => {
                         const ucReqRank = RES_RANKS[uc.flatrate_tier || 'web'] || 0;
@@ -141,7 +143,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                                     <div className="text-sm opacity-70">{uc.description}</div>
                                 </div>
                                 <div className="font-mono font-bold text-sm shrink-0">
-                                    {ucCovered ? <span className="text-success text-sm">Inklusive</span> : formatMoney(Number(uc.base_price))}
+                                    {ucCovered ? <span className="text-success text-sm"><Trans>Inklusive</Trans></span> : formatMoney(Number(uc.base_price))}
                                 </div>
                             </label>
                         );
@@ -151,8 +153,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
 
             {catalog.modifiers.length > 0 && (
                 <div className="space-y-2 pt-2">
-                    <label className="label-text font-bold text-sm opacity-70 uppercase tracking-wide">2. Optionale
-                        Zuschläge</label>
+                    <label className="label-text font-bold text-sm opacity-70 uppercase tracking-wide"><Trans>2. Optionale Zuschläge</Trans></label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {catalog.modifiers.map(mod => {
                             const isModCovered = isBaseCovered && mod.is_included_in_flatrate;
@@ -174,7 +175,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                                         <div className="text-sm opacity-70 mb-1">{mod.description}</div>
                                         <div className="font-mono text-sm font-bold text-warning">
                                             {isModCovered ? <span
-                                                className="text-success text-sm">Kostenfrei (Flatrate)</span> : `+${formatMoney(currentSurcharge)} (+${Number(mod.percent_surcharge)}%)`}
+                                                className="text-success text-sm"><Trans>Kostenfrei (Flatrate)</Trans></span> : `+${formatMoney(currentSurcharge)} (+${Number(mod.percent_surcharge)}%)`}
                                         </div>
                                     </div>
                                 </label>
@@ -189,23 +190,23 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                 <div>
                     <div className="text-2xl font-mono font-bold text-primary">{formatMoney(finalPrice)}</div>
                     {isBaseCovered &&
-                        <div className="text-sm text-success font-bold mt-1">Grundhonorar durch Flatrate gedeckt</div>}
+                        <div className="text-sm text-success font-bold mt-1"><Trans>Grundhonorar durch Flatrate gedeckt</Trans></div>}
                 </div>
                 <div className="w-full md:w-auto flex flex-col gap-2">
                     {/* Primärer Aktions-Button */}
                     {finalPrice === 0 ? (
                         <a href={`/api/photos/${photo.id}/download?tier=${photo?.gallery?.effective_is_free_download ? 'original' : selectedUseCase?.flatrate_tier}`}
                            target="_blank" className="btn btn-success btn-md text-white w-full shadow-sm"><span
-                            className="iconify mdi--download text-lg"></span> Download</a>
+                            className="iconify mdi--download text-lg"></span> <Trans>Download</Trans></a>
                     ) : canBuy ? (
                         <button onClick={handleAddToCart}
                                 className="btn btn-primary btn-md w-full shadow-sm"><span
-                            className="iconify mdi--cart-plus text-lg"></span> In den Warenkorb
+                            className="iconify mdi--cart-plus text-lg"></span> <Trans>In den Warenkorb</Trans>
                         </button>
                     ) : (
                         <button onClick={handleCustomQuote} className="btn btn-outline btn-primary w-full shadow-sm"
-                                title="Erweiterte Rechte als Angebot beim Fotografen anfragen">
-                            <span className="iconify mdi--email-fast text-lg"></span> Upgrade anfragen
+                                title={t`Erweiterte Rechte als Angebot beim Fotografen anfragen`}>
+                            <span className="iconify mdi--email-fast text-lg"></span> <Trans>Upgrade anfragen</Trans>
                         </button>
                     )}
 
@@ -214,7 +215,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                         <a href={`/api/photos/${photo.id}/download?tier=original`}
                            target="_blank"
                            className="btn btn-outline btn-neutral btn-sm w-full shadow-sm mt-1">
-                            <span className="iconify mdi--shield-check-outline text-lg"></span> Admin Download
+                            <span className="iconify mdi--shield-check-outline text-lg"></span> <Trans>Admin Download</Trans>
                         </a>
                     )}
                 </div>
@@ -222,12 +223,12 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
 
             {canBuy && (
                 <div className="mt-2 pt-4 border-t border-base-300">
-                    <p className="text-sm font-bold opacity-70 mb-2 uppercase tracking-wide">Sonderanfrage (Angebot)</p>
+                    <p className="text-sm font-bold opacity-70 mb-2 uppercase tracking-wide"><Trans>Sonderanfrage (Angebot)</Trans></p>
                     <textarea className="textarea textarea-bordered w-full h-16 text-sm resize-none mb-2"
-                              placeholder="Z.B. Exklusivrecht erforderlich..." value={quoteNote}
+                              placeholder={t`Z.B. Exklusivrecht erforderlich...`} value={quoteNote}
                               onChange={(e) => setQuoteNote(e.target.value)}></textarea>
                     <button onClick={handleCustomQuote} className="btn btn-outline btn-sm w-full"><span
-                        className="iconify mdi--file-document-edit-outline"></span> Als Angebot anfragen
+                        className="iconify mdi--file-document-edit-outline"></span> <Trans>Als Angebot anfragen</Trans>
                     </button>
                 </div>
             )}

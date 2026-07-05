@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { useAI } from '../../../logic/useAI';
 import { useUI } from '../../components/UIContext';
@@ -33,9 +35,9 @@ export default function AIGalleryDefaultsModal({ isOpen, onClose, onApply }: Pro
                 location: data.location || '',
                 city: data.detected_city || ''
             });
-            showToast('success', 'KI-Vorschlag geladen.');
+            showToast('success', t`KI-Vorschlag geladen.`);
         } catch {
-            showToast('error', 'KI-Generierung fehlgeschlagen.');
+            showToast('error', t`KI-Generierung fehlgeschlagen.`);
         }
         setIsGenerating(false);
     };
@@ -48,20 +50,20 @@ export default function AIGalleryDefaultsModal({ isOpen, onClose, onApply }: Pro
     };
 
     return (
-        <dialog className="modal modal-open z-[70]">
+        <dialog className="modal modal-open">
             <div className="modal-box max-w-xl relative">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
-                    <span className="iconify mdi--robot-outline text-primary"></span> KI-Vorschlag für Vorgaben
+                    <span className="iconify mdi--robot-outline text-primary"></span> <Trans>KI-Vorschlag für Vorgaben</Trans>
                 </h3>
                 <p className="text-sm opacity-70 mb-4">
-                    Beschreibe die Galerie — die KI generiert Vorschläge für Titel, Beschreibung und Keywords (nur Text, keine Bildanalyse).
+                    <Trans>Beschreibe die Galerie — die KI generiert Vorschläge für Titel, Beschreibung und Keywords (nur Text, keine Bildanalyse).</Trans>
                 </p>
 
                 <textarea
                     value={galleryDescription}
                     onChange={e => setGalleryDescription(e.target.value)}
-                    placeholder="z.B. Hochzeitsreportage im Wiener Burggarten, Mai 2026, Paar vor historischer Kulisse..."
+                    placeholder={t`z.B. Hochzeitsreportage im Wiener Burggarten, Mai 2026, Paar vor historischer Kulisse...`}
                     className="textarea textarea-bordered w-full h-24 mb-4"
                     disabled={isGenerating}
                 />
@@ -75,29 +77,29 @@ export default function AIGalleryDefaultsModal({ isOpen, onClose, onApply }: Pro
                     {isGenerating ? (
                         <span className="loading loading-spinner loading-xs"></span>
                     ) : (
-                        <><span className="iconify mdi--auto-fix"></span> KI generieren</>
+                        <><span className="iconify mdi--auto-fix"></span> <Trans>KI generieren</Trans></>
                     )}
                 </button>
 
                 {result && (
                     <div className="bg-base-200 p-3 rounded-box border border-base-300 space-y-2 mb-4">
-                        <p className="text-xs font-bold opacity-70">Vorschlag:</p>
-                        <div className="text-sm"><span className="font-semibold">Titel:</span> {result.title || '—'}</div>
-                        <div className="text-sm"><span className="font-semibold">Beschreibung:</span> {result.description || '—'}</div>
-                        <div className="text-sm"><span className="font-semibold">Keywords:</span> {result.keywords || '—'}</div>
-                        <div className="text-sm"><span className="font-semibold">Ort:</span> {result.location || '—'}</div>
+                        <p className="text-xs font-bold opacity-70"><Trans>Vorschlag:</Trans></p>
+                        <div className="text-sm"><span className="font-semibold"><Trans>Titel:</Trans></span> {result.title || '—'}</div>
+                        <div className="text-sm"><span className="font-semibold"><Trans>Beschreibung:</Trans></span> {result.description || '—'}</div>
+                        <div className="text-sm"><span className="font-semibold"><Trans>Keywords:</Trans></span> {result.keywords || '—'}</div>
+                        <div className="text-sm"><span className="font-semibold"><Trans>Ort:</Trans></span> {result.location || '—'}</div>
                         <button
                             type="button"
                             onClick={handleApply}
                             className="btn btn-primary btn-sm w-full mt-2"
                         >
-                            Vorschlag übernehmen
+                            <Trans>Vorschlag übernehmen</Trans>
                         </button>
                     </div>
                 )}
 
                 <div className="flex justify-end gap-3">
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>Schliessen</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}><Trans>Schliessen</Trans></button>
                 </div>
             </div>
             <div className="modal-backdrop" onClick={onClose}></div>

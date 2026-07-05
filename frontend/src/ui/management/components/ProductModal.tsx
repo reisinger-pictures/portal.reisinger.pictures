@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,9 +8,9 @@ import { Product } from '../../../api';
 
 const productSchema = z.object({
     type: z.enum(['item', 'discount_fixed', 'discount_percent']),
-    name: z.string().min(1, 'Name ist erforderlich'),
+    name: z.string().min(1, t`Name ist erforderlich`),
     description: z.string().optional(),
-    price: z.number().min(0, 'Wert muss positiv sein')
+    price: z.number().min(0, t`Wert muss positiv sein`)
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -49,12 +51,12 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--package-variant-closed text-primary"></span>
-                    {editingProduct ? 'Katalog-Eintrag bearbeiten' : 'Neuen Eintrag anlegen'}
+                    {editingProduct ? <Trans>Katalog-Eintrag bearbeiten</Trans> : <Trans>Neuen Eintrag anlegen</Trans>}
                 </h3>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="form-control">
-                        <label className="label"><span className="label-text font-bold">Typ *</span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Typ *</Trans></span></label>
                         <select {...register('type')} className="select select-bordered">
                             <option value="item">Leistung / Produkt</option>
                             <option value="discount_fixed">Rabatt (Fixbetrag in €)</option>
@@ -62,23 +64,23 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                         </select>
                     </div>
                     <div className="form-control">
-                        <label className="label"><span className="label-text font-bold">Titel / Name *</span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Titel / Name *</Trans></span></label>
                         <input required type="text" {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
                         {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
                     </div>
                     <div className="form-control">
-                        <label className="label"><span className="label-text font-bold">Zusatzbeschreibung</span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Zusatzbeschreibung</Trans></span></label>
                         <input type="text" {...register('description')} className="input input-bordered" />
                     </div>
                     <div className="form-control w-1/2">
-                        <label className="label"><span className="label-text font-bold">Standard-Wert *</span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Standard-Wert *</Trans></span></label>
                         <input required type="number" step="0.01" min="0" {...register('price', { valueAsNumber: true })} className={`input input-bordered font-mono ${errors.price ? 'input-error' : ''}`} />
                     </div>
 
                     <div className="modal-action col-span-full mt-6">
-                        <button type="button" className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
+                        <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
                         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
+                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
                         </button>
                     </div>
                 </form>

@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEffect, useState } from 'react';
 import ErrorMessage from '../../components/ErrorMessage';
 import { RatingData } from '../../../api';
@@ -59,46 +61,49 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
     if (!isOpen) return null;
 
     return (
-        <div className="modal modal-open z-50">
-            <div className="modal-box max-w-5xl relative flex flex-col max-h-[90vh]">
+        <div className="modal modal-open">
+            <div className="modal-box max-w-5xl relative flex flex-col max-h-90vh">
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-2xl mb-6 shrink-0">Bewertungen & Status</h3>
+                <h3 className="font-bold text-2xl mb-6 shrink-0"><Trans>Bewertungen & Status</Trans></h3>
                 
                 {isLoading ? (
                     <div className="flex-1 flex items-center justify-center p-10"><span className="loading loading-spinner loading-lg text-primary"></span></div>
                 ) : error ? (
-                    <ErrorMessage message="Fehler beim Laden der Bewertungen." />
+                    <ErrorMessage message={t`Fehler beim Laden der Bewertungen.`} />
                 ) : (
                     <div className="flex-1 overflow-y-auto pr-2 space-y-8">
                         <div>
                             <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
-                                <span className="iconify mdi--account-group"></span> Beteiligte Personen
+                                <span className="iconify mdi--account-group"></span> <Trans>Beteiligte Personen</Trans>
                             </h4>
                             <div className="overflow-x-auto border border-base-300 rounded-box">
                                 <table className="table table-zebra w-full">
                                     <thead className="bg-base-200">
                                         <tr>
-                                            <th>Name</th>
-                                            <th>Status</th>
-                                            <th>Fortschritt</th>
+                                            <th><Trans>Name</Trans></th>
+                                            <th><Trans>Status</Trans></th>
+                                            <th><Trans>Fortschritt</Trans></th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {ratingStatusData.map(u => (
+                                        {ratingStatusData.map(u => {
+                                            const ratedCount = u.rated_count;
+                                            return (
                                             <tr key={u.user_id}>
                                                 <td className="font-bold">
                                                     {u.name}
                                                     {u.email && !u.email.includes('@invite.local') && <span className="block text-sm opacity-70 font-normal">{u.email}</span>}
-                                                    {u.email && u.email.includes('@invite.local') && <span className="block text-sm opacity-50 font-normal">Via Magic Link</span>}
+                                                    {u.email && u.email.includes('@invite.local') && <span className="block text-sm opacity-50 font-normal"><Trans>Via Magic Link</Trans></span>}
                                                 </td>
-                                                <td className="whitespace-nowrap">{u.rated_count} von {totalGalleryPhotos} Bildern</td>
-                                                <td className="w-1/3 min-w-[100px]">
+                                                <td className="whitespace-nowrap"><Trans>{ratedCount} von {totalGalleryPhotos} Bildern</Trans></td>
+                                                <td className="w-1/3 min-w-24">
                                                     <progress className="progress progress-primary w-full" value={u.rated_count} max={totalGalleryPhotos || 1}></progress>
                                                 </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                         {ratingStatusData.length === 0 && (
-                                            <tr><td colSpan={3} className="text-center py-6 opacity-50">Es sind aktuell keine Personen für diese Galerie freigeschaltet.<br/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren.</td></tr>
+                                            <tr><td colSpan={3} className="text-center py-6 opacity-50"><Trans>Es sind aktuell keine Personen für diese Galerie freigeschaltet.<br/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren.</Trans></td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -107,16 +112,16 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
 
                         <div>
                             <h4 className="font-bold text-lg mb-3 flex items-center gap-2 mt-4">
-                                <span className="iconify mdi--image-multiple"></span> Detaillierte Auswertungen (Bild-Bewertungen)
+                                <span className="iconify mdi--image-multiple"></span> <Trans>Detaillierte Auswertungen (Bild-Bewertungen)</Trans>
                             </h4>
                             <div className="overflow-x-auto border border-base-300 rounded-box">
                                 <table className="table table-zebra w-full">
                                     <thead className="bg-base-200">
                                         <tr>
-                                            <th>Bild</th>
-                                            <th>Dateiname</th>
-                                            <th>Ø Sterne</th>
-                                            <th>Kommentare</th>
+                                            <th><Trans>Bild</Trans></th>
+                                            <th><Trans>Dateiname</Trans></th>
+                                            <th><Trans>Ø Sterne</Trans></th>
+                                            <th><Trans>Kommentare</Trans></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -128,7 +133,7 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
                                                 <td className="whitespace-pre-wrap text-sm">{r.all_comments || <span className="opacity-50">-</span>}</td>
                                             </tr>
                                         ))}
-                                        {ratingsData.length === 0 && <tr><td colSpan={4} className="text-center py-8 opacity-50">Noch keine Bewertungen vorhanden.</td></tr>}
+                                        {ratingsData.length === 0 && <tr><td colSpan={4} className="text-center py-8 opacity-50"><Trans>Noch keine Bewertungen vorhanden.</Trans></td></tr>}
                                     </tbody>
                                 </table>
                             </div>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import CouponFormDrawer, { type Coupon } from '../management/components/CouponFormDrawer';
 import { UIContext } from '../components/UIContext';
@@ -22,7 +23,7 @@ describe('CouponFormDrawer', () => {
     });
 
     function renderDrawer(editingCoupon: Coupon | null = null) {
-        return render(
+        return renderWithProviders(
             <UIContext.Provider value={mockUIContext}>
                 <CouponFormDrawer
                     isOpen={true}

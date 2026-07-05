@@ -2,6 +2,8 @@ import { Gallery, FlatGroup, GalleryMetadataOpts } from '../../logic/useGallerie
 import { Tenant } from '../../logic/useTenants';
 import { useUI } from './UIContext';
 import { useEffect } from 'react';
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useFocusTrap } from '../../logic/useFocusTrap';
 import { useForm, useWatch } from 'react-hook-form';
 import useSWR from 'swr';
@@ -13,7 +15,7 @@ import CheckboxGroup from '../components/CheckboxGroup';
 import ModalDialogShell from './ModalDialogShell';
 
 const gallerySchema = z.object({
-    name: z.string().min(1, 'Name ist erforderlich'),
+    name: z.string().min(1, t`Name ist erforderlich`),
     slug: z.string(),
     type: z.enum(['selection', 'delivery']),
     is_public: z.boolean(),
@@ -94,26 +96,26 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         try {
             if (editingGallery) {
                 await onUpdate(editingGallery.id, data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts);
-                showToast('success', 'Galerie erfolgreich aktualisiert.');
+                showToast('success', t`Galerie erfolgreich aktualisiert.`);
             } else {
                 await onCreate(data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts);
-                showToast('success', 'Galerie erfolgreich erstellt.');
+                showToast('success', t`Galerie erfolgreich erstellt.`);
             }
             onClose();
         } catch (e: unknown) {
-            showToast('error', (e as Error).message || 'Fehler beim Speichern');
+            showToast('error', (e as Error).message || t`Fehler beim Speichern`);
         }
     };
 
     const handleDelete = async () => {
         if (!editingGallery) return;
-        if (await confirm({ title: 'Galerie löschen?', message: 'Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!', confirmText: 'Unwiderruflich löschen', confirmColor: 'error' })) {
+        if (await confirm({ title: t`Galerie löschen?`, message: t`Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!`, confirmText: t`Unwiderruflich löschen`, confirmColor: 'error' })) {
             try {
                 await onDelete(editingGallery.id);
-                showToast('success', 'Galerie erfolgreich gelöscht.');
+                showToast('success', t`Galerie erfolgreich gelöscht.`);
                 onClose();
             } catch (e: unknown) {
-                showToast('error', (e as Error).message || 'Fehler beim Löschen');
+                showToast('error', (e as Error).message || t`Fehler beim Löschen`);
             }
         }
     };
@@ -125,7 +127,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
     return (
         <ModalDialogShell
-            title={editingGallery ? 'Galerie bearbeiten' : 'Neue Galerie'}
+            title={editingGallery ? <Trans>Galerie bearbeiten</Trans> : <Trans>Neue Galerie</Trans>}
             icon="mdi--image-multiple"
             onClose={onClose}
             onDelete={handleDelete}
@@ -136,13 +138,13 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
             maxWidth="2xl"
             secondaryAction={!editingGallery ? (
                 <button type="button" className="btn btn-xs btn-outline" onClick={() => { onClose(); onOpenGroupModal(); }}>
-                    Ordner / Meta-Galerie erstellen
+                    <Trans>Ordner / Meta-Galerie erstellen</Trans>
                 </button>
             ) : undefined}
         >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold">Name der Galerie</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Name der Galerie</Trans></span></label>
                     <input type="text" {...register('name')}
                            onChange={(e) => {
                                setValue('name', e.target.value, { shouldDirty: true });
@@ -153,14 +155,14 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                            className="input input-bordered w-full" />
                 </div>
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold">URL Slug</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>URL Slug</Trans></span></label>
                     <input type="text" {...register('slug')} onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true, shouldTouch: true})} className="input input-bordered w-full text-sm font-mono opacity-70" />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold">Galerie-Typ</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Galerie-Typ</Trans></span></label>
                     <select {...register('type')}
                             onChange={(e) => {
                                 setValue('type', e.target.value as 'delivery' | 'selection', { shouldDirty: true });
@@ -170,20 +172,20 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                                 }
                             }}
                             className="select select-bordered w-full">
-                        <option value="delivery">Delivery (Downloads)</option>
-                        <option value="selection">Auswahl (Ratings)</option>
+                        <option value="delivery"><Trans>Delivery (Downloads)</Trans></option>
+                        <option value="selection"><Trans>Auswahl (Ratings)</Trans></option>
                     </select>
                 </div>
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold">Sichtbarkeit</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Sichtbarkeit</Trans></span></label>
                     <select disabled={isVisibilityForced} value={isVisibilityForced ? (forcedVisibility ? 'true' : 'false') : (watchIsPublic ? 'true' : 'false')} onChange={e => setValue('is_public', e.target.value === 'true')} className="select select-bordered w-full">
-                        <option value="false">Privat (Nur mit Link / Passwort)</option>
-                        <option value="true">Öffentlich (Für alle sichtbar)</option>
+                        <option value="false"><Trans>Privat (Nur mit Link / Passwort)</Trans></option>
+                        <option value="true"><Trans>Öffentlich (Für alle sichtbar)</Trans></option>
                     </select>
                     {isVisibilityForced && (
                         <label className="label pt-1 pb-0">
                             <span className="label-text-alt text-warning leading-tight whitespace-normal break-words">
-                                {watchType === 'selection' ? 'Bewertungs-Galerien sind zwingend privat.' : 'Wird durch Meta-Galerie erzwungen'}
+                                {watchType === 'selection' ? t`Bewertungs-Galerien sind zwingend privat.` : t`Wird durch Meta-Galerie erzwungen`}
                             </span>
                         </label>
                     )}
@@ -192,17 +194,17 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
             
             <div className="form-control w-full mb-4">
-                <label className="label"><span className="label-text font-bold">Zugeordnete Organisation (Verschieben)</span></label>
+                <label className="label"><span className="label-text font-bold"><Trans>Zugeordnete Organisation (Verschieben)</Trans></span></label>
                 <select {...register('tenant_id')} className="select select-bordered w-full">
-                    <option value="">-- Keine spezifische Organisation --</option>
+                    <option value="">-- <Trans>Keine spezifische Organisation</Trans> --</option>
                     {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
             </div>
 
             <div className="form-control w-full mb-4">
-                <label className="label"><span className="label-text font-bold">In welchem Ordner soll die Galerie liegen?</span></label>
+                <label className="label"><span className="label-text font-bold"><Trans>In welchem Ordner soll die Galerie liegen?</Trans></span></label>
                 <select {...register('gallery_group_id')} className="select select-bordered w-full">
-                    <option value="">-- Oberste Ebene (Root) --</option>
+                    <option value="">-- <Trans>Oberste Ebene (Root)</Trans> --</option>
                     {availableGroups.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
                 </select>
             </div>
@@ -210,16 +212,16 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
             {watchType === 'delivery' && (
                 <div className="space-y-3 mb-4">
                     <CheckboxGroup items={[
-                        { name: 'is_free_download', label: 'Kostenlosen Download erlauben', description: 'Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste.' },
-                        { name: 'is_editorial_only', label: 'Nur für redaktionelle Nutzung (Shop)', description: 'Sperrt kommerzielle Lizenzen im Checkout.' },
-                        { name: 'is_hidden', label: 'Im Frontend verstecken', description: 'Wird nicht in Suchergebnissen oder Feeds gelistet.' },
+                        { name: 'is_free_download', label: t`Kostenlosen Download erlauben`, description: t`Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste.` },
+                        { name: 'is_editorial_only', label: t`Nur für redaktionelle Nutzung (Shop)`, description: t`Sperrt kommerzielle Lizenzen im Checkout.` },
+                        { name: 'is_hidden', label: t`Im Frontend verstecken`, description: t`Wird nicht in Suchergebnissen oder Feeds gelistet.` },
                     ]} register={register} />
 
-                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full">
-                        <input type="checkbox" {...register('is_live')} className="checkbox checkbox-primary" />
+                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full hover:bg-base-300/50 transition-colors">
+                        <input type="checkbox" {...register('is_live')} className="checkbox checkbox-primary shrink-0" />
                         <div>
-                            <span className="label-text font-bold block">LIVE Galerie</span>
-                            <span className="label-text-alt opacity-70 leading-tight block mt-1">Automatischer Refresh für Besucher alle 10 Sekunden.</span>
+                            <span className="label-text font-bold block"><Trans>LIVE Galerie</Trans></span>
+                            <span className="label-text-alt opacity-70 leading-tight block mt-1"><Trans>Automatischer Refresh für Besucher alle 10 Sekunden.</Trans></span>
                         </div>
                     </label>
                 </div>
@@ -227,11 +229,11 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pt-4 border-t border-base-300">
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold">Passwort (Optional)</span></label>
-                    <input type="text" {...register('password')} className="input input-bordered w-full" placeholder={editingGallery ?"Leer = Aktuelles behalten" :"Leer = Nur Magic Link"} />
+                    <label className="label"><span className="label-text font-bold"><Trans>Passwort</Trans></span></label>
+                    <input type="text" {...register('password')} className="input input-bordered w-full" placeholder={editingGallery ? t`Leer = Aktuelles behalten` : t`Leer = Nur Magic Link`} />
                 </div>
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold">Ablaufdatum (Optional)</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Ablaufdatum</Trans></span></label>
                     <input type="date" {...register('expires_at')} className="input input-bordered w-full" />
                 </div>
             </div>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import { MemoryRouter } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../../logic/useAuth';
@@ -70,7 +71,7 @@ const defaultPermissions = {
 };
 
 function renderSidebar(props: Record<string, unknown> = {}) {
-    return render(
+    return renderWithProviders(
         <MemoryRouter>
             <Sidebar {...props} />
         </MemoryRouter>,

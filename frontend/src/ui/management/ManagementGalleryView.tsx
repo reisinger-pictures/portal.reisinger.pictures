@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import GalleryAccessModal from './components/GalleryAccessModal';
 import {useRef, useState} from 'react';
 import ErrorMessage from '../components/ErrorMessage';
@@ -64,7 +66,7 @@ export default function ManagementGalleryView() {
     usePhotoSwipe({ galleryRef, trigger: photos.length });
 
     if (isLoading && photos.length === 0) return <PageLayout><div className="flex h-full items-center justify-center"><span className="loading loading-spinner"></span></div></PageLayout>;
-    if (isError || !gallery) return <PageLayout><div className="p-8"><ErrorMessage message="Galerie nicht gefunden." /></div></PageLayout>;
+    if (isError || !gallery) return <PageLayout><div className="p-8"><ErrorMessage message={t`Galerie nicht gefunden.`} /></div></PageLayout>;
 
     return (
         <PageLayout>
@@ -104,7 +106,7 @@ export default function ManagementGalleryView() {
                             onClick={() => setActiveTab('bilder')}
                         >
                             <span className="iconify mdi--image-multiple-outline mr-1"></span>
-                            Bilder
+                            <Trans>Bilder</Trans>
                         </a>
                         <a
                             role="tab"
@@ -112,7 +114,7 @@ export default function ManagementGalleryView() {
                             onClick={() => setActiveTab('coupons')}
                         >
                             <span className="iconify mdi--ticket-percent-outline mr-1"></span>
-                            Coupons
+                            <Trans>Coupons</Trans>
                         </a>
                     </div>
                 )}
@@ -128,10 +130,10 @@ export default function ManagementGalleryView() {
                                 {gallery.is_live ? (
                                     <p className="mt-2 text-warning flex items-center gap-2">
                                         <span className="iconify mdi--autorenew animate-spin"></span>
-                                        Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10 Sekunden.
+                                        <Trans>Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10 Sekunden.</Trans>
                                     </p>
                                 ) : (
-                                    <p className="mt-2">Lade Bilder per Drag & Drop hoch oder importiere sie über die FTP-Inbox.</p>
+                                    <p className="mt-2"><Trans>Lade Bilder per Drag & Drop hoch oder importiere sie über die FTP-Inbox.</Trans></p>
                                 )}
                             </EmptyState>
                         )}
@@ -155,7 +157,7 @@ export default function ManagementGalleryView() {
 
                         {!isReachingEnd && photos.length > 0 && (
                             <div className="text-center mt-8">
-                                <button className="btn btn-outline" onClick={() => setSize(size + 1)}>Mehr laden</button>
+                                <button className="btn btn-outline" onClick={() => setSize(size + 1)}><Trans>Mehr laden</Trans></button>
                             </div>
                         )}
                     </>

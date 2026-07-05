@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import HighlightText from './HighlightText';
@@ -12,7 +14,7 @@ export interface SearchBarWithSuggestionsProps {
 }
 
 export default function SearchBarWithSuggestions({
-    placeholder = 'Suche in allen Galerien...',
+    placeholder = t`Suche in allen Galerien...`,
     minCharsForSuggestions = 1,
     autoFocus = false,
     clearOnSubmit = false,
@@ -81,11 +83,11 @@ export default function SearchBarWithSuggestions({
                 </button>
             </div>
             {isSearchFocused && searchQuery.length >= minCharsForSuggestions && (
-                <div className="fixed top-[72px] left-2 right-2 md:absolute md:top-14 md:left-0 md:right-auto md:w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-[100] max-h-[60vh] overflow-y-auto">
+                <div className="fixed top-16 left-2 right-2 md:absolute md:top-14 md:left-0 md:right-auto md:w-full bg-base-100 shadow-2xl rounded-box border border-base-300 z-50 max-h-96 overflow-y-auto">
                     <ul className="menu p-2">
                         <li>
                             <Link to={`/search?q=${encodeURIComponent(searchQuery.trim())}`} onClick={clearQuery} className="text-primary font-bold">
-                                <span className="iconify mdi--magnify text-lg mr-1"></span> Suche nach &quot;{searchQuery}&quot;
+                                <span className="iconify mdi--magnify text-lg mr-1"></span> <Trans>Suche nach &quot;{searchQuery}&quot;</Trans>
                             </Link>
                         </li>
                         <div className="divider my-0"></div>
@@ -99,17 +101,17 @@ export default function SearchBarWithSuggestions({
                                         <Link to={'/photos/' + p.id} onClick={clearQuery}>
                                             <div className="flex items-center gap-3">
                                                 <img src={p.thumb_url} className="w-10 h-10 object-cover rounded shadow-sm shrink-0" alt="" />
-                                                <span className="truncate leading-tight flex-1"><HighlightText text={p.title || 'Foto'} highlight={searchQuery} /></span>
+                                                <span className="truncate leading-tight flex-1"><HighlightText text={p.title || t`Foto`} highlight={searchQuery} /></span>
                                             </div>
                                         </Link>
                                     </li>
                                 ))}
                                 {searchResults.galleries.length === 0 && searchResults.photos.length === 0 && (
-                                    <li className="disabled"><span className="opacity-50">Keine direkten Treffer</span></li>
+                                    <li className="disabled"><span className="opacity-50"><Trans>Keine direkten Treffer</Trans></span></li>
                                 )}
                             </>
                         ) : (
-                            <li className="disabled"><span className="opacity-50">Sucht...</span></li>
+                            <li className="disabled"><span className="opacity-50"><Trans>Sucht...</Trans></span></li>
                         )}
                     </ul>
                 </div>

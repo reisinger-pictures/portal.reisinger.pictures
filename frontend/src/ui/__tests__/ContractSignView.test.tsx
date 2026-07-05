@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import ContractSignView from '../ContractSignView';
 import { fetchSignContract } from '../../logic/useContractJoin';
 
@@ -65,7 +66,7 @@ describe('ContractSignView stale detection', () => {
     it('renders contract content on load', async () => {
         vi.mocked(fetchSignContract).mockResolvedValueOnce(version1Data);
 
-        render(<ContractSignView />);
+        renderWithProviders(<ContractSignView />);
 
         await waitFor(() => {
             expect(screen.getByText('Version 1')).toBeInTheDocument();
@@ -78,7 +79,7 @@ describe('ContractSignView stale detection', () => {
     it('shows stale warning when heartbeat triggers isStale', async () => {
         vi.mocked(fetchSignContract).mockResolvedValueOnce(version1Data);
 
-        render(<ContractSignView />);
+        renderWithProviders(<ContractSignView />);
 
         await waitFor(() => {
             expect(screen.getByText('Version 1')).toBeInTheDocument();
@@ -96,7 +97,7 @@ describe('ContractSignView stale detection', () => {
     it('disables sign button when stale', async () => {
         vi.mocked(fetchSignContract).mockResolvedValueOnce(version1Data);
 
-        render(<ContractSignView />);
+        renderWithProviders(<ContractSignView />);
 
         await waitFor(() => {
             expect(screen.getByText('Version 1')).toBeInTheDocument();

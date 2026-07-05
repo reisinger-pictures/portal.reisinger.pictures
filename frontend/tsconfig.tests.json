@@ -28,7 +28,7 @@
   },
   "include": [
     "tests",
-    "src/test-setup.ts",
+    "src/test-setup.tsx",
     "src/ui/__tests__",
     "src/logic/__tests__"
   ]

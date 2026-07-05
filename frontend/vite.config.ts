@@ -1,6 +1,8 @@
 import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import babel from '@rolldown/plugin-babel'
+import lingui, {linguiTransformerBabelPreset} from '@lingui/vite-plugin'
 
 export default defineConfig(() => {
     return {
@@ -9,8 +11,13 @@ export default defineConfig(() => {
         },
         plugins: [
             react(),
-            tailwindcss()
+            tailwindcss(),
+            lingui(),
+            babel({presets: [linguiTransformerBabelPreset()]}),
         ],
+        optimizeDeps: {
+            include: ['photoswipe', 'photoswipe/lightbox'],
+        },
         build: {
             chunkSizeWarningLimit: 1024,
             rollupOptions: {
@@ -25,7 +32,7 @@ export default defineConfig(() => {
                             if (id.includes('photoswipe')) {
                                 return 'vendor-photoswipe';
                             }
-                            if (id.includes("@tiptap/")){
+                            if (id.includes("@tiptap/")) {
                                 return "vendor-tiptap"
                             }
                         }

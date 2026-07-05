@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import ResponsiveImage from '../components/ResponsiveImage';
 import ErrorMessage from '../components/ErrorMessage';
 import {useRef, useState} from 'react';
@@ -54,16 +56,17 @@ export default function ManagementMetaGalleryView() {
         <div className="flex h-full items-center justify-center"><span className="loading loading-spinner"></span></div>
     </PageLayout>;
     if (isError || !group) return <PageLayout>
-        <div className="p-8"><ErrorMessage message="Meta-Galerie nicht gefunden." /></div>
+        <div className="p-8"><ErrorMessage message={t`Meta-Galerie nicht gefunden.`} /></div>
     </PageLayout>;
 
+    const totalDownloads = downloadsCount || 0;
     return (
         <PageLayout>
             <div className="container mx-auto p-4 md:p-8">
                 <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h1 className="text-3xl font-bold flex flex-wrap items-center gap-2">
-                            Meta-Galerie: {group.name}
+                            <Trans>Meta-Galerie:</Trans> {group.name}
                             {isAdmin && (
                                 <button onClick={() => setGroupEditModalOpen(true)}
                                         className="btn btn-ghost btn-sm btn-circle tooltip tooltip-bottom"
@@ -72,11 +75,11 @@ export default function ManagementMetaGalleryView() {
                                 </button>
                             )}
                         </h1>
-                        <p className="opacity-70 mt-2">Sammelansicht aller Fotos. Uploads sind nur in den Untergalerien
-                            möglich.</p>
+                        <p className="opacity-70 mt-2"><Trans>Sammelansicht aller Fotos. Uploads sind nur in den Untergalerien
+                            möglich.</Trans></p>
                     </div>
                     <div className="flex items-center">
-                        <span className="badge badge-ghost font-normal">{downloadsCount || 0} Downloads gesamt</span>
+                        <span className="badge badge-ghost font-normal"><Trans>{totalDownloads} Downloads gesamt</Trans></span>
                     </div>
                 </div>
 
@@ -88,7 +91,7 @@ export default function ManagementMetaGalleryView() {
                             onClick={() => setActiveTab('bilder')}
                         >
                             <span className="iconify mdi--image-multiple-outline mr-1"></span>
-                            Bilder
+                            <Trans>Bilder</Trans>
                         </a>
                         <a
                             role="tab"
@@ -96,7 +99,7 @@ export default function ManagementMetaGalleryView() {
                             onClick={() => setActiveTab('coupons')}
                         >
                             <span className="iconify mdi--ticket-percent-outline mr-1"></span>
-                            Coupons
+                            <Trans>Coupons</Trans>
                         </a>
                     </div>
                 )}
@@ -129,7 +132,7 @@ export default function ManagementMetaGalleryView() {
                                         </button>
                                     </div>
                                     <div
-                                        className="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-br truncate max-w-full">
+                                        className="absolute top-0 left-0 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-br truncate max-w-full">
                                         {photo.gallery?.name}
                                     </div>
                                 </div>
@@ -138,7 +141,7 @@ export default function ManagementMetaGalleryView() {
 
                         {!isReachingEnd && photos.length > 0 && (
                             <div className="text-center mt-8">
-                                <button className="btn btn-outline" onClick={() => setSize(size + 1)}>Mehr laden</button>
+                                <button className="btn btn-outline" onClick={() => setSize(size + 1)}><Trans>Mehr laden</Trans></button>
                             </div>
                         )}
                     </>

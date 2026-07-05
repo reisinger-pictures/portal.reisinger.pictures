@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ClientCartView from '../client/ClientCartView';
@@ -169,7 +170,7 @@ function setupDefaultMocks() {
 }
 
 function renderCartView() {
-    return render(
+    return renderWithProviders(
         <MemoryRouter>
             <ClientCartView />
         </MemoryRouter>,

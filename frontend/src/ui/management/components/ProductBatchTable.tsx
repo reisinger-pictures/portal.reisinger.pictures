@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import {Product} from '../../../api';
 
@@ -84,11 +86,11 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                         {isBatchMode ? (
                             <div className="flex gap-2 w-full">
                                 <button className="btn btn-sm btn-ghost flex-1 sm:flex-none"
-                                        onClick={() => setIsBatchMode(false)} disabled={isSaving}>Abbrechen
+                                        onClick={() => setIsBatchMode(false)} disabled={isSaving}><Trans>Abbrechen</Trans>
                                 </button>
                                 <button className="btn btn-sm btn-primary flex-1 sm:flex-none" onClick={handleSave}
                                         disabled={isSaving}>
-                                    {isSaving ? <span className="loading loading-spinner"></span> : 'Speichern'}
+                                    {isSaving ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
                                 </button>
                             </div>
                         ) : (
@@ -106,10 +108,10 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                 <table className="table table-zebra w-full">
                     <thead>
                     <tr>
-                        <th className="w-[35%]">Name</th>
-                        <th className="w-[45%]">Beschreibung</th>
-                        <th className="text-right w-28">Wert</th>
-                        {!isBatchMode && <th className="text-right w-24">Aktionen</th>}
+                        <th className="w-7/20"><Trans>Name</Trans></th>
+                        <th className="w-9/20"><Trans>Beschreibung</Trans></th>
+                        <th className="text-right w-28"><Trans>Wert</Trans></th>
+                        {!isBatchMode && <th className="text-right w-24"><Trans>Aktionen</Trans></th>}
                     </tr>
                     </thead>
                     <tbody>
@@ -132,7 +134,7 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                                         className="input input-sm input-bordered w-full"
                                         value={batchData[p.id]?.description ?? ''}
                                         onChange={e => updateField(p.id, 'description', e.target.value)}
-                                        placeholder="Optional"
+                                        placeholder={t`Optional`}
                                     />
                                 ) : (
                                     <div className="text-sm opacity-70 leading-relaxed">{p.description || '-'}</div>
@@ -177,8 +179,8 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                     ))}
                     {filteredProducts.length === 0 && (
                         <tr>
-                            <td colSpan={isBatchMode ? 3 : 4} className="text-center py-8 opacity-50">Keine Einträge
-                                gefunden.
+                            <td colSpan={isBatchMode ? 3 : 4} className="text-center py-8 opacity-50">                                        <Trans>Keine Einträge
+                                gefunden.</Trans>
                             </td>
                         </tr>
                     )}
@@ -215,7 +217,7 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                         </div>
 
                         <div className="flex flex-col gap-1">
-                            <span className="text-sm font-bold opacity-70">Beschreibung</span>
+                            <span className="text-sm font-bold opacity-70"><Trans>Beschreibung</Trans></span>
                             {isBatchMode ? (
                                 <input
                                     type="text"
@@ -226,12 +228,12 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                                 />
                             ) : (
                                 <div className="text-sm opacity-80 leading-relaxed">{p.description ||
-                                    <span className="italic opacity-40">Keine Beschreibung</span>}</div>
+                                    <span className="italic opacity-40"><Trans>Keine Beschreibung</Trans></span>}</div>
                             )}
                         </div>
 
                         <div className="flex flex-col gap-1">
-                            <span className="text-sm font-bold opacity-70">Wert</span>
+                            <span className="text-sm font-bold opacity-70"><Trans>Wert</Trans></span>
                             {isBatchMode ? (
                                 <label className="input input-sm input-bordered flex items-center gap-2 w-full">
                                     <input
@@ -255,8 +257,8 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                 ))}
                 {filteredProducts.length === 0 && (
                     <div
-                        className="text-center py-8 opacity-50 border border-dashed border-base-300 rounded-box text-sm">Keine
-                        Einträge gefunden.</div>
+                        className="text-center py-8 opacity-50 border border-dashed border-base-300 rounded-box text-sm"><Trans>Keine
+                        Einträge gefunden.</Trans></div>
                 )}
             </div>
 
@@ -264,10 +266,10 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
             {isBatchMode && products.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-base-300 flex justify-end gap-2">
                     <button className="btn btn-sm btn-ghost" onClick={() => setIsBatchMode(false)}
-                            disabled={isSaving}>Abbrechen
+                            disabled={isSaving}><Trans>Abbrechen</Trans>
                     </button>
                     <button className="btn btn-sm btn-primary" onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? <span className="loading loading-spinner"></span> : 'Speichern'}
+                        {isSaving ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
                     </button>
                 </div>
             )}

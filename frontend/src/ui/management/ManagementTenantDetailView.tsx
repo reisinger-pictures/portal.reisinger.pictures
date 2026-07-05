@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {Tenant, TenantUser, useTenants} from '../../logic/useTenants';
@@ -29,19 +31,19 @@ interface TenantSettingsProps {
 const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFlatrateLevel, setDefaultFlatrateLevel, sharedFlatrateCents, setSharedFlatrateCents, autoJoinPolicy, setAutoJoinPolicy, handleSaveGeneral}: TenantSettingsProps) => (
     <form onSubmit={handleSaveGeneral}
           className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4">
-        <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Einstellungen</h2>
+        <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4"><Trans>Einstellungen</Trans></h2>
         <div className="form-control">
-            <label className="label"><span className="label-text font-bold">Organisations-Name</span></label>
+            <label className="label"><span className="label-text font-bold"><Trans>Organisations-Name</Trans></span></label>
             <input type="text" value={name} onChange={e => setName(e.target.value)} required
                    className="input input-bordered"/>
         </div>
         <div className="form-control">
-            <label className="label"><span className="label-text font-bold">Auto-Join Domain</span></label>
+            <label className="label"><span className="label-text font-bold"><Trans>Auto-Join Domain</Trans></span></label>
             <input type="text" value={domain} onChange={e => setDomain(e.target.value)} placeholder="firma.de"
                    className="input input-bordered font-mono"/>
         </div>
         <div className="form-control">
-            <label className="label"><span className="label-text font-bold">Rechnungs-Rhythmus</span></label>
+            <label className="label"><span className="label-text font-bold"><Trans>Rechnungs-Rhythmus</Trans></span></label>
             <select value={freq} onChange={e => setFreq(e.target.value as 'immediate' | 'monthly' | 'quarterly')}
                     className="select select-bordered">
                 <option value="immediate">Sofort (Einzelrechnung)</option>
@@ -50,7 +52,7 @@ const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, defaul
             </select>
         </div>
         <div className="form-control">
-            <label className="label"><span className="label-text font-bold">Standard-Flatrate-Level</span></label>
+            <label className="label"><span className="label-text font-bold"><Trans>Standard-Flatrate-Level</Trans></span></label>
             <select value={defaultFlatrateLevel} onChange={e => setDefaultFlatrateLevel(e.target.value as 'none' | 'web' | 'print' | 'original')}
                     className="select select-bordered">
                 <option value="none">Keine Flatrate</option>
@@ -68,7 +70,7 @@ const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, defaul
             </div>
         )}
         <div className="form-control">
-            <label className="label"><span className="label-text font-bold">Auto-Join Policy</span></label>
+            <label className="label"><span className="label-text font-bold"><Trans>Auto-Join Policy</Trans></span></label>
             <select value={autoJoinPolicy} onChange={e => setAutoJoinPolicy(e.target.value as 'immediate' | 'requires_invite' | 'disabled')}
                     className="select select-bordered">
                 <option value="immediate">Sofort (automatisch)</option>
@@ -76,7 +78,7 @@ const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, defaul
                 <option value="disabled">Deaktiviert</option>
             </select>
         </div>
-        <button type="submit" className="btn btn-primary w-full mt-4">Speichern</button>
+        <button type="submit" className="btn btn-primary w-full mt-4"><Trans>Speichern</Trans></button>
     </form>
 );
 
@@ -89,12 +91,12 @@ interface TenantInvoicingProps {
 const TenantInvoicing = ({tenant, isGenerating, handleGenerateInvoice}: TenantInvoicingProps) => (
     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4 mt-6">
         <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4 flex items-center gap-2">
-            <span className="iconify mdi--receipt-text text-primary"></span> Abrechnung
+            <span className="iconify mdi--receipt-text text-primary"></span> <Trans>Abrechnung</Trans>
         </h2>
         <div className="flex justify-between items-center">
             <div>
-                <div className="font-bold">Offene Lieferscheine</div>
-                <div className="text-sm opacity-70">Auszustellende Sammelrechnung</div>
+                <div className="font-bold"><Trans>Offene Lieferscheine</Trans></div>
+                <div className="text-sm opacity-70"><Trans>Auszustellende Sammelrechnung</Trans></div>
             </div>
             <div className="text-3xl font-mono font-bold text-warning">{tenant.open_delivery_notes_count || 0}</div>
         </div>
@@ -103,7 +105,7 @@ const TenantInvoicing = ({tenant, isGenerating, handleGenerateInvoice}: TenantIn
             disabled={!tenant.open_delivery_notes_count || tenant.open_delivery_notes_count === 0 || isGenerating}
             className="btn btn-primary w-full mt-4"
         >
-            {isGenerating ? <span className="loading loading-spinner"></span> : 'Sammelrechnung erstellen'}
+            {isGenerating ? <span className="loading loading-spinner"></span> : <Trans>Sammelrechnung erstellen</Trans>}
         </button>
     </div>
 );
@@ -133,21 +135,21 @@ const TenantRelations = ({
                          }: TenantRelationsProps) => (
     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm h-full flex flex-col">
         <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
-            <h2 className="font-bold text-xl">Zuweisungen</h2>
-            <button onClick={handleSaveRelations} className="btn btn-primary btn-sm">Zuweisungen speichern</button>
+            <h2 className="font-bold text-xl"><Trans>Zuweisungen</Trans></h2>
+            <button onClick={handleSaveRelations} className="btn btn-primary btn-sm"><Trans>Zuweisungen speichern</Trans></button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
             <div className="flex flex-col h-full border border-base-300 rounded overflow-hidden">
                 <div className="bg-base-200 p-2 flex justify-between items-center shrink-0 border-b border-base-300">
-                    <span className="font-bold text-sm">Zugeordnete Nutzer</span>
-                    <button className="btn btn-xs btn-primary" onClick={() => setInviteModalOpen(true)}>+ Einladen
+                    <span className="font-bold text-sm"><Trans>Zugeordnete Nutzer</Trans></span>
+                    <button className="btn btn-xs btn-primary" onClick={() => setInviteModalOpen(true)}>+ <Trans>Einladen</Trans>
                     </button>
                 </div>
                 <div className="p-2 overflow-y-auto flex-1 h-64">
                     {users?.map(u => (
                         <label key={u.id}
-                               className="label cursor-pointer justify-start gap-3 p-1 hover:bg-base-200 rounded">
+                               className="label cursor-pointer justify-start gap-3 p-2 rounded hover:bg-base-200 transition-colors">
                             <input type="checkbox" checked={selUsers.includes(u.id)}
                                    onChange={() => toggleId(selUsers, setSelUsers, u.id)}
                                    className="checkbox checkbox-primary shrink-0"/>
@@ -161,13 +163,13 @@ const TenantRelations = ({
             </div>
 
             <div className="flex flex-col h-full border border-base-300 rounded overflow-hidden">
-                <div className="bg-base-200 p-2 font-bold text-sm shrink-0 border-b border-base-300">Zugewiesene
-                    Meta-Galerien
+                <div className="bg-base-200 p-2 font-bold text-sm shrink-0 border-b border-base-300"><Trans>Zugewiesene
+                    Meta-Galerien</Trans>
                 </div>
                 <div className="p-2 overflow-y-auto flex-1 h-64">
                     {flatGroups.map(g => (
                         <label key={g.id}
-                               className="label cursor-pointer justify-start gap-3 p-1 hover:bg-base-200 rounded">
+                               className="label cursor-pointer justify-start gap-3 p-2 rounded hover:bg-base-200 transition-colors">
                             <input type="checkbox" checked={selGroups.includes(g.id)}
                                    onChange={() => toggleId(selGroups, setSelGroups, g.id)}
                                    className="checkbox checkbox-primary shrink-0"/>
@@ -233,7 +235,7 @@ export default function ManagementTenantDetailView() {
                 shared_flatrate_cents: sharedFlatrateCents,
                 auto_join_policy: autoJoinPolicy,
             });
-            showToast('success', 'Organisation aktualisiert.');
+            showToast('success', t`Organisation aktualisiert.`);
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : String(err));
         }
@@ -243,7 +245,7 @@ export default function ManagementTenantDetailView() {
         try {
             await syncUsers(id!, selUsers);
             await syncGroups(id!, selGroups);
-            showToast('success', 'Zuweisungen gespeichert.');
+            showToast('success', t`Zuweisungen gespeichert.`);
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : String(err));
         }
@@ -254,11 +256,11 @@ export default function ManagementTenantDetailView() {
         setIsInviting(true);
         try {
             await apiMutate(`/api/management/tenants/${id}/invites`, 'POST', {email: inviteEmail});
-            showToast('success', 'Einladung erfolgreich versendet.');
+            showToast('success', t`Einladung erfolgreich versendet.`);
             setInviteModalOpen(false);
             setInviteEmail('');
         } catch (err: unknown) {
-            showToast('error', err instanceof Error ? err.message : String(err) || 'Fehler beim Versenden der Einladung.');
+            showToast('error', err instanceof Error ? err.message : String(err) || t`Fehler beim Versenden der Einladung.`);
         } finally {
             setIsInviting(false);
         }
@@ -266,8 +268,8 @@ export default function ManagementTenantDetailView() {
 
     const handleDelete = async () => {
         if (await confirm({
-            title: 'Organisation löschen?',
-            message: 'Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten).',
+            title: t`Organisation löschen?`,
+            message: t`Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten).`,
             confirmColor: 'error'
         })) {
             await deleteTenant(id!);
@@ -279,15 +281,17 @@ export default function ManagementTenantDetailView() {
 
     const handleGenerateInvoice = async () => {
         if (await confirm({
-            title: 'Sammelrechnung erstellen?',
-            message: 'Ausstehende Lieferscheine werden nun gebündelt, eine P-Rechnungsnummer erzeugt und als PDF an deine E-Mail versendet.',
-            confirmText: 'Erstellen',
+            title: t`Sammelrechnung erstellen?`,
+            message: t`Ausstehende Lieferscheine werden nun gebündelt, eine P-Rechnungsnummer erzeugt und als PDF an deine E-Mail versendet.`,
+            confirmText: t`Erstellen`,
             confirmColor: 'primary'
         })) {
             setIsGenerating(true);
             try {
                 const res = await generateCollectiveInvoice(id!);
-                showToast('success', `Sammelrechnung ${res.invoice_number} mit ${res.processed_orders} Positionen erfolgreich erstellt.`);
+                const invoiceNumber = res.invoice_number;
+                const processedOrders = res.processed_orders;
+                showToast('success', t`Sammelrechnung ${invoiceNumber} mit ${processedOrders} Positionen erfolgreich erstellt.`);
             } catch (err: unknown) {
                 showToast('error', err instanceof Error ? err.message : String(err) || 'Fehler bei der Erstellung.');
             } finally {
@@ -302,7 +306,7 @@ export default function ManagementTenantDetailView() {
 
     if (isLoading) return <div className="p-10 flex justify-center"><span
         className="loading loading-spinner loading-lg"></span></div>;
-    if (!tenant) return <div className="p-10"><ErrorMessage message="Organisation nicht gefunden."/></div>;
+    if (!tenant) return <div className="p-10"><ErrorMessage message={t`Organisation nicht gefunden.`}/></div>;
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
 
@@ -314,9 +318,9 @@ export default function ManagementTenantDetailView() {
                         className="iconify mdi--arrow-left text-2xl"></span></button>
                     <div>
                         <h1 className="text-3xl font-bold">{tenant.name}</h1>
-                        <p className="opacity-70">Organisations-Verwaltung</p>
+                        <p className="opacity-70"><Trans>Organisations-Verwaltung</Trans></p>
                     </div>
-                    <button onClick={handleDelete} className="btn btn-outline btn-error btn-sm ml-auto">Löschen</button>
+                    <button onClick={handleDelete} className="btn btn-outline btn-error btn-sm ml-auto"><Trans>Löschen</Trans></button>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -340,29 +344,29 @@ export default function ManagementTenantDetailView() {
             </div>
 
             {isInviteModalOpen && (
-                <div className="modal modal-open z-[60]">
+                <div className="modal modal-open">
                     <div className="modal-box relative">
                         <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
                                 onClick={() => setInviteModalOpen(false)}>✕
                         </button>
-                        <h3 className="font-bold text-lg mb-4">Nutzer in Organisation einladen</h3>
-                        <p className="text-sm opacity-70 mb-4">Der Nutzer erhält eine E-Mail mit einem Link, um sein
-                            Passwort festzulegen und wird automatisch dieser Organisation zugewiesen.</p>
+                        <h3 className="font-bold text-lg mb-4"><Trans>Nutzer in Organisation einladen</Trans></h3>
+                        <p className="text-sm opacity-70 mb-4"><Trans>Der Nutzer erhält eine E-Mail mit einem Link, um sein
+                            Passwort festzulegen und wird automatisch dieser Organisation zugewiesen.</Trans></p>
                         <form onSubmit={handleInvite} className="space-y-4">
                             <div className="form-control">
                                 <label className="label"><span
-                                    className="label-text font-bold">E-Mail Adresse</span></label>
+                                    className="label-text font-bold"><Trans>E-Mail Adresse</Trans></span></label>
                                 <input type="email" required value={inviteEmail}
                                        onChange={e => setInviteEmail(e.target.value)}
-                                       className="input input-bordered w-full" placeholder="kollege@firma.de"/>
+                                        className="input input-bordered w-full" placeholder={t`kollege@firma.de`}/>
                             </div>
                             <div className="modal-action col-span-full">
                                 <button type="button" className="btn btn-ghost"
-                                        onClick={() => setInviteModalOpen(false)}>Abbrechen
+                                        onClick={() => setInviteModalOpen(false)}><Trans>Abbrechen</Trans>
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={isInviting}>
                                     {isInviting ?
-                                        <span className="loading loading-spinner"></span> : 'Einladung Senden'}
+                                        <span className="loading loading-spinner"></span> : <Trans>Einladung Senden</Trans>}
                                 </button>
                             </div>
                         </form>

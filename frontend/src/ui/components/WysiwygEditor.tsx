@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
@@ -131,7 +133,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
             updateSlashMenu(editor);
         },
         editorProps: { 
-            attributes: { class: 'prose prose-sm max-w-none focus:outline-none min-h-[12rem] p-4 text-base-content/90' },
+            attributes: { class: 'prose prose-sm max-w-none focus:outline-none min-h-48 p-4 text-base-content/90' },
             // 🔥 WICHTIG: Tastatur-Events HIER abfangen, bevor Tiptap sie schluckt
             handleKeyDown: (_view, event) => {
                 if (!slashStateRef.current.active) return false;
@@ -192,7 +194,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
                         }}
                         defaultValue=""
                     >
-                        <option value="" disabled className="bg-base-100 text-base-content">Baustein...</option>
+                        <option value="" disabled className="bg-base-100 text-base-content"><Trans>Baustein...</Trans></option>
                         {snippets?.map(s => <option key={s.id} value={s.content_html} className="bg-base-100 text-base-content">{s.title}{s.shortcut ? ` (/${s.shortcut})` : ''}</option>)}
                     </select>
                 )}
@@ -214,7 +216,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
 
                 <div className="flex-1"></div>
 
-                <button type="button" onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()} className="btn btn-sm btn-ghost text-error/50 hover:text-error" title="Formatierung entfernen">
+                <button type="button" onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()} className="btn btn-sm btn-ghost text-error/50 hover:text-error" title={t`Formatierung entfernen`}>
                     <span className="iconify mdi--format-clear text-lg"></span>
                 </button>
             </div>
@@ -222,20 +224,20 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
             <EditorContent editor={editor} />
             
             <div className="bg-base-200 border-t border-base-300 p-1 flex justify-end items-center rounded-b-box text-sm opacity-60">
-                 <span className={editor.getHTML().length > 90000 ? 'text-error font-bold' : ''}>
-                     {editor.getHTML().length.toLocaleString('de-DE')} / 100.000 Zeichen (HTML)
-                 </span>
+                     <span className={editor.getHTML().length > 90000 ? 'text-error font-bold' : ''}>
+                         {editor.getHTML().length.toLocaleString('de-DE')} <Trans>/ 100.000 Zeichen (HTML)</Trans>
+                     </span>
             </div>
 
             {slashState.active && slashState.rect && (
                 <ul 
-                    className="menu bg-base-100 shadow-2xl rounded-box border border-base-300 w-64 fixed z-[9999]"
+                    className="menu bg-base-100 shadow-2xl rounded-box border border-base-300 w-64 fixed z-50"
                     style={{ 
                         top: slashState.rect.bottom + 5, 
                         left: slashState.rect.left 
                     }}
                 >
-                    <li className="menu-title text-sm opacity-70 px-4 py-2">Textbaustein einfügen</li>
+                    <li className="menu-title text-sm opacity-70 px-4 py-2"><Trans>Textbaustein einfügen</Trans></li>
                     {filteredSnippets.length > 0 ? filteredSnippets.map((s, idx) => (
                         <li key={s.id}>
                             <a 
@@ -248,7 +250,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
                             </a>
                         </li>
                     )) : (
-                        <li className="px-4 py-2 text-sm opacity-50">Keine Bausteine gefunden</li>
+                        <li className="px-4 py-2 text-sm opacity-50"><Trans>Keine Bausteine gefunden</Trans></li>
                     )}
                 </ul>
             )}

@@ -165,6 +165,19 @@
     }
 }
 
+@utility h-90vh {
+    height: 90vh;
+}
+@utility h-80vh {
+    height: 80vh;
+}
+@utility max-h-80vh {
+    max-height: 80vh;
+}
+@utility max-h-90vh {
+    max-height: 90vh;
+}
+
 @layer utilities {
     .input {
         @apply w-full;

@@ -1,5 +1,6 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import ErrorBoundary from '../components/ErrorBoundary';
 
@@ -9,7 +10,7 @@ describe('ErrorBoundary', () => {
     });
 
     it('renders children when there is no error', () => {
-        render(
+        renderWithProviders(
             <ErrorBoundary>
                 <div data-testid="child">Hello</div>
             </ErrorBoundary>,
@@ -23,7 +24,7 @@ describe('ErrorBoundary', () => {
 
         const Throw = () => { throw new Error('Test error'); };
 
-        render(
+        renderWithProviders(
             <ErrorBoundary fallback={<div data-testid="custom-fallback">Custom Error</div>}>
                 <Throw />
             </ErrorBoundary>,
@@ -39,7 +40,7 @@ describe('ErrorBoundary', () => {
 
         const Throw = () => { throw new Error('Ein Fehler ist passiert'); };
 
-        render(
+        renderWithProviders(
             <ErrorBoundary>
                 <Throw />
             </ErrorBoundary>,
@@ -55,7 +56,7 @@ describe('ErrorBoundary', () => {
 
         const Throw = () => { throw new Error('retry test'); };
 
-        render(
+        renderWithProviders(
             <ErrorBoundary>
                 <Throw />
             </ErrorBoundary>,
@@ -75,7 +76,7 @@ describe('ErrorBoundary', () => {
             return <div data-testid="recovered">Recovered</div>;
         };
 
-        render(
+        renderWithProviders(
             <ErrorBoundary>
                 <ConditionalThrow />
             </ErrorBoundary>,

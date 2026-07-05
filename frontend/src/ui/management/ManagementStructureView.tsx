@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTenants } from '../../logic/useTenants';
@@ -51,9 +53,9 @@ const TreeNode = ({
                 <Link to={'/' + node.full_path} className={`flex-1 flex items-center gap-3 ${isExpired ? 'line-through opacity-50' : ''}`}>
                     <span className="iconify mdi--image-multiple-outline text-2xl text-base-content/50"></span>
                     <span className="font-medium">{node.name}</span>
-                    <span className="badge badge-sm badge-ghost">{node.type === 'selection' ? 'Auswahl' : 'Delivery'}</span>
+                    <span className="badge badge-sm badge-ghost">{node.type === 'selection' ? <Trans>Auswahl</Trans> : <Trans>Delivery</Trans>}</span>
                 </Link>
-                <button onClick={() => onEditGallery(node)} className="btn btn-ghost btn-sm btn-circle tooltip" data-tip="Bearbeiten">
+                <button onClick={() => onEditGallery(node)} className="btn btn-ghost btn-sm btn-circle tooltip" data-tip={t`Bearbeiten`}>
                     <span className="iconify mdi--pencil text-lg"></span>
                 </button>
             </div>
@@ -64,17 +66,17 @@ const TreeNode = ({
 
     return (
         <details open={isOpen} onToggle={e => setIsOpen(e.currentTarget.open)} className="group border border-base-300 bg-base-100 rounded-box mb-2 shadow-sm">
-            <summary className="flex justify-between items-center w-full py-3 px-4 cursor-pointer bg-base-200/50 hover:bg-base-200 transition-colors list-none [&::-webkit-details-marker]:hidden">
+            <summary className="flex justify-between items-center w-full py-3 px-4 cursor-pointer bg-base-200/50 hover:bg-base-200 transition-colors list-none">
                 <div className="flex items-center gap-3 flex-1">
                     <span className="iconify mdi--chevron-right text-xl transition-transform group-open:rotate-90"></span>
                     <span className="iconify mdi--folder text-2xl text-primary"></span>
                     <span className="font-bold text-lg">{node.name}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenGalleryModal(node.id); }} className="btn btn-ghost btn-xs tooltip" data-tip="Galerie hier erstellen">
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenGalleryModal(node.id); }} className="btn btn-ghost btn-xs tooltip" data-tip={t`Galerie hier erstellen`}>
                         <span className="iconify mdi--image-plus text-base text-primary"></span>
                     </button>
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenGroupModal(node.id); }} className="btn btn-ghost btn-xs tooltip" data-tip="Unterordner hier erstellen">
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenGroupModal(node.id); }} className="btn btn-ghost btn-xs tooltip" data-tip={t`Unterordner hier erstellen`}>
                         <span className="iconify mdi--folder-plus text-base text-primary"></span>
                     </button>
                     {hasInhalt && (
@@ -82,20 +84,20 @@ const TreeNode = ({
                             <button
                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLocalSignal(s => s > 0 ? s + 1 : 1); }}
                                 className="btn btn-ghost btn-xs join-item tooltip"
-                                data-tip="Unterordner ausklappen"
+                                data-tip={t`Unterordner ausklappen`}
                             >
                                 <span className="iconify mdi--expand-all text-base opacity-70"></span>
                             </button>
                             <button
                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLocalSignal(s => s < 0 ? s - 1 : -1); }}
                                 className="btn btn-ghost btn-xs join-item tooltip"
-                                data-tip="Unterordner einklappen"
+                                data-tip={t`Unterordner einklappen`}
                             >
                                 <span className="iconify mdi--collapse-all text-base opacity-70"></span>
                             </button>
                         </div>
                     )}
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditGroup(node); }} className="btn btn-ghost btn-sm btn-circle tooltip" data-tip="Ordner bearbeiten">
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditGroup(node); }} className="btn btn-ghost btn-sm btn-circle tooltip" data-tip={t`Ordner bearbeiten`}>
                         <span className="iconify mdi--pencil text-lg"></span>
                     </button>
                 </div>
@@ -107,7 +109,7 @@ const TreeNode = ({
                 {node.galleries?.map((g: Gallery) => (
                     <TreeNode key={'gal-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={effectiveSignal} />
                 ))}
-                {(!node.children?.length && !node.galleries?.length) && <div className="p-4 text-sm opacity-50 italic">Ordner ist leer.</div>}
+                {(!node.children?.length && !node.galleries?.length) && <div className="p-4 text-sm opacity-50 italic"><Trans>Ordner ist leer.</Trans></div>}
             </div>
         </details>
     );
@@ -138,12 +140,12 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
         <div className="p-6 md:p-10 max-w-6xl mx-auto w-full">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-4xl font-bold mb-2">Galerien</h1>
-                    <p className="opacity-70 text-lg">Verwalte deine Ordner und Galerien.</p>
+                    <h1 className="text-4xl font-bold mb-2"><Trans>Galerien</Trans></h1>
+                    <p className="opacity-70 text-lg"><Trans>Verwalte deine Ordner und Galerien.</Trans></p>
                 </div>
                 
                 <div className="form-control w-full md:w-72">
-                    <label className="label py-1"><span className="label-text font-bold opacity-70">Organisations-Filter</span></label>
+                    <label className="label py-1"><span className="label-text font-bold opacity-70"><Trans>Organisations-Filter</Trans></span></label>
                     <select 
                         className="select select-bordered select-sm w-full" 
                         value={currentTenantFilter} 
@@ -155,20 +157,20 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
                             });
                         }}
                     >
-                        <option value="">-- Alle Organisationen / Eigene --</option>
+                        <option value="">-- <Trans>Alle Organisationen / Eigene</Trans> --</option>
                         {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                 </div>
 
                 <div className="join shadow-sm">
-                    <button onClick={() => onOpenGalleryModal()} className="btn btn-primary join-item"><span className="iconify mdi--image-plus"></span> Neue Galerie</button>
-                    <button onClick={() => onOpenGroupModal()} className="btn btn-outline join-item"><span className="iconify mdi--folder-plus"></span> Neuer Ordner</button>
+                    <button onClick={() => onOpenGalleryModal()} className="btn btn-primary join-item"><span className="iconify mdi--image-plus"></span> <Trans>Neue Galerie</Trans></button>
+                    <button onClick={() => onOpenGroupModal()} className="btn btn-outline join-item"><span className="iconify mdi--folder-plus"></span> <Trans>Neuer Ordner</Trans></button>
                 </div>
             </div>
 
             <div className="flex justify-end gap-2 mb-4">
-                <button onClick={() => setExpandSignal(s => s > 0 ? s + 1 : 1)} className="btn btn-sm btn-ghost"><span className="iconify mdi--expand-all"></span> Alle ausklappen</button>
-                <button onClick={() => setExpandSignal(s => s < 0 ? s - 1 : -1)} className="btn btn-sm btn-ghost"><span className="iconify mdi--collapse-all"></span> Alle einklappen</button>
+                <button onClick={() => setExpandSignal(s => s > 0 ? s + 1 : 1)} className="btn btn-sm btn-ghost"><span className="iconify mdi--expand-all"></span> <Trans>Alle ausklappen</Trans></button>
+                <button onClick={() => setExpandSignal(s => s < 0 ? s - 1 : -1)} className="btn btn-sm btn-ghost"><span className="iconify mdi--collapse-all"></span> <Trans>Alle einklappen</Trans></button>
             </div>
 
             <div className="space-y-2">
@@ -177,7 +179,7 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
                 ))}
                 {safeRootGalleries.length > 0 && (
                     <div className="border border-base-300 bg-base-100 rounded-box shadow-sm mt-6">
-                        <div className="bg-base-200/50 py-2 px-4 font-bold border-b border-base-300 opacity-70">Hauptverzeichnis (Ohne Ordner)</div>
+                        <div className="bg-base-200/50 py-2 px-4 font-bold border-b border-base-300 opacity-70"><Trans>Hauptverzeichnis (Ohne Ordner)</Trans></div>
                         <div className="p-2">
                             {safeRootGalleries.map((g: Gallery) => (
                                 <TreeNode key={'rgal-'+g.id} node={g} onEditGroup={onEditGroup} onEditGallery={onEditGallery} onOpenPhotographerTeam={onOpenPhotographerTeam} onOpenGroupModal={onOpenGroupModal} onOpenGalleryModal={onOpenGalleryModal} expandSignal={expandSignal} />

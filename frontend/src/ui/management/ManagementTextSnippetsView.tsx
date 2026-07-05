@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../api';
@@ -19,14 +21,14 @@ export default function ManagementTextSnippetsView() {
         try {
             if (editingSnippet) {
                 await apiMutate(`/api/management/text-snippets/${editingSnippet.id}`, 'PUT', data);
-                showToast('success', 'Baustein aktualisiert');
+                showToast('success', t`Baustein aktualisiert`);
             } else {
                 await apiMutate('/api/management/text-snippets', 'POST', data);
-                showToast('success', 'Baustein angelegt');
+                showToast('success', t`Baustein angelegt`);
             }
             mutate();
         } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : 'Fehler beim Speichern');
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
         }
     };
 
@@ -36,27 +38,27 @@ export default function ManagementTextSnippetsView() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!(await confirm({ title: 'Textbaustein löschen?', message: 'Möchtest du diesen Baustein wirklich löschen?', confirmColor: 'error' }))) return;
+        if (!(await confirm({ title: t`Textbaustein löschen?`, message: t`Möchtest du diesen Baustein wirklich löschen?`, confirmColor: 'error' }))) return;
         try {
             await apiMutate(`/api/management/text-snippets/${id}`, 'DELETE');
             mutate();
-            showToast('success', 'Baustein gelöscht');
+            showToast('success', t`Baustein gelöscht`);
         } catch {
-            showToast('error', 'Fehler beim Löschen');
+            showToast('error', t`Fehler beim Löschen`);
         }
     };
 
     if (isLoading) return <div className="p-10 flex justify-center"><span className="loading loading-spinner loading-lg"></span></div>;
-    if (error) return <div className="p-10"><ErrorMessage message="Fehler beim Laden der Textbausteine." /></div>;
+    if (error) return <div className="p-10"><ErrorMessage message={t`Fehler beim Laden der Textbausteine.`} /></div>;
 
     return (
         <div className="p-6 md:p-10 max-w-5xl mx-auto w-full">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-4xl font-bold mb-2">Textbausteine</h1>
-                    <p className="opacity-70">Verwalte Vorlagen für Verträge und Sonderkonditionen.</p>
+                    <h1 className="text-4xl font-bold mb-2"><Trans>Textbausteine</Trans></h1>
+                    <p className="opacity-70"><Trans>Verwalte Vorlagen für Verträge und Sonderkonditionen.</Trans></p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setEditingSnippet(null); setIsModalOpen(true); }}>+ Neuer Baustein</button>
+                <button className="btn btn-primary" onClick={() => { setEditingSnippet(null); setIsModalOpen(true); }}>+ <Trans>Neuer Baustein</Trans></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -66,8 +68,8 @@ export default function ManagementTextSnippetsView() {
                             <div className="flex justify-between items-start">
                                 <h2 className="card-title text-primary">{s.title}</h2>
                                 <div className="flex gap-1">
-                                    <button className="btn btn-ghost btn-xs btn-square" title="Bearbeiten" onClick={() => openEdit(s)}><span className="iconify mdi--pencil text-base"></span></button>
-                                    <button className="btn btn-ghost btn-xs btn-square text-error" onClick={() => handleDelete(s.id)} title="Löschen"><span className="iconify mdi--trash-can text-base"></span></button>
+                                    <button className="btn btn-ghost btn-xs btn-square" title={t`Bearbeiten`} onClick={() => openEdit(s)}><span className="iconify mdi--pencil text-base"></span></button>
+                                    <button className="btn btn-ghost btn-xs btn-square text-error" onClick={() => handleDelete(s.id)} title={t`Löschen`}><span className="iconify mdi--trash-can text-base"></span></button>
                                 </div>
                             </div>
                             {s.shortcut && <code className="text-sm bg-base-200 p-1 rounded w-fit mt-1">/{s.shortcut}</code>}

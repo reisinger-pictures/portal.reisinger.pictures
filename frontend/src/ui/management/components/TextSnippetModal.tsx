@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,9 +8,9 @@ import { TextSnippet } from '../../../api';
 import WysiwygEditor from '../../components/WysiwygEditor';
 
 const snippetSchema = z.object({
-    title: z.string().min(1, 'Titel ist erforderlich'),
-    shortcut: z.string().min(1, 'Kürzel ist erforderlich').regex(/^[a-z0-9_-]+$/, 'Nur Kleinbuchstaben, Zahlen, - und _'),
-    content_html: z.string().min(1, 'Inhalt ist erforderlich')
+    title: z.string().min(1, t`Titel ist erforderlich`),
+    shortcut: z.string().min(1, t`Kürzel ist erforderlich`).regex(/^[a-z0-9_-]+$/, t`Nur Kleinbuchstaben, Zahlen, - und _`),
+    content_html: z.string().min(1, t`Inhalt ist erforderlich`)
 });
 
 type SnippetFormValues = z.infer<typeof snippetSchema>;
@@ -45,12 +47,12 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
     if (!isOpen) return null;
 
     return (
-        <div className="modal modal-open z-50">
-            <div className="modal-box max-w-4xl relative flex flex-col h-[80vh]">
+        <div className="modal modal-open">
+            <div className="modal-box max-w-4xl relative flex flex-col h-80vh">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2 shrink-0">
                     <span className="iconify mdi--text-box-multiple text-primary"></span>
-                    {editingSnippet ? 'Textbaustein bearbeiten' : 'Neuen Textbaustein anlegen'}
+                    {editingSnippet ? <Trans>Textbaustein bearbeiten</Trans> : <Trans>Neuen Textbaustein anlegen</Trans>}
                 </h3>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
@@ -79,9 +81,9 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
                     </div>
 
                     <div className="modal-action shrink-0 mt-2">
-                        <button type="button" className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
+                            <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
+                            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                                {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
                         </button>
                     </div>
                 </form>

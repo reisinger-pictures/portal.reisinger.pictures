@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import SidebarLoginForm from '../components/SidebarLoginForm';
 import { useAuth } from '../../logic/useAuth';
@@ -9,7 +10,7 @@ vi.mock('../../logic/useAuth', () => ({
 }));
 
 function renderForm() {
-    return render(<SidebarLoginForm />);
+    return renderWithProviders(<SidebarLoginForm />);
 }
 
 describe('SidebarLoginForm', () => {

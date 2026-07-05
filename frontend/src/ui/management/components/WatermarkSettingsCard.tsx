@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {useEffect, useState} from 'react';
 import {useSettings} from '../../../logic/useSettings';
 import {usePermissions} from '../../../logic/usePermissions';
@@ -58,7 +60,7 @@ export default function WatermarkSettingsCard() {
     const onSubmit = async (data: WatermarkFormValues) => {
         setGenerating(true);
         if (!serverSvgBlob) {
-            showToast('error', 'Brand-Logo konnte nicht geladen werden.');
+            showToast('error', t`Brand-Logo konnte nicht geladen werden.`);
             setGenerating(false);
             return;
         }
@@ -83,9 +85,9 @@ export default function WatermarkSettingsCard() {
 
         try {
             await updateWatermark(fd);
-            showToast('success', 'Wasserzeichen erfolgreich generiert und gespeichert!');
+            showToast('success', t`Wasserzeichen erfolgreich generiert und gespeichert!`);
         } catch {
-            showToast('error', 'Fehler beim Speichern');
+            showToast('error', t`Fehler beim Speichern`);
         }
         setGenerating(false);
     };
@@ -96,22 +98,22 @@ export default function WatermarkSettingsCard() {
         <div className="card bg-base-200 border border-base-300 shadow-sm">
             <div className="card-body">
                 <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-                    <span className="iconify mdi--watermark text-primary text-3xl"></span> Bildschutz
+                    <span className="iconify mdi--watermark text-primary text-3xl"></span> <Trans>Bildschutz</Trans>
                 </h2>
                 <p className="text-sm opacity-70 mb-4">
-                    Dein Logo wird als Wasserzeichen zentriert über das Originalbild gelegt. Die Größe passt sich dynamisch an (1/3 der Bildbreite).
-                    Bei Auswahl-Galerien wird die Deckkraft automatisch reduziert, um die Bildbeurteilung nicht zu stören.
+                    <Trans>Dein Logo wird als Wasserzeichen zentriert über das Originalbild gelegt. Die Größe passt sich dynamisch an (1/3 der Bildbreite).
+                    Bei Auswahl-Galerien wird die Deckkraft automatisch reduziert, um die Bildbeurteilung nicht zu stören.</Trans>
                 </p>
 
                 <div className="alert bg-base-100 shadow-sm border border-base-300 mb-8">
                     <span className="iconify mdi--information text-info text-xl"></span>
-                    <span>Dein aktuelles Marken-Logo (<strong>{svgUrl}</strong>) wird automatisch als Basis für das Wasserzeichen verwendet.</span>
+                    <span><Trans>Dein aktuelles Marken-Logo (<strong>{svgUrl}</strong>) wird automatisch als Basis für das Wasserzeichen verwendet.</Trans></span>
                 </div>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                     <div className="form-control w-full max-w-xl">
                         <label className="label">
-                            <span className="label-text font-bold">Sichtbarkeit (Deckkraft)</span>
+                            <span className="label-text font-bold"><Trans>Sichtbarkeit (Deckkraft)</Trans></span>
                             <span className="label-text-alt font-mono">{Math.round(watchOpacity * 100)} %</span>
                         </label>
                         <input type="range" min="0.05" max="1.0" step="0.05"
@@ -130,20 +132,20 @@ export default function WatermarkSettingsCard() {
                     </div>
 
                     <div className="mt-8 border border-base-300 rounded-box overflow-hidden relative h-48 bg-base-300 flex items-center justify-center select-none shadow-inner">
-                        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,_var(--color-base-content)_1px,_transparent_1px)] [background-size:20px_20px]"></div>
+                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, var(--color-base-content) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
                         <div className="flex flex-col items-center justify-center pointer-events-none w-1/3 h-full">
                             {previewRenderedUrl ? (
-                                <img src={previewRenderedUrl} alt="Watermark Preview" className="w-full h-full object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]" />
+                                <img src={previewRenderedUrl} alt="Watermark Preview" className="w-full h-full object-contain drop-shadow-md" />
                             ) : (
-                                <span className="opacity-50 font-bold bg-base-100 p-2 rounded flex items-center gap-2"><span className="loading loading-spinner loading-xs"></span> Lade Logo...</span>
+                                <span className="opacity-50 font-bold bg-base-100 p-2 rounded flex items-center gap-2"><span className="loading loading-spinner loading-xs"></span> <Trans>Lade Logo...</Trans></span>
                             )}
                         </div>
-                        <span className="absolute bottom-2 left-2 text-[10px] font-bold uppercase opacity-40 bg-base-100 px-2 py-0.5 rounded shadow">Live Vorschau (1:1 Render)</span>
+                        <span className="absolute bottom-2 left-2 text-xs font-bold uppercase opacity-40 bg-base-100 px-2 py-0.5 rounded shadow"><Trans>Live Vorschau (1:1 Render)</Trans></span>
                     </div>
 
                     <div className="mt-6 border-t border-base-300 pt-6">
                         <button type="submit" disabled={formState.isSubmitting || isGenerating || !serverSvgBlob} className="btn btn-primary px-8">
-                            {formState.isSubmitting || isGenerating ? <span className="loading loading-spinner"></span> : 'Wasserzeichen generieren & anwenden'}
+                            {formState.isSubmitting || isGenerating ? <span className="loading loading-spinner"></span> : <Trans>Wasserzeichen generieren & anwenden</Trans>}
                         </button>
                     </div>
                 </form>

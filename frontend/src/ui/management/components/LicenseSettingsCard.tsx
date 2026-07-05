@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {useEffect} from 'react';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
@@ -7,7 +8,7 @@ import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 
 const licenseSettingsSchema = z.object({
-    base_price: z.number().min(0, "Muss positiv sein"),
+    base_price: z.number().min(0, t`Muss positiv sein`),
     mult_commercial: z.number().min(0),
     mult_international: z.number().min(0),
     mult_unlimited: z.number().min(0),
@@ -90,7 +91,7 @@ export default function LicenseSettingsCard() {
     };
 
     if (isLoading) return <div
-        className="card bg-base-200 border border-base-300 p-10 flex items-center justify-center min-h-[300px]"><span
+        className="card bg-base-200 border border-base-300 p-10 flex items-center justify-center min-h-80"><span
         className="loading loading-spinner text-primary"></span></div>;
 
     const onSubmit = async (data: LicenseSettingsFormValues) => {

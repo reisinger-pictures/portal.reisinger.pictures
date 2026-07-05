@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import UserTable from '../management/components/UserTable';
 import { UserDetailed, UserRole } from '../../logic/useUsers';
 
 describe('B5 regression: users?.filter crash (SWR undefined response)', () => {
     it('renders without crashing when users is undefined', () => {
         expect(() =>
-            render(
+            renderWithProviders(
                 <UserTable
                     users={undefined}
                     searchTerm=""
@@ -20,7 +21,7 @@ describe('B5 regression: users?.filter crash (SWR undefined response)', () => {
     });
 
     it('renders "Keine Nutzer gefunden" when users is an empty array', () => {
-        render(
+        renderWithProviders(
             <UserTable
                 users={[]}
                 searchTerm=""
@@ -66,7 +67,7 @@ describe('B5 regression: users?.filter crash (SWR undefined response)', () => {
             },
         ];
 
-        render(
+        renderWithProviders(
             <UserTable
                 users={users}
                 searchTerm=""

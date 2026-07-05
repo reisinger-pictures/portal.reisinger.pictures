@@ -1,5 +1,6 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ManagementManualInvoiceView from '../management/ManagementManualInvoiceView';
@@ -103,7 +104,7 @@ const baseDraft = {
 };
 
 function renderView(props: { type?: 'invoice' | 'offer' } = {}) {
-    return render(
+    return renderWithProviders(
         <MemoryRouter>
             <ManagementManualInvoiceView {...props} />
         </MemoryRouter>,

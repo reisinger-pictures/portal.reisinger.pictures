@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useSearchParams } from 'react-router-dom';
 import {useStats} from '../../logic/useStats';
 import {Legend, Pie, PieChart, ResponsiveContainer, Tooltip} from 'recharts';
@@ -28,10 +30,10 @@ export default function ManagementStatsView() {
     return (
         <ManagementPageShell
             isLoading={isLoading && !stats}
-            title="Statistiken & Audit-Logs"
+            title={t`Statistiken & Audit-Logs`}
             action={
                 <div role="tablist" className="tabs tabs-boxed w-full md:w-auto bg-base-200 border border-base-300 p-1 flex-wrap shadow-sm">
-                    <a role="tab" className={`tab ${!qualityFilter ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.delete('tier'); prev.set('page', '1'); return prev; })}>Alle Auflösungen</a>
+                    <a role="tab" className={`tab ${!qualityFilter ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.delete('tier'); prev.set('page', '1'); return prev; })}><Trans>Alle Auflösungen</Trans></a>
                     <a role="tab" className={`tab ${qualityFilter === 'web' ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.set('tier', 'web'); prev.set('page', '1'); return prev; })}>WEB</a>
                     <a role="tab" className={`tab ${qualityFilter === 'print' ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.set('tier', 'print'); prev.set('page', '1'); return prev; })}>PRINT</a>
                     <a role="tab" className={`tab ${qualityFilter === 'original' ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.set('tier', 'original'); prev.set('page', '1'); return prev; })}>ORIGINAL</a>
@@ -41,15 +43,15 @@ export default function ManagementStatsView() {
         >
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 *:odd:max-lg:last:col-span-2 mb-8">
                 <div className="stat bg-base-100 rounded-box border border-base-300 shadow-sm">
-                    <div className="stat-title text-base-content/70">Zugeordnete Galerien</div>
+                    <div className="stat-title text-base-content/70"><Trans>Zugeordnete Galerien</Trans></div>
                     <div className="stat-value text-primary">{stats?.galleries_count || 0}</div>
                 </div>
                 <div className="stat bg-base-100 rounded-box border border-base-300 shadow-sm">
-                    <div className="stat-title text-base-content/70">Anonyme Gäste</div>
+                    <div className="stat-title text-base-content/70"><Trans>Anonyme Gäste</Trans></div>
                     <div className="stat-value text-accent">{stats?.guest_downloads || 0}</div>
                 </div>
                 <div className="stat bg-base-100 rounded-box border border-base-300 shadow-sm">
-                    <div className="stat-title text-base-content/70">Downloads Gesamt</div>
+                    <div className="stat-title text-base-content/70"><Trans>Downloads Gesamt</Trans></div>
                     <div className="stat-value text-primary">{stats?.total_downloads || 0}</div>
                 </div>
             </div>
@@ -60,17 +62,17 @@ export default function ManagementStatsView() {
                     <div className="card-body p-0 overflow-hidden">
                         <div className="p-4 border-b border-base-300 flex items-center gap-2 bg-base-200/50">
                             <span className="iconify mdi--format-list-bulleted text-xl text-primary"></span>
-                            <h2 className="font-bold text-lg">Letzte Aktivitäten</h2>
+                            <h2 className="font-bold text-lg"><Trans>Letzte Aktivitäten</Trans></h2>
                         </div>
                         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-base-300">
                             <table className="table table-zebra table-sm md:table-md w-full">
                                 <thead>
                                 <tr>
-                                    <th>Datum / Zeit</th>
-                                    <th>Benutzer / Gast</th>
-                                    <th>Galerie</th>
-                                    <th>Typ</th>
-                                    <th>Qualität</th>
+                                    <th><Trans>Datum / Zeit</Trans></th>
+                                    <th><Trans>Benutzer / Gast</Trans></th>
+                                    <th><Trans>Galerie</Trans></th>
+                                    <th><Trans>Typ</Trans></th>
+                                    <th><Trans>Qualität</Trans></th>
                                 </tr>
                                 </thead>
                                 
@@ -80,7 +82,7 @@ export default function ManagementStatsView() {
                                         <td className="whitespace-nowrap text-sm opacity-70">
                                             {new Date(log.created_at).toLocaleString('de-DE')}
                                         </td>
-                                        <td className="font-bold whitespace-nowrap">{log.user_name_snapshot || 'Anonymer Gast'}</td>
+                                        <td className="font-bold whitespace-nowrap">{log.user_name_snapshot || t`Anonymer Gast`}</td>
                                         <td className="max-w-xs truncate"
                                             title={log.gallery_name_snapshot || '-'}>{log.gallery_name_snapshot || '-'}</td>
                                         <td>
@@ -120,7 +122,7 @@ export default function ManagementStatsView() {
                                 {(!filteredLogs || logs?.data.length === 0) && (
                                     <tr>
                                         <td colSpan={5} className="text-center opacity-50 py-8">
-                                            Noch keine Downloads aufgezeichnet.
+                                            <Trans>Noch keine Downloads aufgezeichnet.</Trans>
                                         </td>
                                     </tr>
                                 )}
@@ -139,9 +141,9 @@ export default function ManagementStatsView() {
                     <div className="card bg-base-100 border border-base-300 shadow-sm h-full">
                         <div className="card-body p-4 md:p-6">
                             <h2 className="card-title text-lg mb-4 flex items-center gap-2">
-                                <span className="iconify mdi--domain text-primary"></span> Top Domains
+                                <span className="iconify mdi--domain text-primary"></span> <Trans>Top Domains</Trans>
                             </h2>
-                            <div className="bg-base-200 rounded-box border border-base-300 p-2 md:p-4 w-full h-[300px] flex flex-col justify-center overflow-hidden">
+                            <div className="bg-base-200 rounded-box border border-base-300 p-2 md:p-4 w-full h-80 flex flex-col justify-center overflow-hidden">
                                 {chartData.length > 0 ? (
                                     <ResponsiveContainer width="100%" height="100%" minHeight={100} minWidth={100}>
                                         <PieChart>
@@ -170,7 +172,7 @@ export default function ManagementStatsView() {
                                 ) : (
                                     <div
                                         className="flex h-full items-center justify-center opacity-50 text-sm text-center">
-                                        Noch keine Download-Daten vorhanden.
+                                        <Trans>Noch keine Download-Daten vorhanden.</Trans>
                                     </div>
                                 )}
                             </div>
@@ -180,19 +182,22 @@ export default function ManagementStatsView() {
                     <div className="card bg-base-100 border border-base-300 shadow-sm h-full">
                         <div className="card-body p-4 md:p-6">
                             <h2 className="card-title text-lg mb-4 flex items-center gap-2">
-                                <span className="iconify mdi--trophy text-warning"></span> Top 5 Galerien
+                                <span className="iconify mdi--trophy text-warning"></span> <Trans>Top 5 Galerien</Trans>
                             </h2>
                             <ul className="flex flex-col gap-2">
-                                {stats?.top_galleries?.map((g, i) => (
+                                {stats?.top_galleries?.map((g, i) => {
+                                    const galleryCount = g.count;
+                                    return (
                                     <li key={i} className="bg-base-200 rounded-lg border border-base-300 p-3 hover:bg-base-300 transition-colors">
                                         <a className="flex justify-between items-center gap-4">
                                             <span className="truncate min-w-0 font-medium" title={g.name}>{g.name}</span>
-                                            <span className="badge badge-primary shrink-0 whitespace-nowrap">{g.count} Downloads</span>
+                                            <span className="badge badge-primary shrink-0 whitespace-nowrap"><Trans>{galleryCount} Downloads</Trans></span>
                                         </a>
                                     </li>
-                                ))}
+                                );
+                            })}
                                 {(!stats?.top_galleries || stats.top_galleries.length === 0) &&
-                                    <div className="flex w-full items-center justify-center py-6 opacity-50 text-sm text-center">Keine Daten vorhanden.</div>}
+                                    <div className="flex w-full items-center justify-center py-6 opacity-50 text-sm text-center"><Trans>Keine Daten vorhanden.</Trans></div>}
                             </ul>
 
 

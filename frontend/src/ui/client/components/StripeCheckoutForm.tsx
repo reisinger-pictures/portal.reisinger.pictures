@@ -1,4 +1,6 @@
 import React, {useState, useRef, useEffect} from 'react';
+import {t} from "@lingui/core/macro";
+import {Trans} from "@lingui/react/macro";
 import {useStripe, useElements, PaymentElement} from '@stripe/react-stripe-js';
 import {useUI} from '../../components/UIContext';
 import {Order} from '../../../api';
@@ -40,7 +42,7 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSucces
 
         if (error) {
             setIsProcessing(false);
-            showToast('error', error.message || 'Zahlung fehlgeschlagen.');
+            showToast('error', error.message || t`Zahlung fehlgeschlagen.`);
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
             setIsProcessing(false);
             onSuccess(true);
@@ -87,12 +89,12 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSucces
         <form onSubmit={handleSubmit} className="space-y-4">
             <PaymentElement options={{defaultValues: {billingDetails: {name: defaultName, email: defaultEmail}}}}/>
             <button type="submit" disabled={isProcessing || !stripe} className="btn btn-primary w-full btn-lg">
-                {isProcessing ? <span className="loading loading-spinner"></span> : 'Jetzt bezahlen'}
+                {isProcessing ? <span className="loading loading-spinner"></span> : <Trans>Jetzt bezahlen</Trans>}
             </button>
             {isProcessing &&
                 <p className="text-sm text-center opacity-70 mt-2 flex items-center justify-center gap-2">
                     <span className="loading loading-spinner loading-xs"></span>
-                    Zahlung wird verifiziert...
+                    <Trans>Zahlung wird verifiziert...</Trans>
                 </p>}
         </form>
     );

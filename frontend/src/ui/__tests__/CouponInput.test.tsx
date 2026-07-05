@@ -1,5 +1,6 @@
 import {describe, it, expect, vi, beforeEach} from 'vitest';
-import {render, screen} from '@testing-library/react';
+import {screen} from '@testing-library/react';
+import {renderWithProviders} from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import {MemoryRouter} from 'react-router-dom';
 import CouponInput from '../client/components/CouponInput';
@@ -61,7 +62,7 @@ function setupBrand(isSrp = true) {
 }
 
 function renderCouponInput() {
-    return render(<CouponInput />);
+    return renderWithProviders(<CouponInput />);
 }
 
 describe('CouponInput', () => {
@@ -198,7 +199,7 @@ describe('CouponInput additional', () => {
 
 describe('organisation scope label in ManagementCouponsView', () => {
     it('renders "Organisation" label for organisation-scoped coupons', async () => {
-        render(
+        renderWithProviders(
             <MemoryRouter>
                 <ManagementCouponsView />
             </MemoryRouter>,

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../../../test-setup';
 import userEvent from '@testing-library/user-event';
 import AIBatchEditModal from '../AIBatchEditModal';
 
@@ -59,7 +60,7 @@ describe('AIBatchEditModal', () => {
     it('renders modal with 3 photos, all rows visible', () => {
         setupMocks();
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         expect(screen.getByText('KI Beschriftung')).toBeInTheDocument();
         expect(screen.getByText('Alle generieren (leere)')).toBeInTheDocument();
@@ -68,7 +69,7 @@ describe('AIBatchEditModal', () => {
     it('KI Generieren button disabled when !isAvailable', () => {
         setupMocks({ isAvailable: false });
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         const buttons = screen.getAllByText('KI Generieren');
         buttons.forEach(btn => expect(btn).toBeDisabled());
@@ -77,7 +78,7 @@ describe('AIBatchEditModal', () => {
     it('badge shows "Nicht verfügbar" when mode=unavailable', () => {
         setupMocks({ mode: 'unavailable', isAvailable: false });
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         expect(screen.getByText('Nicht verfügbar')).toBeInTheDocument();
     });
@@ -85,7 +86,7 @@ describe('AIBatchEditModal', () => {
     it('badge shows "Server: gpt-4o" when mode=server', () => {
         setupMocks({ mode: 'server', modelId: 'gpt-4o' });
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         expect(screen.getByText(/Server: gpt-4o/)).toBeInTheDocument();
     });
@@ -101,7 +102,7 @@ describe('AIBatchEditModal', () => {
             detected_city: 'Vienna',
         });
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         const generateButtons = screen.getAllByText('KI Generieren');
         await user.click(generateButtons[0]);
@@ -122,7 +123,7 @@ describe('AIBatchEditModal', () => {
             detected_city: 'Vienna',
         });
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         const contextInput = screen.getByPlaceholderText(/z\.B\. Sommerfest/i);
         await user.type(contextInput, 'Global Context');
@@ -142,7 +143,7 @@ describe('AIBatchEditModal', () => {
         const user = userEvent.setup();
         setupMocks();
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         const specificInputs = screen.getAllByPlaceholderText(/Spezifischer Bild-Kontext/i);
         await user.type(specificInputs[0], 'Row-specific context');
@@ -161,7 +162,7 @@ describe('AIBatchEditModal', () => {
             detected_city: 'Vienna',
         });
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         await user.click(screen.getByText('Alle generieren (leere)'));
 
@@ -175,7 +176,7 @@ describe('AIBatchEditModal', () => {
         const { mockUpdateMetadata, showToast } = setupMocks();
         mockUpdateMetadata.mockResolvedValue(undefined);
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         const saveButtons = screen.getAllByText('Speichern');
         await user.click(saveButtons[0]);
@@ -192,7 +193,7 @@ describe('AIBatchEditModal', () => {
         const { mockGenerateMetadata, showToast } = setupMocks();
         mockGenerateMetadata.mockRejectedValue(new Error('AI Error'));
 
-        render(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
 
         const generateButtons = screen.getAllByText('KI Generieren');
         await user.click(generateButtons[0]);

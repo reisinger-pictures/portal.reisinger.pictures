@@ -1,4 +1,5 @@
 import {useState, useCallback} from 'react';
+import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
 
 export function useInvoiceDragDrop(isOffer: boolean, onFileDrop: (file: File) => void) {
@@ -24,7 +25,7 @@ export function useInvoiceDragDrop(isOffer: boolean, onFileDrop: (file: File) =>
         if (file && file.type === 'application/pdf') {
             await onFileDrop(file);
         } else if (file) {
-            showToast('error', 'Bitte lade eine gültige PDF-Datei hoch.');
+            showToast('error', t`Bitte lade eine gültige PDF-Datei hoch.`);
         }
     }, [isOffer, onFileDrop, showToast]);
 

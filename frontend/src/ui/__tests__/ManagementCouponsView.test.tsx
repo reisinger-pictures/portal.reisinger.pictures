@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../../test-setup';
 import { MemoryRouter } from 'react-router-dom';
 import ManagementCouponsView from '../management/ManagementCouponsView';
 
@@ -38,7 +39,7 @@ describe('ManagementCouponsView', () => {
     });
 
     it('renders organisation label for organisation-scoped coupon', async () => {
-        render(
+        renderWithProviders(
             <MemoryRouter>
                 <ManagementCouponsView />
             </MemoryRouter>,

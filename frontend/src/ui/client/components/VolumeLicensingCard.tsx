@@ -1,4 +1,6 @@
 import {Photo} from '../../../logic/useGallery';
+import {t} from "@lingui/core/macro";
+import {Trans} from "@lingui/react/macro";
 import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
 import {formatMoney} from '../../../logic/utils';
@@ -18,7 +20,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
 
     const handleAddToCart = () => {
         if (isInCart) {
-            showToast('info', 'Bild ist bereits im Warenkorb.');
+            showToast('info', t`Bild ist bereits im Warenkorb.`);
             return;
         }
         addToCart({
@@ -33,10 +35,12 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
         onAddToCart();
     };
 
+    const bestPrice = formatMoney(2000);
+    const nextTierPlural = nextTierCount === 1 ? '' : 'er';
     return (
         <div className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
             <h4 className="font-bold text-xl flex items-center gap-2">
-                <span className="iconify mdi--currency-eur text-primary"></span> Preis
+                <span className="iconify mdi--currency-eur text-primary"></span> <Trans>Preis</Trans>
             </h4>
 
             {/* Current price display */}
@@ -44,31 +48,31 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
                 <div className="text-4xl font-mono font-bold text-primary">
                     {formatMoney(pricePerItemCents)}
                 </div>
-                <div className="text-sm opacity-70 mt-1">pro Bild</div>
+                <div className="text-sm opacity-70 mt-1"><Trans>pro Bild</Trans></div>
             </div>
 
             {/* Volume tiers info */}
             <div className="space-y-2 bg-base-200 p-4 rounded-box border border-base-300">
-                <p className="text-sm font-bold opacity-70 uppercase tracking-wide">Mengenrabatt Staffel</p>
+                <p className="text-sm font-bold opacity-70 uppercase tracking-wide"><Trans>Mengenrabatt Staffel</Trans></p>
                 <div className="space-y-1">
                     <div className="flex justify-between text-sm">
-                        <span>1–9 Bilder</span>
+                        <span><Trans>1–9 Bilder</Trans></span>
                         <span className="font-mono font-bold">{formatMoney(3000)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                         <span className="flex items-center gap-1">
-                            Ab 10 Bilder
+                            <Trans>Ab 10 Bilder</Trans>
                             {tier === 2 && (
-                                <span className="badge badge-success badge-xs text-[10px]">Aktiv</span>
+                                <span className="badge badge-success badge-xs text-xs"><Trans>Aktiv</Trans></span>
                             )}
                         </span>
                         <span className="font-mono font-bold">{formatMoney(2500)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                         <span className="flex items-center gap-1">
-                            Ab 20 Bilder
+                            <Trans>Ab 20 Bilder</Trans>
                             {tier === 3 && (
-                                <span className="badge badge-success badge-xs text-[10px]">Aktiv</span>
+                                <span className="badge badge-success badge-xs text-xs"><Trans>Aktiv</Trans></span>
                             )}
                         </span>
                         <span className="font-mono font-bold">{formatMoney(2000)}</span>
@@ -79,7 +83,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             {/* Next tier hint */}
             {isVolumePricing && nextTierCount > 0 && (
                 <div className="text-sm text-center text-primary font-semibold bg-primary/5 p-3 rounded-box border border-primary/20">
-                    Noch {nextTierCount} Bild{nextTierCount === 1 ? '' : 'er'} bis zum nächsten Rabatt:<br />
+                    {t`Noch ${nextTierCount} Bild${nextTierPlural} bis zum nächsten Rabatt:`}<br />
                     <span className="font-bold">{nextTierLabel}</span>
                 </div>
             )}
@@ -87,7 +91,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             {isVolumePricing && tier === 3 && (
                 <div className="text-sm text-center text-success font-semibold bg-success/5 p-3 rounded-box border border-success/20">
                     <span className="iconify mdi--check-circle inline-block mr-1"></span>
-                    Bester Rabatt aktiv — {formatMoney(2000)} pro Bild
+                    <Trans>Bester Rabatt aktiv — {bestPrice} pro Bild</Trans>
                 </div>
             )}
 
@@ -98,15 +102,15 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
                 className="btn btn-primary btn-md w-full shadow-sm"
             >
                 {isInCart ? (
-                    <><span className="iconify mdi--check text-lg"></span> Im Warenkorb</>
+                    <><span className="iconify mdi--check text-lg"></span> <Trans>Im Warenkorb</Trans></>
                 ) : (
-                    <><span className="iconify mdi--cart-plus text-lg"></span> In den Warenkorb</>
+                    <><span className="iconify mdi--cart-plus text-lg"></span> <Trans>In den Warenkorb</Trans></>
                 )}
             </button>
 
             {isInCart && (
                 <p className="text-xs text-center opacity-60">
-                    Bereits im Warenkorb — der Preis wird basierend auf der Gesamtanzahl berechnet.
+                    <Trans>Bereits im Warenkorb — der Preis wird basierend auf der Gesamtanzahl berechnet.</Trans>
                 </p>
             )}
         </div>

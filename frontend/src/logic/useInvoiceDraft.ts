@@ -1,4 +1,5 @@
 import {useState, useCallback} from 'react';
+import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
 import {DocumentFormData, InvoiceDiscount, InvoiceItem} from '../api';
 import {formatDateToDE, formatLocaleDate} from './utils';
@@ -25,9 +26,10 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
     const getOfferValidUntil = () => {
         const d = new Date();
         d.setDate(d.getDate() + 14);
-        return 'Gültig bis ' + formatLocaleDate(d);
+        const validUntil = formatLocaleDate(d);
+        return t`Gültig bis ${validUntil}`;
     };
-    const getInvoiceDefaultDue = () => 'Zahlbar sofort nach Erhalt der Rechnung.';
+    const getInvoiceDefaultDue = () => t`Zahlbar sofort nach Erhalt der Rechnung.`;
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [dueDateOption, setDueDateOption] = useState('0');
@@ -213,12 +215,12 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                let niceMsg = errData.message || errData.error || 'Fehler beim Generieren (Bitte Eingaben prüfen).';
+                let niceMsg = errData.message || errData.error || t`Fehler beim Generieren (Bitte Eingaben prüfen).`;
                 if (errData.errors) {
                     const firstErr = Object.values(errData.errors)[0];
                     if (Array.isArray(firstErr)) niceMsg = firstErr[0];
                 }
-                if (niceMsg.includes('items.') && niceMsg.includes('description')) niceMsg = 'Bitte alle Titel/Namen bei den Leistungen ausfüllen.';
+                if (niceMsg.includes('items.') && niceMsg.includes('description')) niceMsg = t`Bitte alle Titel/Namen bei den Leistungen ausfüllen.`;
                 throw new Error(niceMsg);
             }
             const blob = await res.blob();
@@ -231,9 +233,9 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             document.body.removeChild(a);
             setIsDirty(false);
             setUnsavedChanges(false);
-            showToast('success', 'Dokument wurde erstellt.');
+            showToast('success', t`Dokument wurde erstellt.`);
         } catch (err: unknown) {
-            showToast('error', err instanceof Error ? err.message : 'Fehler');
+            showToast('error', err instanceof Error ? err.message : t`Fehler`);
         }
         setIsGenerating(false);
     }, [formData, items, discounts, isOffer, showToast, setUnsavedChanges]);
