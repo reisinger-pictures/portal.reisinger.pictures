@@ -203,7 +203,7 @@ export default function LicenseCatalogSettings() {
                                     <tr>
                                         <th className="w-3/10">Titel & Beschreibung</th>
                                         <th className="w-1/5">Flatrate-Verknüpfung</th>
-                                        <th className="text-right w-1/5">Basispreis (Netto)</th>
+                                        <th className="text-right w-1/5">Basispreis</th>
                                         <th className="text-right w-36">Aktionen</th>
                                     </tr>
                                 </thead>
@@ -251,7 +251,7 @@ export default function LicenseCatalogSettings() {
                                 </label>
                             </div>
                             <div className="form-control w-full">
-                                <label className="label py-1"><span className="label-text text-sm font-bold">Preis (Netto €)</span></label>
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Preis</span></label>
                                 <input type="number" step="0.01" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered w-full" required />
                             </div>
                             <div className="form-control w-full">

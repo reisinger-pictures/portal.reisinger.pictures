@@ -132,8 +132,11 @@ export default function ManagementOrdersView() {
                         </div>
 
                         <div className="form-control mb-4">
-                            <label className="label"><span className="label-text font-bold"><Trans>Pauschalpreis (Netto in €)</Trans></span></label>
-                            <input type="number" step="0.01" value={customPrice} onChange={e => setCustomPrice(e.target.value)} className="input input-bordered w-full font-mono"                                 placeholder={t`z.B. 450.00`} autoFocus />
+                            <label className="label"><span className="label-text font-bold"><Trans>Pauschalpreis</Trans></span></label>
+                            <div className="join w-full">
+                                <input type="number" step="0.01" value={customPrice} onChange={e => setCustomPrice(e.target.value)} className="input input-bordered join-item w-full font-mono" placeholder={t`z.B. 450.00`} autoFocus />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                            </div>
                         </div>
 
                         <div className="form-control mb-4">

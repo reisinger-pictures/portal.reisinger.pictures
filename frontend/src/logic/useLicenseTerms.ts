@@ -6,7 +6,7 @@ export interface LicenseTerms {
     calc_hourly_rate?: string;
     calc_images_per_hour?: string;
     calc_outdoor_multiplier?: string;
-    // NEU: B2C Flex-Faktoren
+    calc_flatrate_multiplier?: string;
     srp_base_price?: string;
     srp_setup_fee?: string;
     srp_privacy_fee?: string;
@@ -20,7 +20,7 @@ export interface LicenseTermsPayload {
     calc_hourly_rate?: string | number;
     calc_images_per_hour?: string | number;
     calc_outdoor_multiplier?: string | number;
-    // NEU: B2C Flex-Faktoren Payloads
+    calc_flatrate_multiplier?: string | number;
     srp_base_price?: string | number;
     srp_setup_fee?: string | number;
     srp_privacy_fee?: string | number;

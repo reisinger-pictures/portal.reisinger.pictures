@@ -34,7 +34,10 @@ test.describe('Package Calculator Configuration (G2)', () => {
         await hourlyRateInput.fill('95');
 
         const outdoorFactorInput = cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Faktor' }).locator('input[type="number"]');
-        await outdoorFactorInput.fill('0.65');
+        await outdoorFactorInput.fill('65');
+
+        const flatrateSurchargeInput = cardBody.locator('.form-control').filter({ hasText: 'Reportage-Aufschlag' }).locator('input[type="number"]');
+        await flatrateSurchargeInput.fill('25');
 
         await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
 

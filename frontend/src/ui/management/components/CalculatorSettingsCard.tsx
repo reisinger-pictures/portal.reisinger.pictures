@@ -10,7 +10,8 @@ const calculatorSettingsSchema = z.object({
     calc_base_price: z.number().min(0, t`Muss positiv sein`),
     calc_hourly_rate: z.number().min(0, t`Muss positiv sein`),
     calc_images_per_hour: z.number().int(t`Muss eine ganze Zahl sein`).min(1, t`Mindestens 1 Bild`),
-    calc_outdoor_multiplier: z.number().min(0.1, t`Mindestens 10%`).max(1, t`Maximal 100%`),
+    calc_outdoor_multiplier: z.number().min(10, t`Mindestens 10%`).max(100, t`Maximal 100%`),
+    calc_flatrate_surcharge: z.number().min(0, t`Muss positiv sein`).max(900, t`Maximal 900%`),
     srp_base_price: z.number().min(0, t`Muss positiv sein`),
     srp_setup_fee: z.number().min(0, t`Muss positiv sein`),
     srp_privacy_fee: z.number().min(0, t`Muss positiv sein`),
@@ -27,18 +28,20 @@ export default function CalculatorSettingsCard() {
         resolver: zodResolver(calculatorSettingsSchema),
         defaultValues: {
             calc_base_price: 50, calc_hourly_rate: 80, calc_images_per_hour: 6,
-            calc_outdoor_multiplier: 0.5,
+            calc_outdoor_multiplier: 50, calc_flatrate_surcharge: 20,
             srp_base_price: 149, srp_setup_fee: 50, srp_privacy_fee: 200, srp_extra_image_fee: 15
         }
     });
 
     useEffect(() => {
         if (terms) {
+            const flatrateMultiplier = parseFloat(terms.calc_flatrate_multiplier || '1.2');
             reset({
                 calc_base_price: parseFloat(terms.calc_base_price || '50'),
                 calc_hourly_rate: parseFloat(terms.calc_hourly_rate || '80'),
                 calc_images_per_hour: parseInt(terms.calc_images_per_hour || '6', 10),
-                calc_outdoor_multiplier: parseFloat(terms.calc_outdoor_multiplier || '0.5'),
+                calc_outdoor_multiplier: parseFloat(terms.calc_outdoor_multiplier || '0.5') * 100,
+                calc_flatrate_surcharge: Math.round((flatrateMultiplier - 1) * 100),
                 srp_base_price: parseFloat(terms.srp_base_price || '149'),
                 srp_setup_fee: parseFloat(terms.srp_setup_fee || '50'),
                 srp_privacy_fee: parseFloat(terms.srp_privacy_fee || '200'),
@@ -53,7 +56,8 @@ export default function CalculatorSettingsCard() {
                 calc_base_price: data.calc_base_price,
                 calc_hourly_rate: data.calc_hourly_rate,
                 calc_images_per_hour: data.calc_images_per_hour,
-                calc_outdoor_multiplier: data.calc_outdoor_multiplier,
+                calc_outdoor_multiplier: data.calc_outdoor_multiplier / 100,
+                calc_flatrate_multiplier: 1 + (data.calc_flatrate_surcharge / 100),
                 srp_base_price: data.srp_base_price,
                 srp_setup_fee: data.srp_setup_fee,
                 srp_privacy_fee: data.srp_privacy_fee,
@@ -82,28 +86,43 @@ export default function CalculatorSettingsCard() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Grundpreis (€)</span></label>
-                            <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('calc_base_price', {valueAsNumber: true})} />
+                                className="label-text font-bold">Grundpreis</span></label>
+                            <div className="join w-full">
+                                <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('calc_base_price', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                            </div>
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Stundensatz (€)</span></label>
-                            <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('calc_hourly_rate', {valueAsNumber: true})} />
+                                className="label-text font-bold">Stundensatz</span></label>
+                            <div className="join w-full">
+                                <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('calc_hourly_rate', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                            </div>
                         </div>
                         <div className="form-control">
                             <label className="label"><span
                                 className="label-text font-bold">Bilder pro Stunde</span></label>
-<input type="number" step="1" min="1"
-                                    className="input input-bordered" {...register('calc_images_per_hour', {valueAsNumber: true})} />
+                            <div className="join w-full">
+                                <input type="number" step="1" min="1" className="input input-bordered join-item w-full" {...register('calc_images_per_hour', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">Stk</span>
+                            </div>
                         </div>
                         <div className="form-control">
                             <label className="label"><span
                                 className="label-text font-bold">Outdoor-Faktor</span></label>
-                            <input type="number" step="0.05" min="0.1" max="1"
-                                   className="input input-bordered" {...register('calc_outdoor_multiplier', {valueAsNumber: true})} />
-                            <span className="text-xs opacity-60 mt-1">10-100% (0,5 = 50%)</span>
+                            <div className="join w-full">
+                                <input type="number" step="5" min="10" max="100" className="input input-bordered join-item w-full" {...register('calc_outdoor_multiplier', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">%</span>
+                            </div>
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span
+                                className="label-text font-bold">Reportage-Aufschlag</span></label>
+                            <div className="join w-full">
+                                <input type="number" step="1" min="0" max="900" className="input input-bordered join-item w-full" {...register('calc_flatrate_surcharge', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">%</span>
+                            </div>
                         </div>
                     </div>
 
@@ -111,26 +130,34 @@ export default function CalculatorSettingsCard() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Basispreis (€)</span></label>
-                            <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('srp_base_price', {valueAsNumber: true})} />
+                                className="label-text font-bold">Basispreis</span></label>
+                            <div className="join w-full">
+                                <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_base_price', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                            </div>
                         </div>
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Setup-Fee (€)</span></label>
-                            <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('srp_setup_fee', {valueAsNumber: true})} />
+                            <label className="label"><span className="label-text font-bold">Setup-Fee</span></label>
+                            <div className="join w-full">
+                                <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_setup_fee', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                            </div>
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Extra-Bild (€)</span></label>
-                            <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('srp_extra_image_fee', {valueAsNumber: true})} />
+                                className="label-text font-bold">Extra-Bild</span></label>
+                            <div className="join w-full">
+                                <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_extra_image_fee', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                            </div>
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Privacy-Fee (€)</span></label>
-                            <input type="number" step="0.01"
-                                   className="input input-bordered" {...register('srp_privacy_fee', {valueAsNumber: true})} />
+                                className="label-text font-bold">Privacy-Fee</span></label>
+                            <div className="join w-full">
+                                <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_privacy_fee', {valueAsNumber: true})} />
+                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                            </div>
                         </div>
                     </div>
 

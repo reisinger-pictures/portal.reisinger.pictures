@@ -8,6 +8,7 @@ export interface ShootingPriceInput {
     calc_hourly_rate?: string;
     calc_images_per_hour?: string;
     calc_outdoor_multiplier?: string;
+    calc_flatrate_multiplier?: string;
     duration: number; // Minuten
     images: number;
     isOutdoor: boolean;
@@ -63,7 +64,7 @@ export function calculateCustomStudioPrice(input: ShootingPriceInput): ShootingP
         imagesPrice = imagesPrice * outdoorMultiplier;
     }
 
-    const multiplier = input.flatrate ? 1.2 : 1;
+    const multiplier = input.flatrate ? parseFloat(input.calc_flatrate_multiplier || '1.2') : 1;
     const rawTotal = (basePrice + timePrice + imagesPrice) * multiplier;
     const packagePrice = roundToPsychologicalValue(rawTotal);
 

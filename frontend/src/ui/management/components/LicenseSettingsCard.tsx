@@ -120,9 +120,12 @@ export default function LicenseSettingsCard() {
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <div className="form-control w-full max-w-xs">
                         <label className="label"><span
-                            className="label-text font-bold">Basispreis (Netto in €)</span></label>
-                        <input type="number" step="0.01" {...register('base_price', {valueAsNumber: true})}
-                               className="input input-bordered w-full font-mono text-lg text-primary font-bold"/>
+                            className="label-text font-bold">Basispreis</span></label>
+                        <div className="join w-full max-w-xs">
+                            <input type="number" step="0.01" {...register('base_price', {valueAsNumber: true})}
+                                   className="input input-bordered join-item w-full font-mono text-lg text-primary font-bold"/>
+                            <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                        </div>
                         <div className="label"><span className="label-text-alt opacity-70">Gilt für Redaktionell, 1 Jahr, Web.</span>
                         </div>
                     </div>

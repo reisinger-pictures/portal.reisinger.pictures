@@ -57,6 +57,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
             calc_hourly_rate: terms?.calc_hourly_rate,
             calc_images_per_hour: terms?.calc_images_per_hour,
             calc_outdoor_multiplier: terms?.calc_outdoor_multiplier,
+            calc_flatrate_multiplier: terms?.calc_flatrate_multiplier,
             duration: calcDuration,
             images: calcImages,
             isOutdoor: calcIsOutdoor,
@@ -88,8 +89,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
         let newDiscount: InvoiceDiscount | null = null;
 
         if (calcMode === 'rp' && calcDiscount !== '0') {
-            const dName = calcDiscount === '33' ? 'N*xt Generation / Treue-Rabatt (~33%)' : 'Special Deal OGs (~50%)';
-            const dNotes = calcDiscount === '33' ? 'Förderung für junge Talente.' : 'Partnerrabatt.';
+            const dName = calcDiscount === '33' ? 'Studentenrabatt (unter 26 Jahre)' : 'Special Deal OGs (~50%)';
+            const dNotes = calcDiscount === '33' ? 'Rabatt für Studierende und Auszubildende (unter 26 Jahre).' : 'Partnerrabatt für langjährige Kunden.';
             newDiscount = {type: 'discount_fixed', description: dName, notes: dNotes, price: discountAbsolute};
             newItem.price = packagePriceEuro;
         }
@@ -176,14 +177,14 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                             <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                 <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                        checked={calcIsOutdoor} onChange={e => setCalcIsOutdoor(e.target.checked)}/>
-                                <span className="label-text font-bold">Outdoor-Shooting (Bildpreis-Faktor: {Math.round((parseFloat(terms?.calc_outdoor_multiplier || '0.5')) * 100)}%)</span>
+                                <span className="label-text font-bold">Outdoor-Shooting (Bildpreis: {Math.round((parseFloat(terms?.calc_outdoor_multiplier || '0.5')) * 100)}%)</span>
                             </label>
                         </div>
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                             <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                 <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                        checked={calcIsFlatrate} onChange={e => setCalcIsFlatrate(e.target.checked)}/>
-                                <span className="label-text font-bold">Reportage-Paket (+20% Aufschlag)</span>
+                                <span className="label-text font-bold">Reportage-Paket (+{Math.round((parseFloat(terms?.calc_flatrate_multiplier || '1.2') - 1) * 100)}% Aufschlag)</span>
                             </label>
                         </div>
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
@@ -198,8 +199,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                             <select className="select select-bordered w-full" value={calcDiscount}
                                     onChange={e => setCalcDiscount(e.target.value as ShootingDiscount)}>
                                 <option value="0">Kein Rabatt (0%)</option>
-                                <option value="33">Studenten Rabatt (~33%)</option>
-                                <option value="50">Special Deal OGs (~50%)</option>
+                                <option value="33">Studentenrabatt (33%)</option>
+                                <option value="50">Special Deal OGs (50%)</option>
                             </select>
                         </div>
                     </div>

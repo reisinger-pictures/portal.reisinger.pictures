@@ -78,11 +78,13 @@ export default function ManagementPayoutsView() {
                     </div>
                     <div className="form-control w-full md:w-48">
                         <label className="label">
-                            <span className="label-text font-bold"><Trans>Flatrate-Netto (€)</Trans></span>
+                            <span className="label-text font-bold"><Trans>Flatrate</Trans></span>
                         </label>
-                        <input type="number" step="0.01" value={netPool} onChange={e => setNetPool(e.target.value)}
-                                placeholder={t`z.B. 2500.00`} className="input input-bordered font-mono"
-                               required/>
+                        <div className="join w-full">
+                            <input type="number" step="0.01" value={netPool} onChange={e => setNetPool(e.target.value)}
+                                    placeholder={t`z.B. 2500.00`} className="input input-bordered join-item w-full font-mono" required/>
+                            <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                        </div>
                     </div>
                     <button type="submit" disabled={isCalculating}
                             className="btn btn-primary h-10 px-8 w-full md:w-auto">
@@ -99,7 +101,7 @@ export default function ManagementPayoutsView() {
                             <div key={pool.id} className="bg-base-100 p-4 rounded-box border border-base-300 shadow-sm">
                                 <div className="font-bold text-lg mb-2">{pool.month} / {pool.year}</div>
                                 <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div className="opacity-70"><Trans>Netto-Topf:</Trans></div>
+                                    <div className="opacity-70"><Trans>Pool:</Trans></div>
                                     <div className="font-mono text-right">{formatMoney(pool.net_pool_cents)}</div>
                                     <div className="opacity-70"><Trans>Unique DLs:</Trans></div>
                                     <div className="font-mono text-right">{pool.total_unique_downloads}</div>
