@@ -8,3 +8,5 @@
 * [Legal evidence and disputes](06-legal-evidence-and-disputes.md)
 * [Psychological pricing](07-psychological-pricing.md)
 * [SRP coupon system](08-srp-coupon-system.md)
+* [Stripe checkout flow](09-stripe-checkout-flow.md)
+* [Digital contracts](10-digital-contracts.md)

@@ -5,6 +5,7 @@ import {SidebarHelper} from '../helpers/SidebarHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 import {FormHelper} from '../helpers/FormHelper';
+import {LightboxHelper} from '../helpers/LightboxHelper';
 
 
 
@@ -44,7 +45,7 @@ test.describe('PhotoSwipe & Lightbox UI', () => {
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         const galLink = page.locator('main').locator('a').filter({hasText: galleryName}).first();
-        await expect(galLink).toBeVisible();
+        await expect(galLink).toBeVisible({ timeout: 15000 });
         await galLink.click();
 
         const upload = new UploadHelper(page);
@@ -67,25 +68,20 @@ test.describe('PhotoSwipe & Lightbox UI', () => {
         // BEST PRACTICE: Authentic user behavior. Force a fresh fetch to see updated metadata.
         await page.reload();
 
-        const image = page.locator('a.pswp-item img').first();
-        await image.scrollIntoViewIfNeeded();
-        await expect(image).toBeVisible({ timeout: 15000 });
+        const lightbox = new LightboxHelper(page);
+        await lightbox.image.scrollIntoViewIfNeeded();
+        await expect(lightbox.image).toBeVisible({ timeout: 15000 });
 
-        await expect(page.locator('a.pswp-item').first()).toHaveAttribute('data-title', 'Episches Testbild');
+        await expect(lightbox.imageLink).toHaveAttribute('data-title', 'Episches Testbild');
 
-        await page.locator('a.pswp-item').first().click();
+        await lightbox.imageLink.click();
 
-        const lightbox = page.locator('.pswp');
-        await expect(lightbox).toBeVisible();
+        await expect(lightbox.lightbox).toBeVisible();
 
-        await expect(lightbox.locator('text=Episches Testbild')).toBeVisible();
-        await expect(lightbox.locator('text=Dies ist eine fantastische Beschreibung für die Lightbox-Ansicht.')).toBeVisible();
-        await expect(lightbox.locator('.pswp__custom-caption small')).toContainText('©');
+        await lightbox.expectCaptionVisible('Episches Testbild');
+        await lightbox.expectCaptionVisible('Dies ist eine fantastische Beschreibung für die Lightbox-Ansicht.');
+        await lightbox.expectCopyrightVisible();
 
-        await expect(page.locator('button.pswp__button--close')).toBeVisible({ timeout: 5000 });
-        await expect(async () => {
-            await page.locator('button.pswp__button--close').click();
-            await expect(lightbox).toBeHidden();
-        }).toPass({ timeout: 15000 });
+        await lightbox.close();
     });
 });

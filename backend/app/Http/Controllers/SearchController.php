@@ -11,6 +11,7 @@ use App\Http\Resources\GalleryResource;
 use App\Http\Resources\PhotoResource;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use App\Support\BrandRegistry;
 
 class SearchController extends Controller
 {
@@ -42,8 +43,12 @@ class SearchController extends Controller
         }
 
         if (strlen($q) < 1) {
+            $currentBrand = BrandRegistry::current();
             $publicQuery = Gallery::where('is_public', true)
                 ->where(function($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); });
+            if ($currentBrand !== null) {
+                $publicQuery->where('brand', $currentBrand);
+            }
             $publicGalleryIds = $publicQuery->pluck('id')->toArray();
 
             if ($user && !$user->is_admin) {
@@ -72,7 +77,12 @@ class SearchController extends Controller
         }
 
         $allowedGalleryIds = $user ? $user->getAllowedGalleryIds() : [];
-        $publicGalleryIds = Gallery::where('is_public', true)->pluck('id')->toArray();
+        $currentBrand = BrandRegistry::current();
+        $publicGalleryIds = Gallery::where('is_public', true);
+        if ($currentBrand !== null) {
+            $publicGalleryIds->where('brand', $currentBrand);
+        }
+        $publicGalleryIds = $publicGalleryIds->pluck('id')->toArray();
         
         if (!$canSeeExpired) {
             $allowedGalleryIds = empty($allowedGalleryIds) ? [] : Gallery::whereIn('id', $allowedGalleryIds)->where(function($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); })->pluck('id')->toArray();

@@ -80,9 +80,7 @@ class AccessControlService
         // assignments are also filtered so an SRP user can never reach a B2B gallery via stale links.
         if ($user->brand !== null) {
             $galleryIds = Gallery::whereIn('id', $galleryIds)
-                ->where(function ($q) use ($user) {
-                    $q->where('brand', $user->brand)->orWhereNull('brand');
-                })
+                ->where('brand', $user->brand)
                 ->pluck('id')
                 ->toArray();
         }

@@ -1,5 +1,6 @@
 import { Page, expect } from '@playwright/test';
 import { SidebarHelper } from './SidebarHelper';
+import { ToastHelper } from './ToastHelper';
 import { ModalHelper } from './ModalHelper';
 import { FormHelper } from './FormHelper';
 import { E2ESessionHelper } from './E2ESessionHelper';
@@ -53,7 +54,7 @@ export class GalleryHelper {
         const valueMap = { 'Erben': 'null', 'Offen': 'false', 'Restriktiv': 'true' };
         await select.selectOption(valueMap[status]);
         
-        await expect(this.page.locator('.toast')).toContainText('Status gespeichert');
+        await new ToastHelper(this.page).expectToast('Status gespeichert');
         
         await teamModal.locator('button').filter({ hasText: '✕' }).click();
         await expect(teamModal).toBeHidden();

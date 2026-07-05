@@ -24,5 +24,5 @@ export default defineConfig({
             "frontend/node_modules/**",
             "backend/vendor/**"
         ]
-    }
+    },
 });

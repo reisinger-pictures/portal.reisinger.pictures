@@ -188,7 +188,7 @@ class AccessControlServiceTest extends TestCase
         $this->assertNotContains($galleryB->id, $ids);
     }
 
-    public function test_brand_scoping_allows_null_brand_galleries(): void
+    public function test_brand_scoping_rejects_null_brand_galleries(): void
     {
         $gallery = Gallery::factory()->create(['brand' => null]);
         $user = User::factory()->create(['brand' => 'srp']);
@@ -196,7 +196,7 @@ class AccessControlServiceTest extends TestCase
 
         $ids = $this->service->getAllowedGalleryIds($user);
 
-        $this->assertContains($gallery->id, $ids);
+        $this->assertNotContains($gallery->id, $ids);
     }
 
     // ──────────────────────────────────────────────

@@ -7,6 +7,7 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Http\Resources\GalleryResource;
 use App\Http\Resources\PhotoResource;
+use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\DB;
 
 class GalleryFrontendController extends Controller
@@ -14,6 +15,10 @@ class GalleryFrontendController extends Controller
     public function show($slug)
     {
         $gallery = Gallery::where('slug', $slug)->firstOrFail();
+        $currentBrand = BrandRegistry::current();
+        if ($currentBrand !== null && $gallery->brand !== null && $gallery->brand !== $currentBrand) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
+        }
         $user = auth('api')->user();
 
         $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();

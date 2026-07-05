@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router-dom';
 import {useStats} from '../../logic/useStats';
 import {Legend, Pie, PieChart, ResponsiveContainer, Tooltip} from 'recharts';
 import Pagination from '../components/Pagination';
+import ManagementPageShell from '../components/ManagementPageShell';
 
 export default function ManagementStatsView() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -24,21 +25,20 @@ export default function ManagementStatsView() {
         fill: COLORS[index % COLORS.length]
     }));
 
-    if (isLoading && !stats) return <div className="p-10 flex justify-center"><span
-        className="loading loading-spinner loading-lg"></span></div>;
-
     return (
-        <div className="p-2 md:p-8 max-w-7xl mx-auto w-full">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h1 className="text-3xl md:text-4xl font-bold">Statistiken & Audit-Logs</h1>
+        <ManagementPageShell
+            isLoading={isLoading && !stats}
+            title="Statistiken & Audit-Logs"
+            action={
                 <div role="tablist" className="tabs tabs-boxed w-full md:w-auto bg-base-200 border border-base-300 p-1 flex-wrap shadow-sm">
                     <a role="tab" className={`tab ${!qualityFilter ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.delete('tier'); prev.set('page', '1'); return prev; })}>Alle Auflösungen</a>
                     <a role="tab" className={`tab ${qualityFilter === 'web' ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.set('tier', 'web'); prev.set('page', '1'); return prev; })}>WEB</a>
                     <a role="tab" className={`tab ${qualityFilter === 'print' ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.set('tier', 'print'); prev.set('page', '1'); return prev; })}>PRINT</a>
                     <a role="tab" className={`tab ${qualityFilter === 'original' ? 'tab-active font-bold' : ''}`} onClick={() => setSearchParams(prev => { prev.set('tier', 'original'); prev.set('page', '1'); return prev; })}>ORIGINAL</a>
                 </div>
-            </div>
-
+            }
+            className="p-2 md:p-8"
+        >
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 *:odd:max-lg:last:col-span-2 mb-8">
                 <div className="stat bg-base-100 rounded-box border border-base-300 shadow-sm">
                     <div className="stat-title text-base-content/70">Zugeordnete Galerien</div>
@@ -201,6 +201,6 @@ export default function ManagementStatsView() {
                 </div>
 
             </div>
-        </div>
+        </ManagementPageShell>
     );
 }

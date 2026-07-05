@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
+import { ToastHelper } from '../helpers/ToastHelper';
 
 test.describe('Package Calculator Configuration (G2)', () => {
     let helper: E2ESessionHelper;
@@ -34,6 +35,6 @@ test.describe('Package Calculator Configuration (G2)', () => {
 
         await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
 
-        await expect(page.locator('.toast')).toContainText('Kalkulator-Einstellungen gespeichert');
+        await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
     });
 });

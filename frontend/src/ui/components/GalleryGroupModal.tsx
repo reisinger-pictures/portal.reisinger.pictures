@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { GalleryGroup, FlatGroup, GalleryGroupExtraOpts } from '../../logic/useGalleries';
 import { Tenant } from '../../logic/useTenants';
 import { useUI } from './UIContext';
@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toSlug } from '../../logic/utils';
 import CheckboxGroup from '../components/CheckboxGroup';
+import ModalDialogShell from './ModalDialogShell';
 
 const groupSchema = z.object({
     name: z.string().min(1, 'Name ist erforderlich'),
@@ -88,101 +89,90 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         }
     };
 
+    const parentGroupOptions = useMemo(() => {
+        const result: FlatGroup[] = [];
+        let skipDepth = -1;
+        for (const g of availableGroups) {
+            if (editingGroup && g.id === editingGroup.id) {
+                skipDepth = g.depth;
+                continue;
+            }
+            if (skipDepth !== -1) {
+                if (g.depth > skipDepth) continue;
+                skipDepth = -1;
+            }
+            result.push(g);
+        }
+        return result;
+    }, [availableGroups, editingGroup]);
+
     if (!isOpen) return null;
     if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
     return (
-        <dialog className="modal modal-open z-[60]">
-            <div className="modal-box relative">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-lg mb-4">{editingGroup ? 'Meta-Galerie bearbeiten' : 'Neue Meta-Galerie erstellen'}</h3>
-
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="form-control w-full">
-                            <label className="label"><span className="label-text font-bold">Name</span></label>
-                            <input type="text" {...register('name')}
-                                   onChange={(e) => {
-                                       setValue('name', e.target.value, { shouldDirty: true });
-                                       if (!editingGroup && !dirtyFields.slug && e.target.value) {
-                                           setValue('slug', toSlug(e.target.value));
-                                       }
-                                   }}
-                                   className="input input-bordered w-full"
-                            />
-                        </div>
-                        <div className="form-control w-full">
-                            <label className="label"><span className="label-text font-bold">URL Slug</span></label>
-                            <input type="text" {...register('slug')}
-                                   onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true})}
-                                   className="input input-bordered w-full text-sm font-mono"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="form-control w-full mb-4">
-                        <label className="label"><span className="label-text font-bold">Sichtbarkeits-Vorgabe</span></label>
-                        <select {...register('is_public')} className="select select-bordered w-full">
-                            <option value="null">Keine Vorgabe (Unterordner entscheiden selbst)</option>
-                            <option value="false">Privat erzwingen (Nur mit Link / Passwort)</option>
-                            <option value="true">Öffentlich erzwingen (Für alle sichtbar)</option>
-                        </select>
-                    </div>
-
-                    <div className="space-y-3 mb-4">
-                        <CheckboxGroup items={[
-                            { name: 'is_free_download', label: 'Kostenlosen Download erlauben', description: 'Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterladen.' },
-                            { name: 'is_editorial_only', label: 'Nur für redaktionelle Nutzung (Shop)', description: 'Sperrt kommerzielle Lizenzen im Checkout für diesen Ordner.' },
-                            { name: 'is_hidden', label: 'Im Frontend verstecken', description: 'Wird nicht in Suchergebnissen oder Feeds gelistet.' },
-                        ]} register={register} />
-                    </div>
-
-                    
-                    <div className="form-control w-full mb-4">
-                        <label className="label"><span className="label-text font-bold">Zugeordnete Organisation (Verschieben)</span></label>
-                        <select {...register('tenant_id')} className="select select-bordered w-full">
-                            <option value="">-- Keine spezifische Organisation --</option>
-                            {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                    </div>
-
-<div className="form-control w-full mb-6">
-                        <label className="label"><span className="label-text font-bold">Übergeordnete Meta-Galerie</span></label>
-                        <select {...register('parent_id')} className="select select-bordered w-full">
-                            <option value="">-- Keine --</option>
-                            {(() => {
-                                const result = [];
-                                let skipDepth = -1;
-                                for (const g of availableGroups) {
-                                    if (editingGroup && g.id === editingGroup.id) {
-                                        skipDepth = g.depth;
-                                        continue;
-                                    }
-                                    if (skipDepth !== -1) {
-                                        if (g.depth > skipDepth) continue;
-                                        skipDepth = -1;
-                                    }
-                                    result.push(g);
-                                }
-                                return result.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>);
-                            })()}
-                        </select>
-                    </div>
-
-                    <div className="modal-action col-span-full flex justify-between">
-                        {editingGroup ? (
-                            <button type="button" className="btn btn-outline btn-error" onClick={handleDelete}>Löschen</button>
-                        ) : <div></div>}
-                        <div>
-                            <button type="button" className="btn btn-ghost mr-2" onClick={onClose}>Abbrechen</button>
-                            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
-                            </button>
-                        </div>
-                    </div>
-                </form>
+        <ModalDialogShell
+            title={editingGroup ? 'Meta-Galerie bearbeiten' : 'Neue Meta-Galerie erstellen'}
+            onClose={onClose}
+            onDelete={handleDelete}
+            editing={!!editingGroup}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit(onSubmit)}
+        >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="form-control w-full">
+                    <label className="label"><span className="label-text font-bold">Name</span></label>
+                    <input type="text" {...register('name')}
+                           onChange={(e) => {
+                               setValue('name', e.target.value, { shouldDirty: true });
+                               if (!editingGroup && !dirtyFields.slug && e.target.value) {
+                                   setValue('slug', toSlug(e.target.value));
+                               }
+                           }}
+                           className="input input-bordered w-full"
+                    />
+                </div>
+                <div className="form-control w-full">
+                    <label className="label"><span className="label-text font-bold">URL Slug</span></label>
+                    <input type="text" {...register('slug')}
+                           onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true})}
+                           className="input input-bordered w-full text-sm font-mono"
+                    />
+                </div>
             </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </dialog>
+
+            <div className="form-control w-full mb-4">
+                <label className="label"><span className="label-text font-bold">Sichtbarkeits-Vorgabe</span></label>
+                <select {...register('is_public')} className="select select-bordered w-full">
+                    <option value="null">Keine Vorgabe (Unterordner entscheiden selbst)</option>
+                    <option value="false">Privat erzwingen (Nur mit Link / Passwort)</option>
+                    <option value="true">Öffentlich erzwingen (Für alle sichtbar)</option>
+                </select>
+            </div>
+
+            <div className="space-y-3 mb-4">
+                <CheckboxGroup items={[
+                    { name: 'is_free_download', label: 'Kostenlosen Download erlauben', description: 'Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterladen.' },
+                    { name: 'is_editorial_only', label: 'Nur für redaktionelle Nutzung (Shop)', description: 'Sperrt kommerzielle Lizenzen im Checkout für diesen Ordner.' },
+                    { name: 'is_hidden', label: 'Im Frontend verstecken', description: 'Wird nicht in Suchergebnissen oder Feeds gelistet.' },
+                ]} register={register} />
+            </div>
+
+            
+            <div className="form-control w-full mb-4">
+                <label className="label"><span className="label-text font-bold">Zugeordnete Organisation (Verschieben)</span></label>
+                <select {...register('tenant_id')} className="select select-bordered w-full">
+                    <option value="">-- Keine spezifische Organisation --</option>
+                    {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+            </div>
+
+            <div className="form-control w-full mb-6">
+                <label className="label"><span className="label-text font-bold">Übergeordnete Meta-Galerie</span></label>
+                <select {...register('parent_id')} className="select select-bordered w-full">
+                    <option value="">-- Keine --</option>
+                    {parentGroupOptions.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
+                </select>
+            </div>
+        </ModalDialogShell>
     );
 }

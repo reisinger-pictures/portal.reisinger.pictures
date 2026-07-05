@@ -25,5 +25,5 @@ export default defineConfig({
             "backend/vendor/**",
             "admin.lrplugin/**"
         ]
-    }
+    },
 });

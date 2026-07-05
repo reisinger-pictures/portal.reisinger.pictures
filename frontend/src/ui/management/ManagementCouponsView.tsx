@@ -5,6 +5,7 @@ import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import { useBrand } from '../../logic/useBrand';
 import ErrorMessage from '../components/ErrorMessage';
+import { formatMoney } from '../../logic/utils';
 import CouponFormDrawer, { type Coupon } from './components/CouponFormDrawer';
 import Pagination from '../components/Pagination';
 
@@ -34,7 +35,7 @@ const formatValue = (coupon: Coupon): string => {
     if (Number.isNaN(numeric)) return String(coupon.value);
     switch (coupon.type) {
         case 'fixed':
-            return `${numeric.toFixed(2).replace('.', ',')} €`;
+            return formatMoney(Math.round(numeric * 100));
         case 'percentage':
             return `${numeric} %`;
         default:

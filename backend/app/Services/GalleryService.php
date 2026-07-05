@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
+use App\Support\BrandRegistry;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -37,6 +38,7 @@ class GalleryService
             'is_hidden' => $data['is_hidden'] ?? false,
             'restricted_photographers' => $data['restricted_photographers'] ?? null,
             'tenant_id' => $data['tenant_id'] ?? null,
+            'brand' => BrandRegistry::currentOrDefault()->value,
         ]);
     }
 
@@ -94,6 +96,7 @@ class GalleryService
                 'name' => $data['name'],
                 'slug' => $slug,
                 'type' => $data['type'],
+                'brand' => BrandRegistry::currentOrDefault()->value,
                 'is_live' => ($data['type'] ?? null) === 'selection' ? false : ($data['is_live'] ?? false),
                 'is_public' => $isPublic,
                 'is_free_download' => $data['is_free_download'] ?? false,

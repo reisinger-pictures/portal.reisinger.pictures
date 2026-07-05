@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { FormHelper } from '../helpers/FormHelper';
+import { ToastHelper } from '../helpers/ToastHelper';
 
 
 
@@ -44,9 +45,7 @@ test.describe('Admin Workflow', () => {
         
         await modal.clickButton('Nutzer anlegen & Einladen');
 
-        const toast = page.locator('.toast');
-        await expect(toast).toBeVisible();
-        await expect(toast).toContainText('Nutzer angelegt');
+        await new ToastHelper(page).expectToast('Nutzer angelegt');
         
         await expect(modal.activeModal).toBeHidden();
 

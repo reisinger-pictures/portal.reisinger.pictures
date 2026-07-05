@@ -33,8 +33,8 @@ class SearchTest extends TestCase {
     }
 
     public function test_search_discovery_returns_public_galleries() {
-        Gallery::factory()->create(['is_public' => true, 'name' => 'Public Wedding']);
-        Gallery::factory()->create(['is_public' => false, 'name' => 'Private Secret']);
+        Gallery::factory()->create(['is_public' => true, 'name' => 'Public Wedding', 'brand' => 'rp']);
+        Gallery::factory()->create(['is_public' => false, 'name' => 'Private Secret', 'brand' => 'rp']);
 
         $response = $this->getJson('/api/search?q=');
         $response->assertStatus(200);
@@ -42,7 +42,7 @@ class SearchTest extends TestCase {
     }
 
     public function test_search_filters_photos_by_metadata() {
-        $gallery = Gallery::factory()->create(['is_public' => true, 'type' => 'delivery']);
+        $gallery = Gallery::factory()->create(['is_public' => true, 'type' => 'delivery', 'brand' => 'rp']);
         Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'title' => 'UniqueMountainView',
@@ -59,8 +59,8 @@ class SearchTest extends TestCase {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
 
-        Gallery::factory()->create(['is_public' => false, 'name' => 'Secret Admin Stuff']);
-        Gallery::factory()->create(['is_public' => true, 'name' => 'Public Showcase']);
+        Gallery::factory()->create(['is_public' => false, 'name' => 'Secret Admin Stuff', 'brand' => 'rp']);
+        Gallery::factory()->create(['is_public' => true, 'name' => 'Public Showcase', 'brand' => 'rp']);
 
         $this->waitForSearchIndex();
 
@@ -74,7 +74,7 @@ class SearchTest extends TestCase {
         $client = User::factory()->create();
         $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
 
-        $privateGallery = Gallery::factory()->create(['is_public' => false, 'type' => 'delivery']);
+        $privateGallery = Gallery::factory()->create(['is_public' => false, 'type' => 'delivery', 'brand' => 'rp']);
         $client->galleries()->attach($privateGallery);
         Photo::factory()->create(['gallery_id' => $privateGallery->id, 'title' => 'AllowedPhoto123']);
 
@@ -90,7 +90,7 @@ class SearchTest extends TestCase {
         $photog = User::factory()->create();
         $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
-        $ownGallery = Gallery::factory()->create(['is_public' => false, 'type' => 'delivery']);
+        $ownGallery = Gallery::factory()->create(['is_public' => false, 'type' => 'delivery', 'brand' => 'rp']);
         $photog->galleries()->attach($ownGallery);
         Photo::factory()->create(['gallery_id' => $ownGallery->id, 'title' => 'PhotogOwnPhoto']);
 
@@ -108,7 +108,7 @@ class SearchTest extends TestCase {
      * in config/scout.php (minWordSizeForTypos oneTypo=4).
      */
     public function test_search_is_typo_tolerant_for_photos() {
-        $gallery = Gallery::factory()->create(['is_public' => true, 'type' => 'delivery']);
+        $gallery = Gallery::factory()->create(['is_public' => true, 'type' => 'delivery', 'brand' => 'rp']);
         Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'title' => 'MountainPanorama',

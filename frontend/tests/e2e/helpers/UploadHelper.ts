@@ -1,6 +1,7 @@
 import { Page, expect } from '@playwright/test';
 import path from 'path';
 import { NetworkHelper } from './NetworkHelper';
+import { LightboxHelper } from './LightboxHelper';
 
 export class UploadHelper {
     private network: NetworkHelper;
@@ -39,7 +40,7 @@ export class UploadHelper {
         await expect(toast).toBeVisible({ timeout: 10000 });
 
         // Warten, bis das Bild im DOM gerendert wurde (geduldige Asserts)
-        const image = this.page.locator('a.pswp-item img').first();
+        const image = new LightboxHelper(this.page).image;
 
         // Geduld: Warten bis das Element überhaupt am DOM angebunden und sichtbar ist, bevor wir scrollen
         await expect(image).toBeAttached({ timeout: 15000 });

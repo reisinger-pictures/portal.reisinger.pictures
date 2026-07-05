@@ -46,16 +46,16 @@ class BrandScopingTest extends TestCase
     }
 
     /**
-     * Galleries without an explicit brand (NULL) are visible to brand-bound users of any brand
-     * (legacy galleries remain reachable), matching the OR-NULL clause in the scope.
+     * Galleries without an explicit brand (NULL) are no longer visible — the OR-NULL clause
+     * was removed. The V020 migration backfills all existing null-brand galleries to 'rp'.
      */
-    public function test_legacy_null_brand_gallery_is_reachable_for_brand_bound_user(): void
+    public function test_legacy_null_brand_gallery_is_rejected_for_brand_bound_user(): void
     {
         $user = User::factory()->create(['brand' => Brand::SRP]);
         $legacyGallery = Gallery::factory()->create(['brand' => null]);
         $user->galleries()->attach($legacyGallery->id);
 
-        $this->assertContains($legacyGallery->id, $user->getAllowedGalleryIds());
+        $this->assertNotContains($legacyGallery->id, $user->getAllowedGalleryIds());
     }
 
     /**

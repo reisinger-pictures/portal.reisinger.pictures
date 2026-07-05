@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
+import { ToastHelper } from '../helpers/ToastHelper';
 
 test.describe('Billing Details Save (Bankdaten)', () => {
     let helper: E2ESessionHelper;
@@ -43,7 +44,7 @@ test.describe('Billing Details Save (Bankdaten)', () => {
         await card.getByPlaceholder(/IBAN|AT/i).first().fill(iban);
 
         await card.getByRole('button', { name: 'Bankdaten speichern' }).click();
-        await expect(page.locator('.toast')).toContainText('Bankdaten gespeichert');
+        await new ToastHelper(page).expectToast('Bankdaten gespeichert');
 
         await page.reload();
         await expect(page.locator('h2:has-text("Bankverbindung & Impressum")')).toBeVisible();
@@ -74,6 +75,6 @@ test.describe('Billing Details Save (Bankdaten)', () => {
         await card.getByRole('button', { name: 'Bankdaten speichern' }).click();
 
         await expect(card.locator('.text-error')).toContainText(/IBAN/i);
-        await expect(page.locator('.toast')).not.toContainText('Bankdaten gespeichert');
+        await new ToastHelper(page).expectNoToast('Bankdaten gespeichert');
     });
 });

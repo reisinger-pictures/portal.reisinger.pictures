@@ -1,52 +1,41 @@
-﻿# Task Board — Portal Reisinger Pictures
+# Task Board — Portal Reisinger Pictures
 
-## Session: Search Bar Unification & Duplicate Refactoring
+## Session: Epic Digital Contracts & Signatures (Multi-Signer)
 
-### ✅ Done
-- Created shared `SearchBarWithSuggestions.tsx` component
-- Replaced search bars in `SearchView.tsx`, `GlobalSearchHeader.tsx`, `ManagementDashboard.tsx`, `ClientDashboard.tsx`
-- Created `SearchHelper.ts` E2E test utility
-- Updated all E2E tests to use unified placeholder `"Suche in allen Galerien..."`
+#### P0 — Backend: DB Schema & Models
+- Create migration for `contracts`, `contract_signers`, and `contract_audit_logs` tables.
+- Create eloquent models with relationships (Contract hasMany Signers, Signer hasMany AuditLogs).
+- **Tests:** PHPUnit tests for model creation, JSON casting (roles), and cascade deletions.
 
-### 🔲 Duplicate Refactoring Pipeline (prioritized)
+#### P0 — Backend: API & Audit Trail Logic
+- Create management endpoints: POST (create), GET (list), PUT (update draft), POST (open period), POST (close period).
+- Create public endpoints for token-based access:
+  - GET `/api/contracts/join/{token}` (Fetch active contract metadata & available roles)
+  - POST `/api/contracts/join/{token}` (User joins, selects role, gets personal session)
+  - POST `/api/contracts/sign/{personal_token}` (Submit clickwrap signature)
+- Implement `ContractAuditService` to securely log IP and User-Agent per signer.
+- **Tests:** PHPUnit tests for token validation, role constraints (allow_multiple_roles), and period state transitions (draft -> active -> closed).
 
-#### P0 — GalleryModal / GalleryGroupModal merge
-- Extract shared checkbox group (`is_free_download`, `is_editorial_only`, `is_hidden`)
-- Extract shared modal dialog shell
-- Move `toSlug` to `utils.ts`
-- Files: `GalleryModal.tsx` (273 lines), `GalleryGroupModal.tsx` (206 lines)
-- Est. savings: ~100–130 lines
-- **Tests:** E2E tests for gallery/group create/edit flows
+#### P1 — Frontend: Contract Builder UI (Management)
+- Clone/adapt `ManagementManualInvoiceView` into `ManagementContractView`.
+- Retain Pricing Logic (Items, Discounts).
+- Extract Billing Details into a separate "Rechnungsempfänger (Optional)" block.
+- Add UI to define `available_roles` (tags input) and toggle `allow_multiple_roles_per_signer`.
+- Add "Vertragsperiode starten" action (generates/shows the generic Join-Link and allows sending direct invites).
+- **Tests:** Playwright E2E for creating a contract with custom roles and opening it.
 
-#### P0 — EmptyState component
-- Extract shared empty-state UI for photo/gallery grids
-- Files: `SelectionView.tsx`, `DeliveryView.tsx`, `ManagementDashboard.tsx`, `ManagementGalleryView.tsx`
-- Est. savings: ~20–30 lines
-- **Tests:** Visual regression in E2E (snapshot empty states)
+#### P1 — Frontend: Client Signing UI
+- Create public `ContractJoinView` (for the generic link): Form for Name, Email, and Role selection.
+- Create public `ContractSignView` (accessible via personal token after joining or direct invite).
+- Implement Read-Only view of the HTML content, terms, and pricing items.
+- Implement heartbeat mechanism to log active viewing time per signer.
+- Implement Clickwrap agreement: Mandatory checkbox + legally compliant submit button ("Zahlungspflichtig abschließen" vs. "Vertrag verbindlich abschließen").
+- **Tests:** Playwright E2E mimicking two different clients joining the same contract link, picking roles, and signing.
 
-#### P0 — Pagination component
-- Extract shared pagination UI ("← Zurück" / "Weiter →")
-- Files: `ManagementCouponsView.tsx`, `ManagementStatsView.tsx`
-- Est. savings: ~15–20 lines
-- **Tests:** PHPUnit tests for pagination + E2E
-
-#### P1 — NotificationsOptIn component
-- Extract shared notification toggle
-- Files: `SelectionView.tsx`, `DeliveryView.tsx`
-- Est. savings: ~10–15 lines
-- **Tests:** E2E interaction tests
-
-#### P1 — SearchView → use PageLayout
-- Replace standalone sidebar+header layout with PageLayout
-- Est. savings: ~40–60 lines
-- **Tests:** E2E guest search tests must remain green
-
-#### P2 — ManagementPageShell
-- Create shared wrapper for management views (loading/error/header/card/table)
-- Files: 8 management views
-- Est. savings: ~200–320 lines
-- **Tests:** PHPUnit + E2E for each management view
-
-#### P2 — formatMoney consistency
-- Fix `ManagementCouponsView.tsx` to use shared `formatMoney` from `utils.ts`
-- Est. savings: ~5 lines
+#### P2 — Backend: Final PDF Generation & Auto-Invoicing
+- On `closed` event: Trigger Auto-Invoicing if `total_amount > 0` (using the `billing_details`).
+- Create Blade template for the contract + Multi-Signer Block.
+- Append Multi-Signer Audit Trail (Digital Certificate showing IPs and timestamps for all participants).
+- Embed `%OFFER_JWT:{token}%` into the final PDF.
+- Dispatch `ContractClosedMail` with the immutable PDF attachment to ALL signers and the photographer.
+- **Tests:** PHPUnit tests for the `close` trigger, PDF multi-signer compilation, and mass-email dispatch.

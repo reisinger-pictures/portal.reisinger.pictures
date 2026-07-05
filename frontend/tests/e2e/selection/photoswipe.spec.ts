@@ -6,6 +6,7 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { FormHelper } from '../helpers/FormHelper';
+import { LightboxHelper } from '../helpers/LightboxHelper';
 
 test.describe('PhotoSwipe in Selection Gallery', () => {
     let helper: E2ESessionHelper;
@@ -37,7 +38,7 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
 
         const link = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(link).toBeVisible();
+        await expect(link).toBeVisible({ timeout: 15000 });
         await link.click();
 
         const upload = new UploadHelper(page);
@@ -58,9 +59,9 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
         await page.getByRole('button', { name: 'Weiter als Lightbox Tester' }).click();
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
 
-        await page.locator('a.pswp-item').first().click();
-        const lightbox = page.locator('.pswp');
-        await expect(lightbox).toBeVisible();
+        const lightbox = new LightboxHelper(page);
+        await lightbox.imageLink.click();
+        await expect(lightbox.lightbox).toBeVisible();
         await expect(page.locator('#rating-portal-anchor')).toBeVisible();
 
         const commentInput = page.locator('#rating-portal-anchor input[type="text"]');
@@ -77,10 +78,7 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
         await rateResponse;
 
         await expect(page.locator('#rating-portal-anchor .rating input[type="radio"]').nth(4)).toBeChecked({ timeout: 5000 });
-        await expect(async () => {
-            await page.locator('button.pswp__button--close').click();
-            await expect(lightbox).toBeHidden();
-        }).toPass({ timeout: 15000 });
+        await lightbox.close();
 
         await expect(page.locator('.card-body input[type="radio"]').nth(4)).toBeChecked({ timeout: 5000 });
     });

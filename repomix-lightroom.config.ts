@@ -24,5 +24,5 @@ export default defineConfig({
             "backend/vendor/**",
             "frontend/**"
         ]
-    }
+    },
 });
