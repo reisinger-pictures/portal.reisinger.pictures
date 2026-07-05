@@ -24,6 +24,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     const [calcImages, setCalcImages] = useState<number>(15);
     const [calcIsFlatrate, setCalcIsFlatrate] = useState<boolean>(false);
     const [calcIsOutdoor, setCalcIsOutdoor] = useState<boolean>(false);
+    const [calcIsReorder, setCalcIsReorder] = useState<boolean>(false);
     const [calcDiscount, setCalcDiscount] = useState<ShootingDiscount>('0');
 
     // --- SRP (B2C) State ---
@@ -58,6 +59,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
             images: calcImages,
             isOutdoor: calcIsOutdoor,
             flatrate: calcIsFlatrate,
+            isReorder: calcIsReorder,
             discount: calcDiscount,
         });
         packagePriceEuro = res.packagePrice;
@@ -75,7 +77,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
             desc = `B2C Flex-Shooting (${types[srpType]})`;
             notes = `Setup: ${setups[srpSetup]} | Zusätzliche Bilder: ${srpExtra} | Online-Verbot: ${srpPrivate ? 'Ja' : 'Nein'}`;
         } else {
-            desc = calcIsFlatrate ? 'Reportage / Flatrate-Shooting' : 'Individuelles Shooting-Paket';
+            const baseDesc = calcIsFlatrate ? 'Reportage / Flatrate-Shooting' : 'Individuelles Shooting-Paket';
+            desc = calcIsReorder ? `${baseDesc} (Nachbestellung)` : baseDesc;
             notes = `${calcIsOutdoor ? 'Outdoor' : 'Indoor'} | Dauer: ${calcDuration} Minuten | Inkludierte Bilder: ${calcImages} Stück.`;
         }
 
@@ -179,6 +182,13 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                                 <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                        checked={calcIsFlatrate} onChange={e => setCalcIsFlatrate(e.target.checked)}/>
                                 <span className="label-text font-bold">Reportage-Paket (+20% Aufschlag)</span>
+                            </label>
+                        </div>
+                        <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                            <label className="cursor-pointer label justify-start gap-4 m-0 p-1">
+                                <input type="checkbox" className="checkbox checkbox-primary shrink-0"
+                                       checked={calcIsReorder} onChange={e => setCalcIsReorder(e.target.checked)}/>
+                                <span className="label-text font-bold">Nachbestellung (keine Setup-Gebühr)</span>
                             </label>
                         </div>
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">

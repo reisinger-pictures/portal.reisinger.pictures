@@ -11,6 +11,7 @@ const defaults = (overrides: Partial<ShootingPriceInput> = {}): ShootingPriceInp
     isOutdoor: false,
     flatrate: false,
     discount: '0',
+    isReorder: false,
     ...overrides,
 });
 
@@ -108,6 +109,27 @@ describe('calculateShootingPrice', () => {
         expect(Number.isFinite(result.packagePrice)).toBe(true);
         expect(Number.isFinite(result.finalPrice)).toBe(true);
         expect(result).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
+    });
+
+    it('reorder skips the base price (calc_base_price = 0)', () => {
+        // basePrice=0, time=120, images=200 → 320 → psych 319
+        expect(calculateShootingPrice(defaults({isReorder: true}))).toEqual({packagePrice: 319, finalPrice: 319, discountAbsolute: 0});
+    });
+
+    it('reorder + outdoor applies outdoor multiplier on images', () => {
+        // basePrice=0, time=120, images=200*0.5=100 → 220 → psych 219
+        expect(calculateShootingPrice(defaults({isReorder: true, isOutdoor: true}))).toEqual({packagePrice: 219, finalPrice: 219, discountAbsolute: 0});
+    });
+
+    it('reorder + flatrate applies +20% on (time + images)', () => {
+        // (0 + 120 + 200) * 1.2 = 384 → psych 385
+        expect(calculateShootingPrice(defaults({isReorder: true, flatrate: true}))).toEqual({packagePrice: 385, finalPrice: 385, discountAbsolute: 0});
+    });
+
+    it('reorder + discount skips base price then applies discount', () => {
+        // basePrice=0, time=120, images=200 → 320 → psych 319
+        // 319 - 33% = 213.73 → psych 215
+        expect(calculateShootingPrice(defaults({isReorder: true, discount: '33'}))).toEqual({packagePrice: 319, finalPrice: 215, discountAbsolute: 104});
     });
 });
 

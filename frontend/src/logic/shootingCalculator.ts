@@ -13,6 +13,7 @@ export interface ShootingPriceInput {
     isOutdoor: boolean;
     flatrate: boolean;
     discount: ShootingDiscount;
+    isReorder: boolean;
 }
 
 export interface ShootingPriceResult {
@@ -40,7 +41,7 @@ export function roundToPsychologicalValue(value: number): number {
 export function calculateShootingPrice(input: ShootingPriceInput): ShootingPriceResult { return calculateCustomStudioPrice(input); }
 
 export function calculateCustomStudioPrice(input: ShootingPriceInput): ShootingPriceResult {
-    const basePrice = parseFloat(input.calc_base_price || '50');
+    const basePrice = input.isReorder ? 0 : parseFloat(input.calc_base_price || '50');
     const hourlyRate = parseFloat(input.calc_hourly_rate || '80');
     
     const DEFAULT_IMAGES_PER_HOUR = 6;
