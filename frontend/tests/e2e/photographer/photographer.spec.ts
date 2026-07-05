@@ -60,7 +60,7 @@ test.describe('Photographer Core Workflow', () => {
         const nameInput = modal.activeModal.locator('.form-control').filter({ hasText: 'Name der Galerie' }).locator('input');
         await expect(nameInput).toHaveValue(galleryName);
         await nameInput.fill(editedName);
-        await modal.submitModal('Speichern');
+        await modal.submitModal('Speichern', '/api/management/galleries');
 
         await sidebar.navigateTo('Galerien');
         const newLink = page.locator('main').getByText(editedName).first();

@@ -9,6 +9,7 @@ export class E2ESessionHelper {
     private createdCustomerIds: string[] = [];
     private createdSnippetIds: string[] = [];
     private createdProductIds: string[] = [];
+    private createdContractIds: string[] = [];
     private adminToken: string | null = null;
 
     constructor(private request: APIRequestContext) {}
@@ -94,6 +95,7 @@ export class E2ESessionHelper {
     trackCustomer(id: string) { if (id) this.createdCustomerIds.push(id); }
     trackSnippet(id: string) { if (id) this.createdSnippetIds.push(id); }
     trackProduct(id: string) { if (id) this.createdProductIds.push(id); }
+    trackContract(id: string) { if (id) this.createdContractIds.push(id); }
 
     async seedBillingSettings() {
         await this.ensureAdminLogin();
@@ -116,6 +118,11 @@ export class E2ESessionHelper {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
 
+        // NOTE: Contract cleanup via API would need a DELETE endpoint
+        // on /api/management/contracts/{id}. Currently only tracking is supported.
+        for (const id of this.createdContractIds) {
+            await this.request.delete(`/api/management/contracts/${id}`, { headers }).catch(() => {});
+        }
         for (const id of this.createdGalleryIds) {
             await this.request.delete(`/api/management/galleries/${id}`, { headers }).catch(() => {});
         }

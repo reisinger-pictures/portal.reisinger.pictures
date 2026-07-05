@@ -105,7 +105,7 @@ services:
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - PROXY_DELIVERY_HEADER=${PROXY_DELIVERY_HEADER}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/healthcheck.php"]
+      test: ["CMD", "curl", "-f", "http://localhost/up"]
       interval: "30s"
       timeout: 10s
       retries: 3

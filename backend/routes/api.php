@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ContractController;
+use App\Http\Controllers\ContractJoinController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DownloadController;
@@ -77,6 +79,12 @@ Route::get('/sitemap-images.xml', [SitemapController::class, 'images']);
 
 Route::get('/invites/{token}', [InviteController::class, 'check']);
 Route::get('/tenant-invites/{token}', [TenantInviteController::class, 'check']);
+
+Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check']);
+Route::post('/contracts/join/{token}', [ContractJoinController::class, 'join']);
+Route::get('/contracts/sign/{personalToken}', [ContractJoinController::class, 'contractContent']);
+Route::post('/contracts/sign/{personalToken}', [ContractJoinController::class, 'sign']);
+Route::middleware('throttle:60,1')->post('/contracts/sign/{personalToken}/page-exit', [ContractJoinController::class, 'pageExit']);
 Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem']);
 Route::middleware("throttle:$throttleLimit,1")->post('/tenant-invites/redeem', [TenantInviteController::class, 'redeem']);
 
@@ -176,6 +184,13 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::post('/management/payouts/calculate', [\App\Http\Controllers\PayoutController::class, 'calculate']);
         Route::post('/management/payouts/{id}/approve', [\App\Http\Controllers\PayoutController::class, 'approveStatement']);
         Route::post('/management/payouts/{id}/pay', [\App\Http\Controllers\PayoutController::class, 'markAsPaid']);
+
+        Route::get('/management/contracts', [ContractController::class, 'index']);
+        Route::post('/management/contracts', [ContractController::class, 'store']);
+        Route::get('/management/contracts/{id}', [ContractController::class, 'show']);
+        Route::put('/management/contracts/{id}', [ContractController::class, 'update']);
+        Route::post('/management/contracts/{id}/open', [ContractController::class, 'open']);
+        Route::post('/management/contracts/{id}/close', [ContractController::class, 'close']);
     });
 
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo']);

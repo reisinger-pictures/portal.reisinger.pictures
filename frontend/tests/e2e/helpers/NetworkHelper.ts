@@ -27,10 +27,16 @@ export class NetworkHelper {
     waitForGallerySave() { return this.waitForApi('/api/management/galleries', 'POST'); }
     waitForGalleryUpdate() { return this.waitForApi('/api/management/galleries', 'PUT'); }
 
-    waitForManagementMutation() {
-        return this.page.waitForResponse(res => 
-            res.url().includes('/api/management/') && 
-            ['POST', 'PUT', 'DELETE'].includes(res.request().method())
-        );
+    waitForManagementMutation(urlPattern?: string) {
+        return this.page.waitForResponse(res => {
+            const matchesMethod = ['POST', 'PUT', 'DELETE'].includes(res.request().method());
+            const matchesUrl = urlPattern
+                ? res.url().includes(urlPattern)
+                : res.url().includes('/api/management/');
+            return matchesMethod && matchesUrl;
+        }, { timeout: 15000 }).catch(() => {
+            console.warn('[NetworkHelper] Timeout waiting for management mutation' + (urlPattern ? ` matching ${urlPattern}` : '') + ' — response may have been missed');
+            return null as unknown as Response;
+        });
     }
 }

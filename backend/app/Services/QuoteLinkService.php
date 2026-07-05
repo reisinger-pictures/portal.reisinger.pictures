@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Support\BrandRegistry;
+
 class QuoteLinkService
 {
     /**
@@ -20,9 +22,8 @@ class QuoteLinkService
         ];
 
         $token = app(OfferTokenService::class)->issue($payload, now()->addDays($validityDays));
-        $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
 
-        return $frontendUrl . '/cart?quote_token=' . $token;
+        return BrandRegistry::frontendUrl() . '/cart?quote_token=' . $token;
     }
 
     /**

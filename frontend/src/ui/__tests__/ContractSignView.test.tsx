@@ -1,0 +1,120 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import ContractSignView from '../ContractSignView';
+import { fetchSignContract } from '../../logic/useContractJoin';
+
+// --------------------------------------------------------------------------
+// Mocks
+// --------------------------------------------------------------------------
+
+vi.mock('react-router-dom', () => ({
+    useParams: () => ({ token: 'test-token-123' }),
+    useNavigate: () => vi.fn(),
+}));
+
+vi.mock('../../logic/useContractJoin', () => ({
+    fetchSignContract: vi.fn(),
+    submitSign: vi.fn(),
+    sendPageExit: vi.fn(),
+}));
+
+vi.mock('../../logic/useContractHeartbeat', () => ({
+    useContractHeartbeat: vi.fn(),
+}));
+
+vi.mock('../components/PageLayout', () => ({
+    default: ({ children }: { children: React.ReactNode }) => <div data-testid="page-layout">{children}</div>,
+}));
+
+vi.mock('../components/ErrorMessage', () => ({
+    default: ({ message }: { message: string }) => <div data-testid="error-message">{message}</div>,
+}));
+
+// --------------------------------------------------------------------------
+// Test data
+// --------------------------------------------------------------------------
+
+const version1Data = {
+    contract: {
+        id: 'contract-1',
+        terms_html: '<p>Version 1</p>',
+        items: [],
+        discounts: [],
+        billing_details: null,
+        available_roles: ['Model'],
+        content_version: 0,
+    },
+    signer: {
+        id: 'signer-1',
+        name: 'Test User',
+        email: 'test@example.com',
+        roles: ['Model'],
+        status: 'joined',
+    },
+};
+
+// --------------------------------------------------------------------------
+// Tests
+// --------------------------------------------------------------------------
+
+describe('ContractSignView stale detection', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('renders contract content on load', async () => {
+        vi.mocked(fetchSignContract).mockResolvedValueOnce(version1Data);
+
+        render(<ContractSignView />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Version 1')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('Test User')).toBeInTheDocument();
+        expect(screen.getByText('test@example.com')).toBeInTheDocument();
+    });
+
+    it('shows stale warning when heartbeat triggers isStale', async () => {
+        vi.mocked(fetchSignContract).mockResolvedValueOnce(version1Data);
+
+        render(<ContractSignView />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Version 1')).toBeInTheDocument();
+        });
+
+        const { useContractHeartbeat } = await import('../../logic/useContractHeartbeat');
+        const heartbeatHook = vi.mocked(useContractHeartbeat);
+        const onStale = heartbeatHook.mock.calls[0][3];
+
+        act(() => { onStale(); });
+
+        expect(screen.getByText('Vertrag wurde geändert')).toBeInTheDocument();
+    });
+
+    it('disables sign button when stale', async () => {
+        vi.mocked(fetchSignContract).mockResolvedValueOnce(version1Data);
+
+        render(<ContractSignView />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Version 1')).toBeInTheDocument();
+        });
+
+        const checkbox = screen.getByRole('checkbox');
+        fireEvent.click(checkbox);
+        expect(checkbox).toBeChecked();
+
+        const signButton = screen.getByRole('button', { name: 'Vertrag verbindlich abschließen' });
+        expect(signButton).toBeEnabled();
+
+        const { useContractHeartbeat } = await import('../../logic/useContractHeartbeat');
+        const heartbeatHook = vi.mocked(useContractHeartbeat);
+        const onStale = heartbeatHook.mock.calls[0][3];
+
+        act(() => { onStale(); });
+
+        expect(screen.getByRole('button', { name: 'Vertrag verbindlich abschließen' })).toBeDisabled();
+    });
+});

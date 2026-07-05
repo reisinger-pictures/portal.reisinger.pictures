@@ -20,13 +20,13 @@ use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
 class CheckoutServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, MailpitAssertions;
 
     private CheckoutService $service;
 
@@ -35,10 +35,8 @@ class CheckoutServiceTest extends TestCase
         parent::setUp();
         $this->service = new CheckoutService(new ScopeLicensingStrategy());
 
-        // Mailpit-Postfach vor jedem Test leeren
-        Http::delete('http://127.0.0.1:8026/api/v1/messages');
+        $this->clearMailpit();
 
-        // Bankdaten-Settings für InvoiceMail-PDF-Build
         \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
         \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
         \App\Models\Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
@@ -73,28 +71,6 @@ class CheckoutServiceTest extends TestCase
         ], $billing);
 
         return Request::create('/', 'POST', $payload);
-    }
-
-    private function assertMailpitReceivedMailFor(string $email, int $expectedCount = 1): void
-    {
-        $resp = Http::get('http://127.0.0.1:8026/api/v1/messages');
-        $messages = $resp->json('messages') ?? [];
-        $matched = array_filter($messages, function ($m) use ($email) {
-            foreach (($m['To'] ?? []) as $recipient) {
-                if (($recipient['Address'] ?? '') === $email) {
-                    return true;
-                }
-            }
-            return false;
-        });
-        $this->assertGreaterThanOrEqual($expectedCount, count($matched), "Keine Mail an {$email} in Mailpit gefunden.");
-    }
-
-    private function assertMailpitEmpty(): void
-    {
-        $resp = Http::get('http://127.0.0.1:8026/api/v1/messages');
-        $messages = $resp->json('messages') ?? [];
-        $this->assertSame(0, count($messages), 'Mailpit sollte keine Mail enthalten.');
     }
 
     // ------------------------------------------------------------------
@@ -188,7 +164,7 @@ class CheckoutServiceTest extends TestCase
         $this->assertNotNull($snapshot);
         $this->assertStringStartsWith('L-', $snapshot->invoice_number);
 
-        $this->assertMailpitReceivedMailFor($user->email);
+        $this->assertMailpitSentTo($user->email);
     }
 
     // ------------------------------------------------------------------
@@ -211,7 +187,7 @@ class CheckoutServiceTest extends TestCase
         $snapshot = InvoiceSnapshot::first();
         $this->assertStringStartsWith('P-', $snapshot->invoice_number);
 
-        $this->assertMailpitReceivedMailFor($user->email);
+        $this->assertMailpitSentTo($user->email);
     }
 
     // ------------------------------------------------------------------

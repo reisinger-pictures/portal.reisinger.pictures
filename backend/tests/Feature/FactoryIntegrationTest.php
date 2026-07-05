@@ -9,6 +9,9 @@ use App\Models\LicenseUseCase;
 use App\Models\Order;
 use App\Models\PayoutPool;
 use App\Models\PhotographerStatement;
+use App\Models\Contract;
+use App\Models\ContractAuditLog;
+use App\Models\ContractSigner;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\Tenant;
@@ -16,12 +19,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * BK-00 Smoke-Test: stellt sicher, dass jede neue Factory in einer frischen
- * Test-DB lauffähig ist und alle non-nullable Spalten beliefert.
- *
- * Nach Auswahl im Review ggf. durch spezifischere BK-01..10-Tests abzulösen.
+ * Ensures every factory is runnable in a fresh test database
+ * and populates all non-nullable columns.
  */
-class Bk00FactoriesSmokeTest extends TestCase
+class FactoryIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -83,5 +84,26 @@ class Bk00FactoriesSmokeTest extends TestCase
     {
         $statement = PhotographerStatement::factory()->create();
         $this->assertDatabaseHas('photographer_statements', ['id' => $statement->id]);
+    }
+
+    public function test_contract_factory_creates_row(): void
+    {
+        $contract = Contract::factory()->create();
+        $this->assertDatabaseHas('contracts', ['id' => $contract->id]);
+        $this->assertNotEmpty($contract->items);
+        $this->assertIsArray($contract->available_roles);
+    }
+
+    public function test_contract_signer_factory_creates_row(): void
+    {
+        $signer = ContractSigner::factory()->create();
+        $this->assertDatabaseHas('contract_signers', ['id' => $signer->id]);
+        $this->assertIsArray($signer->roles);
+    }
+
+    public function test_contract_audit_log_factory_creates_row(): void
+    {
+        $log = ContractAuditLog::factory()->create();
+        $this->assertDatabaseHas('contract_audit_logs', ['id' => $log->id]);
     }
 }

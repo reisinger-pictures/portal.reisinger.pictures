@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\Brand;
+use App\Models\Contract;
 use App\Models\Order;
 
 /**
@@ -87,6 +88,27 @@ class BrandRegistry
     public static function resolveFromOrder(Order $order): Brand
     {
         return $order->brand ?? Brand::B2B;
+    }
+
+    /**
+     * Reconstruct the brand from a persisted contract. Falls back to B2B when the contract has no
+     * brand (legacy rows), guaranteeing a deterministic, non-empty result for rendering.
+     */
+    public static function resolveFromContract(Contract $contract): Brand
+    {
+        return $contract->brand ?? Brand::B2B;
+    }
+
+    /**
+     * Resolve the frontend URL for the given brand (or current brand by default).
+     */
+    public static function frontendUrl(?Brand $brand = null): string
+    {
+        $brand ??= self::currentOrDefault();
+        if ($brand === Brand::SRP) {
+            return rtrim(config('app.frontend_url_srp', config('app.frontend_url', config('app.url'))), '/');
+        }
+        return rtrim(config('app.frontend_url', config('app.url')), '/');
     }
 
     /**

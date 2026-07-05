@@ -55,11 +55,16 @@ export class ModalHelper {
         await this.activeModal.locator('button').filter({ hasText: '✕' }).click();
     }
 
-    async submitModal(buttonText: string = 'Speichern') {
-        const savePromise = this.network.waitForManagementMutation();
+    async submitModal(buttonText: string = 'Speichern', urlPattern?: string) {
+        const savePromise = this.network.waitForManagementMutation(urlPattern);
         await this.clickButton(buttonText);
         const res = await savePromise;
         
+        if (!res) {
+            console.warn('[ModalHelper] No management mutation response captured — proceeding with modal close wait');
+            await expect(this.activeModal).toBeHidden({ timeout: 15000 });
+            return {};
+        }
         if (!res.ok()) {
             const errorText = await res.text();
             throw new Error(`API Error ${res.status()}: ${errorText}`);

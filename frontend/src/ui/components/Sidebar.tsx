@@ -76,6 +76,7 @@ export default function Sidebar(props: SidebarProps) {
                                         <li><Link to="/admin-customers" className={props.currentView === 'admin-customers' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-details text-lg"></span> Kunden (CRM)</Link></li>
                                         <li><Link to="/admin-products" className={props.currentView === 'admin-products' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--package-variant-closed text-lg"></span> Produkte & Leistungen</Link></li>
                                         <li><Link to="/admin-snippets" className={props.currentView === 'admin-snippets' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--text-box-multiple text-lg"></span> Textbausteine</Link></li>
+                                        <li><Link to="/admin-contracts" className={props.currentView === 'admin-contracts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-sign text-lg"></span> Verträge</Link></li>
                                     </>
                                 )}
                             </>

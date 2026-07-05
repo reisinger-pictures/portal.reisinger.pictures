@@ -18,7 +18,7 @@ export class GalleryHelper {
         await this.sidebar.openNewGalleryModal();
         const form = new FormHelper(this.page, this.modal);
         await form.fillGalleryModal({ name, type: 'Delivery (Downloads)', visibility });
-        const res = await this.modal.submitModal('Speichern');
+        const res = await this.modal.submitModal('Speichern', '/api/management/galleries');
         if (res?.gallery?.id && this.sessionHelper) {
             this.sessionHelper.trackGallery(res.gallery.id);
         }

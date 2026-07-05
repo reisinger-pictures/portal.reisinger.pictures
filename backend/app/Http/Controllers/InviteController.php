@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use App\Mail\GalleryInviteMail;
+use App\Support\BrandRegistry;
 
 class InviteController extends Controller
 {
@@ -35,7 +36,7 @@ class InviteController extends Controller
 
         return response()->json([
             'success' => true,
-            'link' => rtrim(config('app.frontend_url'), '/') . '/invite/' . $token
+            'link' => BrandRegistry::frontendUrl() . '/invite/' . $token
         ]);
     }
 
@@ -58,7 +59,7 @@ class InviteController extends Controller
                 'name' => $request->name
             ]);
 
-            $link = rtrim(config('app.frontend_url'), '/') . '/invite/' . $token;
+            $link = BrandRegistry::frontendUrl() . '/invite/' . $token;
             Mail::to($request->email)->send(new GalleryInviteMail($gallery->name, $link));
         });
 

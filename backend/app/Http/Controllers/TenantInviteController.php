@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\TenantInviteMail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use App\Support\BrandRegistry;
 
 class TenantInviteController extends Controller
 {
@@ -36,7 +37,7 @@ class TenantInviteController extends Controller
             'expires_at' => now()->addDays(7)
         ]);
 
-        $link = rtrim(config('app.frontend_url'), '/') . '/tenant-invite/' . $token;
+        $link = BrandRegistry::frontendUrl() . '/tenant-invite/' . $token;
         Mail::to($request->email)->queue(new TenantInviteMail($tenant->name, $link));
 
         return response()->json(['success' => true]);

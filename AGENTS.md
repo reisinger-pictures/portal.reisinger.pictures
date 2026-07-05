@@ -90,4 +90,11 @@ npx playwright test --last-failed
 #    - Datei + Testname
 #    - Fehlerursache (wenn bekannt)
 #    - "flaky" tag im Commit/PR
+
+# E2E Timeout Policy (STRICT):
+# - Vor jeder Session die aktuelle Minimallaufzeit messen: npx playwright test
+# - Timeout auf das Doppelte setzen (z.B. 7 min gemessen → 15 min Timeout)
+# - Diese Regel und die Laufzeit in AGENTS.todo.md dokumentieren
+# - Bei Änderungen an E2E-Tests neu messen und aktualisieren
+# Aktuelle Laufzeit (05.07.2026): ~7 min → Timeout: 15 min (900000ms)
 ```

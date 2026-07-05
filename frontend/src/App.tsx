@@ -15,6 +15,8 @@ const ProtectedDashboard = lazy(() => import('./ui/ProtectedDashboard'));
 const GalleryView = lazy(() => import('./ui/GalleryView'));
 const InviteView = lazy(() => import('./ui/InviteView'));
 const TenantInviteView = lazy(() => import('./ui/TenantInviteView'));
+import ContractJoinView from './ui/ContractJoinView';
+import ContractSignView from './ui/ContractSignView';
 const PhotoDetailView = lazy(() => import('./ui/PhotoDetailView'));
 const ManagementMetaGalleryView = lazy(() => import('./ui/management/ManagementMetaGalleryView'));
 const SearchView = lazy(() => import('./ui/SearchView'));
@@ -85,6 +87,8 @@ export default function App() {
                             <Route path="/photos/:id" element={<ErrorBoundary><PhotoDetailView/></ErrorBoundary>}/>
                             <Route path="/invite/:token" element={<ErrorBoundary><InviteView/></ErrorBoundary>}/>
                             <Route path="/tenant-invite/:token" element={<ErrorBoundary><TenantInviteView/></ErrorBoundary>}/>
+                            <Route path="/contracts/join/:token" element={<ErrorBoundary><ContractJoinView/></ErrorBoundary>}/>
+                            <Route path="/contracts/sign/:token" element={<ErrorBoundary><ContractSignView/></ErrorBoundary>}/>
 
                             <Route path="/search" element={<ErrorBoundary><SearchView/></ErrorBoundary>}/>
 
@@ -112,6 +116,7 @@ export default function App() {
                             <Route path="/admin-products" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-snippets" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-payouts" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-contracts" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-coupons" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/my-payouts" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="*" element={<Navigate to="/" replace/>}/>

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\CustomMail;
 use App\Mail\RatingFinishedMail;
+use App\Support\BrandRegistry;
 
 class MailController extends Controller
 {
@@ -40,7 +41,7 @@ class MailController extends Controller
         $count = 0;
 
         foreach ($validUsers as $user) {
-            $link = rtrim(config('app.frontend_url'), '/') . '/' . $gallery->full_path;
+            $link = BrandRegistry::frontendUrl() . '/' . $gallery->full_path;
             $subject = str_replace(['{user_name}', '{gallery_name}'], [$user->name, $gallery->name], $request->subject);
             $body = str_replace(['{user_name}', '{gallery_name}', '{link}'], [$user->name, $gallery->name, $link], $request->body);
 

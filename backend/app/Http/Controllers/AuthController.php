@@ -83,8 +83,7 @@ class AuthController extends Controller
                 ['token' => Hash::make($token), 'created_at' => now()]
             );
 
-            $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
-            $link = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+            $link = BrandRegistry::frontendUrl() . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
             
             \Illuminate\Support\Facades\Mail::to($user->email)->send(
                 new \App\Mail\ActivateAccountMail(
