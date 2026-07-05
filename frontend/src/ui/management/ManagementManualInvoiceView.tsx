@@ -43,6 +43,8 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
         moveItemDown,
         addDiscount,
         removeDiscount,
+        moveDiscountUp,
+        moveDiscountDown,
         handleAddPackageFromCalculator,
         handleMultiUpdate,
         loadExtractedData,
@@ -126,6 +128,8 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                         onDiscountChange={handleDiscountChange}
                         onAddDiscount={addDiscount}
                         onRemoveDiscount={removeDiscount}
+                        onMoveDiscountUp={moveDiscountUp}
+                        onMoveDiscountDown={moveDiscountDown}
                     />
 
                     <InvoiceTotalSummary total={total}/>

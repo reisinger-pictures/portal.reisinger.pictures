@@ -11,6 +11,24 @@ export function formatMoney(cents: number): string {
 /**
  * Gallery and Group related types
  */
+export function moveArrayItemUp<T>(arr: T[], index: number): T[] {
+    if (index <= 0 || index >= arr.length) return arr;
+    const next = [...arr];
+    const tmp = next[index - 1];
+    next[index - 1] = next[index];
+    next[index] = tmp;
+    return next;
+}
+
+export function moveArrayItemDown<T>(arr: T[], index: number): T[] {
+    if (index < 0 || index >= arr.length - 1) return arr;
+    const next = [...arr];
+    const tmp = next[index + 1];
+    next[index + 1] = next[index];
+    next[index] = tmp;
+    return next;
+}
+
 export interface GalleryGroup {
     id: string;
     name: string;

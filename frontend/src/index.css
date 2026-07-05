@@ -177,6 +177,9 @@
 @utility max-h-90vh {
     max-height: 90vh;
 }
+@utility join-badge {
+    @apply join-item bg-primary/15 border border-primary/30 px-2 text-sm flex items-center text-primary font-semibold;
+}
 
 @layer utilities {
     .input {

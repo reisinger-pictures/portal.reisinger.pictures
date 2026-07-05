@@ -1,6 +1,26 @@
 // Pure Shooting-Calculator-Logik (aus ShootingCalculatorModal.tsx extrahiert, verhaltensgleich).
 // Psychologische Rundung ist GEWÜNSCHTES Verhalten — siehe features/ecommerce/07-psychological-pricing.md.
 
+export const DEFAULT_BASE_PRICE = 50;
+export const DEFAULT_HOURLY_RATE = 80;
+export const DEFAULT_IMAGES_PER_HOUR = 6;
+export const DEFAULT_OUTDOOR_MULTIPLIER = '0.5';
+export const DEFAULT_FLATRATE_MULTIPLIER = '1.2';
+export const DEFAULT_SRP_BASE_PRICE = 149;
+export const DEFAULT_SRP_SETUP_FEE = 50;
+export const DEFAULT_SRP_PRIVACY_FEE = 200;
+export const DEFAULT_SRP_EXTRA_IMAGE_FEE = 15;
+
+export function safeParseInt(value: string | undefined | null, fallback: number): number {
+    const parsed = parseInt(value ?? '', 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+export function safeParseFloat(value: string | undefined | null, fallback: number): number {
+    const parsed = parseFloat(value ?? '');
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export type ShootingDiscount = '0' | '33' | '50';
 
 export interface ShootingPriceInput {
@@ -42,10 +62,9 @@ export function roundToPsychologicalValue(value: number): number {
 export function calculateShootingPrice(input: ShootingPriceInput): ShootingPriceResult { return calculateCustomStudioPrice(input); }
 
 export function calculateCustomStudioPrice(input: ShootingPriceInput): ShootingPriceResult {
-    const basePrice = input.isReorder ? 0 : parseFloat(input.calc_base_price || '50');
-    const hourlyRate = parseFloat(input.calc_hourly_rate || '80');
+    const basePrice = input.isReorder ? 0 : safeParseFloat(input.calc_base_price, DEFAULT_BASE_PRICE);
+    const hourlyRate = safeParseFloat(input.calc_hourly_rate, DEFAULT_HOURLY_RATE);
     
-    const DEFAULT_IMAGES_PER_HOUR = 6;
     const parsedImagesPerHour = parseInt(input.calc_images_per_hour || String(DEFAULT_IMAGES_PER_HOUR), 10);
     const imagesPerHourPackage =
         Number.isFinite(parsedImagesPerHour) && parsedImagesPerHour >= 1
@@ -55,16 +74,14 @@ export function calculateCustomStudioPrice(input: ShootingPriceInput): ShootingP
     const durationHours = input.duration / 60;
     const timePrice = durationHours * hourlyRate;
     
-    // Basis-Bildpreis ermitteln
     let imagesPrice = (hourlyRate / imagesPerHourPackage) * input.images;
     
-    // Faktor dynamisch aus den DB-Settings parsen (Default: 0.5)
     if (input.isOutdoor) {
-        const outdoorMultiplier = parseFloat(input.calc_outdoor_multiplier || '0.5');
+        const outdoorMultiplier = safeParseFloat(input.calc_outdoor_multiplier, parseFloat(DEFAULT_OUTDOOR_MULTIPLIER));
         imagesPrice = imagesPrice * outdoorMultiplier;
     }
 
-    const multiplier = input.flatrate ? parseFloat(input.calc_flatrate_multiplier || '1.2') : 1;
+    const multiplier = input.flatrate ? safeParseFloat(input.calc_flatrate_multiplier, parseFloat(DEFAULT_FLATRATE_MULTIPLIER)) : 1;
     const rawTotal = (basePrice + timePrice + imagesPrice) * multiplier;
     const packagePrice = roundToPsychologicalValue(rawTotal);
 
@@ -93,11 +110,10 @@ export interface B2CFlexInput {
 }
 
 export function calculateB2CFlexPrice(input: B2CFlexInput): ShootingPriceResult {
-    // NEU: Fallback-Werte greifen nur, wenn die DB leer sein sollte (Unterstützung für Cent/Dezimal-Beträge)
-    const basePrice = parseFloat(input.srp_base_price || '149');
-    const setupCost = parseFloat(input.srp_setup_fee || '50');
-    const extraImageCost = parseFloat(input.srp_extra_image_fee || '15');
-    const privacyBase = parseFloat(input.srp_privacy_fee || '200');
+    const basePrice = safeParseFloat(input.srp_base_price, DEFAULT_SRP_BASE_PRICE);
+    const setupCost = safeParseFloat(input.srp_setup_fee, DEFAULT_SRP_SETUP_FEE);
+    const extraImageCost = safeParseFloat(input.srp_extra_image_fee, DEFAULT_SRP_EXTRA_IMAGE_FEE);
+    const privacyBase = safeParseFloat(input.srp_privacy_fee, DEFAULT_SRP_PRIVACY_FEE);
 
     let setupFee = 0;
     if (input.setup === 'outdoor_flash' || input.setup === 'indoor') {

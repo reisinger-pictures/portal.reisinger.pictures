@@ -8,13 +8,17 @@ interface InvoiceDiscountsSectionProps {
     onDiscountChange: (index: number, field: string, value: string | number) => void;
     onAddDiscount: () => void;
     onRemoveDiscount: (index: number) => void;
+    onMoveDiscountUp?: (index: number) => void;
+    onMoveDiscountDown?: (index: number) => void;
 }
 
 export default function InvoiceDiscountsSection({
     discounts,
     onDiscountChange,
     onAddDiscount,
-    onRemoveDiscount
+    onRemoveDiscount,
+    onMoveDiscountUp,
+    onMoveDiscountDown
 }: InvoiceDiscountsSectionProps) {
     return (
         <div className="mt-6 border-t border-base-300 pt-6">
@@ -35,6 +39,24 @@ export default function InvoiceDiscountsSection({
                         key={idx}
                         className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300"
                     >
+                        <div className="flex flex-col gap-1 self-center shrink-0 mr-2">
+                            <button
+                                type="button"
+                                onClick={() => onMoveDiscountUp?.(idx)}
+                                disabled={idx === 0 || !onMoveDiscountUp}
+                                className="btn btn-xs btn-ghost btn-square"
+                            >
+                                <span className="iconify mdi--arrow-up text-lg opacity-50"></span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onMoveDiscountDown?.(idx)}
+                                disabled={idx === discounts.length - 1 || !onMoveDiscountDown}
+                                className="btn btn-xs btn-ghost btn-square"
+                            >
+                                <span className="iconify mdi--arrow-down text-lg opacity-50"></span>
+                            </button>
+                        </div>
                         <div className="form-control w-full md:w-1/4 shrink-0">
                             <label className="label py-1">
                                 <span className="label-text text-sm font-bold"><Trans>Art</Trans></span>
@@ -88,7 +110,7 @@ export default function InvoiceDiscountsSection({
                                     onChange={(e) => onDiscountChange(idx, 'price', parseFloat(e.target.value) || 0)}
                                     className="input input-sm input-bordered join-item w-full font-mono text-right bg-base-100"
                                 />
-                                <span className="btn btn-sm btn-disabled join-item">
+                                <span className="join-badge">
                                     {discount.type === 'discount_percent' ? '%' : '€'}
                                 </span>
                             </div>

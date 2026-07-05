@@ -2,7 +2,7 @@ import {useState, useCallback} from 'react';
 import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
 import {DocumentFormData, InvoiceDiscount, InvoiceItem} from '../api';
-import {formatDateToDE, formatLocaleDate} from './utils';
+import {formatDateToDE, formatLocaleDate, moveArrayItemUp, moveArrayItemDown} from './utils';
 
 /**
  * Check if an InvoiceItem is an empty placeholder row (type=item, description+notes blank,
@@ -120,25 +120,16 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
     const moveItemUp = useCallback((index: number) => {
         if (index === 0) return;
         markDirty();
-        setItems(prev => {
-            const newItems = [...prev];
-            const temp = newItems[index - 1];
-            newItems[index - 1] = newItems[index];
-            newItems[index] = temp;
-            return newItems;
-        });
+        setItems(prev => moveArrayItemUp(prev, index));
     }, [markDirty]);
 
     const moveItemDown = useCallback((index: number) => {
         setItems(prev => {
             if (index === prev.length - 1) return prev;
-            const newItems = [...prev];
-            const temp = newItems[index + 1];
-            newItems[index + 1] = newItems[index];
-            newItems[index] = temp;
-            return newItems;
+            const result = moveArrayItemDown(prev, index);
+            markDirty();
+            return result;
         });
-        markDirty();
     }, [markDirty]);
 
     const addDiscount = useCallback(() => {
@@ -149,6 +140,17 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
     const removeDiscount = useCallback((index: number) => {
         markDirty();
         setDiscounts(prev => prev.filter((_, i) => i !== index));
+    }, [markDirty]);
+
+    const moveDiscountUp = useCallback((index: number) => {
+        if (index === 0) return;
+        markDirty();
+        setDiscounts(prev => moveArrayItemUp(prev, index));
+    }, [markDirty]);
+
+    const moveDiscountDown = useCallback((index: number) => {
+        setDiscounts(prev => moveArrayItemDown(prev, index));
+        markDirty();
     }, [markDirty]);
 
     const handleAddPackageFromCalculator = useCallback((newItem: InvoiceItem, newDiscount: InvoiceDiscount | null) => {
@@ -270,6 +272,8 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
         moveItemDown,
         addDiscount,
         removeDiscount,
+        moveDiscountUp,
+        moveDiscountDown,
         handleAddPackageFromCalculator,
         handleMultiUpdate,
         loadExtractedData,

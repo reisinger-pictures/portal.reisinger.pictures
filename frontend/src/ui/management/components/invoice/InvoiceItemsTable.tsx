@@ -107,14 +107,17 @@ export default function InvoiceItemsTable({
                             <label className="label py-1">
                                 <span className="label-text text-sm font-bold"><Trans>Preis / Stück</Trans></span>
                             </label>
-                            <input
-                                required
-                                type="number"
-                                step="0.01"
-                                value={item.price}
-                                onChange={(e) => onItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                                className="input input-sm input-bordered w-full font-mono text-right"
-                            />
+                            <div className="join w-full">
+                                <input
+                                    required
+                                    type="number"
+                                    step="0.01"
+                                    value={item.price}
+                                    onChange={(e) => onItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                    className="input input-sm input-bordered join-item w-full font-mono text-right"
+                                />
+                                <span className="join-badge">€</span>
+                            </div>
                         </div>
 
                         <div className="form-control w-full md:w-28 shrink-0">

@@ -8,6 +8,7 @@ import WysiwygEditor from '../components/WysiwygEditor';
 import InvoiceItemsTable from './components/invoice/InvoiceItemsTable';
 import InvoiceDiscountsSection from './components/invoice/InvoiceDiscountsSection';
 import InvoiceTotalSummary from './components/invoice/InvoiceTotalSummary';
+import {moveArrayItemUp, moveArrayItemDown} from '../../logic/utils';
 import {
     useContracts,
     createContract,
@@ -195,25 +196,11 @@ export default function ManagementContractView() {
     };
 
     const moveItemUp = (index: number) => {
-        if (index === 0) return;
-        setItems(prev => {
-            const next = [...prev];
-            const tmp = next[index - 1];
-            next[index - 1] = next[index];
-            next[index] = tmp;
-            return next;
-        });
+        setItems(prev => moveArrayItemUp(prev, index));
     };
 
     const moveItemDown = (index: number) => {
-        setItems(prev => {
-            if (index === prev.length - 1) return prev;
-            const next = [...prev];
-            const tmp = next[index + 1];
-            next[index + 1] = next[index];
-            next[index] = tmp;
-            return next;
-        });
+        setItems(prev => moveArrayItemDown(prev, index));
     };
 
     const handleDiscountChange = (index: number, field: string, value: string | number) => {
@@ -230,6 +217,14 @@ export default function ManagementContractView() {
 
     const removeDiscount = (index: number) => {
         setDiscounts(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const moveDiscountUp = (index: number) => {
+        setDiscounts(prev => moveArrayItemUp(prev, index));
+    };
+
+    const moveDiscountDown = (index: number) => {
+        setDiscounts(prev => moveArrayItemDown(prev, index));
     };
 
     const handleBillingField = (field: keyof BillingDetails, value: string) => {
@@ -460,6 +455,8 @@ export default function ManagementContractView() {
                             onDiscountChange={handleDiscountChange}
                             onAddDiscount={addDiscount}
                             onRemoveDiscount={removeDiscount}
+                            onMoveDiscountUp={moveDiscountUp}
+                            onMoveDiscountDown={moveDiscountDown}
                         />
                         <InvoiceTotalSummary total={total}/>
                     </div>

@@ -252,7 +252,10 @@ export default function LicenseCatalogSettings() {
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Preis</span></label>
-                                <input type="number" step="0.01" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered w-full" required />
+                                <div className="join w-full">
+                                    <input type="number" step="0.01" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered join-item w-full" required />
+                                    <span className="join-badge">€</span>
+                                </div>
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">&zwnj;</span></label>
@@ -312,8 +315,11 @@ export default function LicenseCatalogSettings() {
                                 </label>
                             </div>
                             <div className="form-control w-full">
-                                <label className="label py-1"><span className="label-text text-sm font-bold">Aufschlag (%)</span></label>
-                                <input type="number" step="0.01" placeholder="z.B. 100" value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered w-full" required />
+                                <label className="label py-1"><span className="label-text text-sm font-bold">Aufschlag</span></label>
+                                <div className="join w-full">
+                                    <input type="number" step="0.01" placeholder="z.B. 100" value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered join-item w-full" required />
+                                    <span className="join-badge">%</span>
+                                </div>
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">&zwnj;</span></label>

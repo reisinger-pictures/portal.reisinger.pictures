@@ -92,6 +92,8 @@ const baseDraft = {
     moveItemDown: vi.fn(),
     addDiscount: vi.fn(),
     removeDiscount: vi.fn(),
+    moveDiscountUp: vi.fn(),
+    moveDiscountDown: vi.fn(),
     handleAddPackageFromCalculator: vi.fn(),
     handleMultiUpdate: vi.fn(),
     loadExtractedData: vi.fn(),

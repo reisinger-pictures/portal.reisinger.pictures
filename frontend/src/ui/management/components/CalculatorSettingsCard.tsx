@@ -1,10 +1,17 @@
 import { t } from "@lingui/core/macro";
-import {useEffect} from 'react';
+import {useEffect, useCallback} from 'react';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
+import {
+    DEFAULT_BASE_PRICE, DEFAULT_HOURLY_RATE, DEFAULT_IMAGES_PER_HOUR,
+    DEFAULT_OUTDOOR_MULTIPLIER, DEFAULT_FLATRATE_MULTIPLIER,
+    DEFAULT_SRP_BASE_PRICE, DEFAULT_SRP_SETUP_FEE,
+    DEFAULT_SRP_PRIVACY_FEE, DEFAULT_SRP_EXTRA_IMAGE_FEE,
+    safeParseFloat, safeParseInt
+} from '../../../logic/shootingCalculator';
 
 const calculatorSettingsSchema = z.object({
     calc_base_price: z.number().min(0, t`Muss positiv sein`),
@@ -20,6 +27,35 @@ const calculatorSettingsSchema = z.object({
 
 type CalculatorSettingsFormValues = z.infer<typeof calculatorSettingsSchema>;
 
+function mapApiToForm(terms: { [key: string]: string | undefined }): CalculatorSettingsFormValues {
+    const flatrateMultiplier = safeParseFloat(terms.calc_flatrate_multiplier, parseFloat(DEFAULT_FLATRATE_MULTIPLIER));
+    return {
+        calc_base_price: safeParseFloat(terms.calc_base_price, DEFAULT_BASE_PRICE),
+        calc_hourly_rate: safeParseFloat(terms.calc_hourly_rate, DEFAULT_HOURLY_RATE),
+        calc_images_per_hour: safeParseInt(terms.calc_images_per_hour, DEFAULT_IMAGES_PER_HOUR),
+        calc_outdoor_multiplier: safeParseFloat(terms.calc_outdoor_multiplier, parseFloat(DEFAULT_OUTDOOR_MULTIPLIER)) * 100,
+        calc_flatrate_surcharge: Math.round((flatrateMultiplier - 1) * 100),
+        srp_base_price: safeParseFloat(terms.srp_base_price, DEFAULT_SRP_BASE_PRICE),
+        srp_setup_fee: safeParseFloat(terms.srp_setup_fee, DEFAULT_SRP_SETUP_FEE),
+        srp_privacy_fee: safeParseFloat(terms.srp_privacy_fee, DEFAULT_SRP_PRIVACY_FEE),
+        srp_extra_image_fee: safeParseFloat(terms.srp_extra_image_fee, DEFAULT_SRP_EXTRA_IMAGE_FEE),
+    };
+}
+
+function mapFormToApi(data: CalculatorSettingsFormValues): Record<string, number | string> {
+    return {
+        calc_base_price: data.calc_base_price,
+        calc_hourly_rate: data.calc_hourly_rate,
+        calc_images_per_hour: data.calc_images_per_hour,
+        calc_outdoor_multiplier: data.calc_outdoor_multiplier / 100,
+        calc_flatrate_multiplier: 1 + (data.calc_flatrate_surcharge / 100),
+        srp_base_price: data.srp_base_price,
+        srp_setup_fee: data.srp_setup_fee,
+        srp_privacy_fee: data.srp_privacy_fee,
+        srp_extra_image_fee: data.srp_extra_image_fee,
+    };
+}
+
 export default function CalculatorSettingsCard() {
     const {terms, updateTerms} = useLicenseTerms();
     const {showToast} = useUI();
@@ -27,41 +63,24 @@ export default function CalculatorSettingsCard() {
     const {register, handleSubmit, reset, formState: {isSubmitting}} = useForm<CalculatorSettingsFormValues>({
         resolver: zodResolver(calculatorSettingsSchema),
         defaultValues: {
-            calc_base_price: 50, calc_hourly_rate: 80, calc_images_per_hour: 6,
+            calc_base_price: DEFAULT_BASE_PRICE, calc_hourly_rate: DEFAULT_HOURLY_RATE,
+            calc_images_per_hour: DEFAULT_IMAGES_PER_HOUR,
             calc_outdoor_multiplier: 50, calc_flatrate_surcharge: 20,
-            srp_base_price: 149, srp_setup_fee: 50, srp_privacy_fee: 200, srp_extra_image_fee: 15
+            srp_base_price: DEFAULT_SRP_BASE_PRICE, srp_setup_fee: DEFAULT_SRP_SETUP_FEE,
+            srp_privacy_fee: DEFAULT_SRP_PRIVACY_FEE, srp_extra_image_fee: DEFAULT_SRP_EXTRA_IMAGE_FEE
         }
     });
 
     useEffect(() => {
         if (terms) {
-            const flatrateMultiplier = parseFloat(terms.calc_flatrate_multiplier || '1.2');
-            reset({
-                calc_base_price: parseFloat(terms.calc_base_price || '50'),
-                calc_hourly_rate: parseFloat(terms.calc_hourly_rate || '80'),
-                calc_images_per_hour: parseInt(terms.calc_images_per_hour || '6', 10),
-                calc_outdoor_multiplier: parseFloat(terms.calc_outdoor_multiplier || '0.5') * 100,
-                calc_flatrate_surcharge: Math.round((flatrateMultiplier - 1) * 100),
-                srp_base_price: parseFloat(terms.srp_base_price || '149'),
-                srp_setup_fee: parseFloat(terms.srp_setup_fee || '50'),
-                srp_privacy_fee: parseFloat(terms.srp_privacy_fee || '200'),
-                srp_extra_image_fee: parseFloat(terms.srp_extra_image_fee || '15')
-            });
+            reset(mapApiToForm(terms));
         }
     }, [terms, reset]);
 
-    const onSubmit = async (data: CalculatorSettingsFormValues) => {
+    const onSubmit = useCallback(async (data: CalculatorSettingsFormValues) => {
         try {
             await updateTerms({
-                calc_base_price: data.calc_base_price,
-                calc_hourly_rate: data.calc_hourly_rate,
-                calc_images_per_hour: data.calc_images_per_hour,
-                calc_outdoor_multiplier: data.calc_outdoor_multiplier / 100,
-                calc_flatrate_multiplier: 1 + (data.calc_flatrate_surcharge / 100),
-                srp_base_price: data.srp_base_price,
-                srp_setup_fee: data.srp_setup_fee,
-                srp_privacy_fee: data.srp_privacy_fee,
-                srp_extra_image_fee: data.srp_extra_image_fee,
+                ...mapFormToApi(data),
                 mult_commercial: terms?.mult_commercial || '2.0',
                 mult_unlimited: terms?.mult_unlimited || '1.5',
                 mult_international: terms?.mult_international || '1.5'
@@ -70,7 +89,7 @@ export default function CalculatorSettingsCard() {
         } catch {
             showToast('error', 'Fehler beim Speichern.');
         }
-    };
+    }, [terms, updateTerms, showToast]);
 
     return (
         <div className="card bg-base-100 border border-base-300 shadow-sm">
@@ -89,7 +108,7 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Grundpreis</span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('calc_base_price', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                                <span className="join-badge">€</span>
                             </div>
                         </div>
                         <div className="form-control">
@@ -97,7 +116,7 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Stundensatz</span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('calc_hourly_rate', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                                <span className="join-badge">€</span>
                             </div>
                         </div>
                         <div className="form-control">
@@ -105,7 +124,7 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Bilder pro Stunde</span></label>
                             <div className="join w-full">
                                 <input type="number" step="1" min="1" className="input input-bordered join-item w-full" {...register('calc_images_per_hour', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">Stk</span>
+                                <span className="join-badge">Stk</span>
                             </div>
                         </div>
                         <div className="form-control">
@@ -113,7 +132,7 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Outdoor-Faktor</span></label>
                             <div className="join w-full">
                                 <input type="number" step="5" min="10" max="100" className="input input-bordered join-item w-full" {...register('calc_outdoor_multiplier', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">%</span>
+                                <span className="join-badge">%</span>
                             </div>
                         </div>
                         <div className="form-control">
@@ -121,7 +140,7 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Reportage-Aufschlag</span></label>
                             <div className="join w-full">
                                 <input type="number" step="1" min="0" max="900" className="input input-bordered join-item w-full" {...register('calc_flatrate_surcharge', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">%</span>
+                                <span className="join-badge">%</span>
                             </div>
                         </div>
                     </div>
@@ -133,14 +152,14 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Basispreis</span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_base_price', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                                <span className="join-badge">€</span>
                             </div>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Setup-Fee</span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_setup_fee', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                                <span className="join-badge">€</span>
                             </div>
                         </div>
                         <div className="form-control">
@@ -148,7 +167,7 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Extra-Bild</span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_extra_image_fee', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                                <span className="join-badge">€</span>
                             </div>
                         </div>
                         <div className="form-control">
@@ -156,7 +175,7 @@ export default function CalculatorSettingsCard() {
                                 className="label-text font-bold">Privacy-Fee</span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_privacy_fee', {valueAsNumber: true})} />
-                                <span className="btn btn-disabled join-item px-3 text-sm no-animation">€</span>
+                                <span className="join-badge">€</span>
                             </div>
                         </div>
                     </div>
