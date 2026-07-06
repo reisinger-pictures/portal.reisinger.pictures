@@ -21,7 +21,7 @@ test.describe('Editorial Only UI & Checkout Constraints', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Editorial flag is inherited and blocks commercial licenses in UI', { tags: ['@feature:client:editorial'] }, async ({page}) => {
+    test('Editorial flag is inherited and blocks commercial licenses in UI', { tag: ['@feature:client:editorial'] }, async ({page}) => {
         const auth = new AuthHelper(page);
         const modal = new ModalHelper(page);
         const form = new FormHelper(page, modal);

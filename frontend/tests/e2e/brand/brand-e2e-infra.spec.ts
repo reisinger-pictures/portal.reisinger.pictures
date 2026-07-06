@@ -13,7 +13,7 @@ const standardFontDataUrl = pathToFileURL(
 
 test.describe('Brand E2E — infra prerequisites (Gaps 4 & 5)', () => {
 
-    test('PDF generated via SRP referer contains SRP-branded content and no B2B leak', { tags: ['@feature:brand:infra'] }, async ({request}) => {
+    test('PDF generated via SRP referer contains SRP-branded content and no B2B leak', { tag: ['@feature:brand:infra'] }, async ({request}) => {
         // Gap 4 + 5 combined: API calls go to localhost:4321 (Playwright baseURL)
         // with Referer: http://buy.localhost:4321/. BrandContextMiddleware picks up
         // the SRP brand from the Referer header in local environment.

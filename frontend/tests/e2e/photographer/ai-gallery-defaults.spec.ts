@@ -23,7 +23,7 @@ test.describe('AI Gallery Defaults — Generate & Preview', () => {
         if (helper) await helper.teardown();
     });
 
-    test('AT-03-E4: opens defaults modal and shows metadata form', { tags: ['@feature:photographer:ai'] }, async ({ page }) => {
+    test('AT-03-E4: opens defaults modal and shows metadata form', { tag: ['@feature:photographer:ai'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 

@@ -1,6 +1,6 @@
 import {Photo} from '../../../logic/useGallery';
 import {t} from "@lingui/core/macro";
-import {Trans} from "@lingui/react/macro";
+import {Trans, Plural} from "@lingui/react/macro";
 import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
 import {formatMoney} from '../../../logic/utils';
@@ -36,7 +36,6 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
     };
 
     const bestPrice = formatMoney(2000);
-    const nextTierPlural = nextTierCount === 1 ? '' : 'er';
     return (
         <div className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
             <h4 className="font-bold text-xl flex items-center gap-2">
@@ -83,7 +82,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             {/* Next tier hint */}
             {isVolumePricing && nextTierCount > 0 && (
                 <div className="text-sm text-center text-primary font-semibold bg-primary/5 p-3 rounded-box border border-primary/20">
-                    {t`Noch ${nextTierCount} Bild${nextTierPlural} bis zum nächsten Rabatt:`}<br />
+                    <Trans><Plural value={nextTierCount} one="Noch # Bild" other="Noch # Bilder" /> bis zum nächsten Rabatt:</Trans><br />
                     <span className="font-bold">{nextTierLabel}</span>
                 </div>
             )}

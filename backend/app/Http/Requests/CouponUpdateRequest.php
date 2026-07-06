@@ -34,11 +34,11 @@ class CouponUpdateRequest extends FormRequest
             : 'in:global,gallery,meta_gallery,photographer,organisation';
 
         $rules = [
-            'code' => 'required|string|max:50',
-            'type' => 'required|string|in:fixed,percentage',
-            'value' => 'required|numeric|min:0|max:9999999.99',
+            'code' => 'sometimes|string|max:50',
+            'type' => 'sometimes|string|in:fixed,percentage',
+            'value' => 'sometimes|numeric|min:0|max:9999999.99',
             'max_items' => 'nullable|integer|min:1|max:999',
-            'scope_type' => 'required|string|' . $scopeTypes,
+            'scope_type' => 'sometimes|string|' . $scopeTypes,
             'scope_id' => 'nullable|string|required_if:scope_type,gallery,meta_gallery',
             'max_uses_global' => 'nullable|integer|min:1',
             'max_uses_per_account' => 'nullable|integer|min:1',
@@ -64,14 +64,16 @@ class CouponUpdateRequest extends FormRequest
                 $validator->errors()->add('value', 'Percentage value must not exceed 100.');
             }
 
-            $brandValue = BrandRegistry::currentOrDefault()->value;
-            $id = $req->route('id');
-            $query = Coupon::where('brand', $brandValue)->where('code', $data['code'] ?? '');
-            if ($id) {
-                $query->where('id', '!=', $id);
-            }
-            if ($query->exists()) {
-                $validator->errors()->add('code', 'A coupon with this code already exists for this brand.');
+            if (!empty($data['code'])) {
+                $brandValue = BrandRegistry::currentOrDefault()->value;
+                $id = $req->route('id');
+                $query = Coupon::where('brand', $brandValue)->where('code', $data['code']);
+                if ($id) {
+                    $query->where('id', '!=', $id);
+                }
+                if ($query->exists()) {
+                    $validator->errors()->add('code', 'A coupon with this code already exists for this brand.');
+                }
             }
 
             if (($data['scope_type'] ?? null) === 'organisation') {

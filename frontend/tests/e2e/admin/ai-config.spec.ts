@@ -1,6 +1,7 @@
 import {expect, test} from '@playwright/test';
 import {AuthHelper} from '../helpers/AuthHelper';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
+import {SidebarHelper} from '../helpers/SidebarHelper';
 
 test.describe('Admin AI Config', () => {
     let helper: E2ESessionHelper;
@@ -15,7 +16,7 @@ test.describe('Admin AI Config', () => {
         if (helper) await helper.teardown();
     });
 
-    test('AT-03-E5a: AI disabled — no banner, no AI button', { tags: ['@feature:admin:ai'] }, async ({ page }) => {
+    test('AT-03-E5a: AI disabled — no banner, no AI button', { tag: ['@feature:admin:ai'] }, async ({ page }) => {
         await page.route('**/api/ai/status', async route => {
             await route.fulfill({ json: { enabled: false, status: 'disabled', model: '' } });
         });
@@ -38,7 +39,7 @@ test.describe('Admin AI Config', () => {
         await expect(page.locator('.alert-warning').filter({ hasText: 'KI-Bildbeschreibung' })).toBeHidden({ timeout: 5000 });
     });
 
-    test('AT-03-E5b: AI unconfigured — warning banner visible', { tags: ['@feature:admin:ai'] }, async ({ page }) => {
+    test('AT-03-E5b: AI unconfigured — warning banner visible', { tag: ['@feature:admin:ai'] }, async ({ page }) => {
         await page.route('**/api/ai/status', async route => {
             await route.fulfill({ json: { enabled: false, status: 'unconfigured', model: '' } });
         });
@@ -61,7 +62,7 @@ test.describe('Admin AI Config', () => {
         await expect(page.locator('.alert-warning').filter({ hasText: 'KI-Bildbeschreibung nicht konfiguriert' })).toBeVisible({ timeout: 5000 });
     });
 
-    test('AT-03-E5c: AI available — no warning banner', { tags: ['@feature:admin:ai'] }, async ({ page }) => {
+    test('AT-03-E5c: AI available — no warning banner', { tag: ['@feature:admin:ai'] }, async ({ page }) => {
         await page.route('**/api/ai/status', async route => {
             await route.fulfill({ json: { enabled: true, status: 'available', model: 'gpt-4o' } });
         });
@@ -97,17 +98,18 @@ test.describe('AI Configuration Page & Generate Button', () => {
         if (helper) await helper.teardown();
     });
 
-    test('AI configuration page loads for super_admin', { tags: ['@feature:admin:ai'] }, async ({ page }) => {
+    test('AI configuration page loads for super_admin', { tag: ['@feature:admin:ai'] }, async ({ page }) => {
         const user = await helper.createIsolatedUser('super_admin');
         const auth = new AuthHelper(page);
         await auth.login(user.email, user.password);
 
-        await page.goto('/settings');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateTo('Einstellungen');
         await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
         await expect(page.getByRole('heading', { name: /Einstellungen/i })).toBeVisible({ timeout: 5000 });
     });
 
-    test('AI generate button is visible in photo management for photographer', { tags: ['@feature:admin:ai'] }, async ({ page }) => {
+    test('AI generate button is visible in photo management for photographer', { tag: ['@feature:admin:ai'] }, async ({ page }) => {
         const user = await helper.createIsolatedUser('photographer');
         const auth = new AuthHelper(page);
 

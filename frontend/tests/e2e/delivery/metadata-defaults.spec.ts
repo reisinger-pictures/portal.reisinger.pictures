@@ -35,7 +35,7 @@ test.describe('Smart Assistance & Metadata Defaults Workflow', () => {
         await auth.login(testUser.email, testUser.password);
     });
 
-    test('Gallery defaults behavior: Graz (auto-fill) and Linz (stay empty on ambiguity)', { tags: ['@feature:delivery:metadata'] }, async ({ page }) => {
+    test('Gallery defaults behavior: Graz (auto-fill) and Linz (stay empty on ambiguity)', { tag: ['@feature:delivery:metadata'] }, async ({ page }) => {
         // 1. Neue Delivery Galerie erstellen
         await sidebar.openNewGalleryModal();
         const form = new FormHelper(page, modal);

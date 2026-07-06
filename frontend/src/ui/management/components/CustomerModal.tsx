@@ -11,6 +11,7 @@ const customerSchema = z.object({
     name: z.string().min(1, t`Name oder Ansprechpartner ist erforderlich`),
     company: z.string().optional(),
     email: z.string().email(t`Ungültige E-Mail-Adresse`).or(z.literal('')),
+    birthdate: z.string().optional(),
     street: z.string().optional(),
     zip: z.string().optional(),
     city: z.string().optional(),
@@ -38,6 +39,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                 name: editingCustomer?.name || '',
                 company: editingCustomer?.company || '',
                 email: editingCustomer?.email || '',
+                birthdate: editingCustomer?.birthdate || '',
                 street: editingCustomer?.street || '',
                 zip: editingCustomer?.zip || '',
                 city: editingCustomer?.city || '',
@@ -82,6 +84,10 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                             <label className="label"><span className="label-text font-bold">E-Mail Adresse</span></label>
                             <input type="email" {...register('email')} className={`input input-bordered ${errors.email ? 'input-error' : ''}`} />
                             {errors.email && <span className="text-error text-xs mt-1">{errors.email.message}</span>}
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold">Geburtsdatum</span></label>
+                            <input type="date" {...register('birthdate')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>

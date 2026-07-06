@@ -21,7 +21,7 @@ test.describe('PhotoSwipe in Selection Gallery', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Photographer creates gallery and client interacts with PhotoSwipe', { tags: ['@feature:selection:ui'] }, async ({ page }) => {
+    test('Photographer creates gallery and client interacts with PhotoSwipe', { tag: ['@feature:selection:ui'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);

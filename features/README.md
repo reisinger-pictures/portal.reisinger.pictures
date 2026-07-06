@@ -30,6 +30,7 @@ This directory serves as the single source of truth for all technical concepts, 
 
 ### 🖼️ Gallery Management
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.
+* [02-ratings-feature.md](gallery/02-ratings-feature.md) - Photo ratings (stars + comments) in selection galleries.
 
 ### ⚙️ Infrastructure
 * [01-deployment.md](infrastructure/01-deployment.md) - Docker, Portainer, and Reverse Proxy.

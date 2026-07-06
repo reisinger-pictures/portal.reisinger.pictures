@@ -18,7 +18,7 @@ test.describe('Brand Tenant Isolation', () => {
             adminUser = await helper.createIsolatedUser('admin');
         });
 
-        test('Admin sees B2B Mandanten section in sidebar', { tags: ['@smoke', '@feature:brand'] }, async ({ page }) => {
+        test('Admin sees B2B Mandanten section in sidebar', { tag: ['@smoke', '@feature:brand'] }, async ({ page }) => {
             const auth = new AuthHelper(page);
             const sidebar = new SidebarHelper(page);
 
@@ -38,7 +38,7 @@ test.describe('Brand Tenant Isolation', () => {
             adminUser = await helper.createIsolatedUser('admin', { brand: 'srp' });
         });
 
-        test('Admin on SRP brand can still access B2B route /tenants', async ({ page }) => {
+        test('Admin on SRP brand can still access B2B route /tenants', { tag: ['@regression', '@feature:brand'] }, async ({ page }) => {
             const auth = new AuthHelper(page);
             await auth.login(adminUser.email, adminUser.password, 'http://buy.localhost:4321/');
 
@@ -46,7 +46,7 @@ test.describe('Brand Tenant Isolation', () => {
             await expect(page.getByRole('heading', { name: 'Organisationen', exact: true })).toBeVisible({ timeout: 10000 });
         });
 
-        test('Admin on SRP brand does not see B2B Mandanten in sidebar', async ({ page }) => {
+        test('Admin on SRP brand does not see B2B Mandanten in sidebar', { tag: ['@regression', '@feature:brand'] }, async ({ page }) => {
             const auth = new AuthHelper(page);
             await auth.login(adminUser.email, adminUser.password, 'http://buy.localhost:4321/');
 
@@ -54,7 +54,7 @@ test.describe('Brand Tenant Isolation', () => {
             await expect(sidebar.getByText('Organisationen (B2B)')).toHaveCount(0);
         });
 
-        test('Client on SRP brand is redirected away from /tenants', async ({ page }) => {
+        test('Client on SRP brand is redirected away from /tenants', { tag: ['@regression', '@feature:brand'] }, async ({ page }) => {
             const clientUser = await helper.createIsolatedUser('client', { brand: 'srp' });
             const auth = new AuthHelper(page);
             await auth.login(clientUser.email, clientUser.password, 'http://buy.localhost:4321/');
@@ -64,7 +64,7 @@ test.describe('Brand Tenant Isolation', () => {
             await expect(page.getByRole('heading', { name: /^Willkommen zurück/ })).toBeVisible({ timeout: 15000 });
         });
 
-        test('Client on SRP brand does not see B2B Mandanten in sidebar', async ({ page }) => {
+        test('Client on SRP brand does not see B2B Mandanten in sidebar', { tag: ['@regression', '@feature:brand'] }, async ({ page }) => {
             const clientUser = await helper.createIsolatedUser('client', { brand: 'srp' });
             const auth = new AuthHelper(page);
             await auth.login(clientUser.email, clientUser.password, 'http://buy.localhost:4321/');
@@ -81,7 +81,7 @@ test.describe('Brand Tenant Isolation', () => {
             if (helper) await helper.teardown();
         });
 
-        test('SRP user cannot see RP data in sidebar', async ({ page, request }) => {
+        test('SRP user cannot see RP data in sidebar', { tag: ['@regression', '@feature:brand'] }, async ({ page, request }) => {
             helper = new E2ESessionHelper(request);
             const user = await helper.createIsolatedUser('photographer', { brand: 'srp' });
             const auth = new AuthHelper(page);
@@ -93,7 +93,7 @@ test.describe('Brand Tenant Isolation', () => {
             await expect(sidebar.getByText('Benutzer & Rechte')).toHaveCount(0);
         });
 
-        test('RP user cannot see SRP data in sidebar', async ({ page, request }) => {
+        test('RP user cannot see SRP data in sidebar', { tag: ['@regression', '@feature:brand'] }, async ({ page, request }) => {
             helper = new E2ESessionHelper(request);
             const user = await helper.createIsolatedUser('photographer');
             const auth = new AuthHelper(page);
@@ -103,7 +103,7 @@ test.describe('Brand Tenant Isolation', () => {
             await expect(sidebar.getByText('Dashboard')).toBeVisible({ timeout: 10000 });
         });
 
-        test('SRP client can access gallery page', async ({ page, request }) => {
+        test('SRP client can access gallery page', { tag: ['@regression', '@feature:brand'] }, async ({ page, request }) => {
             helper = new E2ESessionHelper(request);
             const user = await helper.createIsolatedUser('power_user', { brand: 'srp' });
             const auth = new AuthHelper(page);

@@ -3,10 +3,10 @@ import {test, expect} from '@playwright/test';
 // E2E-01 §1 (Leer-/Grenzzustände, echt): Suche ohne Treffer zeigt dedizierte Empty-State-UI
 // statt einer stillen leeren Liste. Grounded in `src/ui/SearchView.tsx`.
 test.describe('Global Search — Empty-Result State', () => {
-    test('Search with no matches shows dedicated empty-state messages', { tags: ['@feature:guest'] }, async ({page}) => {
+    test('Search with no matches shows dedicated empty-state messages', { tag: ['@feature:guest'] }, async ({page}) => {
         await page.goto('/');
 
-        const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
+        const searchInput = page.getByRole('main').locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();
 
         // Garantiert nicht existierender Begriff — keine Kollision mit realen Galerie-/Bildnamen.
@@ -17,14 +17,14 @@ test.describe('Global Search — Empty-Result State', () => {
         await expect(page).toHaveURL(new RegExp(`/search\\?q=${noMatchTerm}`));
 
         // Heading zeigt den gesuchten Begriff an.
-        await expect(page.getByRole('heading', {name: new RegExp(noMatchTerm)})).toBeVisible({timeout: 15000});
+        await expect(page.getByRole('main').getByRole('heading', {name: new RegExp(noMatchTerm)})).toBeVisible({timeout: 15000});
 
         // Sektion-Überschriften melden explizit null Treffer.
-        await expect(page.getByRole('heading', {name: /^Galerien \(0\)$/})).toBeVisible();
-        await expect(page.getByRole('heading', {name: /^Fotos \(0\)$/})).toBeVisible();
+        await expect(page.getByRole('main').getByRole('heading', {name: /^Galerien \(0\)$/})).toBeVisible();
+        await expect(page.getByRole('main').getByRole('heading', {name: /^Fotos \(0\)$/})).toBeVisible();
 
         // Echte Empty-State-UI (nicht nur eine leere Liste).
-        await expect(page.getByText('Keine passenden Galerien gefunden.')).toBeVisible();
-        await expect(page.getByText('Keine passenden Fotos gefunden.')).toBeVisible();
+        await expect(page.getByRole('main').getByText('Keine passenden Galerien gefunden.')).toBeVisible();
+        await expect(page.getByRole('main').getByText('Keine passenden Fotos gefunden.')).toBeVisible();
     });
 });

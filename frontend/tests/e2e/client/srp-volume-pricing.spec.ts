@@ -164,7 +164,7 @@ test.describe('SRP Volume Pricing', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Frontend: VolumeLicensingCard auf SRP-Brand', { tags: ['@feature:client:volume'] }, async ({ page }) => {
+    test('Frontend: VolumeLicensingCard auf SRP-Brand', { tag: ['@feature:client:volume'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -197,7 +197,7 @@ test.describe('SRP Volume Pricing', () => {
         await expect(page.getByText(/Mengenrabatt/i)).toBeVisible({ timeout: 5000 });
     });
 
-    test('Pricing-Verifikation: Staffel 1/2/3 mit retroaktivem Volumenpreis', { tags: ['@feature:client:volume'] }, async ({ page }) => {
+    test('Pricing-Verifikation: Staffel 1/2/3 mit retroaktivem Volumenpreis', { tag: ['@feature:client:volume'] }, async ({ page }) => {
         test.setTimeout(120000);
         const auth = new AuthHelper(page);
 
@@ -233,7 +233,7 @@ test.describe('SRP Volume Pricing', () => {
         await expect(page.getByText('250.00\u{00A0}€')).toBeVisible();
     });
 
-    test('Pricing-Verifikation: Tier-3-Rendering via UI-Flow (20+ Bilder)', { tags: ['@feature:client:volume'] }, async ({ page }) => {
+    test('Pricing-Verifikation: Tier-3-Rendering via UI-Flow (20+ Bilder)', { tag: ['@feature:client:volume'] }, async ({ page }) => {
         test.setTimeout(120000);
         const auth = new AuthHelper(page);
 
@@ -263,7 +263,7 @@ test.describe('SRP Volume Pricing', () => {
         await expect(page.getByText('440.00\u{00A0}€')).toBeVisible();
     });
 
-    test('API: Login mit SRP-Brand bestätigt brand=srp', { tags: ['@feature:client:volume'] }, async ({ request }) => {
+    test('API: Login mit SRP-Brand bestätigt brand=srp', { tag: ['@feature:client:volume'] }, async ({ request }) => {
         const loginRes = await request.post('/api/auth/login', {
             data: { email: srpBuyer.email, password: srpBuyer.password },
             headers: { 'Accept': 'application/json', 'Referer': 'http://buy.localhost:4321/' },
@@ -281,7 +281,7 @@ test.describe('SRP Volume Pricing', () => {
         expect(meData.roles).toContain('power_user');
     });
 
-    test('API: RP-Checkout unverändert (rp-Smoke Regression)', { tags: ['@feature:client:volume'] }, async ({ request }) => {
+    test('API: RP-Checkout unverändert (rp-Smoke Regression)', { tag: ['@feature:client:volume'] }, async ({ request }) => {
         const rpBuyer = await helper.createIsolatedUser('power_user');
 
         const loginRes = await request.post('/api/auth/login', {
@@ -300,7 +300,7 @@ test.describe('SRP Volume Pricing', () => {
         expect(meData.brand).toBe('rp');
     });
 
-    test('Stripe-Integration: SRP-Volumenbetrag in Stripe-Session (12 Fotos × Tier 2)', { tags: ['@feature:client:volume'] }, async ({ page, request }) => {
+    test('Stripe-Integration: SRP-Volumenbetrag in Stripe-Session (12 Fotos × Tier 2)', { tag: ['@feature:client:volume'] }, async ({ page, request }) => {
         test.setTimeout(120000);
         const auth = new AuthHelper(page);
 

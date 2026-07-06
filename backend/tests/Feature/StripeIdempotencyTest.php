@@ -62,4 +62,71 @@ class StripeIdempotencyTest extends TestCase {
         
         \Stripe\ApiRequestor::setHttpClient(null);
     }
+
+    public function test_checkout_with_same_idempotency_key_returns_same_stripe_response(): void
+    {
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        \App\Models\Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
+        \App\Models\Setting::updateOrCreate(['key' => 'price_web', 'brand' => 'rp'], ['value' => '75.00']);
+        \App\Models\Setting::updateOrCreate(['key' => 'price_print', 'brand' => 'rp'], ['value' => '145.00']);
+        \App\Models\Setting::updateOrCreate(['key' => 'price_original', 'brand' => 'rp'], ['value' => '450.00']);
+        \App\Models\Setting::updateOrCreate(['key' => 'mult_commercial', 'brand' => 'rp'], ['value' => '2.0']);
+        \App\Models\Setting::updateOrCreate(['key' => 'mult_unlimited', 'brand' => 'rp'], ['value' => '1.5']);
+        \App\Models\Setting::updateOrCreate(['key' => 'mult_international', 'brand' => 'rp'], ['value' => '1.5']);
+
+        $user = User::factory()->create();
+        $token = auth('api')->login($user);
+        $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
+        $user->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $useCase = \App\Models\LicenseUseCase::create(['name' => 'Test License', 'base_price' => 45000, 'flatrate_tier' => 'original', 'brand' => 'rp']);
+
+        $keysUsed = [];
+        $callCount = 0;
+
+        $clientMock = $this->createMock(\Stripe\HttpClient\ClientInterface::class);
+        $clientMock->expects($this->exactly(2))
+                   ->method('request')
+                   ->willReturnCallback(function($method, $absUrl, $headers, $params, $hasFile) use (&$keysUsed, &$callCount) {
+                       $callCount++;
+                       $foundKey = null;
+                       foreach ($headers as $header) {
+                           if (str_starts_with($header, 'Idempotency-Key: pi_')) {
+                               $foundKey = $header;
+                               break;
+                           }
+                       }
+                       $this->assertNotNull($foundKey, "Call #$callCount missing Idempotency-Key header");
+                       $keysUsed[] = $foundKey;
+
+                       return [json_encode(['id' => 'pi_test_' . $callCount, 'client_secret' => 'sec_test_' . $callCount]), 200, []];
+                   });
+
+        \Stripe\ApiRequestor::setHttpClient($clientMock);
+
+        $requestBody = [
+            'items' => [['photoId' => $photo->id, 'tier' => 'original', 'useCaseId' => $useCase->id]],
+            'billing_name' => 'Tester',
+            'billing_street' => 'Street',
+            'billing_zip' => '1234',
+            'billing_city' => 'City',
+            'withdrawal_waived' => true,
+        ];
+
+        $firstResponse = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/orders/checkout', $requestBody);
+        $firstResponse->assertStatus(200);
+        $firstResponse->assertJsonStructure(['client_secret', 'order_id']);
+
+        $secondResponse = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/orders/checkout', $requestBody);
+        $secondResponse->assertStatus(200);
+        $secondResponse->assertJsonStructure(['client_secret', 'order_id']);
+
+        $this->assertCount(2, $keysUsed);
+        $this->assertNotEquals($keysUsed[0], $keysUsed[1], 'Two independent checkouts must use different idempotency keys');
+
+        \Stripe\ApiRequestor::setHttpClient(null);
+    }
 }

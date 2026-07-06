@@ -26,7 +26,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Flow P, Q, AG, AJ: Flatrate Bypass, Upselling Cart, Checkout', { tags: ['@feature:client:checkout'] }, async ({ page }) => {
+    test('Flow P, Q, AG, AJ: Flatrate Bypass, Upselling Cart, Checkout', { tag: ['@smoke', '@feature:client:checkout'] }, async ({ page }) => {
         test.setTimeout(60000); // Erhöhtes Timeout, da dieser Test extrem viele Logins/Logouts durchführt
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
@@ -140,7 +140,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         await expect(page.locator('.bg-warning\\/10').filter({ hasText: 'Zahlung ausständig (Kauf auf Rechnung)' })).toBeVisible();
     });
 
-    test('Flow AP: Custom Quotes UI triggers UI notification', { tags: ['@feature:client:checkout'] }, async ({ page }) => {
+    test('Flow AP: Custom Quotes UI triggers UI notification', { tag: ['@feature:client:checkout'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
@@ -153,12 +153,25 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         await form.fillGalleryModal({ name: galleryName, type: 'Delivery (Downloads)' });
         const resData = await modal.submitModal('Speichern');
         if (resData?.gallery?.id) helper.trackGallery(resData.gallery.id);
-        
-        // Galerie erscheint in der Sidebar-Navigation
-        await expect(page.getByRole('link', { name: galleryName })).toBeVisible({ timeout: 10000 });
-        
-        // Galerie ist klickbar und Navigation funktioniert
-        await page.getByRole('link', { name: galleryName }).click();
+
+        // Seite neu laden, damit die Galerie im Hauptbereich erscheint
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
+        // Galerie erscheint im Hauptbereich und ist klickbar
+        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
+        const galAny = page.locator('main').getByText(galleryName).first();
+        await expect(async () => {
+            if (await galLink.isVisible().catch(() => false)) {
+                await galLink.scrollIntoViewIfNeeded();
+                await galLink.evaluate(el => (el as HTMLElement).click());
+            } else {
+                await expect(galAny).toBeVisible({ timeout: 2000 });
+                await galAny.scrollIntoViewIfNeeded();
+                await galAny.evaluate(el => (el as HTMLElement).click());
+            }
+        }).toPass({ timeout: 15000 });
+
         await expect(page.locator('h1:has-text("' + galleryName + '")')).toBeVisible({ timeout: 10000 });
     });
 

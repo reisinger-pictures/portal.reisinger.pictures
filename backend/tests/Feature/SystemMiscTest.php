@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Gallery;
 use App\Models\Photo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 
 class SystemMiscTest extends TestCase
@@ -22,14 +23,14 @@ class SystemMiscTest extends TestCase
         Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, 'dummy content');
         
         // Simuliere Nginx Proxy Konfiguration
-        putenv('PROXY_DELIVERY_HEADER=X-Accel-Redirect');
+        Config::set('services.proxy_delivery_header', 'X-Accel-Redirect');
         
         $response = $this->get('/api/media/' . $gallery->slug . '/' . $photo->id . '.jpg');
         $response->assertStatus(200);
         $response->assertHeader('X-Accel-Redirect');
         $this->assertEquals('', $response->getContent()); // Body muss bei Proxy-Offloading leer sein
         
-        putenv('PROXY_DELIVERY_HEADER='); // Cleanup
+        Config::set('services.proxy_delivery_header', null); // Cleanup
     }
 
     public function test_x_sendfile_header_is_present_for_apache()
@@ -41,12 +42,12 @@ class SystemMiscTest extends TestCase
         Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, 'dummy content');
         
         // Simuliere Apache mod_xsendfile Konfiguration
-        putenv('PROXY_DELIVERY_HEADER=X-Sendfile');
+        Config::set('services.proxy_delivery_header', 'X-Sendfile');
         
         $response = $this->get('/api/media/' . $gallery->slug . '/' . $photo->id . '.jpg');
         $response->assertStatus(200);
         $response->assertHeader('X-Sendfile');
         
-        putenv('PROXY_DELIVERY_HEADER='); // Cleanup
+        Config::set('services.proxy_delivery_header', null); // Cleanup
     }
 }

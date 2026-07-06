@@ -29,7 +29,7 @@ function toInvoiceDiscount(i: Contract['discounts'][number]): InvoiceDiscount {
 }
 
 const emptyBilling: BillingDetails = {
-    name: '', company: '', street: '', zip: '', city: '', country: '', email: '', uid: '',
+    name: '', company: '', street: '', zip: '', city: '', country: '', email: '', uid: '', birthdate: '',
 };
 
 export default function ManagementContractView() {
@@ -422,6 +422,12 @@ export default function ManagementContractView() {
                                     <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>UID</Trans></span></label>
                                     <input type="text" value={billingDetails.uid || ''}
                                            onChange={e => handleBillingField('uid', e.target.value)}
+                                           className="input input-sm input-bordered"/>
+                                </div>
+                                <div className="form-control">
+                                    <label className="label py-1"><span className="label-text text-sm font-bold">Geburtsdatum</span></label>
+                                    <input type="date" value={billingDetails.birthdate || ''}
+                                           onChange={e => handleBillingField('birthdate', e.target.value)}
                                            className="input input-sm input-bordered"/>
                                 </div>
                             </div>

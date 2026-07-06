@@ -28,7 +28,7 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('client on SRP brand is redirected away from the B2B-only /tenants area', { tags: ['@feature:brand:scoping'] }, async ({ page }) => {
+    test('client on SRP brand is redirected away from the B2B-only /tenants area', { tag: ['@feature:brand:scoping'] }, async ({ page }) => {
         // Frontend brand gating mirrors the backend scoping contract: a non-admin client must be
         // kept out of B2B-only areas. We assert the redirect outcome, not a CSS class.
         const clientUser = await helper.createIsolatedUser('client', { brand: 'srp' });
@@ -41,7 +41,7 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
         await expect(page.getByRole('heading', { name: /^Willkommen zurück/ })).toBeVisible({ timeout: 15000 });
     });
 
-    test('client on SRP brand does not see the B2B Mandanten entry in the sidebar', { tags: ['@feature:brand:scoping'] }, async ({ page }) => {
+    test('client on SRP brand does not see the B2B Mandanten entry in the sidebar', { tag: ['@feature:brand:scoping'] }, async ({ page }) => {
         // The sidebar only lists galleries/areas the user is allowed to reach. A client scoped to
         // SRP must not be offered the B2B tenants entry. Asserting link absence (count 0) inside
         // the aside landmark is stable against layout shifts.
@@ -53,7 +53,7 @@ test.describe('Gallery brand scoping (getAllowedGalleryIds)', () => {
         await expect(sidebar.getByText('Organisationen (B2B)')).toHaveCount(0);
     });
 
-    test('cross-brand admin (super_admin) sees the management area regardless of SRP subdomain', { tags: ['@feature:brand:scoping'] }, async ({ page }) => {
+    test('cross-brand admin (super_admin) sees the management area regardless of SRP subdomain', { tag: ['@feature:brand:scoping'] }, async ({ page }) => {
         // A super_admin has brand = null (cross-brand) and must reach management from either host.
         const adminUser = await helper.createIsolatedUser('super_admin');
         const auth = new AuthHelper(page);

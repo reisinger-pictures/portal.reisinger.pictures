@@ -78,7 +78,7 @@ test.describe('E2: Org-Admin editiert Org Settings', () => {
         return { email, password, tenantName, tenantId, userId };
     }
 
-    test('Org-Admin editiert Org Name und speichert', { tags: ['@feature:admin:tenant'] }, async ({ page, request }) => {
+    test('Org-Admin editiert Org Name und speichert', { tag: ['@feature:admin:tenant'] }, async ({ page, request }) => {
         const { email, password, tenantName } = await createOrgAdmin(request, adminToken);
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

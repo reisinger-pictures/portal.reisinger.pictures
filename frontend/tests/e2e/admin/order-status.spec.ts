@@ -24,7 +24,7 @@ test.describe('Order Status Management (G7)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Admin can change order status', { tags: ['@feature:admin:orders'] }, async ({ page }) => {
+    test('Admin can change order status', { tag: ['@feature:admin:orders'] }, async ({ page }) => {
         test.setTimeout(120000);
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

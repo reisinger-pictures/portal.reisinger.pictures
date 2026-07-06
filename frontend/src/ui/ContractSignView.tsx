@@ -197,6 +197,13 @@ export default function ContractSignView() {
                                 {data.contract.billing_details.zip && <><span className="font-bold"><Trans>PLZ:</Trans></span><span>{data.contract.billing_details.zip}</span></>}
                                 {data.contract.billing_details.city && <><span className="font-bold"><Trans>Ort:</Trans></span><span>{data.contract.billing_details.city}</span></>}
                                 {data.contract.billing_details.email && <><span className="font-bold"><Trans>E-Mail:</Trans></span><span>{data.contract.billing_details.email}</span></>}
+                                {(() => {
+                                    const bd = data.contract.billing_details.birthdate;
+                                    if (!bd) return null;
+                                    const birthDate = new Date(bd);
+                                    const age = new Date().getFullYear() - birthDate.getFullYear();
+                                    return <><span className="font-bold">Alter:</span><span>{age} Jahre (geb. {birthDate.toLocaleDateString('de-DE')})</span></>;
+                                })()}
                             </div>
                         </div>
                     </div>

@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\DB;
 
 class FtpController extends Controller
 {
+    public function __construct(
+        private readonly PhotoProcessingService $photoService,
+    ) {}
+
     public function status()
     {
         $user = auth('api')->user();
@@ -76,7 +80,6 @@ class FtpController extends Controller
         if (empty($imageFiles)) return response()->json(['success' => true, 'processed' => 0]);
 
         $processedCount = 0;
-        $photoService = app(PhotoProcessingService::class);
 
         foreach ($imageFiles as $file) {
             $originalName = pathinfo($file, PATHINFO_FILENAME);
@@ -101,7 +104,7 @@ class FtpController extends Controller
                 mkdir(dirname($thumbPath), 0755, true);
             }
 
-            $meta = $photoService->processImage($targetPath, $thumbPath, $gallery);
+            $meta = $this->photoService->processImage($targetPath, $thumbPath, $gallery);
             if (empty($meta['title'])) {
                 $meta['title'] = $originalName; // Dateiname als Titel retten
             }

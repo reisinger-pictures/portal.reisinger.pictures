@@ -31,6 +31,18 @@ export class E2ESessionHelper {
         return this.adminToken || '';
     }
 
+    async loginAs(email: string, password: string, options?: { brand?: 'rp' | 'srp' }): Promise<string> {
+        const referer = options?.brand === 'srp' ? 'http://buy.localhost:4321/' : 'http://localhost:4321/';
+        const loginRes = await this.request.post('/api/auth/login', {
+            data: { email, password },
+            headers: { 'Accept': 'application/json', 'Referer': referer },
+        });
+        if (!loginRes.ok()) throw new Error(`Login failed for ${email}: ${await loginRes.text()}`);
+        const cookies = loginRes.headers()['set-cookie'];
+        const match = cookies?.match(/rp_jwt=([^;]+)/);
+        return match ? `rp_jwt=${match[1]}` : (cookies || '');
+    }
+
     async createIsolatedUser(roleName: 'admin' | 'photographer' | 'client' | 'power_user' | 'customer_manager' | 'super_admin', options?: { assignGalleryId?: string, wantsNotifications?: boolean, brand?: 'rp' | 'srp' }) {
         await this.ensureAdminLogin();
         const uniqueId = Math.random().toString(36).substring(2, 10);
@@ -98,6 +110,22 @@ export class E2ESessionHelper {
     trackProduct(id: string) { if (id) this.createdProductIds.push(id); }
     trackContract(id: string) { if (id) this.createdContractIds.push(id); }
     trackCoupon(id: string) { if (id) this.createdCouponIds.push(id); }
+
+    async createCoupon(data: {
+        code: string;
+        type: string;
+        value: number;
+        scope_type: string;
+        scope_id?: string;
+        active: boolean;
+        used_count?: number;
+    }) {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const res = await this.request.post('/api/management/coupons', { data, headers });
+        if (!res.ok()) throw new Error(`Coupon creation failed: ${await res.text()}`);
+        return res.json();
+    }
 
     async seedBillingSettings() {
         await this.ensureAdminLogin();

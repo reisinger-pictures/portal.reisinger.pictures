@@ -56,6 +56,21 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 - Only **one** coupon can be active at a time (user enters a single code).
 - The volume tier discount (built-in) and a coupon stack: coupon is applied **after** the volume price is calculated.
 - Coupons are brand-isolated (SRP vs B2B). A coupon created for SRP cannot be used in a B2B cart.
+- **Coupon REDEMPTION is SRP-exclusive (Klärung 2026-07-06):** Coupons are designed for the SRP
+  volume-pricing model and are applied exclusively by `VolumeLicensingStrategy`. The
+  `ScopeLicensingStrategy` (RP/B2B) does NOT apply coupons. Consequently `CheckoutService` MUST
+  skip coupon resolution (`resolveCoupon`) and usage increment (`incrementUsage`) entirely when
+  the active strategy is `ScopeLicensingStrategy`. Reason: a coupon carries no discount in the
+  scope-licensing price path, so validating + consuming it would silently burn usage limits
+  without granting any discount.
+  - **IST-Divergence (Bug B-02, AGENTS.todo.md 2026-07-06):** Today `CheckoutService::resolveCoupon()`
+    runs for both strategies — it validates the coupon, and `createOrder()` increments
+    `used_count`/`coupon_user_usage` and stores `coupon_id`/`coupon_discount_cents` on the order,
+    while `ScopeLicensingStrategy` always returns `discountCents: 0`. Net effect for RP: coupon
+    usage is consumed, no discount applied, order records a mismatched `coupon_discount_cents`.
+    SOLL: gate `resolveCoupon`/`incrementUsage` on `VolumeLicensingStrategy`.
+  - Coupon **management** (CRUD) remains available for both brands via API/CLI (see §9); only the
+    UI is SRP-only. The SRP-exclusivity above concerns the *redemption at checkout*, not management.
 - `max_uses_global` limits total redemptions across all users (NULL = unlimited).
 - `max_uses_per_account` limits redemptions **per user account** (NULL = unlimited). Tracked via `coupon_user_usage` table.
 - `expires_at` defines an expiry datetime.
@@ -67,7 +82,7 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 ### 4. Validation Flow (Frontend → Backend)
 
 1. User enters coupon code in checkout.
-2. Frontend calls `POST /api/coupons/validate` with `{code, galleryId?, metaGalleryId?, scopeGalleryId?}`.
+2. Frontend calls `POST /api/coupons/validate` with `{code, gallery_id?, meta_gallery_id?}`.
 3. Backend validation checks (in order):
    - Brand match
    - Active flag
@@ -187,21 +202,23 @@ Unique: `(coupon_id, user_id)`
 - `scope_id` muss eine gültige Tenant-UUID der aktuellen Brand sein
 - Validierung: `Tenant::byBrand(...)->where('id', scope_id)->exists()`
 
-### 9. Super Admin Brand-Context
+### 9. Coupon Management UI — SRP-only
 
-Auch der Super Admin muss sich **auf der korrekten URL** anmelden, um die Daten des Mandanten zu sehen:
+Die Coupon-Verwaltung via UI wird **ausschließlich auf SRP** (`buy.reisinger.pictures`) angeboten. Bei Aufruf auf RP (`portal.reisinger.pictures`) erscheint ein Hinweis: "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
 
 | Aktion | URL | Sichtbar |
 |---|---|---|
-| SRP-Coupons verwalten | `buy.reisinger.pictures` | Nur SRP-Coupons |
-| RP-Coupons verwalten | `portal.reisinger.pictures` | Nur RP-Coupons |
+| SRP-Coupons verwalten | `buy.reisinger.pictures` | UI + API |
+| RP-Coupons verwalten | `portal.reisinger.pictures` | **Nicht im UI** — nur API (Super Admin / Admin) |
 | SRP-Gallerie-Coupons | `buy.reisinger.pictures` | Nur Gallerien mit brand='srp' |
-| RP-Gallerie-Coupons | `portal.reisinger.pictures` | Nur Gallerien mit brand='rp' |
+| RP-Gallerie-Coupons | `portal.reisinger.pictures` | **Nicht im UI** — nur API |
 
 **Implementierung:**
 - Alle Management-Endpoints nutzen `BrandRegistry::currentOrDefault()` zur Filterung
-- Super Admin wird nicht mehr cross-brand auf API-Ebene behandelt (kein `brand=null`-Override mehr in Coupon-Controller/Service)
+- Die Backend-API unterstützt beide Brands (`rp` und `srp`) gleichermaßen — Super Admin und Admin können RP-Coupons über API-Requests oder CLI erstellen/verwalten
+- Die UI-Komponente (`ManagementCouponsView`) blendet sich auf RP aus (`brand === 'srp'` Guard)
 - Der Login bleibt cross-brand (Super Admin kann sich an beiden Portalen anmelden), aber nach dem Login gilt der Host-Kontext
+- **RP-seitige Coupons** werden (falls zukünftig benötigt) via Backend/CLI erstellt — UI-Support ist nicht geplant
 
 ### 10. Error Messages (User-facing)
 

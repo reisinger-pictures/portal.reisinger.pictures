@@ -7,9 +7,14 @@ use App\Models\TextSnippet;
 use App\Http\Resources\TextSnippetResource;
 use App\Support\BrandRegistry;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 
 class TextSnippetController extends Controller
 {
+    public function __construct(
+        private readonly HtmlSanitizer $htmlSanitizer,
+    ) {}
+
     public function index(Request $request)
     {
         $brand = BrandRegistry::currentOrDefault()->value;
@@ -40,8 +45,7 @@ class TextSnippetController extends Controller
             'content_html' => 'nullable|string',
         ]);
 
-        $sanitizer = app(\Symfony\Component\HtmlSanitizer\HtmlSanitizer::class);
-        $validated['content_html'] = $sanitizer->sanitize($validated['content_html'] ?? '');
+        $validated['content_html'] = $this->htmlSanitizer->sanitize($validated['content_html'] ?? '');
         $validated['brand'] = $brand;
         $snippet = TextSnippet::create($validated);
         return response()->json(['success' => true, 'snippet' => new TextSnippetResource($snippet)]);
@@ -59,8 +63,7 @@ class TextSnippetController extends Controller
         ]);
 
         if (isset($validated['content_html'])) {
-            $sanitizer = app(\Symfony\Component\HtmlSanitizer\HtmlSanitizer::class);
-            $validated['content_html'] = $sanitizer->sanitize($validated['content_html']);
+            $validated['content_html'] = $this->htmlSanitizer->sanitize($validated['content_html']);
         }
         $snippet->update($validated);
         return response()->json(['success' => true, 'snippet' => new TextSnippetResource($snippet)]);

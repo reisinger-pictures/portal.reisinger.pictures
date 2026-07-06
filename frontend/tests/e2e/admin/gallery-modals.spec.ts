@@ -18,7 +18,7 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Photographer can save and restore all boolean flags via Group Modal', { tags: ['@feature:admin:galleries'] }, async ({ page }) => {
+    test('Photographer can save and restore all boolean flags via Group Modal', { tag: ['@feature:admin:galleries'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
@@ -53,7 +53,7 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
         await modal.assertCheckboxByLabel('Kostenlosen Download erlauben', true);
     });
 
-    test('Photographer can save and restore all boolean flags via Gallery Modal', { tags: ['@feature:admin:galleries'] }, async ({ page }) => {
+    test('Photographer can save and restore all boolean flags via Gallery Modal', { tag: ['@feature:admin:galleries'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);

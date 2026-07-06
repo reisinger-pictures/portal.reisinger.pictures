@@ -132,7 +132,7 @@ export default function WatermarkSettingsCard() {
                     </div>
 
                     <div className="mt-8 border border-base-300 rounded-box overflow-hidden relative h-48 bg-base-300 flex items-center justify-center select-none shadow-inner">
-                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, var(--color-base-content) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                        <div className="absolute inset-0 opacity-10 bg-checkerboard"></div>
                         <div className="flex flex-col items-center justify-center pointer-events-none w-1/3 h-full">
                             {previewRenderedUrl ? (
                                 <img src={previewRenderedUrl} alt="Watermark Preview" className="w-full h-full object-contain drop-shadow-md" />

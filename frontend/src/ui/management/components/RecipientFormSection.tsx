@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import AutocompleteInput from '../../components/AutocompleteInput';
 import { Customer } from '../../../api';
 import { LocationResult } from '../../../logic/useLocations';
@@ -16,15 +18,15 @@ export interface RecipientFormUpdates {
 export default function RecipientFormSection({ formData, onUpdate, onMultiUpdate }: Props) {
     return (
         <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
-            <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4">Rechnungsempfänger</h2>
-            <p className="text-sm opacity-60 mb-4">Suche nach Kunden (CRM) oder gib die Daten manuell ein.</p>
+            <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4"><Trans>Rechnungsempfänger</Trans></h2>
+            <p className="text-sm opacity-60 mb-4"><Trans>Suche nach Kunden (CRM) oder gib die Daten manuell ein.</Trans></p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <AutocompleteInput<Customer>
-                    label="Name / Ansprechpartner"
+                    label={t`Name / Ansprechpartner`}
                     value={formData.customer_name}
                     onChange={(val) => onUpdate('customer_name', val)}
                     endpoint="/api/management/customers?q="
-                    mapResponse={(data) => data.map(c => ({ id: c.id, title: c.name || c.company || 'Unbekannt', subtitle: `${c.company ? c.company + ' • ' : ''}${c.email || ''}`, raw: c }))}
+                    mapResponse={(data) => data.map(c => ({ id: c.id, title: c.name || c.company || t`Unbekannt`, subtitle: `${c.company ? c.company + ' • ' : ''}${c.email || ''}`, raw: c }))}
                     onSelect={(c) => {
                         onMultiUpdate({
                             customer_name: c.name || '',
@@ -39,23 +41,23 @@ export default function RecipientFormSection({ formData, onUpdate, onMultiUpdate
                     }}
                 />
                 <div className="form-control">
-                    <label className="label"><span className="label-text font-bold">Firma</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Firma</Trans></span></label>
                     <input type="text" value={formData.customer_company} onChange={e => onUpdate('customer_company', e.target.value)} className="input input-bordered" />
                 </div>
                 <div className="form-control">
-                    <label className="label"><span className="label-text font-bold">E-Mail (wird angedruckt)</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>E-Mail (wird angedruckt)</Trans></span></label>
                     <input type="email" value={formData.customer_email} onChange={e => onUpdate('customer_email', e.target.value)} className="input input-bordered" />
                 </div>
                 <div className="form-control">
-                    <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>U-ID (Umsatzsteuer-ID)</Trans></span></label>
                     <input type="text" value={formData.customer_uid} onChange={e => onUpdate('customer_uid', e.target.value)} className="input input-bordered" />
                 </div>
                 <div className="form-control md:col-span-2">
-                    <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Straße & Hausnummer</Trans></span></label>
                     <input type="text" value={formData.customer_street} onChange={e => onUpdate('customer_street', e.target.value)} className="input input-bordered" />
                 </div>
                 <div className="form-control md:col-span-2">
-                    <label className="label"><span className="label-text font-bold">PLZ & Stadt</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>PLZ & Stadt</Trans></span></label>
                     <div className="flex gap-2">
                         <div className="w-1/3 md:w-32">
                             <AutocompleteInput<LocationResult>
@@ -70,7 +72,7 @@ export default function RecipientFormSection({ formData, onUpdate, onMultiUpdate
                                         customer_country: loc.country || formData.customer_country
                                     });
                                 }}
-                                placeholder="PLZ"
+                                placeholder={t`PLZ`}
                             />
                         </div>
                         <div className="flex-1">
@@ -86,14 +88,14 @@ export default function RecipientFormSection({ formData, onUpdate, onMultiUpdate
                                         customer_country: loc.country || formData.customer_country
                                     });
                                 }}
-                                placeholder="Stadt"
+                                placeholder={t`Stadt`}
                             />
                         </div>
                     </div>
                 </div>
                 <div className="form-control md:col-span-2">
                     <AutocompleteInput<LocationResult>
-                        label="Land"
+                        label={t`Land`}
                         value={formData.customer_country}
                         onChange={(val) => onUpdate('customer_country', val)}
                         endpoint="/api/search/locations?type=country&q="

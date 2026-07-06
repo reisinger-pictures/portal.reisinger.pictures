@@ -125,6 +125,12 @@ class ManualDocumentTest extends TestCase
         @unlink($tempPath);
     }
 
+    private function makeFakePdf(string $content): string
+    {
+        $realPdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML('<p>Dummy</p>')->output();
+        return $realPdf . "\n" . $content . "\n";
+    }
+
     public function test_expired_offer_jwt_extraction_returns_400()
     {
         $superAdmin = User::factory()->create();
@@ -133,7 +139,7 @@ class ManualDocumentTest extends TestCase
 
         $expiredJwt = app(\App\Services\OfferTokenService::class)
             ->issue(['customer_name' => 'Expired'], now()->subDay());
-        $pdfContent = "DUMMY PDF\n%OFFER_JWT:{$expiredJwt}%\n";
+        $pdfContent = $this->makeFakePdf("%OFFER_JWT:{$expiredJwt}%");
 
         $tempPath = storage_path('app/private/temp/test_expired_offer_' . uniqid() . '.pdf');
         if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);
@@ -162,7 +168,7 @@ class ManualDocumentTest extends TestCase
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
         $token = auth('api')->login($superAdmin);
 
-        $pdfContent = "DUMMY PDF\n%SMART_DOC:legacy.legacy%\n";
+        $pdfContent = $this->makeFakePdf("%SMART_DOC:legacy.legacy%");
 
         $tempPath = storage_path('app/private/temp/test_legacy_' . uniqid() . '.pdf');
         if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);

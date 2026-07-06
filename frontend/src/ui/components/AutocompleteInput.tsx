@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState, useTransition} from 'react';
 import useSWR from 'swr';
 import {fetcher} from '../../api';
 
@@ -32,6 +32,7 @@ export default function AutocompleteInput<T>({
                                                  disabled,
                                                  className
                                              }: Props<T>) {
+    const [, startTransition] = useTransition();
     const [query, setQuery] = useState(() => value || '');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -45,9 +46,13 @@ export default function AutocompleteInput<T>({
     }
 
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedQuery(query), 300);
+        const timer = setTimeout(() => {
+            startTransition(() => {
+                setDebouncedQuery(query);
+            });
+        }, 300);
         return () => clearTimeout(timer);
-    }, [query]);
+    }, [query, startTransition]);
 
     const fetchUrl = debouncedQuery.length >= 1 ? endpoint + encodeURIComponent(debouncedQuery) : null;
     // isValidating ist bei SWR true, solange ein Request (auch im Hintergrund) läuft

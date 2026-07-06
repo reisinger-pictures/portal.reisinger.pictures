@@ -58,6 +58,7 @@ const GlobalSWRConfig = ({ children }: GlobalSWRConfigProps) => {
 
     return (
         <SWRConfig value={{ 
+            shouldRetryOnError: false,
             onError: (error) => {
                 // Fange 500er Serverfehler und Status 0 (Offline/Netzwerk) global ab
                 if (error.status >= 500 || error.status === 0) {

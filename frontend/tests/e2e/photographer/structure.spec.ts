@@ -20,7 +20,7 @@ test.describe('Management Structure View (Tree)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Photographer can create nested groups and toggle tree nodes', { tags: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
+    test('Photographer can create nested groups and toggle tree nodes', { tag: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
         const groupName = `Tree Group ${Math.random()}`;

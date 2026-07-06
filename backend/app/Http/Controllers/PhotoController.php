@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdatePhotoMetadataRequest;
 use Illuminate\Http\Request;
 use App\Models\Photo;
 use App\Models\PhotoMetadataVersion;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Storage;
 
 class PhotoController extends Controller
 {
-        public function updateMetadata(Request $request, $id)
+    public function updateMetadata(UpdatePhotoMetadataRequest $request, $id)
     {
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
@@ -19,19 +20,7 @@ class PhotoController extends Controller
             return response()->json(['error' => 'Keine Berechtigung, Metadaten zu bearbeiten.'], 403);
         }
 
-        $validated = $request->validate([
-            'title' => 'nullable|string|max:255',
-            'headline' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            
-            'keywords' => 'nullable|string',
-            'location' => 'nullable|string|max:255',
-            'city' => 'nullable|string|max:255',
-            'state' => 'nullable|string|max:255',
-            'country' => 'nullable|string|max:255',
-            'iso_country' => 'nullable|string|max:2',
-            'is_editorial_only' => 'nullable|boolean',
-        ]);
+        $validated = $request->validated();
 
         return \Illuminate\Support\Facades\DB::transaction(function () use ($photo, $user, $validated) {
             // Versionierung: Vorzustand für alle Rollen speichern (vollständiges Audit-Trail)

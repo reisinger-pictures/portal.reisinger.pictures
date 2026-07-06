@@ -10,6 +10,13 @@ use Illuminate\Support\Facades\Log;
 
 class WebhookController extends Controller
 {
+    private \App\Services\StripePaymentService $stripePayment;
+
+    public function __construct(?\App\Services\StripePaymentService $stripePayment = null)
+    {
+        $this->stripePayment = $stripePayment ?? app(\App\Services\StripePaymentService::class);
+    }
+
     public function handleStripe(Request $request)
     {
         $payload = $request->getContent();
@@ -56,13 +63,7 @@ class WebhookController extends Controller
             if ($orderId) {
                 $order = Order::with(['user', 'invoiceSnapshot'])->find($orderId);
                 if ($order && $order->status !== 'paid') {
-                    // Exakte Gebühr via Stripe API abrufen
-                    $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
-                    $intent = $stripe->paymentIntents->retrieve($paymentIntent->id, [
-                        'expand' => ['latest_charge.balance_transaction']
-                    ]);
-                    
-                    $feeCents = $intent->latest_charge->balance_transaction->fee ?? 0;
+                    $feeCents = $this->stripePayment->retrievePaymentIntentWithFee($paymentIntent->id);
                     
                     if ($feeCents === 0) {
                         Log::warning("Stripe Webhook: Balance transaction missing or fee is 0 for Order {$orderId}");
@@ -81,7 +82,7 @@ class WebhookController extends Controller
             $dispute = $event->data->object;
             $piId = $dispute->payment_intent ?? null;
             $order = Order::where('stripe_payment_intent_id', $piId)->first();
-            if ($order) {
+            if ($order && $order->status !== 'disputed') {
                 $order->update(['status' => 'disputed']);
                 Mail::to(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
                     ->send(new \App\Mail\CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$order->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
@@ -90,7 +91,7 @@ class WebhookController extends Controller
             $charge = $event->data->object;
             $piId = $charge->payment_intent ?? null;
             $order = Order::where('stripe_payment_intent_id', $piId)->first();
-            if ($order) {
+            if ($order && $order->status !== 'refunded') {
                 $order->update(['status' => 'refunded']);
             }
         }

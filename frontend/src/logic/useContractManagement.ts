@@ -10,6 +10,7 @@ export interface BillingDetails {
     country?: string;
     email?: string;
     uid?: string;
+    birthdate?: string;
 }
 
 export interface ContractSigner {

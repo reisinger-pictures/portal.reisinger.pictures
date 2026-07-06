@@ -39,71 +39,115 @@ msgstr "[PLZ, Ort]"
 
 #. placeholder {0}: user.name
 #: src/ui/management/components/UserPermissionsModal.tsx
-msgid "{0} bearbeiten"
-msgstr "{0} bearbeiten"
+#~ msgid "{0} bearbeiten"
+#~ msgstr "{0} bearbeiten"
 
 #. placeholder {0}: items.length
 #. placeholder {1}: formatMoney(volumeLicensing.pricePerItemCents)
 #. placeholder {2}: volumeLicensing.tier
 #: src/ui/client/components/CartItemList.tsx
-msgid "{0} Bilder × {1} (Tier {2})"
-msgstr "{0} Bilder × {1} (Tier {2})"
+#~ msgid "{0} Bilder × {1} (Tier {2})"
+#~ msgstr "{0} Bilder × {1} (Tier {2})"
 
 #. placeholder {0}: coupons.length
 #. placeholder {1}: coupons.length === 1 ? '' : 's'
 #: src/ui/management/components/GalleryCouponsTab.tsx
-msgid "{0} Coupon{1} für diese Galerie"
-msgstr "{0} Coupon{1} für diese Galerie"
+#~ msgid "{0} Coupon{1} für diese Galerie"
+#~ msgstr "{0} Coupon{1} für diese Galerie"
 
 #. placeholder {0}: coupons.length
 #. placeholder {1}: coupons.length === 1 ? '' : 's'
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
-msgid "{0} Coupon{1} für diese Galerie-Gruppe"
-msgstr "{0} Coupon{1} für diese Galerie-Gruppe"
+#~ msgid "{0} Coupon{1} für diese Galerie-Gruppe"
+#~ msgstr "{0} Coupon{1} für diese Galerie-Gruppe"
 
 #. placeholder {0}: g.count
 #: src/ui/management/ManagementStatsView.tsx
-msgid "{0} Downloads"
-msgstr "{0} Downloads"
+#~ msgid "{0} Downloads"
+#~ msgstr "{0} Downloads"
 
 #. placeholder {0}: downloadsCount || 0
 #: src/ui/management/ManagementMetaGalleryView.tsx
-msgid "{0} Downloads gesamt"
-msgstr "{0} Downloads gesamt"
+#~ msgid "{0} Downloads gesamt"
+#~ msgstr "{0} Downloads gesamt"
 
 #. placeholder {0}: formatMoney(volumeLicensing.pricePerItemCents)
 #. placeholder {1}: volumeLicensing.tier
 #: src/ui/client/components/CartItemList.tsx
-msgid "{0} pro Bild (Tier {1})"
-msgstr "{0} pro Bild (Tier {1})"
+#~ msgid "{0} pro Bild (Tier {1})"
+#~ msgstr "{0} pro Bild (Tier {1})"
 
 #. placeholder {0}: u.rated_count
 #: src/ui/management/components/RatingStatusModal.tsx
-msgid "{0} von {totalGalleryPhotos} Bildern"
-msgstr "{0} von {totalGalleryPhotos} Bildern"
+#~ msgid "{0} von {totalGalleryPhotos} Bildern"
+#~ msgstr "{0} von {totalGalleryPhotos} Bildern"
 
 #. placeholder {0}: (config.tier1PriceCents / 100).toFixed(0)
 #: src/logic/useVolumeLicensing.ts
-msgid "{0}€ pro Bild"
-msgstr "{0}€ pro Bild"
+#~ msgid "{0}€ pro Bild"
+#~ msgstr "{0}€ pro Bild"
+
+#: src/ui/management/components/GalleryCouponsTab.tsx
+msgid "{couponsLength} Coupon{couponsPlural} für diese Galerie"
+msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie"
+
+#: src/ui/management/components/GalleryGroupCouponsTab.tsx
+msgid "{couponsLength} Coupon{couponsPlural} für diese Galerie-Gruppe"
+msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie-Gruppe"
+
+#: src/ui/management/ManagementStatsView.tsx
+msgid "{galleryCount} Downloads"
+msgstr "{galleryCount} Downloads"
+
+#: src/ui/client/components/CartItemList.tsx
+msgid "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
+msgstr "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
+
+#: src/ui/client/components/CartItemList.tsx
+msgid "{pricePerItemStr} pro Bild (Tier {tierNum})"
+msgstr "{pricePerItemStr} pro Bild (Tier {tierNum})"
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "{progress}% abgeschlossen"
 msgstr "{progress}% abgeschlossen"
 
+#: src/ui/management/components/RatingStatusModal.tsx
+msgid "{ratedCount} von {totalGalleryPhotos} Bildern"
+msgstr "{ratedCount} von {totalGalleryPhotos} Bildern"
+
 #. placeholder {0}: star > 1 ? 'e' : ''
 #: src/ui/client/components/DaisyUIRatingBridge.tsx
-msgid "{star} Stern{0} (Shortcut: {star})"
-msgstr "{star} Stern{0} (Shortcut: {star})"
+#~ msgid "{star} Stern{0} (Shortcut: {star})"
+#~ msgstr "{star} Stern{0} (Shortcut: {star})"
+
+#: src/ui/client/components/DaisyUIRatingBridge.tsx
+msgid "{star} Stern{starSuffix} (Shortcut: {star})"
+msgstr "{star} Stern{starSuffix} (Shortcut: {star})"
 
 #: src/ui/management/components/UploadDropzone.tsx
 msgid "{successCount} Bild(er) hochgeladen"
 msgstr "{successCount} Bild(er) hochgeladen"
 
+#: src/logic/useVolumeLicensing.ts
+msgid "{t1Price}€ pro Bild"
+msgstr "{t1Price}€ pro Bild"
+
 #. placeholder {0}: total === 1 ? '' : 's'
 #: src/ui/management/ManagementCouponsView.tsx
-msgid "{total} Gutscheincode{0} insgesamt"
-msgstr "{total} Gutscheincode{0} insgesamt"
+#~ msgid "{total} Gutscheincode{0} insgesamt"
+#~ msgstr "{total} Gutscheincode{0} insgesamt"
+
+#: src/ui/management/ManagementCouponsView.tsx
+msgid "{total} Gutscheincode{totalPlural} insgesamt"
+msgstr "{total} Gutscheincode{totalPlural} insgesamt"
+
+#: src/ui/management/ManagementMetaGalleryView.tsx
+msgid "{totalDownloads} Downloads gesamt"
+msgstr "{totalDownloads} Downloads gesamt"
+
+#: src/ui/management/components/UserPermissionsModal.tsx
+msgid "{userNameEdit} bearbeiten"
+msgstr "{userNameEdit} bearbeiten"
 
 #: src/ui/components/WysiwygEditor.tsx
 msgid "/ 100.000 Zeichen (HTML)"
@@ -115,8 +159,12 @@ msgstr "← Zurück"
 
 #. placeholder {0}: upgradePrice.toFixed(2)
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "+ {0} €"
-msgstr "+ {0} €"
+#~ msgid "+ {0} €"
+#~ msgstr "+ {0} €"
+
+#: src/ui/client/components/LicenseSelectorModal.tsx
+msgid "+ {upgradePriceFormatted} €"
+msgstr "+ {upgradePriceFormatted} €"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "< 50€ (Rollover)"
@@ -175,8 +223,24 @@ msgstr "4. Ihre Rechte"
 #. placeholder {1}: (config.tier2PriceCents / 100).toFixed(0)
 #. placeholder {1}: (config.tier3PriceCents / 100).toFixed(0)
 #: src/logic/useVolumeLicensing.ts
-msgid "Ab {0} Bildern {1}€ pro Bild"
-msgstr "Ab {0} Bildern {1}€ pro Bild"
+#~ msgid "Ab {0} Bildern {1}€ pro Bild"
+#~ msgstr "Ab {0} Bildern {1}€ pro Bild"
+
+#: src/logic/useVolumeLicensing.ts
+msgid "Ab {nt2Threshold} Bildern {nt2Price}€ pro Bild"
+msgstr "Ab {nt2Threshold} Bildern {nt2Price}€ pro Bild"
+
+#: src/logic/useVolumeLicensing.ts
+msgid "Ab {nt3Threshold} Bildern {nt3Price}€ pro Bild"
+msgstr "Ab {nt3Threshold} Bildern {nt3Price}€ pro Bild"
+
+#: src/logic/useVolumeLicensing.ts
+msgid "Ab {t2Threshold} Bildern {t2Price}€ pro Bild"
+msgstr "Ab {t2Threshold} Bildern {t2Price}€ pro Bild"
+
+#: src/logic/useVolumeLicensing.ts
+msgid "Ab {t3Threshold} Bildern {t3Price}€ pro Bild"
+msgstr "Ab {t3Threshold} Bildern {t3Price}€ pro Bild"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "Ab 10 Bilder"
@@ -187,6 +251,7 @@ msgid "Ab 20 Bilder"
 msgstr "Ab 20 Bilder"
 
 #: src/ui/components/ModalDialogShell.tsx
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/CreateUserModal.tsx
 #: src/ui/management/components/EditableTableRow.tsx
 #: src/ui/management/components/EmailComposerModal.tsx
@@ -282,6 +347,7 @@ msgstr "Aktionen"
 
 #: src/ui/client/components/CouponInput.tsx
 #: src/ui/client/components/VolumeLicensingCard.tsx
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/ManagementContractView.tsx
@@ -457,6 +523,10 @@ msgstr "Art"
 msgid "Auf Anfrage"
 msgstr "Auf Anfrage"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Auf X günstigste Bilder beschränken"
+msgstr "Auf X günstigste Bilder beschränken"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Aufnahmedatum"
 msgstr "Aufnahmedatum"
@@ -508,9 +578,6 @@ msgid "Auszustellende Sammelrechnung"
 msgstr "Auszustellende Sammelrechnung"
 
 #: src/ui/management/ManagementTenantDetailView.tsx
-msgid "Auto-Join Domain"
-msgstr "Auto-Join Domain"
-
 #: src/ui/management/ManagementTenantsView.tsx
 msgid "Auto-Join Domain"
 msgstr "Auto-Join Domain"
@@ -653,8 +720,12 @@ msgstr "Bestellung"
 
 #. placeholder {0}: response.invoice_number
 #: src/ui/client/ClientCartView.tsx
-msgid "Bestellung erfolgreich! (Beleg: {0})"
-msgstr "Bestellung erfolgreich! (Beleg: {0})"
+#~ msgid "Bestellung erfolgreich! (Beleg: {0})"
+#~ msgstr "Bestellung erfolgreich! (Beleg: {0})"
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Bestellung erfolgreich! (Beleg: {invoiceNumber})"
+msgstr "Bestellung erfolgreich! (Beleg: {invoiceNumber})"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Bestellungen & Anfragen"
@@ -666,8 +737,12 @@ msgstr "Bester Rabatt aktiv"
 
 #. placeholder {0}: formatMoney(2000)
 #: src/ui/client/components/VolumeLicensingCard.tsx
-msgid "Bester Rabatt aktiv — {0} pro Bild"
-msgstr "Bester Rabatt aktiv — {0} pro Bild"
+#~ msgid "Bester Rabatt aktiv — {0} pro Bild"
+#~ msgstr "Bester Rabatt aktiv — {0} pro Bild"
+
+#: src/ui/client/components/VolumeLicensingCard.tsx
+msgid "Bester Rabatt aktiv — {bestPrice} pro Bild"
+msgstr "Bester Rabatt aktiv — {bestPrice} pro Bild"
 
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Bestimmt, welche Auflösungen direkt ohne Checkout geladen werden können."
@@ -680,6 +755,10 @@ msgstr "Beteiligte Personen"
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Betrag"
 msgstr "Betrag"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Betrag in €"
+msgstr "Betrag in €"
 
 #: src/ui/management/components/EmailComposerModal.tsx
 msgid "Betreff"
@@ -710,8 +789,12 @@ msgstr "Bild"
 
 #. placeholder {0}: photo.id.substring(0, 8)
 #: src/ui/client/components/LicenseSelectorCard.tsx
-msgid "Bild {0}"
-msgstr "Bild {0}"
+#~ msgid "Bild {0}"
+#~ msgstr "Bild {0}"
+
+#: src/ui/client/components/LicenseSelectorCard.tsx
+msgid "Bild {photoIdShort}"
+msgstr "Bild {photoIdShort}"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "Bild ist bereits im Warenkorb."
@@ -842,6 +925,7 @@ msgstr "Bundesland/Kanton"
 msgid "Büro & Dokumente"
 msgstr "Büro & Dokumente"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -1166,6 +1250,10 @@ msgstr "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten.
 msgid "E-Mail"
 msgstr "E-Mail"
 
+#: src/ui/management/components/RecipientFormSection.tsx
+msgid "E-Mail (wird angedruckt)"
+msgstr "E-Mail (wird angedruckt)"
+
 #: src/ui/components/SidebarLoginForm.tsx
 #: src/ui/management/components/CreateUserModal.tsx
 #: src/ui/management/ManagementTenantDetailView.tsx
@@ -1300,8 +1388,12 @@ msgstr "Erben (Aktuell:"
 
 #. placeholder {0}: data.notified_count
 #: src/ui/management/components/EmailComposerModal.tsx
-msgid "Erfolg! {0} E-Mails versendet."
-msgstr "Erfolg! {0} E-Mails versendet."
+#~ msgid "Erfolg! {0} E-Mails versendet."
+#~ msgstr "Erfolg! {0} E-Mails versendet."
+
+#: src/ui/management/components/EmailComposerModal.tsx
+msgid "Erfolg! {notifiedCount} E-Mails versendet."
+msgstr "Erfolg! {notifiedCount} E-Mails versendet."
 
 #: src/ui/management/components/InviteModal.tsx
 msgid "Erfolgreich generiert!"
@@ -1374,8 +1466,12 @@ msgstr "Fehler bei der KI Generierung für ein Bild."
 
 #. placeholder {0}: aiData.detected_city
 #: src/ui/management/components/AIBatchEditModal.tsx
-msgid "Fehler bei der Stadt-Validierung für \"{0}\"."
-msgstr "Fehler bei der Stadt-Validierung für \"{0}\"."
+#~ msgid "Fehler bei der Stadt-Validierung für \"{0}\"."
+#~ msgstr "Fehler bei der Stadt-Validierung für \"{0}\"."
+
+#: src/ui/management/components/AIBatchEditModal.tsx
+msgid "Fehler bei der Stadt-Validierung für \"{detectedCity}\"."
+msgstr "Fehler bei der Stadt-Validierung für \"{detectedCity}\"."
 
 #: src/logic/usePdfExtraction.ts
 msgid "Fehler beim Auslesen."
@@ -1533,9 +1629,18 @@ msgstr "Fehler beim Wiederherstellen der Version."
 #. placeholder {0}: err instanceof Error ? err.message : 'Nutzer konnte nicht angelegt werden.'
 #: src/ui/management/components/CreateUserModal.tsx
 #: src/ui/management/components/EmailComposerModal.tsx
-msgid "Fehler: {0}"
-msgstr "Fehler: {0}"
+#~ msgid "Fehler: {0}"
+#~ msgstr "Fehler: {0}"
 
+#: src/ui/management/components/CreateUserModal.tsx
+msgid "Fehler: {createError}"
+msgstr "Fehler: {createError}"
+
+#: src/ui/management/components/EmailComposerModal.tsx
+msgid "Fehler: {emailError}"
+msgstr "Fehler: {emailError}"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -1546,11 +1651,9 @@ msgstr "Festbetrag"
 msgid "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
 msgstr "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
 
-#: src/ui/management/ManagementContractView.tsx
-msgid "Firma"
-msgstr "Firma"
-
 #: src/ui/client/ClientCartView.tsx
+#: src/ui/management/components/RecipientFormSection.tsx
+#: src/ui/management/ManagementContractView.tsx
 msgid "Firma"
 msgstr "Firma"
 
@@ -1559,8 +1662,12 @@ msgid "Firma:"
 msgstr "Firma:"
 
 #: src/ui/management/ManagementPayoutsView.tsx
-msgid "Flatrate-Netto (€)"
-msgstr "Flatrate-Netto (€)"
+msgid "Flatrate"
+msgstr "Flatrate"
+
+#: src/ui/management/ManagementPayoutsView.tsx
+#~ msgid "Flatrate-Netto (€)"
+#~ msgstr "Flatrate-Netto (€)"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Flatrate-Pools"
@@ -1587,6 +1694,7 @@ msgstr "Foto"
 msgid "Foto konnte nicht geladen werden oder keine Berechtigung."
 msgstr "Foto konnte nicht geladen werden oder keine Berechtigung."
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
@@ -1633,6 +1741,7 @@ msgstr "FTP Inbox"
 msgid "Für Galerie:"
 msgstr "Für Galerie:"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementStatsView.tsx
@@ -1674,6 +1783,18 @@ msgstr "Galerie nicht gefunden."
 #: src/ui/InviteView.tsx
 msgid "Galerie öffnen"
 msgstr "Galerie öffnen"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Galerie-Gruppe"
+msgstr "Galerie-Gruppe"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Galerie-Gruppen-ID"
+msgstr "Galerie-Gruppen-ID"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Galerie-ID"
+msgstr "Galerie-ID"
 
 #: src/ui/InviteView.tsx
 msgid "Galerie-Passwort"
@@ -1719,6 +1840,10 @@ msgstr "Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterl
 msgid "Geändert von"
 msgstr "Geändert von"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Geltungsbereich"
+msgstr "Geltungsbereich"
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "Generieren"
 msgstr "Generieren"
@@ -1738,8 +1863,12 @@ msgstr "Gesamtbetrag"
 
 #. placeholder {0}: total.toFixed(2)
 #: src/ui/management/components/invoice/InvoiceTotalSummary.tsx
-msgid "Gesamtbetrag: {0} €"
-msgstr "Gesamtbetrag: {0} €"
+#~ msgid "Gesamtbetrag: {0} €"
+#~ msgstr "Gesamtbetrag: {0} €"
+
+#: src/ui/management/components/invoice/InvoiceTotalSummary.tsx
+msgid "Gesamtbetrag: {totalFormatted} €"
+msgstr "Gesamtbetrag: {totalFormatted} €"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Gesamtsumme"
@@ -1757,6 +1886,7 @@ msgstr "Gespeichert!"
 msgid "Gesperrt"
 msgstr "Gesperrt"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Global"
 msgstr "Global"
@@ -1773,14 +1903,19 @@ msgstr "Grundhonorar durch Flatrate gedeckt"
 msgid "Gruppen"
 msgstr "Gruppen"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Gültig bis"
 msgstr "Gültig bis"
 
 #. placeholder {0}: formatLocaleDate(d)
 #: src/logic/useInvoiceDraft.ts
-msgid "Gültig bis {0}"
-msgstr "Gültig bis {0}"
+#~ msgid "Gültig bis {0}"
+#~ msgstr "Gültig bis {0}"
+
+#: src/logic/useInvoiceDraft.ts
+msgid "Gültig bis {validUntil}"
+msgstr "Gültig bis {validUntil}"
 
 #: src/ui/components/Sidebar.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -1810,6 +1945,14 @@ msgstr "Gutscheincode gelöscht"
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Gutscheincode löschen?"
 msgstr "Gutscheincode löschen?"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Gutscheincodes können eingelöst werden"
+msgstr "Gutscheincodes können eingelöst werden"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Gutscheincodes sind deaktiviert"
+msgstr "Gutscheincodes sind deaktiviert"
 
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
@@ -1894,8 +2037,12 @@ msgstr "Im Warenkorb"
 
 #. placeholder {0}: data.processed
 #: src/ui/management/ManagementFtpInbox.tsx
-msgid "Import abgeschlossen. {0} Bilder wurden verschoben."
-msgstr "Import abgeschlossen. {0} Bilder wurden verschoben."
+#~ msgid "Import abgeschlossen. {0} Bilder wurden verschoben."
+#~ msgstr "Import abgeschlossen. {0} Bilder wurden verschoben."
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Import abgeschlossen. {processedCount} Bilder wurden verschoben."
+msgstr "Import abgeschlossen. {processedCount} Bilder wurden verschoben."
 
 #: src/ui/Impressum.tsx
 msgid "Impressum"
@@ -2316,6 +2463,7 @@ msgstr "Lädt..."
 
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/components/IptcMetadataEditor.tsx
+#: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Land"
 msgstr "Land"
@@ -2343,6 +2491,10 @@ msgstr "Läuft ab"
 #: src/ui/components/GalleryModal.tsx
 msgid "Leer = Aktuelles behalten"
 msgstr "Leer = Aktuelles behalten"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "leer = auf gesamten Warenkorb"
+msgstr "leer = auf gesamten Warenkorb"
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Leer = Nur Magic Link"
@@ -2465,6 +2617,22 @@ msgstr "Marketing"
 msgid "Massen-Link (Gruppen)"
 msgstr "Massen-Link (Gruppen)"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Max. globale Verwendungen"
+msgstr "Max. globale Verwendungen"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Max. Verwendungen pro Account"
+msgstr "Max. Verwendungen pro Account"
+
+#: src/ui/management/components/CalculatorSettingsCard.tsx
+msgid "Maximal 100%"
+msgstr "Maximal 100%"
+
+#: src/ui/management/components/CalculatorSettingsCard.tsx
+msgid "Maximal 900%"
+msgstr "Maximal 900%"
+
 #: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "Maximale Originalauflösung"
 msgstr "Maximale Originalauflösung"
@@ -2567,6 +2735,10 @@ msgstr "Metadaten-Vorgaben gespeichert"
 msgid "Mindestens 1 Bild"
 msgstr "Mindestens 1 Bild"
 
+#: src/ui/management/components/CalculatorSettingsCard.tsx
+msgid "Mindestens 10%"
+msgstr "Mindestens 10%"
+
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Mindestens 2 Zeichen"
 msgstr "Mindestens 2 Zeichen"
@@ -2594,18 +2766,35 @@ msgstr "Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird bena
 #. placeholder {0}: coupon.code
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
-msgid "Möchtest du den Coupon \"{0}\" wirklich entfernen?"
-msgstr "Möchtest du den Coupon \"{0}\" wirklich entfernen?"
+#~ msgid "Möchtest du den Coupon \"{0}\" wirklich entfernen?"
+#~ msgstr "Möchtest du den Coupon \"{0}\" wirklich entfernen?"
+
+#: src/ui/management/components/GalleryCouponsTab.tsx
+#: src/ui/management/components/GalleryGroupCouponsTab.tsx
+msgid "Möchtest du den Coupon \"{couponCode}\" wirklich entfernen?"
+msgstr "Möchtest du den Coupon \"{couponCode}\" wirklich entfernen?"
 
 #. placeholder {0}: coupon.code
 #: src/ui/management/ManagementCouponsView.tsx
-msgid "Möchtest du den Gutscheincode \"{0}\" wirklich entfernen?"
-msgstr "Möchtest du den Gutscheincode \"{0}\" wirklich entfernen?"
+#~ msgid "Möchtest du den Gutscheincode \"{0}\" wirklich entfernen?"
+#~ msgstr "Möchtest du den Gutscheincode \"{0}\" wirklich entfernen?"
+
+#: src/ui/management/ManagementCouponsView.tsx
+msgid "Möchtest du den Gutscheincode \"{couponCode}\" wirklich entfernen?"
+msgstr "Möchtest du den Gutscheincode \"{couponCode}\" wirklich entfernen?"
 
 #. placeholder {0}: formatMoney(cents)
 #: src/ui/management/ManagementPayoutsView.tsx
-msgid "Möchtest du den Pool für {month}/{year} wirklich mit {0} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
-msgstr "Möchtest du den Pool für {month}/{year} wirklich mit {0} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
+#~ msgid "Möchtest du den Pool für {month}/{year} wirklich mit {0} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
+#~ msgstr "Möchtest du den Pool für {month}/{year} wirklich mit {0} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
+
+#: src/ui/management/ManagementPayoutsView.tsx
+msgid "Möchtest du den Pool für {month}/{year} wirklich mit {formattedPayout} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
+msgstr "Möchtest du den Pool für {month}/{year} wirklich mit {formattedPayout} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Möchtest du die eingegebenen Daten wirklich verwerfen?"
+msgstr "Möchtest du die eingegebenen Daten wirklich verwerfen?"
 
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Möchtest du diese Metadaten-Version wirklich wiederherstellen? Dies überschreibt den aktuellen Stand."
@@ -2686,6 +2875,10 @@ msgstr "Name"
 msgid "Name (z.B. Firma XYZ)"
 msgstr "Name (z.B. Firma XYZ)"
 
+#: src/ui/management/components/RecipientFormSection.tsx
+msgid "Name / Ansprechpartner"
+msgstr "Name / Ansprechpartner"
+
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Name / Firma"
 msgstr "Name / Firma"
@@ -2717,8 +2910,8 @@ msgid "Nein"
 msgstr "Nein"
 
 #: src/ui/management/ManagementPayoutsView.tsx
-msgid "Netto-Topf:"
-msgstr "Netto-Topf:"
+#~ msgid "Netto-Topf:"
+#~ msgstr "Netto-Topf:"
 
 #: src/ui/management/components/InviteModal.tsx
 msgid "Netzwerkfehler"
@@ -2773,6 +2966,10 @@ msgstr "Neuen Nutzer anlegen"
 msgid "Neuen Nutzer einladen"
 msgstr "Neuen Nutzer einladen"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Neuen Rabattcode anlegen"
+msgstr "Neuen Rabattcode anlegen"
+
 #: src/ui/management/components/TextSnippetModal.tsx
 msgid "Neuen Textbaustein anlegen"
 msgstr "Neuen Textbaustein anlegen"
@@ -2817,13 +3014,21 @@ msgstr "Nicht verfügbar"
 #. placeholder {1}: volumeLicensing.nextTierCount === 1 ? '' : 'er'
 #. placeholder {2}: volumeLicensing.nextTierLabel
 #: src/ui/client/components/CartItemList.tsx
-msgid "Noch {0} {1} bis {2}"
-msgstr "Noch {0} {1} bis {2}"
+#~ msgid "Noch {0} {1} bis {2}"
+#~ msgstr "Noch {0} {1} bis {2}"
+
+#: src/ui/client/components/CartItemList.tsx
+msgid "Noch {nextCount} {nextPlural} bis {nextLabel}"
+msgstr "Noch {nextCount} {nextPlural} bis {nextLabel}"
 
 #. placeholder {0}: nextTierCount === 1 ? '' : 'er'
 #: src/ui/client/components/VolumeLicensingCard.tsx
-msgid "Noch {nextTierCount} Bild{0} bis zum nächsten Rabatt:"
-msgstr "Noch {nextTierCount} Bild{0} bis zum nächsten Rabatt:"
+#~ msgid "Noch {nextTierCount} Bild{0} bis zum nächsten Rabatt:"
+#~ msgstr "Noch {nextTierCount} Bild{0} bis zum nächsten Rabatt:"
+
+#: src/ui/client/components/VolumeLicensingCard.tsx
+msgid "Noch {nextTierCount} Bild{nextTierPlural} bis zum nächsten Rabatt:"
+msgstr "Noch {nextTierCount} Bild{nextTierPlural} bis zum nächsten Rabatt:"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Noch keine Bestellungen im System."
@@ -2985,6 +3190,7 @@ msgstr "Ordner ist leer."
 msgid "Org-Administratoren sehen deine Bestellungen"
 msgstr "Org-Administratoren sehen deine Bestellungen"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Organisation"
 msgstr "Organisation"
@@ -3069,11 +3275,8 @@ msgstr "Paket-Kalkulator"
 msgid "Pärchen"
 msgstr "Pärchen"
 
-#: src/ui/components/SidebarLoginForm.tsx
-msgid "Passwort"
-msgstr "Passwort"
-
 #: src/ui/components/GalleryModal.tsx
+#: src/ui/components/SidebarLoginForm.tsx
 msgid "Passwort"
 msgstr "Passwort"
 
@@ -3094,8 +3297,12 @@ msgid "Passwort speichern & Anmelden"
 msgstr "Passwort speichern & Anmelden"
 
 #: src/ui/management/ManagementOrdersView.tsx
-msgid "Pauschalpreis (Netto in €)"
-msgstr "Pauschalpreis (Netto in €)"
+msgid "Pauschalpreis"
+msgstr "Pauschalpreis"
+
+#: src/ui/management/ManagementOrdersView.tsx
+#~ msgid "Pauschalpreis (Netto in €)"
+#~ msgstr "Pauschalpreis (Netto in €)"
 
 #: src/ui/components/Sidebar.tsx
 msgid "Payouts & Abrechnung"
@@ -3114,9 +3321,14 @@ msgid "PHP"
 msgstr "PHP"
 
 #: src/ui/client/ClientCartView.tsx
+#: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "PLZ"
 msgstr "PLZ"
+
+#: src/ui/management/components/RecipientFormSection.tsx
+msgid "PLZ & Stadt"
+msgstr "PLZ & Stadt"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "PLZ ist erforderlich"
@@ -3126,6 +3338,7 @@ msgstr "PLZ ist erforderlich"
 msgid "PLZ:"
 msgstr "PLZ:"
 
+#: src/ui/management/ManagementPayoutsView.tsx
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Pool:"
 msgstr "Pool:"
@@ -3204,6 +3417,7 @@ msgstr "Profil & Standardwerte"
 msgid "Profil aktualisiert"
 msgstr "Profil aktualisiert"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -3229,6 +3443,10 @@ msgstr "Rabatt hinzufügen"
 #: src/ui/client/components/CouponInput.tsx
 msgid "Rabattcode"
 msgstr "Rabattcode"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Rabattcode bearbeiten"
+msgstr "Rabattcode bearbeiten"
 
 #: src/ui/client/components/CouponInput.tsx
 msgid "Rabattcode entfernen"
@@ -3268,9 +3486,7 @@ msgid "Rechnungsdetails"
 msgstr "Rechnungsdetails"
 
 #: src/ui/ContractSignView.tsx
-msgid "Rechnungsempfänger"
-msgstr "Rechnungsempfänger"
-
+#: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Rechnungsempfänger"
 msgstr "Rechnungsempfänger"
@@ -3324,8 +3540,12 @@ msgstr "Sammelansicht aller Fotos. Uploads sind nur in den Untergalerien möglic
 #. placeholder {0}: res.invoice_number
 #. placeholder {1}: res.processed_orders
 #: src/ui/management/ManagementTenantDetailView.tsx
-msgid "Sammelrechnung {0} mit {1} Positionen erfolgreich erstellt."
-msgstr "Sammelrechnung {0} mit {1} Positionen erfolgreich erstellt."
+#~ msgid "Sammelrechnung {0} mit {1} Positionen erfolgreich erstellt."
+#~ msgstr "Sammelrechnung {0} mit {1} Positionen erfolgreich erstellt."
+
+#: src/ui/management/ManagementTenantDetailView.tsx
+msgid "Sammelrechnung {invoiceNumber} mit {processedOrders} Positionen erfolgreich erstellt."
+msgstr "Sammelrechnung {invoiceNumber} mit {processedOrders} Positionen erfolgreich erstellt."
 
 #: src/ui/management/ManagementTenantDetailView.tsx
 msgid "Sammelrechnung erstellen"
@@ -3347,6 +3567,7 @@ msgstr "Schlagwörter"
 msgid "Schliessen"
 msgstr "Schliessen"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/InviteModal.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Schließen"
@@ -3430,6 +3651,7 @@ msgstr "Sonderanfrage (Angebot)"
 
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/EditableTableRow.tsx
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
@@ -3464,14 +3686,19 @@ msgstr "SRP (buy.reisinger.pictures)"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
+#: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Stadt"
 msgstr "Stadt"
 
 #. placeholder {0}: aiData.detected_city
 #: src/ui/management/components/AIBatchEditModal.tsx
-msgid "Stadt \"{0}\" wurde nicht in der Datenbank gefunden."
-msgstr "Stadt \"{0}\" wurde nicht in der Datenbank gefunden."
+#~ msgid "Stadt \"{0}\" wurde nicht in der Datenbank gefunden."
+#~ msgstr "Stadt \"{0}\" wurde nicht in der Datenbank gefunden."
+
+#: src/ui/management/components/AIBatchEditModal.tsx
+msgid "Stadt \"{detectedCity}\" wurde nicht in der Datenbank gefunden."
+msgstr "Stadt \"{detectedCity}\" wurde nicht in der Datenbank gefunden."
 
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Stadt / Ort"
@@ -3498,8 +3725,12 @@ msgid "Standard-Urheber (IPTC Copyright)"
 msgstr "Standard-Urheber (IPTC Copyright)"
 
 #: src/ui/management/components/ProductModal.tsx
-msgid "Standard-Wert *"
-msgstr "Standard-Wert *"
+msgid "Standard-Wert"
+msgstr "Standard-Wert"
+
+#: src/ui/management/components/ProductModal.tsx
+#~ msgid "Standard-Wert *"
+#~ msgstr "Standard-Wert *"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Starten"
@@ -3545,6 +3776,7 @@ msgid "Straße"
 msgstr "Straße"
 
 #: src/ui/client/ClientCartView.tsx
+#: src/ui/management/components/RecipientFormSection.tsx
 msgid "Straße & Hausnummer"
 msgstr "Straße & Hausnummer"
 
@@ -3571,6 +3803,10 @@ msgstr "Suche in allen Galerien..."
 #: src/ui/components/SearchBarWithSuggestions.tsx
 msgid "Suche nach \"{searchQuery}\""
 msgstr "Suche nach \"{searchQuery}\""
+
+#: src/ui/management/components/RecipientFormSection.tsx
+msgid "Suche nach Kunden (CRM) oder gib die Daten manuell ein."
+msgstr "Suche nach Kunden (CRM) oder gib die Daten manuell ein."
 
 #: src/ui/SearchView.tsx
 msgid "Suchergebnisse für"
@@ -3632,12 +3868,13 @@ msgid "Titel / Beschreibung"
 msgstr "Titel / Beschreibung"
 
 #: src/ui/management/components/invoice/InvoiceItemsTable.tsx
+#: src/ui/management/components/ProductModal.tsx
 msgid "Titel / Name"
 msgstr "Titel / Name"
 
 #: src/ui/management/components/ProductModal.tsx
-msgid "Titel / Name *"
-msgstr "Titel / Name *"
+#~ msgid "Titel / Name *"
+#~ msgstr "Titel / Name *"
 
 #: src/ui/management/components/TextSnippetModal.tsx
 msgid "Titel ist erforderlich"
@@ -3655,16 +3892,22 @@ msgstr "Top 5 Galerien"
 msgid "Top Domains"
 msgstr "Top Domains"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
+#: src/ui/management/components/ProductModal.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Typ"
 msgstr "Typ"
 
 #: src/ui/management/components/ProductModal.tsx
-msgid "Typ *"
-msgstr "Typ *"
+#~ msgid "Typ *"
+#~ msgstr "Typ *"
+
+#: src/ui/management/components/RecipientFormSection.tsx
+msgid "U-ID (Umsatzsteuer-ID)"
+msgstr "U-ID (Umsatzsteuer-ID)"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Überfällig"
@@ -3702,6 +3945,10 @@ msgstr "UID"
 msgid "um den Rechnungs- und Bestellprozess zu aktivieren."
 msgstr "um den Rechnungs- und Bestellprozess zu aktivieren."
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "unbegrenzt"
+msgstr "unbegrenzt"
+
 #: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "Unbegrenzt (x2)"
 msgstr "Unbegrenzt (x2)"
@@ -3711,6 +3958,7 @@ msgid "Unbegrenzt:"
 msgstr "Unbegrenzt:"
 
 #: src/ui/components/PhotoHistoryModal.tsx
+#: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Unbekannt"
 msgstr "Unbekannt"
@@ -3718,6 +3966,10 @@ msgstr "Unbekannt"
 #: src/ui/components/ErrorBoundary.tsx
 msgid "Unbekannter Fehler"
 msgstr "Unbekannter Fehler"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Ungespeicherte Änderungen"
+msgstr "Ungespeicherte Änderungen"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Ungültige E-Mail"
@@ -3926,19 +4178,31 @@ msgstr "Verwaltung"
 msgid "Verwendung"
 msgstr "Verwendung"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Verwerfen"
+msgstr "Verwerfen"
+
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Via Magic Link"
 msgstr "Via Magic Link"
 
 #. placeholder {0}: data?.signer.name
 #: src/ui/ContractSignView.tsx
-msgid "Vielen Dank, {0}."
-msgstr "Vielen Dank, {0}."
+#~ msgid "Vielen Dank, {0}."
+#~ msgstr "Vielen Dank, {0}."
+
+#: src/ui/ContractSignView.tsx
+msgid "Vielen Dank, {signerName}."
+msgstr "Vielen Dank, {signerName}."
 
 #. placeholder {0}: volumeLicensing.tier
 #: src/ui/client/components/CartItemList.tsx
-msgid "Volumenpreis (Tier {0})"
-msgstr "Volumenpreis (Tier {0})"
+#~ msgid "Volumenpreis (Tier {0})"
+#~ msgstr "Volumenpreis (Tier {0})"
+
+#: src/ui/client/components/CartItemList.tsx
+msgid "Volumenpreis (Tier {tierNum})"
+msgstr "Volumenpreis (Tier {tierNum})"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Vor- & Nachname"
@@ -3966,8 +4230,12 @@ msgstr "Wähle deine Favoriten aus."
 
 #. placeholder {0}: photo.title || t`Foto`
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Wähle die gewünschte Auflösung für das Bild <0>{0}</0>."
-msgstr "Wähle die gewünschte Auflösung für das Bild <0>{0}</0>."
+#~ msgid "Wähle die gewünschte Auflösung für das Bild <0>{0}</0>."
+#~ msgstr "Wähle die gewünschte Auflösung für das Bild <0>{0}</0>."
+
+#: src/ui/client/components/LicenseSelectorModal.tsx
+msgid "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
+msgstr "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
 
 #: src/ui/components/Sidebar.tsx
 msgid "Warenkorb"
@@ -4055,8 +4323,12 @@ msgstr "Willkommen zur Fotoauswahl"
 
 #. placeholder {0}: user.name
 #: src/ui/client/ClientDashboard.tsx
-msgid "Willkommen zurück, {0}!"
-msgstr "Willkommen zurück, {0}!"
+#~ msgid "Willkommen zurück, {0}!"
+#~ msgstr "Willkommen zurück, {0}!"
+
+#: src/ui/client/ClientDashboard.tsx
+msgid "Willkommen zurück, {userName}!"
+msgstr "Willkommen zurück, {userName}!"
 
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Wird automatisch befüllt..."
@@ -4112,6 +4384,10 @@ msgstr "z.B. Maria Muster"
 #: src/ui/management/components/InviteModal.tsx
 msgid "z.B. Oma Erna"
 msgstr "z.B. Oma Erna"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "z.B. SOMMER2026"
+msgstr "z.B. SOMMER2026"
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "z.B. Sommerfest der Firma XYZ in Wien, 2026"
@@ -4186,6 +4462,10 @@ msgstr "Zeitraum"
 msgid "Ziel-Galerie auswählen"
 msgstr "Ziel-Galerie auswählen"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Ziel-ID"
+msgstr "Ziel-ID"
+
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Zugeordnete Galerien"
 msgstr "Zugeordnete Galerien"
@@ -4218,8 +4498,12 @@ msgstr "Zugriff erteilt"
 
 #. placeholder {0}: order.status
 #: src/ui/client/ClientOrdersView.tsx
-msgid "Zugriff gesperrt ({0})"
-msgstr "Zugriff gesperrt ({0})"
+#~ msgid "Zugriff gesperrt ({0})"
+#~ msgstr "Zugriff gesperrt ({0})"
+
+#: src/ui/client/ClientOrdersView.tsx
+msgid "Zugriff gesperrt ({orderStatus})"
+msgstr "Zugriff gesperrt ({orderStatus})"
 
 #: src/ui/management/components/ManagementGalleryActions.tsx
 msgid "Zugriff..."

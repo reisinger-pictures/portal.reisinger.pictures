@@ -20,7 +20,6 @@ export function CartProvider({children}: CartProviderProps) {
         const result = loadCartItems(localStorage.getItem(cartKey));
         return result.items;
     });
-    const [isLoaded, setIsLoaded] = useState(true);
     const loadingRef = useRef(false);
 
     // Re-Load bei User-Wechsel mit Zod-Validierung (reine Logik in cartLogic.ts)
@@ -32,14 +31,13 @@ export function CartProvider({children}: CartProviderProps) {
                 showToast('error', 'Warenkorb konnte nicht geladen werden.');
             }
             setItems(result.items);
-            setIsLoaded(true);
             loadingRef.current = false;
         });
     }, [cartKey, showToast]);
 
     // Speichern bei Änderungen
     useEffect(() => {
-        if (!isLoaded || loadingRef.current) return;
+        if (loadingRef.current) return;
         try {
             if (items.length > 0 || localStorage.getItem(cartKey)) {
                 localStorage.setItem(cartKey, JSON.stringify(items));
@@ -47,7 +45,7 @@ export function CartProvider({children}: CartProviderProps) {
         } catch {
             showToast('error', 'Warenkorb konnte nicht gespeichert werden.');
         }
-    }, [items, cartKey, showToast, isLoaded]);
+    }, [items, cartKey, showToast]);
 
     const addToCart = useCallback((item: CartItem) => {
         setItems(prev => addToCartPure(prev, item));

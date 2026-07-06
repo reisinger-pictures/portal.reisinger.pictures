@@ -5,12 +5,17 @@ namespace App\Http\Controllers;
 use App\Constants\TierRanks;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class FileDeliveryController extends Controller
 {
+    public function __construct(
+        private readonly ImageProcessor $imageProcessor,
+    ) {}
+
     public function serve(Request $request, $slug, $identifier)
     {
         $gallery = \Illuminate\Support\Str::isUuid($slug) 
@@ -30,8 +35,6 @@ class FileDeliveryController extends Controller
         }
 
         $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/\\');
-        $processor = app(\App\Services\ImageProcessor::class);
-        $watermarkService = app(\App\Services\ImageProcessor::class);
         
         // 1. Konzeptueller Check: Hat der User das Recht auf die cleane Originaldatei?
         $logicalNeedsWatermark = true;
@@ -70,7 +73,7 @@ class FileDeliveryController extends Controller
             $thumbPath = $baseStoragePath . '/' . $gallery->id . '/_thumbs/' . $size . '/' . $photo->id . '.webp';
             
             $thumbLockKey = 'thumb_generation_' . $photo->id . '_' . $size;
-            Cache::lock($thumbLockKey, 30)->block(10, function () use ($thumbPath, $originalPath, $size, $processor) {
+            Cache::lock($thumbLockKey, 30)->block(10, function () use ($thumbPath, $originalPath, $size) {
                 if (file_exists($thumbPath)) {
                     return;
                 }
@@ -78,7 +81,7 @@ class FileDeliveryController extends Controller
                     @mkdir(dirname($thumbPath), 0755, true);
                 }
                 try {
-                    $processor->generateThumbnail($originalPath, $thumbPath, $size);
+                    $this->imageProcessor->generateThumbnail($originalPath, $thumbPath, $size);
                 } catch (\Throwable $e) {
                     Log::error('Thumbnail generation failed', [
                         'photo_id' => $photo->id,
@@ -98,7 +101,7 @@ class FileDeliveryController extends Controller
                 if (!file_exists($wmPath)) {
                     if (!is_dir(dirname($wmPath))) @mkdir(dirname($wmPath), 0755, true);
                     try {
-                        $watermarkService->applyCenteredWatermark($path, $wmPath, null, $gallery->type);
+                        $this->imageProcessor->applyCenteredWatermark($path, $wmPath, null, $gallery->type);
                         if (!file_exists($wmPath)) throw new \Exception("Watermark file missing.");
                     } catch (\Exception $e) {
                         return response()->json(['error' => 'SECURITY: Watermark-Fail.'], 500);
@@ -127,7 +130,7 @@ class FileDeliveryController extends Controller
                 if (!file_exists($wmPath)) {
                     if (!is_dir(dirname($wmPath))) @mkdir(dirname($wmPath), 0755, true);
                     try {
-                        $watermarkService->applyCenteredWatermark($path, $wmPath, 2000, $gallery->type);
+                        $this->imageProcessor->applyCenteredWatermark($path, $wmPath, 2000, $gallery->type);
                         if (!file_exists($wmPath)) throw new \Exception("Watermark file missing.");
                     } catch (\Exception $e) {
                         return response()->json(['error' => 'SECURITY: Watermark-Fail.'], 500);
@@ -147,7 +150,7 @@ class FileDeliveryController extends Controller
 
         $headers = ['Content-Type' => $photo->mime_type ?? mime_content_type($path), 'Cache-Control' => 'private, max-age=31536000, immutable'];
 
-        if ($proxyHeader = env('PROXY_DELIVERY_HEADER')) {
+        if ($proxyHeader = config('services.proxy_delivery_header')) {
             $headers[$proxyHeader] = $path;
             return response()->make('', 200, $headers);
         }

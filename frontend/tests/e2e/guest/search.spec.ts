@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Global Search Workflow', () => {
-    test('Guest can use global sidebar search to find content', { tags: ['@feature:guest'] }, async ({ page }) => {
+    test('Guest can use global sidebar search to find content', { tag: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
 
         // Auf Mobile das Menü öffnen, damit die Sidebar sichtbar wird
         // await sidebar.openMobileMenu(); // Search is now in header
 
-        const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
+        const searchInput = page.getByRole('main').locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();
 
         const searchTerm = `GlobalSearch${Math.random().toString(36).substring(2, 10)}`;
@@ -16,6 +16,6 @@ test.describe('Global Search Workflow', () => {
 
         // Architektur-Regel: Geduldiges Assert
         await expect(page).toHaveURL(new RegExp(`/search\\?q=${searchTerm}`));
-        await expect(page.locator(`h1:has-text("${searchTerm}")`)).toBeVisible();
+        await expect(page.getByRole('main').locator(`h1:has-text("${searchTerm}")`)).toBeVisible();
     });
 });

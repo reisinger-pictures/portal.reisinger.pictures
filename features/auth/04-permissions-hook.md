@@ -31,7 +31,7 @@ This was incorrect because feature access should be derived from the **authentic
 Consumes `useAuth` and exposes derived booleans:
 
 ```
-isStaff                  → super_admin || admin || photographer
+isStaff                  → super_admin || admin || photographer || org_admin
 canAccessB2BFeatures     → isStaff (not brand-dependent)
 showTenantsSection       → canAccessB2BFeatures
 showCRM                  → canAccessB2BFeatures

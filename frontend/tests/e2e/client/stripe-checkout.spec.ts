@@ -137,7 +137,7 @@ test.describe('Stripe Checkout Workflow', () => {
         return {stripeFrame, form, orderId};
     };
 
-    test('Negative Flow: Handles generic decline and insufficient funds via inline alert', { tags: ['@feature:client:checkout'] }, async ({page}) => {
+    test('Negative Flow: Handles generic decline and insufficient funds via inline alert', { tag: ['@feature:client:checkout'] }, async ({page}) => {
         test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
         const {stripeFrame, form} = await navigateToStripeIframe(page);
 
@@ -169,7 +169,7 @@ test.describe('Stripe Checkout Workflow', () => {
         }).toPass({timeout: 15000});
     });
 
-    test('Positive Flow: Handles successful payment via Visa', { tags: ['@feature:client:checkout'] }, async ({page}) => {
+    test('Positive Flow: Handles successful payment via Visa', { tag: ['@smoke', '@feature:client:checkout'] }, async ({page}) => {
         test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
         const {stripeFrame, form} = await navigateToStripeIframe(page);
 
@@ -178,8 +178,8 @@ test.describe('Stripe Checkout Workflow', () => {
         const payButton = page.getByRole('button', {name: 'Jetzt bezahlen'});
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
-        // Stripe confirmPayment benoetigt externe Verarbeitung - kein DOM-Element verfuegbar
-        await page.waitForTimeout(3000);
+        // Stripe confirmPayment benoetigt externe Verarbeitung - Toast signalisiert Erfolg
+        await expect(page.locator('.toast')).toContainText(/Zahlung erfolgreich/i, { timeout: 15000 });
 
         // Simuliere den Stripe-Return nach erfolgreichem Payment:
         // Stripe leitet den User auf die return_url (/cart?redirect_status=succeeded) zurück.

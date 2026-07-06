@@ -82,41 +82,45 @@ export default function BillingDetailsCard() {
                     Diese Daten werden im Header und Footer deiner PDF-Rechnungen und Lieferscheine angezeigt.
                 </p>
 
-                <form onSubmit={handleSubmit(onSubmit)}>
+                <form onSubmit={handleSubmit(onSubmit)} noValidate>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">Firmenname / Kontoinhaber *</span></label>
+                            <label className="label"><span className="label-text font-bold">Firmenname / Kontoinhaber</span></label>
                             <input type="text"
                                    className="input input-bordered"
                                    placeholder="Name des Inhabers"
                                    disabled={!canEdit}
+                                   required
                                    {...register('bank_holder')} />
                         </div>
 
                         <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">Straße & Hausnummer *</span></label>
+                            <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
                             <input type="text"
                                    className="input input-bordered"
                                    placeholder="Musterstraße 1"
                                    disabled={!canEdit}
+                                   required
                                    {...register('company_street')} />
                         </div>
 
                         <div className="flex gap-4 md:col-span-2 w-full">
                             <div className="form-control w-1/3">
-                                <label className="label"><span className="label-text font-bold">PLZ *</span></label>
+                                <label className="label"><span className="label-text font-bold">PLZ</span></label>
                                 <input type="text"
                                        className="input input-bordered w-full"
                                        placeholder="4020"
                                        disabled={!canEdit}
+                                       required
                                        {...register('company_zip')} />
                             </div>
                             <div className="form-control flex-1">
-                                <label className="label"><span className="label-text font-bold">Stadt *</span></label>
+                                <label className="label"><span className="label-text font-bold">Stadt</span></label>
                                 <input type="text"
                                        className="input input-bordered w-full"
                                        placeholder="Linz"
                                        disabled={!canEdit}
+                                       required
                                        {...register('company_city')} />
                             </div>
                         </div>
@@ -145,11 +149,12 @@ export default function BillingDetailsCard() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">IBAN *</span></label>
+                            <label className="label"><span className="label-text font-bold">IBAN</span></label>
                             <input type="text"
                                    className="input input-bordered font-mono"
                                    placeholder="AT..."
                                    disabled={!canEdit}
+                                   required
                                    {...register('bank_iban')} />
                             {errors.bank_iban && <span className="text-error text-xs mt-1">{errors.bank_iban.message}</span>}
                         </div>

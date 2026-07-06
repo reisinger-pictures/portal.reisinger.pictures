@@ -79,7 +79,7 @@ test.describe('E3: Org-Admin sieht keine fremden Orgs', () => {
         return { email, password, userId };
     }
 
-    test('Org-Admin kann nicht auf fremde Org zugreifen', { tags: ['@feature:admin:tenant'] }, async ({ page, request }) => {
+    test('Org-Admin kann nicht auf fremde Org zugreifen', { tag: ['@feature:admin:tenant'] }, async ({ page, request }) => {
         const tenantA = await createTenant(request, adminToken);
         const tenantB = await createTenant(request, adminToken);
 

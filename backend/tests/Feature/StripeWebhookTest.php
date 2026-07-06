@@ -213,6 +213,90 @@ class StripeWebhookTest extends TestCase
         ]);
     }
 
+    public function test_dispute_created_webhook_is_idempotent(): void
+    {
+        $order = Order::factory()->create([
+            'status' => 'paid',
+            'stripe_payment_intent_id' => 'pi_dispute_idemp_123',
+        ]);
+
+        $secret = 'whsec_dispute_idemp';
+        Config::set('services.stripe.webhook_secret', $secret);
+
+        $payloadData = [
+            'type' => 'charge.dispute.created',
+            'data' => [
+                'object' => [
+                    'payment_intent' => 'pi_dispute_idemp_123',
+                ],
+            ],
+        ];
+
+        [$payload, $sigHeader] = $this->signPayload($secret, $payloadData);
+
+        $this->postJson('/api/webhooks/stripe', $payloadData, [
+            'Stripe-Signature' => $sigHeader,
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'disputed',
+        ]);
+
+        Mail::assertQueued(\App\Mail\CustomMail::class, 1);
+
+        $this->postJson('/api/webhooks/stripe', $payloadData, [
+            'Stripe-Signature' => $sigHeader,
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'disputed',
+        ]);
+
+        Mail::assertQueued(\App\Mail\CustomMail::class, 1);
+    }
+
+    public function test_refunded_webhook_is_idempotent(): void
+    {
+        $order = Order::factory()->create([
+            'status' => 'paid',
+            'stripe_payment_intent_id' => 'pi_refund_idemp_123',
+        ]);
+
+        $secret = 'whsec_refund_idemp';
+        Config::set('services.stripe.webhook_secret', $secret);
+
+        $payloadData = [
+            'type' => 'charge.refunded',
+            'data' => [
+                'object' => [
+                    'payment_intent' => 'pi_refund_idemp_123',
+                ],
+            ],
+        ];
+
+        [$payload, $sigHeader] = $this->signPayload($secret, $payloadData);
+
+        $this->postJson('/api/webhooks/stripe', $payloadData, [
+            'Stripe-Signature' => $sigHeader,
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'refunded',
+        ]);
+
+        $this->postJson('/api/webhooks/stripe', $payloadData, [
+            'Stripe-Signature' => $sigHeader,
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'refunded',
+        ]);
+    }
+
     public function test_unknown_event_type_is_handled_gracefully(): void
     {
         $secret = 'whsec_unknown_secret';

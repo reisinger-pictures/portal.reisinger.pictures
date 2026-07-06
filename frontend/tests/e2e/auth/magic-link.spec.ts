@@ -19,7 +19,7 @@ test.describe('Gallery Invite Link Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('End-to-End Anonymous Magic Link Workflow', { tags: ['@smoke', '@feature:auth'] }, async ({ page }) => {
+    test('End-to-End Anonymous Magic Link Workflow', { tag: ['@smoke', '@feature:auth'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
@@ -71,7 +71,7 @@ test.describe('Gallery Invite Link Workflow', () => {
         await expect(page.locator(`h1:has-text("${galleryName}")`)).toBeVisible();
     });
 
-    test('End-to-End Anonymous Magic Link with Password Protection', async ({ page }) => {
+    test('End-to-End Anonymous Magic Link with Password Protection', { tag: ['@feature:auth'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);

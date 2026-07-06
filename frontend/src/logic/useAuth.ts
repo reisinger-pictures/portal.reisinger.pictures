@@ -8,6 +8,7 @@ export type {User};
 export function useAuth() {
     const {data: user, error, isLoading, mutate} = useSWR<User>('/api/auth/me', fetcher, {
         shouldRetryOnError: false,
+        dedupingInterval: 60_000,
     });
 
     const login = async (email: string, password: string): Promise<void> => {

@@ -5,13 +5,14 @@ namespace App\Models;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Laravel\Scout\Searchable;
 
 class TextSnippet extends Model
 {
-    use HasUuids, Searchable;
+    use HasFactory, HasUuids, Searchable;
 
     public const UPDATED_AT = null;
 

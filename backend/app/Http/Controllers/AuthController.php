@@ -208,7 +208,8 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'id' => $user->id,
+            'id' => $user->guest_id ?: $user->id,
+            'guest_id' => $user->guest_id,
             'name' => $user->name,
             'email' => $user->email,
             'metadata_copyright' => $user->metadata_copyright,
@@ -228,6 +229,7 @@ class AuthController extends Controller
             'roles' => $user->roles->pluck('name'),
             'missing_watermark' => $missingWatermark,
             'ai_is_unconfigured' => app(AIService::class)->isUnconfigured(),
+            'transient_galleries' => $user->transient_galleries ?? [],
             'transient_meta_galleries' => $user->transient_meta_galleries ?? [],
             'my_galleries' => $user->galleries ?? [],
             'photographer_galleries' => $user->photographerGalleries ?? [],

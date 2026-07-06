@@ -5,13 +5,14 @@ namespace App\Models;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Laravel\Scout\Searchable;
 
 class Customer extends Model
 {
-    use HasUuids, Searchable;
+    use HasFactory, HasUuids, Searchable;
 
     public const UPDATED_AT = null;
 
@@ -24,10 +25,14 @@ class Customer extends Model
         'city',
         'country',
         'uid',
-        'brand'
+        'brand',
+        'birthdate',
     ];
 
-    protected $casts = ['brand' => Brand::class];
+    protected $casts = [
+        'brand' => Brand::class,
+        'birthdate' => 'date:Y-m-d',
+    ];
 
     /**
      * Scope to the current brand (host-derived). See spec §3.3 / §3.4.
@@ -49,6 +54,7 @@ class Customer extends Model
             'city' => $this->city,
             'country' => $this->country,
             'uid' => $this->uid,
+            'birthdate' => $this->birthdate?->format('Y-m-d'),
         ];
     }
 }

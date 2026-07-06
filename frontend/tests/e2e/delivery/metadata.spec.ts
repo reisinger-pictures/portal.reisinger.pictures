@@ -28,7 +28,7 @@ test.describe('Metadata & Detail View Workflow', () => {
         await auth.login(testUser.email, testUser.password);
     });
 
-    test('Photographer can view and edit metadata in detail view', { tags: ['@feature:delivery:metadata'] }, async ({ page }) => {
+    test('Photographer can view and edit metadata in detail view', { tag: ['@feature:delivery:metadata'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         await galleryHelper.createAndOpenDeliveryGallery(galleryName);
 
@@ -55,7 +55,7 @@ test.describe('Metadata & Detail View Workflow', () => {
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page.getByRole('button', { name: 'Speichern' })).toBeEnabled();
     });
-    test('UI displays captured_at as readonly field', { tags: ['@feature:delivery:metadata'] }, async ({ page }) => {
+    test('UI displays captured_at as readonly field', { tag: ['@feature:delivery:metadata'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         await galleryHelper.createAndOpenDeliveryGallery(galleryName + ' Date');
 
@@ -78,7 +78,7 @@ test.describe('Metadata & Detail View Workflow', () => {
         await expect(page.locator('div.text-sm').filter({ hasText: '2026' }).first()).toBeVisible();
     });
 
-    test('Photographer can add keywords', { tags: ['@feature:delivery:metadata'] }, async ({ page }) => {
+    test('Photographer can add keywords', { tag: ['@feature:delivery:metadata'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         await galleryHelper.createAndOpenDeliveryGallery(galleryName + ' Keywords');
         const upload = new UploadHelper(page);
@@ -96,7 +96,7 @@ test.describe('Metadata & Detail View Workflow', () => {
         await expect(page.getByRole('button', { name: 'Speichern' })).toBeEnabled();
     });
 
-    test('Photographer can add description', { tags: ['@feature:delivery:metadata'] }, async ({ page }) => {
+    test('Photographer can add description', { tag: ['@feature:delivery:metadata'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         await galleryHelper.createAndOpenDeliveryGallery(galleryName + ' Description');
         const upload = new UploadHelper(page);
@@ -119,7 +119,7 @@ test.describe('Metadata & Detail View Workflow', () => {
         await expect(descInput).toHaveValue(testDescription);
     });
 
-    test('Photographer can add copyright', { tags: ['@feature:delivery:metadata'] }, async ({ page }) => {
+    test('Photographer can add copyright', { tag: ['@feature:delivery:metadata'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         await galleryHelper.createAndOpenDeliveryGallery(galleryName + ' Copyright');
         const upload = new UploadHelper(page);

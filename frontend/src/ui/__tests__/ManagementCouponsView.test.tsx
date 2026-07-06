@@ -21,6 +21,10 @@ vi.mock('swr', () => ({
     }),
 }));
 
+vi.mock('swr/mutation', () => ({
+    default: () => ({ trigger: vi.fn().mockResolvedValue(undefined), isMutating: false }),
+}));
+
 vi.mock('../../logic/useBrand', () => ({
     useBrand: () => ({ isSrp: true }),
 }));

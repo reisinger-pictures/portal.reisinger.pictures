@@ -16,7 +16,7 @@ test.describe('G3: Gallery Deletion', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Photographer can delete a gallery from structure view', { tags: ['@feature:photographer:gallery'] }, async ({ page }) => {
+    test('Photographer can delete a gallery from structure view', { tag: ['@feature:photographer:gallery'] }, async ({ page }) => {
         const testUser = await helper.createIsolatedUser('photographer');
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
@@ -49,7 +49,7 @@ test.describe('G3: Gallery Deletion', () => {
         await expect(page.locator('a').filter({ hasText: galleryName })).toHaveCount(0);
     });
 
-    test('Photographer can cancel gallery deletion', { tags: ['@feature:photographer:gallery'] }, async ({ page }) => {
+    test('Photographer can cancel gallery deletion', { tag: ['@feature:photographer:gallery'] }, async ({ page }) => {
         const testUser = await helper.createIsolatedUser('photographer');
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

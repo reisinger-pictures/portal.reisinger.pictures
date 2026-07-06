@@ -11,17 +11,18 @@ abstract class Controller
     protected function respondWithToken($token, $additionalData = [])
     {
         $ttl = Auth::guard('api')->factory()->getTTL();
-        
+        $secure = env('APP_ENV') !== 'local';
+
         $cookie = cookie(
-            'rp_jwt', 
-            $token, 
-            $ttl, 
-            '/', 
-            null, 
-            env('APP_ENV') !== 'local',
-            true, 
-            false, 
-            'Lax' 
+            'rp_jwt',
+            $token,
+            $ttl,
+            '/',
+            null,
+            $secure,
+            true,
+            false,
+            $secure ? 'None' : 'Lax'
         );
 
         $responseBody = array_merge([

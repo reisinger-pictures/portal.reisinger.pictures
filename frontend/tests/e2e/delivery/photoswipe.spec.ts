@@ -35,7 +35,7 @@ test.describe('PhotoSwipe & Lightbox UI', () => {
         modal = new ModalHelper(page);
     });
 
-    test('Lightbox opens and displays custom IPTC captions', { tags: ['@feature:delivery:ui'] }, async ({page}) => {
+    test('Lightbox opens and displays custom IPTC captions', { tag: ['@feature:delivery:ui'] }, async ({page}) => {
         await auth.login(testUser.email, testUser.password);
 
         await sidebar.openNewGalleryModal();

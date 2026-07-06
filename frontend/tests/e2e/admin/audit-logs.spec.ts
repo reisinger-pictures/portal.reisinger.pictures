@@ -82,7 +82,7 @@ test.describe('Audit Logs (Download Logs)', () => {
         return galleryName;
     }
 
-    test('Download by client is recorded in audit log, visible to photographer', { tags: ['@feature:admin:audit'] }, async ({ page, request }) => {
+    test('Download by client is recorded in audit log, visible to photographer', { tag: ['@feature:admin:audit'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -102,7 +102,7 @@ test.describe('Audit Logs (Download Logs)', () => {
         await expect(page.locator('main table td').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
     });
 
-    test('Filter by gallery name in audit logs', { tags: ['@feature:admin:audit'] }, async ({ page, request }) => {
+    test('Filter by gallery name in audit logs', { tag: ['@feature:admin:audit'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -120,7 +120,7 @@ test.describe('Audit Logs (Download Logs)', () => {
         await expect(table.locator('td').filter({ hasText: galleryName }).first()).toBeVisible({ timeout: 15000 });
     });
 
-    test('Pagination works in audit logs', { tags: ['@feature:admin:audit'] }, async ({ page }) => {
+    test('Pagination works in audit logs', { tag: ['@feature:admin:audit'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -136,7 +136,7 @@ test.describe('Audit Logs (Download Logs)', () => {
         await expect(headers).toHaveText(['Datum / Zeit', 'Benutzer / Gast', 'Galerie', 'Typ', 'Qualität']);
     });
 
-    test('Empty state when no logs', { tags: ['@feature:admin:audit'] }, async ({ page }) => {
+    test('Empty state when no logs', { tag: ['@feature:admin:audit'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 

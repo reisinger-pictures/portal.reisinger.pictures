@@ -42,6 +42,7 @@ class ContractPdfService
         $offerMarker = "%OFFER_JWT:{$offerPayload}%";
 
         $signers = $contract->signers->where('status', 'signed');
+        $ageLabel = \App\Support\AgeHelper::format($contract->billing_details['birthdate'] ?? null, $contract->created_at?->format('Y-m-d'));
         $brand = BrandRegistry::resolveFromContract($contract);
 
         $pdf = Pdf::loadView('pdf.contract_signatures', [
@@ -55,6 +56,7 @@ class ContractPdfService
             'offerMarker' => $offerMarker,
             'isSrp' => $brand === Brand::SRP,
             'pfx' => $brand->prefix(),
+            'ageLabel' => $ageLabel,
         ]);
 
         return $pdf->output();

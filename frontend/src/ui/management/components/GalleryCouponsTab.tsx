@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import useSWR from 'swr';
+import useSWRMutation from 'swr/mutation';
 import { fetcher, apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
 import { useAuth } from '../../../logic/useAuth';
@@ -52,6 +53,10 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
     const { user } = useAuth();
     const swrKey = `/api/management/galleries/${galleryId}/coupons`;
     const { data, error, isLoading, mutate } = useSWR<PaginatedCoupons>(swrKey, fetcher);
+    const { trigger: deleteCoupon } = useSWRMutation<PaginatedCoupons, unknown, string, { id: number }>(
+        swrKey,
+        async (_key, { arg }) => apiMutate<PaginatedCoupons>(`/api/management/coupons/${arg.id}`, 'DELETE'),
+    );
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     const openCreate = () => {
@@ -74,7 +79,8 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
     };
 
     const handleDelete = async (coupon: Coupon) => {
-        if (coupon.id === undefined) return;
+        const couponId = coupon.id;
+        if (couponId === undefined) return;
         if (!user?.is_admin && !user?.is_super_admin && coupon.used_count > 0) return;
         const couponCode = coupon.code;
         if (!(await confirm({
@@ -85,11 +91,18 @@ export default function GalleryCouponsTab({ galleryId }: Props) {
             return;
         }
         try {
-            await apiMutate(`/api/management/coupons/${coupon.id}`, 'DELETE');
+            await deleteCoupon(
+                { id: couponId },
+                {
+                    optimisticData: (currentData) => currentData
+                        ? { ...currentData, data: currentData.data.filter(c => c.id !== couponId), total: currentData.total - 1 }
+                        : { data: [], current_page: 1, last_page: 1, per_page: 50, total: 0 },
+                    rollbackOnError: true,
+                },
+            );
             showToast('success', t`Coupon gelöscht`);
-            void mutate();
-        } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : t`Fehler beim Löschen`);
+        } catch {
+            showToast('error', t`Fehler beim Löschen`);
         }
     };
 

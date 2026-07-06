@@ -24,4 +24,19 @@ enum Brand: string
             self::SRP => 'srp_',
         };
     }
+
+    /** Internal brand identifier (same as ->value, explicit for self-documenting code). */
+    public function id(): string
+    {
+        return $this->value;
+    }
+
+    /** Production domain for this brand. */
+    public function domain(): string
+    {
+        return match ($this) {
+            self::B2B => 'portal.reisinger.pictures',
+            self::SRP => 'buy.reisinger.pictures',
+        };
+    }
 }

@@ -17,6 +17,9 @@ use App\Http\Controllers\LicenseCatalogController;
 use App\Http\Controllers\MailController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SearchController;
@@ -35,17 +38,17 @@ use Illuminate\Support\Facades\Route;
 
 $throttleLimit = env('AUTH_THROTTLE_LIMIT', 9999);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
-    Route::post('/auth/login', [AuthController::class, 'login']);
-    Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
+    Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.auth.reset-password');
 });
 Route::get('/ping', function () {
     return response()->json(['message' => 'API OK']);
-});
+})->name('api.ping');
 // R-01 (naming): Lizenzbedingungen + Preisfaktoren — öffentlich, KEINE Bank-/Firmendaten
 // (diese liegen in /settings/billing-details hinter auth:api).
-Route::get('/settings/license-terms', [SettingsController::class, 'getLicenseTerms']);
-Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index']);
+Route::get('/settings/license-terms', [SettingsController::class, 'getLicenseTerms'])->name('api.settings.license-terms');
+Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index'])->name('api.settings.license-catalog');
 
 if (app()->environment('local', 'testing')) {
     Route::delete('/test/cleanup-user/{id}', function ($id) {
@@ -61,7 +64,7 @@ if (app()->environment('local', 'testing')) {
             $user->delete();
         }
         return response()->json(['success' => true]);
-    });
+    })->name('api.test.cleanup-user');
 
 }
 
@@ -70,181 +73,181 @@ Route::post('/test/flush-queue', function () {
         Artisan::call('queue:work', ['--stop-when-empty' => true]);
     }
     return response()->json(['success' => true]);
-});
+})->name('api.test.flush-queue');
 
-Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe']);
+Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('api.webhooks.stripe')->middleware('throttle:10,1');
 
-Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries']);
-Route::get('/sitemap-images.xml', [SitemapController::class, 'images']);
+Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries'])->name('api.sitemap.galleries');
+Route::get('/sitemap-images.xml', [SitemapController::class, 'images'])->name('api.sitemap.images');
 
-Route::get('/invites/{token}', [InviteController::class, 'check']);
-Route::get('/tenant-invites/{token}', [TenantInviteController::class, 'check']);
+Route::get('/invites/{token}', [InviteController::class, 'check'])->name('api.invites.check');
+Route::get('/tenant-invites/{token}', [TenantInviteController::class, 'check'])->name('api.tenant-invites.check');
 
-Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check']);
-Route::post('/contracts/join/{token}', [ContractJoinController::class, 'join']);
-Route::get('/contracts/sign/{personalToken}', [ContractJoinController::class, 'contractContent']);
-Route::post('/contracts/sign/{personalToken}', [ContractJoinController::class, 'sign']);
-Route::middleware('throttle:60,1')->post('/contracts/sign/{personalToken}/page-exit', [ContractJoinController::class, 'pageExit']);
-Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem']);
-Route::middleware("throttle:$throttleLimit,1")->post('/tenant-invites/redeem', [TenantInviteController::class, 'redeem']);
+Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check'])->name('api.contracts.join.check');
+Route::post('/contracts/join/{token}', [ContractJoinController::class, 'join'])->name('api.contracts.join.join');
+Route::get('/contracts/sign/{personalToken}', [ContractJoinController::class, 'contractContent'])->name('api.contracts.sign.content');
+Route::post('/contracts/sign/{personalToken}', [ContractJoinController::class, 'sign'])->name('api.contracts.sign.sign');
+Route::middleware('throttle:60,1')->post('/contracts/sign/{personalToken}/page-exit', [ContractJoinController::class, 'pageExit'])->name('api.contracts.sign.page-exit');
+Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem'])->name('api.invites.redeem');
+Route::middleware("throttle:$throttleLimit,1")->post('/tenant-invites/redeem', [TenantInviteController::class, 'redeem'])->name('api.tenant-invites.redeem');
 
-Route::get('/search', [SearchController::class, 'search']);
-Route::get('/search/locations', [SearchController::class, 'locations']);
-Route::get('/photos/{id}/context', [SearchController::class, 'photoContext']);
-Route::get('/galleries/{slug}', [GalleryFrontendController::class, 'show']);
-Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])->where('filename', '.*');
+Route::get('/search', [SearchController::class, 'search'])->name('api.search');
+Route::get('/search/locations', [SearchController::class, 'locations'])->name('api.search.locations');
+Route::get('/photos/{id}/context', [SearchController::class, 'photoContext'])->name('api.photos.context');
+Route::get('/galleries/{slug}', [GalleryFrontendController::class, 'show'])->name('api.galleries.show');
+Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])->name('api.media.serve')->where('filename', '.*');
 
 $downloadThrottle = env('DOWNLOAD_THROTTLE', 9999);
-Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', [DownloadController::class, 'downloadSingle']);
-Route::get('/orders/quote-decode', [OrderController::class, 'decodeQuoteLink']);
-Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip']);
+Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', [DownloadController::class, 'downloadSingle'])->name('api.photos.download');
+Route::get('/orders/quote-decode', [QuoteController::class, 'decodeQuoteLink'])->name('api.orders.quote-decode');
+Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
 
 Route::middleware(['auth:api', 'throttle:api'])->group(function () {
-    Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
-    Route::get('/auth/me', [AuthController::class, 'me']);
-    Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
+    Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
+    Route::post('/auth/refresh', [AuthController::class, 'refresh'])->name('api.auth.refresh');
+    Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
+    Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->name('api.auth.profile');
     // R-01 (naming): Bankverbindung & Impressum — sensibel, nur authentifiziert.
-    Route::get('/settings/billing-details', [SettingsController::class, 'getBillingDetails']);
-    Route::post('/photos/{photoId}/rate', [GalleryFrontendController::class, 'rate']);
-    Route::post('/galleries/{id}/finish-rating', [MailController::class, 'finishRating']);
+    Route::get('/settings/billing-details', [SettingsController::class, 'getBillingDetails'])->name('api.settings.billing-details');
+    Route::post('/photos/{photoId}/rate', [GalleryFrontendController::class, 'rate'])->name('api.photos.rate');
+    Route::post('/galleries/{id}/finish-rating', [MailController::class, 'finishRating'])->name('api.galleries.finish-rating');
 
-    Route::get('/notifications/preferences', [NotificationController::class, 'preferences']);
-    Route::post('/galleries/{id}/opt-in', [NotificationController::class, 'toggleGalleryOptIn']);
-    Route::post('/gallery-groups/{id}/opt-in', [NotificationController::class, 'toggleGroupOptIn']);
-    Route::put('/photos/{id}/meta', [PhotoController::class, 'updateMetadata']);
-    Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions']);
-    Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata']);
-    Route::post('/orders/checkout', [OrderController::class, 'checkout']);
-    Route::get('/orders', [OrderController::class, 'index']);
-    Route::get('/orders/{id}/invoice', [OrderController::class, 'downloadInvoice']);
-    Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip']);
-    Route::delete('/photos/{id}', [PhotoController::class, 'destroy']);
-    Route::get('/payouts/my-statements', [\App\Http\Controllers\PayoutController::class, 'myStatements']);
+    Route::get('/notifications/preferences', [NotificationController::class, 'preferences'])->name('api.notifications.preferences');
+    Route::post('/galleries/{id}/opt-in', [NotificationController::class, 'toggleGalleryOptIn'])->name('api.galleries.opt-in');
+    Route::post('/gallery-groups/{id}/opt-in', [NotificationController::class, 'toggleGroupOptIn'])->name('api.gallery-groups.opt-in');
+    Route::put('/photos/{id}/meta', [PhotoController::class, 'updateMetadata'])->name('api.photos.meta');
+    Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions'])->name('api.photos.versions');
+    Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata'])->name('api.photos.revert');
+    Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');
+    Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
+    Route::get('/orders/{id}/invoice', [InvoiceController::class, 'downloadInvoice'])->name('api.orders.invoice');
+    Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
+    Route::delete('/photos/{id}', [PhotoController::class, 'destroy'])->name('api.photos.destroy');
+    Route::get('/payouts/my-statements', [\App\Http\Controllers\PayoutController::class, 'myStatements'])->name('api.payouts.my-statements');
 
     // AI Metadata Generation
-    Route::get('/ai/status', [AIController::class, 'status']);
-    Route::post('/ai/generate-metadata', [AIController::class, 'generateMetadata']);
-    Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText']);
+    Route::get('/ai/status', [AIController::class, 'status'])->name('api.ai.status');
+    Route::post('/ai/generate-metadata', [AIController::class, 'generateMetadata'])->name('api.ai.generate-metadata');
+    Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText'])->name('api.ai.generate-metadata-text');
 
     // Coupon validation (public, auth-required)
-    Route::post('/coupons/validate', [CouponController::class, 'validateCoupon'])->middleware('throttle:coupon-validate');
+    Route::post('/coupons/validate', [CouponController::class, 'validateCoupon'])->name('api.coupons.validate')->middleware('throttle:coupon-validate');
 });
 
 Route::middleware(['auth:api', 'management'])->group(function () {
-    Route::get('/management/galleries', [GalleryController::class, 'indexAdmin']);
-    Route::post('/management/gallery-groups', [GalleryController::class, 'storeGroup']);
-    Route::put('/management/gallery-groups/{id}', [GalleryController::class, 'updateGroup']);
-    Route::delete('/management/gallery-groups/{id}', [GalleryController::class, 'deleteGroup']);
-    Route::post('/management/galleries', [GalleryController::class, 'storeGallery']);
-    Route::post('/management/galleries/{id}/sync-access', [GalleryController::class, 'syncAccess']);
-    Route::post('/management/galleries/{id}/sync-photographers', [GalleryController::class, 'syncPhotographers']);
-    Route::post('/management/gallery-groups/{id}/sync-photographers', [GalleryController::class, 'syncGroupPhotographers']);
-    Route::put('/management/galleries/{id}', [GalleryController::class, 'updateGallery']);
-    Route::delete('/management/galleries/{id}', [GalleryController::class, 'destroyGallery']);
-    Route::get('/management/gallery-groups/{id}', [GalleryController::class, 'showGroup']);
-    Route::get('/management/galleries/{id}/export', [GalleryController::class, 'exportRatings']);
-    Route::get('/management/galleries/{id}/rating-status', [GalleryController::class, 'ratingStatus']);
+    Route::get('/management/galleries', [GalleryController::class, 'indexAdmin'])->name('api.management.galleries.index');
+    Route::post('/management/gallery-groups', [GalleryController::class, 'storeGroup'])->name('api.management.gallery-groups.store');
+    Route::put('/management/gallery-groups/{id}', [GalleryController::class, 'updateGroup'])->name('api.management.gallery-groups.update');
+    Route::delete('/management/gallery-groups/{id}', [GalleryController::class, 'deleteGroup'])->name('api.management.gallery-groups.destroy');
+    Route::post('/management/galleries', [GalleryController::class, 'storeGallery'])->name('api.management.galleries.store');
+    Route::post('/management/galleries/{id}/sync-access', [GalleryController::class, 'syncAccess'])->name('api.management.galleries.sync-access');
+    Route::post('/management/galleries/{id}/sync-photographers', [GalleryController::class, 'syncPhotographers'])->name('api.management.galleries.sync-photographers');
+    Route::post('/management/gallery-groups/{id}/sync-photographers', [GalleryController::class, 'syncGroupPhotographers'])->name('api.management.gallery-groups.sync-photographers');
+    Route::put('/management/galleries/{id}', [GalleryController::class, 'updateGallery'])->name('api.management.galleries.update');
+    Route::delete('/management/galleries/{id}', [GalleryController::class, 'destroyGallery'])->name('api.management.galleries.destroy');
+    Route::get('/management/gallery-groups/{id}', [GalleryController::class, 'showGroup'])->name('api.management.gallery-groups.show');
+    Route::get('/management/galleries/{id}/export', [GalleryController::class, 'exportRatings'])->name('api.management.galleries.export');
+    Route::get('/management/galleries/{id}/rating-status', [GalleryController::class, 'ratingStatus'])->name('api.management.galleries.rating-status');
 
-    Route::get('/management/galleries/{id}/invites', [InviteController::class, 'index']);
-    Route::post('/management/galleries/{id}/invites', [InviteController::class, 'generate']);
-    Route::put('/management/invites/{id}', [InviteController::class, 'update']);
-    Route::delete('/management/invites/{id}', [InviteController::class, 'destroy']);
-    Route::post('/management/galleries/{id}/invites/send', [InviteController::class, 'sendEmail']);
-    Route::post('/management/upload', [ImageController::class, 'upload']);
-    Route::post('/management/galleries/{id}/send-custom-email', [MailController::class, 'sendCustom']);
+    Route::get('/management/galleries/{id}/invites', [InviteController::class, 'index'])->name('api.management.galleries.invites');
+    Route::post('/management/galleries/{id}/invites', [InviteController::class, 'generate'])->name('api.management.galleries.invites.generate');
+    Route::put('/management/invites/{id}', [InviteController::class, 'update'])->name('api.management.invites.update');
+    Route::delete('/management/invites/{id}', [InviteController::class, 'destroy'])->name('api.management.invites.destroy');
+    Route::post('/management/galleries/{id}/invites/send', [InviteController::class, 'sendEmail'])->name('api.management.galleries.invites.send');
+    Route::post('/management/upload', [ImageController::class, 'upload'])->name('api.management.upload');
+    Route::post('/management/galleries/{id}/send-custom-email', [MailController::class, 'sendCustom'])->name('api.management.galleries.send-custom-email');
 
-    Route::get('/management/roles', [UserController::class, 'roles']);
-    Route::get('/management/users', [UserController::class, 'index']);
-    Route::post('/management/users', [UserController::class, 'store']);
-    Route::put('/management/users/{id}', [UserController::class, 'update']);
-    Route::delete('/management/users/{id}', [UserController::class, 'destroy']);
-
-
-    Route::get('/management/settings/watermark', [SettingsController::class, 'getWatermark']);
-    Route::get('/management/settings/watermark/svg', [SettingsController::class, 'getWatermarkSvg']);
+    Route::get('/management/roles', [UserController::class, 'roles'])->name('api.management.roles');
+    Route::get('/management/users', [UserController::class, 'index'])->name('api.management.users.index');
+    Route::post('/management/users', [UserController::class, 'store'])->name('api.management.users.store');
+    Route::put('/management/users/{id}', [UserController::class, 'update'])->name('api.management.users.update');
+    Route::delete('/management/users/{id}', [UserController::class, 'destroy'])->name('api.management.users.destroy');
 
 
-    Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark']);
-    Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms']);
+    Route::get('/management/settings/watermark', [SettingsController::class, 'getWatermark'])->name('api.management.settings.watermark');
+    Route::get('/management/settings/watermark/svg', [SettingsController::class, 'getWatermarkSvg'])->name('api.management.settings.watermark-svg');
+
+
+    Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark'])->name('api.management.settings.watermark.update');
+    Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms'])->name('api.management.settings.license-terms');
     // R-01: Billing-/Impressum-Konfiguration ist ein Super-Admin-Anliegen (s. isImpressumMissing-
     // Gate im Frontend) → zusätzlich super_admin-gesichert. Lesen (GET /settings/billing-details)
     // bleibt auth:api, da Klienten die Bankdaten für "Kauf auf Rechnung" brauchen.
-    Route::put('/management/settings/billing-details', [SettingsController::class, 'updateBillingDetails'])->middleware('super_admin');
+    Route::put('/management/settings/billing-details', [SettingsController::class, 'updateBillingDetails'])->name('api.management.settings.billing-details')->middleware('super_admin');
 
     Route::middleware(['super_admin'])->group(function () {
-        Route::post('/management/settings/license-use-cases', [LicenseCatalogController::class, 'storeUseCase']);
-        Route::put('/management/settings/license-use-cases/{id}', [LicenseCatalogController::class, 'updateUseCase']);
-        Route::delete('/management/settings/license-use-cases/{id}', [LicenseCatalogController::class, 'destroyUseCase']);
-        Route::post('/management/settings/license-modifiers', [LicenseCatalogController::class, 'storeModifier']);
-        Route::put('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'updateModifier']);
-        Route::delete('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'destroyModifier']);
+        Route::post('/management/settings/license-use-cases', [LicenseCatalogController::class, 'storeUseCase'])->name('api.management.settings.license-use-cases.store');
+        Route::put('/management/settings/license-use-cases/{id}', [LicenseCatalogController::class, 'updateUseCase'])->name('api.management.settings.license-use-cases.update');
+        Route::delete('/management/settings/license-use-cases/{id}', [LicenseCatalogController::class, 'destroyUseCase'])->name('api.management.settings.license-use-cases.destroy');
+        Route::post('/management/settings/license-modifiers', [LicenseCatalogController::class, 'storeModifier'])->name('api.management.settings.license-modifiers.store');
+        Route::put('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'updateModifier'])->name('api.management.settings.license-modifiers.update');
+        Route::delete('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'destroyModifier'])->name('api.management.settings.license-modifiers.destroy');
 
-        Route::get('/management/payouts', [\App\Http\Controllers\PayoutController::class, 'adminIndex']);
-        Route::post('/management/payouts/calculate', [\App\Http\Controllers\PayoutController::class, 'calculate']);
-        Route::post('/management/payouts/{id}/approve', [\App\Http\Controllers\PayoutController::class, 'approveStatement']);
-        Route::post('/management/payouts/{id}/pay', [\App\Http\Controllers\PayoutController::class, 'markAsPaid']);
+        Route::get('/management/payouts', [\App\Http\Controllers\PayoutController::class, 'adminIndex'])->name('api.management.payouts');
+        Route::post('/management/payouts/calculate', [\App\Http\Controllers\PayoutController::class, 'calculate'])->name('api.management.payouts.calculate');
+        Route::post('/management/payouts/{id}/approve', [\App\Http\Controllers\PayoutController::class, 'approveStatement'])->name('api.management.payouts.approve');
+        Route::post('/management/payouts/{id}/pay', [\App\Http\Controllers\PayoutController::class, 'markAsPaid'])->name('api.management.payouts.pay');
 
-        Route::get('/management/contracts', [ContractController::class, 'index']);
-        Route::post('/management/contracts', [ContractController::class, 'store']);
-        Route::get('/management/contracts/{id}', [ContractController::class, 'show']);
-        Route::put('/management/contracts/{id}', [ContractController::class, 'update']);
-        Route::post('/management/contracts/{id}/open', [ContractController::class, 'open']);
-        Route::post('/management/contracts/{id}/close', [ContractController::class, 'close']);
+        Route::get('/management/contracts', [ContractController::class, 'index'])->name('api.management.contracts.index');
+        Route::post('/management/contracts', [ContractController::class, 'store'])->name('api.management.contracts.store');
+        Route::get('/management/contracts/{id}', [ContractController::class, 'show'])->name('api.management.contracts.show');
+        Route::put('/management/contracts/{id}', [ContractController::class, 'update'])->name('api.management.contracts.update');
+        Route::post('/management/contracts/{id}/open', [ContractController::class, 'open'])->name('api.management.contracts.open');
+        Route::post('/management/contracts/{id}/close', [ContractController::class, 'close'])->name('api.management.contracts.close');
     });
 
-    Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo']);
+    Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo'])->name('api.management.settings.system');
 
-    Route::get('/management/ftp/status', [FtpController::class, 'status']);
-    Route::post('/management/ftp/target', [FtpController::class, 'setTarget']);
-    Route::post('/management/ftp/process', [FtpController::class, 'process']);
+    Route::get('/management/ftp/status', [FtpController::class, 'status'])->name('api.management.ftp.status');
+    Route::post('/management/ftp/target', [FtpController::class, 'setTarget'])->name('api.management.ftp.target');
+    Route::post('/management/ftp/process', [FtpController::class, 'process'])->name('api.management.ftp.process');
 
 
-    Route::get('/management/tenants', [TenantController::class, 'index']);
-    Route::post('/management/tenants', [TenantController::class, 'store']);
-    Route::get('/management/tenants/{id}', [TenantController::class, 'show']);
-    Route::post('/management/tenants/{id}/invites', [TenantInviteController::class, 'invite']);
-    Route::put('/management/tenants/{id}', [TenantController::class, 'update']);
-    Route::delete('/management/tenants/{id}', [TenantController::class, 'destroy']);
-    Route::post('/management/tenants/{id}/collective-invoice', [TenantController::class, 'generateCollectiveInvoice']);
-    Route::put('/management/tenants/{id}/users', [TenantController::class, 'syncUsers']);
-    Route::put('/management/tenants/{id}/groups', [TenantController::class, 'syncGroups']);
+    Route::get('/management/tenants', [TenantController::class, 'index'])->name('api.management.tenants.index');
+    Route::post('/management/tenants', [TenantController::class, 'store'])->name('api.management.tenants.store');
+    Route::get('/management/tenants/{id}', [TenantController::class, 'show'])->name('api.management.tenants.show');
+    Route::post('/management/tenants/{id}/invites', [TenantInviteController::class, 'invite'])->name('api.management.tenants.invites');
+    Route::put('/management/tenants/{id}', [TenantController::class, 'update'])->name('api.management.tenants.update');
+    Route::delete('/management/tenants/{id}', [TenantController::class, 'destroy'])->name('api.management.tenants.destroy');
+    Route::post('/management/tenants/{id}/collective-invoice', [TenantController::class, 'generateCollectiveInvoice'])->name('api.management.tenants.collective-invoice');
+    Route::put('/management/tenants/{id}/users', [TenantController::class, 'syncUsers'])->name('api.management.tenants.sync-users');
+    Route::put('/management/tenants/{id}/groups', [TenantController::class, 'syncGroups'])->name('api.management.tenants.sync-groups');
 
-    Route::get('/management/orders', [OrderController::class, 'indexAdmin']);
-    Route::put('/management/orders/{id}/status', [OrderController::class, 'updateStatus']);
-    Route::post('/management/orders/quote-link', [OrderController::class, 'generateQuoteLink']);
-    Route::post('/management/orders/{id}/send-quote', [OrderController::class, 'sendQuote']);
-    Route::post('/management/invoices/manual', [OrderController::class, 'generateManualInvoice']);
-    Route::post('/management/invoices/extract-offer', [OrderController::class, 'extractOffer']);
+    Route::get('/management/orders', [OrderController::class, 'indexAdmin'])->name('api.management.orders.index');
+    Route::put('/management/orders/{id}/status', [OrderController::class, 'updateStatus'])->name('api.management.orders.status');
+    Route::post('/management/orders/quote-link', [QuoteController::class, 'generateQuoteLink'])->name('api.management.orders.quote-link');
+    Route::post('/management/orders/{id}/send-quote', [QuoteController::class, 'sendQuote'])->name('api.management.orders.send-quote');
+    Route::post('/management/invoices/manual', [InvoiceController::class, 'generateManualInvoice'])->name('api.management.invoices.manual');
+    Route::post('/management/invoices/extract-offer', [QuoteController::class, 'extractOffer'])->name('api.management.invoices.extract-offer');
         Route::middleware(['super_admin'])->group(function () {
-        Route::get('/management/products', [ProductController::class, 'index']);
-        Route::post('/management/products', [ProductController::class, 'store']);
-        Route::put('/management/products/{id}', [ProductController::class, 'update']);
-        Route::delete('/management/products/{id}', [ProductController::class, 'destroy']);
-        Route::get('/management/customers', [CustomerController::class, 'index']);
-        Route::post('/management/customers', [CustomerController::class, 'store']);
-        Route::put('/management/customers/{id}', [CustomerController::class, 'update']);
-        Route::delete('/management/customers/{id}', [CustomerController::class, 'destroy']);
+        Route::get('/management/products', [ProductController::class, 'index'])->name('api.management.products.index');
+        Route::post('/management/products', [ProductController::class, 'store'])->name('api.management.products.store');
+        Route::put('/management/products/{id}', [ProductController::class, 'update'])->name('api.management.products.update');
+        Route::delete('/management/products/{id}', [ProductController::class, 'destroy'])->name('api.management.products.destroy');
+        Route::get('/management/customers', [CustomerController::class, 'index'])->name('api.management.customers.index');
+        Route::post('/management/customers', [CustomerController::class, 'store'])->name('api.management.customers.store');
+        Route::put('/management/customers/{id}', [CustomerController::class, 'update'])->name('api.management.customers.update');
+        Route::delete('/management/customers/{id}', [CustomerController::class, 'destroy'])->name('api.management.customers.destroy');
 
-        Route::get('/management/text-snippets', [TextSnippetController::class, 'index']);
-        Route::post('/management/text-snippets', [TextSnippetController::class, 'store']);
-        Route::put('/management/text-snippets/{id}', [TextSnippetController::class, 'update']);
-        Route::delete('/management/text-snippets/{id}', [TextSnippetController::class, 'destroy']);
+        Route::get('/management/text-snippets', [TextSnippetController::class, 'index'])->name('api.management.text-snippets.index');
+        Route::post('/management/text-snippets', [TextSnippetController::class, 'store'])->name('api.management.text-snippets.store');
+        Route::put('/management/text-snippets/{id}', [TextSnippetController::class, 'update'])->name('api.management.text-snippets.update');
+        Route::delete('/management/text-snippets/{id}', [TextSnippetController::class, 'destroy'])->name('api.management.text-snippets.destroy');
     });
 
     // SRP-01: Coupon management (super_admin, admin, photographer)
-    Route::get('/management/coupons', [CouponController::class, 'index']);
-    Route::post('/management/coupons', [CouponController::class, 'store']);
-    Route::put('/management/coupons/{id}', [CouponController::class, 'update']);
-    Route::delete('/management/coupons/{id}', [CouponController::class, 'destroy']);
+    Route::get('/management/coupons', [CouponController::class, 'index'])->name('api.management.coupons.index');
+    Route::post('/management/coupons', [CouponController::class, 'store'])->name('api.management.coupons.store');
+    Route::put('/management/coupons/{id}', [CouponController::class, 'update'])->name('api.management.coupons.update');
+    Route::delete('/management/coupons/{id}', [CouponController::class, 'destroy'])->name('api.management.coupons.destroy');
 
     // SRP-01: Gallery/Group coupon endpoints
-    Route::get('/management/galleries/{id}/coupons', [CouponController::class, 'galleryCoupons']);
-    Route::post('/management/galleries/{id}/coupons', [CouponController::class, 'storeGalleryCoupon']);
-    Route::get('/management/gallery-groups/{id}/coupons', [CouponController::class, 'groupCoupons']);
-    Route::post('/management/gallery-groups/{id}/coupons', [CouponController::class, 'storeGroupCoupon']);
+    Route::get('/management/galleries/{id}/coupons', [CouponController::class, 'galleryCoupons'])->name('api.management.galleries.coupons');
+    Route::post('/management/galleries/{id}/coupons', [CouponController::class, 'storeGalleryCoupon'])->name('api.management.galleries.coupons.store');
+    Route::get('/management/gallery-groups/{id}/coupons', [CouponController::class, 'groupCoupons'])->name('api.management.gallery-groups.coupons');
+    Route::post('/management/gallery-groups/{id}/coupons', [CouponController::class, 'storeGroupCoupon'])->name('api.management.gallery-groups.coupons.store');
 
-    Route::get('/management/stats', [StatsController::class, 'index']);
-    Route::get('/management/logs', [StatsController::class, 'logs']);
+    Route::get('/management/stats', [StatsController::class, 'index'])->name('api.management.stats');
+    Route::get('/management/logs', [StatsController::class, 'logs'])->name('api.management.logs');
 
 });

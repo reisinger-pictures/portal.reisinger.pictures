@@ -26,7 +26,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Client requests quote, Admin answers via Mail, Client accepts', { tags: ['@feature:client:quote'] }, async ({ page, request }) => {
+    test('Client requests quote, Admin answers via Mail, Client accepts', { tag: ['@feature:client:quote'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const modal = new ModalHelper(page);
         const form = new FormHelper(page, modal);
@@ -122,7 +122,7 @@ test.describe('Custom Quotes Full Workflow', () => {
             url.searchParams.set('quote_token', t);
             window.history.pushState({}, '', url.toString());
             window.dispatchEvent(new PopStateEvent('popstate'));
-        }, token as string);
+        }, token!);
 
         await expect(async () => {
             await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.', { timeout: 1000 });

@@ -43,6 +43,9 @@
                     @if(!empty($contract->billing_details['zip']) || !empty($contract->billing_details['city'])) {{ $contract->billing_details['zip'] }} {{ $contract->billing_details['city'] }}<br> @endif
                     @if(!empty($contract->billing_details['country'])) {{ $contract->billing_details['country'] }}<br> @endif
                     @if(!empty($contract->billing_details['uid'])) UID: {{ $contract->billing_details['uid'] }}<br> @endif
+                    @if($ageLabel)
+                        <p style="margin-top: 4px; font-size: 10px; color: #666;">{{ $ageLabel }}</p>
+                    @endif
                 @endif
             </td>
             <td style="width: 50%; text-align: right;">

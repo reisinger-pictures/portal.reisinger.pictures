@@ -55,25 +55,26 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
                     {editingSnippet ? <Trans>Textbaustein bearbeiten</Trans> : <Trans>Neuen Textbaustein anlegen</Trans>}
                 </h3>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+                <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden" noValidate>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 shrink-0">
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Titel (Intern) *</span></label>
+                            <label className="label"><span className="label-text font-bold">Titel (Intern)</span></label>
                             <input required type="text" {...register('title')} className={`input input-bordered ${errors.title ? 'input-error' : ''}`} />
                             {errors.title && <span className="text-error text-xs mt-1">{errors.title.message}</span>}
                         </div>
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Kürzel (Shortcut) *</span></label>
+                            <label className="label"><span className="label-text font-bold">Kürzel (Shortcut)</span></label>
                             <div className="join w-full">
                                 <span className="btn no-animation join-item bg-base-300 border-base-300 font-mono opacity-70">/</span>
-                                <input type="text" {...register('shortcut')} className={`input input-bordered join-item w-full font-mono lowercase ${errors.shortcut ? 'input-error' : ''}`} />
+                                <input type="text" required {...register('shortcut')} className={`input input-bordered join-item w-full font-mono lowercase ${errors.shortcut ? 'input-error' : ''}`} />
                             </div>
                             {errors.shortcut && <span className="text-error text-xs mt-1">{errors.shortcut.message}</span>}
                         </div>
                     </div>
 
                     <div className="form-control flex-1 overflow-hidden mb-4 flex flex-col">
-                        <label className="label shrink-0"><span className="label-text font-bold">Inhalt (HTML) *</span></label>
+                        <label className="label shrink-0"><span className="label-text font-bold">Inhalt (HTML)</span></label>
+                        <input type="hidden" required />
                         <div className="flex-1 overflow-y-auto">
                             <WysiwygEditor value={watchContentHtml || ''} onChange={val => setValue('content_html', val)} hideSnippets={true} />
                         </div>

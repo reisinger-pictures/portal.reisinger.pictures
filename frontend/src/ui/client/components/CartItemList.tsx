@@ -1,5 +1,5 @@
 import {t} from "@lingui/core/macro";
-import {Trans} from "@lingui/react/macro";
+import {Trans, Plural} from "@lingui/react/macro";
 import type {VolumeLicensingResult} from '../../../logic/CartContext';
 import {CartItem} from '../../../logic/CartContext';
 import {formatMoney} from '../../../logic/utils';
@@ -20,7 +20,6 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
     const tierNum = volumeLicensing?.tier ?? 0;
     const nextCount = volumeLicensing?.nextTierCount ?? 0;
     const nextLabel = volumeLicensing?.nextTierLabel ?? '';
-    const nextPlural = nextCount === 1 ? '' : 'er';
     const itemCount = items.length;
 
     return (
@@ -41,7 +40,7 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                     </div>
                     {volumeLicensing.nextTierCount > 0 && (
                         <span className="text-xs opacity-70">
-                            {t`Noch ${nextCount} ${nextPlural} bis ${nextLabel}`}
+                            <Trans><Plural value={nextCount} one="Noch # Bild" other="Noch # Bilder" /> bis {nextLabel}</Trans>
                         </span>
                     )}
                     {volumeLicensing.tier === 3 && (

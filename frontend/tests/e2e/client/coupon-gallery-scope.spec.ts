@@ -22,7 +22,7 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Gallery-scoped coupon applies to matching gallery', { tags: ['@feature:client:coupon'] }, async ({ page }) => {
+    test('Gallery-scoped coupon applies to matching gallery', { tag: ['@feature:client:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const upload = new UploadHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
@@ -36,24 +36,16 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
         await auth.logout('http://buy.localhost:4321/');
 
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
         const couponCode = `GAL-${Math.random().toString(36).substring(2, 8)}`;
-        const createRes = await page.evaluate(async ({ code, galleryId }: { code: string; galleryId: string }) => {
-            const res = await fetch('/api/management/coupons', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    code,
-                    type: 'fixed',
-                    value: 10,
-                    scope_type: 'gallery',
-                    scope_id: galleryId,
-                    active: true,
-                }),
-            });
-            return res.json();
-        }, { code: couponCode, galleryId });
-        if (!createRes?.coupon?.id) throw new Error(`Coupon creation failed: ${JSON.stringify(createRes)}`);
-        helper.trackCoupon(createRes.coupon.id);
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const createRes = await request.post('/api/management/coupons', {
+            data: { code: couponCode, type: 'fixed', value: 10, scope_type: 'gallery', scope_id: galleryId, active: true },
+            headers: couHeaders,
+        });
+        if (!createRes.ok()) throw new Error(`Coupon creation failed: ${await createRes.text()}`);
+        const createResJson = await createRes.json();
+        if (createResJson?.coupon?.id) helper.trackCoupon(createResJson.coupon.id);
         await auth.logout('http://buy.localhost:4321/');
 
         await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
@@ -74,7 +66,7 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
         await auth.logout('http://buy.localhost:4321/');
     });
 
-    test('Gallery-scoped coupon rejected for non-matching gallery', { tags: ['@feature:client:coupon'] }, async ({ page }) => {
+    test('Gallery-scoped coupon rejected for non-matching gallery', { tag: ['@feature:client:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const upload = new UploadHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
@@ -92,23 +84,15 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
         await auth.logout('http://buy.localhost:4321/');
 
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
         const couponCode = `GAL-${Math.random().toString(36).substring(2, 8)}`;
-        const createRes = await page.evaluate(async ({ code, galleryId }: { code: string; galleryId: string }) => {
-            const res = await fetch('/api/management/coupons', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    code,
-                    type: 'fixed',
-                    value: 10,
-                    scope_type: 'gallery',
-                    scope_id: galleryId,
-                    active: true,
-                }),
-            });
-            return res.json();
-        }, { code: couponCode, galleryId: galleryAId });
-        if (createRes?.coupon?.id) helper.trackCoupon(createRes.coupon.id);
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const createRes2 = await request.post('/api/management/coupons', {
+            data: { code: couponCode, type: 'fixed', value: 10, scope_type: 'gallery', scope_id: galleryAId, active: true },
+            headers: couHeaders,
+        });
+        const createRes2Json = await createRes2.json();
+        if (createRes2Json?.coupon?.id) helper.trackCoupon(createRes2Json.coupon.id);
         await auth.logout('http://buy.localhost:4321/');
 
         await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');

@@ -232,10 +232,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
             {slashState.active && slashState.rect && (
                 <ul 
                     className="menu bg-base-100 shadow-2xl rounded-box border border-base-300 w-64 fixed z-50"
-                    style={{ 
-                        top: slashState.rect.bottom + 5, 
-                        left: slashState.rect.left 
-                    }}
+                    style={{ top: slashState.rect.bottom + 5, left: slashState.rect.left }}
                 >
                     <li className="menu-title text-sm opacity-70 px-4 py-2"><Trans>Textbaustein einfügen</Trans></li>
                     {filteredSnippets.length > 0 ? filteredSnippets.map((s, idx) => (

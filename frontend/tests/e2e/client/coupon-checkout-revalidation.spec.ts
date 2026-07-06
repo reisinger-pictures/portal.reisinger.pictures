@@ -48,7 +48,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
     }
 
-    test('Invalid coupon shows error at checkout', { tags: ['@feature:client:coupon'] }, async ({ page }) => {
+    test('Invalid coupon shows error at checkout', { tag: ['@feature:client:coupon'] }, async ({ page }) => {
         const { galleryName } = await setupGalleryWithPhoto(page);
 
         await page.route('**/api/coupons/validate', async route => {
@@ -79,7 +79,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         await expect(page.getByRole('alert').first()).toContainText('Der Rabattcode ist nicht mehr gültig.');
     });
 
-    test('Expired coupon shows error at checkout', { tags: ['@feature:client:coupon'] }, async ({ page }) => {
+    test('Expired coupon shows error at checkout', { tag: ['@feature:client:coupon'] }, async ({ page }) => {
         const { galleryName } = await setupGalleryWithPhoto(page);
 
         await page.route('**/api/coupons/validate', async route => {
@@ -135,7 +135,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         await expect(page.locator('.toast')).toContainText('Der Rabattcode ist nicht mehr gültig.');
     });
 
-    test('Valid coupon applies discount', { tags: ['@feature:client:coupon'] }, async ({ page }) => {
+    test('Valid coupon applies discount', { tag: ['@feature:client:coupon'] }, async ({ page }) => {
         const { galleryName } = await setupGalleryWithPhoto(page);
 
         await page.route('**/api/coupons/validate', async route => {

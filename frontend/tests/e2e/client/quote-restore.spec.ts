@@ -16,8 +16,9 @@ test.describe('Quote Cart Restore Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Navigating with quote_token fetches data, populates cart, and cleans URL', { tags: ['@feature:client:quote'] }, async ({ page, request }) => {
+    test('Navigating with quote_token fetches data, populates cart, and cleans URL', { tag: ['@feature:client:quote'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
         await auth.login(testUser.email, testUser.password);
 
         // Reale Token-Generierung via Admin API (Real-Flow)
@@ -29,11 +30,10 @@ test.describe('Quote Cart Restore Workflow', () => {
         const quoteToken = quoteData.link.split('quote_token=')[1];
 
         // Simuliere den Klick auf den Link: SPA-navigiere zum Warenkorb, dann token per URL setzen
-        const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Warenkorb');
-        await page.evaluate((token) => {
+        await page.evaluate((t) => {
             const url = new URL(window.location.href);
-            url.searchParams.set('quote_token', token);
+            url.searchParams.set('quote_token', t);
             window.history.pushState({}, '', url.toString());
             window.dispatchEvent(new PopStateEvent('popstate'));
         }, quoteToken);

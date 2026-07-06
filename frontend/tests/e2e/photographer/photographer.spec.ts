@@ -29,7 +29,7 @@ test.describe('Photographer Core Workflow', () => {
         await auth.login(testUser.email, testUser.password);
     });
 
-    test('Photographer can create a new delivery gallery', { tags: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
+    test('Photographer can create a new delivery gallery', { tag: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
         const galleryName = `Create Test ${Math.random().toString(36).substring(2, 10)}`;
@@ -44,7 +44,7 @@ test.describe('Photographer Core Workflow', () => {
         await expect(link).toBeVisible({ timeout: 15000 });
     });
 
-    test('Photographer can edit an existing gallery', async ({ page }) => {
+    test('Photographer can edit an existing gallery', { tag: ['@regression', '@feature:photographer'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         const modal = new ModalHelper(page);
         const sidebar = new SidebarHelper(page);
@@ -67,7 +67,7 @@ test.describe('Photographer Core Workflow', () => {
         await expect(newLink).toBeVisible({ timeout: 15000 });
     });
 
-    test('Photographer can upload an image and sees it in personal feed', { tags: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
+    test('Photographer can upload an image and sees it in personal feed', { tag: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         const upload = new UploadHelper(page);
         const sidebar = new SidebarHelper(page);
@@ -86,7 +86,7 @@ test.describe('Photographer Core Workflow', () => {
         await expect(page.locator('.space-y-8').first()).toBeVisible();
     });
 
-    test('Photographer can toggle between management and client view', async ({ page }) => {
+    test('Photographer can toggle between management and client view', { tag: ['@regression', '@feature:photographer'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         const galleryName = `Toggle Test ${Math.random().toString(36).substring(2, 10)}`;
 
@@ -110,7 +110,7 @@ test.describe('Photographer Core Workflow', () => {
         await expect(inviteBtn).toBeVisible();
     });
 
-    test('Photographer can update profile settings and verify FTP slug', async ({ page }) => {
+    test('Photographer can update profile settings and verify FTP slug', { tag: ['@regression', '@feature:photographer'] }, async ({ page }) => {
         const sidebar = new SidebarHelper(page);
         
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);

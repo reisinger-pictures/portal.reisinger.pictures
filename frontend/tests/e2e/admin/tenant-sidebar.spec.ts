@@ -78,7 +78,7 @@ test.describe('E1: Org-Admin Tenant Overview Visibility', () => {
         return { email, password, tenantName, tenantId, userId };
     }
 
-    test('Org-Admin sieht Organisation in Übersicht', { tags: ['@feature:admin:tenant'] }, async ({ page, request }) => {
+    test('Org-Admin sieht Organisation in Übersicht', { tag: ['@feature:admin:tenant'] }, async ({ page, request }) => {
         const { email, password, tenantName } = await createOrgAdmin(request, adminToken);
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

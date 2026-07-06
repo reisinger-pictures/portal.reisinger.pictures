@@ -53,7 +53,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super Admin uses CRM autocomplete, Tiptap shortcuts and generates PDF Offer', { tags: ['@feature:admin:documents'] }, async ({ page }) => {
+    test('Super Admin uses CRM autocomplete, Tiptap shortcuts and generates PDF Offer', { tag: ['@feature:admin:documents'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         await auth.login(testUser.email, testUser.password);
@@ -143,7 +143,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await expect(editor).toContainText(`Magic${uniqueSuffix}Content`);
     });
 
-    test('Super Admin can use the Shooting Package Calculator with 50% OG discount', { tags: ['@feature:admin:documents'] }, async ({ page }) => {
+    test('Super Admin can use the Shooting Package Calculator with 50% OG discount', { tag: ['@feature:admin:documents'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         await auth.login(testUser.email, testUser.password);

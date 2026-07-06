@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Enums\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 
 class FileDeliveryControllerTest extends TestCase
@@ -418,7 +419,7 @@ class FileDeliveryControllerTest extends TestCase
 
     public function test_proxy_delivery_header_returned_when_configured(): void
     {
-        putenv('PROXY_DELIVERY_HEADER=X-Sendfile');
+        Config::set('services.proxy_delivery_header', 'X-Sendfile');
 
         $user = User::factory()->create(['flatrate_level' => 'original']);
         $gallery = $this->createPrivateDeliveryGallery();
@@ -432,6 +433,6 @@ class FileDeliveryControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertHeader('X-Sendfile');
 
-        putenv('PROXY_DELIVERY_HEADER');
+        Config::set('services.proxy_delivery_header', null);
     }
 }

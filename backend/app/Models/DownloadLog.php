@@ -14,6 +14,7 @@ class DownloadLog extends Model
 
     protected $fillable = [
         'user_id',
+        'guest_id',
         'user_name_snapshot',
         'gallery_id',
         'gallery_name_snapshot',
@@ -27,6 +28,7 @@ class DownloadLog extends Model
 
     protected $casts = [
         'payload' => 'array',
+        'guest_id' => 'string',
     ];
 
     public function gallery()

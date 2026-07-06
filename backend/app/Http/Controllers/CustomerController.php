@@ -40,6 +40,7 @@ class CustomerController extends Controller
             'city' => 'nullable|string|max:255',
             'country' => 'nullable|string|max:255',
             'uid' => 'nullable|string|max:100',
+            'birthdate' => 'nullable|date|before:today|before:-10 years',
         ]);
 
         $validated['brand'] = BrandRegistry::currentOrDefault()->value;
@@ -60,6 +61,7 @@ class CustomerController extends Controller
             'city' => 'nullable|string|max:255',
             'country' => 'nullable|string|max:255',
             'uid' => 'nullable|string|max:100',
+            'birthdate' => 'nullable|date|before:today|before:-10 years',
         ]);
 
         $customer->update($validated);

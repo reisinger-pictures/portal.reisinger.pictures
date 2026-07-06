@@ -16,88 +16,65 @@ test.describe('Coupon Admin CRUD', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Admin can create a fixed global coupon', { tags: ['@feature:admin:coupon'] }, async ({ page }) => {
+    test('Admin can create a fixed global coupon', { tag: ['@feature:admin:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
 
-        const { coupon: fixedCoupon } = await page.evaluate(async () => {
-            const code = `FIXED-${Math.random().toString(36).substring(2, 8)}`;
-            const res = await fetch('/api/management/coupons', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    code,
-                    type: 'fixed',
-                    value: 15,
-                    scope_type: 'global',
-                    active: true,
-                }),
-            });
-            return res.json();
+        const couponCode = `FIXED-${Math.random().toString(36).substring(2, 8)}`;
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const createRes = await request.post('/api/management/coupons', {
+            data: { code: couponCode, type: 'fixed', value: 15, scope_type: 'global', active: true },
+            headers: couHeaders,
         });
-        if (fixedCoupon?.id) helper.trackCoupon(fixedCoupon.id);
+        const createResJson = await createRes.json();
+        if (createResJson?.coupon?.id) helper.trackCoupon(createResJson.coupon.id);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
         await expect(page.locator('h1')).toContainText('Gutscheincode', { timeout: 15000 });
 
-        await expect(page.locator('table')).toContainText(fixedCoupon.code, { timeout: 10000 });
+        await expect(page.locator('table')).toContainText(couponCode, { timeout: 10000 });
     });
 
-    test('Admin can create organisation-scoped coupon', { tags: ['@feature:admin:coupon'] }, async ({ page }) => {
+    test('Admin can create organisation-scoped coupon', { tag: ['@feature:admin:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
 
-        const { coupon: orgCoupon } = await page.evaluate(async () => {
-            const code = `ORG-${Math.random().toString(36).substring(2, 8)}`;
-            const res = await fetch('/api/management/coupons', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    code,
-                    type: 'fixed',
-                    value: 10,
-                    scope_type: 'global',
-                    active: true,
-                }),
-            });
-            return res.json();
+        const couponOrgCode = `ORG-${Math.random().toString(36).substring(2, 8)}`;
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const orgRes = await request.post('/api/management/coupons', {
+            data: { code: couponOrgCode, type: 'fixed', value: 10, scope_type: 'global', active: true },
+            headers: couHeaders,
         });
-        if (orgCoupon?.id) helper.trackCoupon(orgCoupon.id);
+        const orgResJson = await orgRes.json();
+        if (orgResJson?.coupon?.id) helper.trackCoupon(orgResJson.coupon.id);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
         await expect(page.locator('h1')).toContainText('Gutscheincode', { timeout: 15000 });
 
-        await expect(page.locator('table')).toContainText(orgCoupon.code, { timeout: 10000 });
+        await expect(page.locator('table')).toContainText(couponOrgCode, { timeout: 10000 });
     });
 
-    test('Admin can delete a used coupon', { tags: ['@feature:admin:coupon'] }, async ({ page }) => {
+    test('Admin can delete a used coupon', { tag: ['@feature:admin:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
 
         const couponCode = `USED-${Math.random().toString(36).substring(2, 8)}`;
-        const { coupon } = await page.evaluate(async (code) => {
-            const res = await fetch('/api/management/coupons', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    code,
-                    type: 'fixed',
-                    value: 5,
-                    scope_type: 'global',
-                    active: true,
-                    used_count: 1,
-                }),
-            });
-            return res.json();
-        }, couponCode);
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        await request.post('/api/management/coupons', {
+            data: { code: couponCode, type: 'fixed', value: 5, scope_type: 'global', active: true, used_count: 1 },
+            headers: couHeaders,
+        });
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
         await expect(page.locator('h1')).toContainText('Gutscheincode', { timeout: 15000 });
 
-        const row = page.locator('tr').filter({ hasText: coupon.code });
+        const row = page.locator('tr').filter({ hasText: couponCode });
         await expect(row).toBeVisible({ timeout: 10000 });
 
         const deleteBtn = row.locator('button[title="Löschen"]');
@@ -114,31 +91,24 @@ test.describe('Coupon Admin CRUD', () => {
         await expect(row).toBeHidden({ timeout: 10000 });
     });
 
-    test('Admin can toggle coupon active/inactive', { tags: ['@feature:admin:coupon'] }, async ({ page }) => {
+    test('Admin can toggle coupon active/inactive', { tag: ['@feature:admin:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
 
-        const couponCode = `TOGGLE-${Math.random().toString(36).substring(2, 8)}`;
-        const { coupon } = await page.evaluate(async (code) => {
-            const res = await fetch('/api/management/coupons', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    code,
-                    type: 'percentage',
-                    value: 10,
-                    scope_type: 'global',
-                    active: true,
-                }),
-            });
-            return res.json();
-        }, couponCode);
-        if (coupon?.id) helper.trackCoupon(coupon.id);
+        const toggleCouponCode = `TOGGLE-${Math.random().toString(36).substring(2, 8)}`;
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const toggleRes = await request.post('/api/management/coupons', {
+            data: { code: toggleCouponCode, type: 'percentage', value: 10, scope_type: 'global', active: true },
+            headers: couHeaders,
+        });
+        const toggleResJson = await toggleRes.json();
+        if (toggleResJson?.coupon?.id) helper.trackCoupon(toggleResJson.coupon.id);
 
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Gutscheincode');
 
-        const row = page.locator('tr').filter({ hasText: coupon.code });
+        const row = page.locator('tr').filter({ hasText: toggleCouponCode });
         await expect(row).toBeVisible({ timeout: 15000 });
         await expect(row.locator('span.badge-success')).toContainText('Aktiv', { timeout: 10000 });
 

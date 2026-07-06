@@ -18,7 +18,7 @@ test.describe('Payout System UI Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super-Admin calculates pool, Photographer views statements', { tags: ['@feature:admin:payouts'] }, async ({ page }) => {
+    test('Super-Admin calculates pool, Photographer views statements', { tag: ['@feature:admin:payouts'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -48,7 +48,7 @@ test.describe('Payout System UI Workflow', () => {
         await expect(page.locator('td', { hasText: 'Du hast bisher noch keine Abrechnungen erhalten.' })).toBeVisible();
     });
 
-    test('Payout calculation with negative amount is rejected', { tags: ['@feature:admin:payouts'] }, async ({ page }) => {
+    test('Payout calculation with negative amount is rejected', { tag: ['@feature:admin:payouts'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -62,7 +62,7 @@ test.describe('Payout System UI Workflow', () => {
         await expect(page.locator('.toast')).toContainText('Bitte einen gültigen Betrag eingeben.');
     });
 
-    test('Photographer can see detailed breakdown', { tags: ['@feature:admin:payouts'] }, async ({ page }) => {
+    test('Photographer can see detailed breakdown', { tag: ['@feature:admin:payouts'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 

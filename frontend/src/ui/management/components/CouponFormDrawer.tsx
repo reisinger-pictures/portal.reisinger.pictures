@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -59,8 +60,8 @@ interface Props {
 }
 
 const TYPE_VALUE_LABEL: Record<CouponFormValues['type'], string> = {
-    fixed: 'Betrag in €',
-    percentage: 'Prozent',
+    fixed: t`Betrag in €`,
+    percentage: t`Prozent`,
 };
 
 const SCOPE_REQUIRES_TARGET: ReadonlySet<CouponFormValues['scope_type']> = new Set([
@@ -108,7 +109,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
     const handleClose = async () => {
         if (isDirty) {
-            const confirmed = await confirm({ title: 'Ungespeicherte Änderungen', message: 'Möchtest du die eingegebenen Daten wirklich verwerfen?', confirmText: 'Verwerfen', confirmColor: 'warning' });
+            const confirmed = await confirm({ title: t`Ungespeicherte Änderungen`, message: t`Möchtest du die eingegebenen Daten wirklich verwerfen?`, confirmText: t`Verwerfen`, confirmColor: 'warning' });
             if (!confirmed) return;
         }
         onClose();
@@ -148,26 +149,27 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                     type="button"
                     className="btn btn-circle btn-ghost absolute right-2 top-2"
                     onClick={handleClose}
-                    aria-label="Schließen"
+                    aria-label={t`Schließen`}
                 >
                     ✕
                 </button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--ticket-percent-outline text-primary"></span>
-                    {editingCoupon ? 'Rabattcode bearbeiten' : 'Neuen Rabattcode anlegen'}
+                    {editingCoupon ? <Trans>Rabattcode bearbeiten</Trans> : <Trans>Neuen Rabattcode anlegen</Trans>}
                 </h3>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
                             <label className="label">
-                                <span className="label-text font-bold">Code *</span>
+                                <span className="label-text font-bold"><Trans>Code</Trans></span>
                             </label>
                             <input
                                 type="text"
+                                required
                                 {...register('code')}
                                 className={`input input-bordered uppercase ${errors.code ? 'input-error' : ''}`}
-                                placeholder="z.B. SOMMER2026"
+                                placeholder={t`z.B. SOMMER2026`}
                             />
                             {errors.code && (
                                 <span className="text-error text-xs mt-1">{errors.code.message}</span>
@@ -176,11 +178,11 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
                         <div className="form-control">
                             <label className="label">
-                                <span className="label-text font-bold">Typ *</span>
+                                <span className="label-text font-bold"><Trans>Typ</Trans></span>
                             </label>
-                            <select {...register('type')} className="select select-bordered">
-                                <option value="fixed">Festbetrag</option>
-                                <option value="percentage">Prozent</option>
+                            <select required {...register('type')} className="select select-bordered">
+                                <option value="fixed"><Trans>Festbetrag</Trans></option>
+                                <option value="percentage"><Trans>Prozent</Trans></option>
                             </select>
                             {errors.type && (
                                 <span className="text-error text-xs mt-1">{errors.type.message}</span>
@@ -189,12 +191,13 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
                         <div className="form-control">
                             <label className="label">
-                                <span className="label-text font-bold">{valueLabel} *</span>
+                                <span className="label-text font-bold">{valueLabel}</span>
                             </label>
                             <input
                                 type="number"
                                 step="0.01"
                                 min="0"
+                                required
                                 {...register('value', { valueAsNumber: true })}
                                 className={`input input-bordered font-mono ${errors.value ? 'input-error' : ''}`}
                             />
@@ -205,14 +208,14 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
                         <div className="form-control">
                             <label className="label">
-                                <span className="label-text font-bold">Geltungsbereich *</span>
+                                <span className="label-text font-bold"><Trans>Geltungsbereich</Trans></span>
                             </label>
-                            <select {...register('scope_type')} className="select select-bordered">
-                                <option value="global">Global</option>
-                                <option value="gallery">Galerie</option>
-                                <option value="meta_gallery">Galerie-Gruppe</option>
-                                <option value="organisation">Organisation</option>
-                                <option value="photographer">Fotograf</option>
+                            <select required {...register('scope_type')} className="select select-bordered">
+                                <option value="global"><Trans>Global</Trans></option>
+                                <option value="gallery"><Trans>Galerie</Trans></option>
+                                <option value="meta_gallery"><Trans>Galerie-Gruppe</Trans></option>
+                                <option value="organisation"><Trans>Organisation</Trans></option>
+                                <option value="photographer"><Trans>Fotograf</Trans></option>
                             </select>
                             {errors.scope_type && (
                                 <span className="text-error text-xs mt-1">{errors.scope_type.message}</span>
@@ -222,13 +225,13 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                         {showScopeTarget && (
                             <div className="form-control md:col-span-2">
                                 <label className="label">
-                                    <span className="label-text font-bold">Ziel-ID *</span>
+                                    <span className="label-text font-bold"><Trans>Ziel-ID</Trans></span>
                                 </label>
                                 <input
                                     type="text"
                                     {...register('scope_id')}
                                     className={`input input-bordered font-mono ${errors.scope_id ? 'input-error' : ''}`}
-                                    placeholder={watchScopeType === 'gallery' ? 'Galerie-ID' : 'Galerie-Gruppen-ID'}
+                                    placeholder={watchScopeType === 'gallery' ? t`Galerie-ID` : t`Galerie-Gruppen-ID`}
                                 />
                                 {errors.scope_id && (
                                     <span className="text-error text-xs mt-1">{errors.scope_id.message}</span>
@@ -239,7 +242,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                         {showMaxItems && (
                             <div className="form-control md:col-span-2">
                                 <label className="label">
-                                    <span className="label-text font-bold">Auf X günstigste Bilder beschränken</span>
+                                    <span className="label-text font-bold"><Trans>Auf X günstigste Bilder beschränken</Trans></span>
                                 </label>
                                 <input
                                     type="number"
@@ -248,7 +251,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                                     step="1"
                                     {...register('max_items', { valueAsNumber: true })}
                                     className={`input input-bordered font-mono ${errors.max_items ? 'input-error' : ''}`}
-                                    placeholder="leer = auf gesamten Warenkorb"
+                                    placeholder={t`leer = auf gesamten Warenkorb`}
                                 />
                                 {errors.max_items && (
                                     <span className="text-error text-xs mt-1">{errors.max_items.message}</span>
@@ -258,7 +261,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
                         <div className="form-control">
                             <label className="label">
-                                <span className="label-text font-bold">Max. globale Verwendungen</span>
+                                <span className="label-text font-bold"><Trans>Max. globale Verwendungen</Trans></span>
                             </label>
                             <input
                                 type="number"
@@ -266,7 +269,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                                 step="1"
                                 {...register('max_uses_global', { valueAsNumber: true })}
                                 className={`input input-bordered font-mono ${errors.max_uses_global ? 'input-error' : ''}`}
-                                placeholder="unbegrenzt"
+                                placeholder={t`unbegrenzt`}
                             />
                             {errors.max_uses_global && (
                                 <span className="text-error text-xs mt-1">{errors.max_uses_global.message}</span>
@@ -275,7 +278,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
                         <div className="form-control">
                             <label className="label">
-                                <span className="label-text font-bold">Max. Verwendungen pro Account</span>
+                                <span className="label-text font-bold"><Trans>Max. Verwendungen pro Account</Trans></span>
                             </label>
                             <input
                                 type="number"
@@ -283,7 +286,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                                 step="1"
                                 {...register('max_uses_per_account', { valueAsNumber: true })}
                                 className={`input input-bordered font-mono ${errors.max_uses_per_account ? 'input-error' : ''}`}
-                                placeholder="unbegrenzt"
+                                placeholder={t`unbegrenzt`}
                             />
                             {errors.max_uses_per_account && (
                                 <span className="text-error text-xs mt-1">{errors.max_uses_per_account.message}</span>
@@ -292,7 +295,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
                         <div className="form-control">
                             <label className="label">
-                                <span className="label-text font-bold">Gültig bis</span>
+                                <span className="label-text font-bold"><Trans>Gültig bis</Trans></span>
                             </label>
                             <input
                                 type="date"
@@ -308,9 +311,9 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                                     {...register('active')}
                                     className="checkbox checkbox-primary"
                                 />
-                                <span className="label-text font-bold">Aktiv</span>
+                                <span className="label-text font-bold"><Trans>Aktiv</Trans></span>
                                 <span className="label-text-alt opacity-60">
-                                    {watchActive ? 'Gutscheincodes können eingelöst werden' : 'Gutscheincodes sind deaktiviert'}
+                                    {watchActive ? <Trans>Gutscheincodes können eingelöst werden</Trans> : <Trans>Gutscheincodes sind deaktiviert</Trans>}
                                 </span>
                             </label>
                         </div>
@@ -318,10 +321,10 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
                     <div className="modal-action col-span-full mt-6">
                         <button type="button" className="btn btn-ghost" onClick={handleClose}>
-                            Abbrechen
+                            <Trans>Abbrechen</Trans>
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
+                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
                         </button>
                     </div>
                 </form>

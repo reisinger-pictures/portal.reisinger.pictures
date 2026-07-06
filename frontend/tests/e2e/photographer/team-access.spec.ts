@@ -20,7 +20,7 @@ test.describe('Photographer Team Access Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Test 5: Photog B can access and upload to an OPEN gallery created by Photog A', { tags: ['@feature:photographer:team'] }, async ({ page }) => {
+    test('Test 5: Photog B can access and upload to an OPEN gallery created by Photog A', { tag: ['@feature:photographer:team'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
         const upload = new UploadHelper(page);
@@ -43,7 +43,7 @@ test.describe('Photographer Team Access Workflow', () => {
         await expect(page.locator('a.pswp-item img').first()).toBeVisible();
     });
 
-    test('Test 6: Photog B CANNOT access a RESTRICTED gallery created by Photog A', { tags: ['@feature:photographer:team'] }, async ({ page }) => {
+    test('Test 6: Photog B CANNOT access a RESTRICTED gallery created by Photog A', { tag: ['@feature:photographer:team'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
         const sidebar = new SidebarHelper(page);

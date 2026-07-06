@@ -4,14 +4,15 @@
 > Verknüpft: `features/infrastructure/07-lightroom-multi-tenant-gap.md`,
 > `features/infrastructure/08-tenant-brand-concept.md`,
 > `features/infrastructure/09-brand-context-queue-cli.md`,
-> `features/infrastructure/11-brand-settings-separation.md`.
+> `features/infrastructure/11-brand-settings-separation.md`,
+> `features/infrastructure/25-brand-separation-matrix.md`.
 
 ## 1. Kontext
 
 Das Portal betreibt zwei White-Label-Brands:
 
 - **B2B** (`rp`): `reisinger.pictures` — vollständiges Admin-/Mandanten-/CRM-/Invoicing-Portal.
-- **SRP** (`srp`): `story.reisinger.pictures` — reduziertes B2C-Kunden-Portal.
+- **SRP** (`srp`): `buy.reisinger.pictures` — reduziertes B2C-Kunden-Portal.
 
 Bisher wird die Brand als **freier String** (`'reisinger.pictures'` / `'story.reisinger.pictures'`) behandelt,
 und die Host→Brand-Map ist **doppelt** gepflegt (Backend `BrandContextMiddleware` und Frontend
@@ -29,7 +30,8 @@ Settings-/PDF-Pfaden.
 
 - **ENUM** `App\Enums\Brand` mit Werten `'rp'` (B2B) und `'srp'` (SRP); `null` bedeutet
   bewusst cross-brand (Super-Admin).
-- `Brand`-Methoden: `label()`, `domain()` (prod), `prefix()` (`'srp_'` | `''`).
+- `Brand`-Methoden: `id()` (enum value, self-documenting), `prefix()` (`'srp_'` | `''`).
+- `BrandRegistry`-Methoden (Brand-Kontext-Auflösung): `frontendUrl()`, `resolveFromContract()`, `reset()`, u. a. (siehe §2.3).
 
 ### 2.2 `brand`-Spalte als ENUM-Fremdschlüssel auf 6 Tabellen
 
@@ -40,9 +42,8 @@ vorhandene Bestandsdaten auf `'rp'`. Index je Spalte für Brand-Scoping-Queries.
 ### 2.3 Zentrale `BrandRegistry`
 
 - **Backend** `App\Support\BrandRegistry`: `fromHost()`, `current()`, `currentOrDefault()`,
-  `isSrp()`, `prefix()`, `set()`, `resolveFromOrder()`. Einzige Autorität für Host→Brand und
-  `config('app.brand')`-Zugriff. Alle inline-Checks (`=== 'story.reisinger.pictures'`, `$pfx = …`) werden
-  darauf umgestellt.
+  `isSrp()`, `prefix()`, `set()`, `resolveFromOrder()`, `resolveFromContract()`, `frontendUrl()`, `reset()`.
+  Einzige Autorität für Host→Brand und Frontend-URL-Auflösung.
 - **Frontend** `frontend/src/logic/brandRegistry.ts`: typsichere Konstanten + reine Funktionen
   `getBrandFromHostname()`, `isSrpBrand()`, `brandPrefix()`. `useBrand.ts` delegiert dorthin
   (Asset-/Portal-Logik bleibt UI-spezifisch in `useBrand`).
@@ -73,7 +74,7 @@ Hostname vertrauen muss.
 
 ### 2.8 Lokale Brand-Unterscheidung via Proxy (relative URLs)
 
-- Prod: domain-basiert (`portal.reisinger.pictures` vs `portal.story.reisinger.pictures`).
+- Prod: domain-basiert (`portal.reisinger.pictures` vs `buy.reisinger.pictures`).
 - Lokal: **zwei Vite-Instanzen** — Port 4321 = B2B (`portal.test`), Port 4322 = SRP
   (`portal-srp.test`), jeweils eigenes Proxy-Target. Frontend-URLs bleiben **relativ**
   (`/api/...`); das Proxy-Target entscheidet, welchen Host das Backend sieht, sodass

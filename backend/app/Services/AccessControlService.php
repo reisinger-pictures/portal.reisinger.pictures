@@ -60,7 +60,7 @@ class AccessControlService
                 $allGalleries = Gallery::with('galleryGroup')->get();
                 return $allGalleries->filter(fn($g) => !$g->effective_restricted_photographers)->pluck('id')->toArray();
             };
-            $unrestrictedIds = Cache::rememberForever('unrestricted_photographer_gallery_ids', $buildUnrestricted);
+            $unrestrictedIds = Cache::remember('unrestricted_photographer_gallery_ids', now()->addMinutes(5), $buildUnrestricted);
             $galleryIds = array_merge($galleryIds, $unrestrictedIds);
 
             $photogGalleryIds = $user->photographerGalleries()->pluck('galleries.id')->toArray();

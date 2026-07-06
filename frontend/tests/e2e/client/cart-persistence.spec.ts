@@ -16,7 +16,7 @@ test.describe('Cart Persistence & Validation Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Invalid or corrupted localStorage is caught by Zod and results in empty cart', { tags: ['@feature:client:cart'] }, async ({ page }) => {
+    test('Invalid or corrupted localStorage is caught by Zod and results in empty cart', { tag: ['@feature:client:cart'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
         
@@ -28,21 +28,21 @@ test.describe('Cart Persistence & Validation Workflow', () => {
         await expect(page.locator('text=Dein Warenkorb ist leer.')).toBeVisible();
 
         // 1. Inject completely corrupted JSON
-        await page.evaluate((key) => {
+        await page.addInitScript((key) => {
             localStorage.setItem(key, 'THIS_IS_NOT_JSON');
         }, cartKey);
         await page.reload();
         await expect(page.locator('text=Dein Warenkorb ist leer.')).toBeVisible();
 
         // 2. Inject valid JSON but invalid schema (missing required fields)
-        await page.evaluate((key) => {
+        await page.addInitScript((key) => {
             localStorage.setItem(key, JSON.stringify([{ invalid: 'data', price: 'not-a-number' }]));
         }, cartKey);
         await page.reload();
         await expect(page.locator('text=Dein Warenkorb ist leer.')).toBeVisible();
 
         // 3. Inject valid cart matching the Zod schema
-        await page.evaluate((key) => {
+        await page.addInitScript((key) => {
             localStorage.setItem(key, JSON.stringify([{
                 photoId: 'valid-id-123',
                 filename: 'Test Bild',

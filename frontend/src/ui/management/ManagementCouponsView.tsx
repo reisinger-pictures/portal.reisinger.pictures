@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useSWR from 'swr';
+import useSWRMutation from 'swr/mutation';
 import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import { useAuth } from '../../logic/useAuth';
@@ -70,6 +71,14 @@ export default function ManagementCouponsView() {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
     const swrKey = `/api/management/coupons?page=${page}`;
     const { data, error, isLoading, mutate } = useSWR<PaginatedCoupons>(swrKey, fetcher);
+    const { trigger: toggleCoupon } = useSWRMutation<PaginatedCoupons, unknown, string, { id: number; active: boolean }>(
+        swrKey,
+        async (_key, { arg }) => apiMutate<PaginatedCoupons>(`/api/management/coupons/${arg.id}`, 'PUT', { active: arg.active }),
+    );
+    const { trigger: deleteCoupon } = useSWRMutation<PaginatedCoupons, unknown, string, { id: number }>(
+        swrKey,
+        async (_key, { arg }) => apiMutate<PaginatedCoupons>(`/api/management/coupons/${arg.id}`, 'DELETE'),
+    );
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
 
@@ -115,21 +124,27 @@ export default function ManagementCouponsView() {
     };
 
     const handleToggle = async (coupon: Coupon) => {
-        if (coupon.id === undefined) return;
+        const couponId = coupon.id;
+        if (couponId === undefined) return;
         try {
-            await apiMutate(`/api/management/coupons/${coupon.id}`, 'PUT', {
-                ...coupon,
-                active: !coupon.active,
-            });
+            await toggleCoupon(
+                { id: couponId, active: !coupon.active },
+                {
+                    optimisticData: (currentData) => currentData
+                        ? { ...currentData, data: currentData.data.map(c => c.id === couponId ? { ...c, active: !c.active } : c) }
+                        : { data: [] as Coupon[], current_page: 1, last_page: 1, per_page: 50, total: 0 },
+                    rollbackOnError: true,
+                },
+            );
             showToast('success', coupon.active ? t`Gutscheincode deaktiviert` : t`Gutscheincode aktiviert`);
-            void mutate();
         } catch (e: unknown) {
             showToast('error', e instanceof Error ? e.message : t`Fehler beim Umschalten`);
         }
     };
 
     const handleDelete = async (coupon: Coupon) => {
-        if (coupon.id === undefined) return;
+        const couponId = coupon.id;
+        if (couponId === undefined) return;
         if (!user?.is_admin && !user?.is_super_admin && coupon.used_count > 0) return;
         const couponCode = coupon.code;
         if (!(await confirm({
@@ -140,11 +155,18 @@ export default function ManagementCouponsView() {
             return;
         }
         try {
-            await apiMutate(`/api/management/coupons/${coupon.id}`, 'DELETE');
+            await deleteCoupon(
+                { id: couponId },
+                {
+                    optimisticData: (currentData) => currentData
+                        ? { ...currentData, data: currentData.data.filter(c => c.id !== couponId), total: currentData.total - 1 }
+                        : { data: [] as Coupon[], current_page: 1, last_page: 1, per_page: 50, total: 0 },
+                    rollbackOnError: true,
+                },
+            );
             showToast('success', t`Gutscheincode gelöscht`);
-            void mutate();
-        } catch (e: unknown) {
-            showToast('error', e instanceof Error ? e.message : t`Fehler beim Löschen`);
+        } catch {
+            showToast('error', t`Fehler beim Löschen`);
         }
     };
 

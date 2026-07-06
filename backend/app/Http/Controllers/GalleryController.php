@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\GalleryGroup;
 use App\Models\Gallery;
@@ -10,6 +11,7 @@ use App\Http\Requests\StoreGroupRequest;
 use App\Http\Requests\UpdateGroupRequest;
 use App\Http\Requests\StoreGalleryRequest;
 use App\Http\Requests\UpdateGalleryRequest;
+use App\Http\Requests\SyncGalleryAccessRequest;
 use App\Http\Resources\GalleryResource;
 use App\Http\Resources\GalleryGroupResource;
 use App\Http\Resources\PhotoResource;
@@ -167,19 +169,19 @@ class GalleryController extends Controller
         ]);
     }
 
-    public function syncAccess(Request $request, $id) {
+    public function syncAccess(SyncGalleryAccessRequest $request, $id): JsonResponse {
         $user = auth('api')->user();
         if (!$user->is_admin) return response()->json(['error' => 'Nur Admins können Zugriffe direkt verwalten'], 403);
 
-        $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
-        $targetUser = \App\Models\User::findOrFail($request->user_id);
+        $validated = $request->validated();
+        $targetUser = \App\Models\User::findOrFail($validated['user_id']);
 
         $gallery = Gallery::findOrFail($id);
         if (Gate::denies('manage', $gallery)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
-        if ($request->action === 'attach') {
+        if ($validated['action'] === 'attach') {
             $targetUser->galleries()->syncWithoutDetaching([$id]);
         } else {
             $targetUser->galleries()->detach($id);
@@ -187,18 +189,18 @@ class GalleryController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function syncPhotographers(Request $request, $id) {
+    public function syncPhotographers(SyncGalleryAccessRequest $request, $id): JsonResponse {
         $user = auth('api')->user();
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
-        $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
-        $targetUser = \App\Models\User::findOrFail($request->user_id);
+        $validated = $request->validated();
+        $targetUser = \App\Models\User::findOrFail($validated['user_id']);
 
         $gallery = Gallery::findOrFail($id);
         if (Gate::denies('manage', $gallery)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
-        if ($request->action === 'attach') {
+        if ($validated['action'] === 'attach') {
             $targetUser->photographerGalleries()->syncWithoutDetaching([$id]);
         } else {
             $targetUser->photographerGalleries()->detach($id);
@@ -206,18 +208,18 @@ class GalleryController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function syncGroupPhotographers(Request $request, $id) {
+    public function syncGroupPhotographers(SyncGalleryAccessRequest $request, $id): JsonResponse {
         $user = auth('api')->user();
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
-        $request->validate(['user_id' => 'required|string', 'action' => 'required|in:attach,detach']);
-        $targetUser = \App\Models\User::findOrFail($request->user_id);
+        $validated = $request->validated();
+        $targetUser = \App\Models\User::findOrFail($validated['user_id']);
 
         $group = \App\Models\GalleryGroup::findOrFail($id);
         if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->photographerGalleryGroups()->where('gallery_groups.id', $group->id)->exists())) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
-        if ($request->action === 'attach') {
+        if ($validated['action'] === 'attach') {
             $targetUser->photographerGalleryGroups()->syncWithoutDetaching([$id]);
         } else {
             $targetUser->photographerGalleryGroups()->detach($id);

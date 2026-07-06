@@ -6,6 +6,7 @@ use App\Constants\TierRanks;
 use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
@@ -13,6 +14,10 @@ use ZipStream\ZipStream;
 
 class DownloadController extends Controller
 {
+    public function __construct(
+        private readonly ImageProcessor $imageProcessor,
+    ) {}
+
     private function authorizeGalleryAccess($gallery)
     {
         $user = auth('api')->user();
@@ -157,7 +162,8 @@ class DownloadController extends Controller
         $userName = $user ? $user->name : 'Gast';
 
         DownloadLog::create([
-            'user_id' => $user ? $user->id : null,
+            'user_id' => $user && $user->id ? $user->id : null,
+            'guest_id' => $user && $user->guest_id ? $user->guest_id : null,
             'user_name_snapshot' => $userName,
             'gallery_id' => $gallery->id,
             'gallery_name_snapshot' => $gallery->name,
@@ -166,7 +172,6 @@ class DownloadController extends Controller
             'user_agent' => $request->userAgent()
         ]);
 
-        $processor = app(\App\Services\ImageProcessor::class);
         $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
 
         $tempDir = storage_path('app/private/temp');
@@ -175,9 +180,9 @@ class DownloadController extends Controller
         $scaledBase = $tempDir . '/base_scale_' . $photo->id . '_' . $tier . '.jpg';
         $lockKey = 'scale_' . $photo->id . '_' . $tier;
 
-        \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($processor, $sourcePath, $scaledBase, $maxWidth) {
+        \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($sourcePath, $scaledBase, $maxWidth) {
             if (!file_exists($scaledBase)) {
-                $processor->scaleImage($sourcePath, $scaledBase, $maxWidth);
+                $this->imageProcessor->scaleImage($sourcePath, $scaledBase, $maxWidth);
             }
         });
 
@@ -214,7 +219,8 @@ class DownloadController extends Controller
         $photoCount = $gallery->photos()->count();
 
         DownloadLog::create([
-            'user_id' => $user ? $user->id : null,
+            'user_id' => $user && $user->id ? $user->id : null,
+            'guest_id' => $user && $user->guest_id ? $user->guest_id : null,
             'user_name_snapshot' => $userName,
             'gallery_id' => $gallery->id,
             'gallery_name_snapshot' => $gallery->name,
@@ -227,8 +233,6 @@ class DownloadController extends Controller
 
         return response()->streamDownload(function () use ($gallery, $baseStoragePath, $userName, $user, $tier, $hasFullAccess) {
             $zip = new ZipStream(sendHttpHeaders: false);
-            $watermarkService = app(\App\Services\ImageProcessor::class);
-            $processor = app(\App\Services\ImageProcessor::class);
             $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
 
             $tempDir = storage_path('app/private/temp');
@@ -245,7 +249,7 @@ class DownloadController extends Controller
                     if (!file_exists($wmPath)) {
                         if (!is_dir(dirname($wmPath)))
                             mkdir(dirname($wmPath), 0755, true);
-                        $watermarkService->applyCenteredWatermark($sourcePath, $wmPath, 2000);
+                        $this->imageProcessor->applyCenteredWatermark($sourcePath, $wmPath, 2000);
                     }
                     $sourcePath = $wmPath;
                 }
@@ -254,9 +258,9 @@ class DownloadController extends Controller
                 $tempFiles[] = $scaledBase;
                 $lockKey = 'scale_' . $photo->id . '_' . $tier;
 
-                \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($processor, $sourcePath, $scaledBase, $maxWidth) {
+                \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($sourcePath, $scaledBase, $maxWidth) {
                     if (!file_exists($scaledBase)) {
-                        $processor->scaleImage($sourcePath, $scaledBase, $maxWidth);
+                        $this->imageProcessor->scaleImage($sourcePath, $scaledBase, $maxWidth);
                     }
                 });
 
@@ -296,7 +300,6 @@ class DownloadController extends Controller
 
         $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/\\');
         $userName = $user ? $user->name : 'Kunde';
-        $processor = app(\App\Services\ImageProcessor::class);
 
         DownloadLog::create([
             'user_id' => $user->id,
@@ -309,7 +312,7 @@ class DownloadController extends Controller
             'photo_count' => count($snapshot->customer_details['items'])
         ]);
 
-        return response()->streamDownload(function () use ($snapshot, $baseStoragePath, $userName, $processor) {
+        return response()->streamDownload(function () use ($snapshot, $baseStoragePath, $userName) {
             $zip = new ZipStream(sendHttpHeaders: false);
             $tempDir = storage_path('app/private/temp');
             if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
@@ -333,9 +336,9 @@ class DownloadController extends Controller
                 $tempFiles[] = $scaledBase;
                 $lockKey = 'scale_' . $photo->id . '_' . $tier;
 
-                \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($processor, $sourcePath, $scaledBase, $maxWidth) {
+                \Illuminate\Support\Facades\Cache::lock($lockKey, 60)->block(30, function () use ($sourcePath, $scaledBase, $maxWidth) {
                     if (!file_exists($scaledBase)) {
-                        $processor->scaleImage($sourcePath, $scaledBase, $maxWidth);
+                        $this->imageProcessor->scaleImage($sourcePath, $scaledBase, $maxWidth);
                     }
                 });
 

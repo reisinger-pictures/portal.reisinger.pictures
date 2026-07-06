@@ -12,7 +12,7 @@ export default function GlobalSearchHeader({ onMenuClick }: GlobalSearchHeaderPr
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     return (
-        <header className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
+        <header role="banner" className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
             <button type="button" className={`btn btn-square btn-ghost md:hidden shrink-0 ${isSearchFocused ? 'hidden' : ''}`} onClick={onMenuClick}>
                 <span className="iconify mdi--menu text-2xl"></span>
             </button>

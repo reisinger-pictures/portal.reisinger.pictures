@@ -87,7 +87,8 @@ class User extends Authenticatable implements JWTSubject
     public function getIsAdminAttribute(): bool { return $this->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists(); }
     public function getIsOrgAdminAttribute(): bool { return $this->roles()->where('name', UserRole::ORG_ADMIN->value)->exists() && $this->tenant_id !== null; }
 
-    public function getIsCustomerManagerAttribute(): bool { trigger_error('Use is_org_admin instead', E_USER_DEPRECATED); return $this->getIsOrgAdminAttribute(); }
+    /** @deprecated Use is_org_admin instead. */
+    public function getIsCustomerManagerAttribute(): bool { return $this->getIsOrgAdminAttribute(); }
     public function getIsPowerUserAttribute(): bool { return $this->roles()->where('name', UserRole::POWER_USER->value)->exists(); }
 
     public function getAllowedGalleryIds(): array

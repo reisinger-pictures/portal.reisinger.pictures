@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 class ImageController extends Controller
 {
+    public function __construct(
+        private readonly PhotoProcessingService $photoService,
+    ) {}
+
     public function upload(Request $request)
     {
         $request->validate([
@@ -58,8 +62,7 @@ class ImageController extends Controller
         $lrUuid = $request->lr_uuid ?? Str::uuid()->toString();
 
         // Heavy Lifting (ExifTool CLI) VOR der DB-Transaktion ausführen, um Deadlocks zu vermeiden!
-        $photoService = app(\App\Services\PhotoProcessingService::class);
-        $meta = $photoService->processImage($file->getPathname(), '', $gallery);
+        $meta = $this->photoService->processImage($file->getPathname(), '', $gallery);
         $meta['mime_type'] = $mimeType;
         if (empty($meta['title'])) {
             $meta['title'] = $originalName;

@@ -45,7 +45,7 @@ test.describe('Download Invoice brand-leak (B-01 F2)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('invoice download endpoint does not 500 on brand-leak code path (B-01 F2)', { tags: ['@feature:brand:invoice'] }, async ({ request }) => {
+    test('invoice download endpoint does not 500 on brand-leak code path (B-01 F2)', { tag: ['@feature:brand:invoice'] }, async ({ request }) => {
         // The lowest-maintenance PDF guard: hit the authenticated download endpoint and assert on
         // the response shape rather than parsing the binary. The endpoint 500'd during the B-01 F2
         // regression (`$get` on null), so a clean non-500 is the meaningful guard. There is no
@@ -58,7 +58,7 @@ test.describe('Download Invoice brand-leak (B-01 F2)', () => {
         expect(res.status(), 'downloadInvoice must not 500 (B-01 F2 regression)').not.toBe(500);
     });
 
-    test('on-page Bankdaten block exposes the resolved brand IBAN (B2B default on dev host)', { tags: ['@feature:brand:invoice'] }, async ({ page }) => {
+    test('on-page Bankdaten block exposes the resolved brand IBAN (B2B default on dev host)', { tag: ['@feature:brand:invoice'] }, async ({ page }) => {
         // On the single dev Vite instance the request host is always localhost -> B2B brand is
         // resolved by BrandContextMiddleware. So the on-page Bankdaten block must reflect the B2B
         // settings. This guards that the same SettingResolver used by downloadInvoice is wired into

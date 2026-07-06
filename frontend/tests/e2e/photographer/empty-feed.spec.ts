@@ -18,7 +18,7 @@ test.describe('Photographer Empty Feed (G11)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Photographer with no activity sees empty state', async ({ page }) => {
+    test('Photographer with no activity sees empty state', { tag: ['@regression', '@feature:photographer'] }, async ({ page }) => {
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Dashboard');
 
@@ -30,7 +30,7 @@ test.describe('Photographer Empty Feed (G11)', () => {
         await expect(feedSection).toBeVisible({ timeout: 10000 });
     });
 
-    test('Dashboard loads without errors for new photographer', { tags: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
+    test('Dashboard loads without errors for new photographer', { tag: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Dashboard');
 
@@ -41,7 +41,7 @@ test.describe('Photographer Empty Feed (G11)', () => {
         expect(errors.filter(e => !e.includes('favicon')).length).toBe(0);
     });
 
-    test('Photographer sees FTP Inbox card on Dashboard', async ({ page }) => {
+    test('Photographer sees FTP Inbox card on Dashboard', { tag: ['@regression', '@feature:photographer'] }, async ({ page }) => {
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Dashboard');
 

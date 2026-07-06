@@ -54,17 +54,17 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                     {editingProduct ? <Trans>Katalog-Eintrag bearbeiten</Trans> : <Trans>Neuen Eintrag anlegen</Trans>}
                 </h3>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4" noValidate>
                     <div className="form-control">
-                        <label className="label"><span className="label-text font-bold"><Trans>Typ *</Trans></span></label>
-                        <select {...register('type')} className="select select-bordered">
+                        <label className="label"><span className="label-text font-bold"><Trans>Typ</Trans></span></label>
+                        <select required {...register('type')} className="select select-bordered">
                             <option value="item">Leistung / Produkt</option>
                             <option value="discount_fixed">Rabatt (Fixbetrag in €)</option>
                             <option value="discount_percent">Rabatt (Prozentual in %)</option>
                         </select>
                     </div>
                     <div className="form-control">
-                        <label className="label"><span className="label-text font-bold"><Trans>Titel / Name *</Trans></span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Titel / Name</Trans></span></label>
                         <input required type="text" {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
                         {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
                     </div>
@@ -73,7 +73,7 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                         <input type="text" {...register('description')} className="input input-bordered" />
                     </div>
                     <div className="form-control w-1/2">
-                        <label className="label"><span className="label-text font-bold"><Trans>Standard-Wert *</Trans></span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Standard-Wert</Trans></span></label>
                         <input required type="number" step="0.01" min="0" {...register('price', { valueAsNumber: true })} className={`input input-bordered font-mono ${errors.price ? 'input-error' : ''}`} />
                     </div>
 

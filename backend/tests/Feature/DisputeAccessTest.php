@@ -4,10 +4,11 @@ namespace Tests\Feature;
 use Tests\TestCase;
 use App\Models\Order;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 
-class DisputeAccessTest extends TestCase {
-    use RefreshDatabase;
+class DisputeAccessTest extends TestCase
+{
+    use DatabaseTransactions;
 
     public function test_webhook_dispute_locks_order_status() {
         \Illuminate\Support\Facades\Mail::fake();
@@ -46,5 +47,70 @@ class DisputeAccessTest extends TestCase {
         // Verifizieren, ob die Bestellung auf 'disputed' gesetzt wurde
         $order->refresh();
         $this->assertEquals('disputed', $order->status);
+    }
+
+    public function test_disputed_order_blocks_download_for_user()
+    {
+        $user = User::factory()->create();
+        $order = Order::create([
+            'user_id' => $user->id,
+            'status' => 'disputed',
+            'total_amount' => 5000,
+        ]);
+
+        $response = $this->actingAs($user, 'api')
+            ->getJson('/api/orders/' . $order->id . '/download-zip');
+
+        $response->assertStatus(403);
+        $response->assertJsonPath('message', 'Zugriff aufgrund des Bestellstatus gesperrt.');
+    }
+
+    public function test_refunded_order_blocks_download_for_user()
+    {
+        $user = User::factory()->create();
+        $order = Order::create([
+            'user_id' => $user->id,
+            'status' => 'refunded',
+            'total_amount' => 5000,
+        ]);
+
+        $response = $this->actingAs($user, 'api')
+            ->getJson('/api/orders/' . $order->id . '/download-zip');
+
+        $response->assertStatus(403);
+        $response->assertJsonPath('message', 'Zugriff aufgrund des Bestellstatus gesperrt.');
+    }
+
+    public function test_cancelled_order_blocks_download_for_user()
+    {
+        $user = User::factory()->create();
+        $order = Order::create([
+            'user_id' => $user->id,
+            'status' => 'cancelled',
+            'total_amount' => 5000,
+        ]);
+
+        $response = $this->actingAs($user, 'api')
+            ->getJson('/api/orders/' . $order->id . '/download-zip');
+
+        $response->assertStatus(403);
+        $response->assertJsonPath('message', 'Zugriff aufgrund des Bestellstatus gesperrt.');
+    }
+
+    public function test_paid_order_is_not_blocked_by_status_check()
+    {
+        $user = User::factory()->create();
+        $order = Order::create([
+            'user_id' => $user->id,
+            'status' => 'paid',
+            'total_amount' => 5000,
+        ]);
+
+        // A paid order without invoiceSnapshot returns 404 (no items),
+        // proving the status check did NOT block the request.
+        $response = $this->actingAs($user, 'api')
+            ->getJson('/api/orders/' . $order->id . '/download-zip');
+
+        $response->assertStatus(404);
     }
 }

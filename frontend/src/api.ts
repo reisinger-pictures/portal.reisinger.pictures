@@ -147,7 +147,7 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE
 };
 
 // --- Global Data Contracts ---
-export interface Customer { id: string; name: string; company?: string | null; email?: string | null; street?: string | null; zip?: string | null; city?: string | null; country?: string | null; uid?: string | null; }
+export interface Customer { id: string; name: string; company?: string | null; email?: string | null; birthdate?: string | null; street?: string | null; zip?: string | null; city?: string | null; country?: string | null; uid?: string | null; }
 export interface Product { id: string; type: 'item' | 'discount_fixed' | 'discount_percent'; name: string; description?: string | null; price: number; }
 export interface Gallery {
     id: string;

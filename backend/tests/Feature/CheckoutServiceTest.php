@@ -337,13 +337,14 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 11. Transaktions-Rollback: Stripe schlägt fehl -> kein Order/Snapshot persistiert
+    // 11. Stripe-Fehler nach abgeschlossener Transaktion:
+    //     Order/Snapshot bleiben erhalten, nur kein PaymentIntent.
     // ------------------------------------------------------------------
-    public function test_process_checkout_stripe_failure_rolls_back_order_and_snapshot(): void
+    public function test_process_checkout_stripe_failure_keeps_order_and_snapshot(): void
     {
         [$user, $photo, $useCase] = $this->setupPaidItem();
 
-        // Stripe-Client wirft Exception -> DB::transaction muss rollbacken
+        // Stripe-Client wirft Exception — passiert NACH dem DB::transaction-Commit
         $clientMock = $this->createMock(\Stripe\HttpClient\ClientInterface::class);
         $clientMock->expects($this->once())->method('request')->willThrowException(new \RuntimeException('Stripe down'));
         \Stripe\ApiRequestor::setHttpClient($clientMock);
@@ -354,16 +355,21 @@ class CheckoutServiceTest extends TestCase
                 $user,
                 'stripe'
             );
-            $this->fail('Expected RuntimeException from Stripe client to trigger rollback.');
+            $this->fail('Expected RuntimeException from Stripe client.');
         } catch (\RuntimeException $e) {
-            // erwartet — Exception fliegt aus der Transaktion → Rollback
+            // erwartet — Exception fliegt aus respondBasedOnPayment (ausserhalb der Transaktion)
         } finally {
             \Stripe\ApiRequestor::setHttpClient(null);
         }
 
-        // Alles zurückgerollt
-        $this->assertSame(0, Order::count());
-        $this->assertSame(0, InvoiceSnapshot::count());
+        // Order/Snapshot sind erhalten, da die DB-Transaktion vor dem Stripe-Call committed wurde
+        $this->assertSame(1, Order::count());
+        $this->assertSame(1, InvoiceSnapshot::count());
+
+        $order = Order::first();
+        $this->assertNotNull($order);
+        $this->assertEquals('pending_payment', $order->status);
+        $this->assertNull($order->stripe_payment_intent_id);
     }
 
     // ------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useTransition } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import HighlightText from './HighlightText';
 import { useSearch } from '../../logic/useSearch';
@@ -25,14 +25,19 @@ export default function SearchBarWithSuggestions({
     const [searchQuery, setSearchQuery] = useState(qParam);
     const [debouncedQuery, setDebouncedQuery] = useState(qParam);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [, startTransition] = useTransition();
     const { results: searchResults } = useSearch(debouncedQuery, false, true);
     const navigate = useNavigate();
     const formRef = useRef<HTMLFormElement>(null);
 
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedQuery(searchQuery), 200);
+        const timer = setTimeout(() => {
+            startTransition(() => {
+                setDebouncedQuery(searchQuery);
+            });
+        }, 200);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, startTransition]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

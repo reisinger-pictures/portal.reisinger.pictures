@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\GenerateInviteRequest;
+use App\Http\Requests\RedeemInviteRequest;
+use App\Http\Requests\SendInviteEmailRequest;
 use Illuminate\Http\Request;
 use App\Models\Gallery;
 use App\Models\GalleryInvite;
@@ -15,23 +18,19 @@ use App\Support\BrandRegistry;
 
 class InviteController extends Controller
 {
-    public function generate(Request $request, $galleryId)
+    public function generate(GenerateInviteRequest $request, $galleryId)
     {
         $gallery = Gallery::findOrFail($galleryId);
         if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
-        $request->validate([
-            'name' => 'nullable|string|max:255',
-            'can_edit_metadata' => 'boolean'
-        ]);
-
+        $validated = $request->validated();
         $token = Str::random(64);
         
         GalleryInvite::create([
             'gallery_id' => $gallery->id,
             'token' => $token,
-            'name' => $request->name,
-            'can_edit_metadata' => $request->can_edit_metadata ?? false
+            'name' => $validated['name'] ?? null,
+            'can_edit_metadata' => $validated['can_edit_metadata'] ?? false
         ]);
 
         return response()->json([
@@ -40,27 +39,24 @@ class InviteController extends Controller
         ]);
     }
 
-    public function sendEmail(Request $request, $galleryId)
+    public function sendEmail(SendInviteEmailRequest $request, $galleryId)
     {
         $gallery = Gallery::findOrFail($galleryId);
         if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
-        $request->validate([
-            'email' => 'required|email',
-            'name' => 'nullable|string|max:255'
-        ]);
+        $validated = $request->validated();
         
-        \Illuminate\Support\Facades\DB::transaction(function () use ($gallery, $request) {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($gallery, $validated) {
             $token = Str::random(64);
             
             GalleryInvite::create([
                 'gallery_id' => $gallery->id,
                 'token' => $token,
-                'name' => $request->name
+                'name' => $validated['name'] ?? null
             ]);
 
             $link = BrandRegistry::frontendUrl() . '/invite/' . $token;
-            Mail::to($request->email)->send(new GalleryInviteMail($gallery->name, $link));
+            Mail::to($validated['email'])->send(new GalleryInviteMail($gallery->name, $link));
         });
 
         return response()->json(['success' => true]);
@@ -77,20 +73,14 @@ class InviteController extends Controller
         ]);
     }
 
-    public function redeem(Request $request)
+    public function redeem(RedeemInviteRequest $request)
     {
-        $request->validate([
-            'token' => 'required|string',
-            'name' => 'nullable|string',
-            'email' => 'nullable|email',
-            'password' => 'nullable|string',
-            'accept_privacy' => 'required|accepted'
-        ]);
+        $validated = $request->validated();
 
-        $invite = \App\Models\GalleryInvite::where('token', $request->token)->with('gallery')->firstOrFail();
+        $invite = \App\Models\GalleryInvite::where('token', $validated['token'])->with('gallery')->firstOrFail();
         $gallery = $invite->gallery;
 
-        if ($gallery->password_hash && !\Illuminate\Support\Facades\Hash::check($request->password, $gallery->password_hash)) {
+        if ($gallery->password_hash && !\Illuminate\Support\Facades\Hash::check($validated['password'] ?? null, $gallery->password_hash)) {
             return response()->json(['error' => 'Das Galerie-Passwort ist nicht korrekt.'], 403);
         }
 
@@ -124,8 +114,8 @@ class InviteController extends Controller
         }
 
         // Anonymous Guest
-        $guestName = $invite->name ?? $request->name ?? 'Gast';
-        $guestEmail = $request->email;
+        $guestName = $invite->name ?? $validated['name'] ?? 'Gast';
+        $guestEmail = $validated['email'] ?? null;
         $guestId = (string) \Illuminate\Support\Str::uuid();
 
         if ($guestEmail) {

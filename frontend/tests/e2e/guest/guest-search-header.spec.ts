@@ -1,23 +1,23 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Guest Search & Header (G9)', () => {
-    test('Guest can see search input on landing page', { tags: ['@feature:guest'] }, async ({ page }) => {
+    test('Guest can see search input on landing page', { tag: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
-        const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
+        const searchInput = page.getByRole('main').locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();
     });
 
-    test('Guest sees header with brand elements', { tags: ['@feature:guest'] }, async ({ page }) => {
+    test('Guest sees header with brand elements', { tag: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
-        const header = page.locator('header').first();
+        const header = page.getByRole('banner');
         await expect(header).toHaveCount(1);
-        const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
+        const searchInput = page.getByRole('main').locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();
     });
 
-    test('Guest search returns results', { tags: ['@feature:guest'] }, async ({ page }) => {
+    test('Guest search returns results', { tag: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
-        const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
+        const searchInput = page.getByRole('main').locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();
 
         const randomSearchTerm = `Search-${Math.random().toString(36).substring(2, 10)}`;
@@ -25,6 +25,6 @@ test.describe('Guest Search & Header (G9)', () => {
         await searchInput.press('Enter');
 
         await expect(page).toHaveURL(new RegExp(`/search\\?q=${randomSearchTerm}`));
-        await expect(page.getByRole('heading', { name: new RegExp(randomSearchTerm) })).toBeVisible({ timeout: 15000 });
+        await expect(page.getByRole('main').getByRole('heading', { name: new RegExp(randomSearchTerm) })).toBeVisible({ timeout: 15000 });
     });
 });

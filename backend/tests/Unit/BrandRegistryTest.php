@@ -111,4 +111,16 @@ class BrandRegistryTest extends TestCase
         $this->assertSame('srp_', Brand::SRP->prefix());
         $this->assertSame('', Brand::B2B->prefix());
     }
+
+    public function test_enum_id(): void
+    {
+        $this->assertSame('rp', Brand::B2B->id());
+        $this->assertSame('srp', Brand::SRP->id());
+    }
+
+    public function test_enum_domain(): void
+    {
+        $this->assertSame('portal.reisinger.pictures', Brand::B2B->domain());
+        $this->assertSame('buy.reisinger.pictures', Brand::SRP->domain());
+    }
 }

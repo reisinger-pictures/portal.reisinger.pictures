@@ -17,7 +17,7 @@ test.describe('Package Calculator Configuration (G2)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Admin can configure package calculator settings', { tags: ['@feature:admin:calculator'] }, async ({ page }) => {
+    test('Admin can configure package calculator settings', { tag: ['@feature:admin:calculator'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -44,44 +44,47 @@ test.describe('Package Calculator Configuration (G2)', () => {
         await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
     });
 
-    test('Admin can set outdoor multiplier and verify it in the shooting calculator', { tags: ['@feature:admin:calculator'] }, async ({ page, request }) => {
+    test('Admin can set outdoor multiplier and verify it in the shooting calculator', { tag: ['@feature:admin:calculator'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
-        // Outdoor-Faktor per API setzen (0.3 = 30%)
-        await request.put('/api/management/settings/license-terms', {
-            data: {
-                calc_base_price: 50,
-                calc_hourly_rate: 80,
-                calc_images_per_hour: 6,
-                calc_outdoor_multiplier: 0.3,
-                mult_commercial: 2.0,
-                mult_unlimited: 1.5,
-                mult_international: 1.5
-            },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
-        });
-
+        // Log in and save all calculator settings via the UI form to ensure correct brand scope
         await auth.login(superAdmin.email, superAdmin.password);
+        await sidebar.navigateTo('Einstellungen');
+
+        await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
+
+        const calculatorCard = page.locator('main h2:has-text("Paket-Rechner Konfiguration")').first();
+        await expect(calculatorCard).toBeVisible();
+        const cardBody = calculatorCard.locator('..').locator('..');
+
+        await cardBody.locator('.form-control').filter({ hasText: 'Grundpreis' }).locator('input[type="number"]').fill('50');
+        await cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]').fill('80');
+        await cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Faktor' }).locator('input[type="number"]').fill('30');
+        await cardBody.locator('.form-control').filter({ hasText: 'Bilder pro Stunde' }).locator('input[type="number"]').fill('6');
+
+        await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
+        await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
+
+        // Navigate to manual offer page and open calculator
         await sidebar.navigateTo('Manuelles Angebot');
 
-        // Kalkulator Modal öffnen
         await page.locator('button:has-text("Paket-Kalkulator")').click();
         const calcModal = page.locator('.modal-open');
         await expect(calcModal).toBeVisible();
 
-        // Werte eintragen: 90 Min, 15 Bilder
+        // Enter values: 90 min, 15 images
         await calcModal.locator('.form-control', { hasText: 'Dauer (Min.)' }).locator('input').fill('90');
         await calcModal.locator('.form-control', { hasText: 'Inkl. Bilder' }).locator('input').fill('15');
 
-        // Outdoor aktivieren
+        // Activate outdoor
         await calcModal.locator('label').filter({ hasText: 'Outdoor-Shooting' }).locator('input[type="checkbox"]').check();
 
-        // Berechnen & Hinzufügen klicken
+        // Calculate & add
         await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();
         await expect(calcModal).toBeHidden();
 
-        // Ergebnis validieren:
+        // Verify result:
         // Base 50 + Time 120 + (Images 200 * 0.3 = 60) = 230 → psych 229
         const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
         await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });

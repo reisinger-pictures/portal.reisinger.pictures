@@ -21,7 +21,7 @@ test.describe('Client Notifications Opt-In', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Client can toggle email notifications in gallery view', { tags: ['@feature:client:optin'] }, async ({ page }) => {
+    test('Client can toggle email notifications in gallery view', { tag: ['@feature:client:optin'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);

@@ -21,7 +21,7 @@ test.describe('Route Guards & IDOR Boundaries', () => {
     test.describe('Unauthenticated access is redirected to home', () => {
         for (const route of PROTECTED_ROUTES) {
             const tags = route === PROTECTED_ROUTES[0] ? ['@smoke', '@feature:auth'] : ['@regression', '@feature:auth'];
-            test(`Unauthenticated user is redirected from ${route} to home`, { tags }, async ({page}) => {
+            test(`Unauthenticated user is redirected from ${route} to home`, { tag: tags }, async ({page}) => {
                 await page.context().clearCookies();
                 await page.goto(route);
 
@@ -47,7 +47,7 @@ test.describe('Route Guards & IDOR Boundaries', () => {
             if (helper) await helper.teardown();
         });
 
-        test('Client opening an admin route directly sees client dashboard, not admin data', { tags: ['@smoke', '@feature:auth'] }, async ({page}) => {
+        test('Client opening an admin route directly sees client dashboard, not admin data', { tag: ['@smoke', '@feature:auth'] }, async ({page}) => {
             const auth = new AuthHelper(page);
             await auth.login(clientUser.email, clientUser.password);
 
@@ -61,7 +61,7 @@ test.describe('Route Guards & IDOR Boundaries', () => {
             await expect(page.getByText('Aktuell sind keine privaten Galerien für dich freigeschaltet.').first()).toBeVisible();
         });
 
-        test('Login button has an accessible name (a11y spot-check, E2E-01 §5)', { tags: ['@smoke', '@feature:auth'] }, async ({page}) => {
+        test('Login button has an accessible name (a11y spot-check, E2E-01 §5)', { tag: ['@smoke', '@feature:auth'] }, async ({page}) => {
             await page.context().clearCookies();
             await page.goto('/');
 

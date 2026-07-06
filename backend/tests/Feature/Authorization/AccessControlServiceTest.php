@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AccessControlService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class AccessControlServiceTest extends TestCase
@@ -221,5 +222,60 @@ class AccessControlServiceTest extends TestCase
         $ids = $this->service->getSubGroupIds([]);
 
         $this->assertSame([], $ids);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Cache Invalidation (S3 — Regression)
+    // ──────────────────────────────────────────────
+
+    public function test_cache_invalidates_when_restricted_photographers_changes(): void
+    {
+        $gallery = Gallery::factory()->create(['restricted_photographers' => false]);
+        $user = $this->createPhotographer();
+
+        // First call fills the cache
+        $idsBefore = $this->service->getAllowedGalleryIds($user);
+        $this->assertContains($gallery->id, $idsBefore);
+
+        // Update the gallery to restricted
+        $gallery->restricted_photographers = true;
+        $gallery->save();
+
+        // Second call should have cache invalidated
+        $idsAfter = $this->service->getAllowedGalleryIds($user);
+        $this->assertNotContains($gallery->id, $idsAfter);
+    }
+
+    public function test_cache_invalidates_on_gallery_create(): void
+    {
+        $user = $this->createPhotographer();
+
+        // Fill cache with current state (no galleries)
+        $idsBefore = $this->service->getAllowedGalleryIds($user);
+        $this->assertEmpty($idsBefore);
+
+        // Create a new unrestricted gallery
+        $gallery = Gallery::factory()->create(['restricted_photographers' => false]);
+
+        // Cache should be invalidated and include the new gallery
+        $idsAfter = $this->service->getAllowedGalleryIds($user);
+        $this->assertContains($gallery->id, $idsAfter);
+    }
+
+    public function test_cache_invalidates_on_gallery_delete(): void
+    {
+        $gallery = Gallery::factory()->create(['restricted_photographers' => false]);
+        $user = $this->createPhotographer();
+
+        // Fill cache
+        $idsBefore = $this->service->getAllowedGalleryIds($user);
+        $this->assertContains($gallery->id, $idsBefore);
+
+        // Delete the gallery
+        $gallery->delete();
+
+        // Cache should be invalidated
+        $idsAfter = $this->service->getAllowedGalleryIds($user);
+        $this->assertNotContains($gallery->id, $idsAfter);
     }
 }

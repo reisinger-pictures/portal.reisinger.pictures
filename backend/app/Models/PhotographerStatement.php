@@ -25,6 +25,7 @@ class PhotographerStatement extends Model
         'earned_amount_cents' => 'integer',
         'rolled_over_amount_cents' => 'integer',
         'total_payable_cents' => 'integer',
+        'status' => 'string',
     ];
 
     public function user()

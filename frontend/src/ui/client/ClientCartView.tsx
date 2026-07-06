@@ -225,7 +225,7 @@ export default function ClientCartView() {
                                 </div>
                             ) : (
                                 <form id="checkout-form" onSubmit={handleSubmit(onCheckout)}
-                                      className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm sticky top-24">
+                                      className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm sticky top-24" noValidate>
                                     <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
                                         <span
                                             className="iconify mdi--card-account-details text-primary"></span> <Trans>Rechnungsadresse</Trans>
@@ -235,7 +235,7 @@ export default function ClientCartView() {
                                         <div className="form-control">
                                             <label className="label py-1"><span
                                                 className="label-text text-sm font-bold"><Trans>Vor- & Nachname</Trans></span></label>
-                                            <input type="text" {...register('billing_name')}
+                                            <input type="text" required {...register('billing_name')}
                                                    className={`input input-bordered ${errors.billing_name ? 'input-error' : ''}`}/>
                                         </div>
                                         <div className="form-control">
@@ -247,20 +247,20 @@ export default function ClientCartView() {
                                         <div className="form-control">
                                             <label className="label py-1"><span
                                                 className="label-text text-sm font-bold"><Trans>Straße & Hausnummer</Trans></span></label>
-                                            <input type="text" {...register('billing_street')}
+                                            <input type="text" required {...register('billing_street')}
                                                    className={`input input-bordered ${errors.billing_street ? 'input-error' : ''}`}/>
                                         </div>
                                         <div className="flex gap-4">
                                             <div className="form-control w-1/3">
                                                 <label className="label py-1"><span
                                                     className="label-text text-sm font-bold"><Trans>PLZ</Trans></span></label>
-                                                <input type="text" {...register('billing_zip')}
+                                                <input type="text" required {...register('billing_zip')}
                                                        className={`input input-bordered ${errors.billing_zip ? 'input-error' : ''}`}/>
                                             </div>
                                             <div className="form-control flex-1">
                                                 <label className="label py-1"><span
                                                     className="label-text text-sm font-bold"><Trans>Ort</Trans></span></label>
-                                                <input type="text" {...register('billing_city')}
+                                                <input type="text" required {...register('billing_city')}
                                                        className={`input input-bordered ${errors.billing_city ? 'input-error' : ''}`}/>
                                             </div>
                                         </div>

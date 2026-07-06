@@ -79,7 +79,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         return galleryName;
     }
 
-    test('Test 1: ZIP Download dropdown restricts options and downloads correctly', { tags: ['@feature:delivery:download'] }, async ({page, request}) => {
+    test('Test 1: ZIP Download dropdown restricts options and downloads correctly', { tag: ['@feature:delivery:download'] }, async ({page, request}) => {
         const galleryName = await setupGalleryAndAssign(page, request, 'print');
         const auth = new AuthHelper(page);
 
@@ -87,9 +87,8 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
 
         // Verify flatrate_level is applied in the frontend
         await expect(async () => {
-            const userData = await page.evaluate(() =>
-                fetch('/api/auth/me', { headers: { 'Accept': 'application/json' } }).then(r => r.json())
-            );
+            const meRes = await page.request.get('/api/auth/me', { headers: { 'Accept': 'application/json' } });
+            const userData = await meRes.json();
             expect(userData.flatrate_level).toBe('print');
         }).toPass({ timeout: 10000 });
 
@@ -122,7 +121,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         expect(download.suggestedFilename()).toMatch(/\.zip$/i);
     });
 
-    test('Test 2: Normal client does not see upgrade options and cart button', { tags: ['@feature:delivery:download'] }, async ({page, request}) => {
+    test('Test 2: Normal client does not see upgrade options and cart button', { tag: ['@feature:delivery:download'] }, async ({page, request}) => {
         const galleryName = await setupGalleryAndAssign(page, request, 'print');
         const auth = new AuthHelper(page);
 
@@ -145,7 +144,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         await expect(cartButton).toBeHidden();
     });
 
-    test('Test 3: Single Download executes successfully when covered by flatrate', { tags: ['@feature:delivery:download'] }, async ({page, request}) => {
+    test('Test 3: Single Download executes successfully when covered by flatrate', { tag: ['@feature:delivery:download'] }, async ({page, request}) => {
         const galleryName = await setupGalleryAndAssign(page, request, 'original');
         const auth = new AuthHelper(page);
 
@@ -153,9 +152,8 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
 
         // Verify flatrate_level is applied in the frontend
         await expect(async () => {
-            const userData = await page.evaluate(() =>
-                fetch('/api/auth/me', { headers: { 'Accept': 'application/json' } }).then(r => r.json())
-            );
+            const meRes = await page.request.get('/api/auth/me', { headers: { 'Accept': 'application/json' } });
+            const userData = await meRes.json();
             expect(userData.flatrate_level).toBe('original');
         }).toPass({ timeout: 10000 });
 
@@ -187,7 +185,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         expect(download.suggestedFilename()).toMatch(/\.jpg$/i);
     });
 
-    test('Test 4: Admin and Photographer see the Admin Download button in PhotoDetailView', { tags: ['@feature:delivery:download'] }, async ({page, request}) => {
+    test('Test 4: Admin and Photographer see the Admin Download button in PhotoDetailView', { tag: ['@feature:delivery:download'] }, async ({page, request}) => {
         const galleryName = await setupGalleryAndAssign(page, request, 'original');
         const auth = new AuthHelper(page);
 

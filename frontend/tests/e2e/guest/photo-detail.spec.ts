@@ -19,7 +19,7 @@ test.describe('Guest Photo Detail (G4)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Guest can view public photo details', { tags: ['@smoke', '@feature:guest'] }, async ({ page }) => {
+    test('Guest can view public photo details', { tag: ['@smoke', '@feature:guest'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
@@ -41,12 +41,12 @@ test.describe('Guest Photo Detail (G4)', () => {
         await expect(galLink).toBeVisible({ timeout: 15000 });
         await galLink.click();
 
-        await expect(page.getByRole('heading', { name: galleryName })).toBeVisible({ timeout: 10000 });
+        await expect(page.getByRole('main').getByRole('heading', { name: galleryName })).toBeVisible({ timeout: 10000 });
 
         const upload = new UploadHelper(page);
         await upload.uploadSampleImage();
 
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
 
         const galleryUrl = page.url();
 
@@ -55,7 +55,7 @@ test.describe('Guest Photo Detail (G4)', () => {
         await page.goto(galleryUrl);
 
         await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('h1:has-text("' + galleryName + '")').first()).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('a.pswp-item').first()).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('main').locator('h1:has-text("' + galleryName + '")').first()).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('main').locator('a.pswp-item').first()).toBeVisible({ timeout: 15000 });
     });
 });

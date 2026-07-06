@@ -114,15 +114,19 @@ class Gallery extends Model
 
     protected static function booted()
     {
-        static::saved(function () {
+        static::saved(function (self $gallery) {
             \Illuminate\Support\Facades\DB::afterCommit(function() {
                 app(\App\Services\GalleryTreeService::class)->clearCache();
             });
+            if ($gallery->wasRecentlyCreated || $gallery->wasChanged('restricted_photographers')) {
+                \Illuminate\Support\Facades\Cache::forget('unrestricted_photographer_gallery_ids');
+            }
         });
         static::deleted(function () {
             \Illuminate\Support\Facades\DB::afterCommit(function() {
                 app(\App\Services\GalleryTreeService::class)->clearCache();
             });
+            \Illuminate\Support\Facades\Cache::forget('unrestricted_photographer_gallery_ids');
         });
     }
 

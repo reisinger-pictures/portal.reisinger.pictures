@@ -76,14 +76,24 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-users', fn ($user) => $user->is_admin || $user->is_org_admin);
 
         Gate::define('purchase-upgrades', function ($user) {
-            $isClient = $user->roles()->where('name', \App\Enums\UserRole::CLIENT->value)->exists();
-            $isPrivileged = $user->is_power_user || $user->is_admin || $user->is_super_admin || $user->is_photographer;
+            $user->loadMissing('roles');
+            $roleNames = $user->roles->pluck('name')->all();
+            $isClient = in_array(\App\Enums\UserRole::CLIENT->value, $roleNames);
+            $isPrivileged = in_array(\App\Enums\UserRole::POWER_USER->value, $roleNames)
+                || in_array(\App\Enums\UserRole::ADMIN->value, $roleNames)
+                || in_array(\App\Enums\UserRole::SUPER_ADMIN->value, $roleNames)
+                || in_array(\App\Enums\UserRole::PHOTOGRAPHER->value, $roleNames);
             return !$isClient || $isPrivileged;
         });
 
         Gate::define('purchase-on-invoice', function ($user) {
-            $isClient = $user->roles()->where('name', \App\Enums\UserRole::CLIENT->value)->exists();
-            return $isClient || $user->is_power_user || $user->is_admin || $user->is_super_admin;
+            $user->loadMissing('roles');
+            $roleNames = $user->roles->pluck('name')->all();
+            $isClient = in_array(\App\Enums\UserRole::CLIENT->value, $roleNames);
+            $isPrivileged = in_array(\App\Enums\UserRole::POWER_USER->value, $roleNames)
+                || in_array(\App\Enums\UserRole::ADMIN->value, $roleNames)
+                || in_array(\App\Enums\UserRole::SUPER_ADMIN->value, $roleNames);
+            return $isClient || $isPrivileged;
         });
 
         \Illuminate\Support\Facades\Auth::provider('transient_eloquent', function ($app, array $config) {
