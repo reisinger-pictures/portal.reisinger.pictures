@@ -75,7 +75,7 @@ class StripeWebhookTest extends TestCase
 
         [$payload, $sigHeader] = $this->signPayload($secret, $payloadData);
 
-        $clientMock = $this->createMock(ClientInterface::class);
+        $clientMock = $this->createStub(ClientInterface::class);
         $clientMock->method('request')
             ->willReturn([
                 json_encode([
@@ -272,7 +272,7 @@ class StripeWebhookTest extends TestCase
 
         [$payload, $sigHeader] = $this->signPayload($secret, $payloadData);
 
-        $clientMock = $this->createMock(ClientInterface::class);
+        $clientMock = $this->createStub(ClientInterface::class);
         $clientMock->method('request')
             ->willReturn([
                 json_encode([
@@ -376,7 +376,7 @@ class StripeWebhookTest extends TestCase
         $signature = hash_hmac('sha256', "{$timestamp}.{$payload}", $secret2);
         $sigHeader = "t={$timestamp},v1={$signature}";
 
-        $clientMock = $this->createMock(ClientInterface::class);
+        $clientMock = $this->createStub(ClientInterface::class);
         $clientMock->method('request')
             ->willReturn([
                 json_encode([

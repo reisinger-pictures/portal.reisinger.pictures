@@ -28,7 +28,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
     const galleryNameA = `Flow A Test ${uniqueId()}`;
     const galleryNameK = `Flow K Expired ${uniqueId()}`;
 
-    test('Flow B: Photographer can delete a photo from detail view', async ({ page }) => {
+    test('Flow B: Photographer can delete a photo from detail view', { tags: ['@feature:photographer:photos'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
 
@@ -54,7 +54,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await expect(page.locator('text=Noch keine Bilder vorhanden')).toBeVisible();
     });
 
-    test('Flow A: Photographer grants transient metadata rights via Magic Link, Client edits, Photographer restores', async ({ page }) => {
+    test('Flow A: Photographer grants transient metadata rights via Magic Link, Client edits, Photographer restores', { tags: ['@feature:photographer:photos'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
@@ -135,7 +135,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         }).toPass({ timeout: 15000 });
     });
 
-    test('Flow K: Expired galleries are crossed out and deny guest access', async ({ page }) => {
+    test('Flow K: Expired galleries are crossed out and deny guest access', { tags: ['@feature:photographer:photos'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
@@ -173,7 +173,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await expect(page.locator('text=Galerie nicht gefunden oder Zugriff verweigert.')).toBeVisible();
     });
 
-    test('Flow L: Invalid magic link does not destroy active user session', async ({ page }) => {
+    test('Flow L: Invalid magic link does not destroy active user session', { tags: ['@feature:photographer:photos'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
 
         await auth.login(clientUser.email, clientUser.password);
@@ -186,7 +186,7 @@ test.describe('Photo Management Workflow (Flows A, B, K, L, M)', () => {
         await expect(page.locator('h1:has-text("Willkommen zurück")')).toBeVisible();
     });
 
-    test('Flow M: Admin cannot see management buttons or delete photos', async ({ page }) => {
+    test('Flow M: Admin cannot see management buttons or delete photos', { tags: ['@feature:photographer:photos'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
 
         await auth.login(adminUser.email, adminUser.password);

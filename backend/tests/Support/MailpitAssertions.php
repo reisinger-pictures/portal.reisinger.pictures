@@ -8,11 +8,6 @@ trait MailpitAssertions
 {
     private const MAILPIT_API = 'http://127.0.0.1:8026/api/v1';
 
-    protected function clearMailpit(): void
-    {
-        Http::delete(self::MAILPIT_API . '/messages');
-    }
-
     protected function getMailpitMessages(): array
     {
         return Http::get(self::MAILPIT_API . '/messages')->json('messages', []);
@@ -33,6 +28,12 @@ trait MailpitAssertions
         return null;
     }
 
+    protected function getMailpitMessagesByRecipient(string $email): array
+    {
+        $response = Http::get(self::MAILPIT_API . '/search', ['query' => "to:{$email}"]);
+        return $response->json('messages', []);
+    }
+
     protected function assertMailpitSentTo(string $email, int $expectedCount = 1): void
     {
         $messages = $this->getMailpitMessages();
@@ -43,12 +44,6 @@ trait MailpitAssertions
             count($matched),
             "Expected at least {$expectedCount} mail(s) to {$email} in Mailpit, found " . count($matched)
         );
-    }
-
-    protected function assertMailpitEmpty(): void
-    {
-        $messages = $this->getMailpitMessages();
-        $this->assertSame(0, count($messages), 'Expected Mailpit to be empty');
     }
 
     protected function assertMailpitAttachmentExists(

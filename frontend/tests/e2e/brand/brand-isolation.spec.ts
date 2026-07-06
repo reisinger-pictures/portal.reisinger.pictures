@@ -18,7 +18,7 @@ test.describe('Brand Tenant Isolation', () => {
             adminUser = await helper.createIsolatedUser('admin');
         });
 
-        test('Admin sees B2B Mandanten section in sidebar', async ({ page }) => {
+        test('Admin sees B2B Mandanten section in sidebar', { tags: ['@smoke', '@feature:brand'] }, async ({ page }) => {
             const auth = new AuthHelper(page);
             const sidebar = new SidebarHelper(page);
 

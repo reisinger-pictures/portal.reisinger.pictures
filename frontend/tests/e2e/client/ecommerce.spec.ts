@@ -26,7 +26,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Flow P, Q, AG, AJ: Flatrate Bypass, Upselling Cart, Checkout', async ({ page }) => {
+    test('Flow P, Q, AG, AJ: Flatrate Bypass, Upselling Cart, Checkout', { tags: ['@feature:client:checkout'] }, async ({ page }) => {
         test.setTimeout(60000); // Erhöhtes Timeout, da dieser Test extrem viele Logins/Logouts durchführt
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
@@ -140,7 +140,7 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         await expect(page.locator('.bg-warning\\/10').filter({ hasText: 'Zahlung ausständig (Kauf auf Rechnung)' })).toBeVisible();
     });
 
-    test('Flow AP: Custom Quotes UI triggers UI notification', async ({ page }) => {
+    test('Flow AP: Custom Quotes UI triggers UI notification', { tags: ['@feature:client:checkout'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);

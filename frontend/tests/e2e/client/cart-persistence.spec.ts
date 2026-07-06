@@ -16,7 +16,7 @@ test.describe('Cart Persistence & Validation Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Invalid or corrupted localStorage is caught by Zod and results in empty cart', async ({ page }) => {
+    test('Invalid or corrupted localStorage is caught by Zod and results in empty cart', { tags: ['@feature:client:cart'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
         

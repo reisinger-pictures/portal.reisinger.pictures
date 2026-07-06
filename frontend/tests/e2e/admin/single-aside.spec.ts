@@ -16,7 +16,7 @@ test.describe('B7: Doppelte Sidebar Regression', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Sidebar wird nur einmal gerendert', async ({ page }) => {
+    test('Sidebar wird nur einmal gerendert', { tags: ['@feature:admin:ui'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 

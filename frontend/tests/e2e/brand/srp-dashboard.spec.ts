@@ -17,7 +17,7 @@ test.describe('SRP Brand Dashboard (G12)', () => {
 
     test.skip(({ browserName }) => browserName !== 'chromium', 'Desktop only');
 
-    test('SRP admin sidebar has no B2B admin items', async ({ page }) => {
+    test('SRP admin sidebar has no B2B admin items', { tags: ['@feature:brand:dashboard'] }, async ({ page }) => {
         test.setTimeout(30000);
         const auth = new AuthHelper(page);
         await auth.login(adminUser.email, adminUser.password, 'http://buy.localhost:4321/');
@@ -31,7 +31,7 @@ test.describe('SRP Brand Dashboard (G12)', () => {
         await expect(sidebar.getByText('Organisationen')).toHaveCount(0);
     });
 
-    test('SRP admin is redirected from B2B routes', async ({ page }) => {
+    test('SRP admin is redirected from B2B routes', { tags: ['@feature:brand:dashboard'] }, async ({ page }) => {
         test.setTimeout(30000);
         const auth = new AuthHelper(page);
         await auth.login(adminUser.email, adminUser.password, 'http://buy.localhost:4321/');
@@ -40,7 +40,7 @@ test.describe('SRP Brand Dashboard (G12)', () => {
         await expect(page.getByRole('heading', { name: 'Organisationen', exact: true })).toBeVisible({ timeout: 15000 });
     });
 
-    test('SRP client sidebar has no admin items', async ({ page }) => {
+    test('SRP client sidebar has no admin items', { tags: ['@feature:brand:dashboard'] }, async ({ page }) => {
         test.setTimeout(30000);
         const clientUser = await helper.createIsolatedUser('power_user', { brand: 'srp' });
         const auth = new AuthHelper(page);

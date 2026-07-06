@@ -22,7 +22,7 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Gallery-scoped coupon applies to matching gallery', async ({ page }) => {
+    test('Gallery-scoped coupon applies to matching gallery', { tags: ['@feature:client:coupon'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const upload = new UploadHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
@@ -74,7 +74,7 @@ test.describe('Gallery-Scoped Coupons (SRP)', () => {
         await auth.logout('http://buy.localhost:4321/');
     });
 
-    test('Gallery-scoped coupon rejected for non-matching gallery', async ({ page }) => {
+    test('Gallery-scoped coupon rejected for non-matching gallery', { tags: ['@feature:client:coupon'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const upload = new UploadHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);

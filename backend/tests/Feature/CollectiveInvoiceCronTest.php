@@ -9,17 +9,17 @@ use App\Models\Order;
 use App\Models\InvoiceSnapshot;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Artisan;
+use Tests\Support\MailpitAssertions;
 
+#[\PHPUnit\Framework\Attributes\Group('mailpit')]
 class CollectiveInvoiceCronTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, MailpitAssertions;
 
     protected function setUp(): void
     {
         parent::setUp();
-        Http::delete('http://127.0.0.1:8026/api/v1/messages');
     }
 
     public function test_cron_generates_collective_invoices_at_end_of_month_with_pdf()
@@ -60,18 +60,11 @@ class CollectiveInvoiceCronTest extends TestCase
         // Warteschlange abarbeiten, damit die InvoiceMail verschickt wird
         Artisan::call('queue:work', ['--stop-when-empty' => true]);
 
-        // Mailpit via API abfragen
-        $mailpitResponse = Http::get('http://127.0.0.1:8026/api/v1/messages');
-        $messages = $mailpitResponse->json('messages');
-        $this->assertGreaterThan(0, count($messages), 'Es wurde keine E-Mail an Mailpit versendet.');
-        
-        // Details der ersten Mail abrufen, um Attachments zu prüfen
-        $messageId = $messages[0]['ID'];
-        $mailDetails = Http::get("http://127.0.0.1:8026/api/v1/message/{$messageId}");
-        $attachments = $mailDetails->json('Attachments');
-        
-        $this->assertNotEmpty($attachments, 'Die Rechnungs-E-Mail hat keinen Anhang.');
-        $this->assertStringEndsWith('.pdf', $attachments[0]['FileName'], 'Der Anhang ist kein PDF.');
+        // Mailpit via API abfragen — recipient-spezifisch, nicht global
+        $this->assertMailpitAttachmentExists(
+            'tenant-accounting@example.com',
+            expectedMimeType: 'application/pdf',
+        );
 
         Carbon::setTestNow();
     }

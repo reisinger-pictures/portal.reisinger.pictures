@@ -20,10 +20,12 @@ use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
+#[\PHPUnit\Framework\Attributes\Group('mailpit')]
 class CheckoutServiceTest extends TestCase
 {
     use RefreshDatabase, MailpitAssertions;
@@ -34,8 +36,6 @@ class CheckoutServiceTest extends TestCase
     {
         parent::setUp();
         $this->service = new CheckoutService(new ScopeLicensingStrategy());
-
-        $this->clearMailpit();
 
         \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
         \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
@@ -116,6 +116,8 @@ class CheckoutServiceTest extends TestCase
     {
         [$user, $photo] = $this->setupAccessibleItem();
 
+        Mail::fake();
+
         $response = $this->service->processCheckout(
             $this->makeRequest(
                 [['photoId' => $photo->id, 'isQuote' => true, 'tier' => 'web']],
@@ -137,7 +139,7 @@ class CheckoutServiceTest extends TestCase
         $this->assertSame(0, $order->total_amount);
 
         // Quote -> KEINE Mail
-        $this->assertMailpitEmpty();
+        Mail::assertNothingQueued();
     }
 
     // ------------------------------------------------------------------
@@ -225,6 +227,8 @@ class CheckoutServiceTest extends TestCase
         ]);
         $user = User::factory()->create();
 
+        Mail::fake();
+
         $response = $this->service->processCheckout(
             $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
             $user,
@@ -234,7 +238,7 @@ class CheckoutServiceTest extends TestCase
         $this->assertEquals(403, $response->status());
         $this->assertSame(0, Order::count());
         $this->assertSame(0, InvoiceSnapshot::count());
-        $this->assertMailpitEmpty();
+        Mail::assertNothingQueued();
     }
 
     // ------------------------------------------------------------------
@@ -517,7 +521,7 @@ class CheckoutServiceTest extends TestCase
             $photo3 = Photo::factory()->create(['gallery_id' => $gallery->id]);
             $user = User::factory()->create();
 
-            $strategy = $this->createMock(PricingStrategy::class);
+            $strategy = $this->createStub(PricingStrategy::class);
             $strategy->method('calculateCart')->willReturn([
                 'items' => [
                     ['itemId' => $photo1->id, 'priceCents' => 3000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
@@ -580,7 +584,7 @@ class CheckoutServiceTest extends TestCase
             $photo2 = Photo::factory()->create(['gallery_id' => $gallery->id]);
             $user = User::factory()->create();
 
-            $strategy = $this->createMock(PricingStrategy::class);
+            $strategy = $this->createStub(PricingStrategy::class);
             $strategy->method('calculateCart')->willReturn([
                 'items' => [
                     ['itemId' => $photo1->id, 'priceCents' => 0, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],

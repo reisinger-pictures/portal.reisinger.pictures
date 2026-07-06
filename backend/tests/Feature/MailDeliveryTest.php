@@ -8,6 +8,7 @@ use App\Models\Gallery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\MailpitAssertions;
 
+#[\PHPUnit\Framework\Attributes\Group('mailpit')]
 class MailDeliveryTest extends TestCase
 {
     use RefreshDatabase, MailpitAssertions;
@@ -15,7 +16,6 @@ class MailDeliveryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->clearMailpit();
     }
 
     public function test_invite_email_is_sent_to_mailpit()
@@ -35,9 +35,9 @@ class MailDeliveryTest extends TestCase
 
         $response->assertStatus(200);
 
-        $message = $this->getMailpitMessageByEmail('kunde@example.com');
-        $this->assertNotNull($message, 'E-Mail an kunde@example.com nicht in Mailpit gefunden');
-        $this->assertStringContainsString('Sommerfest', $message['Subject']);
+        $messages = $this->getMailpitMessagesByRecipient('kunde@example.com');
+        $matching = array_filter($messages, fn ($m) => str_contains($m['Subject'] ?? '', 'Sommerfest'));
+        $this->assertNotEmpty($matching, 'E-Mail an kunde@example.com mit Betreff "Sommerfest" nicht in Mailpit gefunden');
     }
 
     public function test_invoice_email_has_pdf_attachment_with_bank_details()
@@ -57,7 +57,11 @@ class MailDeliveryTest extends TestCase
 
         \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\InvoiceMail($order, $snapshot, ['Zusatzdokument.pdf' => 'dummy-pdf-content']));
 
-        $attachments = $this->assertMailpitAttachmentExists('invoice@example.com');
+        $attachments = $this->assertMailpitAttachmentExists(
+            'invoice@example.com',
+            expectedFilename: 'RE-1234.pdf',
+            expectedMimeType: 'application/pdf',
+        );
 
         $this->assertCount(2, $attachments, 'Es sollten exakt 2 Attachments existieren (Rechnung + Zusatzdokument).');
         $this->assertEquals('RE-1234.pdf', $attachments[0]['FileName']);

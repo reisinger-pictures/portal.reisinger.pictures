@@ -31,7 +31,7 @@ test.describe('Admin Workflow', () => {
         modal = new ModalHelper(page);
     });
 
-    test('Admin can manage users and roles', async ({ page, request }) => {
+    test('Admin can manage users and roles', { tags: ['@smoke', '@feature:admin'] }, async ({ page, request }) => {
         await auth.login(testUser.email, testUser.password);
 
         await sidebar.navigateTo('Benutzer & Rechte');
@@ -66,7 +66,7 @@ test.describe('Admin Workflow', () => {
         await modal.clickButton('Abbrechen');
     });
 
-    test('Admin can access settings', async ({ page }) => {
+    test('Admin can access settings', { tags: ['@smoke', '@feature:admin'] }, async ({ page }) => {
         await auth.login(testUser.email, testUser.password);
         await sidebar.navigateTo('Einstellungen');
         await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();

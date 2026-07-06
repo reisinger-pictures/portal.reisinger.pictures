@@ -13,6 +13,7 @@ use App\Enums\Brand;
 use App\Support\BrandRegistry;
 use Tests\Support\MailpitAssertions;
 
+#[\PHPUnit\Framework\Attributes\Group('mailpit')]
 class ContractCloseTest extends TestCase
 {
     use RefreshDatabase, MailpitAssertions;
@@ -25,8 +26,6 @@ class ContractCloseTest extends TestCase
         Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'RP Test Holder']);
         Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
         Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'RPBIC']);
-
-        $this->clearMailpit();
     }
 
     private function createSuperAdmin(): User

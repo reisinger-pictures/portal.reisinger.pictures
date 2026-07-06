@@ -20,7 +20,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Flow AB & AE: Tenant Invite and Collective Invoice View', async ({ page, request }) => {
+    test('Flow AB & AE: Tenant Invite and Collective Invoice View', { tags: ['@feature:admin:tenant'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);

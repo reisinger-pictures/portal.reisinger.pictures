@@ -78,7 +78,7 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
         return { email, password, tenantName, tenantId, userId };
     }
 
-    test('Org-Admin lädt User ein, User registriert sich und hat Org', async ({ page, request }) => {
+    test('Org-Admin lädt User ein, User registriert sich und hat Org', { tags: ['@feature:auth:invite'] }, async ({ page, request }) => {
         const { email, password, tenantId } = await createOrgAdmin(request, adminToken);
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

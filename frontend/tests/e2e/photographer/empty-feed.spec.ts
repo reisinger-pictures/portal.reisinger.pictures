@@ -30,7 +30,7 @@ test.describe('Photographer Empty Feed (G11)', () => {
         await expect(feedSection).toBeVisible({ timeout: 10000 });
     });
 
-    test('Dashboard loads without errors for new photographer', async ({ page }) => {
+    test('Dashboard loads without errors for new photographer', { tags: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Dashboard');
 

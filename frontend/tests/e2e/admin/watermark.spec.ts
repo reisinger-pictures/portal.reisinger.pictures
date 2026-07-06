@@ -16,7 +16,7 @@ test.describe('Watermark Configuration', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Admin can see and interact with watermark settings', async ({ page }) => {
+    test('Admin can see and interact with watermark settings', { tags: ['@feature:admin:watermark'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -41,7 +41,7 @@ test.describe('Watermark Configuration', () => {
         await expect(submitBtn).toBeVisible();
     });
 
-    test('Admin can adjust watermark opacity and submit the form', async ({ page }) => {
+    test('Admin can adjust watermark opacity and submit the form', { tags: ['@feature:admin:watermark'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 

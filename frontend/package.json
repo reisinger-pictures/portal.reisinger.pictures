@@ -11,6 +11,8 @@
         "lint": "eslint . --max-warnings 0",
         "lint:fix": "eslint . --fix --max-warnings 0",
         "test:e2e": "playwright test",
+        "test:e2e:smoke": "playwright test --grep @smoke",
+        "test:e2e:grep": "playwright test --grep",
         "test:e2e:failed": "playwright test --last-failed",
         "test:e2e:ui": "playwright test --ui",
         "test": "vitest",

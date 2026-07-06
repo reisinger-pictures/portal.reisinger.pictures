@@ -29,7 +29,7 @@ test.describe('Photographer Core Workflow', () => {
         await auth.login(testUser.email, testUser.password);
     });
 
-    test('Photographer can create a new delivery gallery', async ({ page }) => {
+    test('Photographer can create a new delivery gallery', { tags: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
         const galleryName = `Create Test ${Math.random().toString(36).substring(2, 10)}`;
@@ -67,7 +67,7 @@ test.describe('Photographer Core Workflow', () => {
         await expect(newLink).toBeVisible({ timeout: 15000 });
     });
 
-    test('Photographer can upload an image and sees it in personal feed', async ({ page }) => {
+    test('Photographer can upload an image and sees it in personal feed', { tags: ['@smoke', '@feature:photographer'] }, async ({ page }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         const upload = new UploadHelper(page);
         const sidebar = new SidebarHelper(page);

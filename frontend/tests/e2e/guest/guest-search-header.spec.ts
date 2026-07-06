@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Guest Search & Header (G9)', () => {
-    test('Guest can see search input on landing page', async ({ page }) => {
+    test('Guest can see search input on landing page', { tags: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
         const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();
     });
 
-    test('Guest sees header with brand elements', async ({ page }) => {
+    test('Guest sees header with brand elements', { tags: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
         const header = page.locator('header').first();
         await expect(header).toHaveCount(1);
@@ -15,7 +15,7 @@ test.describe('Guest Search & Header (G9)', () => {
         await expect(searchInput).toBeVisible();
     });
 
-    test('Guest search returns results', async ({ page }) => {
+    test('Guest search returns results', { tags: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
         const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');
         await expect(searchInput).toBeVisible();

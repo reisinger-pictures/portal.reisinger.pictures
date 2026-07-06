@@ -3,7 +3,7 @@ import {test, expect} from '@playwright/test';
 // E2E-01 §1 (Leer-/Grenzzustände, echt): Suche ohne Treffer zeigt dedizierte Empty-State-UI
 // statt einer stillen leeren Liste. Grounded in `src/ui/SearchView.tsx`.
 test.describe('Global Search — Empty-Result State', () => {
-    test('Search with no matches shows dedicated empty-state messages', async ({page}) => {
+    test('Search with no matches shows dedicated empty-state messages', { tags: ['@feature:guest'] }, async ({page}) => {
         await page.goto('/');
 
         const searchInput = page.locator('input[placeholder="Suche in allen Galerien..."]');

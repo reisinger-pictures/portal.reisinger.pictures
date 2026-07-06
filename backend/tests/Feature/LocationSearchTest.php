@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use Tests\TestCase;
 use App\Models\Location;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Meilisearch\Contracts\TasksQuery;
 
 class LocationSearchTest extends TestCase
 {
@@ -13,19 +12,7 @@ class LocationSearchTest extends TestCase
 
     protected function setUp(): void {
         parent::setUp();
-        \Illuminate\Support\Facades\Artisan::call('scout:flush', ['model' => Location::class]);
-        \Illuminate\Support\Facades\Artisan::call('scout:sync-index-settings');
-    }
-
-    protected function waitForSearchIndex() {
-        $client = app(\Meilisearch\Client::class);
-        $query = (new TasksQuery())->setStatuses(['enqueued', 'processing']);
-        $tasks = $client->getTasks($query);
-
-        foreach ($tasks as $task) {
-            $uid = is_array($task) ? $task['uid'] : $task->getUid();
-            $client->waitForTask($uid, 5000, 50);
-        }
+        config(['scout.driver' => 'database']);
     }
 
     public function test_location_endpoint_requires_minimum_length_and_valid_type()
@@ -48,8 +35,6 @@ class LocationSearchTest extends TestCase
             'iso_country' => 'AT'
         ]);
 
-        $this->waitForSearchIndex();
-
         $resCity = $this->getJson('/api/search/locations?q=Linz&type=city');
         $resCity->assertStatus(200);
         $this->assertCount(1, $resCity->json());
@@ -63,8 +48,6 @@ class LocationSearchTest extends TestCase
     {
         Location::create(['type' => 'city', 'name' => 'Wien', 'postal_code' => '1010', 'state' => 'Wien', 'country' => 'Österreich', 'iso_country' => 'AT', 'population' => 1000000]);
         Location::create(['type' => 'city', 'name' => 'Wien', 'postal_code' => '1020', 'state' => 'Wien', 'country' => 'Österreich', 'iso_country' => 'AT', 'population' => 900000]);
-
-        $this->waitForSearchIndex();
 
         $res = $this->getJson('/api/search/locations?q=Wien&type=city');
         $res->assertStatus(200);

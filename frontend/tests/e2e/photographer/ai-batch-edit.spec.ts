@@ -24,7 +24,7 @@ test.describe('AI Batch Edit Modal (Server-Side)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('shows AI Batch-Edit button for photographer in delivery gallery', async ({page}) => {
+    test('shows AI Batch-Edit button for photographer in delivery gallery', { tags: ['@feature:photographer:ai'] }, async ({page}) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 
@@ -37,7 +37,7 @@ test.describe('AI Batch Edit Modal (Server-Side)', () => {
         await expect(aiButton).toBeVisible();
     });
 
-    test('opens AI Batch-Edit modal when button is clicked', async ({page}) => {
+    test('opens AI Batch-Edit modal when button is clicked', { tags: ['@feature:photographer:ai'] }, async ({page}) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 

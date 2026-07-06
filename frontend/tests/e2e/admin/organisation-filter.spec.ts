@@ -16,7 +16,7 @@ test.describe('G6: Gallery Tree Organisation Filter', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Organisation filter hides groups assigned to other tenants', async ({ page, request }) => {
+    test('Organisation filter hides groups assigned to other tenants', { tags: ['@feature:admin:tenant'] }, async ({ page, request }) => {
         const adminToken = helper.getAdminToken();
         const headers = { 'Accept': 'application/json', 'Cookie': adminToken };
 

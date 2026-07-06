@@ -27,7 +27,6 @@ class BrandLeakTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Http::delete('http://127.0.0.1:8026/api/v1/messages');
         Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'B2B Holder']);
         Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'B2B123']);
         Setting::updateOrCreate(['key' => 'bank_bic'], ['value' => 'B2BBIC']);

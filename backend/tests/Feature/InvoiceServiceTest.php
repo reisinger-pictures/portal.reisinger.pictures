@@ -9,12 +9,13 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\InvoiceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
 class InvoiceServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, MailpitAssertions;
 
     private InvoiceService $service;
 
@@ -22,9 +23,6 @@ class InvoiceServiceTest extends TestCase
     {
         parent::setUp();
         $this->service = new InvoiceService();
-        // Mailpit leeren für sauberen State (QUEUE_CONNECTION=sync → ShouldQueue-Mailables
-        // werden inline versendet, kein queue:work nötig).
-        Http::delete('http://127.0.0.1:8026/api/v1/messages');
 
         // Bankdaten für den InvoiceMail-PDF-Build
         \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
@@ -88,10 +86,7 @@ class InvoiceServiceTest extends TestCase
             'total_amount' => 5000,
         ]);
 
-        // InvoiceMail via Mailpit (KEIN Mail::fake())
-        $messages = Http::get('http://127.0.0.1:8026/api/v1/messages')->json('messages');
-        $this->assertGreaterThan(0, count($messages), 'Keine E-Mail an Mailpit versendet.');
-        $this->assertStringContainsString('happy@example.com', $messages[0]['To'][0]['Address']);
+        $this->assertMailpitSentTo('happy@example.com');
     }
 
     /**
@@ -242,24 +237,21 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame('Linz', $details['city']);
         $this->assertSame('initiator@example.com', $details['email']);
 
-        // Mail geht an Initiator
-        $messages = Http::get('http://127.0.0.1:8026/api/v1/messages')->json('messages');
-        $this->assertGreaterThan(0, count($messages));
-        $this->assertStringContainsString('initiator@example.com', $messages[0]['To'][0]['Address']);
+        $this->assertMailpitSentTo('initiator@example.com');
     }
 
     public function test_generateForTenant_tenant_without_users_returns_error(): void
     {
         $tenant = Tenant::create(['name' => 'Empty Tenant']);
 
+        Mail::fake();
         $result = $this->service->generateForTenant($tenant);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Keine offenen Lieferscheine', $result['error']);
         // Keine collective Order, keine Mail
         $this->assertDatabaseMissing('orders', ['status' => 'invoice_created']);
-        $messages = Http::get('http://127.0.0.1:8026/api/v1/messages')->json('messages');
-        $this->assertSame(0, count($messages));
+        Mail::assertNothingQueued();
 
         // REVIEW-Hinweis: Der ehemals tote mailTo=null Zweig wurde entfernt,
         // da er über die vorherigen Guards ohnehin unerreichbar war.

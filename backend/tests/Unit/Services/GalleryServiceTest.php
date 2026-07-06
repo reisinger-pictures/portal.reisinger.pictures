@@ -18,13 +18,13 @@ class GalleryServiceTest extends TestCase
     use RefreshDatabase;
 
     private GalleryService $service;
-    private SlugService|\PHPUnit\Framework\MockObject\MockObject $slugService;
+    private SlugService|\PHPUnit\Framework\MockObject\Stub $slugService;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->slugService = $this->createMock(SlugService::class);
+        $this->slugService = $this->createStub(SlugService::class);
         $this->service = new GalleryService($this->slugService);
     }
 
@@ -32,6 +32,8 @@ class GalleryServiceTest extends TestCase
 
     public function test_storeGroup_creates_group_with_slug_from_service(): void
     {
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
             ->with('meine-gruppe', 'gallery_groups', 'slug', null)
@@ -56,6 +58,8 @@ class GalleryServiceTest extends TestCase
 
     public function test_storeGroup_uses_name_for_slug_when_slug_not_provided(): void
     {
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
             ->with('Meine Gruppe', 'gallery_groups', 'slug', null)
@@ -96,6 +100,8 @@ class GalleryServiceTest extends TestCase
             'slug' => 'original',
         ]);
 
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
             ->with('aktualisiert', 'gallery_groups', 'slug', null)
@@ -120,6 +126,8 @@ class GalleryServiceTest extends TestCase
             'slug' => 'original',
         ]);
 
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
             ->with('neuer-slug', 'gallery_groups', 'slug', null)
@@ -137,6 +145,8 @@ class GalleryServiceTest extends TestCase
 
     public function test_storeGallery_creates_gallery_with_basic_data(): void
     {
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
             ->with('Meine Galerie', 'galleries', 'slug', null)
@@ -285,6 +295,8 @@ class GalleryServiceTest extends TestCase
     {
         $gallery = Gallery::factory()->create(['slug' => 'existing-slug']);
 
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
             ->with('new-slug', 'galleries', 'slug', null)
@@ -301,6 +313,8 @@ class GalleryServiceTest extends TestCase
     {
         $gallery = Gallery::factory()->create(['slug' => 'my-slug']);
 
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->never())
             ->method('makeUnique');
 
@@ -373,6 +387,8 @@ class GalleryServiceTest extends TestCase
             'slug' => 'original-slug',
         ]);
 
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->never())->method('makeUnique');
 
         $updated = $this->service->updateGallery($gallery, [

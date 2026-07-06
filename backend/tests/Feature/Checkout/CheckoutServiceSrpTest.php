@@ -31,9 +31,6 @@ class CheckoutServiceSrpTest extends TestCase
 
         $this->service = new CheckoutService(new VolumeLicensingStrategy(new SettingResolver()));
 
-        // Mailpit-Postfach vor jedem Test leeren
-        Http::delete('http://127.0.0.1:8026/api/v1/messages');
-
         // Bankdaten-Settings für InvoiceMail-PDF-Build
         \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'srp'], ['value' => 'SRP Test Holder']);
         \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'srp'], ['value' => 'AT987654321']);

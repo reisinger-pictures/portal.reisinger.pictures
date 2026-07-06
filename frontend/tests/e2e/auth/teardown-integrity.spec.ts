@@ -3,7 +3,7 @@ import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {UserDetailed} from '../../../src/logic/useUsers';
 
 test.describe('Teardown Integrity Validation', () => {
-    test('Flow AK: UserController@destroy properly wipes user and ensures test isolation', async ({request}) => {
+    test('Flow AK: UserController@destroy properly wipes user and ensures test isolation', { tags: ['@feature:auth:teardown'] }, async ({request}) => {
         const helper = new E2ESessionHelper(request);
         const testUser = await helper.createIsolatedUser('client');
 

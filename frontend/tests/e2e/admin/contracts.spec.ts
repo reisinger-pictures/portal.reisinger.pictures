@@ -18,7 +18,7 @@ test.describe('Digital Contracts Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super Admin creates, opens a contract via UI and sees join link', async ({ page }) => {
+    test('Super Admin creates, opens a contract via UI and sees join link', { tags: ['@feature:admin:contracts'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -70,7 +70,7 @@ test.describe('Digital Contracts Workflow', () => {
         await expect(page.locator('input[readonly]')).toHaveValue(/\/contracts\/join\//, { timeout: 10000 });
     });
 
-    test('Two clients join and sign a contract via API, then admin closes it', async ({ page, request }) => {
+    test('Two clients join and sign a contract via API, then admin closes it', { tags: ['@feature:admin:contracts'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
 
         await auth.login(testUser.email, testUser.password);
@@ -182,7 +182,7 @@ test.describe('Digital Contracts Workflow', () => {
         expect(closeData.contract.status).toBe('closed');
     });
 
-test('Admin edits active contract, signer is blocked from signing stale version', async ({ page, request }) => {
+test('Admin edits active contract, signer is blocked from signing stale version', { tags: ['@feature:admin:contracts'] }, async ({ page, request }) => {
     const auth = new AuthHelper(page);
     await auth.login(testUser.email, testUser.password);
 

@@ -16,7 +16,7 @@ test.describe('License Catalog Admin Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super Admin can add and edit license modifiers', async ({ page }) => {
+    test('Super Admin can add and edit license modifiers', { tags: ['@feature:admin:licenses'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         

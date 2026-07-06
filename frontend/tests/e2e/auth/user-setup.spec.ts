@@ -36,7 +36,7 @@ test.describe('User Setup via Mailpit Workflow', () => {
         mailpit = new MailpitHelper(request);
     });
 
-    test('Admin invites a new user and user completes setup', async ({ page, request }) => {
+    test('Admin invites a new user and user completes setup', { tags: ['@feature:auth:setup'] }, async ({ page, request }) => {
         // --- Phase 1: Admin lädt ein ---
         await auth.login(testUser.email, testUser.password);
         await sidebar.navigateTo('Benutzer & Rechte');

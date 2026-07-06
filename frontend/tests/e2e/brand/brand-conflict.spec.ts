@@ -21,7 +21,7 @@ test.describe('E7: Brand-Konflikt Route Guard', () => {
         if (helper) await helper.teardown();
     });
 
-    test('User mit Brand rp und SRP-Tenant kann sich nicht auf SRP-Portal anmelden', async ({ page, request }) => {
+    test('User mit Brand rp und SRP-Tenant kann sich nicht auf SRP-Portal anmelden', { tags: ['@feature:brand:isolation'] }, async ({ page, request }) => {
         const headers = { 'Accept': 'application/json', 'Cookie': adminToken };
 
         const tenantRes = await request.post('/api/management/tenants', {

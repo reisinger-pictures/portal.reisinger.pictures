@@ -28,7 +28,16 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
   * Code-Reviews, temporäre Analysen und Diskussionen → `AGENTS.todo.md`. Nur wenn ein neuer SOLL-Zustand definiert wird → `features/`.
 * **Task & Test Tracking:** Every feature requires actionable TODOs in `AGENTS.todo.md`. You MUST explicitly include TODOs for writing test cases (PHPUnit for backend, Playwright for E2E).
 
-## 2. AI Operating Rules (STRICT)
+## 2. E2E Tag Policy (STRICT)
+
+* **E2E tests MUST be tagged** using Playwright's `{tags: [...]}` syntax. Every test gets one of these tiers:
+  * `@smoke` — Critical path (login, guest, auth, basic CRUD). Run after every code change.
+  * `@regression` — Full functional coverage. Run before deployment.
+  * `@feature:<name>` — Optional, for feature-specific selection (e.g., `@feature:checkout`, `@feature:brand`).
+* **Device-specific tests** (mobile-only gestures, responsive layout) use `@mobile` tag.
+* **New E2E tests MUST include at least one tag.** If the test is critical path, use `@smoke`. If it's feature-specific, use `@feature:<name>`. Deep edge cases can remain untagged but will only run in the full pre-deployment suite.
+
+## 3. AI Operating Rules (STRICT)
 * **useEffect & Derived State Policy (STRICT):** Forbid the use of `useEffect` for side effects triggered by user events (e.g. creating object URLs). Handlers MUST perform these actions. Forbid the use of `useState` for values that can be derived during rendering.
 * **Tailwind JIT Policy (STRICT):** Dynamische String-Konkatenation für Tailwind-Klassen (z.B. `btn-${color}`) ist **strikt verboten**, da der JIT-Compiler diese beim Build-Prozess übersieht und restlos entfernt (Purge). Klassen müssen immer vollständig und statisch ausgeschrieben werden (z.B. per explizitem Mapping-Objekt oder Ternary-Operator).
 * **Tailwind-Only Policy (STRICT):** Das `style`-Attribut ist **strikt verboten** – mit Ausnahme von dynamischen Werten, die sich zur Laufzeit ändern (z. B. berechnete Breiten/Höhen aus Benutzereingaben, animierte Werte). Statische Layout-Werte (insb. vh/vw/dvh/dvw-basierte Größen) MÜSSEN via Tailwind-Klassen gelöst werden. Werte in eckigen Klammern (JIT-Bracket-Syntax wie `w-[30%]`, `text-[10px]`, `max-w-[200px]`) bleiben ebenfalls **strikt verboten** — außer bei Iconify-Icons. Tailwind 4 bietet native Fraktionen (`w-3/10`, `w-1/5`), Spacing-Werte (`max-w-xs`, `text-xs`, `h-80`) und `dvh`-Utilities (`h-dvh`, `max-h-dvh`). Reichen diese nicht aus, ist eine Erweiterung der Tailwind-Konfiguration (z. B. via `@utility` in `index.css`) dem Inline-Style vorzuziehen.
@@ -55,11 +64,11 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
   * Die CSS-Regel in `index.css` (`.form-control:has(input[required], select[required], textarea[required]) .label-text::after`) ist der zentrale Mechanismus und darf nicht umgangen werden.
 * **Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. V017 ist die letzte deployte Migration. Vor dem Deployment werden alle Nicht-Produktions-Migrationen (≥ V018) zu EINER konsolidierten Migration zusammengefasst. Diese Regel verhindert eine übermäßig fragmentierte Migrations-Historie.
 
-## 3. AI Agent Roles & Responsibilities
+## 4. AI Agent Roles & Responsibilities
 The system and workflow are managed via a Main/Secondary Model architecture to prevent context pollution:
 * **Main Model (Planner & Reviewer):** Has the full project context. Analyzes the problem, designs the architecture, updates documentation, and reviews implementations. Delegates isolated coding tasks to the Secondary Model by providing only the necessary files and specific instructions.
 * **Secondary Model (Implementer):** Runs in a fresh, isolated context. Receives specific instructions and target files from the Main Model, implements the changes, and generates the patch script.
-* **E2E Execution (STRICT):** Playwright-Tests immer direkt via `npx playwright test` ausführen. Für Wiederholung fehlgeschlagener Tests: `npx playwright test --last-failed`.
+* **E2E Execution (STRICT):** Playwright-Tests per Tag ausführen (siehe §2). Bei jedem Code-Change: `test:e2e:smoke`. Vor Deployment: `test:e2e` (full suite). Für Wiederholung fehlgeschlagener Tests: `npx playwright test --last-failed`.
 * **Workflow-Reihenfolge für Test-Fixes (STRICT):**
   * 1. Dokumentieren (SOLL in `features/`, Bug-Analyse)
   * 2. Backend Unit/Integration-Tests schreiben (`php artisan test --filter`)
@@ -68,7 +77,7 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
 * **localStorage Injection (STRICT ANTI-PATTERN):** Daten via `page.evaluate()` oder `addInitScript` in `localStorage` zu injizieren ist verboten. localStorage ist ein Implementierungsdetail des Frontends. Tests MÜSSEN den User-Flow abbilden: Login → Navigation → Formular-Interaktion. Ausnahme: `E2ESessionHelper` für Test-Setup (API-basiert).
 * **Max 3 Fix-Versuche für Tests (STRICT):** Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agent an den Benutzer zurückgeben mit einer Analyse was schiefgeht. Keine Endlos-Fix-Loops.
 
-## 4. Test Commands
+## 5. Test Commands
 ```bash
 # Backend (PHP via Herd: PATH muss php85 enthalten)
 export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
@@ -80,21 +89,33 @@ cd frontend && pnpm vitest run
 # Frontend Lint + Build (pnpm, NICHT npm)
 cd frontend && pnpm lint:fix && pnpm build
 
-# E2E (Playwright — alle Tests, dann --last-failed)
+# E2E (Playwright — full suite, nur vor Deployment)
 cd frontend
 npx playwright test
+
+# E2E (nur @smoke — nach jedem Code-Change)
+cd frontend
+npx playwright test --grep @smoke
+
+# E2E (nur spezifisches Feature, z.B. checkout)
+cd frontend
+npx playwright test --grep @feature:checkout
 
 # E2E (nur fehlgeschlagene wiederholen)
 cd frontend
 npx playwright test --last-failed
 
 # E2E Workflow:
-# 1. Immer ALLE Tests ausführen (nicht nur Subset per Tag)
-# 2. Bei Fehlschlägen: npx playwright test --last-failed bis alle grün
-# 3. Flaky Tests (mal grün/mal rot) in AGENTS.todo.md dokumentieren mit:
+# 1. Nach jedem Code-Change: pnpm test:e2e:smoke
+# 2. Feature-spezifisch: npx playwright test --grep @feature:<name>
+# 3. Nur vor Deployment: npx playwright test (full suite)
+# 4. Flaky Tests in AGENTS.todo.md dokumentieren mit:
 #    - Datei + Testname
 #    - Fehlerursache (wenn bekannt)
 #    - "flaky" tag im Commit/PR
+#
+# Bug-Fixing: Bei fehlschlagenden E2E-Tests npx playwright test --last-failed
+# wiederholt ausführen, bis alle grün sind.
 
 # E2E Timeout Policy (STRICT):
 # - Vor jeder Session die aktuelle Minimallaufzeit messen: npx playwright test
@@ -102,4 +123,14 @@ npx playwright test --last-failed
 # - Diese Regel und die Laufzeit in AGENTS.todo.md dokumentieren
 # - Bei Änderungen an E2E-Tests neu messen und aktualisieren
 # Aktuelle Laufzeit (05.07.2026): ~7 min → Timeout: 15 min (900000ms)
+
+# Backend Parallel Testing (PHP):
+# Derzeit laufen ~500 PHP Tests sequenziell. Für schnellere Feedback-Loops:
+# 1. paratest installieren: composer require --dev brianium/paratest
+# 2. php artisan test --parallel (Laravel 11 built-in parallel runner)
+# 3. Prozesse: 8 (Ryzen-Kerne)
+# 
+# PHP Group-Strategy (noch nicht implementiert):
+# 1. Tests mit @group=smoke taggen für schnelle Regression
+# 2. Nur Feature-Tests bei Feature-Arbeit: php artisan test --testsuite=Feature --parallel
 ```

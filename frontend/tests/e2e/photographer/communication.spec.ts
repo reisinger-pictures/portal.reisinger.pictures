@@ -25,7 +25,7 @@ test.describe('Communication Workflow (Flows E, F)', () => {
         await auth.login(photogUser.email, photogUser.password);
     });
 
-    test('Flow F: Email button is disabled without subscribers, enabled with opt-in and supports preview', async ({ page, request }) => {
+    test('Flow F: Email button is disabled without subscribers, enabled with opt-in and supports preview', { tags: ['@feature:photographer:communication'] }, async ({ page, request }) => {
         const galleryHelper = new GalleryHelper(page, helper);
         
         const galleryName = `Comm F ${Math.random().toString(36).substring(2, 10)}`;
@@ -94,7 +94,7 @@ test.describe('Communication Workflow (Flows E, F)', () => {
         await expect(page.locator('.toast')).toContainText('E-Mails versendet');
     });
 
-    test('Flow E: Photographer can generate and revoke an invite link', async ({ page }) => {
+    test('Flow E: Photographer can generate and revoke an invite link', { tags: ['@feature:photographer:communication'] }, async ({ page }) => {
         const modal = new ModalHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
         

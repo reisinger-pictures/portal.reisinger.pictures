@@ -17,7 +17,7 @@ test.describe('Package Calculator Configuration (G2)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Admin can configure package calculator settings', async ({ page }) => {
+    test('Admin can configure package calculator settings', { tags: ['@feature:admin:calculator'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -44,7 +44,7 @@ test.describe('Package Calculator Configuration (G2)', () => {
         await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
     });
 
-    test('Admin can set outdoor multiplier and verify it in the shooting calculator', async ({ page, request }) => {
+    test('Admin can set outdoor multiplier and verify it in the shooting calculator', { tags: ['@feature:admin:calculator'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 

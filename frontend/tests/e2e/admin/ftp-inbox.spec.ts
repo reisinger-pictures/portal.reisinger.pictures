@@ -12,7 +12,7 @@ test.describe('G1: FTP Inbox Feature', () => {
         if (helper) await helper.teardown();
     });
 
-    test('FTP Inbox is visible for photographers on Dashboard', async ({ page, request }) => {
+    test('FTP Inbox is visible for photographers on Dashboard', { tags: ['@feature:admin:ftp'] }, async ({ page, request }) => {
         helper = new E2ESessionHelper(request);
         const testUser = await helper.createIsolatedUser('photographer');
         const auth = new AuthHelper(page);
@@ -26,7 +26,7 @@ test.describe('G1: FTP Inbox Feature', () => {
         await expect(main.locator('code.font-bold.font-mono')).toBeVisible();
     });
 
-    test('FTP Inbox is NOT visible for non-photographer roles', async ({ page, request }) => {
+    test('FTP Inbox is NOT visible for non-photographer roles', { tags: ['@feature:admin:ftp'] }, async ({ page, request }) => {
         helper = new E2ESessionHelper(request);
         const testUser = await helper.createIsolatedUser('client');
         const auth = new AuthHelper(page);
@@ -37,7 +37,7 @@ test.describe('G1: FTP Inbox Feature', () => {
         await expect(page.locator('h2:has-text("FTP Inbox")')).toHaveCount(0);
     });
 
-    test('Photographer can set and remove target gallery in FTP Inbox', async ({ page, request }) => {
+    test('Photographer can set and remove target gallery in FTP Inbox', { tags: ['@feature:admin:ftp'] }, async ({ page, request }) => {
         helper = new E2ESessionHelper(request);
         const testUser = await helper.createIsolatedUser('photographer');
         const auth = new AuthHelper(page);

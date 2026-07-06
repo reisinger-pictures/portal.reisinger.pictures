@@ -19,7 +19,7 @@ test.describe('Guest Photo Detail (G4)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Guest can view public photo details', async ({ page }) => {
+    test('Guest can view public photo details', { tags: ['@smoke', '@feature:guest'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);

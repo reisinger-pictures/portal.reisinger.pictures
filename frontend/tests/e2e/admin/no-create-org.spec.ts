@@ -78,7 +78,7 @@ test.describe('E6: Kein Organisation anlegen Button für Org-Admin', () => {
         return { email, password, tenantName, tenantId, userId };
     }
 
-    test('Org-Admin sieht keinen Organisation anlegen Button', async ({ page, request }) => {
+    test('Org-Admin sieht keinen Organisation anlegen Button', { tags: ['@feature:admin:tenant'] }, async ({ page, request }) => {
         const { email, password } = await createOrgAdmin(request, adminToken);
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

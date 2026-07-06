@@ -17,7 +17,7 @@ test.describe('Billing Details Save (Bankdaten)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super Admin can save bank details and they persist after reload', async ({ page }) => {
+    test('Super Admin can save bank details and they persist after reload', { tags: ['@feature:admin:billing'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -52,7 +52,7 @@ test.describe('Billing Details Save (Bankdaten)', () => {
         await expect(card.getByPlaceholder(/IBAN|AT/i).first()).toHaveValue(iban);
     });
 
-    test('Invalid IBAN is rejected by validation', async ({ page }) => {
+    test('Invalid IBAN is rejected by validation', { tags: ['@feature:admin:billing'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 

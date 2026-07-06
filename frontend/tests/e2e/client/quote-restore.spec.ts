@@ -16,7 +16,7 @@ test.describe('Quote Cart Restore Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Navigating with quote_token fetches data, populates cart, and cleans URL', async ({ page, request }) => {
+    test('Navigating with quote_token fetches data, populates cart, and cleans URL', { tags: ['@feature:client:quote'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);
 

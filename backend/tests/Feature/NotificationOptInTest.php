@@ -5,9 +5,10 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Gallery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\MailpitAssertions;
 
 class NotificationOptInTest extends TestCase {
-    use RefreshDatabase;
+    use RefreshDatabase, MailpitAssertions;
 
     public function test_client_can_toggle_opt_in_and_mail_controller_respects_it() {
         $client = User::factory()->create(['email' => 'optin@test.com']);
@@ -27,8 +28,6 @@ class NotificationOptInTest extends TestCase {
         $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $adminToken = auth('api')->login($admin);
         
-        \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages');
-
         $adminResponse = $this->withHeaders(['Authorization' => "Bearer $adminToken"])
              ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [
                  'subject' => 'OptIn Update', 'body' => 'Hello'
@@ -40,9 +39,6 @@ class NotificationOptInTest extends TestCase {
         // WORKER STARTEN: Leert die asynchrone Warteschlange für den Test
         \Illuminate\Support\Facades\Artisan::call('queue:work', ['--stop-when-empty' => true]);
 
-        $mailpitResponse = \Illuminate\Support\Facades\Http::get('http://127.0.0.1:8026/api/v1/messages');
-        $messages = $mailpitResponse->json('messages');
-        $this->assertGreaterThan(0, count($messages));
-        $this->assertStringContainsString('optin@test.com', $messages[0]['To'][0]['Address']);
+        $this->assertMailpitSentTo('optin@test.com');
     }
 }

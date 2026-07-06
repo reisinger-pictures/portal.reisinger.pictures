@@ -33,7 +33,7 @@ test.describe('Product Batch Edit Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super Admin can search and batch edit products', async ({ page }) => {
+    test('Super Admin can search and batch edit products', { tags: ['@feature:admin:products'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Global Search Workflow', () => {
-    test('Guest can use global sidebar search to find content', async ({ page }) => {
+    test('Guest can use global sidebar search to find content', { tags: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
 
         // Auf Mobile das Menü öffnen, damit die Sidebar sichtbar wird

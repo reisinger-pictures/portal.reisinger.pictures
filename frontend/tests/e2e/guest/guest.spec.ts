@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Guest Workflow', () => {
-    test('Guest can access discovery search and perform a query', async ({ page }) => {
+    test('Guest can access discovery search and perform a query', { tags: ['@smoke', '@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
 
         await expect(page.getByRole('heading', { name: 'Neueste Entdeckungen' })).toBeVisible();

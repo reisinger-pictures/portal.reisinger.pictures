@@ -16,7 +16,7 @@ test.describe('Coupon Admin CRUD', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Admin can create a fixed global coupon', async ({ page }) => {
+    test('Admin can create a fixed global coupon', { tags: ['@feature:admin:coupon'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
 
@@ -44,7 +44,7 @@ test.describe('Coupon Admin CRUD', () => {
         await expect(page.locator('table')).toContainText(fixedCoupon.code, { timeout: 10000 });
     });
 
-    test('Admin can create organisation-scoped coupon', async ({ page }) => {
+    test('Admin can create organisation-scoped coupon', { tags: ['@feature:admin:coupon'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
 
@@ -72,7 +72,7 @@ test.describe('Coupon Admin CRUD', () => {
         await expect(page.locator('table')).toContainText(orgCoupon.code, { timeout: 10000 });
     });
 
-    test('Admin can delete a used coupon', async ({ page }) => {
+    test('Admin can delete a used coupon', { tags: ['@feature:admin:coupon'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
 
@@ -114,7 +114,7 @@ test.describe('Coupon Admin CRUD', () => {
         await expect(row).toBeHidden({ timeout: 10000 });
     });
 
-    test('Admin can toggle coupon active/inactive', async ({ page }) => {
+    test('Admin can toggle coupon active/inactive', { tags: ['@feature:admin:coupon'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
 

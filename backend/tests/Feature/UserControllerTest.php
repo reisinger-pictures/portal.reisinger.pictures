@@ -4,17 +4,15 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\MailpitAssertions;
 
 class UserControllerTest extends TestCase {
-    use RefreshDatabase;
+    use RefreshDatabase, MailpitAssertions;
 
     public function test_admin_can_create_user() {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
-
-        // Vor dem Test die Mailpit API bereinigen
-        \Illuminate\Support\Facades\Http::delete('http://127.0.0.1:8026/api/v1/messages');
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
                          ->postJson('/api/management/users', ['name' => 'Test User', 'email' => 'test@test.com']);
@@ -22,13 +20,7 @@ class UserControllerTest extends TestCase {
         $response->assertStatus(200);
         $this->assertDatabaseHas('users', ['email' => 'test@test.com']);
 
-        // Harter Check gegen die Mailpit API (statt Mocking)
-        $mailpitResponse = \Illuminate\Support\Facades\Http::get('http://127.0.0.1:8026/api/v1/messages');
-        $this->assertTrue($mailpitResponse->successful(), 'Mailpit API nicht erreichbar');
-        
-        $messages = $mailpitResponse->json('messages');
-        $this->assertCount(1, $messages, 'Es sollte exakt eine E-Mail versendet worden sein.');
-        $this->assertStringContainsString('test@test.com', $messages[0]['To'][0]['Address']);
+        $this->assertMailpitSentTo('test@test.com');
     }
 
     public function test_partial_update_preserves_roles() {

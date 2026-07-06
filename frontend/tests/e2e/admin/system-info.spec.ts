@@ -16,7 +16,7 @@ test.describe('System Info Page (G10)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('System info page displays system information', async ({ page }) => {
+    test('System info page displays system information', { tags: ['@feature:admin:system'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 

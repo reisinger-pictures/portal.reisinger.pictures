@@ -18,7 +18,7 @@ test.describe('Empty Cart — UI & Accessibility', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Empty cart renders empty-state UI with an accessible home link', async ({page}) => {
+    test('Empty cart renders empty-state UI with an accessible home link', { tags: ['@feature:client:cart'] }, async ({page}) => {
         const auth = new AuthHelper(page);
         await auth.login(clientUser.email, clientUser.password);
 

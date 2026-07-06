@@ -137,7 +137,7 @@ test.describe('Stripe Checkout Workflow', () => {
         return {stripeFrame, form, orderId};
     };
 
-    test('Negative Flow: Handles generic decline and insufficient funds via inline alert', async ({page}) => {
+    test('Negative Flow: Handles generic decline and insufficient funds via inline alert', { tags: ['@feature:client:checkout'] }, async ({page}) => {
         test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
         const {stripeFrame, form} = await navigateToStripeIframe(page);
 
@@ -169,7 +169,7 @@ test.describe('Stripe Checkout Workflow', () => {
         }).toPass({timeout: 15000});
     });
 
-    test('Positive Flow: Handles successful payment via Visa', async ({page}) => {
+    test('Positive Flow: Handles successful payment via Visa', { tags: ['@feature:client:checkout'] }, async ({page}) => {
         test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
         const {stripeFrame, form} = await navigateToStripeIframe(page);
 

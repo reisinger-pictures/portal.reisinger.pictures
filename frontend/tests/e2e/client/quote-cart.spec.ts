@@ -26,7 +26,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Client requests quote, Admin answers via Mail, Client accepts', async ({ page, request }) => {
+    test('Client requests quote, Admin answers via Mail, Client accepts', { tags: ['@feature:client:quote'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const modal = new ModalHelper(page);
         const form = new FormHelper(page, modal);

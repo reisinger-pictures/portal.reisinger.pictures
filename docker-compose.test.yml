@@ -9,7 +9,9 @@ services:
       MYSQL_DATABASE: portal_test_db
       MYSQL_USER: portal_user
       MYSQL_PASSWORD: admin
-    volumes: ["db_data_test:/var/lib/mysql"]
+    volumes:
+      - "db_data_test:/var/lib/mysql"
+      - "./docker/test/init:/docker-entrypoint-initdb.d"
 
   search:
     image: getmeili/meilisearch:v1.48.3
