@@ -19,7 +19,7 @@ class Gallery extends Model
         'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos',
         'default_title', 'default_description', 'default_keywords',
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
-        'tenant_id', 'brand',
+        'org_ids', 'brand',
         'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers'
     ];
 
@@ -46,7 +46,6 @@ class Gallery extends Model
         'default_state',
         'default_country',
         'default_iso_country',
-        'tenant_id',
         'brand',
         'expires_at'
     ];
@@ -58,7 +57,6 @@ class Gallery extends Model
         'brand' => Brand::class,
         'apply_metadata_to_photos' => 'boolean',
         'expires_at' => 'datetime',
-        'tenant_id' => 'string',
         'is_free_download' => 'boolean',
         'is_editorial_only' => 'boolean',
         'is_hidden' => 'boolean',
@@ -66,7 +64,7 @@ class Gallery extends Model
     ];
 
     // Dieses Attribut wird bei JSON-Responses automatisch angehängt
-    protected $appends = ['full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download'];
+    protected $appends = ['full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'org_ids'];
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
@@ -143,6 +141,19 @@ class Gallery extends Model
     public function galleryGroup()
     {
         return $this->belongsTo(GalleryGroup::class);
+    }
+
+    public function orgs()
+    {
+        return $this->belongsToMany(Org::class, 'gallery_org');
+    }
+
+    public function getOrgIdsAttribute(): array
+    {
+        if (!$this->relationLoaded('orgs')) {
+            return [];
+        }
+        return $this->orgs->pluck('id')->toArray();
     }
 
     public function toSearchableArray()

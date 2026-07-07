@@ -38,8 +38,8 @@ class StatsController extends Controller
         }
 
         if ($user->is_org_admin && !$user->is_admin) {
-            $tenantUserIds = \App\Models\User::where('tenant_id', $user->tenant_id)->pluck('id');
-            $query->whereIn('user_id', $tenantUserIds);
+            $orgUserIds = \App\Models\User::where('org_id', $user->org_id)->pluck('id');
+            $query->whereIn('user_id', $orgUserIds);
         } elseif (!$user->is_admin) {
             $galleryIds = array_unique(array_merge(
                 $user->galleries()->pluck('galleries.id')->toArray(),

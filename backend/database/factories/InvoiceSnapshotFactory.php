@@ -32,8 +32,8 @@ class InvoiceSnapshotFactory extends Factory
                 'items' => $items,
             ],
             'total_net' => $totalNet,
-            'total_gross' => (int) round($totalNet * 1.20),
-            'tax_rate' => 20.00,
+            'total_gross' => $totalNet,
+            'tax_rate' => null,
         ];
     }
 }

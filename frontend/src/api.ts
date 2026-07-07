@@ -94,8 +94,13 @@ export const fetcher = async <T>(url: string): Promise<T> => {
     }
 
     const contentType = res.headers.get('content-type');
+    const text = await res.text();
     if (contentType && contentType.includes('application/json')) {
-        return res.json() as Promise<T>;
+        try {
+            return text ? JSON.parse(text) : {} as T;
+        } catch {
+            throw new Error('Server-Antwort konnte nicht als JSON verarbeitet werden.');
+        }
     }
     
     throw new Error('Server hat kein valides JSON zurückgegeben.');
@@ -143,7 +148,7 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE
         }
     }
     
-    return {} as T;
+    throw new Error('Server hat kein valides JSON zurückgegeben.');
 };
 
 // --- Global Data Contracts ---
@@ -177,7 +182,7 @@ export interface Gallery {
     gallery_group_id?: string | null;
     expires_at?: string | null;
     created_at?: string;
-    tenant_id?: string | null;
+    org_ids?: string[];
     brand?: string | null;
 }
 

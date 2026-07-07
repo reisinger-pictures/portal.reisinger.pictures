@@ -35,9 +35,9 @@ class GalleryController extends Controller
     {
         $user = auth('api')->user();
         $filterType = $request->query('filter_type');
-        $tenantId = $request->query('tenant_id');
+        $orgId = $request->query('org_id');
 
-        $treeArray = $this->galleryTreeService->getAdminTree($user, $filterType, $tenantId);
+        $treeArray = $this->galleryTreeService->getAdminTree($user, $filterType, $orgId);
 
         return response()->json($treeArray);
     }
@@ -47,7 +47,8 @@ class GalleryController extends Controller
      */
     public function storeGroup(StoreGroupRequest $request)
     {
-        $group = $this->galleryService->storeGroup($request->validated());
+        $data = $request->validated();
+        $group = $this->galleryService->storeGroup($data);
 
         return response()->json(['success' => true, 'group' => new GalleryGroupResource($group)]);
     }

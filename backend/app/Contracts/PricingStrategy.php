@@ -38,4 +38,13 @@ interface PricingStrategy
  * }
      */
     public function calculateCart(array $items, User $user, ?string $couponCode = null): array;
+
+    /**
+     * Check if this pricing strategy supports coupon codes.
+     *
+     * VolumeLicensingStrategy (SRP) returns true — coupons are a feature of the
+     * SRP self-service portal. ScopeLicensingStrategy (RP) returns false — coupon
+     * codes are not applicable for B2B use-case-based pricing.
+     */
+    public function supportsCoupons(): bool;
 }

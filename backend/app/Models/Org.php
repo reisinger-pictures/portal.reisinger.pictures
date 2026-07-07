@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class Tenant extends Model
+class Org extends Model
 {
     use HasFactory, HasUuids;
 
@@ -31,7 +31,7 @@ class Tenant extends Model
 
     public function users()
     {
-        return $this->hasMany(User::class, 'tenant_id');
+        return $this->hasMany(User::class, 'org_id');
     }
 
     public function galleryGroups()

@@ -14,12 +14,16 @@ class QuoteLinkService
     /**
      * Generate a quote link carrying a signed JWT token (`?quote_token=`).
      */
-    public function generateQuoteLink(array $photoIds, int $customPrice, int $validityDays = self::DEFAULT_VALIDITY_DAYS): string
+    public function generateQuoteLink(array $photoIds, int $customPrice, int $validityDays = self::DEFAULT_VALIDITY_DAYS, ?string $rightsText = null): string
     {
         $payload = [
             'photos' => $photoIds,
             'price' => $customPrice,
         ];
+
+        if ($rightsText !== null) {
+            $payload['rights_text'] = $rightsText;
+        }
 
         $token = app(OfferTokenService::class)->issue($payload, now()->addDays($validityDays));
 
@@ -35,11 +39,4 @@ class QuoteLinkService
         return app(OfferTokenService::class)->verify($token);
     }
 
-    /**
-     * Extract token from request query string.
-     */
-    public function extractTokenFromRequest(array $queryParams): ?string
-    {
-        return $queryParams['token'] ?? null;
-    }
 }

@@ -2,13 +2,14 @@
 
 namespace Database\Factories;
 
-use App\Models\Tenant;
+use App\Enums\Brand;
+use App\Models\Org;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<Tenant>
+ * @extends Factory<Org>
  */
-class TenantFactory extends Factory
+class OrgFactory extends Factory
 {
     public function definition(): array
     {
@@ -16,11 +17,17 @@ class TenantFactory extends Factory
             'name' => $this->faker->company(),
             'domain' => $this->faker->unique()->domainName(),
             'invoice_frequency' => $this->faker->randomElement(['immediate', 'monthly', 'quarterly']),
+            'brand' => Brand::B2B->value,
         ];
     }
 
     public function immediate(): static
     {
         return $this->state(fn (array $attributes) => ['invoice_frequency' => 'immediate']);
+    }
+
+    public function srp(): static
+    {
+        return $this->state(fn (array $attributes) => ['brand' => Brand::SRP->value]);
     }
 }

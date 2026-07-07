@@ -4,14 +4,14 @@ namespace App\Mail;
 
 use Illuminate\Support\Facades\Log;
 
-class TenantInviteMail extends AbstractBrandAwareMailable
+class OrgInviteMail extends AbstractBrandAwareMailable
 {
-    public $tenantName;
+    public $orgName;
     public $inviteLink;
 
-    public function __construct($tenantName, $inviteLink)
+    public function __construct($orgName, $inviteLink)
     {
-        $this->tenantName = $tenantName;
+        $this->orgName = $orgName;
         $this->inviteLink = $inviteLink;
         $this->initializeBrand();
     }
@@ -20,11 +20,11 @@ class TenantInviteMail extends AbstractBrandAwareMailable
     {
         $this->applyBrandFrom();
 
-        return $this->subject("Einladung zur Organisation: {$this->tenantName}")
-                    ->view('emails.tenant_invite')
+        return $this->subject("Einladung zur Organisation: {$this->orgName}")
+                    ->view('emails.org_invite')
                     ->with([
                         'logoUrl' => $this->brandLogoUrl(),
-                        'tenantName' => $this->tenantName,
+                        'orgName' => $this->orgName,
                     ]);
     }
 
@@ -32,7 +32,7 @@ class TenantInviteMail extends AbstractBrandAwareMailable
     {
         Log::error('Queue job failed', [
             'job' => static::class,
-            'tenantName' => $this->tenantName,
+            'orgName' => $this->orgName,
             'exception' => $exception->getMessage(),
         ]);
     }

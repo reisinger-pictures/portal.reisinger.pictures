@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import WysiwygEditor from '../components/WysiwygEditor';
@@ -54,7 +54,7 @@ describe('WysiwygEditor', () => {
             isAdmin: true,
             isPhotographer: false,
             isOrgAdmin: false,
-            showTenantsSection: false,
+            showOrgsSection: false,
             canEditMetadata: false,
             isPowerUser: false,
             canAccessB2BFeatures: false,

@@ -122,7 +122,7 @@ test.describe('AI Configuration Page & Generate Button', () => {
             await route.fulfill({
                 json: {
                     groups: [],
-                    root_galleries: [{ id: 'e2e-ai-gallery', name: 'AI Test Gallery', type: 'delivery', is_live: true, full_path: 'e2e-ai-gallery', tenant_id: null, expires_at: null }],
+                    root_galleries: [{ id: 'e2e-ai-gallery', name: 'AI Test Gallery', type: 'delivery', is_live: true, full_path: 'e2e-ai-gallery', org_id: null, expires_at: null }],
                 }
             });
         });

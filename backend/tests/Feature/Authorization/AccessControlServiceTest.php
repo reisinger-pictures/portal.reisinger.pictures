@@ -6,7 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Role;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\User;
 use App\Services\AccessControlService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -96,15 +96,16 @@ class AccessControlServiceTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    //  Tenant Integration
+    //  Org Integration
     // ──────────────────────────────────────────────
 
-    public function test_tenant_direct_gallery_access(): void
+    public function test_org_direct_gallery_access(): void
     {
-        $tenant = Tenant::factory()->create();
-        $gallery = Gallery::factory()->create(['tenant_id' => $tenant->id, 'type' => 'delivery']);
+        $org = Org::factory()->create();
+        $gallery = Gallery::factory()->create(['type' => 'delivery']);
+        $gallery->orgs()->attach($org->id);
         $user = User::factory()->create();
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $ids = $this->service->getAllowedGalleryIds($user);
@@ -112,13 +113,14 @@ class AccessControlServiceTest extends TestCase
         $this->assertContains($gallery->id, $ids);
     }
 
-    public function test_tenant_group_gallery_access(): void
+    public function test_org_group_gallery_access(): void
     {
-        $tenant = Tenant::factory()->create();
-        $group = GalleryGroup::factory()->create(['tenant_id' => $tenant->id]);
+        $org = Org::factory()->create();
+        $group = GalleryGroup::factory()->create();
+        $group->orgs()->attach($org->id);
         $gallery = Gallery::factory()->create(['gallery_group_id' => $group->id, 'type' => 'delivery']);
         $user = User::factory()->create();
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $ids = $this->service->getAllowedGalleryIds($user);

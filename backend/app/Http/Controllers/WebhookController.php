@@ -7,6 +7,7 @@ use App\Models\Order;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\InvoiceMail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class WebhookController extends Controller
 {
@@ -73,29 +74,54 @@ class WebhookController extends Controller
                         'status' => 'paid',
                         'stripe_fee_cents' => $feeCents
                     ]);
-                    if ($order->user) {
+                    if ($order->user && !Cache::has('invoice_sent_' . $order->id)) {
                         Mail::to($order->user->email)->queue(new InvoiceMail($order, $order->invoiceSnapshot));
+                        Cache::put('invoice_sent_' . $order->id, true, now()->addDays(7));
                     }
                 }
             }
         } elseif ($event->type === 'charge.dispute.created') {
             $dispute = $event->data->object;
             $piId = $dispute->payment_intent ?? null;
+            if ($piId === null) {
+                Log::warning('Webhook: dispute with null payment_intent, skipping', ['dispute_id' => $dispute->id ?? null]);
+                return response()->json(['status' => 'success']);
+            }
             $order = Order::where('stripe_payment_intent_id', $piId)->first();
             if ($order && $order->status !== 'disputed') {
                 $order->update(['status' => 'disputed']);
+                $this->clearPurchasedCache($order);
                 Mail::to(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
                     ->send(new \App\Mail\CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$order->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
             }
         } elseif ($event->type === 'charge.refunded') {
             $charge = $event->data->object;
             $piId = $charge->payment_intent ?? null;
+            if ($piId === null) {
+                Log::warning('Webhook: refund with null payment_intent, skipping', ['charge_id' => $charge->id ?? null]);
+                return response()->json(['status' => 'success']);
+            }
             $order = Order::where('stripe_payment_intent_id', $piId)->first();
             if ($order && $order->status !== 'refunded') {
                 $order->update(['status' => 'refunded']);
+                $this->clearPurchasedCache($order);
             }
         }
 
         return response()->json(['status' => 'success']);
+    }
+
+    private function clearPurchasedCache(Order $order): void
+    {
+        $snapshot = $order->invoiceSnapshot;
+        if (!$snapshot) return;
+
+        $items = $snapshot->customer_details['items'] ?? [];
+        foreach ($items as $item) {
+            if (!isset($item['photoId'])) continue;
+            foreach (['web', 'print', 'original'] as $tier) {
+                Cache::forget("user.{$order->user_id}.purchased.{$item['photoId']}.{$tier}");
+            }
+        }
     }
 }

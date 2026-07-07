@@ -2,7 +2,7 @@
 
 **Status:** Draft  
 **Epic:** SRP-01 / SRP-01-ext  
-**Tags:** `coupon`, `discount`, `pricing`, `srp`, `photographer`, `scope`, `tenant`, `organisation`, `max-items`
+**Tags:** `coupon`, `discount`, `pricing`, `srp`, `photographer`, `scope`, `Org`, `organisation`, `max-items`
 
 ## Target State (Soll-Zustand)
 
@@ -25,7 +25,7 @@ Coupons can be restricted by scope:
 | `gallery` | Valid only when the cart contains items from the specified `scope_id` (galleries.id) |
 | `meta_gallery` | Valid only when the cart contains items from the specified `scope_id` (gallery_groups.id) |
 | `photographer` | Valid only when the cart contains items from **any** gallery owned by the coupon creator (via `photographer_gallery_groups`). `scope_id` is ignored. |
-| `organisation` | Valid only when the authenticated user belongs to the B2B tenant specified by `scope_id` (tenants.id). Primarily for mandantenweite Rabattcodes in B2B contexts. `scope_id` contains the tenant UUID. |
+| `organisation` | Valid only when the authenticated user belongs to the B2B Org specified by `scope_id` (tenants.id). Primarily for mandantenweite Rabattcodes in B2B contexts. `scope_id` contains the Org UUID. |
 
 If a cart contains items from multiple galleries, a gallery-scoped coupon applies when *any* item belongs to the matching gallery.
 
@@ -47,9 +47,9 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 
 **Use Case – Mandantenweiter Organisations-Code:**
 
-- `scope_type=organisation`, `scope_id=<tenant-UUID>`, `type=fixed`, `value=10`
-- Nur Benutzer, die dem Tenant `scope_id` angehören, können diesen Code einlösen.
-- Tenant-Zugehörigkeit wird via `user->tenants()->first()` geprüft (Standard-B2B-Tenant des Users).
+- `scope_type=organisation`, `scope_id=<Org-UUID>`, `type=fixed`, `value=10`
+- Nur Benutzer, die dem Org `scope_id` angehören, können diesen Code einlösen.
+- Org-Zugehörigkeit wird via `user->tenants()->first()` geprüft (Standard-B2B-Org des Users).
 
 ### 3. Business Rules
 
@@ -195,12 +195,12 @@ Unique: `(coupon_id, user_id)`
 **Scope-Einschränkung Photographer:**
 - Darf nur `scope_id` auf Galleries/Groups setzen, zu denen er via `photographer_gallery_groups` berechtigt ist
 - Bei `scope_type = 'photographer'` wird der Coupon automatisch auf alle seine Gallerien angewandt
-- `scope_type = 'organisation'` ist für Photographer nicht erlaubt (kein Tenant-Zugriff)
+- `scope_type = 'organisation'` ist für Photographer nicht erlaubt (kein Org-Zugriff)
 
 **Organisation-Scope Einschränkungen:**
 - Nur Super Admin und Admin (brand-bound) dürfen `scope_type = 'organisation'` setzen
-- `scope_id` muss eine gültige Tenant-UUID der aktuellen Brand sein
-- Validierung: `Tenant::byBrand(...)->where('id', scope_id)->exists()`
+- `scope_id` muss eine gültige Org-UUID der aktuellen Brand sein
+- Validierung: `Org::byBrand(...)->where('id', scope_id)->exists()`
 
 ### 9. Coupon Management UI — SRP-only
 

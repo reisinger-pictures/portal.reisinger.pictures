@@ -81,18 +81,18 @@ class StatsCalculationService
      */
     public function getOrgAdminStats(User $user, ?string $tier = null): array
     {
-        $tenantUserIds = User::where('tenant_id', $user->tenant_id)->pluck('id')->toArray();
+        $orgUserIds = User::where('org_id', $user->org_id)->pluck('id')->toArray();
 
         $tierFilterDb = function($query) use ($tier) {
             if ($tier) $query->where('download_logs.resolution_tier', $tier);
         };
 
-        $totalDownloads = DownloadLog::whereIn('user_id', $tenantUserIds)
+        $totalDownloads = DownloadLog::whereIn('user_id', $orgUserIds)
             ->where('item_type', 'single_image')
             ->where($tierFilterDb)
             ->count();
 
-        $totalDownloads += DownloadLog::whereIn('user_id', $tenantUserIds)
+        $totalDownloads += DownloadLog::whereIn('user_id', $orgUserIds)
             ->where('item_type', 'full_zip')
             ->where($tierFilterDb)
             ->sum('photo_count');
@@ -102,7 +102,7 @@ class StatsCalculationService
 
         $rawDomainStats = DB::table('download_logs')
             ->join('users', 'download_logs.user_id', '=', 'users.id')
-            ->whereIn('download_logs.user_id', $tenantUserIds)
+            ->whereIn('download_logs.user_id', $orgUserIds)
             ->where($tierFilterDb)
             ->selectRaw('SUBSTRING_INDEX(users.email, "@", -1) as domain, COUNT(*) as count')
             ->groupBy('domain')
@@ -112,7 +112,7 @@ class StatsCalculationService
 
         $topGalleries = DB::table('download_logs')
             ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
-            ->whereIn('user_id', $tenantUserIds)
+            ->whereIn('user_id', $orgUserIds)
             ->whereNotNull('gallery_name_snapshot')
             ->where($tierFilterDb)
             ->groupBy('gallery_name_snapshot')

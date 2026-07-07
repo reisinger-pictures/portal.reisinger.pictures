@@ -12,7 +12,7 @@ use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
 use App\Models\Order;
 use App\Models\Photo;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Services\CheckoutService;
@@ -143,13 +143,13 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 3. Lieferschein (Tenant invoice_frequency != immediate)
+    // 3. Lieferschein (Org invoice_frequency != immediate)
     // ------------------------------------------------------------------
-    public function test_process_checkout_lieferschein_when_tenant_invoice_frequency_is_not_immediate(): void
+    public function test_process_checkout_lieferschein_when_org_invoice_frequency_is_not_immediate(): void
     {
         [$user, $photo, $useCase] = $this->setupPaidItem();
-        $tenant = Tenant::create(['name' => 'Firma AG', 'invoice_frequency' => 'monthly']);
-        $user->tenant_id = $tenant->id;
+        $org = Org::create(['name' => 'Firma AG', 'invoice_frequency' => 'monthly']);
+        $user->org_id = $org->id;
         $user->save();
 
         $response = $this->service->processCheckout(
@@ -170,7 +170,7 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 4. paymentMethod 'invoice' (ohne Tenant) -> status invoice_created + Mail
+    // 4. paymentMethod 'invoice' (ohne Org) -> status invoice_created + Mail
     // ------------------------------------------------------------------
     public function test_process_checkout_invoice_payment_method_creates_invoice_and_sends_mail(): void
     {
@@ -287,13 +287,13 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 9. invoice_frequency 'immediate' + Tenant -> Stripe-Pfad (KEIN Lieferschein)
+    // 9. invoice_frequency 'immediate' + Org -> Stripe-Pfad (KEIN Lieferschein)
     // ------------------------------------------------------------------
-    public function test_process_checkout_tenant_with_immediate_invoice_frequency_does_not_create_lieferschein(): void
+    public function test_process_checkout_org_with_immediate_invoice_frequency_does_not_create_lieferschein(): void
     {
         [$user, $photo, $useCase] = $this->setupPaidItem();
-        $tenant = Tenant::create(['name' => 'Immediate Co', 'invoice_frequency' => 'immediate']);
-        $user->tenant_id = $tenant->id;
+        $org = Org::create(['name' => 'Immediate Co', 'invoice_frequency' => 'immediate']);
+        $user->org_id = $org->id;
         $user->save();
 
         $clientMock = $this->createMock(\Stripe\HttpClient\ClientInterface::class);
@@ -350,14 +350,14 @@ class CheckoutServiceTest extends TestCase
         \Stripe\ApiRequestor::setHttpClient($clientMock);
 
         try {
-            $this->service->processCheckout(
+            $response = $this->service->processCheckout(
                 $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
                 $user,
                 'stripe'
             );
-            $this->fail('Expected RuntimeException from Stripe client.');
-        } catch (\RuntimeException $e) {
-            // erwartet — Exception fliegt aus respondBasedOnPayment (ausserhalb der Transaktion)
+
+            $this->assertEquals(502, $response->status());
+            $this->assertSame('Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.', $response->getData(true)['error']);
         } finally {
             \Stripe\ApiRequestor::setHttpClient(null);
         }
@@ -368,7 +368,7 @@ class CheckoutServiceTest extends TestCase
 
         $order = Order::first();
         $this->assertNotNull($order);
-        $this->assertEquals('pending_payment', $order->status);
+        $this->assertEquals('cancelled', $order->status);
         $this->assertNull($order->stripe_payment_intent_id);
     }
 
@@ -528,6 +528,7 @@ class CheckoutServiceTest extends TestCase
             $user = User::factory()->create();
 
             $strategy = $this->createStub(PricingStrategy::class);
+            $strategy->method('supportsCoupons')->willReturn(true);
             $strategy->method('calculateCart')->willReturn([
                 'items' => [
                     ['itemId' => $photo1->id, 'priceCents' => 3000, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],

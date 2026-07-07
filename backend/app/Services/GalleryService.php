@@ -28,7 +28,7 @@ class GalleryService
             'gallery_groups'
         );
 
-        return GalleryGroup::create([
+        $group = GalleryGroup::create([
             'name' => $data['name'],
             'slug' => $slug,
             'parent_id' => $data['parent_id'] ?? null,
@@ -37,9 +37,14 @@ class GalleryService
             'is_editorial_only' => $data['is_editorial_only'] ?? false,
             'is_hidden' => $data['is_hidden'] ?? false,
             'restricted_photographers' => $data['restricted_photographers'] ?? null,
-            'tenant_id' => $data['tenant_id'] ?? null,
             'brand' => BrandRegistry::currentOrDefault()->value,
         ]);
+
+        if (!empty($data['org_id'])) {
+            $group->orgs()->attach($data['org_id']);
+        }
+
+        return $group;
     }
 
     /**
@@ -103,7 +108,6 @@ class GalleryService
                 'is_editorial_only' => $data['is_editorial_only'] ?? false,
                 'is_hidden' => $data['is_hidden'] ?? false,
                 'restricted_photographers' => $data['restricted_photographers'] ?? null,
-                'tenant_id' => $data['tenant_id'] ?? null,
                 'gallery_group_id' => $data['gallery_group_id'] ?? null,
                 'password_hash' => !empty($data['password']) ? Hash::make($data['password']) : null,
                 'expires_at' => $expiresAt,
@@ -122,6 +126,8 @@ class GalleryService
             if ($user && $user->is_photographer) {
                 $user->photographerGalleries()->syncWithoutDetaching([$gallery->id]);
             }
+
+            $gallery->orgs()->sync($data['org_ids'] ?? []);
 
             return $gallery;
         }, 3);
@@ -157,6 +163,8 @@ class GalleryService
         }
 
         $gallery->update($data);
+
+        $gallery->orgs()->sync($data['org_ids'] ?? []);
 
         $this->applyMetadataToPhotos($gallery);
 

@@ -26,7 +26,7 @@ class QuoteController extends Controller
         $items = $order->invoiceSnapshot->customer_details['items'] ?? [];
         $photoIds = array_column($items, 'photoId');
 
-        $link = $this->quoteLinkService->generateQuoteLink($photoIds, $request->custom_price);
+        $link = $this->quoteLinkService->generateQuoteLink($photoIds, $request->custom_price, rightsText: $request->rights_text);
 
         $subject = "Individuelles Angebot";
         $body = "<p>" . nl2br(htmlspecialchars($request->message)) . "</p><br><p><a href=\"{$link}\">Hier geht es zum Angebot und Checkout</a></p>";
@@ -40,9 +40,9 @@ class QuoteController extends Controller
     {
         $user = auth('api')->user();
         if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
-        $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer']);
+        $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer', 'rights_text' => 'nullable|string|max:2000']);
 
-        $link = $this->quoteLinkService->generateQuoteLink($request->photo_ids, $request->custom_price);
+        $link = $this->quoteLinkService->generateQuoteLink($request->photo_ids, $request->custom_price, rightsText: $request->rights_text);
 
         return response()->json(['success' => true, 'link' => $link]);
     }

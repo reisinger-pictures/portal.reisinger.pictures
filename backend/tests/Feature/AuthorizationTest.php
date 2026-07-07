@@ -7,7 +7,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
-// use App\Models\DomainMapping; (Removed in favor of Tenant)
+// use App\Models\DomainMapping; (Removed in favor of Org)
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class AuthorizationTest extends TestCase
@@ -51,14 +51,14 @@ class AuthorizationTest extends TestCase
         $user = User::factory()->create(['email' => 'employee@firma.com']);
         $group = GalleryGroup::factory()->create();
         
-        $tenant = \App\Models\Tenant::create([
+        $org = \App\Models\Org::create([
             'name' => 'Firma',
             'domain' => 'firma.com',
             'invoice_frequency' => 'immediate'
         ]);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
-        $tenant->galleryGroups()->attach($group->id);
+        $org->galleryGroups()->attach($group->id);
 
         $deliveryGallery = Gallery::factory()->create([
             'gallery_group_id' => $group->id, 

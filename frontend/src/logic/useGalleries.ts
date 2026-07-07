@@ -20,7 +20,8 @@ export interface GalleryGroup {
     effective_is_free_download?: boolean;
     children?: GalleryGroup[];
     galleries?: Gallery[];
-    tenant_id?: string | null;
+    org_id?: string | null;
+    orgs?: Array<{ id: string; name: string }>;
 }
 
 export interface GalleryTreeResponse {
@@ -90,13 +91,13 @@ export function useProtectedGalleries() {
         await invalidateAll();
     };
 
-    const createGallery = async (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: GalleryMetadataOpts) => {
-        await apiMutate('/api/management/galleries', 'POST', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts });
+    const createGallery = async (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: GalleryMetadataOpts, orgIds?: string[]) => {
+        await apiMutate('/api/management/galleries', 'POST', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts, org_ids: orgIds });
         await invalidateAll();
     };
 
-    const updateGallery = async (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: GalleryMetadataOpts) => {
-        await apiMutate('/api/management/galleries/' + id, 'PUT', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts });
+    const updateGallery = async (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, groupId?: string | null, password?: string, expiresAt?: string, metadataOpts?: GalleryMetadataOpts, orgIds?: string[]) => {
+        await apiMutate('/api/management/galleries/' + id, 'PUT', { name, slug, type, is_live: isLive, is_public: isPublic, gallery_group_id: groupId, password, expires_at: expiresAt, ...metadataOpts, org_ids: orgIds });
         await invalidateAll();
     };
 

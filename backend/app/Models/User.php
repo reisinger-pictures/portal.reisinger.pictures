@@ -35,7 +35,7 @@ class User extends Authenticatable implements JWTSubject
 
     protected $fillable = [
         'name', 'email', 'password', 'brand', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
-        'can_purchase_upgrades', 'current_ftp_gallery_id', 'ftp_slug', 'tenant_id',
+        'can_purchase_upgrades', 'current_ftp_gallery_id', 'ftp_slug', 'org_id',
         'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city'
     ];
 
@@ -70,11 +70,11 @@ class User extends Authenticatable implements JWTSubject
     public function photographerGalleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'photographer_gallery_groups'); }
     public function currentFtpGallery() { return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id'); }
     public function photos() { return $this->hasMany(Photo::class); }
-    public function tenant(): BelongsTo { return $this->belongsTo(Tenant::class); }
+    public function org(): BelongsTo { return $this->belongsTo(Org::class); }
 
-    public function scopeByTenant(Builder $query, string $tenantId): Builder
+    public function scopeByOrg(Builder $query, string $orgId): Builder
     {
-        return $query->where('tenant_id', $tenantId);
+        return $query->where('org_id', $orgId);
     }
 
     public function getIsPendingAttribute(): bool
@@ -85,7 +85,7 @@ class User extends Authenticatable implements JWTSubject
 
     public function getIsPhotographerAttribute(): bool { return $this->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists(); }
     public function getIsAdminAttribute(): bool { return $this->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists(); }
-    public function getIsOrgAdminAttribute(): bool { return $this->roles()->where('name', UserRole::ORG_ADMIN->value)->exists() && $this->tenant_id !== null; }
+    public function getIsOrgAdminAttribute(): bool { return $this->roles()->where('name', UserRole::ORG_ADMIN->value)->exists() && $this->org_id !== null; }
 
     /** @deprecated Use is_org_admin instead. */
     public function getIsCustomerManagerAttribute(): bool { return $this->getIsOrgAdminAttribute(); }
@@ -130,6 +130,12 @@ class User extends Authenticatable implements JWTSubject
 
     public function hasPurchasedPhoto($photoId, $requestedTier): bool
     {
+        $cacheKey = "user.{$this->id}.purchased.{$photoId}.{$requestedTier}";
+        $cached = cache()->get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
+        }
+
         $orders = \App\Models\Order::where('user_id', $this->id)
             ->whereNotIn('status', ['disputed', 'refunded', 'cancelled'])
             ->where(function ($q) {
@@ -146,7 +152,10 @@ class User extends Authenticatable implements JWTSubject
             foreach ($items as $item) {
                 if (($item['photoId'] ?? '') === $photoId) {
                     $itemRank = TierRanks::RANKS[$item['tier'] ?? 'none'] ?? 0;
-                    if ($itemRank >= $reqRank) return true;
+                    if ($itemRank >= $reqRank) {
+                        cache()->put($cacheKey, true, 3600);
+                        return true;
+                    }
                 }
             }
         }

@@ -9,7 +9,7 @@ export interface Permissions {
     canEditMetadata: boolean;
     isPowerUser: boolean;
     canAccessB2BFeatures: boolean;
-    showTenantsSection: boolean;
+    showOrgsSection: boolean;
     showCRM: boolean;
     showInvoicing: boolean;
     showPayouts: boolean;
@@ -34,7 +34,7 @@ export function computePermissions(user: User | null | undefined): Permissions {
         canEditMetadata,
         isPowerUser,
         canAccessB2BFeatures,
-        showTenantsSection: canAccessB2BFeatures,
+        showOrgsSection: canAccessB2BFeatures,
         showCRM: canAccessB2BFeatures,
         showInvoicing: canAccessB2BFeatures,
         showPayouts: isSuperAdmin,

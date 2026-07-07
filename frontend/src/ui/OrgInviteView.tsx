@@ -8,7 +8,7 @@ import PageLayout from './components/PageLayout';
 import { apiMutate } from '../api';
 import { useAuth } from '../logic/useAuth';
 
-export default function TenantInviteView() {
+export default function OrgInviteView() {
     const { token } = useParams<{ token: string }>();
     const navigate = useNavigate();
     const { mutate } = useSWRConfig();
@@ -16,7 +16,7 @@ export default function TenantInviteView() {
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [tenantName, setTenantName] = useState('');
+    const [orgName, setOrgName] = useState('');
     const [email, setEmail] = useState('');
     const [confirmed, setConfirmed] = useState(false);
 
@@ -26,13 +26,13 @@ export default function TenantInviteView() {
     const [acceptPrivacy, setAcceptPrivacy] = useState(false);
 
     useEffect(() => {
-        fetch('/api/tenant-invites/' + token, { headers: { 'Accept': 'application/json' } })
+        fetch('/api/org-invites/' + token, { headers: { 'Accept': 'application/json' } })
             .then(res => {
                 if (!res.ok) throw new Error(t`Dieser Einladungslink ist ungültig oder abgelaufen.`);
                 return res.json();
             })
             .then(data => {
-                setTenantName(data.tenant_name);
+                setOrgName(data.org_name);
                 setEmail(data.email);
                 setLoading(false);
             })
@@ -46,7 +46,7 @@ export default function TenantInviteView() {
         setError('');
         setIsSubmitting(true);
         try {
-            await apiMutate('/api/tenant-invites/redeem', 'POST', {
+            await apiMutate('/api/org-invites/redeem', 'POST', {
                 token, accept_privacy: true,
                 ...(user ? {} : { name, password })
             });
@@ -76,7 +76,7 @@ export default function TenantInviteView() {
         );
     }
 
-    if (error && !tenantName) {
+    if (error && !orgName) {
         return (
             <PageLayout>
                 <div className="flex h-full items-center justify-center p-4">
@@ -94,7 +94,7 @@ export default function TenantInviteView() {
                         <div className="card-body">
                             <h2 className="card-title text-2xl mb-1"><Trans>Account erstellen</Trans></h2>
                             <p className="text-base-content/70 mb-4">
-                                <Trans>Du bist dabei, <strong>{tenantName}</strong> beizutreten. Erstelle deinen Account, um fortzufahren.</Trans>
+                                <Trans>Du bist dabei, <strong>{orgName}</strong> beizutreten. Erstelle deinen Account, um fortzufahren.</Trans>
                             </p>
                             {error && <ErrorMessage message={error} className="mb-4" />}
                             <form onSubmit={e => { e.preventDefault(); handleJoin(); }} className="space-y-4">
@@ -140,11 +140,11 @@ export default function TenantInviteView() {
                         <h2 className="card-title text-2xl mb-1"><Trans>Einladung zu Organisation</Trans></h2>
 
                         <div className="bg-base-200 rounded-box p-4 my-4 text-center">
-                            <p className="text-lg font-bold">{tenantName}</p>
+                            <p className="text-lg font-bold">{orgName}</p>
                         </div>
 
                         <p className="text-base-content/70 mb-4">
-                            <Trans>Du wurdest eingeladen, der Organisation <strong>{tenantName}</strong> beizutreten.</Trans>
+                            <Trans>Du wurdest eingeladen, der Organisation <strong>{orgName}</strong> beizutreten.</Trans>
                         </p>
 
                         <ul className="list-disc list-inside text-sm text-base-content/70 space-y-1 mb-4">

@@ -21,18 +21,18 @@ test.describe('E7: Brand-Konflikt Route Guard', () => {
         if (helper) await helper.teardown();
     });
 
-    test('User mit Brand rp und SRP-Tenant kann sich nicht auf SRP-Portal anmelden', { tag: ['@feature:brand:isolation'] }, async ({ page, request }) => {
+    test('User mit Brand rp und SRP-Org kann sich nicht auf SRP-Portal anmelden', { tag: ['@feature:brand:isolation'] }, async ({ page, request }) => {
         const headers = { 'Accept': 'application/json', 'Cookie': adminToken };
 
-        const tenantRes = await request.post('/api/management/tenants', {
-            data: { name: `SRP Tenant ${Math.random().toString(36).substring(2, 10)}`, invoice_frequency: 'immediate', brand: 'srp' },
+        const tenantRes = await request.post('/api/management/orgs', {
+            data: { name: `SRP Org ${Math.random().toString(36).substring(2, 10)}`, invoice_frequency: 'immediate', brand: 'srp' },
             headers
         });
-        if (!tenantRes.ok()) throw new Error(`Tenant creation failed: ${await tenantRes.text()}`);
+        if (!tenantRes.ok()) throw new Error(`Org creation failed: ${await tenantRes.text()}`);
         const tenantData = await tenantRes.json();
-        const tenantId = tenantData.tenant?.id;
-        if (!tenantId) throw new Error('Tenant ID missing');
-        helper.trackTenant(tenantId);
+        const orgId = tenantData.org?.id;
+        if (!orgId) throw new Error('Org ID missing');
+        helper.trackOrg(orgId);
 
         const uniqueId = Math.random().toString(36).substring(2, 10);
         const email = `e2e-brand-conflict-${uniqueId}@example.com`;
@@ -58,7 +58,7 @@ test.describe('E7: Brand-Konflikt Route Guard', () => {
             headers
         });
 
-        await request.put(`/api/management/tenants/${tenantId}/users`, {
+        await request.put(`/api/management/orgs/${orgId}/users`, {
             data: { user_ids: [userId] },
             headers
         });

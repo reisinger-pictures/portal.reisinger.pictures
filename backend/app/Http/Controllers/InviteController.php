@@ -120,7 +120,7 @@ class InviteController extends Controller
 
         if ($guestEmail) {
             $realUser = \App\Models\User::where('email', $guestEmail)->first();
-            if ($realUser && ($realUser->password || $realUser->is_admin)) {
+            if ($realUser) {
                 return response()->json(['error' => 'Diese E-Mail ist bereits mit einem Passwort registriert. Bitte logge dich regulär ein.'], 403);
             }
         }

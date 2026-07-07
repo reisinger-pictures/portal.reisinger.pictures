@@ -102,7 +102,7 @@ describe('Sidebar', () => {
             isSuperAdmin: false,
             isPhotographer: false,
             isOrgAdmin: false,
-            showTenantsSection: false,
+            showOrgsSection: false,
             canEditMetadata: false,
             isPowerUser: false,
             canAccessB2BFeatures: false,
@@ -219,7 +219,7 @@ describe('Sidebar', () => {
                 isSuperAdmin: false,
                 isPhotographer: true,
                 isOrgAdmin: false,
-                showTenantsSection: false,
+                showOrgsSection: false,
             });
             renderSidebar();
 
@@ -242,7 +242,7 @@ describe('Sidebar', () => {
                 isSuperAdmin: false,
                 isPhotographer: true,
                 isOrgAdmin: false,
-                showTenantsSection: false,
+                showOrgsSection: false,
                 canEditMetadata: true,
                 isPowerUser: false,
                 canAccessB2BFeatures: false,
@@ -270,7 +270,7 @@ describe('Sidebar', () => {
                 isSuperAdmin: true,
                 isPhotographer: false,
                 isOrgAdmin: false,
-                showTenantsSection: true,
+                showOrgsSection: true,
             });
             renderSidebar();
 
@@ -289,7 +289,7 @@ describe('Sidebar', () => {
                 isSuperAdmin: false,
                 isPhotographer: false,
                 isOrgAdmin: true,
-                showTenantsSection: true,
+                showOrgsSection: true,
             });
             renderSidebar();
 
@@ -309,7 +309,7 @@ describe('Sidebar', () => {
                 isSuperAdmin: false,
                 isPhotographer: true,
                 isOrgAdmin: false,
-                showTenantsSection: false,
+                showOrgsSection: false,
             });
             renderSidebar();
 
@@ -336,7 +336,7 @@ describe('SRP admin navigation', () => {
             isSuperAdmin: false,
             isPhotographer: true,
             isOrgAdmin: false,
-            showTenantsSection: false,
+            showOrgsSection: false,
             canEditMetadata: true,
         });
         vi.mocked(useBrand).mockReturnValue({
@@ -364,7 +364,7 @@ describe('SRP admin navigation', () => {
             isAdmin: false,
             isPhotographer: true,
             isOrgAdmin: false,
-            showTenantsSection: false,
+            showOrgsSection: false,
         });
         renderSidebar();
 

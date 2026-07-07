@@ -1,15 +1,15 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
-import { useTenants } from '../../logic/useTenants';
+import { useOrgs } from '../../logic/useOrgs';
 import { useUI } from '../components/UIContext';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '../../logic/usePermissions';
 import PageLayout from '../components/PageLayout';
 import EmptyState from '../components/EmptyState';
 
-export default function ManagementTenantsView() {
-    const { tenants, createTenant, isLoading } = useTenants();
+export default function ManagementOrgsView() {
+    const { orgs, createOrg, isLoading } = useOrgs();
     const { showToast } = useUI();
     const { isAdmin } = usePermissions();
     const navigate = useNavigate();
@@ -25,7 +25,7 @@ export default function ManagementTenantsView() {
         e.preventDefault();
         setIsCreating(true);
         try {
-            await createTenant({
+            await createOrg({
                 name: newName,
                 domain: newDomain || null,
                 invoice_frequency: 'immediate',
@@ -48,7 +48,7 @@ export default function ManagementTenantsView() {
     if (isLoading) return <div className="p-10 flex justify-center"><span className="loading loading-spinner loading-lg"></span></div>;
 
     return (
-        <PageLayout currentView="tenants">
+        <PageLayout currentView="orgs">
         <div className="p-6 md:p-10 max-w-6xl mx-auto w-full relative">
             <div className="flex justify-between items-center mb-8">
                 <div>
@@ -59,8 +59,8 @@ export default function ManagementTenantsView() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {tenants?.map(t => (
-                    <div key={t.id} className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/tenants/${t.id}`)}>
+                {orgs?.map(t => (
+                    <div key={t.id} className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/orgs/${t.id}`)}>
                         <div className="card-body p-5">
                             <h2 className="card-title text-xl text-primary">{t.name}</h2>
                             {t.domain ? <code className="text-sm bg-base-200 p-1 rounded">@{t.domain}</code> : <span className="text-sm opacity-50 italic"><Trans>Keine Auto-Join Domain</Trans></span>}
@@ -76,7 +76,7 @@ export default function ManagementTenantsView() {
                         </div>
                     </div>
                 ))}
-                {tenants?.length === 0 && (
+                {orgs?.length === 0 && (
                     <EmptyState icon="mdi--domain" title="Noch keine Organisationen angelegt." className="col-span-full py-12" />
                 )}
             </div>

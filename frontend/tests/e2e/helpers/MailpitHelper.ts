@@ -37,7 +37,7 @@ export class MailpitHelper {
         return this.extractLinkForEmail(email, /token=([a-zA-Z0-9]+)/);
     }
 
-    async extractTenantInviteToken(email: string): Promise<string | null> {
-        return this.extractLinkForEmail(email, /tenant-invite\/([a-zA-Z0-9]+)/);
+    async extractOrgInviteToken(email: string): Promise<string | null> {
+        return this.extractLinkForEmail(email, /org-invite\/([a-zA-Z0-9]+)/);
     }
 }

@@ -6,6 +6,7 @@ import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import { Order, OrderItem } from '../../api';
 import { formatMoney } from '../../logic/utils';
+import WysiwygEditor from '../components/WysiwygEditor';
 
 
 
@@ -17,6 +18,7 @@ export default function ManagementOrdersView() {
     const [quoteOrder, setQuoteOrder] = useState<Order | null>(null);
     const [customPrice, setCustomPrice] = useState<string>('');
     const [quoteMessage, setQuoteMessage] = useState<string>('');
+    const [rightsText, setRightsText] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
 
     if (isLoading) return <div className="p-10 flex justify-center"><span className="loading loading-spinner loading-lg"></span></div>;
@@ -38,7 +40,8 @@ export default function ManagementOrdersView() {
         try {
             await apiMutate(`/api/management/orders/${quoteOrder.id}/send-quote`, 'POST', {
                 custom_price: Math.round(parseFloat(customPrice.replace(',', '.')) * 100),
-                message: quoteMessage
+                message: quoteMessage,
+                rights_text: rightsText || null,
             });
             showToast('success', t`Angebot per E-Mail gesendet!`);
             setQuoteOrder(null);
@@ -100,7 +103,7 @@ export default function ManagementOrdersView() {
                                             <option value="cancelled"><Trans>Storniert</Trans></option>
                                         </select>
                                         {order.is_quote_request && order.status === 'pending' ? (
-                                            <button onClick={() => { setQuoteOrder(order); setCustomPrice(''); setQuoteMessage(''); }} className="btn btn-xs btn-primary">
+                                            <button onClick={() => { setQuoteOrder(order); setCustomPrice(''); setQuoteMessage(''); setRightsText(''); }} className="btn btn-xs btn-primary">
                                                 <Trans>Kalkulieren & Antworten</Trans>
                                             </button>
                                         ) : null}
@@ -141,7 +144,12 @@ export default function ManagementOrdersView() {
 
                         <div className="form-control mb-4">
                             <label className="label"><span className="label-text font-bold"><Trans>Nachricht an den Kunden</Trans></span></label>
-                            <textarea value={quoteMessage} onChange={e => setQuoteMessage(e.target.value)} className="textarea textarea-bordered w-full h-24"                                 placeholder={t`Hallo, hier ist mein Angebot für Ihre speziellen Rechte...`}></textarea>
+                            <textarea value={quoteMessage} onChange={e => setQuoteMessage(e.target.value)} className="textarea textarea-bordered w-full h-24"                                 placeholder={t`Hallo, hier ist mein Angebot...`}></textarea>
+                        </div>
+
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text font-bold"><Trans>Nutzungsrechte (optional)</Trans></span></label>
+                            <WysiwygEditor value={rightsText} onChange={setRightsText} />
                         </div>
 
                         <div className="modal-action col-span-full">

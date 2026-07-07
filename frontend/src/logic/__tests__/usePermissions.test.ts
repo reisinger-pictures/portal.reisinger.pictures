@@ -28,7 +28,7 @@ describe('computePermissions', () => {
         expect(p.canEditMetadata).toBe(false);
         expect(p.isPowerUser).toBe(false);
         expect(p.canAccessB2BFeatures).toBe(false);
-        expect(p.showTenantsSection).toBe(false);
+        expect(p.showOrgsSection).toBe(false);
         expect(p.showCRM).toBe(false);
         expect(p.showInvoicing).toBe(false);
         expect(p.showPayouts).toBe(false);
@@ -71,9 +71,9 @@ describe('computePermissions', () => {
         expect(computePermissions(clientUser).canAccessB2BFeatures).toBe(false);
     });
 
-    it('showTenantsSection / showCRM / showInvoicing equal canAccessB2BFeatures', () => {
+    it('showOrgsSection / showCRM / showInvoicing equal canAccessB2BFeatures', () => {
         const p = computePermissions(user({ is_admin: true }));
-        expect(p.showTenantsSection).toBe(true);
+        expect(p.showOrgsSection).toBe(true);
         expect(p.showCRM).toBe(true);
         expect(p.showInvoicing).toBe(true);
     });

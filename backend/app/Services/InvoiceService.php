@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\Order;
 use App\Models\InvoiceSnapshot;
 use App\Models\InvoiceSequence;
@@ -12,13 +12,13 @@ use Illuminate\Support\Facades\Mail;
 
 class InvoiceService
 {
-    public function generateForTenant(Tenant $tenant, $initiator = null)
+    public function generateForOrg(Org $org, $initiator = null)
     {
-        return DB::transaction(function () use ($tenant, $initiator) {
-            $tenantUserIds = $tenant->users()->pluck('users.id')->toArray();
+        return DB::transaction(function () use ($org, $initiator) {
+            $orgUserIds = $org->users()->pluck('users.id')->toArray();
 
             try {
-                $openOrders = Order::whereIn('user_id', $tenantUserIds)
+                $openOrders = Order::whereIn('user_id', $orgUserIds)
                     ->where('status', 'delivery_note')
                     ->with(['invoiceSnapshot', 'user'])
                     ->lockForUpdate()
@@ -31,7 +31,7 @@ class InvoiceService
             }
 
             if ($openOrders->isEmpty()) {
-                return ['success' => false, 'error' => 'Keine offenen Lieferscheine für diesen Mandanten gefunden.'];
+                return ['success' => false, 'error' => 'Keine offenen Lieferscheine für diese Organisation gefunden.'];
             }
 
             $totalNet = 0.00;
@@ -61,12 +61,12 @@ class InvoiceService
                 $order->update(['status' => 'archived_in_collective']);
             }
 
-            $fallbackUser = $tenant->users()->first();
+            $fallbackUser = $org->users()->first();
             $billingStreet = $initiator ? $initiator->billing_street : ($fallbackUser->billing_street ?? 'Firmenadresse');
             $billingZip = $initiator ? $initiator->billing_zip : ($fallbackUser->billing_zip ?? '0000');
             $billingCity = $initiator ? $initiator->billing_city : ($fallbackUser->billing_city ?? 'Unbekannt');
 
-            $brand = $openOrders->first()->brand ?? \App\Enums\Brand::B2B->value;
+            $brand = $org->brand?->value ?? $openOrders->first()->brand ?? \App\Enums\Brand::B2B->value;
 
             $collectiveOrder = Order::create([
                 'user_id' => $initiator ? $initiator->id : ($fallbackUser->id ?? null),
@@ -82,9 +82,9 @@ class InvoiceService
                 'invoice_number' => $invoiceNumber,
                 'brand' => $brand,
                 'customer_details' => [
-                    'name' => $tenant->name,
+                    'name' => $org->name,
                     'email' => $initiator ? $initiator->email : ($fallbackUser->email ?? config('mail.from.address')),
-                    'company' => $tenant->name,
+                    'company' => $org->name,
                     'street' => $billingStreet,
                     'zip' => $billingZip,
                     'city' => $billingCity,
@@ -95,7 +95,7 @@ class InvoiceService
                 ],
                 'total_net' => $totalNet,
                 'total_gross' => $totalGross,
-                'tax_rate' => 0.00
+                'tax_rate' => null
             ]);
 
             $mailTo = $initiator ? $initiator->email : $fallbackUser->email;

@@ -25,10 +25,10 @@ class UserController extends Controller
             if (!$user->is_org_admin) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
-            if ($user->tenant_id === null) {
+            if ($user->org_id === null) {
                 return response()->json(['data' => []]);
             }
-            $query->where('tenant_id', $user->tenant_id);
+            $query->where('org_id', $user->org_id);
         }
 
         return \App\Http\Resources\UserResource::collection($query->get());
@@ -48,16 +48,16 @@ class UserController extends Controller
     {
         $currentUser = auth('api')->user();
 
-        // Org Admin: scope to their tenant
-        $managerTenant = null;
+        // Org Admin: scope to their org
+        $managerOrg = null;
         if ($currentUser && $currentUser->is_org_admin) {
-            $managerTenant = \App\Models\Tenant::find($currentUser->tenant_id);
-            if (!$managerTenant) {
+            $managerOrg = \App\Models\Org::find($currentUser->org_id);
+            if (!$managerOrg) {
                 return response()->json(['error' => 'Customer Manager hat keine Organisation.'], 422);
             }
         }
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $managerTenant) {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $managerOrg) {
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -65,12 +65,12 @@ class UserController extends Controller
                 'brand' => BrandRegistry::currentOrDefault(),
             ]);
 
-            // If created by a Customer Manager, assign to their tenant
-            if ($managerTenant) {
-                $user->tenant_id = $managerTenant->id;
+            // If created by a Customer Manager, assign to their org
+            if ($managerOrg) {
+                $user->org_id = $managerOrg->id;
 
-                // Inherit role from tenant's default_role_id
-                $roleId = $managerTenant->default_role_id;
+                // Inherit role from org's default_role_id
+                $roleId = $managerOrg->default_role_id;
                 if (!$roleId) {
                     $clientRole = Role::where('name', UserRole::CLIENT->value)->first();
                     $roleId = $clientRole?->id;
@@ -79,11 +79,11 @@ class UserController extends Controller
                     $user->roles()->attach($roleId);
                 }
 
-                // Inherit flatrate settings from tenant
-                if ($managerTenant->default_flatrate_level) {
-                    $user->flatrate_level = $managerTenant->default_flatrate_level;
+                // Inherit flatrate settings from org
+                if ($managerOrg->default_flatrate_level) {
+                    $user->flatrate_level = $managerOrg->default_flatrate_level;
                 }
-                if ($managerTenant->can_purchase_upgrades) {
+                if ($managerOrg->can_purchase_upgrades) {
                     $user->can_purchase_upgrades = true;
                 }
                 $user->save();
@@ -120,8 +120,8 @@ class UserController extends Controller
             if (!$currentUser->is_org_admin) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
-            if ($user->tenant_id !== $currentUser->tenant_id) {
-                return response()->json(['error' => 'Forbidden (Tenant Isolation)'], 403);
+            if ($user->org_id !== $currentUser->org_id) {
+                return response()->json(['error' => 'Forbidden (Org Isolation)'], 403);
             }
         }
 
@@ -179,8 +179,8 @@ class UserController extends Controller
             if (!$currentUser->is_org_admin) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
-            if ($user->tenant_id !== $currentUser->tenant_id) {
-                return response()->json(['error' => 'Forbidden (Tenant Isolation)'], 403);
+            if ($user->org_id !== $currentUser->org_id) {
+                return response()->json(['error' => 'Forbidden (Org Isolation)'], 403);
             }
         }
 

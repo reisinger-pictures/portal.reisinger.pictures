@@ -14,7 +14,7 @@ use App\Models\PayoutPool;
 use App\Models\PhotographerStatement;
 use App\Models\Product;
 use App\Models\Setting;
-use App\Models\Tenant;
+use App\Models\Org;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -48,7 +48,7 @@ class FactoryIntegrationTest extends TestCase
             'Setting'               => [Setting::class, 'key'],
             'LicenseUseCase'        => [LicenseUseCase::class, 'id'],
             'LicenseModifier'       => [LicenseModifier::class, 'id'],
-            'Tenant'                => [Tenant::class, 'id'],
+            'Org'                   => [Org::class, 'id'],
             'Order'                 => [Order::class, 'id'],
             'InvoiceSnapshot'       => [InvoiceSnapshot::class, 'invoice_number'],
             'DownloadLog'           => [DownloadLog::class, 'id'],

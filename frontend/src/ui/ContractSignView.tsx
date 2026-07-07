@@ -6,6 +6,7 @@ import PageLayout from './components/PageLayout';
 import ErrorMessage from './components/ErrorMessage';
 import { fetchSignContract, sendPageExit, submitSign, SignContractResponse } from '../logic/useContractJoin';
 import { useContractHeartbeat } from '../logic/useContractHeartbeat';
+import { calcAge } from '../logic/utils';
 
 function formatMoney(cents: number): string {
     return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -201,7 +202,7 @@ export default function ContractSignView() {
                                     const bd = data.contract.billing_details.birthdate;
                                     if (!bd) return null;
                                     const birthDate = new Date(bd);
-                                    const age = new Date().getFullYear() - birthDate.getFullYear();
+                                    const age = calcAge(birthDate);
                                     return <><span className="font-bold">Alter:</span><span>{age} Jahre (geb. {birthDate.toLocaleDateString('de-DE')})</span></>;
                                 })()}
                             </div>

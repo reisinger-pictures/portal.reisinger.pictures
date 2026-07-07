@@ -8,6 +8,15 @@ export function formatMoney(cents: number): string {
     return (cents / 100).toFixed(2) + ' €';
 }
 
+export function calcAge(birthDate: Date, reference: Date = new Date()): number {
+    let age = reference.getFullYear() - birthDate.getFullYear();
+    const monthDiff = reference.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && reference.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
+}
+
 /**
  * Gallery and Group related types
  */

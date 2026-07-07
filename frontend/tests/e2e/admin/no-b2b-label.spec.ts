@@ -25,16 +25,16 @@ test.describe('E5: Kein B2B-Label sichtbar für Org-Admin', () => {
 
     async function createOrgAdmin(request: APIRequestContext, token: string) {
         const headers = { 'Accept': 'application/json', 'Cookie': token };
-        const tenantName = `E2E Tenant ${Math.random().toString(36).substring(2, 10)}`;
-        const tenantRes = await request.post('/api/management/tenants', {
-            data: { name: tenantName, invoice_frequency: 'immediate' },
+        const orgName = `E2E Org ${Math.random().toString(36).substring(2, 10)}`;
+        const tenantRes = await request.post('/api/management/orgs', {
+            data: { name: orgName, invoice_frequency: 'immediate' },
             headers
         });
-        if (!tenantRes.ok()) throw new Error(`Tenant creation failed: ${await tenantRes.text()}`);
+        if (!tenantRes.ok()) throw new Error(`Org creation failed: ${await tenantRes.text()}`);
         const tenantData = await tenantRes.json();
-        const tenantId = tenantData.tenant?.id;
-        if (!tenantId) throw new Error('Tenant ID missing');
-        helper.trackTenant(tenantId);
+        const orgId = tenantData.org?.id;
+        if (!orgId) throw new Error('Org ID missing');
+        helper.trackOrg(orgId);
 
         const uniqueId = Math.random().toString(36).substring(2, 10);
         const email = `e2e-org-admin-${uniqueId}@example.com`;
@@ -60,7 +60,7 @@ test.describe('E5: Kein B2B-Label sichtbar für Org-Admin', () => {
             headers
         });
 
-        await request.put(`/api/management/tenants/${tenantId}/users`, {
+        await request.put(`/api/management/orgs/${orgId}/users`, {
             data: { user_ids: [userId] },
             headers
         });
@@ -75,10 +75,10 @@ test.describe('E5: Kein B2B-Label sichtbar für Org-Admin', () => {
         });
         if (!resetRes.ok()) throw new Error(`Password reset failed: ${await resetRes.text()}`);
 
-        return { email, password, tenantName, tenantId, userId };
+        return { email, password, orgName, orgId, userId };
     }
 
-    test('Org-Admin sieht kein B2B-Label auf Dashboard, Organisationen und Benutzerseite', { tag: ['@feature:admin:tenant'] }, async ({ page, request }) => {
+    test('Org-Admin sieht kein B2B-Label auf Dashboard, Organisationen und Benutzerseite', { tag: ['@feature:admin:Org'] }, async ({ page, request }) => {
         const { email, password } = await createOrgAdmin(request, adminToken);
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

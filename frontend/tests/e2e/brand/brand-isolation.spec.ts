@@ -3,7 +3,7 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 
-test.describe('Brand Tenant Isolation', () => {
+test.describe('Brand Org Isolation', () => {
     let helper: E2ESessionHelper;
 
     test.afterEach(async () => {

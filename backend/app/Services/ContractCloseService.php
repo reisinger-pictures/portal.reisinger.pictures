@@ -43,7 +43,14 @@ class ContractCloseService
             DB::transaction(function () use ($contract, $totalGross, &$orderId, &$invoiceNumber) {
                 $brand = $contract->brand ?? BrandRegistry::currentOrDefault();
 
+                $userId = null;
+                if (!empty($contract->billing_details['email'])) {
+                    $billingUser = \App\Models\User::where('email', $contract->billing_details['email'])->first();
+                    $userId = $billingUser?->id;
+                }
+
                 $order = Order::create([
+                    'user_id' => $userId,
                     'status' => 'invoice_created',
                     'total_amount' => $totalGross,
                     'is_quote_request' => false,
@@ -60,9 +67,9 @@ class ContractCloseService
                         $contract->billing_details ?? [],
                         ['items' => $contract->items ?? [], 'terms' => $contract->terms_html ?? '']
                     ),
-                    'total_net' => (int) round($totalGross / 1.2),
+                    'total_net' => $totalGross,
                     'total_gross' => $totalGross,
-                    'tax_rate' => 20,
+                    'tax_rate' => null,
                 ]);
 
                 $orderId = $order->id;

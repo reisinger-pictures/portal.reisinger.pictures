@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
@@ -123,7 +123,7 @@ describe('ManagementManualInvoiceView', () => {
             isAdmin: true,
             isPhotographer: false,
             isOrgAdmin: false,
-            showTenantsSection: false,
+            showOrgsSection: false,
             canEditMetadata: false,
             isPowerUser: false,
             canAccessB2BFeatures: false,
@@ -142,7 +142,7 @@ describe('ManagementManualInvoiceView', () => {
             isAdmin: false,
             isPhotographer: false,
             isOrgAdmin: false,
-            showTenantsSection: false,
+            showOrgsSection: false,
             canEditMetadata: false,
             isPowerUser: false,
             canAccessB2BFeatures: false,

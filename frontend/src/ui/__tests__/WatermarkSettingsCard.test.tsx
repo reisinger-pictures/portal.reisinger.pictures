@@ -51,7 +51,7 @@ const defaultPermissions = {
     canEditMetadata: false,
     isPowerUser: false,
     canAccessB2BFeatures: false,
-    showTenantsSection: false,
+    showOrgsSection: false,
     showCRM: false,
     showInvoicing: false,
     showPayouts: false,

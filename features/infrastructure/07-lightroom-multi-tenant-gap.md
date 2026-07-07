@@ -1,4 +1,4 @@
-# Lightroom Plugin — Multi-Tenant Support Gap (R-16)
+# Lightroom Plugin — Multi-Org Support Gap (R-16)
 
 > **Status:** ✅ Gelöst (2026-07-02). Siehe Änderungen unten.
 > Verknüpft mit `AGENTS.todo.md` → L-01.
@@ -10,21 +10,21 @@ Das Portal-Backend wurde zu einem **Multi-Brand-/Single-Codebase-System** ausgeb
 Hostnamen (siehe `06-multi-domain-branding.md`).
 
 Das **Lightroom Classic Plugin** (`admin.lrplugin/`) ist an dieser Stelle **nicht** mitgewachsen:
-Es ist ein **starrer Single-Tenant-Client**, hart verdrahtet auf `https://portal.reisinger.pictures`.
+Es ist ein **starrer Single-Org-Client**, hart verdrahtet auf `https://portal.reisinger.pictures`.
 
 ## 2. Status Quo (zusammengefasst)
 
-Das Plugin ist ein **Single-Tenant-Client**, hart verdrahtet auf `https://portal.reisinger.pictures`:
+Das Plugin ist ein **Single-Org-Client**, hart verdrahtet auf `https://portal.reisinger.pictures`:
 - **API-Base-URL:** Hardcoded in `Api.lua:9` — nur Prod/Test-Umschalter, kein Brand-Switch
 - **Upload-Payload:** Kein `brand`/`X-Brand`-Feld — nur `gallery_id`, `lr_uuid`, `file`
 - **Galerie-Routing:** Rein `gallery_id`-basiert, kein Brand-Filter
 - **Invite-Links:** Feste Domain `portal.reisinger.pictures`
 
-Ein Treffer für `story.reisinger.pictures` / `srp` / `brand` / `tenant` existiert im gesamten Plugin **nicht**.
+Ein Treffer für `story.reisinger.pictures` / `srp` / `brand` / `Org` existiert im gesamten Plugin **nicht**.
 
 ## 3. Konkrete Eingriffspunkte für ein künftiges Refactoring
 
-Für echten Multi-Tenant-Support müssen mindestens drei Dinge ergänzt werden:
+Für echten Multi-Org-Support müssen mindestens drei Dinge ergänzt werden:
 
 1. **Brand-bezogene Base-URL ODER Brand-Header** — zentrale Stelle `Api.lua:7` `Api.getApiUrl()`
    bzw. `Api.lua:17` `Api.call(...)` (z. B. konfigurierbare Domain-Auswahl oder konstanter
@@ -34,7 +34,7 @@ Für echten Multi-Tenant-Support müssen mindestens drei Dinge ergänzt werden:
    (`reloadTree`) bzw. ein Brand-Selector im Login-/Galerie-Dialog.
 
 Sowie flankierend:
-- `GalleryDialog.lua:200` / `MetaGalleryDialog.lua:97` — `brand_id`/`tenant` bei Create/Update.
+- `GalleryDialog.lua:200` / `MetaGalleryDialog.lua:97` — `brand_id`/`Org` bei Create/Update.
 - `InviteDialog.lua:43` — per-Brand-Einladungsdomain.
 
 ## 4. Risiko & Abhängigkeit

@@ -59,18 +59,18 @@ class FormRoundtripTest extends TestCase {
         $this->assertDatabaseHas('text_snippets', array_merge(['id' => $id], $updated));
     }
 
-    public function test_tenant_modal_roundtrip() {
+    public function test_org_modal_roundtrip() {
         $token = $this->getAdminToken();
-        $payload = ['name' => 'RT Tenant', 'domain' => 'rt.example.com', 'invoice_frequency' => 'monthly'];
+        $payload = ['name' => 'RT Org', 'domain' => 'rt.example.com', 'invoice_frequency' => 'monthly'];
         
-        $res = $this->withHeaders(['Authorization' => "Bearer $token"])->postJson('/api/management/tenants', $payload);
+        $res = $this->withHeaders(['Authorization' => "Bearer $token"])->postJson('/api/management/orgs', $payload);
         $res->assertStatus(200);
-        $id = $res->json('tenant.id');
-        $this->assertDatabaseHas('tenants', array_merge(['id' => $id], $payload));
+        $id = $res->json('org.id');
+        $this->assertDatabaseHas('orgs', array_merge(['id' => $id], $payload));
 
-        $updated = ['name' => 'Upd Tenant', 'domain' => 'upd.example.com', 'invoice_frequency' => 'quarterly'];
-        $this->withHeaders(['Authorization' => "Bearer $token"])->putJson("/api/management/tenants/{$id}", $updated)->assertStatus(200);
-        $this->assertDatabaseHas('tenants', array_merge(['id' => $id], $updated));
+        $updated = ['name' => 'Upd Org', 'domain' => 'upd.example.com', 'invoice_frequency' => 'quarterly'];
+        $this->withHeaders(['Authorization' => "Bearer $token"])->putJson("/api/management/orgs/{$id}", $updated)->assertStatus(200);
+        $this->assertDatabaseHas('orgs', array_merge(['id' => $id], $updated));
     }
 
     public function test_gallery_group_modal_roundtrip() {

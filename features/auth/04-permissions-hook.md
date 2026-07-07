@@ -33,7 +33,7 @@ Consumes `useAuth` and exposes derived booleans:
 ```
 isStaff                  → super_admin || admin || photographer || org_admin
 canAccessB2BFeatures     → isStaff (not brand-dependent)
-showTenantsSection       → canAccessB2BFeatures
+showOrgsSection       → canAccessB2BFeatures
 showCRM                  → canAccessB2BFeatures
 showInvoicing            → canAccessB2BFeatures
 showPayouts              → is_super_admin
@@ -42,10 +42,10 @@ showPayouts              → is_super_admin
 ## 4. Migration
 
 - `useBrandAccess.ts` is removed.
-- All consumers of `canAccessB2BFeatures`, `showTenantsSection`, `isStaff` etc. import from `usePermissions` instead.
+- All consumers of `canAccessB2BFeatures`, `showOrgsSection`, `isStaff` etc. import from `usePermissions` instead.
 - `isB2B` / `isATR` are available through `useBrand` if needed.
 
 ## Related
 
 - [Roles & Access Management](01-roles-and-access.md)
-- [Frontend Brand & Tenant Isolation](../infrastructure/10-frontend-brand-tenant-isolation.md)
+- [Frontend Brand & Org Isolation](../infrastructure/10-frontend-brand-Org-isolation.md)

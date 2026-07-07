@@ -12,10 +12,10 @@ class GalleryTreeService
     /**
      * Get the complete gallery tree for admin view with optional filtering
      */
-    public function getAdminTree(User $user, ?string $filterType = null, ?string $tenantId = null): array
+    public function getAdminTree(User $user, ?string $filterType = null, ?string $orgId = null): array
     {
         $buildTree = function () {
-            $groups = GalleryGroup::query()->whereNull('parent_id')->with(['children', 'galleries'])->get();
+            $groups = GalleryGroup::query()->whereNull('parent_id')->with(['children', 'galleries', 'orgs'])->get();
             $rootGalleries = Gallery::query()->whereNull('gallery_group_id')->get();
             return [
                 'groups' => $groups->toArray(),
@@ -36,8 +36,8 @@ class GalleryTreeService
         if ($filterType) {
             $treeArray = $this->filterTreeByType($treeArray, $filterType);
         }
-        if ($tenantId) {
-            $treeArray = $this->filterTreeByTenant($treeArray, $tenantId);
+        if ($orgId) {
+            $treeArray = $this->filterTreeByOrg($treeArray, $orgId);
         }
 
         return $treeArray;
@@ -104,12 +104,14 @@ class GalleryTreeService
     }
 
     /**
-     * Filter tree by tenant
+     * Filter tree by org
      */
-    private function filterTreeByTenant(array $treeArray, string $tenantId): array
+    private function filterTreeByOrg(array $treeArray, string $orgId): array
     {
-        $groupPredicate = fn(array $node): bool => ($node['tenant_id'] ?? null) === $tenantId;
-        $galleryPredicate = fn(array $g): bool => ($g['tenant_id'] ?? null) === $tenantId;
+        $orgGroupIds = \App\Models\GalleryGroup::whereHas('orgs', fn($q) => $q->where('org_id', $orgId))->pluck('id')->toArray();
+        $orgGalleryIds = \App\Models\Gallery::whereHas('orgs', fn($q) => $q->where('org_id', $orgId))->pluck('id')->toArray();
+        $groupPredicate = fn(array $node): bool => in_array($node['id'], $orgGroupIds);
+        $galleryPredicate = fn(array $g): bool => in_array($g['id'], $orgGalleryIds);
         $treeArray['groups'] = $this->pruneEmptyGroups(
             $this->filterGroupsRecursive($treeArray['groups'], $galleryPredicate, $groupPredicate)
         );

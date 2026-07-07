@@ -3,25 +3,25 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Tenant;
-use App\Models\TenantInvite;
+use App\Models\Org;
+use App\Models\OrgInvite;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\TenantInviteMail;
+use App\Mail\OrgInviteMail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Support\BrandRegistry;
 
-class TenantInviteController extends Controller
+class OrgInviteController extends Controller
 {
-    public function invite(Request $request, $tenantId)
+    public function invite(Request $request, $orgId)
     {
         $user = auth('api')->user();
-        $tenant = Tenant::findOrFail($tenantId);
+        $org = Org::findOrFail($orgId);
 
-        // Scoped Policy: Nur Admins oder Org-Admin DES Mandanten dürfen einladen
-        if (!$user->is_admin && !($user->is_org_admin && $user->tenant_id === $tenantId)) {
-            return response()->json(['error' => 'Keine Berechtigung, Nutzer in diesen Mandanten einzuladen.'], 403);
+        // Scoped Policy: Nur Admins oder Org-Admin DES Org dürfen einladen
+        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $orgId)) {
+            return response()->json(['error' => 'Keine Berechtigung, Nutzer in diese Organisation einzuladen.'], 403);
         }
 
         $request->validate([
@@ -29,29 +29,29 @@ class TenantInviteController extends Controller
         ]);
 
         $token = Str::random(64);
-        
-        $invite = TenantInvite::create([
+
+        $invite = OrgInvite::create([
             'email' => $request->email,
-            'tenant_id' => $tenant->id,
+            'org_id' => $org->id,
             'token' => $token,
             'expires_at' => now()->addDays(7)
         ]);
 
-        $link = BrandRegistry::frontendUrl() . '/tenant-invite/' . $token;
-        Mail::to($request->email)->queue(new TenantInviteMail($tenant->name, $link));
+        $link = BrandRegistry::frontendUrl($org->brand) . '/org-invite/' . $token;
+        Mail::to($request->email)->queue(new OrgInviteMail($org->name, $link));
 
         return response()->json(['success' => true]);
     }
 
     public function check($token)
     {
-        $invite = TenantInvite::where('token', $token)
+        $invite = OrgInvite::where('token', $token)
             ->where('expires_at', '>', now())
-            ->with('tenant')
+            ->with('org')
             ->firstOrFail();
-            
+
         return response()->json([
-            'tenant_name' => $invite->tenant->name,
+            'org_name' => $invite->org->name,
             'email' => $invite->email
         ]);
     }
@@ -74,8 +74,9 @@ class TenantInviteController extends Controller
             ]);
         }
 
-        $invite = TenantInvite::where('token', $request->token)
+        $invite = OrgInvite::where('token', $request->token)
             ->where('expires_at', '>', now())
+            ->with('org')
             ->firstOrFail();
 
         return DB::transaction(function () use ($request, $invite, $user) {
@@ -92,8 +93,9 @@ class TenantInviteController extends Controller
                 }
             }
 
-            // Tenant-Zuweisung sicherstellen
-            $user->tenant_id = $invite->tenant_id;
+            // Org-Zuweisung sicherstellen
+            $user->org_id = $invite->org_id;
+            $user->brand = $invite->org->brand;
             $user->save();
 
             // Client-Rolle vergeben falls noch keine

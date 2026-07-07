@@ -8,7 +8,7 @@ use App\Models\CouponUserUsage;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Photo;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\User;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CouponService;
@@ -464,16 +464,16 @@ class CouponServiceTest extends TestCase
 
     public function test_find_valid_coupon_organisation_scope_success(): void
     {
-        $tenant = Tenant::factory()->create();
+        $org = Org::factory()->create();
         $user = User::factory()->create();
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $coupon = Coupon::factory()->create([
             'brand' => 'srp',
             'code' => 'ORGVALID',
             'scope_type' => 'organisation',
-            'scope_id' => $tenant->id,
+            'scope_id' => $org->id,
             'active' => true,
         ]);
 
@@ -484,19 +484,19 @@ class CouponServiceTest extends TestCase
         $this->assertSame($coupon->id, $found->id);
     }
 
-    public function test_find_valid_coupon_organisation_scope_wrong_tenant(): void
+    public function test_find_valid_coupon_organisation_scope_wrong_org(): void
     {
-        $tenantA = Tenant::factory()->create();
-        $tenantB = Tenant::factory()->create();
+        $orgA = Org::factory()->create();
+        $orgB = Org::factory()->create();
         $user = User::factory()->create();
-        $user->tenant_id = $tenantB->id;
+        $user->org_id = $orgB->id;
         $user->save();
 
         Coupon::factory()->create([
             'brand' => 'srp',
             'code' => 'ORGWRONG',
             'scope_type' => 'organisation',
-            'scope_id' => $tenantA->id,
+            'scope_id' => $orgA->id,
             'active' => true,
         ]);
 
@@ -506,16 +506,16 @@ class CouponServiceTest extends TestCase
         $this->assertStringContainsString('not valid for your account', $error);
     }
 
-    public function test_find_valid_coupon_organisation_scope_no_tenant(): void
+    public function test_find_valid_coupon_organisation_scope_no_org(): void
     {
-        $tenant = Tenant::factory()->create();
-        $user = User::factory()->create(); // no tenant attached
+        $org = Org::factory()->create();
+        $user = User::factory()->create(); // no org attached
 
         Coupon::factory()->create([
             'brand' => 'srp',
             'code' => 'ORGNOTENANT',
             'scope_type' => 'organisation',
-            'scope_id' => $tenant->id,
+            'scope_id' => $org->id,
             'active' => true,
         ]);
 
@@ -527,13 +527,13 @@ class CouponServiceTest extends TestCase
 
     public function test_find_valid_coupon_organisation_scope_requires_auth(): void
     {
-        $tenant = Tenant::factory()->create();
+        $org = Org::factory()->create();
 
         Coupon::factory()->create([
             'brand' => 'srp',
             'code' => 'ORGAUTH',
             'scope_type' => 'organisation',
-            'scope_id' => $tenant->id,
+            'scope_id' => $org->id,
             'active' => true,
         ]);
 

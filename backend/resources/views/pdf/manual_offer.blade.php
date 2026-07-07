@@ -82,6 +82,13 @@
         </tbody>
     </table>
 
+    @if(!empty($snapshot->customer_details['custom_conditions']))
+        <div class="editor-content" style="margin-top: 20px; padding: 15px; background: #fcfcfc; border: 1px solid #eee; border-radius: 5px;">
+            <strong>Lizenzbedingungen / Custom Conditions</strong>
+            {!! $snapshot->customer_details['custom_conditions'] !!}
+        </div>
+    @endif
+
     @include('pdf.footer', ['bankHolder' => $bankHolder, 'bankIban' => $bankIban, 'bankBic' => $bankBic])
 </body>
 </html>

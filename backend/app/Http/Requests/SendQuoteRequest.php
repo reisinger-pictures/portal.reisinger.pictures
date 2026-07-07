@@ -16,7 +16,8 @@ class SendQuoteRequest extends FormRequest
     {
         return [
             'custom_price' => 'required|integer',
-            'message' => 'required|string'
+            'message' => 'required|string',
+            'rights_text' => 'nullable|string|max:2000'
         ];
     }
 

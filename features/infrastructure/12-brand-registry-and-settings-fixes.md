@@ -1,8 +1,8 @@
 # Brand-Registry, Brand-ENUM & Settings-Reparaturen — Konzept (SOLL)
 
 > **Status:** Beschreibt den Soll-Zustand (Ziel).
-> Verknüpft: `features/infrastructure/07-lightroom-multi-tenant-gap.md`,
-> `features/infrastructure/08-tenant-brand-concept.md`,
+> Verknüpft: `features/infrastructure/07-lightroom-multi-Org-gap.md`,
+> `features/infrastructure/08-Org-brand-concept.md`,
 > `features/infrastructure/09-brand-context-queue-cli.md`,
 > `features/infrastructure/11-brand-settings-separation.md`,
 > `features/infrastructure/25-brand-separation-matrix.md`.

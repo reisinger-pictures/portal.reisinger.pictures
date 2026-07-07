@@ -5,22 +5,22 @@ namespace Tests\Feature;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Role;
-use App\Models\Tenant;
-use App\Models\TenantInvite;
+use App\Models\Org;
+use App\Models\OrgInvite;
 use App\Enums\UserRole;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-class TenantOrganizationCoreTest extends TestCase
+class OrgOrganizationCoreTest extends TestCase
 {
     use RefreshDatabase;
 
     private function orgAdminContext(): array
     {
-        $tenant = Tenant::factory()->create(['invoice_frequency' => 'immediate']);
-        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        $org = Org::factory()->create(['invoice_frequency' => 'immediate']);
+        $user = User::factory()->create(['org_id' => $org->id]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
-        return ['token' => auth('api')->login($user), 'tenant' => $tenant, 'user' => $user];
+        return ['token' => auth('api')->login($user), 'org' => $org, 'user' => $user];
     }
 
     private function adminToken(): string
@@ -30,9 +30,9 @@ class TenantOrganizationCoreTest extends TestCase
         return auth('api')->login($user);
     }
 
-    private function orgAdminWithoutTenantToken(): string
+    private function orgAdminWithoutOrgToken(): string
     {
-        $user = User::factory()->create(['tenant_id' => null]);
+        $user = User::factory()->create(['org_id' => null]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
         return auth('api')->login($user);
     }
@@ -41,20 +41,20 @@ class TenantOrganizationCoreTest extends TestCase
     // N2: Org-Admin editiert eigene Org (@update)
     // ──────────────────────────────────────────────
 
-    public function test_org_admin_can_update_own_tenant(): void
+    public function test_org_admin_can_update_own_org(): void
     {
         $ctx = $this->orgAdminContext();
 
         $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->putJson('/api/management/tenants/' . $ctx['tenant']->id, [
+            ->putJson('/api/management/orgs/' . $ctx['org']->id, [
                 'name' => 'Updated Org',
                 'invoice_frequency' => 'monthly',
             ])
             ->assertStatus(200)
             ->assertJsonPath('success', true);
 
-        $this->assertDatabaseHas('tenants', [
-            'id' => $ctx['tenant']->id,
+        $this->assertDatabaseHas('orgs', [
+            'id' => $ctx['org']->id,
             'name' => 'Updated Org',
         ]);
     }
@@ -63,13 +63,13 @@ class TenantOrganizationCoreTest extends TestCase
     // N3: Org-Admin editiert NICHT fremde Org (403)
     // ──────────────────────────────────────────────
 
-    public function test_org_admin_cannot_update_other_tenant(): void
+    public function test_org_admin_cannot_update_other_org(): void
     {
         $ctx = $this->orgAdminContext();
-        $otherTenant = Tenant::factory()->create(['invoice_frequency' => 'immediate']);
+        $otherOrg = Org::factory()->create(['invoice_frequency' => 'immediate']);
 
         $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->putJson('/api/management/tenants/' . $otherTenant->id, [
+            ->putJson('/api/management/orgs/' . $otherOrg->id, [
                 'name' => 'Hacked',
                 'invoice_frequency' => 'monthly',
             ])
@@ -80,12 +80,12 @@ class TenantOrganizationCoreTest extends TestCase
     // N4: Org-Admin erstellt KEINE Org (@store → 403)
     // ──────────────────────────────────────────────
 
-    public function test_org_admin_cannot_create_tenant(): void
+    public function test_org_admin_cannot_create_org(): void
     {
         $ctx = $this->orgAdminContext();
 
         $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->postJson('/api/management/tenants', [
+            ->postJson('/api/management/orgs', [
                 'name' => 'New Org',
                 'invoice_frequency' => 'immediate',
             ])
@@ -96,12 +96,12 @@ class TenantOrganizationCoreTest extends TestCase
     // N5: Org-Admin löscht KEINE Org (@destroy → 403)
     // ──────────────────────────────────────────────
 
-    public function test_org_admin_cannot_delete_tenant(): void
+    public function test_org_admin_cannot_delete_org(): void
     {
         $ctx = $this->orgAdminContext();
 
         $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->deleteJson('/api/management/tenants/' . $ctx['tenant']->id)
+            ->deleteJson('/api/management/orgs/' . $ctx['org']->id)
             ->assertStatus(403);
     }
 
@@ -109,7 +109,7 @@ class TenantOrganizationCoreTest extends TestCase
     // N6: Org-Admin erstellt User in eigener Org
     // ──────────────────────────────────────────────
 
-    public function test_org_admin_can_create_user_in_own_tenant(): void
+    public function test_org_admin_can_create_user_in_own_org(): void
     {
         $ctx = $this->orgAdminContext();
 
@@ -124,17 +124,17 @@ class TenantOrganizationCoreTest extends TestCase
 
         $user = User::where('email', 'newuser@example.com')->first();
         $this->assertNotNull($user);
-        $this->assertEquals($ctx['tenant']->id, $user->tenant_id);
+        $this->assertEquals($ctx['org']->id, $user->org_id);
     }
 
     // ──────────────────────────────────────────────
     // N7: Org-Admin löscht User in eigener Org
     // ──────────────────────────────────────────────
 
-    public function test_org_admin_can_delete_user_in_own_tenant(): void
+    public function test_org_admin_can_delete_user_in_own_org(): void
     {
         $ctx = $this->orgAdminContext();
-        $targetUser = User::factory()->create(['tenant_id' => $ctx['tenant']->id]);
+        $targetUser = User::factory()->create(['org_id' => $ctx['org']->id]);
 
         $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
             ->deleteJson('/api/management/users/' . $targetUser->id)
@@ -145,20 +145,20 @@ class TenantOrganizationCoreTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    // N9: org_admin ohne tenant_id → 403
+    // N9: org_admin ohne org_id → 403
     // ──────────────────────────────────────────────
 
-    public function test_org_admin_without_tenant_id_gets_403(): void
+    public function test_org_admin_without_org_id_gets_403(): void
     {
-        $token = $this->orgAdminWithoutTenantToken();
-        $someTenant = Tenant::factory()->create(['invoice_frequency' => 'immediate']);
+        $token = $this->orgAdminWithoutOrgToken();
+        $someOrg = Org::factory()->create(['invoice_frequency' => 'immediate']);
 
         $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->getJson('/api/management/tenants')
+            ->getJson('/api/management/orgs')
             ->assertStatus(403);
 
         $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->getJson('/api/management/tenants/' . $someTenant->id)
+            ->getJson('/api/management/orgs/' . $someOrg->id)
             ->assertStatus(403);
     }
 
@@ -168,8 +168,8 @@ class TenantOrganizationCoreTest extends TestCase
 
     public function test_is_customer_manager_is_alias_for_is_org_admin(): void
     {
-        $tenant = Tenant::factory()->create(['invoice_frequency' => 'immediate']);
-        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        $org = Org::factory()->create(['invoice_frequency' => 'immediate']);
+        $user = User::factory()->create(['org_id' => $org->id]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
 
         $this->assertTrue($user->is_org_admin);
@@ -189,10 +189,10 @@ class TenantOrganizationCoreTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    // N12: StatsController scoped per tenant_id
+    // N12: StatsController scoped per org_id
     // ──────────────────────────────────────────────
 
-    public function test_org_admin_stats_are_scoped_to_own_tenant(): void
+    public function test_org_admin_stats_are_scoped_to_own_org(): void
     {
         $ctx = $this->orgAdminContext();
 
@@ -208,7 +208,7 @@ class TenantOrganizationCoreTest extends TestCase
 
     public function test_brand_conflict_on_auto_join_returns_403(): void
     {
-        $tenant = Tenant::factory()->create([
+        $org = Org::factory()->create([
             'domain' => 'srp-company.com',
             'brand' => 'srp',
             'auto_join_policy' => 'immediate',
@@ -225,25 +225,25 @@ class TenantOrganizationCoreTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    // N14: Invite-Redeem für eingeloggten User → tenant_id gesetzt
+    // N14: Invite-Redeem für eingeloggten User → org_id gesetzt
     // ──────────────────────────────────────────────
 
-    public function test_logged_in_user_can_redeem_invite_and_get_tenant_id(): void
+    public function test_logged_in_user_can_redeem_invite_and_get_org_id(): void
     {
-        $tenant = Tenant::factory()->create(['invoice_frequency' => 'immediate']);
-        $invite = TenantInvite::create([
+        $org = Org::factory()->create(['invoice_frequency' => 'immediate']);
+        $invite = OrgInvite::create([
             'email' => 'existing@example.com',
-            'tenant_id' => $tenant->id,
+            'org_id' => $org->id,
             'token' => 'n14-redeem-token',
             'expires_at' => now()->addDays(7),
         ]);
 
-        // Create a user who is already logged in (no tenant_id yet)
-        $user = User::factory()->create(['tenant_id' => null]);
+        // Create a user who is already logged in (no org_id yet)
+        $user = User::factory()->create(['org_id' => null]);
         $token = auth('api')->login($user);
 
         $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->postJson('/api/tenant-invites/redeem', [
+            ->postJson('/api/org-invites/redeem', [
                 'token' => 'n14-redeem-token',
                 'accept_privacy' => true,
             ])
@@ -251,8 +251,8 @@ class TenantOrganizationCoreTest extends TestCase
             ->assertJsonPath('success', true);
 
         $user->refresh();
-        $this->assertEquals($tenant->id, $user->tenant_id);
-        $this->assertDatabaseMissing('tenant_invites', ['token' => 'n14-redeem-token']);
+        $this->assertEquals($org->id, $user->org_id);
+        $this->assertDatabaseMissing('org_invites', ['token' => 'n14-redeem-token']);
     }
 
     // ──────────────────────────────────────────────
@@ -261,15 +261,15 @@ class TenantOrganizationCoreTest extends TestCase
 
     public function test_redeem_invite_without_privacy_returns_422(): void
     {
-        $tenant = Tenant::factory()->create(['invoice_frequency' => 'immediate']);
-        $invite = TenantInvite::create([
+        $org = Org::factory()->create(['invoice_frequency' => 'immediate']);
+        $invite = OrgInvite::create([
             'email' => 'noprivacy@example.com',
-            'tenant_id' => $tenant->id,
+            'org_id' => $org->id,
             'token' => 'no-privacy-token',
             'expires_at' => now()->addDays(7),
         ]);
 
-        $this->postJson('/api/tenant-invites/redeem', [
+        $this->postJson('/api/org-invites/redeem', [
             'token' => 'no-privacy-token',
             'name' => 'No Privacy User',
             'password' => 'password123',

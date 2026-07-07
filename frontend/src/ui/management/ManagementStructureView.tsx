@@ -2,7 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useTenants } from '../../logic/useTenants';
+import { useOrgs } from '../../logic/useOrgs';
 import { Gallery, GalleryGroup, GalleryTreeResponse } from '../../logic/useGalleries';
 
 function isGallery(node: Gallery | GalleryGroup): node is Gallery {
@@ -116,21 +116,21 @@ const TreeNode = ({
 };
 
 export default function ManagementStructureView({ tree, onOpenGroupModal, onOpenGalleryModal, onEditGroup, onEditGallery, onOpenPhotographerTeam }: Props) {
-    const { tenants } = useTenants();
+    const { orgs } = useOrgs();
     const [searchParams, setSearchParams] = useSearchParams();
-    const currentTenantFilter = searchParams.get('tenant_id') || '';
+    const currentOrgFilter = searchParams.get('org_id') || '';
     const [expandSignal, setExpandSignal] = useState(0);
     
-    function filterTreeGroups(groups: GalleryGroup[], tenantId: string): GalleryGroup[] {
+    function filterTreeGroups(groups: GalleryGroup[], orgId: string): GalleryGroup[] {
         return groups.map(g => ({
             ...g,
-            children: g.children ? filterTreeGroups(g.children, tenantId) : [],
-            galleries: g.galleries ? g.galleries.filter(gal => gal.tenant_id === tenantId) : [],
-        })).filter(g => g.tenant_id === tenantId || g.children?.length || g.galleries?.length);
+            children: g.children ? filterTreeGroups(g.children, orgId) : [],
+            galleries: g.galleries ? g.galleries.filter(gal => (gal.org_ids ?? []).includes(orgId)) : [],
+        })).filter(g => (g.orgs ?? []).some(o => o.id === orgId) || g.children?.length || g.galleries?.length);
     }
 
-    const filteredTree = currentTenantFilter && tree
-        ? { groups: filterTreeGroups([...tree.groups], currentTenantFilter), root_galleries: (tree.root_galleries ?? []).filter(g => g.tenant_id === currentTenantFilter) }
+    const filteredTree = currentOrgFilter && tree
+        ? { groups: filterTreeGroups([...tree.groups], currentOrgFilter), root_galleries: (tree.root_galleries ?? []).filter(g => (g.org_ids ?? []).includes(currentOrgFilter)) }
         : tree;
 
     const safeGroups = Array.isArray(filteredTree?.groups) ? [...filteredTree.groups].sort((a,b)=>a.name.localeCompare(b.name)) : [];
@@ -148,17 +148,17 @@ export default function ManagementStructureView({ tree, onOpenGroupModal, onOpen
                     <label className="label py-1"><span className="label-text font-bold opacity-70"><Trans>Organisations-Filter</Trans></span></label>
                     <select 
                         className="select select-bordered select-sm w-full" 
-                        value={currentTenantFilter} 
+                        value={currentOrgFilter} 
                         onChange={e => {
                             setSearchParams(prev => {
-                                if (e.target.value) prev.set('tenant_id', e.target.value);
-                                else prev.delete('tenant_id');
+                                if (e.target.value) prev.set('org_id', e.target.value);
+                                else prev.delete('org_id');
                                 return prev;
                             });
                         }}
                     >
                         <option value="">-- <Trans>Alle Organisationen / Eigene</Trans> --</option>
-                        {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        {orgs?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                 </div>
 

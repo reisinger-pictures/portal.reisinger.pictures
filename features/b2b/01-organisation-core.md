@@ -107,15 +107,15 @@ Admin sucht User per Name/E-Mail
 
 ## 4. Implikationen für existierende Migrationen
 
-### 4.1. DomainMapping → Tenant
+### 4.1. DomainMapping → Org
 
 - `domain_mappings` Tabelle wurde in V004 **gelöscht** und durch `tenants` ersetzt
 - Das alte Auto-Join Verhalten (immediate, jede Role) ging verloren
 - SOLL: `tenants` um `default_role_id`, `default_flatrate_level`, `can_purchase_upgrades`, `auto_join_policy` erweitern
 
-### 4.2. Doppelte Tenant-Zuordnung (V017)
+### 4.2. Doppelte Org-Zuordnung (V017)
 
-- `galleries.tenant_id` + `gallery_groups.tenant_id` (direkt) + `gallery_group_tenant` (Pivot) = zwei konkurrierende Quellen
+- `galleries.tenant_id` + `gallery_groups.tenant_id` (direkt) + `gallery_group_org` (Pivot) = zwei konkurrierende Quellen
 - SOLL: **Eine Quelle**. Entweder direkte `tenant_id` ODER Pivot, nicht beide.
 
 ### 4.3. Invoice Frequency

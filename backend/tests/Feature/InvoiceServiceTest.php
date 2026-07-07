@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\InvoiceSequence;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\User;
 use App\Services\InvoiceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,18 +58,18 @@ class InvoiceServiceTest extends TestCase
         return $order;
     }
 
-    public function test_generateForTenant_happy_path_single_user_single_order(): void
+    public function test_generateForOrg_happy_path_single_user_single_order(): void
     {
-        $tenant = Tenant::create(['name' => 'Happy Tenant', 'invoice_frequency' => 'monthly']);
+        $org = Org::create(['name' => 'Happy Org', 'invoice_frequency' => 'monthly']);
         $user = User::factory()->create(['email' => 'happy@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $order = $this->makeDeliveryNoteOrder($user, 5000, [
             ['photoId' => 'p1', 'price' => 5000, 'tier' => 'web'],
         ]);
 
-        $result = $this->service->generateForTenant($tenant);
+        $result = $this->service->generateForOrg($org);
 
         // Return-Shape
         $this->assertTrue($result['success']);
@@ -92,17 +92,17 @@ class InvoiceServiceTest extends TestCase
     /**
      * Invarianten zur Rechnungsnummern-Generierung:
      *  - Rückgabe invoice_number identisch mit InvoiceSnapshot->invoice_number der collective Order.
-     *  - InvoiceSequence.current_value inkrementiert exakt 1× pro generateForTenant-Auf­ruf.
+     *  - InvoiceSequence.current_value inkrementiert exakt 1× pro generateForOrg-Auf­ruf.
      *
      * Hinweis: Der Service reicht 'invoice_number' => $invoiceNumber ans InvoiceSnapshot::create
      * durch, sodass der booted()-Creating-Hook (nur bei leerer Nummer aktiv) nicht erneut generiert.
      * (Verifiziert: kein Doppel-Inkrement.)
      */
-    public function test_generateForTenant_invoice_number_consistency_single_increment_review(): void
+    public function test_generateForOrg_invoice_number_consistency_single_increment_review(): void
     {
-        $tenant = Tenant::create(['name' => 'Seq Tenant']);
+        $org = Org::create(['name' => 'Seq Org']);
         $user = User::factory()->create(['email' => 'seq@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
         $this->makeDeliveryNoteOrder($user, 1000);
 
@@ -110,15 +110,15 @@ class InvoiceServiceTest extends TestCase
         // makeDeliveryNoteOrder hat bereits 1× inkrementiert (L-Nummer) → $before NACHDEM lesen
         $before = InvoiceSequence::firstOrCreate(['year' => $year], ['current_value' => 0])->current_value;
 
-        $result = $this->service->generateForTenant($tenant);
+        $result = $this->service->generateForOrg($org);
 
         $after = InvoiceSequence::where('year', $year)->value('current_value');
 
-        // Exakt EIN Inkrement durch generateForTenant
+        // Exakt EIN Inkrement durch generateForOrg
         $this->assertSame(
             1,
             $after - $before,
-            'InvoiceSequence muss pro generateForTenant-Aufruf exakt einmal inkrementieren.'
+            'InvoiceSequence muss pro generateForOrg-Aufruf exakt einmal inkrementieren.'
         );
 
         // Rückgabe-Nummer identisch mit Snapshot-Datensatz der collective Order
@@ -133,18 +133,18 @@ class InvoiceServiceTest extends TestCase
         );
     }
 
-    public function test_generateForTenant_enriches_items_with_ordered_by_and_original_order_id(): void
+    public function test_generateForOrg_enriches_items_with_ordered_by_and_original_order_id(): void
     {
-        $tenant = Tenant::create(['name' => 'Items Tenant']);
+        $org = Org::create(['name' => 'Items Org']);
         $user = User::factory()->create(['name' => 'Maria Bestellerin', 'email' => 'items@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $this->makeDeliveryNoteOrder($user, 3000, [
             ['photoId' => 'photo-A', 'price' => 3000, 'tier' => 'web'],
         ]);
 
-        $this->service->generateForTenant($tenant);
+        $this->service->generateForOrg($org);
 
         $collectiveOrder = Order::where('status', 'invoice_created')->first();
         $snapshot = InvoiceSnapshot::where('order_id', $collectiveOrder->id)->first();
@@ -158,11 +158,11 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame($originalOrder->id, $items[0]['original_order_id']);
     }
 
-    public function test_generateForTenant_merges_terms_across_multiple_orders(): void
+    public function test_generateForOrg_merges_terms_across_multiple_orders(): void
     {
-        $tenant = Tenant::create(['name' => 'Terms Tenant']);
+        $org = Org::create(['name' => 'Terms Org']);
         $user = User::factory()->create(['email' => 'terms@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $this->makeDeliveryNoteOrder($user, 1000, [['photoId' => 'x1', 'price' => 1000, 'tier' => 'web']], [
@@ -174,7 +174,7 @@ class InvoiceServiceTest extends TestCase
             'shipping' => 'versichert',
         ]);
 
-        $this->service->generateForTenant($tenant);
+        $this->service->generateForOrg($org);
 
         $collectiveOrder = Order::where('status', 'invoice_created')->first();
         $snapshot = InvoiceSnapshot::where('order_id', $collectiveOrder->id)->first();
@@ -186,17 +186,17 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame('versichert', $terms['shipping']);
     }
 
-    public function test_generateForTenant_billing_fallback_firmenadresse_when_initiator_null_and_user_billing_empty(): void
+    public function test_generateForOrg_billing_fallback_firmenadresse_when_initiator_null_and_user_billing_empty(): void
     {
-        $tenant = Tenant::create(['name' => 'Fallback Tenant']);
+        $org = Org::create(['name' => 'Fallback Org']);
         // billing_* bewusst NICHT setzen → bleiben null → Fallback greift
         $user = User::factory()->create(['email' => 'fallback@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $this->makeDeliveryNoteOrder($user, 1500);
 
-        $this->service->generateForTenant($tenant);
+        $this->service->generateForOrg($org);
 
         $collectiveOrder = Order::where('status', 'invoice_created')->first();
         $snapshot = InvoiceSnapshot::where('order_id', $collectiveOrder->id)->first();
@@ -208,11 +208,11 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame('Österreich', $details['country']);
     }
 
-    public function test_generateForTenant_uses_initiator_billing_when_provided(): void
+    public function test_generateForOrg_uses_initiator_billing_when_provided(): void
     {
-        $tenant = Tenant::create(['name' => 'Initiator Tenant']);
+        $org = Org::create(['name' => 'Initiator Org']);
         $user = User::factory()->create(['email' => 'tenantuser@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
         $this->makeDeliveryNoteOrder($user, 2200);
 
@@ -222,10 +222,10 @@ class InvoiceServiceTest extends TestCase
         $initiator->billing_zip = '4020';
         $initiator->billing_city = 'Linz';
         $initiator->save();
-        $initiator->tenant_id = $tenant->id;
+        $initiator->org_id = $org->id;
         $initiator->save();
 
-        $this->service->generateForTenant($tenant, $initiator);
+        $this->service->generateForOrg($org, $initiator);
 
         $collectiveOrder = Order::where('status', 'invoice_created')->first();
         $this->assertSame($initiator->id, $collectiveOrder->user_id);
@@ -240,12 +240,12 @@ class InvoiceServiceTest extends TestCase
         $this->assertMailpitSentTo('initiator@example.com');
     }
 
-    public function test_generateForTenant_tenant_without_users_returns_error(): void
+    public function test_generateForOrg_org_without_users_returns_error(): void
     {
-        $tenant = Tenant::create(['name' => 'Empty Tenant']);
+        $org = Org::create(['name' => 'Empty Org']);
 
         Mail::fake();
-        $result = $this->service->generateForTenant($tenant);
+        $result = $this->service->generateForOrg($org);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Keine offenen Lieferscheine', $result['error']);
@@ -257,17 +257,17 @@ class InvoiceServiceTest extends TestCase
         // da er über die vorherigen Guards ohnehin unerreichbar war.
     }
 
-    public function test_generateForTenant_users_without_delivery_note_orders_returns_error(): void
+    public function test_generateForOrg_users_without_delivery_note_orders_returns_error(): void
     {
-        $tenant = Tenant::create(['name' => 'NoDelivery Tenant']);
+        $org = Org::create(['name' => 'NoDelivery Org']);
         $user = User::factory()->create(['email' => 'paid@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         // Order mit anderem Status (nicht delivery_note) → darf NICHT erfasst werden
         $paidOrder = Order::create(['user_id' => $user->id, 'status' => 'paid', 'total_amount' => 999]);
 
-        $result = $this->service->generateForTenant($tenant);
+        $result = $this->service->generateForOrg($org);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Keine offenen Lieferscheine', $result['error']);
@@ -276,15 +276,15 @@ class InvoiceServiceTest extends TestCase
         $this->assertDatabaseMissing('orders', ['status' => 'invoice_created']);
     }
 
-    public function test_generateForTenant_multiple_users_multiple_orders_all_archived_and_accumulated(): void
+    public function test_generateForOrg_multiple_users_multiple_orders_all_archived_and_accumulated(): void
     {
-        $tenant = Tenant::create(['name' => 'Multi Tenant']);
+        $org = Org::create(['name' => 'Multi Org']);
 
         $userA = User::factory()->create(['name' => 'Alpha', 'email' => 'alpha@example.com']);
         $userB = User::factory()->create(['name' => 'Beta', 'email' => 'beta@example.com']);
-        $userA->tenant_id = $tenant->id;
+        $userA->org_id = $org->id;
         $userA->save();
-        $userB->tenant_id = $tenant->id;
+        $userB->org_id = $org->id;
         $userB->save();
 
         // 3 delivery_note-Orders über 2 User, Summe 1000+2000+4000 = 7000
@@ -292,7 +292,7 @@ class InvoiceServiceTest extends TestCase
         $this->makeDeliveryNoteOrder($userA, 2000, [['photoId' => 'a2', 'price' => 2000, 'tier' => 'print']]);
         $this->makeDeliveryNoteOrder($userB, 4000, [['photoId' => 'b1', 'price' => 4000, 'tier' => 'original']]);
 
-        $result = $this->service->generateForTenant($tenant);
+        $result = $this->service->generateForOrg($org);
 
         $this->assertTrue($result['success']);
         $this->assertSame(3, $result['processed_orders']);
@@ -322,13 +322,13 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame(['Alpha', 'Alpha', 'Beta'], $orderedBy);
     }
 
-    public function test_generateForTenant_status_filter_excludes_non_delivery_note_orders(): void
+    public function test_generateForOrg_status_filter_excludes_non_delivery_note_orders(): void
     {
         // Sicherheitsnetz: auch wenn eine Order is_quote_request=true hat, entscheidet der
         // status=delivery_note Filter. Andere Status werden nicht gezogen.
-        $tenant = Tenant::create(['name' => 'QuoteFilter Tenant']);
+        $org = Org::create(['name' => 'QuoteFilter Org']);
         $user = User::factory()->create(['email' => 'qf@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         Order::create([
@@ -339,7 +339,7 @@ class InvoiceServiceTest extends TestCase
         ]);
         $this->makeDeliveryNoteOrder($user, 800);
 
-        $result = $this->service->generateForTenant($tenant);
+        $result = $this->service->generateForOrg($org);
 
         // Nur die delivery_note-Order wurde verarbeitet
         $this->assertTrue($result['success']);

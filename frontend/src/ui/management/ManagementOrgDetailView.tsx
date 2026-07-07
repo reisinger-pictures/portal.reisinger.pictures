@@ -2,7 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
-import {Tenant, TenantUser, useTenants} from '../../logic/useTenants';
+import {Org, OrgUser, useOrgs} from '../../logic/useOrgs';
 import {useUsers} from '../../logic/useUsers';
 import {FlatGroup} from '../../logic/useGalleries';
 import {flattenGroups} from '../../logic/utils';
@@ -12,7 +12,7 @@ import {useUI} from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import PageLayout from '../components/PageLayout';
 
-interface TenantSettingsProps {
+interface OrgSettingsProps {
     name: string;
     setName: (v: string) => void;
     domain: string;
@@ -28,7 +28,7 @@ interface TenantSettingsProps {
     handleSaveGeneral: (e: React.FormEvent) => void;
 }
 
-const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFlatrateLevel, setDefaultFlatrateLevel, sharedFlatrateCents, setSharedFlatrateCents, autoJoinPolicy, setAutoJoinPolicy, handleSaveGeneral}: TenantSettingsProps) => (
+const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFlatrateLevel, setDefaultFlatrateLevel, sharedFlatrateCents, setSharedFlatrateCents, autoJoinPolicy, setAutoJoinPolicy, handleSaveGeneral}: OrgSettingsProps) => (
     <form onSubmit={handleSaveGeneral}
           className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4">
         <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4"><Trans>Einstellungen</Trans></h2>
@@ -82,13 +82,13 @@ const TenantSettings = ({name, setName, domain, setDomain, freq, setFreq, defaul
     </form>
 );
 
-interface TenantInvoicingProps {
-    tenant: Tenant;
+interface OrgInvoicingProps {
+    org: Org;
     isGenerating: boolean;
     handleGenerateInvoice: () => void;
 }
 
-const TenantInvoicing = ({tenant, isGenerating, handleGenerateInvoice}: TenantInvoicingProps) => (
+const OrgInvoicing = ({org, isGenerating, handleGenerateInvoice}: OrgInvoicingProps) => (
     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4 mt-6">
         <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4 flex items-center gap-2">
             <span className="iconify mdi--receipt-text text-primary"></span> <Trans>Abrechnung</Trans>
@@ -98,11 +98,11 @@ const TenantInvoicing = ({tenant, isGenerating, handleGenerateInvoice}: TenantIn
                 <div className="font-bold"><Trans>Offene Lieferscheine</Trans></div>
                 <div className="text-sm opacity-70"><Trans>Auszustellende Sammelrechnung</Trans></div>
             </div>
-            <div className="text-3xl font-mono font-bold text-warning">{tenant.open_delivery_notes_count || 0}</div>
+            <div className="text-3xl font-mono font-bold text-warning">{org.open_delivery_notes_count || 0}</div>
         </div>
         <button
             onClick={handleGenerateInvoice}
-            disabled={!tenant.open_delivery_notes_count || tenant.open_delivery_notes_count === 0 || isGenerating}
+            disabled={!org.open_delivery_notes_count || org.open_delivery_notes_count === 0 || isGenerating}
             className="btn btn-primary w-full mt-4"
         >
             {isGenerating ? <span className="loading loading-spinner"></span> : <Trans>Sammelrechnung erstellen</Trans>}
@@ -110,8 +110,8 @@ const TenantInvoicing = ({tenant, isGenerating, handleGenerateInvoice}: TenantIn
     </div>
 );
 
-interface TenantRelationsProps {
-    users?: TenantUser[];
+interface OrgRelationsProps {
+    users?: OrgUser[];
     flatGroups: FlatGroup[];
     selUsers: string[];
     setSelUsers: React.Dispatch<React.SetStateAction<string[]>>;
@@ -122,17 +122,17 @@ interface TenantRelationsProps {
     toggleId: (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, toggleId: string) => void;
 }
 
-const TenantRelations = ({
-                             users,
-                             flatGroups,
-                             selUsers,
-                             setSelUsers,
-                             selGroups,
-                             setSelGroups,
-                             handleSaveRelations,
-                             setInviteModalOpen,
-                             toggleId
-                         }: TenantRelationsProps) => (
+const OrgRelations = ({
+                         users,
+                         flatGroups,
+                         selUsers,
+                         setSelUsers,
+                         selGroups,
+                         setSelGroups,
+                         handleSaveRelations,
+                         setInviteModalOpen,
+                         toggleId
+                     }: OrgRelationsProps) => (
     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm h-full flex flex-col">
         <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
             <h2 className="font-bold text-xl"><Trans>Zuweisungen</Trans></h2>
@@ -182,19 +182,19 @@ const TenantRelations = ({
     </div>
 );
 
-export default function ManagementTenantDetailView() {
+export default function ManagementOrgDetailView() {
     const {id} = useParams<{ id: string }>();
     const navigate = useNavigate();
     const {showToast, confirm} = useUI();
     const {
-        tenant,
+        org,
         isLoading,
-        updateTenant,
-        deleteTenant,
+        updateOrg,
+        deleteOrg,
         syncUsers,
         syncGroups,
         generateCollectiveInvoice
-    } = useTenants(id);
+    } = useOrgs(id);
     const {users} = useUsers();
     const {tree} = useProtectedGalleries();
 
@@ -211,23 +211,23 @@ export default function ManagementTenantDetailView() {
     const [inviteEmail, setInviteEmail] = useState('');
     const [isInviting, setIsInviting] = useState(false);
 
-    const [prevTenantId, setPrevTenantId] = useState<string | null>(null);
-    if (tenant && tenant.id !== prevTenantId) {
-        setPrevTenantId(tenant.id);
-        setName(tenant.name);
-        setDomain(tenant.domain || '');
-        setFreq(tenant.invoice_frequency);
-        setDefaultFlatrateLevel(tenant.default_flatrate_level || 'none');
-        setSharedFlatrateCents(tenant.shared_flatrate_cents ?? 0);
-        setAutoJoinPolicy(tenant.auto_join_policy || 'immediate');
-        setSelUsers(tenant.users?.map(u => u.id) || []);
-        setSelGroups(tenant.gallery_groups?.map(g => g.id) || []);
+    const [prevOrgId, setPrevOrgId] = useState<string | null>(null);
+    if (org && org.id !== prevOrgId) {
+        setPrevOrgId(org.id);
+        setName(org.name);
+        setDomain(org.domain || '');
+        setFreq(org.invoice_frequency);
+        setDefaultFlatrateLevel(org.default_flatrate_level || 'none');
+        setSharedFlatrateCents(org.shared_flatrate_cents ?? 0);
+        setAutoJoinPolicy(org.auto_join_policy || 'immediate');
+        setSelUsers(org.users?.map(u => u.id) || []);
+        setSelGroups(org.gallery_groups?.map(g => g.id) || []);
     }
 
     const handleSaveGeneral = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await updateTenant(id!, {
+            await updateOrg(id!, {
                 name,
                 domain: domain || null,
                 invoice_frequency: freq,
@@ -255,7 +255,7 @@ export default function ManagementTenantDetailView() {
         e.preventDefault();
         setIsInviting(true);
         try {
-            await apiMutate(`/api/management/tenants/${id}/invites`, 'POST', {email: inviteEmail});
+            await apiMutate(`/api/management/orgs/${id}/invites`, 'POST', {email: inviteEmail});
             showToast('success', t`Einladung erfolgreich versendet.`);
             setInviteModalOpen(false);
             setInviteEmail('');
@@ -272,8 +272,8 @@ export default function ManagementTenantDetailView() {
             message: t`Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten).`,
             confirmColor: 'error'
         })) {
-            await deleteTenant(id!);
-            navigate('/tenants');
+            await deleteOrg(id!);
+            navigate('/orgs');
         }
     };
 
@@ -306,18 +306,18 @@ export default function ManagementTenantDetailView() {
 
     if (isLoading) return <div className="p-10 flex justify-center"><span
         className="loading loading-spinner loading-lg"></span></div>;
-    if (!tenant) return <div className="p-10"><ErrorMessage message={t`Organisation nicht gefunden.`}/></div>;
+    if (!org) return <div className="p-10"><ErrorMessage message={t`Organisation nicht gefunden.`}/></div>;
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
 
     return (
-        <PageLayout currentView="tenants">
+        <PageLayout currentView="orgs">
             <div className="p-6 md:p-10 max-w-6xl mx-auto w-full relative">
                 <div className="flex items-center gap-4 mb-8">
-                    <button onClick={() => navigate('/tenants')} className="btn btn-circle btn-ghost shrink-0"><span
+                    <button onClick={() => navigate('/orgs')} className="btn btn-circle btn-ghost shrink-0"><span
                         className="iconify mdi--arrow-left text-2xl"></span></button>
                     <div>
-                        <h1 className="text-3xl font-bold">{tenant.name}</h1>
+                        <h1 className="text-3xl font-bold">{org.name}</h1>
                         <p className="opacity-70"><Trans>Organisations-Verwaltung</Trans></p>
                     </div>
                     <button onClick={handleDelete} className="btn btn-outline btn-error btn-sm ml-auto"><Trans>Löschen</Trans></button>
@@ -325,17 +325,17 @@ export default function ManagementTenantDetailView() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-1 space-y-6">
-                                        <TenantSettings name={name} setName={setName} domain={domain} setDomain={setDomain} freq={freq}
-                                        setFreq={setFreq}
-                                        defaultFlatrateLevel={defaultFlatrateLevel} setDefaultFlatrateLevel={setDefaultFlatrateLevel}
-                                        sharedFlatrateCents={sharedFlatrateCents} setSharedFlatrateCents={setSharedFlatrateCents}
-                                        autoJoinPolicy={autoJoinPolicy} setAutoJoinPolicy={setAutoJoinPolicy}
-                                        handleSaveGeneral={handleSaveGeneral}/>
-                        <TenantInvoicing tenant={tenant} isGenerating={isGenerating}
+                                    <OrgSettings name={name} setName={setName} domain={domain} setDomain={setDomain} freq={freq}
+                                    setFreq={setFreq}
+                                    defaultFlatrateLevel={defaultFlatrateLevel} setDefaultFlatrateLevel={setDefaultFlatrateLevel}
+                                    sharedFlatrateCents={sharedFlatrateCents} setSharedFlatrateCents={setSharedFlatrateCents}
+                                    autoJoinPolicy={autoJoinPolicy} setAutoJoinPolicy={setAutoJoinPolicy}
+                                    handleSaveGeneral={handleSaveGeneral}/>
+                        <OrgInvoicing org={org} isGenerating={isGenerating}
                                          handleGenerateInvoice={handleGenerateInvoice}/>
                     </div>
                     <div className="lg:col-span-2">
-                        <TenantRelations users={users} flatGroups={flatGroups} selUsers={selUsers}
+                        <OrgRelations users={users} flatGroups={flatGroups} selUsers={selUsers}
                                          setSelUsers={setSelUsers} selGroups={selGroups} setSelGroups={setSelGroups}
                                          handleSaveRelations={handleSaveRelations}
                                          setInviteModalOpen={setInviteModalOpen} toggleId={toggleId}/>

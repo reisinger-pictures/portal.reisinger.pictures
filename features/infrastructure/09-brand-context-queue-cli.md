@@ -2,7 +2,7 @@
 
 > **Status:** Beschreibt den **Ist-Stand** (Implementierung) und die zugrunde liegende Problemanalyse.
 > Verknüpft: `AGENTS.todo.md` A-08, `features/infrastructure/06-multi-domain-branding.md`,
-> `features/infrastructure/08-tenant-brand-concept.md`, `features/infrastructure/12-brand-registry-and-settings-fixes.md`.
+> `features/infrastructure/08-Org-brand-concept.md`, `features/infrastructure/12-brand-registry-and-settings-fixes.md`.
 > Erstellt 2026-06-29. Aktualisiert 2026-07-01 (A-08 Queue State-Resetter).
 
 ## 1. Kontext

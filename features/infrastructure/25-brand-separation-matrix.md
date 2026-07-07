@@ -17,7 +17,7 @@ Runtime brand is resolved from the HTTP host by `BrandRegistry::fromHost()` (bac
 
 | Feature | RP | SRP | Cross-Brand | Notes |
 |---|---|---|---|---|
-| **Tenants/Organizations** | ✅ Full UI | ❌ Hidden (sidebar `!isSrp`) | Super-Admin (brand=null) sees all brands | Route requires `requiredFeature="b2b"`. Tenant model has nullable `brand` column. |
+| **Tenants/Organizations** | ✅ Full UI | ❌ Hidden (sidebar `!isSrp`) | Super-Admin (brand=null) sees all brands | Route requires `requiredFeature="b2b"`. Org model has nullable `brand` column. |
 | **Coupons** | ❌ UI blocked ("only on SRP") | ✅ Full CRUD | Super-Admin can manage via API from any context | Frontend gating only (`!isSrp` early return). Backend `CouponController` may create coupons on any brand. |
 | **CRM (Customers)** | ✅ Full CRUD | ❌ No UI | Brand-scoped by `Customer::forCurrentBrand()` | Route requires `requiredFeature="b2b"`. Customers have `brand` column. |
 | **Invoices** | ✅ Full | ⚠️ Via orders (SRP orders generate RP invoices) | Invoice brand is inherited from order | `InvoiceService` brands from order->brand, fallback B2B. Snapshots have `brand` column. |
@@ -29,7 +29,7 @@ Runtime brand is resolved from the HTTP host by `BrandRegistry::fromHost()` (bac
 | **Settings / Branding** | ✅ Own theme/logo/watermark | ✅ Own theme/logo/watermark | `SettingResolver` with prefix | `applyTheme()` sets brand-specific daisyUI themes (`b2b-*` / `srp-*`). |
 | **FTP Inboxes** | ✅ Photographer inbox | ✅ Photographer inbox | Per-user, brand-scoped via `getAllowedGalleryIds()` | `ftp_slug` is user-level, not brand-level. |
 | **Stats** | ✅ Admin/OrgAdmin stats | ✅ Admin/OrgAdmin stats | Cross-brand (no brand filter in queries) | Admin sees ALL galleries. No brand filtering in `StatsCalculationService`. |
-| **Registration** | ✅ Brand=B2B for new users | ✅ Brand=SRP for new users | Auto-join scoped by tenant's brand | `AuthController::register()` writes `BrandRegistry::currentOrDefault()` into user.brand. |
+| **Registration** | ✅ Brand=B2B for new users | ✅ Brand=SRP for new users | Auto-join scoped by Org's brand | `AuthController::register()` writes `BrandRegistry::currentOrDefault()` into user.brand. |
 | **Login** | ✅ Brand-bound check | ✅ Brand-bound check | Super-Admin (brand=null) cross-brand | `AuthController::login()` rejects brand mismatch (U-01). |
 | **Search (Global)** | ✅ All galleries | ✅ All galleries | Cross-brand by role | `SearchView` no brand gating. |
 | **Watermarks** | ✅ Own SVGs | ✅ Own SVGs | Per-brand file prefix | `SettingsController` uses `BrandRegistry::prefix()` for `_watermarks/` path. |

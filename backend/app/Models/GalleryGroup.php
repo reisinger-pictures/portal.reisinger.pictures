@@ -6,6 +6,7 @@ use App\Enums\Brand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\DB;
 
 class GalleryGroup extends Model
 {
@@ -22,7 +23,6 @@ class GalleryGroup extends Model
         'is_editorial_only',
         'is_hidden',
         'restricted_photographers',
-        'tenant_id',
         'brand'
     ];
 
@@ -72,10 +72,47 @@ class GalleryGroup extends Model
             }
         });
 
-        static::saved(function () {
-            \Illuminate\Support\Facades\DB::afterCommit(function() {
+        static::saved(function (GalleryGroup $group) {
+            \Illuminate\Support\Facades\DB::afterCommit(function() use ($group) {
                 app(\App\Services\GalleryTreeService::class)->clearCache();
             });
+
+            if ($group->wasChanged('brand') && $group->brand !== null) {
+                $groupIds = DB::select("
+                    WITH RECURSIVE descendants AS (
+                        SELECT id FROM gallery_groups WHERE parent_id = ?
+                        UNION ALL
+                        SELECT g.id FROM gallery_groups g
+                        INNER JOIN descendants d ON g.parent_id = d.id
+                    )
+                    SELECT id FROM descendants
+                ", [$group->id]);
+
+                $groupIds = array_column($groupIds, 'id');
+
+                if (!empty($groupIds)) {
+                    GalleryGroup::whereIn('id', $groupIds)
+                        ->where(function ($q) use ($group) {
+                            $q->where('brand', '!=', $group->brand->value)
+                              ->orWhereNull('brand');
+                        })
+                        ->update(['brand' => $group->brand->value]);
+
+                    Gallery::whereIn('gallery_group_id', $groupIds)
+                        ->where(function ($q) use ($group) {
+                            $q->where('brand', '!=', $group->brand->value)
+                              ->orWhereNull('brand');
+                        })
+                        ->update(['brand' => $group->brand->value]);
+                }
+
+                Gallery::where('gallery_group_id', $group->id)
+                    ->where(function ($q) use ($group) {
+                        $q->where('brand', '!=', $group->brand->value)
+                          ->orWhereNull('brand');
+                    })
+                    ->update(['brand' => $group->brand->value]);
+            }
         });
         static::deleted(function () {
             \Illuminate\Support\Facades\DB::afterCommit(function() {
@@ -166,7 +203,7 @@ class GalleryGroup extends Model
 
     public function children()
     {
-        return $this->hasMany(GalleryGroup::class, 'parent_id')->with(['children', 'galleries']);
+        return $this->hasMany(GalleryGroup::class, 'parent_id')->with(['children', 'galleries', 'orgs']);
     }
 
     public function galleries()
@@ -174,8 +211,8 @@ class GalleryGroup extends Model
         return $this->hasMany(Gallery::class);
     }
 
-    public function tenants()
+    public function orgs()
     {
-        return $this->belongsToMany(Tenant::class);
+        return $this->belongsToMany(Org::class);
     }
 }

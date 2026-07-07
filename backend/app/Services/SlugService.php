@@ -24,12 +24,24 @@ class SlugService
     {
         $slug = Str::slug($value);
 
-        $query = DB::table($table)->where($column, 'LIKE', "{$slug}%");
-        if ($ignoreId !== null) {
-            $query->where('id', '!=', $ignoreId);
-        }
-        $count = $query->count();
+        $baseSlug = $slug;
 
-        return $count > 0 ? "{$slug}-{$count}" : $slug;
+        $isTaken = function ($s) use ($table, $column, $ignoreId) {
+            $q = DB::table($table)->where($column, $s);
+            if ($ignoreId !== null) {
+                $q->where('id', '!=', $ignoreId);
+            }
+            return $q->exists();
+        };
+
+        if (!$isTaken($baseSlug)) {
+            return $baseSlug;
+        }
+
+        $counter = 1;
+        while ($isTaken($baseSlug . '-' . $counter)) {
+            $counter++;
+        }
+        return $baseSlug . '-' . $counter;
     }
 }

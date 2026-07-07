@@ -25,7 +25,7 @@ status: active
 - Dieses Modal bietet einen Live-Preview-Toggle, der die eingegebenen Variablen (z. B. `{user_name}`, `{link}`) durch Dummy-Daten ersetzt und das finale HTML rendert.
 
 ## 4. Brand-Aware Emails (EMAIL-01–04)
-- Alle 7 Mail-Klassen (`InvoiceMail`, `CustomMail`, `GalleryInviteMail`, `ActivateAccountMail`, `RatingFinishedMail`, `NotificationMail`, `TenantInviteMail`) nutzen das `BrandAwareMail` Trait.
+- Alle 7 Mail-Klassen (`InvoiceMail`, `CustomMail`, `GalleryInviteMail`, `ActivateAccountMail`, `RatingFinishedMail`, `NotificationMail`, `OrgInviteMail`) nutzen das `BrandAwareMail` Trait.
 - Das Trait stellt sicher:
   - **Brand Context Restoration:** `ensureBrandContext()` stellt den Brand bei Queue-Workern wieder her (captured via `initializeBrand()` im Konstruktor).
   - **Frontend URL (EMAIL-01):** `brandFrontendUrl()` liefert `config('app.frontend_url_srp')` für SRP, sonst `config('app.frontend_url')`.

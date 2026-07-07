@@ -26,7 +26,7 @@ export interface FillUserModalParams {
     email?: string;
 }
 
-export interface FillTenantModalParams {
+export interface FillOrgModalParams {
     name?: string;
 }
 
@@ -79,7 +79,7 @@ export class FormHelper {
         if (params.email !== undefined) await this.modal.fillInputByLabel('E-Mail Adresse', params.email);
     }
 
-    async fillTenantModal(params: FillTenantModalParams) {
+    async fillOrgModal(params: FillOrgModalParams) {
         if (params.name !== undefined) await this.modal.fillInputByLabel('Name (z.B. Firma XYZ)', params.name);
     }
 

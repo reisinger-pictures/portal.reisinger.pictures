@@ -5,10 +5,10 @@ namespace Tests\Feature;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Role;
-use App\Models\Tenant;
+use App\Models\Org;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-class TenantControllerTest extends TestCase
+class OrgControllerTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -26,34 +26,34 @@ class TenantControllerTest extends TestCase
         return auth('api')->login($user);
     }
 
-    public function test_admin_can_list_tenants(): void
+    public function test_admin_can_list_orgs(): void
     {
-        Tenant::factory()->count(3)->create();
+        Org::factory()->count(3)->create();
         $token = $this->adminToken();
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->getJson('/api/management/tenants');
+            ->getJson('/api/management/orgs');
 
         $response->assertStatus(200);
         $this->assertCount(3, $response->json());
     }
 
-    public function test_regular_user_cannot_list_tenants(): void
+    public function test_regular_user_cannot_list_orgs(): void
     {
-        Tenant::factory()->count(2)->create();
+        Org::factory()->count(2)->create();
         $token = $this->clientToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->getJson('/api/management/tenants')
+            ->getJson('/api/management/orgs')
             ->assertStatus(403);
     }
 
-    public function test_admin_can_create_tenant(): void
+    public function test_admin_can_create_org(): void
     {
         $token = $this->adminToken();
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/management/tenants', [
+            ->postJson('/api/management/orgs', [
                 'name' => 'Test Mandant',
                 'domain' => 'test.example.com',
                 'invoice_frequency' => 'monthly',
@@ -62,95 +62,95 @@ class TenantControllerTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('success', true);
 
-        $this->assertDatabaseHas('tenants', ['name' => 'Test Mandant', 'domain' => 'test.example.com']);
+        $this->assertDatabaseHas('orgs', ['name' => 'Test Mandant', 'domain' => 'test.example.com']);
     }
 
-    public function test_create_tenant_validates_required_fields(): void
+    public function test_create_org_validates_required_fields(): void
     {
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/management/tenants', [])
+            ->postJson('/api/management/orgs', [])
             ->assertStatus(422);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/management/tenants', ['name' => 'No Frequency'])
+            ->postJson('/api/management/orgs', ['name' => 'No Frequency'])
             ->assertStatus(422);
     }
 
-    public function test_create_tenant_validates_invoice_frequency(): void
+    public function test_create_org_validates_invoice_frequency(): void
     {
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/management/tenants', [
+            ->postJson('/api/management/orgs', [
                 'name' => 'Bad Freq',
                 'invoice_frequency' => 'yearly',
             ])
             ->assertStatus(422);
     }
 
-    public function test_non_admin_cannot_create_tenant(): void
+    public function test_non_admin_cannot_create_org(): void
     {
         $token = $this->clientToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/management/tenants', [
+            ->postJson('/api/management/orgs', [
                 'name' => 'Hack Attempt',
                 'invoice_frequency' => 'immediate',
             ])
             ->assertStatus(403);
     }
 
-    public function test_admin_can_update_tenant(): void
+    public function test_admin_can_update_org(): void
     {
-        $tenant = Tenant::factory()->create(['name' => 'Old Name', 'invoice_frequency' => 'immediate']);
+        $org = Org::factory()->create(['name' => 'Old Name', 'invoice_frequency' => 'immediate']);
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->putJson("/api/management/tenants/{$tenant->id}", [
+            ->putJson("/api/management/orgs/{$org->id}", [
                 'name' => 'New Name',
                 'invoice_frequency' => 'monthly',
             ])
             ->assertStatus(200)
             ->assertJsonPath('success', true);
 
-        $this->assertDatabaseHas('tenants', ['id' => $tenant->id, 'name' => 'New Name', 'invoice_frequency' => 'monthly']);
+        $this->assertDatabaseHas('orgs', ['id' => $org->id, 'name' => 'New Name', 'invoice_frequency' => 'monthly']);
     }
 
-    public function test_non_admin_cannot_update_tenant(): void
+    public function test_non_admin_cannot_update_org(): void
     {
-        $tenant = Tenant::factory()->create();
+        $org = Org::factory()->create();
         $token = $this->clientToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->putJson("/api/management/tenants/{$tenant->id}", [
+            ->putJson("/api/management/orgs/{$org->id}", [
                 'name' => 'Hacked',
                 'invoice_frequency' => 'monthly',
             ])
             ->assertStatus(403);
     }
 
-    public function test_admin_can_delete_tenant(): void
+    public function test_admin_can_delete_org(): void
     {
-        $tenant = Tenant::factory()->create();
+        $org = Org::factory()->create();
         $token = $this->adminToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->deleteJson("/api/management/tenants/{$tenant->id}")
+            ->deleteJson("/api/management/orgs/{$org->id}")
             ->assertStatus(200)
             ->assertJsonPath('success', true);
 
-        $this->assertModelMissing($tenant);
+        $this->assertModelMissing($org);
     }
 
-    public function test_non_admin_cannot_delete_tenant(): void
+    public function test_non_admin_cannot_delete_org(): void
     {
-        $tenant = Tenant::factory()->create();
+        $org = Org::factory()->create();
         $token = $this->clientToken();
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->deleteJson("/api/management/tenants/{$tenant->id}")
+            ->deleteJson("/api/management/orgs/{$org->id}")
             ->assertStatus(403);
     }
 }

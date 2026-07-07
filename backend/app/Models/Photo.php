@@ -123,6 +123,9 @@ class Photo extends Model
     }
 
     public function getFilenameAttribute(): string {
+        if (isset($this->attributes['filename']) && $this->attributes['filename'] !== null) {
+            return $this->attributes['filename'];
+        }
         $ext = 'jpg';
         if ($this->mime_type === 'image/png') $ext = 'png';
         if ($this->mime_type === 'image/webp') $ext = 'webp';

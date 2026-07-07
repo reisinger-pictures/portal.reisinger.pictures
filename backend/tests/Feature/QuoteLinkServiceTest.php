@@ -64,15 +64,4 @@ class QuoteLinkServiceTest extends TestCase
         $this->assertNull($this->service->decode($expiredToken));
     }
 
-    public function test_extract_token_from_request_returns_token(): void
-    {
-        $result = $this->service->extractTokenFromRequest(['token' => 'abc123']);
-        $this->assertSame('abc123', $result);
-    }
-
-    public function test_extract_token_from_request_returns_null_when_missing(): void
-    {
-        $this->assertNull($this->service->extractTokenFromRequest([]));
-        $this->assertNull($this->service->extractTokenFromRequest(['other' => 'x']));
-    }
 }

@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class TenantInvite extends Model
+class OrgInvite extends Model
 {
     use HasUuids;
 
@@ -13,7 +13,7 @@ class TenantInvite extends Model
 
     protected $fillable = [
         'email',
-        'tenant_id',
+        'org_id',
         'token',
         'expires_at'
     ];
@@ -22,8 +22,8 @@ class TenantInvite extends Model
         'expires_at' => 'datetime'
     ];
 
-    public function tenant()
+    public function org()
     {
-        return $this->belongsTo(Tenant::class);
+        return $this->belongsTo(Org::class);
     }
 }

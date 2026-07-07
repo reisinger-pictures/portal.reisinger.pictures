@@ -147,7 +147,7 @@ describe('StripeCheckoutForm', () => {
         });
     });
 
-    it('polls /api/orders when paymentIntent status is processing', async () => {
+    it('polls /api/orders/{orderId} when paymentIntent status is processing', async () => {
         vi.useFakeTimers();
 
         mockConfirmPayment.mockResolvedValue({
@@ -157,7 +157,7 @@ describe('StripeCheckoutForm', () => {
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: () => Promise.resolve([{ id: 'ord_123', status: 'paid' }]),
+            json: () => Promise.resolve({ id: 'ord_123', status: 'paid' }),
         }));
 
         renderForm();
@@ -166,7 +166,7 @@ describe('StripeCheckoutForm', () => {
 
         expect(defaultProps.onSuccess).not.toHaveBeenCalled();
 
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(2000);
 
         expect(defaultProps.onSuccess).toHaveBeenCalledWith(true);
 
@@ -174,7 +174,7 @@ describe('StripeCheckoutForm', () => {
         vi.unstubAllGlobals();
     }, 10000);
 
-    it('calls onSuccess(false) after 15 polling failures', async () => {
+    it('calls onSuccess(false) after 30 polling failures', async () => {
         vi.useFakeTimers();
 
         mockConfirmPayment.mockResolvedValue({
@@ -184,15 +184,15 @@ describe('StripeCheckoutForm', () => {
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: () => Promise.resolve([{ id: 'ord_123', status: 'pending' }]),
+            json: () => Promise.resolve({ id: 'ord_123', status: 'pending' }),
         }));
 
         renderForm();
 
         submitForm();
 
-        for (let i = 0; i < 16; i++) {
-            await vi.advanceTimersByTimeAsync(1000);
+        for (let i = 0; i < 31; i++) {
+            await vi.advanceTimersByTimeAsync(2000);
         }
 
         expect(defaultProps.onSuccess).toHaveBeenCalledWith(false);

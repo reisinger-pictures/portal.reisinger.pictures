@@ -9,7 +9,7 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\Role;
 use App\Models\Setting;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\User;
 use App\Services\InvoiceService;
 use App\Services\SettingResolver;
@@ -134,9 +134,9 @@ class BrandLeakTest extends TestCase
 
     public function test_invoice_service_persists_brand_on_collective_orders(): void
     {
-        $tenant = Tenant::create(['name' => 'Brand Tenant', 'invoice_frequency' => 'monthly']);
+        $org = Org::create(['name' => 'Brand Org', 'invoice_frequency' => 'monthly']);
         $user = User::factory()->create(['email' => 'brand-tenant@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $order = Order::create([
@@ -157,7 +157,7 @@ class BrandLeakTest extends TestCase
         ]);
 
         $service = new InvoiceService();
-        $result = $service->generateForTenant($tenant);
+        $result = $service->generateForOrg($org);
         $this->assertTrue($result['success']);
 
         $this->assertDatabaseHas('orders', [

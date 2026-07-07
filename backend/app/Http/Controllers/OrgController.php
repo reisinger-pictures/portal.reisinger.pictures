@@ -2,24 +2,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class TenantController extends Controller
+class OrgController extends Controller
 {
     public function index()
     {
         $user = auth('api')->user();
 
-        if ($user->is_admin) {
-            return response()->json(Tenant::withCount(['users', 'galleryGroups'])->orderBy('name')->get());
+        $query = Org::withCount(['users', 'galleryGroups'])->orderBy('name');
+
+        if ($user->is_org_admin) {
+            $query->where('id', $user->org_id);
+        }
+
+        $query->when($user->brand !== null, fn($q) => $q->where('brand', $user->brand));
+
+        if ($user->is_admin || $user->is_photographer) {
+            return response()->json($query->get());
         } elseif ($user->is_org_admin) {
-            $tenant = Tenant::withCount(['users', 'galleryGroups'])->find($user->tenant_id);
-            return response()->json($tenant ? [$tenant] : []);
-        } elseif ($user->is_photographer) {
-            return response()->json(Tenant::withCount(['users', 'galleryGroups'])->orderBy('name')->get());
+            $org = $query->first();
+            return response()->json($org ? [$org] : []);
         }
 
         return response()->json(['error' => 'Forbidden'], 403);
@@ -28,18 +34,22 @@ class TenantController extends Controller
     public function show($id)
     {
         $user = auth('api')->user();
-        $tenant = Tenant::with(['users:id,name,email,tenant_id', 'galleryGroups:id,name,parent_id'])->findOrFail($id);
+        $org = Org::with(['users:id,name,email,org_id', 'galleryGroups:id,name,parent_id'])->findOrFail($id);
 
-        if (!$user->is_admin && $user->tenant_id !== $id) {
+        if (!$user->is_admin && $user->org_id !== $id) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $openDeliveryNotesCount = \App\Models\Order::whereIn('user_id', $tenant->users()->pluck('id'))
+        if ($user->brand !== null && $org->brand !== null && $user->brand !== $org->brand) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
+
+        $openDeliveryNotesCount = \App\Models\Order::whereIn('user_id', $org->users()->pluck('id'))
             ->where('status', 'delivery_note')
             ->count();
-        $tenant->setAttribute('open_delivery_notes_count', $openDeliveryNotesCount);
+        $org->setAttribute('open_delivery_notes_count', $openDeliveryNotesCount);
 
-        return response()->json($tenant);
+        return response()->json($org);
     }
 
     public function store(Request $request)
@@ -48,7 +58,7 @@ class TenantController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'domain' => 'nullable|string|max:255|unique:tenants,domain',
+            'domain' => 'nullable|string|max:255|unique:orgs,domain',
             'invoice_frequency' => 'required|in:immediate,monthly,quarterly',
             'default_flatrate_level' => 'nullable|in:none,web,print,original',
             'shared_flatrate_cents' => 'nullable|integer|min:0',
@@ -58,22 +68,22 @@ class TenantController extends Controller
 
         $data = $request->only(['name', 'domain', 'invoice_frequency', 'default_flatrate_level', 'shared_flatrate_cents', 'can_purchase_upgrades', 'auto_join_policy']);
         $data['brand'] = BrandRegistry::currentOrDefault();
-        $tenant = Tenant::create($data);
-        return response()->json(['success' => true, 'tenant' => $tenant]);
+        $org = Org::create($data);
+        return response()->json(['success' => true, 'org' => $org]);
     }
 
     public function update(Request $request, $id)
     {
         $user = auth('api')->user();
-        if (!$user->is_admin && !($user->is_org_admin && $user->tenant_id === $id)) {
+        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $tenant = Tenant::findOrFail($id);
+        $org = Org::findOrFail($id);
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'domain' => 'nullable|string|max:255|unique:tenants,domain,' . $id,
+            'domain' => 'nullable|string|max:255|unique:orgs,domain,' . $id,
             'invoice_frequency' => 'required|in:immediate,monthly,quarterly',
             'default_flatrate_level' => 'nullable|in:none,web,print,original',
             'shared_flatrate_cents' => 'nullable|integer|min:0',
@@ -81,38 +91,44 @@ class TenantController extends Controller
             'auto_join_policy' => 'in:immediate,requires_invite,disabled',
         ]);
 
-        $tenant->update($request->only(['name', 'domain', 'invoice_frequency', 'default_flatrate_level', 'shared_flatrate_cents', 'can_purchase_upgrades', 'auto_join_policy']));
-        return response()->json(['success' => true, 'tenant' => $tenant]);
+        $org->update($request->only(['name', 'domain', 'invoice_frequency', 'default_flatrate_level', 'shared_flatrate_cents', 'can_purchase_upgrades', 'auto_join_policy']));
+        return response()->json(['success' => true, 'org' => $org]);
     }
 
     public function destroy($id)
     {
         if (!auth('api')->user()->is_admin) return response()->json(['error' => 'Forbidden'], 403);
 
-        $tenant = Tenant::with('users')->findOrFail($id);
+        $org = Org::findOrFail($id);
 
-        // Revoke org-derived role + flatrate from all users before deleting
-        foreach ($tenant->users as $user) {
-            if ($tenant->default_role_id && $user->roles->contains($tenant->default_role_id)) {
-                $user->roles()->detach($tenant->default_role_id);
-            }
-            if ($tenant->default_flatrate_level && $user->flatrate_level === $tenant->default_flatrate_level) {
-                $user->flatrate_level = 'none';
-            }
-            if ($tenant->can_purchase_upgrades && $user->can_purchase_upgrades) {
-                $user->can_purchase_upgrades = false;
-            }
-            $user->save();
-        }
+        DB::transaction(function () use ($org) {
+            $userIds = $org->users()->pluck('users.id');
 
-        $tenant->delete();
+            $users = \App\Models\User::whereIn('id', $userIds)->get();
+            foreach ($users as $user) {
+                if ($org->default_role_id && $user->roles->contains($org->default_role_id)) {
+                    $user->roles()->detach($org->default_role_id);
+                }
+                if ($org->default_flatrate_level && $user->flatrate_level === $org->default_flatrate_level) {
+                    $user->flatrate_level = 'none';
+                }
+                if ($org->can_purchase_upgrades && $user->can_purchase_upgrades) {
+                    $user->can_purchase_upgrades = false;
+                }
+                $user->org_id = null;
+                $user->save();
+            }
+
+            $org->delete();
+        });
+
         return response()->json(['success' => true]);
     }
 
     public function syncUsers(Request $request, $id)
     {
         $user = auth('api')->user();
-        if (!$user->is_admin && !($user->is_org_admin && $user->tenant_id === $id)) {
+        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -129,33 +145,43 @@ class TenantController extends Controller
             return response()->json(['error' => 'Super-Admins können keiner Organisation zugewiesen werden.'], 422);
         }
 
-        $tenant = Tenant::findOrFail($id);
+        $org = Org::findOrFail($id);
+
+        if ($org->brand !== null) {
+            $conflictingUsers = \App\Models\User::whereIn('id', $request->user_ids ?? [])
+                ->whereNotNull('brand')
+                ->where('brand', '!=', $org->brand)
+                ->exists();
+            if ($conflictingUsers) {
+                return response()->json(['error' => 'Ein oder mehrere Benutzer sind für eine andere Marke registriert und können dieser Organisation nicht zugewiesen werden.'], 422);
+            }
+        }
 
         // Get currently assigned user IDs before syncing
-        $oldUserIds = $tenant->users()->pluck('id')->toArray();
+        $oldUserIds = $org->users()->pluck('id')->toArray();
         $newUserIds = $request->user_ids ?? [];
         $removedUserIds = array_diff($oldUserIds, $newUserIds);
 
-        // Set tenant_id on newly assigned users
-        \App\Models\User::whereIn('id', $newUserIds)->update(['tenant_id' => $id]);
+        // Set org_id on newly assigned users
+        \App\Models\User::whereIn('id', $newUserIds)->update(['org_id' => $id]);
 
         // Revoke organization-derived role + flatrate from removed users
         if (!empty($removedUserIds)) {
             $removedUsers = \App\Models\User::whereIn('id', $removedUserIds)->get();
             foreach ($removedUsers as $removedUser) {
                 // Only revoke if the user's role matches the org's default role
-                if ($tenant->default_role_id && $removedUser->roles->contains($tenant->default_role_id)) {
-                    $removedUser->roles()->detach($tenant->default_role_id);
+                if ($org->default_role_id && $removedUser->roles->contains($org->default_role_id)) {
+                    $removedUser->roles()->detach($org->default_role_id);
                 }
                 // Reset flatrate to 'none' if it matches the org's default
-                if ($tenant->default_flatrate_level && $removedUser->flatrate_level === $tenant->default_flatrate_level) {
+                if ($org->default_flatrate_level && $removedUser->flatrate_level === $org->default_flatrate_level) {
                     $removedUser->flatrate_level = 'none';
                 }
                 // Reset can_purchase_upgrades if it was inherited from org
-                if ($tenant->can_purchase_upgrades && $removedUser->can_purchase_upgrades) {
+                if ($org->can_purchase_upgrades && $removedUser->can_purchase_upgrades) {
                     $removedUser->can_purchase_upgrades = false;
                 }
-                $removedUser->tenant_id = null;
+                $removedUser->org_id = null;
                 $removedUser->save();
             }
         }
@@ -166,14 +192,14 @@ class TenantController extends Controller
     public function syncGroups(Request $request, $id)
     {
         $user = auth('api')->user();
-        if (!$user->is_admin && !($user->is_org_admin && $user->tenant_id === $id)) {
+        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
-        
+
         $request->validate(['group_ids' => 'array']);
-        $tenant = Tenant::findOrFail($id);
-        $tenant->galleryGroups()->sync($request->group_ids ?? []);
-        
+        $org = Org::findOrFail($id);
+        $org->galleryGroups()->sync($request->group_ids ?? []);
+
         return response()->json(['success' => true]);
     }
 
@@ -181,12 +207,12 @@ class TenantController extends Controller
     public function generateCollectiveInvoice($id, \App\Services\InvoiceService $invoiceService)
     {
         $user = auth('api')->user();
-        if (!$user->is_admin && !($user->is_org_admin && $user->tenant_id === $id)) {
+        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $tenant = Tenant::findOrFail($id);
-        $result = $invoiceService->generateForTenant($tenant, $user);
+        $org = Org::findOrFail($id);
+        $result = $invoiceService->generateForOrg($org, $user);
 
         if (!$result['success']) {
             return response()->json(['error' => $result['error']], 400);

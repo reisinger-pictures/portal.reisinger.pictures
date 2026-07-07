@@ -60,6 +60,11 @@ class ScopeLicensingStrategy implements PricingStrategy
         ];
     }
 
+    public function supportsCoupons(): bool
+    {
+        return false;
+    }
+
     /**
      * Replicate the original PricingService::calculateItemPriceCents() logic.
      *

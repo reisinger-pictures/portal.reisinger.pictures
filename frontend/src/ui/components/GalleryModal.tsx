@@ -1,5 +1,5 @@
 import { Gallery, FlatGroup, GalleryMetadataOpts } from '../../logic/useGalleries';
-import { Tenant } from '../../logic/useTenants';
+import { Org } from '../../logic/useOrgs';
 import { useUI } from './UIContext';
 import { useEffect } from 'react';
 import { t } from "@lingui/core/macro";
@@ -23,7 +23,7 @@ const gallerySchema = z.object({
     gallery_group_id: z.string(),
     password: z.string().optional(),
     expires_at: z.string().optional(),
-    tenant_id: z.string().optional(),
+    org_ids: z.array(z.string()),
     is_free_download: z.boolean().optional(),
     is_editorial_only: z.boolean().optional(),
     is_hidden: z.boolean().optional()
@@ -37,19 +37,19 @@ interface Props {
     availableGroups: FlatGroup[];
     editingGallery?: Gallery | null;
     defaultGroupId?: string | null;
-    onCreate: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
-    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
+    onCreate: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts, orgIds?: string[]) => Promise<void>;
+    onUpdate: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts, orgIds?: string[]) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
 }
 
 export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
-    const { data: tenants, isLoading } = useSWR<Tenant[]>('/api/management/tenants', fetcher);
+    const { data: orgs, isLoading } = useSWR<Org[]>('/api/management/orgs', fetcher);
 
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
         defaultValues: {
-            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', is_free_download: false, is_editorial_only: false, is_hidden: false
+            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', org_ids: [], is_free_download: false, is_editorial_only: false, is_hidden: false
         }
     });
 
@@ -57,7 +57,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         if (isOpen) {
             reset({
                 name: editingGallery?.name || '',
-                tenant_id: editingGallery?.tenant_id || '',
+                org_ids: editingGallery?.org_ids || [],
                 slug: editingGallery?.slug || '',
                 type: editingGallery?.type || 'delivery',
                 is_public: editingGallery?.is_public || false,
@@ -75,6 +75,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     const watchType = useWatch({ control, name: 'type' });
     const watchGroupId = useWatch({ control, name: 'gallery_group_id' });
     const watchIsPublic = useWatch({ control, name: 'is_public' });
+    const watchOrgIds = useWatch({ control, name: 'org_ids' });
 
     const selectedParent = availableGroups.find(g => g.id === (watchGroupId === '' ? null : watchGroupId));
     let isVisibilityForced = selectedParent?.is_public !== undefined && selectedParent?.is_public !== null;
@@ -95,10 +96,10 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
         try {
             if (editingGallery) {
-                await onUpdate(editingGallery.id, data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts);
+                await onUpdate(editingGallery.id, data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts, data.org_ids);
                 showToast('success', t`Galerie erfolgreich aktualisiert.`);
             } else {
-                await onCreate(data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts);
+                await onCreate(data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts, data.org_ids);
                 showToast('success', t`Galerie erfolgreich erstellt.`);
             }
             onClose();
@@ -194,11 +195,30 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
             
             <div className="form-control w-full mb-4">
-                <label className="label"><span className="label-text font-bold"><Trans>Zugeordnete Organisation (Verschieben)</Trans></span></label>
-                <select {...register('tenant_id')} className="select select-bordered w-full">
-                    <option value="">-- <Trans>Keine spezifische Organisation</Trans> --</option>
-                    {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+                <label className="label"><span className="label-text font-bold"><Trans>Zugeordnete Organisationen</Trans></span></label>
+                <div className="flex flex-wrap gap-3 p-3 bg-base-200 rounded-box border border-base-300">
+                    {orgs?.map(org => (
+                        <label key={org.id} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={(watchOrgIds ?? []).includes(org.id)}
+                                onChange={() => {
+                                    const current = watchOrgIds ?? [];
+                                    if (current.includes(org.id)) {
+                                        setValue('org_ids', current.filter(id => id !== org.id), { shouldDirty: true });
+                                    } else {
+                                        setValue('org_ids', [...current, org.id], { shouldDirty: true });
+                                    }
+                                }}
+                                className="checkbox checkbox-sm checkbox-primary"
+                            />
+                            <span className="text-sm">{org.name}</span>
+                        </label>
+                    ))}
+                    {(!orgs || orgs.length === 0) && (
+                        <span className="text-sm opacity-50 italic"><Trans>Keine Organisationen verfügbar</Trans></span>
+                    )}
+                </div>
             </div>
 
             <div className="form-control w-full mb-4">

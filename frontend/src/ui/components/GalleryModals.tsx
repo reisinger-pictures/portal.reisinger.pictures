@@ -14,9 +14,9 @@ interface GalleryModalsProps {
     defaultGroupId?: string | null;
 
     onCreateGroup: (name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: GalleryGroupExtraOpts) => Promise<void>;
-    onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
+    onCreateGallery: (name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts, orgIds?: string[]) => Promise<void>;
     onUpdateGroup: (id: string, name: string, slug: string, isPublic: boolean | null, parentId?: string | null, extraOpts?: GalleryGroupExtraOpts) => Promise<void>;
-    onUpdateGallery: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts) => Promise<void>;
+    onUpdateGallery: (id: string, name: string, slug: string, type: 'selection' | 'delivery', isLive: boolean, isPublic: boolean, parentId?: string | null, pw?: string, exp?: string, metadataOpts?: GalleryMetadataOpts, orgIds?: string[]) => Promise<void>;
     onDeleteGroup: (id: string) => Promise<void>;
     onDeleteGallery: (id: string) => Promise<void>;
 }

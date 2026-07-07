@@ -305,17 +305,17 @@ class StatsCalculationServiceTest extends TestCase
         $this->assertEquals(1, $result['guest_downloads']);
     }
 
-    public function test_get_org_admin_stats_filters_by_tenants()
+    public function test_get_org_admin_stats_filters_by_orgs()
     {
-        $tenant = \App\Models\Tenant::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
+        $org = \App\Models\Org::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
 
         $manager = User::factory()->create();
         $manager->roles()->attach(\App\Models\Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]));
-        $manager->tenant_id = $tenant->id;
+        $manager->org_id = $org->id;
         $manager->save();
 
         $user1 = User::factory()->create();
-        $user1->tenant_id = $tenant->id;
+        $user1->org_id = $org->id;
         $user1->save();
 
         $user2 = User::factory()->create();
@@ -343,7 +343,7 @@ class StatsCalculationServiceTest extends TestCase
             'resolution_tier' => 'web',
         ]);
 
-        // user2 is not in the tenant — should be excluded
+        // user2 is not in the org — should be excluded
         \App\Models\DownloadLog::create([
             'user_id' => $user2->id,
             'gallery_id' => $gallery->id,
@@ -360,17 +360,17 @@ class StatsCalculationServiceTest extends TestCase
 
         $result = $this->service->getOrgAdminStats($manager);
 
-        // Only user1 (tenant member) should be counted
+        // Only user1 (org member) should be counted
         $this->assertEquals(3, $result['total_downloads']);
     }
 
     public function test_get_org_admin_stats_guest_downloads_always_zero()
     {
-        $tenant = \App\Models\Tenant::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
+        $org = \App\Models\Org::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
 
         $manager = User::factory()->create();
         $manager->roles()->attach(\App\Models\Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]));
-        $manager->tenant_id = $tenant->id;
+        $manager->org_id = $org->id;
         $manager->save();
 
         $result = $this->service->getOrgAdminStats($manager);

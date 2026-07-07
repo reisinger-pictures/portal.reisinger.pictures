@@ -18,7 +18,7 @@ Bei Versionskonflikten (z.B. `Your database version (X) is incompatible with you
 
 Danach im Backend `php artisan migrate:fresh --seed` ausführen, um die Indizes neu zu befüllen.
 
-## 2. Tenant Isolation & Permissions
+## 2. Org Isolation & Permissions
 - `whereIn('gallery_id', [...])` is used directly in the Scout query to filter search results based on the `getAllowedGalleryIds()` logic.
 - **Maintenance:** The `gallery_id` must be a `filterableAttribute` in Meilisearch.
 

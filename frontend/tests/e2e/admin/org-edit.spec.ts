@@ -1,9 +1,10 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
+import { SidebarHelper } from '../helpers/SidebarHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 
-test.describe('E3: Org-Admin sieht keine fremden Orgs', () => {
+test.describe('E2: Org-Admin editiert Org Settings', () => {
     let helper: E2ESessionHelper;
     let adminToken: string;
 
@@ -22,21 +23,19 @@ test.describe('E3: Org-Admin sieht keine fremden Orgs', () => {
         if (helper) await helper.teardown();
     });
 
-    async function createTenant(request: APIRequestContext, token: string) {
+    async function createOrgAdmin(request: APIRequestContext, token: string) {
         const headers = { 'Accept': 'application/json', 'Cookie': token };
-        const name = `E2E Tenant ${Math.random().toString(36).substring(2, 10)}`;
-        const res = await request.post('/api/management/tenants', {
-            data: { name, invoice_frequency: 'immediate' },
+        const orgName = `E2E Org ${Math.random().toString(36).substring(2, 10)}`;
+        const tenantRes = await request.post('/api/management/orgs', {
+            data: { name: orgName, invoice_frequency: 'immediate' },
             headers
         });
-        if (!res.ok()) throw new Error(`Tenant creation failed: ${await res.text()}`);
-        const data = await res.json();
-        helper.trackTenant(data.tenant.id);
-        return data.tenant;
-    }
+        if (!tenantRes.ok()) throw new Error(`Org creation failed: ${await tenantRes.text()}`);
+        const tenantData = await tenantRes.json();
+        const orgId = tenantData.org?.id;
+        if (!orgId) throw new Error('Org ID missing');
+        helper.trackOrg(orgId);
 
-    async function createOrgAdminForTenant(request: APIRequestContext, token: string, tenantId: string) {
-        const headers = { 'Accept': 'application/json', 'Cookie': token };
         const uniqueId = Math.random().toString(36).substring(2, 10);
         const email = `e2e-org-admin-${uniqueId}@example.com`;
         const password = 'SecurePassword123!';
@@ -61,7 +60,7 @@ test.describe('E3: Org-Admin sieht keine fremden Orgs', () => {
             headers
         });
 
-        await request.put(`/api/management/tenants/${tenantId}/users`, {
+        await request.put(`/api/management/orgs/${orgId}/users`, {
             data: { user_ids: [userId] },
             headers
         });
@@ -76,26 +75,32 @@ test.describe('E3: Org-Admin sieht keine fremden Orgs', () => {
         });
         if (!resetRes.ok()) throw new Error(`Password reset failed: ${await resetRes.text()}`);
 
-        return { email, password, userId };
+        return { email, password, orgName, orgId, userId };
     }
 
-    test('Org-Admin kann nicht auf fremde Org zugreifen', { tag: ['@feature:admin:tenant'] }, async ({ page, request }) => {
-        const tenantA = await createTenant(request, adminToken);
-        const tenantB = await createTenant(request, adminToken);
-
-        const orgAdmin = await createOrgAdminForTenant(request, adminToken, tenantA.id);
+    test('Org-Admin editiert Org Name und speichert', { tag: ['@feature:admin:Org'] }, async ({ page, request }) => {
+        const { email, password, orgName } = await createOrgAdmin(request, adminToken);
         const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
 
-        await auth.login(orgAdmin.email, orgAdmin.password);
+        await auth.login(email, password);
+        await sidebar.navigateTo('Organisationen');
 
-        await page.goto(`/tenants/${tenantB.id}`);
+        const orgCard = page.locator('main .card').filter({ hasText: orgName }).first();
+        await expect(orgCard).toBeVisible({ timeout: 10000 });
+        await orgCard.click();
 
-        const hasError = page.locator('.alert').getByText('Forbidden').first();
-        const has404 = page.locator('.alert').getByText('nicht gefunden').first();
-        const isRedirected = page.locator('h1:has-text("Organisationen")').first();
+        await expect(page.locator('h1:has-text("' + orgName + '")')).toBeVisible({ timeout: 10000 });
 
-        await expect(
-            hasError.or(has404).or(isRedirected)
-        ).toBeVisible({ timeout: 15000 });
+        const newName = `Updated ${Math.random().toString(36).substring(2, 10)}`;
+        const nameInput = page.locator('input[value="' + orgName + '"]');
+        await expect(nameInput).toBeVisible();
+        await nameInput.fill(newName);
+
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+
+        await expect(page.locator('.toast')).toContainText('Organisation aktualisiert.', { timeout: 10000 });
+
+        await expect(page.locator('h1:has-text("' + newName + '")')).toBeVisible();
     });
 });

@@ -52,7 +52,7 @@ class GalleryServiceTest extends TestCase
         $this->assertFalse($group->is_editorial_only);
         $this->assertFalse($group->is_hidden);
         $this->assertNull($group->parent_id);
-        $this->assertNull($group->tenant_id);
+        $this->assertNull($group->org_id);
         $this->assertDatabaseHas('gallery_groups', ['slug' => 'meine-gruppe']);
     }
 
@@ -72,7 +72,7 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('meine-gruppe', $group->slug);
     }
 
-    public function test_storeGroup_accepts_parent_id_and_tenant_id(): void
+    public function test_storeGroup_accepts_parent_id_and_org_id(): void
     {
         $parent = GalleryGroup::factory()->create();
 
@@ -86,7 +86,7 @@ class GalleryServiceTest extends TestCase
         ]);
 
         $this->assertSame($parent->id, $group->parent_id);
-        $this->assertNull($group->tenant_id);
+        $this->assertNull($group->org_id);
         $this->assertTrue($group->is_public);
         $this->assertTrue($group->is_editorial_only);
     }

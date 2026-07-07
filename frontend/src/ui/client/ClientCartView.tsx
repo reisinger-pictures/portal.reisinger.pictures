@@ -52,6 +52,7 @@ export default function ClientCartView() {
 
     const [searchParams] = useSearchParams();
     const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'invoice'>('stripe');
+    const [quoteToken, setQuoteToken] = useState<string | null>(null);
 
     const redirectStatus = searchParams.get('redirect_status');
     useEffect(() => {
@@ -83,6 +84,7 @@ export default function ClientCartView() {
                     showToast('error', data.error || t`Angebot ist abgelaufen — bitte kontaktieren Sie den Fotografen.`);
                     return;
                 }
+                setQuoteToken(incomingToken);
                 clearCart();
                 data.photos.forEach((pid: string) => {
                     addToCart({
@@ -139,8 +141,9 @@ export default function ClientCartView() {
             return;
         }
         try {
-            const payload = {
+            const payload: Record<string, unknown> = {
                 items,
+                    quote_token: quoteToken,
                 billing_name: data.billing_name,
                 billing_company: data.billing_company,
                 billing_street: data.billing_street,

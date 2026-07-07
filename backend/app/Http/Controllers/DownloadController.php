@@ -43,7 +43,7 @@ class DownloadController extends Controller
         return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value ?? '');
     }
 
-    private function injectMetadata($sourcePath, $photo, $userName)
+    private function injectMetadata($sourcePath, $photo, $userName, ?string $customConditions = null)
     {
         $tempDir = storage_path('app/private/temp');
         if (!is_dir($tempDir))
@@ -54,8 +54,18 @@ class DownloadController extends Controller
         $artist = $this->sanitizeExifValue(trim($photo->artist ?? config('app.name', 'Reisinger Foto Portal'), "\"\'"));
         $copyright = 'Copyright ' . date('Y') . ' ' . $artist;
         $editorialNotice = ($photo->effective_is_editorial_only || $photo->is_editorial_only) ? ' - EDITORIAL USE ONLY / NUR FÜR REDAKTIONELLE NUTZUNG FREIGEGEBEN' : '';
-        $instructions = $this->sanitizeExifValue('Licensed to / Downloaded by: ' . $userName . $editorialNotice);
         $agbUrl = 'https://reisinger.pictures/agb';
+
+        if ($customConditions !== null) {
+            $ccSanitized = $this->sanitizeExifValue($customConditions);
+            $instructions = $this->sanitizeExifValue('Licensed to / Downloaded by: ' . $userName . $editorialNotice);
+            $usageTerms = $ccSanitized;
+            $rights = $ccSanitized;
+        } else {
+            $instructions = $this->sanitizeExifValue('Licensed to / Downloaded by: ' . $userName . $editorialNotice);
+            $usageTerms = $agbUrl;
+            $rights = $agbUrl;
+        }
 
         $title = $this->sanitizeExifValue($photo->title ?? '');
         $description = $this->sanitizeExifValue($photo->description ?? '');
@@ -113,8 +123,8 @@ class DownloadController extends Controller
             "-Copyright={$copyright}",
             "-CopyrightNotice={$copyright}",
             "-SpecialInstructions={$instructions}",
-            "-UsageTerms={$agbUrl}",
-            "-Rights={$agbUrl}",
+            "-UsageTerms={$usageTerms}",
+            "-Rights={$rights}",
             '-o', $tempPath,
             $sourcePath
         );
@@ -342,7 +352,8 @@ class DownloadController extends Controller
                     }
                 });
 
-                $processedPath = $this->injectMetadata($scaledBase, $photo, $userName);
+                $customConditions = $snapshot->customer_details['custom_conditions'] ?? null;
+                $processedPath = $this->injectMetadata($scaledBase, $photo, $userName, $customConditions);
 
                 $downloadName = $photo->id . '_' . strtoupper($tier) . '.jpg';
 

@@ -4,16 +4,16 @@ topic: roles-and-rbac
 status: active
 ---
 
-# Technical Concept: Roles & Access Management (Single Tenant)
+# Technical Concept: Roles & Access Management (Single Org)
 
 ## 1. Enterprise Role Model (RBAC 2.0)
 To support scalable B2B governance without cluttering the `users` table with boolean flags, permissions are strictly managed via the n:m `roles` table.
 
 **Defined Roles:**
-- **Super Admin (`super_admin`):** Highest enterprise role. Full system access across all tenants including billing, payout, watermark, license catalog, and system-level configuration. Not scoped by `tenant_id` — operates globally. See `infrastructure/10-frontend-brand-tenant-isolation.md`.
+- **Super Admin (`super_admin`):** Highest enterprise role. Full system access across all tenants including billing, payout, watermark, license catalog, and system-level configuration. Not scoped by `tenant_id` — operates globally. See `infrastructure/10-frontend-brand-Org-isolation.md`.
 - **Global Admin (`admin`):** Full system access across all tenants.
 - **Photographer (`photographer`):** Operational user. Manages assigned galleries and uploads.
-- **Organisation Admin (`org_admin`):** Tenant-specific admin. Can manage users within their own organization (domain) and view tenant-wide audit logs. UI is shared with Global Admins but scoped to their `tenant_id`.
+- **Organisation Admin (`org_admin`):** Org-specific admin. Can manage users within their own organization (domain) and view Org-wide audit logs. UI is shared with Global Admins but scoped to their `tenant_id`.
 - **Power-User (`power_user`):** Authorized to purchase resolution upgrades on invoice (Delta-Pricing).
 - **Client (`client`):** Standard user. Can only consume included flat-rate downloads. Upgrades are hidden.
 

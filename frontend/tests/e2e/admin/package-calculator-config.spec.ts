@@ -66,6 +66,9 @@ test.describe('Package Calculator Configuration (G2)', () => {
         await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
         await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
 
+        // Wait for the form to reflect the saved hourly rate (ensures SWR cache is fresh)
+        await expect(cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]')).toHaveValue('80');
+
         // Navigate to manual offer page and open calculator
         await sidebar.navigateTo('Manuelles Angebot');
 

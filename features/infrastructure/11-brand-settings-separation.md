@@ -1,7 +1,7 @@
 # Markenspezifische Settings-Trennung — Konzept (SOLL)
 
 > **Status:** Beschreibt den Soll-Zustand (Ziel).
-> Verknüpft: `features/infrastructure/06-multi-domain-branding.md`, `features/infrastructure/08-tenant-brand-concept.md`.
+> Verknüpft: `features/infrastructure/06-multi-domain-branding.md`, `features/infrastructure/08-Org-brand-concept.md`.
 
 ## 1. Kontext
 

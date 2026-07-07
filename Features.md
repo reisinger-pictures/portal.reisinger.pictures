@@ -93,7 +93,7 @@ Detaillierte Spezifikationen nach Kategorie:
 - [05-watermark-refactoring.md](./features/infrastructure/05-watermark-refactoring.md)
 - [06-multi-domain-branding.md](./features/infrastructure/06-multi-domain-branding.md)
 - [07-lightroom-multi-tenant-gap.md](./features/infrastructure/07-lightroom-multi-tenant-gap.md)
-- [08-tenant-brand-concept.md](./features/infrastructure/08-tenant-brand-concept.md)
+- [08-org-brand-concept.md](./features/infrastructure/08-org-brand-concept.md)
 - [09-brand-context-queue-cli.md](./features/infrastructure/09-brand-context-queue-cli.md)
 - [10-frontend-brand-tenant-isolation.md](./features/infrastructure/10-frontend-brand-tenant-isolation.md)
 - [11-brand-settings-separation.md](./features/infrastructure/11-brand-settings-separation.md)

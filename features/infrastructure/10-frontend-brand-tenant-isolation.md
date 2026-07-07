@@ -7,7 +7,7 @@
 >
 > Ursprünglich: `active` — beschreibt den verbindlichen, entschiedenen Endzustand.
 > Verknüpft: `AGENTS.todo.md` A-01 (aufgelöst), T-03 (ehem. R-15b), T-09,
-> `features/infrastructure/08-tenant-brand-concept.md`,
+> `features/infrastructure/08-Org-brand-concept.md`,
 > `features/auth/01-roles-and-access.md`.
 > Erstellt 2026-06-29; Policy-Entscheidung (A-01) 2026-06-29.
 
@@ -49,8 +49,8 @@ This was evaluated and **rejected**. Reasons:
    role definitions in `features/auth/01-roles-and-access.md` already promise cross-system
    access (Photographer: "across the system"; Admin: "statistics for ALL galleries across the
    system"). Per-brand isolation would break their core workflows.
-2. **SaaS best practice:** Staff are trusted internal operators → cross-tenant by default.
-   External customer accounts → tenant-scoped. This is the standard multi-tenant pattern.
+2. **SaaS best practice:** Staff are trusted internal operators → cross-Org by default.
+   External customer accounts → Org-scoped. This is the standard multi-Org pattern.
 3. **Simplicity:** One rule — `brand != null` ⟺ external/client account, `brand == null`
    ⟺ staff. No per-role special cases.
 
@@ -90,10 +90,10 @@ Ein neuer pure-Logic-Hook (z. B. `frontend/src/logic/useBrandAccess.ts`) kapselt
 
 - Diese Isolation ist eine **Frontend-UX-Maßnahme** (verhindert, dass Kunden B2B-Funktionen
   sehen). Die **echte Daten-Isolation** muss zwingend im Backend erfolgen (API-Endpunkte
-  filtern nach Brand/Tenant) — das ist ein separates Thema und aus dem Frontend nicht allein
+  filtern nach Brand/Org) — das ist ein separates Thema und aus dem Frontend nicht allein
   lösbar.
 - Der UI-Begriff „Mandant" wird ggf. im Rahmen von T-01 angepasst (siehe
-  `08-tenant-brand-concept.md` §3).
+  `08-Org-brand-concept.md` §3).
 
 ## 6. Verifikation (später)
 

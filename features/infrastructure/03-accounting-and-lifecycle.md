@@ -12,6 +12,12 @@ status: active
 - **Number Sequencing:** A centralized, autonomous number range for the shop (`P-YYYY-NNNN`). Protected via pessimistic database locking (`lockForUpdate`).
 - **Payment Terms & Status:** Default payment term is 14 days. Orders have a trackable payment status (`open`, `overdue`, `paid`). Dunning (Mahnwesen) is handled manually by the admin based on these statuses.
 
+## 1b. Tax Handling (Kleinunternehmerregelung)
+- **tax_rate = null:** All `invoice_snapshots` store `tax_rate` as `null` (nullable decimal column). A null value means "no VAT applicable."
+- **No VAT display:** When `tax_rate` is null, PDF invoices show no tax line. The Kleinunternehmer legal notice is rendered in the PDF footer template.
+- **All prices are net:** `total_net` and `total_gross` are identical when `tax_rate` is null. The system does not compute or display VAT amounts.
+- **Scope:** Applies to all invoice types — shop orders (CheckoutService), manual invoices (InvoiceService), and contract invoices (ContractCloseService).
+
 ## 2. Collective Invoices (Sammelrechnung) vs. Direct Invoice
 - **Direct Invoice:** Standard users immediately receive an invoice with a generated number upon checkout.
 - **Collective Invoice (Future Scope):** Purchases by specific B2B tenants initially generate a "Delivery Note" (Lieferschein) as an order line item without a fiscal invoice number. The actual invoice number is only assigned when the collective invoice is generated at the end of the billing period (month/quarter).

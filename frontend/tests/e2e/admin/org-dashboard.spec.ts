@@ -7,7 +7,7 @@ import { MailpitHelper } from '../helpers/MailpitHelper';
 import { FormHelper } from '../helpers/FormHelper';
 import { UserDetailed } from '../../../src/logic/useUsers';
 
-test.describe('Tenant Management & Invoicing Workflow', () => {
+test.describe('Org Management & Invoicing Workflow', () => {
     let helper: E2ESessionHelper;
     let adminUser = { email: '', password: '', id: '' };
 
@@ -20,43 +20,43 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Flow AB & AE: Tenant Invite and Collective Invoice View', { tag: ['@feature:admin:tenant'] }, async ({ page, request }) => {
+    test('Flow AB & AE: Org Invite and Collective Invoice View', { tag: ['@feature:admin:Org'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
         const mailpit = new MailpitHelper(request);
         
-        const tenantName = `Tenant ${Math.random().toString(36).substring(2, 10)}`;
-        const guestEmail = `tenant-guest-${Math.random().toString(36).substring(2, 10)}@example.com`;
+        const orgName = `Org ${Math.random().toString(36).substring(2, 10)}`;
+        const guestEmail = `Org-guest-${Math.random().toString(36).substring(2, 10)}@example.com`;
 
         await auth.login(adminUser.email, adminUser.password);
         await sidebar.navigateTo('Organisationen');
 
         await page.getByRole('button', { name: '+ Neue Organisation' }).click();
         const form = new FormHelper(page, modal);
-        await form.fillTenantModal({ name: tenantName });
+        await form.fillOrgModal({ name: orgName });
         const resData = await modal.submitModal('Speichern');
-        if (resData?.tenant?.id) helper.trackTenant(resData.tenant.id);
+        if (resData?.org?.id) helper.trackOrg(resData.org.id);
 
-        await page.locator('.card-title', { hasText: tenantName }).click();
-        await expect(page.locator(`h1:has-text("${tenantName}")`)).toBeVisible();
+        await page.locator('.card-title', { hasText: orgName }).click();
+        await expect(page.locator(`h1:has-text("${orgName}")`)).toBeVisible();
 
         await page.getByRole('button', { name: '+ Einladen' }).click();
         await modal.activeModal.locator('input[type="email"]').fill(guestEmail);
         await modal.submitModal('Einladung Senden');
         await expect(page.locator('.toast')).toContainText('Einladung erfolgreich versendet');
         
-        const token = await mailpit.extractTenantInviteToken(guestEmail);
+        const token = await mailpit.extractOrgInviteToken(guestEmail);
         expect(token).toBeTruthy();
         
         await auth.logout();
 
-        const inviteLink = `/tenant-invite/${token}`;
+        const inviteLink = `/org-invite/${token}`;
         await page.goto(inviteLink);
         await expect(page.locator('h2:has-text("Einladung zu Organisation")')).toBeVisible();
         await page.getByRole('button', { name: 'Beitreten & Fortfahren' }).click();
         await expect(page.locator('h2:has-text("Account erstellen")')).toBeVisible();
-        await page.getByPlaceholder('z.B. Maria Muster').fill('Tenant Angestellter');
+        await page.getByPlaceholder('z.B. Maria Muster').fill('Org Angestellter');
         await page.locator('.card-body').locator('input[type="password"]').fill('SecurePass123!');
         await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
         await page.getByRole('button', { name: 'Account aktivieren & Beitreten' }).click();
@@ -66,7 +66,7 @@ test.describe('Tenant Management & Invoicing Workflow', () => {
 
         await auth.login(adminUser.email, adminUser.password);
         await sidebar.navigateTo('Organisationen');
-        await page.locator('.card-title', { hasText: tenantName }).click();
+        await page.locator('.card-title', { hasText: orgName }).click();
         
         const invBtn = page.getByRole('button', { name: 'Sammelrechnung erstellen' });
         await expect(invBtn).toBeVisible();

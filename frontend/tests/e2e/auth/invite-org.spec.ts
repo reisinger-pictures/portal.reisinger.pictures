@@ -25,16 +25,16 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
 
     async function createOrgAdmin(request: APIRequestContext, token: string) {
         const headers = { 'Accept': 'application/json', 'Cookie': token };
-        const tenantName = `E2E Tenant ${Math.random().toString(36).substring(2, 10)}`;
-        const tenantRes = await request.post('/api/management/tenants', {
-            data: { name: tenantName, invoice_frequency: 'immediate' },
+        const orgName = `E2E Org ${Math.random().toString(36).substring(2, 10)}`;
+        const tenantRes = await request.post('/api/management/orgs', {
+            data: { name: orgName, invoice_frequency: 'immediate' },
             headers
         });
-        if (!tenantRes.ok()) throw new Error(`Tenant creation failed: ${await tenantRes.text()}`);
+        if (!tenantRes.ok()) throw new Error(`Org creation failed: ${await tenantRes.text()}`);
         const tenantData = await tenantRes.json();
-        const tenantId = tenantData.tenant?.id;
-        if (!tenantId) throw new Error('Tenant ID missing');
-        helper.trackTenant(tenantId);
+        const orgId = tenantData.org?.id;
+        if (!orgId) throw new Error('Org ID missing');
+        helper.trackOrg(orgId);
 
         const uniqueId = Math.random().toString(36).substring(2, 10);
         const email = `e2e-org-admin-${uniqueId}@example.com`;
@@ -60,7 +60,7 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
             headers
         });
 
-        await request.put(`/api/management/tenants/${tenantId}/users`, {
+        await request.put(`/api/management/orgs/${orgId}/users`, {
             data: { user_ids: [userId] },
             headers
         });
@@ -75,11 +75,11 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
         });
         if (!resetRes.ok()) throw new Error(`Password reset failed: ${await resetRes.text()}`);
 
-        return { email, password, tenantName, tenantId, userId };
+        return { email, password, orgName, orgId, userId };
     }
 
     test('Org-Admin lädt User ein, User registriert sich und hat Org', { tag: ['@feature:auth:invite'] }, async ({ page, request }) => {
-        const { email, password, tenantId } = await createOrgAdmin(request, adminToken);
+        const { email, password, orgId } = await createOrgAdmin(request, adminToken);
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const mailpit = new MailpitHelper(request);
@@ -104,10 +104,10 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
 
         await auth.logout();
 
-        const inviteToken = await mailpit.extractTenantInviteToken(guestEmail);
+        const inviteToken = await mailpit.extractOrgInviteToken(guestEmail);
         expect(inviteToken).toBeTruthy();
 
-        await page.goto(`/tenant-invite/${inviteToken}`);
+        await page.goto(`/org-invite/${inviteToken}`);
         await expect(page.locator('h2:has-text("Einladung zu Organisation")')).toBeVisible({ timeout: 10000 });
         await page.getByRole('button', { name: 'Beitreten & Fortfahren' }).click();
         await expect(page.locator('h2:has-text("Account erstellen")')).toBeVisible();
@@ -129,7 +129,7 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
             helper.trackUser(invitedUser.id);
         }
 
-        const tenantRes = await request.get(`/api/management/tenants/${tenantId}`, {
+        const tenantRes = await request.get(`/api/management/orgs/${orgId}`, {
             headers: { 'Accept': 'application/json', 'Cookie': adminToken }
         });
         if (tenantRes.ok()) {

@@ -52,24 +52,24 @@ class AuthController extends Controller
             ]);
 
             $domain = explode('@', $validated['email'])[1] ?? null;
-            $tenant = $domain ? \App\Models\Tenant::where('domain', $domain)->first() : null;
+            $org = $domain ? \App\Models\Org::where('domain', $domain)->first() : null;
 
-            if ($tenant) {
-                // Brand check: tenant brand must match the current request brand
-                if ($tenant->brand !== null && $tenant->brand !== BrandRegistry::currentOrDefault()) {
+            if ($org) {
+                // Brand check: org brand must match the current request brand
+                if ($org->brand !== null && $org->brand !== BrandRegistry::currentOrDefault()) {
                     return response()->json(['error' => 'Registrierung für diese Domain ist auf diesem Portal nicht möglich.'], 403);
                 }
 
                 // Evaluate auto_join_policy
-                if ($tenant->auto_join_policy === \App\Enums\AutoJoinPolicy::REQUIRES_INVITE) {
+                if ($org->auto_join_policy === \App\Enums\AutoJoinPolicy::REQUIRES_INVITE) {
                     // No auto-join — user must be invited manually
                     // Still attach if there's a pending invite for this email
-                    $pendingInvite = \App\Models\TenantInvite::where('email', $validated['email'])
-                        ->where('tenant_id', $tenant->id)
+                    $pendingInvite = \App\Models\OrgInvite::where('email', $validated['email'])
+                        ->where('org_id', $org->id)
                         ->where('expires_at', '>', now())
                         ->first();
                     if ($pendingInvite) {
-                        $user->tenant_id = $tenant->id;
+                        $user->org_id = $org->id;
                         $user->save();
                         $pendingInvite->delete();
                     }
@@ -122,11 +122,6 @@ class AuthController extends Controller
             return response()->json(['error' => 'Der Link ist ungültig oder abgelaufen.'], 400);
         }
 
-        $user->password = Hash::make($request->password);
-        $user->save();
-        
-        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
-
         // U-01: Brand-Mismatch check — same as in login().
         if ($user->brand !== null && $user->brand !== BrandRegistry::currentOrDefault()) {
             return response()->json([
@@ -134,14 +129,19 @@ class AuthController extends Controller
             ], 403);
         }
 
+        $user->password = Hash::make($request->password);
+        $user->save();
+        
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
         // Deferred auto-join: after successful password reset (proves email ownership),
-        // re-lookup tenant by domain and apply immediate auto-join if configured.
+        // re-lookup org by domain and apply immediate auto-join if configured.
         $emailParts = explode('@', $user->email);
         $domain = $emailParts[1] ?? null;
-        $tenant = $domain ? \App\Models\Tenant::where('domain', $domain)->first() : null;
-        if ($tenant && $tenant->auto_join_policy === \App\Enums\AutoJoinPolicy::IMMEDIATE && !$user->tenant_id) {
-            // Assign role from tenant's default_role_id, fallback to client
-            $roleId = $tenant->default_role_id;
+        $org = $domain ? \App\Models\Org::where('domain', $domain)->first() : null;
+        if ($org && $org->auto_join_policy === \App\Enums\AutoJoinPolicy::IMMEDIATE && !$user->org_id && ($org->brand === null || $org->brand === BrandRegistry::currentOrDefault())) {
+            // Assign role from org's default_role_id, fallback to client
+            $roleId = $org->default_role_id;
             if (!$roleId) {
                 $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
                 throw_unless($clientRole, \RuntimeException::class, 'Critical: Default CLIENT role missing in database.');
@@ -151,15 +151,15 @@ class AuthController extends Controller
                 $user->roles()->attach($roleId);
             }
 
-            // Inherit flatrate settings from tenant
-            if ($tenant->default_flatrate_level) {
-                $user->flatrate_level = $tenant->default_flatrate_level;
+            // Inherit flatrate settings from org
+            if ($org->default_flatrate_level) {
+                $user->flatrate_level = $org->default_flatrate_level;
             }
-            if ($tenant->can_purchase_upgrades) {
+            if ($org->can_purchase_upgrades) {
                 $user->can_purchase_upgrades = true;
             }
 
-            $user->tenant_id = $tenant->id;
+            $user->org_id = $org->id;
             $user->save();
         }
 

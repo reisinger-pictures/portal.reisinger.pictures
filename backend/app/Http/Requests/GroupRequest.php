@@ -14,7 +14,6 @@ abstract class GroupRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => 'nullable|string|exists:tenants,id',
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'parent_id' => 'nullable|string|exists:gallery_groups,id',
@@ -23,6 +22,7 @@ abstract class GroupRequest extends FormRequest
             'is_editorial_only' => 'nullable|boolean',
             'is_hidden' => 'nullable|boolean',
             'restricted_photographers' => 'nullable|boolean',
+            'org_id' => ['nullable', 'exists:orgs,id'],
         ];
     }
 }

@@ -1,4 +1,4 @@
-import {Navigate, Route, Routes} from 'react-router-dom';
+import {Navigate, Route, Routes, useParams} from 'react-router-dom';
 import ErrorMessage from './ui/components/ErrorMessage';
 import {useAuth} from './logic/useAuth';
 import {usePermissions} from './logic/usePermissions';
@@ -16,14 +16,14 @@ const ResetPassword = lazy(() => import('./ui/ResetPassword'));
 const ProtectedDashboard = lazy(() => import('./ui/ProtectedDashboard'));
 const GalleryView = lazy(() => import('./ui/GalleryView'));
 const InviteView = lazy(() => import('./ui/InviteView'));
-const TenantInviteView = lazy(() => import('./ui/TenantInviteView'));
+const OrgInviteView = lazy(() => import('./ui/OrgInviteView'));
 import ContractJoinView from './ui/ContractJoinView';
 import ContractSignView from './ui/ContractSignView';
 const PhotoDetailView = lazy(() => import('./ui/PhotoDetailView'));
 const ManagementMetaGalleryView = lazy(() => import('./ui/management/ManagementMetaGalleryView'));
 const SearchView = lazy(() => import('./ui/SearchView'));
-const ManagementTenantsView = lazy(() => import('./ui/management/ManagementTenantsView'));
-const ManagementTenantDetailView = lazy(() => import('./ui/management/ManagementTenantDetailView'));
+const ManagementOrgsView = lazy(() => import('./ui/management/ManagementOrgsView'));
+const ManagementOrgDetailView = lazy(() => import('./ui/management/ManagementOrgDetailView'));
 const UserProfileView = lazy(() => import('./ui/UserProfileView'));
 const Privacy = lazy(() => import('./ui/Privacy'));
 const Impressum = lazy(() => import('./ui/Impressum'));
@@ -44,6 +44,11 @@ function ProtectedRoute({children, requiredFeature}: ProtectedRouteProps) {
 }
 
 const SuspenseFallback = () => <div className="flex h-screen items-center justify-center"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
+
+function TenantRedirect() {
+    const { id } = useParams<{ id: string }>();
+    return <Navigate to={`/orgs/${id}`} replace />;
+}
 
 interface GlobalSWRConfigProps { children: React.ReactNode }
 
@@ -90,7 +95,7 @@ export default function App() {
                             <Route path="/galleries/*" element={<ErrorBoundary><GalleryView/></ErrorBoundary>}/>
                             <Route path="/photos/:id" element={<ErrorBoundary><PhotoDetailView/></ErrorBoundary>}/>
                             <Route path="/invite/:token" element={<ErrorBoundary><InviteView/></ErrorBoundary>}/>
-                            <Route path="/tenant-invite/:token" element={<ErrorBoundary><TenantInviteView/></ErrorBoundary>}/>
+                            <Route path="/org-invite/:token" element={<ErrorBoundary><OrgInviteView/></ErrorBoundary>}/>
                             <Route path="/contracts/join/:token" element={<ErrorBoundary><ContractJoinView/></ErrorBoundary>}/>
                             <Route path="/contracts/sign/:token" element={<ErrorBoundary><ContractSignView/></ErrorBoundary>}/>
 
@@ -111,8 +116,10 @@ export default function App() {
                             <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/cart" element={<ProtectedRoute><ErrorBoundary><ClientCartView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/orders" element={<ProtectedRoute><ErrorBoundary><ClientOrdersView/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/tenants" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementTenantsView/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/tenants/:id" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementTenantDetailView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/orgs" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementOrgsView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/orgs/:id" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementOrgDetailView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/tenants" element={<Navigate to="/orgs" replace />}/>
+                            <Route path="/tenants/:id" element={<TenantRedirect />}/>
                             <Route path="/admin-orders" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-manual-invoice" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-manual-offer" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>

@@ -39,14 +39,14 @@ This directory serves as the single source of truth for all technical concepts, 
 * [04-payout-system.md](infrastructure/04-payout-system.md) - Weighted share pool model, deduplication and statements.
 * [05-watermark-refactoring.md](infrastructure/05-watermark-refactoring.md) - Auto-generation of watermark PNGs and SVG rasterization.
 * **Brand System** (Lesereihenfolge: 08 → 06 → 12 → 15 → 10 → 09 → 20):
-  * [08-tenant-brand-concept.md](infrastructure/08-tenant-brand-concept.md) - Tenant vs. Brand: Begriffsklärung.
+  * [08-Org-brand-concept.md](infrastructure/08-Org-brand-concept.md) - Org vs. Brand: Begriffsklärung.
   * [06-multi-domain-branding.md](infrastructure/06-multi-domain-branding.md) - Hostname-Erkennung, Tailwind-Theming, Assets pro Domain.
   * [12-brand-registry-and-settings-fixes.md](infrastructure/12-brand-registry-and-settings-fixes.md) - `BrandRegistry`-API: `fromHost()`, `current()`, `currentOrDefault()`.
   * [15-strict-user-brand-isolation.md](infrastructure/15-strict-user-brand-isolation.md) - Login-Enforcement: Brand-Mismatch-Rejection, Staff-Brand-Binding (U-01, U-02).
-  * [10-frontend-brand-tenant-isolation.md](infrastructure/10-frontend-brand-tenant-isolation.md) - Frontend: `useBrand`-Hook, Sidebar-Filterung, Route-Guards.
+  * [10-frontend-brand-Org-isolation.md](infrastructure/10-frontend-brand-Org-isolation.md) - Frontend: `useBrand`-Hook, Sidebar-Filterung, Route-Guards.
   * [09-brand-context-queue-cli.md](infrastructure/09-brand-context-queue-cli.md) - Brand-Kontext in Queue-Jobs und CLI-Commands.
   * [20-setting-resolver.md](infrastructure/20-setting-resolver.md) - Brand-gescopte Settings (Fallback-Chain).
-* [07-lightroom-multi-tenant-gap.md](infrastructure/07-lightroom-multi-tenant-gap.md) - Lightroom plugin single-tenant gap analysis.
+* [07-lightroom-multi-Org-gap.md](infrastructure/07-lightroom-multi-Org-gap.md) - Lightroom plugin single-Org gap analysis.
 * [11-brand-settings-separation.md](infrastructure/11-brand-settings-separation.md) - Symmetric brand-prefixed settings resolver.
 * [13-ftp-brand-isolation.md](infrastructure/13-ftp-brand-isolation.md) - FTP upload brand isolation and defense-in-depth.
 * [14-per-brand-catalog.md](infrastructure/14-per-brand-catalog.md) - Per-brand catalog, CRM, and settings isolation.

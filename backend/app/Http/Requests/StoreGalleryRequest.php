@@ -12,7 +12,6 @@ class StoreGalleryRequest extends GalleryRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => 'nullable|string|exists:tenants,id',
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'type' => 'required|in:selection,delivery',
@@ -25,6 +24,8 @@ class StoreGalleryRequest extends GalleryRequest
             'restricted_photographers' => 'nullable|boolean',
             'password' => 'nullable|string',
             'expires_at' => 'nullable|date',
+            'org_ids' => ['sometimes', 'array'],
+            'org_ids.*' => ['exists:orgs,id'],
             'allow_client_metadata_edit' => 'boolean',
             'apply_metadata_to_photos' => 'boolean',
             'default_title' => 'nullable|string',

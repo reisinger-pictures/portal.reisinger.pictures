@@ -188,6 +188,11 @@ class VolumeLicensingStrategy implements PricingStrategy
      *
      * Reads thresholds and prices from SettingResolver, falling back to hardcoded defaults.
      */
+    public function supportsCoupons(): bool
+    {
+        return true;
+    }
+
     private function resolveTierPrice(int $count): int
     {
         if ($count <= 0) {

@@ -22,7 +22,7 @@ interface SidebarProps {
 export default function Sidebar(props: SidebarProps) {
     const { logoSrc, portalName, impressumUrl, isSrp } = useBrand();
     const {user, logout} = useAuth();
-    const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isOrgAdmin, showTenantsSection } = usePermissions();
+    const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isOrgAdmin, showOrgsSection } = usePermissions();
     const navigate = useNavigate();
     const { itemCount } = useCart();
 
@@ -91,9 +91,9 @@ export default function Sidebar(props: SidebarProps) {
                         )}
 
                         <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Verwaltung</Trans></li>
-                        {(isAdmin || isOrgAdmin) && showTenantsSection && !isSrp && (
+                        {(isAdmin || isOrgAdmin) && showOrgsSection && !isSrp && (
                             <>
-                                <li><Link to="/tenants" className={props.currentView?.startsWith('tenants') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> <Trans>Organisationen</Trans></Link></li>
+                                <li><Link to="/orgs" className={props.currentView?.startsWith('orgs') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> <Trans>Organisationen</Trans></Link></li>
                                 <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {isOrgAdmin && !isAdmin ? <Trans>Mein Team</Trans> : <Trans>Benutzer & Rechte</Trans>}</Link></li>
                             </>
                         )}

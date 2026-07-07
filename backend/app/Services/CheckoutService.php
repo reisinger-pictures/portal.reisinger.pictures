@@ -9,6 +9,7 @@ use App\Services\CouponService;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\CustomMail;
 use App\Mail\InvoiceMail;
 
 class CheckoutService {
@@ -30,26 +31,59 @@ class CheckoutService {
         try {
             [$strategyItems, $isQuoteRequest] = $this->validateItems($request->items, $user);
 
-            $couponCode = $request->input('coupon_code');
-            $appliedCoupon = $this->resolveCoupon($couponCode, $request->items, $user);
+            $quoteToken = $request->input('quote_token');
 
-            $pricingResult = $this->strategy->calculateCart($strategyItems, $user, $couponCode);
-            $totalNetCents = $pricingResult['totalCents'];
-            $couponDiscountCents = (int) ($pricingResult['discountCents'] ?? 0);
-            $appliedCouponId = $pricingResult['couponId'] ?? null;
+            $appliedCoupon = null;
 
-            $lineItems = $this->buildLineItems($pricingResult, $request->items);
+            if ($quoteToken !== null) {
+                // Custom price path — price comes from verified token, NOT from request
+                $offerTokenService = app(\App\Services\OfferTokenService::class);
+                $tokenPayload = $offerTokenService->verify($quoteToken);
+                if ($tokenPayload === null) {
+                    throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                        response()->json(['error' => 'Angebot ist abgelaufen oder ungültig.'], 422)
+                    );
+                }
 
-            if ($totalNetCents <= 0 && !$isQuoteRequest) {
+                $totalNetCents = (int) $tokenPayload['price'];
+                $couponDiscountCents = 0;
+
+                $lineItems = $this->buildQuoteLineItems($tokenPayload);
+                $customConditions = $tokenPayload['rights_text'] ?? null;
+            } else {
+                // Normal pricing path
+                $couponCode = $request->input('coupon_code');
+                if ($this->strategy->supportsCoupons() && $couponCode !== null) {
+                    $appliedCoupon = $this->resolveCoupon($couponCode, $request->items, $user);
+                }
+
+                $pricingResult = $this->strategy->calculateCart($strategyItems, $user, $this->strategy->supportsCoupons() ? $couponCode : null);
+                $totalNetCents = $pricingResult['totalCents'];
+                $couponDiscountCents = (int) ($pricingResult['discountCents'] ?? 0);
+
+                $lineItems = $this->buildLineItems($pricingResult, $request->items);
+                $customConditions = null;
+            }
+
+            if ($totalNetCents <= 0 && !$isQuoteRequest && $quoteToken === null) {
                 return response()->json(['error' => 'Warenkorb hat keinen Wert.'], 400);
             }
 
-            $order = DB::transaction(function () use ($request, $user, $paymentMethod, $appliedCouponId, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems) {
+            $order = DB::transaction(function () use ($request, $user, $paymentMethod, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions) {
                 $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
+
+                $appliedCouponId = null;
+                if ($appliedCoupon !== null) {
+                    [$lockedCoupon, $couponError] = $this->couponService->lockAndRevalidateCoupon($appliedCoupon, $user->id);
+                    if ($lockedCoupon === null) {
+                        throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => $couponError], 422));
+                    }
+                    $appliedCouponId = $lockedCoupon->id;
+                }
 
                 $order = $this->createOrder($user, $totalNetCents, $isQuoteRequest, $paymentMethod, $appliedCouponId, $couponDiscountCents);
 
-                $this->createInvoiceSnapshot($order, $request, $user, $lineItems, $totalNetCents);
+                $this->createInvoiceSnapshot($order, $request, $user, $lineItems, $totalNetCents, $customConditions);
 
                 return $order;
             });
@@ -138,21 +172,17 @@ class CheckoutService {
             throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => 'Der Rabattcode ist nicht mehr gültig.'], 422));
         }
 
-        [$validCoupon, $couponError] = $this->couponService->lockAndRevalidateCoupon($validCoupon, $user->id);
-        if ($validCoupon === null) {
-            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => $couponError], 422));
-        }
-
         return $validCoupon;
     }
 
     private function buildLineItems(array $pricingResult, array $requestItems): array
     {
         $lineItems = [];
+        $requestItemsById = collect($requestItems)->keyBy('photoId')->toArray();
 
-        foreach ($pricingResult['items'] as $idx => $pricedItem) {
-            $item = $requestItems[$idx] ?? [];
+        foreach ($pricingResult['items'] as $pricedItem) {
             $photoId = $pricedItem['itemId'];
+            $item = $requestItemsById[$photoId] ?? [];
             $photo = Photo::find($photoId);
 
             $lineItems[] = [
@@ -196,8 +226,8 @@ class CheckoutService {
 
     private function createOrder($user, int $totalNetCents, bool $isQuoteRequest, string $paymentMethod, $appliedCouponId, int $couponDiscountCents): Order
     {
-        $tenant = $user->tenant;
-        $isLieferschein = $tenant && $tenant->invoice_frequency !== 'immediate';
+        $org = $user->org;
+        $isLieferschein = $org && $org->invoice_frequency !== 'immediate';
         $orderStatus = $isQuoteRequest ? 'pending' : ($isLieferschein ? 'delivery_note' : ($paymentMethod === 'invoice' ? 'invoice_created' : 'pending_payment'));
 
         $orderData = [
@@ -220,23 +250,54 @@ class CheckoutService {
         return Order::create($orderData);
     }
 
-    private function createInvoiceSnapshot(Order $order, $request, $user, array $lineItems, int $totalNetCents): InvoiceSnapshot
+    private function buildQuoteLineItems(array $tokenPayload): array
     {
-        $tenant = $user->tenant;
-        $isLieferschein = $tenant && $tenant->invoice_frequency !== 'immediate';
+        $photoIds = $tokenPayload['photos'] ?? [];
+        $totalPrice = (int) ($tokenPayload['price'] ?? 0);
+        $count = count($photoIds);
+        $perItemCents = $count > 0 ? (int) round($totalPrice / $count) : 0;
+
+        $lineItems = [];
+        foreach ($photoIds as $photoId) {
+            $photo = Photo::find($photoId);
+            $lineItems[] = [
+                'photoId' => $photoId,
+                'filename' => $photo ? ($photo->title ?: 'Bild ' . substr($photo->id, 0, 8)) : 'Unbekannt',
+                'tier' => 'original',
+                'useCaseId' => null,
+                'useCaseName' => 'Angebot (Festpreis)',
+                'modifierNames' => [],
+                'price' => $perItemCents,
+                'isQuote' => false,
+                'notes' => null,
+            ];
+        }
+        return $lineItems;
+    }
+
+    private function createInvoiceSnapshot(Order $order, $request, $user, array $lineItems, int $totalNetCents, null|string|array $customConditions = null): InvoiceSnapshot
+    {
+        $org = $user->org;
+        $isLieferschein = $org && $org->invoice_frequency !== 'immediate';
         $prefix = $isLieferschein ? 'L-' : 'P-';
         $invoiceNumber = \App\Models\InvoiceSequence::getNextInvoiceNumber($prefix);
+
+        $customerDetails = [
+            'name' => $request->billing_name, 'company' => $request->billing_company, 'street' => $request->billing_street,
+            'zip' => $request->billing_zip, 'city' => $request->billing_city, 'email' => $user->email,
+            'country' => 'Österreich', 'items' => $lineItems, 'quote_message' => $request->quote_message ?? null, 'terms' => [],
+        ];
+
+        if ($customConditions !== null) {
+            $customerDetails['custom_conditions'] = $customConditions;
+        }
 
         return InvoiceSnapshot::create([
             'order_id' => $order->id,
             'invoice_number' => $invoiceNumber,
             'brand' => $order->brand,
-            'customer_details' => [
-                'name' => $request->billing_name, 'company' => $request->billing_company, 'street' => $request->billing_street,
-                'zip' => $request->billing_zip, 'city' => $request->billing_city, 'email' => $user->email,
-                'country' => 'Österreich', 'items' => $lineItems, 'quote_message' => $request->quote_message ?? null, 'terms' => [],
-            ],
-            'total_net' => $totalNetCents, 'total_gross' => $totalNetCents, 'tax_rate' => 0.00,
+            'customer_details' => $customerDetails,
+            'total_net' => $totalNetCents, 'total_gross' => $totalNetCents, 'tax_rate' => null,
         ]);
     }
 
@@ -248,16 +309,22 @@ class CheckoutService {
             return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
         }
 
-        $tenant = $user->tenant;
-        $isLieferschein = $tenant && $tenant->invoice_frequency !== 'immediate';
+        $org = $user->org;
+        $isLieferschein = $org && $org->invoice_frequency !== 'immediate';
 
         if ($isLieferschein || $paymentMethod === 'invoice') {
             Mail::to($user->email)->queue(new InvoiceMail($order, $snapshot));
             return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
         }
 
-        $paymentResult = $this->stripePayment->createPaymentIntent((int) round($totalNetCents), $order->id, $user->email);
-        $order->update(['ip_address' => $request->ip(), 'stripe_payment_intent_id' => $paymentResult['id']]);
+        try {
+            $paymentResult = $this->stripePayment->createPaymentIntent((int) round($totalNetCents), $order->id, $user->email);
+            $order->update(['ip_address' => $request->ip(), 'stripe_payment_intent_id' => $paymentResult['id']]);
+        } catch (\Throwable $e) {
+            $order->update(['status' => 'cancelled']);
+            Mail::to(env('ACCOUNTING_EMAIL'))->queue(new CustomMail('Zahlungsfehler', 'Bestellung ' . $order->id . ' konnte nicht bezahlt werden: ' . $e->getMessage()));
+            return response()->json(['error' => 'Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.'], 502);
+        }
         return response()->json(['success' => true, 'requires_action' => true, 'client_secret' => $paymentResult['client_secret'], 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
     }
 }

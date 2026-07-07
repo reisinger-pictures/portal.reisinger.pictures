@@ -67,7 +67,7 @@ class SlugServiceTest extends TestCase
         $this->assertSame('existing', $slug);
     }
 
-    public function test_still_detects_collision_from_other_rows_when_ignoring_id()
+    public function test_returns_bare_slug_when_ignoring_own_id()
     {
         $gallery = Gallery::factory()->create(['slug' => 'collision']);
         Gallery::factory()->create(['slug' => 'collision-1']);
@@ -79,7 +79,16 @@ class SlugServiceTest extends TestCase
             (string) $gallery->id
         );
 
-        $this->assertSame('collision-1', $slug);
+        $this->assertSame('collision', $slug);
+    }
+
+    public function test_returns_bare_slug_when_free_even_if_numbered_variant_exists()
+    {
+        Gallery::factory()->create(['slug' => 'foo-1']);
+
+        $slug = $this->service->makeUnique('foo', 'galleries', 'slug');
+
+        $this->assertSame('foo', $slug);
     }
 
     public function test_handles_german_umlauts()

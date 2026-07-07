@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { GalleryGroup, FlatGroup, GalleryGroupExtraOpts } from '../../logic/useGalleries';
-import { Tenant } from '../../logic/useTenants';
+import { Org } from '../../logic/useOrgs';
 import { useUI } from './UIContext';
 import { useForm } from 'react-hook-form';
 import useSWR from 'swr';
@@ -21,7 +21,7 @@ const groupSchema = z.object({
     is_free_download: z.boolean().optional(),
     is_editorial_only: z.boolean().optional(),
     is_hidden: z.boolean().optional(),
-    tenant_id: z.string().optional()
+    org_id: z.string().optional()
 });
 type GroupFormValues = z.infer<typeof groupSchema>;
 
@@ -38,7 +38,7 @@ interface Props {
 
 export default function GalleryGroupModal({ isOpen, onClose, availableGroups, editingGroup, defaultParentId, onCreate, onUpdate, onDelete }: Props) {
     const { showToast, confirm } = useUI();
-    const { data: tenants, isLoading } = useSWR<Tenant[]>('/api/management/tenants', fetcher);
+    const { data: orgs, isLoading } = useSWR<Org[]>('/api/management/orgs', fetcher);
 
     const { register, handleSubmit, reset, setValue, formState: { isSubmitting, dirtyFields } } = useForm<GroupFormValues>({
         resolver: zodResolver(groupSchema),
@@ -49,7 +49,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         if (isOpen) {
             reset({
                 name: editingGroup?.name || '',
-                tenant_id: editingGroup?.tenant_id || '',
+                org_id: editingGroup?.org_id || '',
                 slug: editingGroup?.slug || '',
                 is_free_download: !!editingGroup?.is_free_download,
                 is_editorial_only: !!editingGroup?.is_editorial_only,
@@ -162,9 +162,9 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
             
             <div className="form-control w-full mb-4">
                 <label className="label"><span className="label-text font-bold"><Trans>Zugeordnete Organisation (Verschieben)</Trans></span></label>
-                <select {...register('tenant_id')} className="select select-bordered w-full">
+                <select {...register('org_id')} className="select select-bordered w-full">
                     <option value="">-- <Trans>Keine spezifische Organisation</Trans> --</option>
-                    {tenants?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {orgs?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
             </div>
 

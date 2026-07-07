@@ -16,33 +16,33 @@ test.describe('G6: Gallery Tree Organisation Filter', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Organisation filter hides groups assigned to other tenants', { tag: ['@feature:admin:tenant'] }, async ({ page, request }) => {
+    test('Organisation filter hides groups assigned to other tenants', { tag: ['@feature:admin:Org'] }, async ({ page, request }) => {
         const adminToken = helper.getAdminToken();
         const headers = { 'Accept': 'application/json', 'Cookie': adminToken };
 
-        const tenant1Name = `E2E Tenant 1 ${Math.random().toString(36).substring(2, 10)}`;
-        const tenant1Res = await request.post('/api/management/tenants', {
+        const tenant1Name = `E2E Org 1 ${Math.random().toString(36).substring(2, 10)}`;
+        const tenant1Res = await request.post('/api/management/orgs', {
             data: { name: tenant1Name, invoice_frequency: 'immediate' },
             headers
         });
         const tenant1 = await tenant1Res.json();
-        const tenant1Id = tenant1.tenant?.id;
-        if (!tenant1Id) throw new Error('Tenant 1 ID missing');
-        helper.trackTenant(tenant1Id);
+        const tenant1Id = tenant1.org?.id;
+        if (!tenant1Id) throw new Error('Org 1 ID missing');
+        helper.trackOrg(tenant1Id);
 
-        const tenant2Name = `E2E Tenant 2 ${Math.random().toString(36).substring(2, 10)}`;
-        const tenant2Res = await request.post('/api/management/tenants', {
+        const tenant2Name = `E2E Org 2 ${Math.random().toString(36).substring(2, 10)}`;
+        const tenant2Res = await request.post('/api/management/orgs', {
             data: { name: tenant2Name, invoice_frequency: 'immediate' },
             headers
         });
         const tenant2 = await tenant2Res.json();
-        const tenant2Id = tenant2.tenant?.id;
-        if (!tenant2Id) throw new Error('Tenant 2 ID missing');
-        helper.trackTenant(tenant2Id);
+        const tenant2Id = tenant2.org?.id;
+        if (!tenant2Id) throw new Error('Org 2 ID missing');
+        helper.trackOrg(tenant2Id);
 
         const group1Name = `E2E Group 1 ${Math.random().toString(36).substring(2, 10)}`;
         const group1Res = await request.post('/api/management/gallery-groups', {
-            data: { name: group1Name, tenant_id: tenant1Id },
+            data: { name: group1Name, org_id: tenant1Id },
             headers
         });
         const group1Data = await group1Res.json();
@@ -51,7 +51,7 @@ test.describe('G6: Gallery Tree Organisation Filter', () => {
 
         const group2Name = `E2E Group 2 ${Math.random().toString(36).substring(2, 10)}`;
         const group2Res = await request.post('/api/management/gallery-groups', {
-            data: { name: group2Name, tenant_id: tenant2Id },
+            data: { name: group2Name, org_id: tenant2Id },
             headers
         });
         const group2Data = await group2Res.json();
@@ -72,6 +72,8 @@ test.describe('G6: Gallery Tree Organisation Filter', () => {
         const filterSelect = main.locator('select').first();
         await expect(filterSelect.locator(`option[value="${tenant1Id}"]`)).toBeAttached({ timeout: 10000 });
         await filterSelect.selectOption(tenant1Id);
+        // Wait for URL to reflect the filter param before checking visibility
+        await expect(page).toHaveURL(/org_id/);
 
         await expect(main.locator('summary').filter({ hasText: group1Name })).toBeVisible({ timeout: 10000 });
         await expect(main.locator('summary').filter({ hasText: group2Name })).toHaveCount(0);

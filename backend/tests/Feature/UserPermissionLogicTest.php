@@ -8,7 +8,7 @@ use App\Models\GalleryGroup;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\Role;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -156,16 +156,16 @@ class UserPermissionLogicTest extends TestCase
     }
 
     // =====================================================================
-    // 1d. getAllowedGalleryIds() — Tenant-Zuweisungen (nur type=delivery)
+    // 1d. getAllowedGalleryIds() — Org-Zuweisungen (nur type=delivery)
     // =====================================================================
 
-    public function test_get_allowed_gallery_ids_tenant_includes_only_delivery_galleries(): void
+    public function test_get_allowed_gallery_ids_org_includes_only_delivery_galleries(): void
     {
         $user = User::factory()->create();
-        $tenant = Tenant::factory()->create();
+        $org = Org::factory()->create();
         $group = GalleryGroup::factory()->create();
-        $tenant->galleryGroups()->attach($group->id);
-        $user->tenant_id = $tenant->id;
+        $org->galleryGroups()->attach($group->id);
+        $user->org_id = $org->id;
         $user->save();
 
         $deliveryGallery = Gallery::factory()->create([
@@ -183,13 +183,13 @@ class UserPermissionLogicTest extends TestCase
         $this->assertNotContains($selectionGallery->id, $result);
     }
 
-    public function test_get_allowed_gallery_ids_tenant_excludes_non_delivery_galleries_completely(): void
+    public function test_get_allowed_gallery_ids_org_excludes_non_delivery_galleries_completely(): void
     {
         $user = User::factory()->create();
-        $tenant = Tenant::factory()->create();
+        $org = Org::factory()->create();
         $group = GalleryGroup::factory()->create();
-        $tenant->galleryGroups()->attach($group->id);
-        $user->tenant_id = $tenant->id;
+        $org->galleryGroups()->attach($group->id);
+        $user->org_id = $org->id;
         $user->save();
 
         // Nur selection-Galerie — darf NICHT auftauchen
@@ -908,8 +908,8 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_is_org_admin_attribute_returns_true_for_role(): void
     {
-        $tenant = \App\Models\Tenant::factory()->create();
-        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        $org = \App\Models\Org::factory()->create();
+        $user = User::factory()->create(['org_id' => $org->id]);
         $this->assignRole($user, UserRole::ORG_ADMIN);
 
         $this->assertTrue($user->is_org_admin);

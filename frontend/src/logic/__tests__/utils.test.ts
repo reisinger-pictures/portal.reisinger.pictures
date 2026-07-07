@@ -9,6 +9,7 @@ import {
     isEmpty,
     safeJsonParse,
     GalleryGroup,
+    calcAge,
 } from '../utils';
 
 describe('formatMoney', () => {
@@ -215,5 +216,31 @@ describe('safeJsonParse', () => {
     it('preserves the fallback type', () => {
         expect(safeJsonParse('x', 42)).toBe(42);
         expect(safeJsonParse('x', {default: true})).toEqual({default: true});
+    });
+});
+
+describe('calcAge', () => {
+    it('born 2010-12-31, reference 2026-01-01 → 15 (birthday not yet occurred)', () => {
+        expect(calcAge(new Date('2010-12-31'), new Date('2026-01-01'))).toBe(15);
+    });
+
+    it('born 2000-06-15, reference 2025-06-15 → 25 (exact birthday)', () => {
+        expect(calcAge(new Date('2000-06-15'), new Date('2025-06-15'))).toBe(25);
+    });
+
+    it('born 2000-06-15, reference 2025-06-14 → 24 (day before birthday)', () => {
+        expect(calcAge(new Date('2000-06-15'), new Date('2025-06-14'))).toBe(24);
+    });
+
+    it('born 1990-03-01, reference 2025-02-28 → 34 (month before birthday)', () => {
+        expect(calcAge(new Date('1990-03-01'), new Date('2025-02-28'))).toBe(34);
+    });
+
+    it('born 2000-01-01, reference 2000-01-01 → 0 (same day)', () => {
+        expect(calcAge(new Date('2000-01-01'), new Date('2000-01-01'))).toBe(0);
+    });
+
+    it('born 2000-01-01, reference 2000-12-31 → 0 (first year, not yet birthday)', () => {
+        expect(calcAge(new Date('2000-01-01'), new Date('2000-12-31'))).toBe(0);
     });
 });

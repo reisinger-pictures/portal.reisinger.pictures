@@ -12,14 +12,14 @@ Orders track the following states, enforced by `Order::booted()`:
 |---|---|---|
 | `pending` | Quote request — no payment expected | Checkout with `is_quote_request=true` |
 | `invoice_created` | Payment via invoice (B2B) | Checkout with `payment_method=invoice` |
-| `delivery_note` | Collective invoice tenant — no immediate payment | Checkout with tenant `invoice_frequency !== immediate` |
+| `delivery_note` | Collective invoice Org — no immediate payment | Checkout with Org `invoice_frequency !== immediate` |
 | `pending_payment` | Stripe PaymentIntent created, awaiting confirmation | Checkout via Stripe |
 | `paid` | Payment confirmed | Webhook `payment_intent.succeeded` |
 | `overdue` | Invoice payment overdue | Manual admin action |
 | `cancelled` | Order cancelled by admin (also set when a quote is superseded) | Admin `updateStatus` or `sendQuote` |
 | `disputed` | Chargeback initiated | Webhook `charge.dispute.created` |
 | `refunded` | Full refund processed | Webhook `charge.refunded` |
-| `archived_in_collective` | Consolidated into a collective invoice | Tenant collective invoice generation |
+| `archived_in_collective` | Consolidated into a collective invoice | Org collective invoice generation |
 
 ### 1.1 State Transitions
 
@@ -27,7 +27,7 @@ Orders track the following states, enforced by `Order::booted()`:
 cart → [payment_method=stripe]  → pending_payment → paid
      → [payment_method=invoice] → invoice_created  → paid (manual)
      → [is_quote_request]       → pending          → cancelled (when admin sends quote link)
-     → [delivery_note tenant]   → delivery_note    → archived_in_collective
+     → [delivery_note Org]   → delivery_note    → archived_in_collective
 
 paid → disputed → refunded
 paid → refunded (direct)
@@ -142,4 +142,4 @@ If `fee` is 0, a warning is logged. The fee is stored in `orders.stripe_fee_cent
 
 - **Quote requests** (`is_quote_request=true`): Status `pending`. Photographer sets custom price in backend, generates a JWT-based quote link (see `features/infrastructure/18-jwt-offer-tokens.md`). Client opens link, cart is restored, checkout proceeds with the locked price.
 - **Invoice (B2B):** Status `invoice_created`. PDF invoice sent immediately. Payment collected offline (bank transfer). Admin marks as `paid` manually.
-- **Delivery notes (collective invoice tenant):** Status `delivery_note`. Orders are consolidated into a monthly collective invoice. Individual orders are marked `archived_in_collective`.
+- **Delivery notes (collective invoice Org):** Status `delivery_note`. Orders are consolidated into a monthly collective invoice. Individual orders are marked `archived_in_collective`.

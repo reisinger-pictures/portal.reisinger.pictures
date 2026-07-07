@@ -3,7 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Coupon;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Support\BrandRegistry;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -77,9 +77,9 @@ class CouponUpdateRequest extends FormRequest
             }
 
             if (($data['scope_type'] ?? null) === 'organisation') {
-                $tenantExists = Tenant::where('id', $data['scope_id'] ?? '')->where('brand', $brandValue)->exists();
-                if (!$tenantExists) {
-                    $validator->errors()->add('scope_id', 'Tenant not found for this brand.');
+                $orgExists = Org::where('id', $data['scope_id'] ?? '')->where('brand', $brandValue)->exists();
+                if (!$orgExists) {
+                    $validator->errors()->add('scope_id', 'Org not found for this brand.');
                 }
             }
         });

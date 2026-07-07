@@ -27,4 +27,4 @@ status: active
 
 ## Related
 - [Roles & Access Management](../auth/01-roles-and-access.md) — role-based access model that magic links complement
-- [Roles & Access Management (Single Tenant)](../auth/03-roles-and-rbac.md) — enterprise RBAC alignment with transient access
+- [Roles & Access Management (Single Org)](../auth/03-roles-and-rbac.md) — enterprise RBAC alignment with transient access

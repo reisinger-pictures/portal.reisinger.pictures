@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import { MemoryRouter } from 'react-router-dom';
@@ -164,7 +164,7 @@ describe('ManagementGalleryView', () => {
             isSuperAdmin: false,
             isPhotographer: true,
             isOrgAdmin: false,
-            showTenantsSection: false,
+            showOrgsSection: false,
             canEditMetadata: true,
             isPowerUser: false,
             canAccessB2BFeatures: false,

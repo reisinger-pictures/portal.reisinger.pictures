@@ -5,7 +5,7 @@ export class E2ESessionHelper {
     private createdUserIds: string[] = [];
     private createdGalleryIds: string[] = [];
     private createdGroupIds: string[] = [];
-    private createdTenantIds: string[] = [];
+    private createdOrgIds: string[] = [];
     private createdCustomerIds: string[] = [];
     private createdSnippetIds: string[] = [];
     private createdProductIds: string[] = [];
@@ -104,7 +104,7 @@ export class E2ESessionHelper {
     trackUser(id: string) { if (id) this.createdUserIds.push(id); }
     trackGallery(id: string) { if (id) this.createdGalleryIds.push(id); }
     trackGroup(id: string) { if (id) this.createdGroupIds.push(id); }
-    trackTenant(id: string) { if (id) this.createdTenantIds.push(id); }
+    trackOrg(id: string) { if (id) this.createdOrgIds.push(id); }
     trackCustomer(id: string) { if (id) this.createdCustomerIds.push(id); }
     trackSnippet(id: string) { if (id) this.createdSnippetIds.push(id); }
     trackProduct(id: string) { if (id) this.createdProductIds.push(id); }
@@ -161,7 +161,7 @@ export class E2ESessionHelper {
         await this.deleteResources(this.createdGalleryIds, '/api/management/galleries', 'gallery');
         await this.deleteResources(this.createdGroupIds, '/api/management/gallery-groups', 'gallery-group');
         await this.deleteResources(this.createdUserIds, '/api/test/cleanup-user', 'user');
-        await this.deleteResources(this.createdTenantIds, '/api/management/tenants', 'tenant');
+        await this.deleteResources(this.createdOrgIds, '/api/management/orgs', 'Org');
         await this.deleteResources(this.createdCustomerIds, '/api/management/customers', 'customer');
         await this.deleteResources(this.createdSnippetIds, '/api/management/text-snippets', 'text-snippet');
         await this.deleteResources(this.createdProductIds, '/api/management/products', 'product');

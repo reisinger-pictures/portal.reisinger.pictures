@@ -13,7 +13,7 @@ status: active
 
 ## 2. Role System
 Roles are strictly separated.
-- **Super Admin (`is_super_admin`):** Highest privilege level. Can manage billing details, system settings, payouts, watermark SVG, license catalog, and tenant-wide configurations. Has implicit access to all galleries and resources without explicit permission checks. Used in `infrastructure/10-frontend-brand-tenant-isolation.md` for tenant-unrestricted access.
+- **Super Admin (`is_super_admin`):** Highest privilege level. Can manage billing details, system settings, payouts, watermark SVG, license catalog, and Org-wide configurations. Has implicit access to all galleries and resources without explicit permission checks. Used in `infrastructure/10-frontend-brand-Org-isolation.md` for Org-unrestricted access.
 - **Admin (`is_admin`):** Broad management access. Manages users, roles, and global settings (watermark). Can view statistics for ALL galleries across the system. Does **not** have implicit super-user access to private galleries or files.
 - **Photographer (`is_photographer`):** Operational user. Can create/edit/delete galleries, upload photos, manage metadata, send invites, and view statistics ONLY for their *own* galleries or when they are added to a specific gallery.
 - **Client (`is_client`):** Standard registered user. Has explicit access to specific galleries. 
@@ -35,6 +35,6 @@ Roles are strictly separated.
 
 ## Related
 - [Magic Links & Invites](../auth/02-magic-links.md) — transient access for guests overriding role model
-- [Roles & Access Management (Single Tenant)](../auth/03-roles-and-rbac.md) — enterprise RBAC evolution of the role system
+- [Roles & Access Management (Single Org)](../auth/03-roles-and-rbac.md) — enterprise RBAC evolution of the role system
 - [Audit Logs & GDPR](../delivery/02-audit-logs.md) — access logging and data minimization
-- [Frontend Brand & Tenant Isolation](../infrastructure/10-frontend-brand-tenant-isolation.md) — Super Admin tenant-unrestricted access
+- [Frontend Brand & Org Isolation](../infrastructure/10-frontend-brand-Org-isolation.md) — Super Admin Org-unrestricted access

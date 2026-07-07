@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\User;
 use App\Models\Order;
 use App\Models\InvoiceSnapshot;
@@ -24,9 +24,9 @@ class CollectiveInvoiceCronTest extends TestCase
 
     public function test_cron_generates_collective_invoices_at_end_of_month_with_pdf()
     {
-        $tenant = Tenant::create(['name' => 'Test Tenant', 'invoice_frequency' => 'monthly']);
+        $org = Org::create(['name' => 'Test Org', 'invoice_frequency' => 'monthly']);
         $user = User::factory()->create(['email' => 'tenant-accounting@example.com']);
-        $user->tenant_id = $tenant->id;
+        $user->org_id = $org->id;
         $user->save();
 
         $order = Order::create([

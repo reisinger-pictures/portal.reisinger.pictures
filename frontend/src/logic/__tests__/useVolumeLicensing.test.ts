@@ -126,14 +126,31 @@ describe('calculateVolumeTotal', () => {
         expect(calculateVolumeTotal(items, customConfig)).toBe(5 * 1000);
     });
 
-    it('includes quote items in count for volume tier calculation', () => {
-        // 2 normal + 1 quote = 3 items → tier 1 (3000 each)
+    it('excludes quote items from count for volume tier calculation', () => {
+        // 2 normal + 1 quote = 2 non-quote items → tier 1 (3000 each)
         const items = [
             {price: 1000, isQuote: false},
             {price: 1500, isQuote: false},
             {price: 0, isQuote: true},
         ];
-        // Retroactive: all 3 items at 3000 = 9000
-        expect(calculateVolumeTotal(items)).toBe(3 * 3000);
+        // Only non-quote items count: 2 × 3000 = 6000
+        expect(calculateVolumeTotal(items)).toBe(2 * 3000);
+    });
+
+    it('5 non-quote + 3 quote → tier based on 5, total = 5 × tierPrice (not 8 ×)', () => {
+        const items = [
+            {price: 1000, isQuote: false},
+            {price: 1000, isQuote: false},
+            {price: 1000, isQuote: false},
+            {price: 1000, isQuote: false},
+            {price: 1000, isQuote: false},
+            {price: 0, isQuote: true},
+            {price: 0, isQuote: true},
+            {price: 0, isQuote: true},
+        ];
+        // 5 non-quote items → tier 1 (3000 each), total = 5 × 3000 = 15000
+        // If quotes were counted: 8 × 3000 = 24000
+        expect(calculateVolumeTotal(items)).toBe(5 * 3000);
+        expect(calculateVolumeTotal(items)).not.toBe(8 * 3000);
     });
 });

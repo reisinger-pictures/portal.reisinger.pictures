@@ -26,8 +26,8 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StatsController;
-use App\Http\Controllers\TenantController;
-use App\Http\Controllers\TenantInviteController;
+use App\Http\Controllers\OrgController;
+use App\Http\Controllers\OrgInviteController;
 use App\Http\Controllers\TextSnippetController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WebhookController;
@@ -81,7 +81,7 @@ Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries'])->n
 Route::get('/sitemap-images.xml', [SitemapController::class, 'images'])->name('api.sitemap.images');
 
 Route::get('/invites/{token}', [InviteController::class, 'check'])->name('api.invites.check');
-Route::get('/tenant-invites/{token}', [TenantInviteController::class, 'check'])->name('api.tenant-invites.check');
+Route::get('/org-invites/{token}', [OrgInviteController::class, 'check'])->name('api.org-invites.check');
 
 Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check'])->name('api.contracts.join.check');
 Route::post('/contracts/join/{token}', [ContractJoinController::class, 'join'])->name('api.contracts.join.join');
@@ -89,7 +89,7 @@ Route::get('/contracts/sign/{personalToken}', [ContractJoinController::class, 'c
 Route::post('/contracts/sign/{personalToken}', [ContractJoinController::class, 'sign'])->name('api.contracts.sign.sign');
 Route::middleware('throttle:60,1')->post('/contracts/sign/{personalToken}/page-exit', [ContractJoinController::class, 'pageExit'])->name('api.contracts.sign.page-exit');
 Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem'])->name('api.invites.redeem');
-Route::middleware("throttle:$throttleLimit,1")->post('/tenant-invites/redeem', [TenantInviteController::class, 'redeem'])->name('api.tenant-invites.redeem');
+Route::middleware("throttle:$throttleLimit,1")->post('/org-invites/redeem', [OrgInviteController::class, 'redeem'])->name('api.org-invites.redeem');
 
 Route::get('/search', [SearchController::class, 'search'])->name('api.search');
 Route::get('/search/locations', [SearchController::class, 'locations'])->name('api.search.locations');
@@ -203,15 +203,15 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/ftp/process', [FtpController::class, 'process'])->name('api.management.ftp.process');
 
 
-    Route::get('/management/tenants', [TenantController::class, 'index'])->name('api.management.tenants.index');
-    Route::post('/management/tenants', [TenantController::class, 'store'])->name('api.management.tenants.store');
-    Route::get('/management/tenants/{id}', [TenantController::class, 'show'])->name('api.management.tenants.show');
-    Route::post('/management/tenants/{id}/invites', [TenantInviteController::class, 'invite'])->name('api.management.tenants.invites');
-    Route::put('/management/tenants/{id}', [TenantController::class, 'update'])->name('api.management.tenants.update');
-    Route::delete('/management/tenants/{id}', [TenantController::class, 'destroy'])->name('api.management.tenants.destroy');
-    Route::post('/management/tenants/{id}/collective-invoice', [TenantController::class, 'generateCollectiveInvoice'])->name('api.management.tenants.collective-invoice');
-    Route::put('/management/tenants/{id}/users', [TenantController::class, 'syncUsers'])->name('api.management.tenants.sync-users');
-    Route::put('/management/tenants/{id}/groups', [TenantController::class, 'syncGroups'])->name('api.management.tenants.sync-groups');
+    Route::get('/management/orgs', [OrgController::class, 'index'])->name('api.management.orgs.index');
+    Route::post('/management/orgs', [OrgController::class, 'store'])->name('api.management.orgs.store');
+    Route::get('/management/orgs/{id}', [OrgController::class, 'show'])->name('api.management.orgs.show');
+    Route::post('/management/orgs/{id}/invites', [OrgInviteController::class, 'invite'])->name('api.management.orgs.invites');
+    Route::put('/management/orgs/{id}', [OrgController::class, 'update'])->name('api.management.orgs.update');
+    Route::delete('/management/orgs/{id}', [OrgController::class, 'destroy'])->name('api.management.orgs.destroy');
+    Route::post('/management/orgs/{id}/collective-invoice', [OrgController::class, 'generateCollectiveInvoice'])->name('api.management.orgs.collective-invoice');
+    Route::put('/management/orgs/{id}/users', [OrgController::class, 'syncUsers'])->name('api.management.orgs.sync-users');
+    Route::put('/management/orgs/{id}/groups', [OrgController::class, 'syncGroups'])->name('api.management.orgs.sync-groups');
 
     Route::get('/management/orders', [OrderController::class, 'indexAdmin'])->name('api.management.orders.index');
     Route::put('/management/orders/{id}/status', [OrderController::class, 'updateStatus'])->name('api.management.orders.status');

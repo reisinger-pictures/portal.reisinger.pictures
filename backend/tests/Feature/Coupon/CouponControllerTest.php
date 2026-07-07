@@ -10,7 +10,7 @@ use App\Models\CouponUserUsage;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Role;
-use App\Models\Tenant;
+use App\Models\Org;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -413,7 +413,7 @@ class CouponControllerTest extends TestCase
 
     public function test_create_coupon_with_organisation_scope(): void
     {
-        $tenant = Tenant::factory()->create(['brand' => Brand::SRP]);
+        $org = Org::factory()->create(['brand' => Brand::SRP]);
 
         $response = $this->withHeaders($this->authHeaders())
             ->postJson('/api/management/coupons', [
@@ -421,7 +421,7 @@ class CouponControllerTest extends TestCase
                 'type' => 'percentage',
                 'value' => 10,
                 'scope_type' => 'organisation',
-                'scope_id' => $tenant->id,
+                'scope_id' => $org->id,
                 'active' => true,
             ]);
 
@@ -430,11 +430,11 @@ class CouponControllerTest extends TestCase
         $this->assertDatabaseHas('coupons', [
             'code' => 'ORGCREATE',
             'scope_type' => 'organisation',
-            'scope_id' => $tenant->id,
+            'scope_id' => $org->id,
         ]);
     }
 
-    public function test_create_coupon_organisation_scope_invalid_tenant(): void
+    public function test_create_coupon_organisation_scope_invalid_org(): void
     {
         $response = $this->withHeaders($this->authHeaders())
             ->postJson('/api/management/coupons', [

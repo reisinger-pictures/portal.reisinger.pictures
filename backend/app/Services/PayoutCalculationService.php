@@ -96,10 +96,19 @@ class PayoutCalculationService
             $earnings = (int) bcmul($shares, (string)$pool->value_per_share_cents, 0);
             $earnings = (int) bcdiv(bcmul((string)$earnings, (string)$pool->photographer_share_percent, 0), '100', 0);
 
+            $existingLocked = PhotographerStatement::where('user_id', $photogId)
+                ->where('month', $pool->month)
+                ->where('year', $pool->year)
+                ->whereIn('status', ['approved', 'paid'])
+                ->first();
+            if ($existingLocked) {
+                continue;
+            }
+
             $stmt = PhotographerStatement::firstOrNew([
                 'user_id' => $photogId, 'month' => $pool->month, 'year' => $pool->year
             ]);
-            
+
             $stmt->total_shares_earned = bcadd((string)($stmt->total_shares_earned ?? '0.0000'), $shares, 4);
             $stmt->pool_earnings_cents = ($stmt->pool_earnings_cents ?? 0) + $earnings;
             $stmt->save();
@@ -154,6 +163,15 @@ class PayoutCalculationService
                 
                 // Fotografen-Anteil: 50% vom Netto-Aufpreis (exakt ueber bcmath)
                 $photogShareCents = (int) bcmul((string)$netCents, '0.50', 0);
+
+                $existingLocked = PhotographerStatement::where('user_id', $photo->user_id)
+                    ->where('month', $month)
+                    ->where('year', $year)
+                    ->whereIn('status', ['approved', 'paid'])
+                    ->first();
+                if ($existingLocked) {
+                    continue;
+                }
 
                 $stmt = PhotographerStatement::firstOrNew([
                     'user_id' => $photo->user_id, 'month' => $month, 'year' => $year

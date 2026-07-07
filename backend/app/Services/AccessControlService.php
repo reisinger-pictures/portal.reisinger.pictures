@@ -12,7 +12,7 @@ class AccessControlService
 {
     /**
      * Get all gallery IDs a user is allowed to access.
-     * Includes direct assignments, group assignments (recursive), tenant integration,
+     * Includes direct assignments, group assignments (recursive), org integration,
      * photographer-specific access, transient galleries, and brand scoping.
      *
      * @return array<string>
@@ -35,20 +35,19 @@ class AccessControlService
             $galleryIds = array_unique(array_merge($galleryIds, $groupGalleryIds));
         }
 
-        // 3. Tenant Integration (Direct column + pivot group assignments)
-        if ($user->tenant_id) {
-            $tenantGalleryIds = Gallery::where('tenant_id', $user->tenant_id)->where('type', 'delivery')->pluck('id')->toArray();
-            $directGroupIds = GalleryGroup::where('tenant_id', $user->tenant_id)->pluck('id')->toArray();
-            $pivotGroupIds = DB::table('gallery_group_tenant')->where('tenant_id', $user->tenant_id)->pluck('gallery_group_id')->toArray();
+        // 3. Org Integration (pivot group assignments)
+        if ($user->org_id) {
+            $orgGalleryIds = Gallery::whereHas('orgs', fn($q) => $q->where('orgs.id', $user->org_id))->where('type', 'delivery')->pluck('id')->toArray();
+            $pivotGroupIds = DB::table('gallery_group_org')->where('org_id', $user->org_id)->pluck('gallery_group_id')->toArray();
 
-            $combinedGroupIds = array_unique(array_merge($directGroupIds, $pivotGroupIds));
-            $allTenantGroupIds = $this->getSubGroupIds($combinedGroupIds);
+            $combinedGroupIds = $pivotGroupIds;
+            $allOrgGroupIds = $this->getSubGroupIds($combinedGroupIds);
 
-            if (!empty($allTenantGroupIds)) {
-                $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allTenantGroupIds)->where('type', 'delivery')->pluck('id')->toArray();
-                $tenantGalleryIds = array_unique(array_merge($tenantGalleryIds, $groupGalleryIds));
+            if (!empty($allOrgGroupIds)) {
+                $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allOrgGroupIds)->where('type', 'delivery')->pluck('id')->toArray();
+                $orgGalleryIds = array_unique(array_merge($orgGalleryIds, $groupGalleryIds));
             }
-            $galleryIds = array_unique(array_merge($galleryIds, $tenantGalleryIds));
+            $galleryIds = array_unique(array_merge($galleryIds, $orgGalleryIds));
         }
 
         if (!empty($user->transient_galleries)) {
@@ -76,7 +75,7 @@ class AccessControlService
         $galleryIds = array_values(array_unique($galleryIds));
 
         // Brand scoping: brand-bound users (brand != null) see only galleries of their own brand.
-        // Cross-brand users (brand = null, e.g. Super-Admin) see all brands. Guest/tenant gallery
+        // Cross-brand users (brand = null, e.g. Super-Admin) see all brands. Guest/org gallery
         // assignments are also filtered so an SRP user can never reach a B2B gallery via stale links.
         if ($user->brand !== null) {
             $galleryIds = Gallery::whereIn('id', $galleryIds)

@@ -11,7 +11,7 @@
                 </td></tr>
                 <tr><td style="padding: 20px 30px 30px 30px;">
                     <h2 style="color: #2A9D8F; margin-top: 0;">Einladung zu Organisation</h2>
-                    <p style="color: #333333; line-height: 1.6; margin-bottom: 16px;">Du wurdest eingeladen, der Organisation <b>{{ $tenantName }}</b> auf dem Reisinger Foto Portal beizutreten.</p>
+                    <p style="color: #333333; line-height: 1.6; margin-bottom: 16px;">Du wurdest eingeladen, der Organisation <b>{{ $orgName }}</b> auf dem Reisinger Foto Portal beizutreten.</p>
                     <p style="color: #555555; line-height: 1.5; margin-bottom: 20px; font-size: 14px;">
                         Als Mitglied dieser Organisation erhältst du Zugriff auf freigeschaltete Galerien. Org-Administratoren können deine Bestellungen einsehen.
                     </p>

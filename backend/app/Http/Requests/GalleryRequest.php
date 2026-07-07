@@ -9,7 +9,6 @@ abstract class GalleryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => 'nullable|string|exists:tenants,id',
             'name' => 'nullable|string|max:255',
             'slug' => 'nullable|string|max:255',
             'type' => 'nullable|in:selection,delivery',
@@ -22,6 +21,8 @@ abstract class GalleryRequest extends FormRequest
             'restricted_photographers' => 'nullable|boolean',
             'password' => 'nullable|string',
             'expires_at' => 'nullable|date',
+            'org_ids' => ['sometimes', 'array'],
+            'org_ids.*' => ['exists:orgs,id'],
             'allow_client_metadata_edit' => 'nullable|boolean',
             'apply_metadata_to_photos' => 'nullable|boolean',
             'default_title' => 'nullable|string',

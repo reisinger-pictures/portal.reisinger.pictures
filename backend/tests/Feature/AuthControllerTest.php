@@ -2,7 +2,10 @@
 namespace Tests\Feature;
 use Tests\TestCase;
 use App\Models\User;
+use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Tests\Support\MailpitAssertions;
 
 class AuthControllerTest extends TestCase {
@@ -60,5 +63,34 @@ class AuthControllerTest extends TestCase {
         $token = auth('api')->login($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/auth/me');
         $response->assertStatus(200)->assertJsonPath('email', $user->email);
+    }
+
+    public function test_password_reset_on_wrong_brand_returns_403_and_does_not_change_password() {
+        // B-09: Brand-Check before password mutation.
+        $user = User::factory()->create([
+            'brand' => 'srp',
+            'password' => null,
+        ]);
+
+        $tokenValue = 'valid-reset-token-123';
+        DB::table('password_reset_tokens')->insert([
+            'email' => $user->email,
+            'token' => Hash::make($tokenValue),
+            'created_at' => now(),
+        ]);
+
+        // BrandRegistry is set to B2B (default from TestCase setUp),
+        // but the user has brand=srp → mismatch.
+        $response = $this->postJson('/api/auth/reset-password', [
+            'email' => $user->email,
+            'token' => $tokenValue,
+            'password' => 'newPassword123',
+        ]);
+
+        $response->assertStatus(403);
+        $response->assertJson(['error' => 'Dieser Account ist für ein anderes Portal registriert.']);
+
+        $user->refresh();
+        $this->assertNull($user->password, 'Password must remain unchanged on brand mismatch');
     }
 }

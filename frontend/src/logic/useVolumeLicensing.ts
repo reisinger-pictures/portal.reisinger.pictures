@@ -83,15 +83,12 @@ export function calculateVolumeTier(
  * @param config – optional volume pricing config
  */
 export function calculateVolumeTotal(
-    items: Array<{priceCents?: number; price?: number}>,
+    items: Array<{priceCents?: number; price?: number; isQuote?: boolean}>,
     config: VolumePricingConfig = DEFAULT_VOLUME_PRICING,
 ): number {
-    const count = items.length;
+    const nonQuoteItems = items.filter(i => !i.isQuote);
+    const count = nonQuoteItems.length;
     const {priceCents} = calculateVolumeTier(count, config);
-    // Quote items are excluded but they still count towards the volume tier.
-    // The price field for quote items is 0 — we just sum non-quote items
-    // at the volume price. However retroactive pricing means ALL items
-    // at the same price. So: count * priceCents.
     return count * priceCents;
 }
 
@@ -120,7 +117,8 @@ export function useVolumeLicensing(items: CartItem[]): VolumeLicensingResult {
         };
     }
 
-    const count = items.length;
+    const nonQuoteItems = items.filter(i => !i.isQuote);
+    const count = nonQuoteItems.length;
     const {priceCents, tier} = calculateVolumeTier(count, config);
     const totalCents = count * priceCents;
 

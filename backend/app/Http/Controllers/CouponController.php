@@ -8,6 +8,7 @@ use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
+use App\Enums\Brand;
 use App\Http\Resources\CouponResource;
 use App\Services\CouponService;
 use App\Support\BrandRegistry;
@@ -326,6 +327,10 @@ class CouponController extends Controller
         $brand = BrandRegistry::current();
         if ($brand === null) {
             return response()->json(['valid' => false, 'error' => 'No brand context available.'], 400);
+        }
+
+        if ($brand->value !== Brand::SRP->value) {
+            return response()->json(['valid' => false, 'error' => 'Coupons are only available on buy.reisinger.pictures.']);
         }
 
         $userId = auth()->id();

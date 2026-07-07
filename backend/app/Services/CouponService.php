@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\Brand;
 use App\Models\Coupon;
 use App\Models\CouponUserUsage;
-use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -111,18 +110,18 @@ class CouponService
             return [null, 'This coupon is not valid for your selected items.'];
         }
 
-        // organisation scope: coupon is valid for the user's tenant
+        // organisation scope: coupon is valid for the user's org
         if ($coupon->scope_type === 'organisation') {
             if ($userId === null) {
                 return [null, 'This coupon is not valid for your account.'];
             }
 
-            $userTenant = User::find($userId)?->tenant;
-            if ($userTenant === null) {
+            $userOrg = User::find($userId)?->org;
+            if ($userOrg === null) {
                 return [null, 'This coupon is not valid for your account.'];
             }
 
-            if ((string) $coupon->scope_id !== (string) $userTenant->id) {
+            if ((string) $coupon->scope_id !== (string) $userOrg->id) {
                 return [null, 'This coupon is not valid for your account.'];
             }
         }

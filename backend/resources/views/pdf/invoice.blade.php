@@ -124,6 +124,12 @@
     </div>
 
     <div style="margin-top: 20px;">
+        @if(!empty($snapshot->customer_details['custom_conditions']))
+            <div class="editor-content" style="font-size: 11px; color: #555; margin-top: 10px;">
+                <strong>Lizenzbedingungen / Custom Conditions</strong>
+                {!! $snapshot->customer_details['custom_conditions'] !!}
+            </div>
+        @endif
         @if(!empty($snapshot->customer_details['custom_html_terms']))
             <div class="editor-content" style="font-size: 11px; color: #555; margin-top: 10px;">
                 {!! $snapshot->customer_details['custom_html_terms'] !!}

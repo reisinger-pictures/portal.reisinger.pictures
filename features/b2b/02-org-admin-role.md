@@ -14,7 +14,7 @@ DSGVO-Grundlage: Kein Org-Admin darf Daten ausserhalb seiner Organisation einseh
 
 ### Mapping User → Organisation (1:n statt n:m)
 
-Bisher gab es eine n:m-Beziehung via `tenant_user`-Pivot. **Neu:** Ein User gehört zu
+Bisher gab es eine n:m-Beziehung via `org_user`-Pivot. **Neu:** Ein User gehört zu
 **maximal einer** Organisation. Die Zuordnung erfolgt direkt über `users.tenant_id`.
 
 ```
@@ -53,9 +53,9 @@ Schema::table('users', function (Blueprint $table) {
 });
 ```
 
-### `tenant_user`-Pivot
+### `org_user`-Pivot
 
-Die Hauptzuordnung erfolgt via `users.tenant_id`. `tenant_user` wird in V019 gelöscht (`DROP TABLE`).
+Die Hauptzuordnung erfolgt via `users.tenant_id`. `org_user` wird in V019 gelöscht (`DROP TABLE`).
 
 ---
 
@@ -65,9 +65,9 @@ Die Hauptzuordnung erfolgt via `users.tenant_id`. `tenant_user` wird in V019 gel
 
 ```php
 // Relation
-public function tenant(): BelongsTo
+public function Org(): BelongsTo
 {
-    return $this->belongsTo(Tenant::class);
+    return $this->belongsTo(Org::class);
 }
 
 // Attribute
@@ -83,13 +83,13 @@ public function getIsCustomerManagerAttribute(): bool
 }
 
 // Scope
-public function scopeByTenant(Builder $query, string $tenantId): Builder
+public function scopeByOrg(Builder $query, string $tenantId): Builder
 {
     return $query->where('tenant_id', $tenantId);
 }
 ```
 
-### Tenant Model
+### Org Model
 
 Die `$fillable` + `$casts` Erweiterungen (auto_join_policy, default_role_id,
 default_flatrate_level, can_purchase_upgrades) bleiben wie in Phase 0a implementiert.
@@ -98,7 +98,7 @@ default_flatrate_level, can_purchase_upgrades) bleiben wie in Phase 0a implement
 
 ## 4. Controller-Änderungen
 
-### 4.1. TenantController
+### 4.1. OrgController
 
 ```php
 // index() — org_admin sieht nur die eigene Org
@@ -106,9 +106,9 @@ public function index()
 {
     $user = auth()->user();
     if ($user->is_admin) {
-        $tenants = Tenant::all();
+        $tenants = Org::all();
     } elseif ($user->is_org_admin) {
-        $tenants = Tenant::where('id', $user->tenant_id)->get();
+        $tenants = Org::where('id', $user->tenant_id)->get();
     } else {
         abort(403);
     }
@@ -243,7 +243,7 @@ const isStaff = user?.is_admin || user?.is_super_admin || isOrgAdmin;
 
 ## 7. Invite-Flow
 
-### 7.1. TenantInviteController::redeem
+### 7.1. OrgInviteController::redeem
 
 ```php
 public function redeem(Request $request)
@@ -253,12 +253,12 @@ public function redeem(Request $request)
     if ($user) {
         // Bereits eingeloggt: tenant_id setzen, kein Name/Passwort nötig
         $request->validate(['token' => 'required|string', 'accept_privacy' => 'required|accepted']);
-        $invite = TenantInvite::where('token', $request->token)->firstOrFail();
+        $invite = OrgInvite::where('token', $request->token)->firstOrFail();
         $user->update(['tenant_id' => $invite->tenant_id]);
     } else {
         // Neuer User: Registrierung + tenant_id setzen
         $request->validate(['token' => 'required|string', 'name' => 'required|string|max:255', 'password' => 'required|string|min:8', 'accept_privacy' => 'required|accepted']);
-        $invite = TenantInvite::where('token', $request->token)->firstOrFail();
+        $invite = OrgInvite::where('token', $request->token)->firstOrFail();
         $user = User::create([
             'name' => $request->name,
             'email' => $invite->email,
@@ -277,6 +277,6 @@ public function redeem(Request $request)
 |-------|-------------|
 | User → Org | 1:n via `users.tenant_id` (FK, nullable) |
 | Rolle bei Entfernen aus Org | `tenant_id = NULL` + Rollen-Zuordnungen werden gelöscht. User hat danach keine aktive Rolle. |
-| `tenant_user`-Pivot | Wird in V019 gelöscht (`DROP TABLE`). |
-| Migration | Alles in V019 (Settings PK, FKs, tenant_id, tenant_user drop, rename). |
+| `org_user`-Pivot | Wird in V019 gelöscht (`DROP TABLE`). |
+| Migration | Alles in V019 (Settings PK, FKs, tenant_id, org_user drop, rename). |
 | Invite-Rolle | Keine Rolle. Eingeladener User bekommt nur `tenant_id` gesetzt. Mitgliedschaft wird durch `tenant_id != null` definiert, Rollen durch bestehendes Gate-System.

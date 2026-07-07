@@ -3,7 +3,7 @@ import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
 import {useStripe, useElements, PaymentElement} from '@stripe/react-stripe-js';
 import {useUI} from '../../components/UIContext';
-import {Order} from '../../../api';
+
 
 export interface StripeCheckoutFormProps {
     orderId: string;
@@ -53,35 +53,35 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSucces
                 if (!mountedRef.current) return;
                 attempts++;
                 try {
-                    const res = await fetch('/api/orders', {
+                    const res = await fetch(`/api/orders/${orderId}`, {
                         headers: {'Accept': 'application/json'},
                         credentials: 'include'
                     });
-                    const orders = await res.json();
-                    const currentOrder = orders.find((o: Order) => o.id === orderId);
+                    const currentOrder = await res.json();
 
                     if (currentOrder && currentOrder.status === 'paid') {
                         if (intervalRef.current) clearInterval(intervalRef.current);
                         intervalRef.current = null;
                         if (mountedRef.current) setIsProcessing(false);
                         onSuccess(true);
-                    } else if (attempts >= 15) {
+                    } else if (attempts >= 30) {
                         if (intervalRef.current) clearInterval(intervalRef.current);
                         intervalRef.current = null;
                         if (mountedRef.current) setIsProcessing(false);
                         onSuccess(false);
                     }
                 } catch {
-                    if (attempts >= 15) {
+                    if (attempts >= 30) {
                         if (intervalRef.current) clearInterval(intervalRef.current);
                         intervalRef.current = null;
                         if (mountedRef.current) setIsProcessing(false);
                         onSuccess(false);
                     }
                 }
-            }, 1000);
+            }, 2000);
         } else {
             setIsProcessing(false);
+            showToast('info', 'Zahlung unvollständig — bitte erneut versuchen.');
         }
     };
 
