@@ -6,6 +6,8 @@ use App\Models\Contract;
 use App\Models\ContractSigner;
 use App\Models\ContractAuditLog;
 use App\Services\ContractAuditService;
+use App\Services\ContractCloseService;
+use App\Services\ContractTemplateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,9 +23,13 @@ class ContractJoinController extends Controller
         if ($contract->status !== 'active') {
             return response()->json(['error' => 'Dieser Vertrag nimmt keine Unterschriften mehr an'], 410);
         }
+        if ($contract->expires_at && $contract->expires_at->isPast()) {
+            return response()->json(['error' => 'Der Vertragslink ist abgelaufen'], 410);
+        }
         return response()->json([
             'contract_id' => $contract->id,
             'status' => $contract->status,
+            'type' => $contract->type,
             'available_roles' => $contract->available_roles,
             'allow_multiple_roles' => $contract->allow_multiple_roles_per_signer,
             'terms_html' => $contract->terms_html,
@@ -37,6 +43,10 @@ class ContractJoinController extends Controller
             return response()->json(['error' => 'Vertrag nicht verfügbar'], 410);
         }
 
+        if ($contract->expires_at && $contract->expires_at->isPast()) {
+            return response()->json(['error' => 'Der Vertragslink ist abgelaufen'], 410);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
@@ -46,6 +56,41 @@ class ContractJoinController extends Controller
 
         if (count($validated['roles']) > 1 && !$contract->allow_multiple_roles_per_signer) {
             return response()->json(['error' => 'Mehrere Rollen pro Unterzeichner sind nicht erlaubt'], 422);
+        }
+
+        $personalToken = Str::random(64);
+
+        if ($contract->type === 'template') {
+            $existingSigner = ContractSigner::where('email', $validated['email'])
+                ->whereHas('contract', function ($q) use ($contract) {
+                    $q->where('template_id', $contract->id);
+                })
+                ->first();
+            if ($existingSigner) {
+                if ($existingSigner->status === 'signed') {
+                    return response()->json(['error' => 'Mit dieser E-Mail wurde bereits unterschrieben'], 409);
+                }
+                return response()->json([
+                    'personal_token' => $existingSigner->personal_token,
+                    'name' => $existingSigner->name,
+                    'roles' => $existingSigner->roles,
+                ]);
+            }
+
+            $result = app(ContractTemplateService::class)->createInstance($contract, [
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'roles' => $validated['roles'],
+                'personal_token' => $personalToken,
+            ]);
+
+            app(ContractAuditService::class)->log($result['instance']->id, $result['signer']->id, 'opened', $request);
+
+            return response()->json([
+                'personal_token' => $personalToken,
+                'name' => $result['signer']->name,
+                'roles' => $result['signer']->roles,
+            ], 201);
         }
 
         $existing = ContractSigner::where('contract_id', $contract->id)
@@ -68,8 +113,6 @@ class ContractJoinController extends Controller
                 'roles' => $existingJoined->roles,
             ]);
         }
-
-        $personalToken = Str::random(64);
 
         $signer = ContractSigner::create([
             'contract_id' => $contract->id,
@@ -171,6 +214,13 @@ class ContractJoinController extends Controller
         }
 
         app(ContractAuditService::class)->log($signer->contract_id, $signer->id, 'signed', $request);
+
+        $signer->refresh();
+        if ($signer->contract->template_id !== null) {
+            $signer->contract->status = 'closed';
+            $signer->contract->save();
+            app(ContractCloseService::class)->close($signer->contract);
+        }
 
         return response()->json(['success' => true, 'message' => 'Vertrag erfolgreich unterschrieben']);
     }

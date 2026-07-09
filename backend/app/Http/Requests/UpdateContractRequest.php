@@ -14,6 +14,8 @@ class UpdateContractRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'type' => 'nullable|string|in:contract,template',
+            'expires_at' => 'nullable|date',
             'billing_details' => 'nullable|array',
             'billing_details.name' => 'nullable|string|max:255',
             'billing_details.company' => 'nullable|string|max:255',

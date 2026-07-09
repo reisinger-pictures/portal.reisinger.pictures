@@ -234,4 +234,140 @@ class ContractControllerTest extends TestCase
             'content_version' => 0,
         ]);
     }
+
+    public function test_can_create_template(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'type' => 'template',
+            'available_roles' => ['Model'],
+            'terms_html' => '<p>Template</p>',
+            'items' => [],
+            'discounts' => [],
+            'expires_at' => now()->addDays(30)->toDateTimeString(),
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('contracts', [
+            'type' => 'template',
+            'status' => 'draft',
+        ]);
+    }
+
+    public function test_cannot_open_template_without_expiry(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'draft',
+            'expires_at' => null,
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->withHeaders($headers)->postJson("/api/management/contracts/{$contract->id}/open");
+        $response->assertStatus(422);
+    }
+
+    public function test_cannot_open_template_with_past_expiry(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'draft',
+            'expires_at' => now()->subDay(),
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->withHeaders($headers)->postJson("/api/management/contracts/{$contract->id}/open");
+        $response->assertStatus(422);
+    }
+
+    public function test_can_open_template_with_valid_expiry(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'draft',
+            'expires_at' => now()->addDays(30),
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->withHeaders($headers)->postJson("/api/management/contracts/{$contract->id}/open");
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'active',
+        ]);
+        $this->assertNotNull($response->json('contract.join_token'));
+    }
+
+    public function test_index_filters_by_type(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        Contract::factory()->create(['type' => 'template', 'brand' => Brand::B2B]);
+        Contract::factory()->create(['type' => 'contract', 'brand' => Brand::B2B]);
+        Contract::factory()->create(['type' => 'contract', 'brand' => Brand::B2B]);
+
+        $response = $this->withHeaders($headers)->getJson('/api/management/contracts?type=template');
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json());
+
+        $response2 = $this->withHeaders($headers)->getJson('/api/management/contracts?type=contract');
+        $response2->assertStatus(200);
+        $this->assertCount(2, $response2->json());
+    }
+
+    public function test_instances_endpoint_returns_template_instances(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+
+        $instance = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => $template->id,
+            'status' => 'closed',
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->withHeaders($headers)->getJson("/api/management/contracts/{$template->id}/instances");
+        $response->assertStatus(200);
+        $responseData = $response->json();
+        $this->assertIsArray($responseData);
+        $this->assertCount(1, $responseData);
+        $this->assertEquals($instance->id, $responseData[0]['id']);
+    }
+
+    public function test_close_instance_works(): void
+    {
+        Mail::fake();
+
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $instance = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => Contract::factory()->create(['type' => 'template', 'brand' => Brand::B2B])->id,
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->withHeaders($headers)->postJson("/api/management/contracts/{$instance->id}/close");
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $instance->id,
+            'status' => 'closed',
+        ]);
+    }
 }

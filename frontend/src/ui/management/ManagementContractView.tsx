@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import {useState, useCallback} from 'react';
+import {useState, useCallback, useRef} from 'react';
 import {usePermissions} from '../../logic/usePermissions';
 import {useUI} from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
@@ -15,6 +15,7 @@ import {
     updateContract,
     openContract,
     closeContract,
+    fetchInstances,
     Contract,
     BillingDetails,
 } from '../../logic/useContractManagement';
@@ -47,6 +48,9 @@ export default function ManagementContractView() {
     const [allowMultipleRoles, setAllowMultipleRoles] = useState(false);
     const [billingDetails, setBillingDetails] = useState<BillingDetails>({...emptyBilling});
     const [closesAt, setClosesAt] = useState('');
+    const [contractType, setContractType] = useState<'contract' | 'template'>('contract');
+    const [expiresAt, setExpiresAt] = useState('');
+    const [instances, setInstances] = useState<Contract[]>([]);
     const [roleInput, setRoleInput] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [joinLink, setJoinLink] = useState<string | null>(null);
@@ -59,6 +63,9 @@ export default function ManagementContractView() {
         setAllowMultipleRoles(false);
         setBillingDetails({...emptyBilling});
         setClosesAt('');
+        setContractType('contract');
+        setExpiresAt('');
+        setInstances([]);
         setJoinLink(null);
     }, []);
 
@@ -70,13 +77,27 @@ export default function ManagementContractView() {
         setAllowMultipleRoles(contract.allow_multiple_roles_per_signer);
         setBillingDetails(contract.billing_details ?? {...emptyBilling});
         setClosesAt(contract.closes_at || '');
+        setContractType(contract.type || 'contract');
+        setExpiresAt(contract.expires_at || '');
         setJoinLink(null);
     }, []);
+
+    const instancesReqIdRef = useRef(0);
 
     const handleSelectContract = (contract: Contract) => {
         setEditingContract(contract);
         setIsNew(false);
         loadContract(contract);
+        if (contract.type === 'template') {
+            const reqId = ++instancesReqIdRef.current;
+            fetchInstances(contract.id).then(data => {
+                if (reqId === instancesReqIdRef.current) setInstances(data);
+            }).catch(() => {
+                if (reqId === instancesReqIdRef.current) setInstances([]);
+            });
+        } else {
+            setInstances([]);
+        }
     };
 
     const handleNewContract = () => {
@@ -95,7 +116,9 @@ export default function ManagementContractView() {
                 available_roles: availableRoles,
                 allow_multiple_roles_per_signer: allowMultipleRoles,
                 billing_details: billingDetails,
-                closes_at: closesAt,
+                closes_at: closesAt || null,
+                type: contractType,
+                expires_at: expiresAt || null,
             };
 
             if (isNew) {
@@ -116,9 +139,12 @@ export default function ManagementContractView() {
 
     const handleOpen = async () => {
         if (!editingContract) return;
+        const isTemplate = editingContract.type === 'template';
         const ok = await confirm({
             title: t`Vertragsperiode starten`,
-            message: t`Nach dem Start kann der Vertrag nicht mehr bearbeitet werden. Der generierte Join-Link wird an die Unterzeichner weitergegeben. Fortfahren?`,
+            message: isTemplate
+                ? t`Nach dem Start kann die Vorlage über den Join-Link von mehreren Personen signiert werden. Jeder Unterzeichner erhält eine eigene Vertragsinstanz. Fortfahren?`
+                : t`Nach dem Start kann der Vertrag nicht mehr bearbeitet werden. Der generierte Join-Link wird an die Unterzeichner weitergegeben. Fortfahren?`,
             confirmText: t`Starten`,
             confirmColor: 'primary',
         });
@@ -284,6 +310,7 @@ export default function ManagementContractView() {
                                 <th><Trans>Status</Trans></th>
                                 <th><Trans>Rollen</Trans></th>
                                 <th><Trans>Unterzeichner</Trans></th>
+                                <th><Trans>Typ</Trans></th>
                                 <th><Trans>Erstellt</Trans></th>
                                 <th></th>
                             </tr>
@@ -296,6 +323,7 @@ export default function ManagementContractView() {
                                     <td>{statusBadge(c.status)}</td>
                                     <td className="font-mono text-xs">{c.available_roles?.join(', ') || '—'}</td>
                                     <td>{c.signers?.length ?? 0}</td>
+                                    <td><span className="badge badge-sm">{c.type === 'template' ? t`Vorlage` : t`Vertrag`}</span></td>
                                     <td className="text-xs opacity-60">{new Date(c.created_at).toLocaleDateString('de-DE')}</td>
                                     <td>
                                         <span className="iconify mdi--chevron-right opacity-40"></span>
@@ -327,6 +355,32 @@ export default function ManagementContractView() {
                             )}
                         </div>
                     </div>
+
+                    {isNew && (
+                        <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
+                            <h2 className="font-bold text-xl mb-4"><Trans>Vertragstyp</Trans></h2>
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-box hover:bg-base-300/50 transition-colors">
+                                    <input type="radio" name="contractType" value="contract" checked={contractType === 'contract'}
+                                           onChange={() => setContractType('contract')}
+                                           className="radio radio-primary" />
+                                    <div>
+                                        <span className="font-bold"><Trans>Standard-Vertrag</Trans></span>
+                                        <p className="text-xs opacity-60"><Trans>Mehrere Unterzeichner auf einem Vertrag</Trans></p>
+                                    </div>
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-box hover:bg-base-300/50 transition-colors">
+                                    <input type="radio" name="contractType" value="template" checked={contractType === 'template'}
+                                           onChange={() => setContractType('template')}
+                                           className="radio radio-primary" />
+                                    <div>
+                                        <span className="font-bold"><Trans>Vorlage</Trans></span>
+                                        <p className="text-xs opacity-60"><Trans>Jeder Unterzeichner erhält eine eigene Instanz</Trans></p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Roles section */}
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
@@ -434,15 +488,25 @@ export default function ManagementContractView() {
                         </details>
                     </div>
 
-                    {/* Closes at */}
+                    {/* Vertragsperiode */}
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                         <h2 className="font-bold text-xl mb-4"><Trans>Vertragsperiode</Trans></h2>
-                        <div className="form-control max-w-xs">
-                            <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Gültig bis</Trans></span></label>
-                            <input type="date" value={closesAt}
-                                   onChange={e => setClosesAt(e.target.value)}
-                                   className="input input-sm input-bordered"/>
-                        </div>
+                        {contractType === 'template' ? (
+                            <div className="form-control max-w-xs">
+                                <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Join-Link gültig bis</Trans></span></label>
+                                <input type="date" value={expiresAt}
+                                       onChange={e => setExpiresAt(e.target.value)}
+                                       className="input input-sm input-bordered"/>
+                                <label className="label py-1"><span className="label-text text-xs opacity-60"><Trans>Nach Ablauf kann niemand mehr über den Link beitreten</Trans></span></label>
+                            </div>
+                        ) : (
+                            <div className="form-control max-w-xs">
+                                <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Gültig bis</Trans></span></label>
+                                <input type="date" value={closesAt}
+                                       onChange={e => setClosesAt(e.target.value)}
+                                       className="input input-sm input-bordered"/>
+                            </div>
+                        )}
                     </div>
 
                     {/* Items / Discounts (reuse existing invoice components) */}
@@ -514,6 +578,36 @@ export default function ManagementContractView() {
                                             <td className="text-xs">{s.roles.join(', ') || '—'}</td>
                                             <td>{s.status === 'signed' ? <span className="badge badge-success badge-sm"><Trans>Unterschrieben</Trans></span> : s.status === 'joined' ? <span className="badge badge-info badge-sm"><Trans>Beigetreten</Trans></span> : <span className="badge badge-ghost badge-sm"><Trans>Eingeladen</Trans></span>}</td>
                                             <td className="text-xs opacity-60">{s.signed_at ? new Date(s.signed_at).toLocaleDateString('de-DE') : '—'}</td>
+                                        </tr>
+                                    ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {editingContract?.type === 'template' && instances.length > 0 && (
+                        <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
+                            <h2 className="font-bold text-xl mb-4"><Trans>Instanzen</Trans> ({instances.length})</h2>
+                            <div className="overflow-x-auto">
+                                <table className="table table-sm w-full">
+                                    <thead>
+                                    <tr>
+                                        <th><Trans>Unterzeichner</Trans></th>
+                                        <th><Trans>E-Mail</Trans></th>
+                                        <th><Trans>Rollen</Trans></th>
+                                        <th><Trans>Status</Trans></th>
+                                        <th><Trans>Erstellt am</Trans></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {instances.map(inst => (
+                                        <tr key={inst.id} className="cursor-pointer hover:bg-base-200" onClick={() => handleSelectContract(inst)}>
+                                            <td className="font-medium">{inst.signers?.[0]?.name || '—'}</td>
+                                            <td className="text-sm opacity-70">{inst.signers?.[0]?.email || '—'}</td>
+                                            <td className="text-xs">{inst.signers?.[0]?.roles?.join(', ') || '—'}</td>
+                                            <td>{statusBadge(inst.status)}</td>
+                                            <td className="text-xs opacity-60">{new Date(inst.created_at).toLocaleDateString('de-DE')}</td>
                                         </tr>
                                     ))}
                                     </tbody>

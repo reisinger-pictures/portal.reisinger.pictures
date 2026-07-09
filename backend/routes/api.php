@@ -194,6 +194,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::put('/management/contracts/{id}', [ContractController::class, 'update'])->name('api.management.contracts.update');
         Route::post('/management/contracts/{id}/open', [ContractController::class, 'open'])->name('api.management.contracts.open');
         Route::post('/management/contracts/{id}/close', [ContractController::class, 'close'])->name('api.management.contracts.close');
+        Route::get('/management/contracts/{id}/instances', [ContractController::class, 'instances'])->name('api.management.contracts.instances');
     });
 
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo'])->name('api.management.settings.system');

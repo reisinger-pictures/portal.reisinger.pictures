@@ -27,6 +27,7 @@ export interface ContractSigner {
 
 export interface Contract {
     id: string;
+    type: 'contract' | 'template';
     status: 'draft' | 'active' | 'closed' | 'cancelled';
     billing_details: BillingDetails | null;
     items: ContractItem[];
@@ -36,10 +37,14 @@ export interface Contract {
     allow_multiple_roles_per_signer: boolean;
     join_token: string | null;
     closes_at: string | null;
+    template_id: string | null;
+    expires_at: string | null;
     created_at: string;
     updated_at: string;
     signers?: ContractSigner[];
 }
+
+export type ContractInstance = Contract;
 
 export interface ContractItem {
     type: 'item' | 'discount_fixed' | 'discount_percent';
@@ -57,7 +62,13 @@ export interface ContractFormData {
     available_roles: string[];
     allow_multiple_roles_per_signer: boolean;
     billing_details: BillingDetails;
-    closes_at: string;
+    closes_at: string | null;
+    type: 'contract' | 'template';
+    expires_at: string | null;
+}
+
+export async function fetchInstances(id: string): Promise<Contract[]> {
+    return fetcher(`/api/management/contracts/${id}/instances`);
 }
 
 export function useContracts() {

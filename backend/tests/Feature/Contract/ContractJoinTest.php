@@ -8,6 +8,7 @@ use App\Models\Contract;
 use App\Models\ContractSigner;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
+use Illuminate\Support\Facades\Mail;
 
 class ContractJoinTest extends TestCase
 {
@@ -391,6 +392,163 @@ class ContractJoinTest extends TestCase
         $this->assertDatabaseHas('contract_audit_logs', [
             'action' => 'heartbeat',
             'contract_signer_id' => $signer->id,
+        ]);
+    }
+
+    public function test_template_join_creates_instance_and_signer(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'join_token' => 'tpl-join',
+            'available_roles' => ['Model', 'Fotograf'],
+            'terms_html' => '<p>Template Terms</p>',
+            'items' => [['type' => 'item', 'description' => 'Test Item', 'qty' => 1, 'price' => 1000, 'notes' => '']],
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->postJson('/api/contracts/join/tpl-join', [
+            'name' => 'Max Mustermann',
+            'email' => 'max@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonStructure(['personal_token', 'name', 'roles']);
+
+        $this->assertDatabaseHas('contracts', [
+            'type' => 'contract',
+            'template_id' => $template->id,
+            'terms_html' => '<p>Template Terms</p>',
+        ]);
+
+        $instance = Contract::where('template_id', $template->id)->first();
+        $this->assertNotNull($instance);
+        $this->assertDatabaseHas('contract_signers', [
+            'contract_id' => $instance->id,
+            'name' => 'Max Mustermann',
+            'email' => 'max@example.com',
+            'status' => 'joined',
+        ]);
+    }
+
+    public function test_template_join_copies_template_data(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'join_token' => 'tpl-data',
+            'available_roles' => ['Model'],
+            'terms_html' => '<p>Copied Terms</p>',
+            'items' => [['type' => 'item', 'description' => 'Foto', 'qty' => 1, 'price' => 5000, 'notes' => '']],
+            'discounts' => [['type' => 'discount_fixed', 'description' => 'Rabatt', 'price' => 500, 'notes' => '']],
+            'brand' => Brand::B2B,
+        ]);
+
+        $this->postJson('/api/contracts/join/tpl-data', [
+            'name' => 'User',
+            'email' => 'user@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $instance = Contract::where('template_id', $template->id)->first();
+        $this->assertEquals('<p>Copied Terms</p>', $instance->terms_html);
+        $this->assertEquals($template->items, $instance->items);
+        $this->assertEquals($template->discounts, $instance->discounts);
+        $this->assertEquals($template->available_roles, $instance->available_roles);
+    }
+
+    public function test_template_expired_returns_410_on_check(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'join_token' => 'expired-tpl',
+            'expires_at' => now()->subDay(),
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->getJson('/api/contracts/join/expired-tpl');
+        $response->assertStatus(410);
+    }
+
+    public function test_template_expired_returns_410_on_join(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'join_token' => 'expired-join',
+            'expires_at' => now()->subDay(),
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->postJson('/api/contracts/join/expired-join', [
+            'name' => 'Test',
+            'email' => 'test@example.com',
+            'roles' => ['Model'],
+        ]);
+        $response->assertStatus(410);
+    }
+
+    public function test_template_sign_auto_closes_instance(): void
+    {
+        Mail::fake();
+
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+
+        $instance = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => $template->id,
+            'status' => 'active',
+            'terms_html' => '<p>Instance</p>',
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $instance->id,
+            'personal_token' => 'auto-close-token',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->postJson('/api/contracts/sign/auto-close-token', [
+            'accept_contract' => true,
+            'content_version' => $instance->content_version,
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $instance->id,
+            'status' => 'closed',
+        ]);
+    }
+
+    public function test_standard_contract_sign_does_not_auto_close(): void
+    {
+        $contract = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => null,
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'standard-sign',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->postJson('/api/contracts/sign/standard-sign', [
+            'accept_contract' => true,
+            'content_version' => $contract->content_version,
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'active',
         ]);
     }
 }

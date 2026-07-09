@@ -72,6 +72,9 @@ class ContractFactory extends Factory
             'allow_multiple_roles_per_signer' => $this->faker->boolean(20),
             'join_token' => $this->faker->optional(0.5)->regexify('[A-Za-z0-9]{64}'),
             'content_version' => 0,
+            'type' => 'contract',
+            'template_id' => null,
+            'expires_at' => null,
             'closes_at' => $this->faker->optional(0.6)->dateTimeBetween('+1 day', '+30 days'),
         ];
     }
@@ -91,6 +94,16 @@ class ContractFactory extends Factory
             'status' => 'active',
             'join_token' => $this->faker->regexify('[A-Za-z0-9]{64}'),
             'closes_at' => $this->faker->dateTimeBetween('+7 days', '+30 days'),
+        ]);
+    }
+
+    public function template(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => 'template',
+            'join_token' => null,
+            'closes_at' => null,
+            'expires_at' => now()->addDays(30),
         ]);
     }
 }

@@ -15,20 +15,30 @@ class ContractController extends Controller
 {
     public function index(Request $request)
     {
-        $contracts = Contract::with('signers')
-            ->where('brand', BrandRegistry::currentOrDefault())
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $query = Contract::with('signers')
+            ->where('brand', BrandRegistry::currentOrDefault());
+
+        if ($request->has('type') && in_array($request->query('type'), ['contract', 'template'])) {
+            $query->where('type', $request->query('type'));
+        }
+
+        $contracts = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json($contracts);
     }
 
     public function store(StoreContractRequest $request)
     {
-        $contract = Contract::create(array_merge(
+        $data = array_merge(
             $request->validated(),
             ['status' => 'draft', 'brand' => BrandRegistry::currentOrDefault()]
-        ));
+        );
+
+        if (empty($data['type'])) {
+            $data['type'] = 'contract';
+        }
+
+        $contract = Contract::create($data);
 
         return response()->json([
             'success' => true,
@@ -53,6 +63,10 @@ class ContractController extends Controller
 
         if ($contract->status === 'active' && $contract->signers()->where('status', 'signed')->exists()) {
             return response()->json(['error' => 'Vertrag kann nicht mehr bearbeitet werden, da bereits Unterschriften vorliegen'], 403);
+        }
+
+        if ($request->has('type') && $request->input('type') !== $contract->type) {
+            return response()->json(['error' => 'Der Vertragstyp kann nach der Erstellung nicht mehr geändert werden'], 422);
         }
 
         $contract->update($request->validated());
@@ -81,6 +95,10 @@ class ContractController extends Controller
             return response()->json(['error' => 'Nur Entwürfe können geöffnet werden'], 400);
         }
 
+        if ($contract->type === 'template' && (!$contract->expires_at || $contract->expires_at->isPast())) {
+            return response()->json(['error' => 'Für Vorlagen muss ein gültiges Ablaufdatum in der Zukunft gesetzt sein'], 422);
+        }
+
         $contract->status = 'active';
         $contract->join_token = Str::random(64);
         $contract->save();
@@ -92,6 +110,22 @@ class ContractController extends Controller
             'join_link' => rtrim($frontendUrl, '/') . '/contracts/join/' . $contract->join_token,
             'contract' => $contract,
         ]);
+    }
+
+    public function instances($id)
+    {
+        $template = Contract::findOrFail($id);
+
+        if ($template->type !== 'template') {
+            return response()->json(['error' => 'Nicht gefunden'], 404);
+        }
+
+        $instances = Contract::with('signers')
+            ->where('template_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($instances);
     }
 
     public function close($id)

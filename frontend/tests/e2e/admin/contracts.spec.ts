@@ -182,78 +182,252 @@ test.describe('Digital Contracts Workflow', () => {
         expect(closeData.contract.status).toBe('closed');
     });
 
-test('Admin edits active contract, signer is blocked from signing stale version', { tag: ['@feature:admin:contracts'] }, async ({ page, request }) => {
-    const auth = new AuthHelper(page);
-    await auth.login(testUser.email, testUser.password);
+    test('Admin edits active contract, signer is blocked from signing stale version', { tag: ['@feature:admin:contracts'] }, async ({ page, request }) => {
+        const auth = new AuthHelper(page);
+        await auth.login(testUser.email, testUser.password);
 
-    // Create contract via API
-    const createRes = await request.post('/api/management/contracts', {
-        data: {
-            available_roles: ['Model'],
-            allow_multiple_roles_per_signer: false,
-            terms_html: `<p>Version 1 - ${uniqueSuffix}</p>`,
-            items: [],
-            discounts: [],
-        },
-        headers: {
-            'Cookie': helper.getAdminToken(),
-            'Accept': 'application/json',
-        },
+        // Create contract via API
+        const createRes = await request.post('/api/management/contracts', {
+            data: {
+                available_roles: ['Model'],
+                allow_multiple_roles_per_signer: false,
+                terms_html: `<p>Version 1 - ${uniqueSuffix}</p>`,
+                items: [],
+                discounts: [],
+            },
+            headers: {
+                'Cookie': helper.getAdminToken(),
+                'Accept': 'application/json',
+            },
+        });
+        expect(createRes.ok()).toBeTruthy();
+        const contractData = await createRes.json();
+        const contractId = contractData.contract?.id;
+        expect(contractId).toBeDefined();
+        helper.trackContract(contractId);
+
+        // Open the contract (start signing period)
+        const openRes = await request.post(`/api/management/contracts/${contractId}/open`, {
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+        });
+        expect(openRes.ok()).toBeTruthy();
+        const openData = await openRes.json();
+        const joinLink = openData.join_link;
+        expect(joinLink).toBeDefined();
+        const joinToken = joinLink.split('/contracts/join/')[1];
+
+        // Client joins
+        const joinRes = await request.post(`/api/contracts/join/${joinToken}`, {
+            data: { name: 'Test User', email: `test-${uniqueSuffix}@example.com`, roles: ['Model'] },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(joinRes.ok()).toBeTruthy();
+        const joinData = await joinRes.json();
+        const personalToken = joinData.personal_token;
+
+        // Client opens sign page
+        await page.goto(`/contracts/sign/${personalToken}`);
+        await expect(page.locator('h1').filter({ hasText: 'Vertrag' })).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.editor-content')).toContainText(`Version 1 - ${uniqueSuffix}`, { timeout: 10000 });
+
+        // Admin edits the contract while signer has it open (increments content_version)
+        const editRes = await request.put(`/api/management/contracts/${contractId}`, {
+            data: { terms_html: `<p>Version 2 - ${uniqueSuffix}</p>` },
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+        });
+        expect(editRes.ok()).toBeTruthy();
+
+        // Wait for heartbeat (5s interval) to detect staleness
+        await expect(page.locator('.alert.alert-warning')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('.alert.alert-warning')).toContainText('Vertrag wurde geändert');
+
+        // Verify sign button is disabled while stale
+        await expect(page.getByRole('button', { name: 'Vertrag verbindlich abschließen' })).toBeDisabled();
+
+        // Reload the page to get updated content
+        await page.goto(`/contracts/sign/${personalToken}`);
+        await expect(page.locator('.editor-content')).toContainText(`Version 2 - ${uniqueSuffix}`, { timeout: 10000 });
+
+        // Stale warning should be gone after reload
+        await expect(page.locator('.alert.alert-warning')).toBeHidden({ timeout: 5000 });
+
+        // Sign with the new version works
+        await page.getByRole('checkbox').check();
+        await page.getByRole('button', { name: 'Vertrag verbindlich abschließen' }).click();
+        await expect(page.locator('h2').filter({ hasText: 'Vertrag unterschrieben!' })).toBeVisible({ timeout: 10000 });
     });
-    expect(createRes.ok()).toBeTruthy();
-    const contractData = await createRes.json();
-    const contractId = contractData.contract?.id;
-    expect(contractId).toBeDefined();
-    helper.trackContract(contractId);
 
-    // Open the contract (start signing period)
-    const openRes = await request.post(`/api/management/contracts/${contractId}/open`, {
-        headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+    test('Admin creates template, client joins and signs, instance is auto-closed', { tag: ['@feature:admin:contracts'] }, async ({ page, request }) => {
+        const auth = new AuthHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        const createRes = await request.post('/api/management/contracts', {
+            data: {
+                type: 'template',
+                available_roles: ['Model'],
+                allow_multiple_roles_per_signer: false,
+                terms_html: `<p>Template ${uniqueSuffix}</p>`,
+                items: [{ type: 'item', description: 'Fotoshooting', qty: 1, price: 15000, notes: '' }],
+                discounts: [],
+                expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+            },
+            headers: {
+                'Cookie': helper.getAdminToken(),
+                'Accept': 'application/json',
+            },
+        });
+        expect(createRes.ok()).toBeTruthy();
+        const templateData = await createRes.json();
+        const templateId = templateData.contract?.id;
+        expect(templateId).toBeDefined();
+        helper.trackContract(templateId);
+
+        const openRes = await request.post(`/api/management/contracts/${templateId}/open`, {
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+        });
+        expect(openRes.ok()).toBeTruthy();
+        const openData = await openRes.json();
+        const joinLink = openData.join_link;
+        const joinToken = joinLink.split('/contracts/join/')[1];
+
+        const joinRes = await request.post(`/api/contracts/join/${joinToken}`, {
+            data: { name: 'Template Signer', email: `tpl-${uniqueSuffix}@example.com`, roles: ['Model'] },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(joinRes.ok()).toBeTruthy();
+        const joinData = await joinRes.json();
+        const personalToken = joinData.personal_token;
+
+        const contentRes = await request.get(`/api/contracts/sign/${personalToken}`, {
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(contentRes.ok()).toBeTruthy();
+        const contentData = await contentRes.json();
+        const contentVersion = contentData.contract.content_version;
+
+        const signRes = await request.post(`/api/contracts/sign/${personalToken}`, {
+            data: { accept_contract: true, content_version: contentVersion },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(signRes.ok()).toBeTruthy();
+
+        const instancesRes = await request.get(`/api/management/contracts/${templateId}/instances`, {
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+        });
+        expect(instancesRes.ok()).toBeTruthy();
+        const instances = await instancesRes.json();
+        expect(instances.length).toBe(1);
+        expect(instances[0].status).toBe('closed');
+        expect(instances[0].template_id).toBe(templateId);
     });
-    expect(openRes.ok()).toBeTruthy();
-    const openData = await openRes.json();
-    const joinLink = openData.join_link;
-    expect(joinLink).toBeDefined();
-    const joinToken = joinLink.split('/contracts/join/')[1];
 
-    // Client joins
-    const joinRes = await request.post(`/api/contracts/join/${joinToken}`, {
-        data: { name: 'Test User', email: `test-${uniqueSuffix}@example.com`, roles: ['Model'] },
-        headers: { 'Accept': 'application/json' },
+    test('Template with expired link returns 410', { tag: ['@feature:admin:contracts'] }, async ({ request, page }) => {
+        const auth = new AuthHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        const createRes = await request.post('/api/management/contracts', {
+            data: {
+                type: 'template',
+                available_roles: ['Model'],
+                terms_html: `<p>Expired Template ${uniqueSuffix}</p>`,
+                items: [],
+                discounts: [],
+                expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+            },
+            headers: {
+                'Cookie': helper.getAdminToken(),
+                'Accept': 'application/json',
+            },
+        });
+        expect(createRes.ok()).toBeTruthy();
+        const templateData = await createRes.json();
+        const templateId = templateData.contract?.id;
+        helper.trackContract(templateId);
+
+        const openRes = await request.post(`/api/management/contracts/${templateId}/open`, {
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+        });
+        expect(openRes.ok()).toBeTruthy();
+        const openData = await openRes.json();
+        const joinToken = openData.join_link.split('/contracts/join/')[1];
+
+        await request.put(`/api/management/contracts/${templateId}`, {
+            data: { expires_at: '2000-01-01T00:00:00.000Z' },
+            headers: {
+                'Cookie': helper.getAdminToken(),
+                'Accept': 'application/json',
+            },
+        });
+
+        const expiredCheck = await request.get(`/api/contracts/join/${joinToken}`, {
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(expiredCheck.status()).toBe(410);
     });
-    expect(joinRes.ok()).toBeTruthy();
-    const joinData = await joinRes.json();
-    const personalToken = joinData.personal_token;
 
-    // Client opens sign page
-    await page.goto(`/contracts/sign/${personalToken}`);
-    await expect(page.locator('h1').filter({ hasText: 'Vertrag' })).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.editor-content')).toContainText(`Version 1 - ${uniqueSuffix}`, { timeout: 10000 });
+    test('Multiple clients signing same template creates multiple instances', { tag: ['@feature:admin:contracts'] }, async ({ request, page }) => {
+        const auth = new AuthHelper(page);
+        await auth.login(testUser.email, testUser.password);
 
-    // Admin edits the contract while signer has it open (increments content_version)
-    const editRes = await request.put(`/api/management/contracts/${contractId}`, {
-        data: { terms_html: `<p>Version 2 - ${uniqueSuffix}</p>` },
-        headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+        const createRes = await request.post('/api/management/contracts', {
+            data: {
+                type: 'template',
+                available_roles: ['Model', 'Fotograf'],
+                allow_multiple_roles_per_signer: false,
+                terms_html: `<p>Multi Template ${uniqueSuffix}</p>`,
+                items: [],
+                discounts: [],
+                expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+            },
+            headers: {
+                'Cookie': helper.getAdminToken(),
+                'Accept': 'application/json',
+            },
+        });
+        expect(createRes.ok()).toBeTruthy();
+        const templateId = (await createRes.json()).contract.id;
+        helper.trackContract(templateId);
+
+        const openRes = await request.post(`/api/management/contracts/${templateId}/open`, {
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+        });
+        expect(openRes.ok()).toBeTruthy();
+        const joinToken = (await openRes.json()).join_link.split('/contracts/join/')[1];
+
+        const join1Res = await request.post(`/api/contracts/join/${joinToken}`, {
+            data: { name: 'Alice', email: `alice-${uniqueSuffix}@example.com`, roles: ['Model'] },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(join1Res.ok()).toBeTruthy();
+        const token1 = (await join1Res.json()).personal_token;
+
+        const join2Res = await request.post(`/api/contracts/join/${joinToken}`, {
+            data: { name: 'Bob', email: `bob-${uniqueSuffix}@example.com`, roles: ['Fotograf'] },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(join2Res.ok()).toBeTruthy();
+        const token2 = (await join2Res.json()).personal_token;
+
+        for (const token of [token1, token2]) {
+            const contentRes = await request.get(`/api/contracts/sign/${token}`, {
+                headers: { 'Accept': 'application/json' },
+            });
+            const contentVersion = (await contentRes.json()).contract.content_version;
+            const signRes = await request.post(`/api/contracts/sign/${token}`, {
+                data: { accept_contract: true, content_version: contentVersion },
+                headers: { 'Accept': 'application/json' },
+            });
+            expect(signRes.ok()).toBeTruthy();
+        }
+
+        const instancesRes = await request.get(`/api/management/contracts/${templateId}/instances`, {
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+        });
+        expect(instancesRes.ok()).toBeTruthy();
+        const instances = await instancesRes.json();
+        expect(instances.length).toBe(2);
+        instances.forEach((inst: { status: string }) => {
+            expect(inst.status).toBe('closed');
+        });
     });
-    expect(editRes.ok()).toBeTruthy();
-
-    // Wait for heartbeat (5s interval) to detect staleness
-    await expect(page.locator('.alert.alert-warning')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.alert.alert-warning')).toContainText('Vertrag wurde geändert');
-
-    // Verify sign button is disabled while stale
-    await expect(page.getByRole('button', { name: 'Vertrag verbindlich abschließen' })).toBeDisabled();
-
-    // Reload the page to get updated content
-    await page.goto(`/contracts/sign/${personalToken}`);
-    await expect(page.locator('.editor-content')).toContainText(`Version 2 - ${uniqueSuffix}`, { timeout: 10000 });
-
-    // Stale warning should be gone after reload
-    await expect(page.locator('.alert.alert-warning')).toBeHidden({ timeout: 5000 });
-
-    // Sign with the new version works
-    await page.getByRole('checkbox').check();
-    await page.getByRole('button', { name: 'Vertrag verbindlich abschließen' }).click();
-    await expect(page.locator('h2').filter({ hasText: 'Vertrag unterschrieben!' })).toBeVisible({ timeout: 10000 });
-});
 });
