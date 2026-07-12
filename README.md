@@ -33,6 +33,22 @@ Falls du das Projekt neu eingerichtet hast oder sich die Datenbankstruktur geän
 * **Feierabend:** Nutze `🛑 [Core] Stop Docker (Graceful)` um die Services sauber herunterzufahren.
 * **Achtung:** `🧨 [Gefahr] DB Reset & Seed` löscht deine gesamte lokale Datenbank unwiderruflich und baut sie neu auf!
 
+### macOS: exiftool & ImageMagick für Laravel Herd
+
+Das Backend verarbeitet Bilder über die externen CLI-Tools `exiftool` (EXIF-Metadaten, MIME-Validierung) und ImageMagick (`magick`/`convert`, Skalierung). Diese werden via Symfony Process aufgerufen und müssen im `PATH` des Webserver-Prozesses liegen.
+
+**Problem auf macOS:** Laravel Herd betreibt PHP-FPM als GUI-Daemon via `launchd`. GUI-Prozesse erben beim Systemstart nur `/usr/local/bin` und die Systempfade aus `/etc/paths` — **nicht** die Shell-Config (`~/.zshrc`). Homebrew installiert die Tools unter `/opt/homebrew/bin` (Apple Silicon) bzw. `/usr/local/bin` (Intel). Auf Intel-Macs sind die Tools somit automatisch erreichbar, auf Apple Silicon jedoch **nicht**.
+
+**Lösung (einmalig, Apple Silicon):** Lege Symlinks im systemweiten `PATH` an, den auch `launchd`/PHP-FPM lesen:
+
+```bash
+sudo ln -s /opt/homebrew/bin/exiftool /usr/local/bin/exiftool
+sudo ln -s /opt/homebrew/bin/magick /usr/local/bin/magick
+sudo ln -s /opt/homebrew/bin/convert /usr/local/bin/convert
+```
+
+Danach Laravel Herd einmal neu starten, damit PHP-FPM die Tools findet. Ohne diesen Schritt schlagen Bild-Uploads mit `422 "Die hochgeladene Datei ist kein gültiges oder lesbares Bild."` fehl (der serverseitige `exiftool`-MIME-Check läuft ins Leere).
+
 ### Login-Daten (Lokal)
 - **Dashboard:** `florian@reisinger.pictures` / `admin`
 - **Datenbank:** user: `portal_user` / pass: `admin`
