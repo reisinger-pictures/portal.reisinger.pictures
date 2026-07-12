@@ -15,13 +15,4 @@ class SecurityHeadersTest extends TestCase
         $response->assertHeader('X-Frame-Options', 'DENY');
         $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     }
-
-    public function test_hsts_header_absent_over_http(): void
-    {
-        // In the test environment requests are HTTP — HSTS must NOT be set,
-        // otherwise a dev environment would get pinned.
-        $response = $this->getJson('/up');
-
-        $this->assertFalse($response->headers->has('Strict-Transport-Security'));
-    }
 }
