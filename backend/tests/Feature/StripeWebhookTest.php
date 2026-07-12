@@ -44,6 +44,7 @@ class StripeWebhookTest extends TestCase
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'status' => 'pending',
+            'total_amount' => 5000,
             'stripe_payment_intent_id' => 'pi_test_intent_123',
         ]);
         $snapshot = InvoiceSnapshot::create([
@@ -68,6 +69,7 @@ class StripeWebhookTest extends TestCase
             'data' => [
                 'object' => [
                     'id' => 'pi_test_intent_123',
+                    'amount_received' => 5000,
                     'metadata' => ['order_id' => $order->id],
                 ],
             ],
@@ -100,6 +102,65 @@ class StripeWebhookTest extends TestCase
             'id' => $order->id,
             'status' => 'paid',
             'stripe_fee_cents' => 150,
+        ]);
+    }
+
+    public function test_underpaid_payment_intent_does_not_mark_order_paid(): void
+    {
+        $user = User::factory()->create();
+        $order = Order::factory()->create([
+            'user_id' => $user->id,
+            'status' => 'pending',
+            'total_amount' => 5000,
+            'stripe_payment_intent_id' => 'pi_test_intent_underpaid',
+        ]);
+
+        $secret = 'whsec_test_underpaid';
+        Config::set('services.stripe.webhook_secret', $secret);
+
+        // Attacker pays 1 cent for a 50.00 EUR order via a manipulated intent
+        $payloadData = [
+            'type' => 'payment_intent.succeeded',
+            'data' => [
+                'object' => [
+                    'id' => 'pi_test_intent_underpaid',
+                    'amount_received' => 1,
+                    'metadata' => ['order_id' => $order->id],
+                ],
+            ],
+        ];
+
+        [$payload, $sigHeader] = $this->signPayload($secret, $payloadData);
+
+        $clientMock = $this->createStub(ClientInterface::class);
+        $clientMock->method('request')
+            ->willReturn([
+                json_encode([
+                    'id' => 'pi_test_intent_underpaid',
+                    'latest_charge' => [
+                        'balance_transaction' => ['fee' => 0],
+                    ],
+                ]),
+                200,
+                [],
+            ]);
+        ApiRequestor::setHttpClient($clientMock);
+
+        $response = $this->postJson('/api/webhooks/stripe', $payloadData, [
+            'Stripe-Signature' => $sigHeader,
+        ]);
+
+        // 200 so Stripe does not retry, but the order must stay pending
+        $response->assertStatus(200);
+        $response->assertJson(['status' => 'ignored', 'reason' => 'underpaid']);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('orders', [
+            'id' => $order->id,
+            'status' => 'paid',
         ]);
     }
 
@@ -325,6 +386,7 @@ class StripeWebhookTest extends TestCase
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'status' => 'pending',
+            'total_amount' => 5000,
             'stripe_payment_intent_id' => 'pi_idempotent_123',
         ]);
         InvoiceSnapshot::create([
@@ -349,6 +411,7 @@ class StripeWebhookTest extends TestCase
             'data' => [
                 'object' => [
                     'id' => 'pi_idempotent_123',
+                    'amount_received' => 5000,
                     'metadata' => ['order_id' => $order->id],
                 ],
             ],
@@ -424,6 +487,7 @@ class StripeWebhookTest extends TestCase
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'status' => 'pending',
+            'total_amount' => 5000,
             'stripe_payment_intent_id' => 'pi_multi_secret_123',
         ]);
         InvoiceSnapshot::create([
@@ -449,6 +513,7 @@ class StripeWebhookTest extends TestCase
             'data' => [
                 'object' => [
                     'id' => 'pi_multi_secret_123',
+                    'amount_received' => 5000,
                     'metadata' => ['order_id' => $order->id],
                 ],
             ],

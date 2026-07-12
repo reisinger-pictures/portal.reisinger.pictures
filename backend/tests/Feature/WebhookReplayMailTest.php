@@ -45,6 +45,7 @@ class WebhookReplayMailTest extends TestCase
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'status' => 'pending',
+            'total_amount' => 5000,
             'stripe_payment_intent_id' => 'pi_replay_123',
         ]);
         InvoiceSnapshot::create([
@@ -69,6 +70,7 @@ class WebhookReplayMailTest extends TestCase
             'data' => [
                 'object' => [
                     'id' => 'pi_replay_123',
+                    'amount_received' => 5000,
                     'metadata' => ['order_id' => $order->id],
                 ],
             ],

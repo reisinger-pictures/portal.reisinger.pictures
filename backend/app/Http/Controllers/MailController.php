@@ -57,6 +57,12 @@ class MailController extends Controller
     {
         $gallery = Gallery::findOrFail($galleryId);
         $user = auth('api')->user();
+        if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
+
+        // IDOR guard: only users who can access the gallery may trigger the rating-finished notification.
+        if (!$user->canAccessGallery($gallery->id)) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
 
         // Strikte Logik: Wir informieren NUR Fotografen/Admins, die explizit dieser Galerie
         // zugewiesen sind UND Benachrichtigungen (wants_notifications = true) aktiviert haben.

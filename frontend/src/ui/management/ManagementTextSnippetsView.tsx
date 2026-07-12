@@ -8,6 +8,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import TextSnippetModal from './components/TextSnippetModal';
 import { TextSnippet } from '../../api';
 import EmptyState from '../components/EmptyState';
+import { sanitizeHtml } from '../../logic/sanitizeHtml';
 
 
 
@@ -73,7 +74,7 @@ export default function ManagementTextSnippetsView() {
                                 </div>
                             </div>
                             {s.shortcut && <code className="text-sm bg-base-200 p-1 rounded w-fit mt-1">/{s.shortcut}</code>}
-                            <div className="mt-4 p-3 bg-base-200/50 rounded-box border border-base-300 opacity-80 text-sm line-clamp-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: s.content_html }}></div>
+                            <div className="mt-4 p-3 bg-base-200/50 rounded-box border border-base-300 opacity-80 text-sm line-clamp-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(s.content_html) }}></div>
                         </div>
                     </div>
                 ))}

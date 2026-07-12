@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(\App\Http\Middleware\BrandContextMiddleware::class);
+        $middleware->append(\App\Http\Middleware\SetSecurityHeaders::class);
         // Registriere den Alias für unsere Admin-Middleware
         $middleware->alias([
             'management' => ManagementMiddleware::class,

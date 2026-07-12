@@ -13,7 +13,10 @@ class ManagementMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $user = auth()->user();
+        $user = auth('api')->user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
 
         if ($user->is_admin || $user->is_super_admin) {
             return $next($request);

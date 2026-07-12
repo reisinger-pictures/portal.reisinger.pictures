@@ -4,6 +4,8 @@ import { renderWithProviders } from '../../test-setup';
 import ContractSignView from '../ContractSignView';
 import { fetchSignContract } from '../../logic/useContractJoin';
 
+// DOMPurify needs a real DOM; the jsdom environment is set globally via vitest config.
+
 // --------------------------------------------------------------------------
 // Mocks
 // --------------------------------------------------------------------------
@@ -117,5 +119,42 @@ describe('ContractSignView stale detection', () => {
         act(() => { onStale(); });
 
         expect(screen.getByRole('button', { name: 'Vertrag verbindlich abschließen' })).toBeDisabled();
+    });
+
+    it('sanitizes XSS payloads from terms_html before rendering (C5 regression)', async () => {
+        // terms_html contains a malicious <script> tag + a safe paragraph.
+        // The script must be stripped before it reaches the DOM.
+        const xssData = {
+            contract: {
+                id: 'contract-xss',
+                terms_html: '<script>alert("xss")</script><p>safe content</p>',
+                items: [],
+                discounts: [],
+                billing_details: null,
+                available_roles: ['Model'],
+                content_version: 0,
+            },
+            signer: {
+                id: 'signer-1',
+                name: 'Test User',
+                email: 'test@example.com',
+                roles: ['Model'],
+                status: 'joined',
+            },
+        };
+        vi.mocked(fetchSignContract).mockResolvedValueOnce(xssData);
+
+        const { container } = renderWithProviders(<ContractSignView />);
+
+        await waitFor(() => {
+            expect(screen.getByText('safe content')).toBeInTheDocument();
+        });
+
+        // Safe paragraph rendered inside the .editor-content container
+        const editorContent = container.querySelector('.editor-content');
+        expect(editorContent?.textContent).toContain('safe content');
+        expect(editorContent?.querySelector('script')).toBeNull();
+        // No script anywhere in the rendered terms
+        expect(container.innerHTML).not.toContain('alert("xss")');
     });
 });

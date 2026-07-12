@@ -45,6 +45,11 @@ class NotificationController extends Controller {
         $user = auth('api')->user();
         if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
 
+        // IDOR guard: only users who can access the gallery may toggle notifications for it.
+        if (!$user->canAccessGallery($id)) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
+
         DB::table('user_galleries')->updateOrInsert(
             ['user_id' => $user->id, 'gallery_id' => $id],
             ['wants_notifications' => $request->wants_notifications]
@@ -56,6 +61,11 @@ class NotificationController extends Controller {
         $request->validate(['wants_notifications' => 'required|boolean']);
         $user = auth('api')->user();
         if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
+
+        // IDOR guard: only users who belong to the group may toggle notifications for it.
+        if (!$user->galleryGroups()->where('gallery_groups.id', $id)->exists()) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
 
         DB::table('user_gallery_groups')->updateOrInsert(
             ['user_id' => $user->id, 'gallery_group_id' => $id],

@@ -64,6 +64,21 @@ class WebhookController extends Controller
             if ($orderId) {
                 $order = Order::with(['user', 'invoiceSnapshot'])->find($orderId);
                 if ($order && $order->status !== 'paid') {
+                    // Amount verification: reject underpaid intents. Both values
+                    // are integer cents in EUR, so no conversion is needed.
+                    // Returns 200 so Stripe does not retry a webhook that is
+                    // legitimately signed but reflects an underpayment (fraud
+                    // scenario, not a malformed webhook). Logged for manual review.
+                    $expectedCents = (int) $order->total_amount;
+                    $receivedCents = (int) ($paymentIntent->amount_received ?? 0);
+                    if ($receivedCents < $expectedCents) {
+                        Log::warning("Stripe Webhook: underpaid intent for Order {$orderId}", [
+                            'expected_cents' => $expectedCents,
+                            'received_cents' => $receivedCents,
+                        ]);
+                        return response()->json(['status' => 'ignored', 'reason' => 'underpaid'], 200);
+                    }
+
                     $feeCents = $this->stripePayment->retrievePaymentIntentWithFee($paymentIntent->id);
                     
                     if ($feeCents === 0) {

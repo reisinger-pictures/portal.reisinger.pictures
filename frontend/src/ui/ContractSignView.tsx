@@ -7,6 +7,7 @@ import ErrorMessage from './components/ErrorMessage';
 import { fetchSignContract, sendPageExit, submitSign, SignContractResponse } from '../logic/useContractJoin';
 import { useContractHeartbeat } from '../logic/useContractHeartbeat';
 import { calcAge } from '../logic/utils';
+import { sanitizeHtml } from '../logic/sanitizeHtml';
 
 function formatMoney(cents: number): string {
     return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -131,7 +132,7 @@ export default function ContractSignView() {
                     <div className="card bg-base-100 shadow-xl">
                         <div className="card-body">
                             <h2 className="text-xl font-bold mb-4"><Trans>Vertragsinhalt</Trans></h2>
-                            <div className="editor-content prose max-w-none" dangerouslySetInnerHTML={{ __html: data.contract.terms_html }} />
+                            <div className="editor-content prose max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.contract.terms_html) }} />
                         </div>
                     </div>
                 )}
