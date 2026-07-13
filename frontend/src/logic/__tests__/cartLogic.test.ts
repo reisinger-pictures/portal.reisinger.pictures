@@ -7,7 +7,6 @@ import {
     calculateTotalAmount,
     loadCartItems,
 } from '../cartLogic';
-import {BRAND_B2B, BRAND_SRP} from '../brandRegistry';
 import {CartItem} from '../CartContext';
 
 const item = (overrides: Partial<CartItem> = {}): CartItem => ({
@@ -84,33 +83,33 @@ describe('calculateTotalAmount', () => {
         expect(calculateTotalAmount([item({price: 0}), item({price: -500})])).toBe(-500);
     });
 
-    it('defaults to B2B brand when no brand is passed', () => {
-        // legacy call without brand argument → should behave as B2B
+    it('defaults to scope licensing when no flag is passed', () => {
+        // call without useVolumePricing argument → should behave as scope licensing
         expect(calculateTotalAmount([item({price: 1000})])).toBe(1000);
     });
 
-    it('uses legacy summation for B2B brand', () => {
-        expect(calculateTotalAmount([item({price: 1000}), item({price: 2500})], BRAND_B2B)).toBe(3500);
+    it('uses legacy summation for scope licensing', () => {
+        expect(calculateTotalAmount([item({price: 1000}), item({price: 2500})], false)).toBe(3500);
     });
 
-    it('uses volume pricing for SRP brand (retroactive per-item price)', () => {
+    it('uses volume pricing when useVolumePricing is true (retroactive per-item price)', () => {
         // 3 items at tier 1 → 3000 each = 9000 (not 1000+2500+999)
         const items = [item({price: 1000}), item({price: 2500}), item({price: 999})];
-        expect(calculateTotalAmount(items, BRAND_SRP)).toBe(3 * 3000);
+        expect(calculateTotalAmount(items, true)).toBe(3 * 3000);
     });
 
-    it('SRP: 10 items at tier 2 (2500 each)', () => {
+    it('volume: 10 items at tier 2 (2500 each)', () => {
         const items = Array.from({length: 10}, (_, i) => item({photoId: `p${i}`, price: 0}));
-        expect(calculateTotalAmount(items, BRAND_SRP)).toBe(10 * 2500);
+        expect(calculateTotalAmount(items, true)).toBe(10 * 2500);
     });
 
-    it('SRP: 20 items at tier 3 (2000 each)', () => {
+    it('volume: 20 items at tier 3 (2000 each)', () => {
         const items = Array.from({length: 20}, (_, i) => item({photoId: `p${i}`, price: 0}));
-        expect(calculateTotalAmount(items, BRAND_SRP)).toBe(20 * 2000);
+        expect(calculateTotalAmount(items, true)).toBe(20 * 2000);
     });
 
-    it('SRP: empty cart returns 0', () => {
-        expect(calculateTotalAmount([], BRAND_SRP)).toBe(0);
+    it('volume: empty cart returns 0', () => {
+        expect(calculateTotalAmount([], true)).toBe(0);
     });
 });
 

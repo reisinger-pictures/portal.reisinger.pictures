@@ -14,7 +14,7 @@ import {useState, useCallback} from 'react';
 import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
 import useCoupon from '../../../logic/useCoupon';
-import {useBrand} from '../../../logic/useBrand';
+import {useLicensingMode} from '../../../logic/useLicensingMode';
 import {formatMoney} from '../../../logic/utils';
 
 interface CouponInputProps {
@@ -22,7 +22,7 @@ interface CouponInputProps {
 }
 
 export default function CouponInput({galleryId}: CouponInputProps) {
-    const {isSrp} = useBrand();
+    const licensingMode = useLicensingMode();
     const {couponCode, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon({galleryId});
     const [inputValue, setInputValue] = useState<string>('');
 
@@ -36,7 +36,8 @@ export default function CouponInput({galleryId}: CouponInputProps) {
         setInputValue('');
     }, [removeCoupon]);
 
-    if (!isSrp) {
+    // Coupons are coupled to volume licensing (VolumeLicensingStrategy.supportsCoupons()).
+    if (licensingMode !== 'volume_licensing') {
         return null;
     }
 

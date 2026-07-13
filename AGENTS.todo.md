@@ -231,5 +231,58 @@ Files: useContractJoin.test.ts, useContractHeartbeat.test.ts, ContractSignView.t
 ### Ausstehend
 
 **Umgesetzt am 2026-07-11:** C5, C6, H1, H2, H3, H4, H6 (Security-Hardening PR).
+**Umgesetzt am 2026-07-13:** Meilisearch `created_at` sortable-Fix (CustomerControllerTest), localStorage-Polyfill (Vitest pre-existing 38 Failures), exiftool/ImageMagick-Symlink-Doku (README macOS-Abschnitt), `.run/`+`sync.sh` getrackt.
 **Offen:** H5 (CI), alle Mediums (M1–M9) und Lows (L1–L5) — User entscheidet später.
-**Backend-Tests/E2E ausstehend:** PHPUnit + Playwright-Smoke konnten lokal nicht validiert werden (keine MariaDB / kein Backend-Laufzeit auf Port 4321 in dieser Umgebung). Code folgt etablierten Patterns; Validierung muss in einer Umgebung mit DB + Backend erfolgen.
+
+---
+
+## B2B Feature-Parity + Tarif-Umbenennung (2026-07-13)
+
+> Branch `feat/b2b-feature-parity`. Ziel: Alle Features brand-agnostisch über Settings steuerbar, nicht mehr über hardcoded `isSrp`/`Brand::SRP`-Gates. Vorbereitung für SRP-Stilllegung in separatem PR.
+
+### Status: Code-complete, Tests grün (bis auf Playwright-Smoke)
+
+**Vitest:** 467/467 grün · **PHPUnit (betroffene Bereiche):** 59/59 grün · **Playwright @smoke:** 40 fehlgeschlagen — muss untersucht werden (vermutlich durch Pricing-Logic-Umstellung: Volume-Licensing-Default auf B2B greift nicht ohne Setting-Eintrag).
+
+### Umgesetzt
+
+- [x] **Fix 1 — Tarif-Umbenennung:** "Premium Tarif" → "Standard Tarif", "Standard Tarif" → "Flex Tarif" in `ShootingCalculatorModal.tsx` + `CalculatorSettingsCard.tsx`. Variable `usePremium` → `useStandard`. Keine Backend-/Logik-Änderung.
+- [x] **Fix 2 — B2C Flex-Kalkulator auf B2B:** `ShootingCalculatorModal.tsx` — `isSrp &&`-Gate aus calcMode + Tab-Toggle entfernt. Beide Rechner (Flex + Standard) auf allen Brands verfügbar.
+- [x] **Fix 3a-c — Volume Licensing Setting-gesteuert:**
+  - `useLicensingMode.ts`: Liest `pricing_strategy` aus `useLicenseTerms` (API) statt hardcoded `brand === 'srp'`.
+  - `useVolumeLicensing.ts:109`: `if (!isSrp)` → `if (licensingMode !== 'volume_licensing')`.
+  - `cartLogic.ts:44`: `calculateTotalAmount(items, brand)` → `calculateTotalAmount(items, useVolumePricing: boolean)`. `CartProvider` nutzt jetzt `volumeLicensing.isVolumePricing` als单一 Source of Truth.
+  - `SettingsController::getLicenseTerms`: Liefert jetzt `pricing_strategy`-Key via API (Default `'scope_licensing'`).
+- [x] **Fix 3d-e — Coupons an Volume Licensing gekoppelt:**
+  - Frontend: `CouponInput.tsx`, `Sidebar.tsx`, `ManagementCouponsView.tsx`, `ManagementGalleryView.tsx`, `ManagementMetaGalleryView.tsx` — alle `isSrp`-Gates durch `licensingMode === 'volume_licensing'` ersetzt.
+  - Backend: `CouponController.php:332-334` — Hard-Gate `brand !== SRP` entfernt. Coupon-Verfügbarkeit wird jetzt über `PricingStrategy::supportsCoupons()` kontrolliert (Volume Licensing → Coupons erlaubt).
+- [x] **Fix 4 — CRM-Alter 16:** `CustomerController.php:43,64` — `before:-10 years` → `before:-16 years`. Birthdate bleibt `nullable` (optional). PHPUnit-Regression-Test `test_birthdate_validates_minimum_age_16` hinzugefügt (15j → 422, 16j → 200, leer → 200).
+
+### Offen / TODOs
+
+- [ ] **Playwright @smoke 40 Failures** untersuchen. Vermutung: Volume-Licensing-Default auf B2B ohne Setting-Eintrag → `useLicensingMode` liefert `'scope_licensing'` (Fallback), Cart-Logik verhält sich anders als erwartet. Entweder Tests anpassen oder `pricing_strategy=volume_licensing` als Default-Setting auf B2B setzen.
+- [ ] **PR: SRP-Stilllegung** (separater Branch nach Parity-Merge). User-Entscheidung 13.07.2026:
+  - `Brand::SRP`-Case aus Enum entfernen.
+  - Datenmigration: `UPDATE … SET brand='rp' WHERE brand='srp'` für alle betroffenen Tabellen (Galleries, Users, Orders, Photos, Settings, Customers, Coupons, Contracts, InvoiceSnapshots).
+  - `buy.reisinger.pictures`-Domain stilllegen (kein Redirect — bewusst, User-Entscheidung).
+  - Alle verbleibenden `Brand::SRP`/`isSrp`-Referenzen entfernen (~30+ Dateien).
+  - `BrandRegistry::fromHost` erkennt nur noch `rp`.
+  - Zukunft Mandanten: Brand-Architektur (`Brand`-Enum, `BrandRegistry`, `BrandContextMiddleware`) bleibt erhalten, neue Mandanten werden als neue Cases hinzugefügt.
+- [ ] **PR: Per-Gallery Licensing Override** (später). Architektur-Refactor:
+  - Neue Gallery-Spalte `licensing_mode` (nullable = inherit Brand-Setting).
+  - Mixed-Cart-Problem: Warenkorb mit Fotos aus Volume- und Scope-Licensing-Galerien erfordert Refaktorierung von `PricingStrategy::calculateCart` (pro-Item-Gruppen-Auflösung).
+  - Frontend-Cart-Total muss gemischte Modi berechnen.
+  - Migration + Model + UI. Architektonisch signifikant.
+- [ ] **`features/`-Dokumentation** aktualisieren: Neuer SOLL-Zustand für Pricing-Architektur (Setting-basiert, nicht Brand-basiert). Nach Merge des Parity-PRs.
+
+### Validierung (Stand 2026-07-13)
+
+| Suite | Ergebnis | Hinweis |
+|-------|----------|---------|
+| `pnpm lint:fix` | ✅ 0 Warnings | |
+| `pnpm build` (tsc -b) | ✅ OK | |
+| Vitest (full) | ✅ 467/467 | cartLogic-Tests auf `useVolumePricing: boolean` umgestellt, Coupon/Sidebar/CartView-Tests mit `useLicensingMode`-Mock |
+| PHPUnit (CustomerController, Coupon, Settings, Checkout) | ✅ 59/59 | |
+| PHPUnit (FileDelivery) | ✅ 24/24 isoliert | Memory-Limit nur in paralleler Voll-Suite |
+| PHPUnit (full) | ⚠️ Memory-Limit bei FileDelivery | Pre-existing, nicht durch Parity-Änderungen |
+| Playwright @smoke | ❌ 40 failed | Muss untersucht werden — siehe TODO oben |

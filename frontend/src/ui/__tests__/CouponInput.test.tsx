@@ -11,10 +11,10 @@ vi.mock('../../logic/useCoupon', () => ({
     default: () => mockUseCoupon(),
 }));
 
-const mockUseBrand = vi.fn();
+const mockLicensingMode = vi.fn();
 
-vi.mock('../../logic/useBrand', () => ({
-    useBrand: () => mockUseBrand(),
+vi.mock('../../logic/useLicensingMode', () => ({
+    useLicensingMode: () => mockLicensingMode(),
 }));
 
 vi.mock('swr', () => ({
@@ -57,8 +57,8 @@ function setupMocks(overrides: Record<string, unknown> = {}) {
     mockUseCoupon.mockReturnValue({...defaults, ...overrides});
 }
 
-function setupBrand(isSrp = true) {
-    mockUseBrand.mockReturnValue({isSrp});
+function setupLicensing(mode: 'volume_licensing' | 'scope_licensing' = 'volume_licensing') {
+    mockLicensingMode.mockReturnValue(mode);
 }
 
 function renderCouponInput() {
@@ -68,7 +68,7 @@ function renderCouponInput() {
 describe('CouponInput', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        setupBrand(true);
+        setupLicensing('volume_licensing');
     });
 
     it('renders input and button', () => {

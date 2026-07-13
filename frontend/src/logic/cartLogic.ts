@@ -1,6 +1,5 @@
 import {z} from 'zod';
 import {CartItem} from './CartContext';
-import {BRAND_B2B, BRAND_SRP, type Brand} from './brandRegistry';
 import {calculateVolumeTotal} from './useVolumeLicensing';
 
 export const cartItemSchema = z.object({
@@ -37,12 +36,12 @@ export function removeFromCartPure(prev: CartItem[], photoId: string): CartItem[
 /**
  * Summe der Preise aller Nicht-Quote-Items (isQuote falsy → zählt).
  *
- * Brand-aware: for SRP the total is computed via retroactive volume pricing
- * (all items at the same volume tier price). For RP (default) the legacy
- * per-item summation is used.
+ * Licensing-mode-aware: when `useVolumePricing` is true, the total is computed
+ * via retroactive volume pricing (all items at the same volume tier price).
+ * Otherwise the legacy per-item summation is used.
  */
-export function calculateTotalAmount(items: CartItem[], brand: Brand = BRAND_B2B): number {
-    if (brand === BRAND_SRP) {
+export function calculateTotalAmount(items: CartItem[], useVolumePricing = false): number {
+    if (useVolumePricing) {
         return calculateVolumeTotal(items);
     }
     return items.reduce((sum, item) => sum + (item.isQuote ? 0 : item.price), 0);

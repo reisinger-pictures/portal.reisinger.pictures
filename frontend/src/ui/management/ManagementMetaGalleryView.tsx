@@ -9,7 +9,7 @@ import {flattenGroups} from '../../logic/utils';
 import {GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
 import {usePermissions} from '../../logic/usePermissions';
 import {useMetaGallery} from '../../logic/useMetaGallery';
-import {useBrand} from '../../logic/useBrand';
+import {useLicensingMode} from '../../logic/useLicensingMode';
 import PageLayout from '../components/PageLayout';
 import GalleryModals from '../components/GalleryModals';
 import GalleryGroupCouponsTab from './components/GalleryGroupCouponsTab';
@@ -19,7 +19,8 @@ export default function ManagementMetaGalleryView() {
     const {id} = useParams<{ id: string }>();
     const navigate = useNavigate();
     const {isAdmin} = usePermissions();
-    const {isSrp} = useBrand();
+    const licensingMode = useLicensingMode();
+    const isVolumeLicensing = licensingMode === 'volume_licensing';
     const {tree, updateGroup, deleteGroup} = useProtectedGalleries();
     const {
         group,
@@ -34,7 +35,7 @@ export default function ManagementMetaGalleryView() {
     } = useMetaGallery(id);
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab: 'bilder' | 'coupons' =
-        isSrp && searchParams.get('tab') === 'coupons' ? 'coupons' : 'bilder';
+        isVolumeLicensing && searchParams.get('tab') === 'coupons' ? 'coupons' : 'bilder';
     const setActiveTab = (tab: 'bilder' | 'coupons') => {
         setSearchParams(prev => {
             const updated = new URLSearchParams(prev);
@@ -83,7 +84,7 @@ export default function ManagementMetaGalleryView() {
                     </div>
                 </div>
 
-                {isSrp && (
+                {isVolumeLicensing && (
                     <div role="tablist" className="tabs tabs-boxed w-full md:w-auto bg-base-200 border border-base-300 p-1 flex-wrap shadow-sm mb-6">
                         <a
                             role="tab"
@@ -147,7 +148,7 @@ export default function ManagementMetaGalleryView() {
                     </>
                 )}
 
-                {activeTab === 'coupons' && isSrp && (
+                {activeTab === 'coupons' && isVolumeLicensing && (
                     <GalleryGroupCouponsTab groupId={group.id} />
                 )}
 

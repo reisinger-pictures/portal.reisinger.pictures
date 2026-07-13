@@ -7,6 +7,7 @@ import { useAuth } from '../../logic/useAuth';
 import { usePermissions } from '../../logic/usePermissions';
 import { useCart } from '../../logic/CartContext';
 import { useBrand } from '../../logic/useBrand';
+import { useLicensingMode } from '../../logic/useLicensingMode';
 
 // --------------------------------------------------------------------------
 // Mocks
@@ -27,6 +28,10 @@ vi.mock('../../logic/useBrand', () => ({
         portalName: 'Reisinger Foto Portal',
         impressumUrl: 'https://reisinger.pictures/impressum/',
     })),
+}));
+
+vi.mock('../../logic/useLicensingMode', () => ({
+    useLicensingMode: vi.fn(() => 'scope_licensing'),
 }));
 
 vi.mock('../../logic/useAuth', () => ({
@@ -318,8 +323,9 @@ describe('Sidebar', () => {
     });
 });
 
-describe('SRP admin navigation', () => {
+describe('Volume licensing admin navigation', () => {
     beforeEach(() => {
+        vi.mocked(useLicensingMode).mockReturnValue('volume_licensing');
         vi.mocked(useAuth).mockReturnValue({
             user: { ...mockUser, is_admin: true },
             isLoading: false,
@@ -345,11 +351,10 @@ describe('SRP admin navigation', () => {
             svgUrl: '/brands/rp/safari-pinned-tab.svg',
             portalName: 'Reisinger Foto Portal',
             impressumUrl: 'https://reisinger.pictures/impressum/',
-            isSrp: true,
         });
     });
 
-    it('shows "Gutscheincode" link when isStaff, isAdmin, and isSrp are true', () => {
+    it('shows "Gutscheincode" link when isStaff, isAdmin, and volume licensing is active', () => {
         renderSidebar();
 
         expect(screen.getByText('Gutscheincode')).toBeInTheDocument();
@@ -371,15 +376,8 @@ describe('SRP admin navigation', () => {
         expect(screen.queryByText('Gutscheincode')).not.toBeInTheDocument();
     });
 
-    it('hides "Gutscheincode" link when isSrp is false', () => {
-        vi.mocked(useBrand).mockReturnValue({
-            brand: 'rp',
-            logoSrc: '/brands/rp/android-chrome-192x192.png',
-            svgUrl: '/brands/rp/safari-pinned-tab.svg',
-            portalName: 'Reisinger Foto Portal',
-            impressumUrl: 'https://reisinger.pictures/impressum/',
-            isSrp: false,
-        });
+    it('hides "Gutscheincode" link when licensing is scope_licensing', () => {
+        vi.mocked(useLicensingMode).mockReturnValue('scope_licensing');
         renderSidebar();
 
         expect(screen.queryByText('Gutscheincode')).not.toBeInTheDocument();

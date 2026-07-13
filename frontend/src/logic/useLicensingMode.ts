@@ -1,15 +1,19 @@
-import { useBrand } from './useBrand';
+import { useLicenseTerms } from './useLicenseTerms';
 
 export type LicensingMode = 'scope_licensing' | 'volume_licensing';
 
 /**
- * Determine the active licensing mode based on the current brand.
+ * Determine the active licensing mode from the backend `pricing_strategy`
+ * setting (delivered via /api/settings/license-terms).
  *
- * In the future this will be fetched from the API/settings; currently
- * it is hardcoded by brand.
+ * Falls back to 'scope_licensing' while the terms are loading or when the
+ * setting is absent. This replaces the previous hardcoded brand check and
+ * allows volume licensing (and its coupled coupons) to be enabled per-brand
+ * via the `pricing_strategy` setting.
  */
 export function useLicensingMode(): LicensingMode {
-  const { brand } = useBrand();
-  // TODO: fetch from settings/API instead of hardcoded brand check
-  return brand === 'srp' ? 'volume_licensing' : 'scope_licensing';
+  const { terms } = useLicenseTerms();
+  return terms?.pricing_strategy === 'volume_licensing'
+    ? 'volume_licensing'
+    : 'scope_licensing';
 }

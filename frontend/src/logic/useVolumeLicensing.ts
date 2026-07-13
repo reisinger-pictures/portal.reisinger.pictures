@@ -9,7 +9,7 @@
  */
 import {t} from "@lingui/core/macro";
 import {CartItem, VolumeLicensingResult} from './CartContext';
-import {useBrand} from './useBrand';
+import {useLicensingMode} from './useLicensingMode';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -103,10 +103,10 @@ export function calculateVolumeTotal(
  * so consumers can branch on this flag.
  */
 export function useVolumeLicensing(items: CartItem[]): VolumeLicensingResult {
-    const {isSrp} = useBrand();
+    const licensingMode = useLicensingMode();
     const config = DEFAULT_VOLUME_PRICING;
 
-    if (!isSrp) {
+    if (licensingMode !== 'volume_licensing') {
         return {
             tier: 1,
             pricePerItemCents: config.tier1PriceCents,

@@ -54,6 +54,10 @@ vi.mock('../../logic/useAuth', () => ({
     useAuth: vi.fn(),
 }));
 
+vi.mock('../../logic/useLicensingMode', () => ({
+    useLicensingMode: () => 'scope_licensing',
+}));
+
 vi.mock('../../logic/usePermissions', () => ({
     usePermissions: vi.fn(() => ({
         isPowerUser: false,

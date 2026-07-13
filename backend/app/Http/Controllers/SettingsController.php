@@ -133,10 +133,11 @@ class SettingsController extends Controller
             'calc_images_per_hour' => $resolver->get('calc_images_per_hour'),
             'calc_outdoor_multiplier' => $resolver->get('calc_outdoor_multiplier'),
             'calc_flatrate_multiplier' => $resolver->get('calc_flatrate_multiplier'),
-            'srp_base_price' => $resolver->get('base_price'),
-            'srp_setup_fee' => $resolver->get('setup_fee'),
-            'srp_privacy_fee' => $resolver->get('privacy_fee'),
-            'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
+                'srp_base_price' => $resolver->get('base_price'),
+                'srp_setup_fee' => $resolver->get('setup_fee'),
+                'srp_privacy_fee' => $resolver->get('privacy_fee'),
+                'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
+                'pricing_strategy' => $resolver->get('pricing_strategy') ?? 'scope_licensing',
         ]);
     }
 

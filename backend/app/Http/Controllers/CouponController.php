@@ -329,10 +329,6 @@ class CouponController extends Controller
             return response()->json(['valid' => false, 'error' => 'No brand context available.'], 400);
         }
 
-        if ($brand->value !== Brand::SRP->value) {
-            return response()->json(['valid' => false, 'error' => 'Coupons are only available on buy.reisinger.pictures.']);
-        }
-
         $userId = auth()->id();
 
         [$coupon, $error] = $this->couponService->findValidCoupon(

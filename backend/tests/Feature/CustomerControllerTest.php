@@ -175,4 +175,37 @@ class CustomerControllerTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    public function test_birthdate_validates_minimum_age_16()
+    {
+        // Under 16 → rejected (422)
+        $underagePayload = [
+            'name' => 'Too Young',
+            'email' => 'young@test.com',
+            'birthdate' => now()->subYears(15)->format('Y-m-d'),
+        ];
+        $response = $this->actingAs($this->superAdmin, 'api')
+            ->postJson('/api/management/customers', $underagePayload);
+        $response->assertStatus(422);
+
+        // Exactly 16 → accepted
+        $validPayload = [
+            'name' => 'Sixteen',
+            'email' => 'sixteen@test.com',
+            'birthdate' => now()->subYears(16)->format('Y-m-d'),
+        ];
+        $response = $this->actingAs($this->superAdmin, 'api')
+            ->postJson('/api/management/customers', $validPayload);
+        $response->assertStatus(200);
+
+        // Empty birthdate → accepted (optional)
+        $noBirthdatePayload = [
+            'name' => 'No Birthdate',
+            'email' => 'none@test.com',
+            'birthdate' => null,
+        ];
+        $response = $this->actingAs($this->superAdmin, 'api')
+            ->postJson('/api/management/customers', $noBirthdatePayload);
+        $response->assertStatus(200);
+    }
 }

@@ -3,7 +3,6 @@ import {CartItem, CartContext} from './CartContext';
 import {useAuth} from './useAuth';
 import {useUI} from '../ui/components/UIContext';
 import {addToCartPure, removeFromCartPure, calculateTotalAmount, loadCartItems} from './cartLogic';
-import {useBrand} from './useBrand';
 import {useVolumeLicensing} from './useVolumeLicensing';
 
 export interface CartProviderProps {
@@ -13,7 +12,6 @@ export interface CartProviderProps {
 export function CartProvider({children}: CartProviderProps) {
     const {user} = useAuth();
     const {showToast} = useUI();
-    const {brand} = useBrand();
     const cartKey = `rp_cart_${user?.id ? btoa(String(user.id)) : 'guest'}`;
 
     const [items, setItems] = useState<CartItem[]>(() => {
@@ -57,9 +55,9 @@ export function CartProvider({children}: CartProviderProps) {
 
     const clearCart = useCallback(() => setItems([]), []);
 
-    // Derived values: volume licensing pricing + totalAmount (brand-aware)
+    // Derived values: volume licensing pricing + totalAmount (licensing-mode-aware)
     const volumeLicensing = useVolumeLicensing(items);
-    const totalAmount = calculateTotalAmount(items, brand);
+    const totalAmount = calculateTotalAmount(items, volumeLicensing.isVolumePricing);
     const itemCount = items.length;
 
     const contextValue = useMemo(

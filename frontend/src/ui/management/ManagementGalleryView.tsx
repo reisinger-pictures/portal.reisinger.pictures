@@ -10,7 +10,7 @@ import {flattenGroups} from '../../logic/utils';
 import {useProtectedGalleries} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import {usePermissions} from '../../logic/usePermissions';
-import {useBrand} from '../../logic/useBrand';
+import {useLicensingMode} from '../../logic/useLicensingMode';
 import EmailComposerModal from './components/EmailComposerModal';
 import InviteModal from './components/InviteModal';
 import PageLayout from '../components/PageLayout';
@@ -35,10 +35,11 @@ export default function ManagementGalleryView() {
     const {tree, updateGallery, deleteGallery} = useProtectedGalleries();
     const {user} = useAuth();
     const {isAdmin, isPhotographer} = usePermissions();
-    const {isSrp} = useBrand();
+    const licensingMode = useLicensingMode();
+    const isVolumeLicensing = licensingMode === 'volume_licensing';
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab: 'bilder' | 'coupons' =
-        isSrp && searchParams.get('tab') === 'coupons' ? 'coupons' : 'bilder';
+        isVolumeLicensing && searchParams.get('tab') === 'coupons' ? 'coupons' : 'bilder';
     const setActiveTab = (tab: 'bilder' | 'coupons') => {
         setSearchParams(prev => {
             const updated = new URLSearchParams(prev);
@@ -98,7 +99,7 @@ export default function ManagementGalleryView() {
                     />
                 </div>
 
-                {isSrp && (
+                {isVolumeLicensing && (
                     <div role="tablist" className="tabs tabs-boxed w-full md:w-auto bg-base-200 border border-base-300 p-1 flex-wrap shadow-sm mb-6">
                         <a
                             role="tab"
@@ -163,7 +164,7 @@ export default function ManagementGalleryView() {
                     </>
                 )}
 
-                {activeTab === 'coupons' && isSrp && (
+                {activeTab === 'coupons' && isVolumeLicensing && (
                     <GalleryCouponsTab galleryId={gallery.id} />
                 )}
 

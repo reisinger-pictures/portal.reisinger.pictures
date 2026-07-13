@@ -11,6 +11,7 @@ export interface LicenseTerms {
     srp_setup_fee?: string;
     srp_privacy_fee?: string;
     srp_extra_image_fee?: string;
+    pricing_strategy?: string;
 
     [key: string]: string | undefined;
 }

@@ -101,7 +101,7 @@ export default function CalculatorSettingsCard() {
                     Definiere die Parameter für den manuellen "Paket-Kalkulator" in Angeboten und Rechnungen.
                 </p>
                 <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Premium Tarif</div>
+                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Standard Tarif</div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                         <div className="form-control">
                             <label className="label"><span
@@ -145,7 +145,7 @@ export default function CalculatorSettingsCard() {
                         </div>
                     </div>
 
-                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Standard Tarif</div>
+                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Flex Tarif</div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="form-control">
                             <label className="label"><span

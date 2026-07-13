@@ -4,7 +4,6 @@ import {useState} from 'react';
 import {InvoiceDiscount, InvoiceItem} from '../../../api';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {calculateB2CFlexPrice, calculateShootingPrice, ShootingDiscount} from '../../../logic/shootingCalculator';
-import {useBrand} from '../../../logic/useBrand';
 
 interface ShootingCalculatorModalProps {
     isOpen: boolean;
@@ -13,13 +12,12 @@ interface ShootingCalculatorModalProps {
 }
 
 export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}: ShootingCalculatorModalProps) {
-    const {isSrp} = useBrand();
     const {terms} = useLicenseTerms();
 
-    const [usePremium, setUsePremium] = useState(false);
-    // calcMode is derived from the current brand (via useBrand() / hostname), not from a
-    // brand-ID, so it stays in sync with the domain automatically.
-    const calcMode = (isSrp && !usePremium) ? 'srp' : 'rp';
+    const [useStandard, setUseStandard] = useState(true);
+    // calcMode selects between the "Flex" (srp) and "Standard" (rp) calculators.
+    // Both are available on every brand so admins can build any package type.
+    const calcMode = useStandard ? 'rp' : 'srp';
 
     // --- RP State ---
     const [calcDuration, setCalcDuration] = useState<number>(90);
@@ -107,15 +105,13 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                 </button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--calculator text-primary"></span>
-                    {calcMode === 'srp' ? <Trans>B2C Flex-Paket Rechner</Trans> : <Trans>Shooting-Paket Kalkulator</Trans>}
+                    {calcMode === 'srp' ? <Trans>Flex Tarif Rechner</Trans> : <Trans>Standard Tarif Rechner</Trans>}
                 </h3>
 
-                {isSrp && (
-                    <div className="tabs tabs-boxed mb-4 w-full flex bg-base-200">
-                        <button type="button" className={`tab flex-1 ${!usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(false)}><Trans>B2C Flex-Paket</Trans></button>
-                        <button type="button" className={`tab flex-1 ${usePremium ? 'tab-active font-bold' : ''}`} onClick={() => setUsePremium(true)}><Trans>Premium Tarif</Trans></button>
-                    </div>
-                )}
+                <div className="tabs tabs-boxed mb-4 w-full flex bg-base-200">
+                    <button type="button" className={`tab flex-1 ${!useStandard ? 'tab-active font-bold' : ''}`} onClick={() => setUseStandard(false)}><Trans>Flex Tarif</Trans></button>
+                    <button type="button" className={`tab flex-1 ${useStandard ? 'tab-active font-bold' : ''}`} onClick={() => setUseStandard(true)}><Trans>Standard Tarif</Trans></button>
+                </div>
 
                 {calcMode === 'srp' ? (
                     <div className="space-y-4">

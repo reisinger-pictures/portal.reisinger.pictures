@@ -25,8 +25,8 @@ vi.mock('swr/mutation', () => ({
     default: () => ({ trigger: vi.fn().mockResolvedValue(undefined), isMutating: false }),
 }));
 
-vi.mock('../../logic/useBrand', () => ({
-    useBrand: () => ({ isSrp: true }),
+vi.mock('../../logic/useLicensingMode', () => ({
+    useLicensingMode: () => 'volume_licensing',
 }));
 
 vi.mock('../components/UIContext', () => ({
