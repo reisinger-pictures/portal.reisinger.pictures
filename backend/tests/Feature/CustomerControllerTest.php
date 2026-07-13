@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Meilisearch\Contracts\TasksQuery;
 use Tests\TestCase;
 
 class CustomerControllerTest extends TestCase
@@ -24,6 +25,13 @@ class CustomerControllerTest extends TestCase
         parent::setUp();
         BrandRegistry::set(Brand::B2B);
 
+        // Flush + re-sync Meilisearch index settings so sortableAttributes
+        // (e.g. created_at on the customers index) are applied and stale
+        // documents from previous runs (without created_at) are removed.
+        \Illuminate\Support\Facades\Artisan::call('scout:flush', ['model' => Customer::class]);
+        \Illuminate\Support\Facades\Artisan::call('scout:sync-index-settings');
+        $this->waitForMeilisearchTasks();
+
         $this->superAdmin = User::factory()->create(['brand' => Brand::B2B]);
         $this->superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
@@ -32,6 +40,20 @@ class CustomerControllerTest extends TestCase
 
         $this->photographer = User::factory()->create(['brand' => Brand::B2B]);
         $this->photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
+    }
+
+    /**
+     * Wait for pending Meilisearch async tasks (flush, settings update) to finish,
+     * mirroring the pattern in SearchTest.
+     */
+    private function waitForMeilisearchTasks(): void
+    {
+        $client = app(\Meilisearch\Client::class);
+        $query = (new TasksQuery())->setStatuses(['enqueued', 'processing']);
+        foreach ($client->getTasks($query) as $task) {
+            $uid = is_array($task) ? $task['uid'] : $task->getUid();
+            $client->waitForTask($uid, 5000, 50);
+        }
     }
 
     public function test_super_admin_can_list_customers()

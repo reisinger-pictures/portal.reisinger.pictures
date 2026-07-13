@@ -55,6 +55,7 @@ class Customer extends Model
             'country' => $this->country,
             'uid' => $this->uid,
             'birthdate' => $this->birthdate?->format('Y-m-d'),
+            'created_at' => $this->created_at?->timestamp,
         ];
     }
 }
