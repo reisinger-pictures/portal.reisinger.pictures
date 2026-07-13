@@ -1,59 +1,80 @@
-/**
- * Central brand resolution (frontend mirror of backend App\Support\BrandRegistry).
- *
- * The brand identifier is the short enum code (`rp` = B2B / reisinger.pictures,
- * `srp` = SRP / buy.reisinger.pictures). See features/infrastructure/12-brand-registry-and-settings-fixes.md.
- *
- * Pure functions only — no React, no side effects. UI-specific derivations (logos, portal name)
- * live in useBrand.ts and consume these primitives.
- */
+import useSWR from 'swr';
+import {fetcher} from '../api';
 
-export const BRAND_B2B = 'rp' as const;
-export const BRAND_SRP = 'srp' as const;
-export type Brand = typeof BRAND_B2B | typeof BRAND_SRP;
+export type BrandId = string;
 
-/**
- * Resolve the brand from a hostname. `buy.*` resolves to SRP, everything else to B2B.
- * Browsers resolve `*.localhost` to 127.0.0.1 automatically — no hosts file needed.
- */
-export function getBrandFromHostname(hostname: string): Brand {
-    if (hostname.toLowerCase().startsWith('buy.')) {
-        return BRAND_SRP;
+export interface BrandFeatures {
+    coupons?: boolean;
+    orgs?: boolean;
+    volume_licensing?: boolean;
+    [key: string]: boolean | undefined;
+}
+
+export interface BrandConfig {
+    id: BrandId;
+    name: string;
+    theme: string;
+    portal_name: string;
+    impressum_url: string | null;
+    logo_path: string | null;
+    features: BrandFeatures;
+}
+
+const themeMap: Record<string, { light: string; dark: string }> = {
+    rp: {light: 'reisinger-light', dark: 'b2b-dark'},
+    srp: {light: 'srp-light', dark: 'srp-dark'},
+};
+
+const defaultTheme = {light: 'reisinger-light', dark: 'b2b-dark'};
+
+export function getBrandFromHostname(hostname: string): BrandId {
+    const h = hostname.toLowerCase();
+    if (h.startsWith('buy.') || h === 'srp.localhost' || h.endsWith('.srp.localhost')) {
+        return 'srp';
     }
-    return BRAND_B2B;
+    return 'rp';
 }
 
-export function isSrpBrand(brand: Brand): boolean {
-    return brand === BRAND_SRP;
+export function getBrandTheme(brand: BrandId): { light: string; dark: string } {
+    return themeMap[brand] ?? defaultTheme;
 }
 
-/** Setting/asset key prefix for a brand ('' for B2B, 'srp_' for SRP). */
-export function brandPrefix(brand: Brand): 'srp_' | '' {
-    return brand === BRAND_SRP ? 'srp_' : '';
+export function useBrandConfig() {
+    const {data, error, isLoading} = useSWR<BrandConfig>('/api/settings/brand-config', fetcher, {
+        dedupingInterval: 300_000,
+    });
+
+    return {
+        config: data ?? null,
+        isLoading,
+        error,
+    };
 }
 
 export function useBrand() {
-    const brand: Brand = getBrandFromHostname(window.location.hostname);
-    const isSrp = isSrpBrand(brand);
+    const brand = getBrandFromHostname(window.location.hostname);
+    const {config} = useBrandConfig();
+    const theme = getBrandTheme(brand);
+
     return {
         brand,
-        isSrp,
-        logoSrc: isSrp ? '/brands/srp/android-chrome-192x192.png' : '/brands/rp/android-chrome-192x192.png',
-        svgUrl: isSrp ? '/brands/srp/safari-pinned-tab.svg' : '/brands/rp/safari-pinned-tab.svg',
-        portalName: 'Reisinger Foto Portal',
-        impressumUrl: isSrp ? 'https://buy.reisinger.pictures/impressum/' : 'https://reisinger.pictures/impressum/'
+        config,
+        logoSrc: config?.logo_path ?? `/brands/${brand}/android-chrome-192x192.png`,
+        svgUrl: `/brands/${brand}/safari-pinned-tab.svg`,
+        portalName: config?.portal_name ?? 'Reisinger Foto Portal',
+        impressumUrl: config?.impressum_url ?? null,
+        features: config?.features ?? {},
+        theme,
     };
 }
 
 export function applyTheme() {
     const brand = getBrandFromHostname(window.location.hostname);
+    const theme = getBrandTheme(brand);
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
     const setTheme = (dark: boolean) => {
-        const theme = isSrpBrand(brand)
-            ? (dark ? 'srp-dark' : 'srp-light')
-            : (dark ? 'b2b-dark' : 'reisinger-light');
-        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-theme', dark ? theme.dark : theme.light);
         document.documentElement.setAttribute('data-brand', brand);
     };
 

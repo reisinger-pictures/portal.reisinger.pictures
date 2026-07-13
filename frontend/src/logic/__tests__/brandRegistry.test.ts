@@ -1,40 +1,43 @@
 import {describe, it, expect} from 'vitest';
 import {
-    BRAND_SRP,
-    BRAND_B2B,
-    brandPrefix,
     getBrandFromHostname,
-    isSrpBrand,
+    getBrandTheme,
 } from '../brandRegistry';
 
 describe('brandRegistry', () => {
     describe('getBrandFromHostname', () => {
-        it('resolves SRP for buy.* subdomains', () => {
-            expect(getBrandFromHostname('buy.localhost')).toBe(BRAND_SRP);
-            expect(getBrandFromHostname('buy.reisinger.pictures')).toBe(BRAND_SRP);
-            expect(getBrandFromHostname('BUY.EXAMPLE.COM')).toBe(BRAND_SRP);
+        it('resolves srp for buy.* subdomains', () => {
+            expect(getBrandFromHostname('buy.localhost')).toBe('srp');
+            expect(getBrandFromHostname('buy.reisinger.pictures')).toBe('srp');
+            expect(getBrandFromHostname('BUY.EXAMPLE.COM')).toBe('srp');
         });
 
-        it('defaults to B2B for non-SRP hosts', () => {
-            expect(getBrandFromHostname('portal.localhost')).toBe(BRAND_B2B);
-            expect(getBrandFromHostname('portal.reisinger.pictures')).toBe(BRAND_B2B);
-            expect(getBrandFromHostname('portal.test')).toBe(BRAND_B2B);
-            expect(getBrandFromHostname('example.com')).toBe(BRAND_B2B);
-            expect(getBrandFromHostname('localhost')).toBe(BRAND_B2B);
-        });
-    });
-
-    describe('isSrpBrand', () => {
-        it('returns true only for SRP', () => {
-            expect(isSrpBrand(BRAND_SRP)).toBe(true);
-            expect(isSrpBrand(BRAND_B2B)).toBe(false);
+        it('defaults to rp for non-SRP hosts', () => {
+            expect(getBrandFromHostname('portal.localhost')).toBe('rp');
+            expect(getBrandFromHostname('portal.reisinger.pictures')).toBe('rp');
+            expect(getBrandFromHostname('portal.test')).toBe('rp');
+            expect(getBrandFromHostname('example.com')).toBe('rp');
+            expect(getBrandFromHostname('localhost')).toBe('rp');
         });
     });
 
-    describe('brandPrefix', () => {
-        it('returns srp_ for SRP and empty for B2B', () => {
-            expect(brandPrefix(BRAND_SRP)).toBe('srp_');
-            expect(brandPrefix(BRAND_B2B)).toBe('');
+    describe('getBrandTheme', () => {
+        it('returns correct theme for rp', () => {
+            const theme = getBrandTheme('rp');
+            expect(theme.light).toBe('reisinger-light');
+            expect(theme.dark).toBe('b2b-dark');
+        });
+
+        it('returns correct theme for srp', () => {
+            const theme = getBrandTheme('srp');
+            expect(theme.light).toBe('srp-light');
+            expect(theme.dark).toBe('srp-dark');
+        });
+
+        it('falls back to default theme for unknown brand', () => {
+            const theme = getBrandTheme('unknown');
+            expect(theme.light).toBe('reisinger-light');
+            expect(theme.dark).toBe('b2b-dark');
         });
     });
 });

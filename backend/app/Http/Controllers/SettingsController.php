@@ -105,6 +105,24 @@ class SettingsController extends Controller
     }
 
     /**
+     * Public brand configuration for the current brand.
+     * Used by the frontend to resolve theme, feature flags, portal name, etc.
+     */
+    public function getBrandConfig()
+    {
+        $config = BrandRegistry::configOrDefault();
+        return response()->json([
+            'id' => $config->id,
+            'name' => $config->name,
+            'theme' => $config->theme,
+            'portal_name' => $config->portalName,
+            'impressum_url' => $config->impressumUrl,
+            'logo_path' => $config->logoPath,
+            'features' => (object) $config->features,
+        ]);
+    }
+
+    /**
      * R-01 (security/naming): Lizenzbedingungen + Preisfaktoren — KEINE Bank-/Firmendaten.
      * Öffentlich (Gallery-/License-Selector-/Calculator-Flows). Sensible Billing-/Impressum-Daten
      * liegen bewusst im separaten, auth-geschützten Endpunkt getBillingDetails() (SRP-Trennung).

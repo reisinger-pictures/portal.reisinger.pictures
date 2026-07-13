@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\Brand;
 use App\Models\Contract;
 use App\Support\BrandRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -54,7 +53,7 @@ class ContractPdfService
             'bankBic' => $bankDetails['bic'],
             'signers' => $signers,
             'offerMarker' => $offerMarker,
-            'isSrp' => $brand === Brand::SRP,
+            'isSrp' => $brand->value === 'srp',
             'pfx' => $brand->prefix(),
             'ageLabel' => $ageLabel,
         ]);

@@ -8,9 +8,10 @@
 
   <script>
     (function() {
-      var isSrp = window.location.hostname.toLowerCase().startsWith('buy.');
-      var brand = isSrp ? 'srp' : 'rp';
-      var themeColor = isSrp ? '#8940FA' : '#2A9D8F';
+      var host = window.location.hostname.toLowerCase();
+      var brand = host.startsWith('buy.') || host === 'srp.localhost' || host.endsWith('.srp.localhost') ? 'srp' : 'rp';
+      var themeColors = { rp: '#2A9D8F', srp: '#8940FA' };
+      var themeColor = themeColors[brand] || themeColors.rp;
       var head = document.head;
       
       var links = [

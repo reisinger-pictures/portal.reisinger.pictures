@@ -2,7 +2,6 @@
 
 namespace App\Mail;
 
-use App\Enums\Brand;
 use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +41,7 @@ class InvoiceMail extends AbstractBrandAwareMailable
                 'bankHolder' => $resolver->get('bank_holder'),
                 'bankIban' => $resolver->get('bank_iban'),
                 'bankBic' => $resolver->get('bank_bic'),
-                'isSrp' => $this->brand === Brand::SRP,
+                'isSrp' => $this->brand?->value === 'srp',
                 'pfx' => $this->brand?->prefix() ?? '',
             ]);
 

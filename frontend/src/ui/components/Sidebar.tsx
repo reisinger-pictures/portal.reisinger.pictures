@@ -21,7 +21,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar(props: SidebarProps) {
-    const { logoSrc, portalName, impressumUrl, isSrp } = useBrand();
+    const { logoSrc, portalName, impressumUrl, features } = useBrand();
     const {user, logout} = useAuth();
     const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isOrgAdmin, showOrgsSection } = usePermissions();
     const licensingMode = useLicensingMode();
@@ -68,7 +68,7 @@ export default function Sidebar(props: SidebarProps) {
                         )}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> <Trans>Suche & Entdecken</Trans></Link></li>
 
-                        {isAdmin && !isSrp && (
+                        {isAdmin && (
                             <>
                                 <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Büro & Dokumente</Trans></li>
                                 <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> <Trans>Shop-Bestellungen</Trans></Link></li>
@@ -94,7 +94,7 @@ export default function Sidebar(props: SidebarProps) {
                         )}
 
                         <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Verwaltung</Trans></li>
-                        {(isAdmin || isOrgAdmin) && showOrgsSection && !isSrp && (
+                        {(isAdmin || isOrgAdmin) && showOrgsSection && features.orgs && (
                             <>
                                 <li><Link to="/orgs" className={props.currentView?.startsWith('orgs') ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--domain text-lg"></span> <Trans>Organisationen</Trans></Link></li>
                                 <li><Link to="/users" className={props.currentView === 'users' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-group text-lg"></span> {isOrgAdmin && !isAdmin ? <Trans>Mein Team</Trans> : <Trans>Benutzer & Rechte</Trans>}</Link></li>
@@ -128,7 +128,7 @@ export default function Sidebar(props: SidebarProps) {
 
             <div className="mt-auto border-t border-base-300 bg-base-200 shrink-0">
                 <div className="p-3 text-center">
-                    <a href={impressumUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <a href={impressumUrl ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                         <span className="iconify mdi--open-in-new"></span> <Trans>Impressum & Datenschutz</Trans>
                     </a>
                 </div>

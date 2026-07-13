@@ -24,9 +24,14 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('../../logic/useBrand', () => ({
     useBrand: vi.fn(() => ({
+        brand: 'rp',
+        features: { coupons: true, orgs: true },
+        config: null,
         logoSrc: '/brands/rp/android-chrome-192x192.png',
+        svgUrl: '/brands/rp/safari-pinned-tab.svg',
         portalName: 'Reisinger Foto Portal',
         impressumUrl: 'https://reisinger.pictures/impressum/',
+        theme: { light: 'reisinger-light', dark: 'b2b-dark' },
     })),
 }));
 
@@ -347,10 +352,13 @@ describe('Volume licensing admin navigation', () => {
         });
         vi.mocked(useBrand).mockReturnValue({
             brand: 'rp',
+            features: { coupons: true, orgs: true },
+            config: null,
             logoSrc: '/brands/rp/android-chrome-192x192.png',
             svgUrl: '/brands/rp/safari-pinned-tab.svg',
             portalName: 'Reisinger Foto Portal',
             impressumUrl: 'https://reisinger.pictures/impressum/',
+            theme: { light: 'reisinger-light', dark: 'b2b-dark' },
         });
     });
 

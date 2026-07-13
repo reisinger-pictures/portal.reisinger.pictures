@@ -47,6 +47,7 @@ Route::get('/ping', function () {
 })->name('api.ping');
 // R-01 (naming): Lizenzbedingungen + Preisfaktoren — öffentlich, KEINE Bank-/Firmendaten
 // (diese liegen in /settings/billing-details hinter auth:api).
+Route::get('/settings/brand-config', [SettingsController::class, 'getBrandConfig'])->name('api.settings.brand-config');
 Route::get('/settings/license-terms', [SettingsController::class, 'getLicenseTerms'])->name('api.settings.license-terms');
 Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index'])->name('api.settings.license-catalog');
 

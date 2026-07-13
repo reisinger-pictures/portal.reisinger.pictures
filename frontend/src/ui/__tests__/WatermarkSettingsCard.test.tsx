@@ -82,12 +82,14 @@ describe('WatermarkSettingsCard', () => {
             setUnsavedChanges: vi.fn(),
         });
         vi.mocked(useBrand).mockReturnValue({
+            brand: 'rp',
+            features: { coupons: true, orgs: true },
+            config: null,
             logoSrc: '',
+            svgUrl: '/brand.svg',
             portalName: 'Test Portal',
             impressumUrl: '',
-            svgUrl: '/brand.svg',
-            brand: 'rp' as const,
-            isSrp: false,
+            theme: { light: 'reisinger-light', dark: 'b2b-dark' },
         });
 
         // --- default fetch: return a valid SVG blob ---

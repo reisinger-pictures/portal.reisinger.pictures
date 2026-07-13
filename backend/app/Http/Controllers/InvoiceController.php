@@ -32,7 +32,7 @@ class InvoiceController extends Controller
                 'bankHolder' => $resolver->get('bank_holder'),
                 'bankIban' => $resolver->get('bank_iban'),
                 'bankBic' => $resolver->get('bank_bic'),
-                'isSrp' => $brand === \App\Enums\Brand::SRP,
+                'isSrp' => $brand->value === 'srp',
                 'pfx' => $brand->prefix(),
             ])->download($order->invoiceSnapshot->invoice_number . '.pdf');
         } finally {
@@ -70,7 +70,7 @@ class InvoiceController extends Controller
         $viewName = $isOffer ? 'pdf.manual_offer' : 'pdf.invoice';
         $bankDetails = $this->invoiceService->getBankDetails();
 
-        $isSrp = \App\Support\BrandRegistry::isSrp();
+        $isSrp = \App\Support\BrandRegistry::configOrDefault()->id === 'srp';
         $pfx = \App\Support\BrandRegistry::prefix();
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
