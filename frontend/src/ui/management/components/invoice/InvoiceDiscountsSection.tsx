@@ -82,14 +82,14 @@ export default function InvoiceDiscountsSection({
                                 mapResponse={(data) => data.map(p => ({
                                     id: p.id,
                                     title: p.name,
-                                    subtitle: `${p.price.toFixed(2)} ${p.type === 'discount_percent' ? '%' : '€'}`,
+                                    subtitle: `${(p.price / 100).toFixed(2)} ${p.type === 'discount_percent' ? '%' : '€'}`,
                                     raw: p
                                 }))}
                                 onSelect={(p) => {
                                     onDiscountChange(idx, 'type', p.type || 'discount_fixed');
                                     onDiscountChange(idx, 'description', p.name);
                                     onDiscountChange(idx, 'notes', p.description || '');
-                                    onDiscountChange(idx, 'price', p.type === 'discount_percent' ? p.price : p.price / 100);
+                                    onDiscountChange(idx, 'price', p.price / 100);
                                 }}
                                 placeholder={t`z.B. Stammkundenrabatt`}
                                 className="input input-sm input-bordered w-full bg-base-100"

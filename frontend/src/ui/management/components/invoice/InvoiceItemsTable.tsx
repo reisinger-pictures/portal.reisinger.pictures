@@ -62,7 +62,7 @@ export default function InvoiceItemsTable({
                                 mapResponse={(data) => data.map(p => ({
                                     id: p.id,
                                     title: p.name,
-                                    subtitle: `${p.price.toFixed(2)} €`,
+                                    subtitle: `${(p.price / 100).toFixed(2)} €`,
                                     raw: p
                                 }))}
                                 onSelect={(p) => {
