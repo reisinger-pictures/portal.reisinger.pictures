@@ -31,11 +31,10 @@ export class E2ESessionHelper {
         return this.adminToken || '';
     }
 
-    async loginAs(email: string, password: string, options?: { brand?: string }): Promise<string> {
-        const referer = options?.brand === 'srp' ? 'http://buy.localhost:4321/' : 'http://localhost:4321/';
+    async loginAs(email: string, password: string, _options?: { brand?: string }): Promise<string> {
         const loginRes = await this.request.post('/api/auth/login', {
             data: { email, password },
-            headers: { 'Accept': 'application/json', 'Referer': referer },
+            headers: { 'Accept': 'application/json' },
         });
         if (!loginRes.ok()) throw new Error(`Login failed for ${email}: ${await loginRes.text()}`);
         const cookies = loginRes.headers()['set-cookie'];
@@ -79,9 +78,7 @@ export class E2ESessionHelper {
             headers
         });
 
-        // Password reset must include a Referer matching the user's brand —
-        // AuthController::resetPassword checks brand mismatch (U-01).
-        const refererBrand = options?.brand === 'srp' ? 'http://buy.localhost:4321/' : 'http://localhost:4321/';
+        const refererBrand = 'http://localhost:4321/';
         const mailpit = new MailpitHelper(this.request);
         const token = await mailpit.extractPasswordResetToken(email);
         const resetRes = await this.request.post('/api/auth/reset-password', {

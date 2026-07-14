@@ -64,7 +64,7 @@ class SettingsController extends Controller
     {
         $request->validate([
             'opacity' => 'nullable|numeric|min:0.05|max:1.0',
-            'svg' => 'nullable|file',
+            'svg' => 'nullable|file|mimes:svg|max:512',
             'bucket_500' => 'nullable|file',
             'bucket_1000' => 'nullable|file',
             'bucket_2000' => 'nullable|file',

@@ -109,7 +109,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('api', fn (Request $request) =>
-            Limit::perMinute((int) env('API_THROTTLE_LIMIT', 120))->by($request->user('api')?->getKey() ?? $request->ip())
+            Limit::perMinute(config('app.throttle_api', 120))->by($request->user('api')?->getKey() ?? $request->ip())
         );
 
         RateLimiter::for('coupon-validate', fn (Request $request) =>

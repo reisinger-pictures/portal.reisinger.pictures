@@ -14,8 +14,8 @@ test.describe('Coupon Checkout Re-validation', () => {
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
-        photogUser = await helper.createIsolatedUser('photographer', { brand: 'srp' });
-        buyerUser = await helper.createIsolatedUser('power_user', { brand: 'srp' });
+        photogUser = await helper.createIsolatedUser('photographer', { brand: 'rp' });
+        buyerUser = await helper.createIsolatedUser('power_user', { brand: 'rp' });
     });
 
     test.afterEach(async () => {
@@ -27,14 +27,14 @@ test.describe('Coupon Checkout Re-validation', () => {
         const upload = new UploadHelper(page);
         const galleryHelper = new GalleryHelper(page, helper);
 
-        await auth.login(photogUser.email, photogUser.password, 'http://buy.localhost:4321/');
+        await auth.login(photogUser.email, photogUser.password, 'http://localhost:4321/');
 
         const galleryName = `Coupon Chk ${Math.random().toString(36).substring(2, 10)}`;
         await galleryHelper.createAndOpenDeliveryGallery(galleryName, 'Öffentlich (Für alle sichtbar)');
 
         await upload.uploadSampleImage();
         const galleryUrl = page.url();
-        await auth.logout('http://buy.localhost:4321/');
+        await auth.logout('http://localhost:4321/');
 
         return { galleryUrl, galleryName };
     }
@@ -63,7 +63,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         });
 
         const auth = new AuthHelper(page);
-        await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
+        await auth.login(buyerUser.email, buyerUser.password, 'http://localhost:4321/');
 
         await addItemToCart(page, galleryName);
 
@@ -105,7 +105,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         });
 
         const auth = new AuthHelper(page);
-        await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
+        await auth.login(buyerUser.email, buyerUser.password, 'http://localhost:4321/');
 
         await addItemToCart(page, galleryName);
 
@@ -160,7 +160,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         });
 
         const auth = new AuthHelper(page);
-        await auth.login(buyerUser.email, buyerUser.password, 'http://buy.localhost:4321/');
+        await auth.login(buyerUser.email, buyerUser.password, 'http://localhost:4321/');
 
         await addItemToCart(page, galleryName);
 

@@ -118,7 +118,7 @@ class OrgInviteController extends Controller
             \Illuminate\Support\Facades\Auth::guard('api')->logout();
             $token = \Illuminate\Support\Facades\Auth::guard('api')->login($user);
             $ttl = \Illuminate\Support\Facades\Auth::guard('api')->factory()->getTTL();
-            $cookie = cookie('rp_jwt', $token, $ttl, '/', null, env('APP_ENV') !== 'local', true, false, 'Lax');
+            $cookie = cookie('rp_jwt', $token, $ttl, '/', null, !app()->environment('local'), true, false, 'Lax');
             return response()->json(['success' => true])->withCookie($cookie);
         });
     }

@@ -61,13 +61,13 @@
 
 ## B2B Feature-Parity + Tarif-Umbenennung (2026-07-13)
 
-> Branch `feat/b2b-feature-parity`. Ziel: Alle Features brand-agnostisch über Settings steuerbar, nicht mehr über hardcoded `isSrp`/`Brand::SRP`-Gates. Vorbereitung für SRP-Stilllegung in separatem PR.
+> Branch `feat/b2b-feature-parity` (gemerged). Ziel: Alle Features brand-agnostisch über Settings steuerbar, nicht mehr über hardcoded `isSrp`/`Brand::SRP`-Gates. SRP-Entfernung erfolgt im Brand-Refactor (`1831116`, siehe unten).
 
 
 ### Offen
 
-- [ ] **Playwright @smoke verifizieren** — AGENTS.todo.md meldete 40 Failures vom 2026-07-13 (vermutlich Volume-Licensing-Default ohne Setting-Eintrag). Keine `.last-run.json` auf Disk, Status unbekannt. Nach dem DB-Brand-Refactor (`4075ad8`) neu messen: `pnpm test:e2e:smoke`. Timeout: 15 min (900000ms, ca. 2× Laufzeit).
-- [ ] **PR: Multi-Tenant-Fertigstellung** (Generalisierung der SRP-Forks) — siehe Abschnitt "Multi-Tenant-Fertigstellung" unten. *Strategie-Pivot: statt SRP auf RP zu kollabieren, werden die `isSrp`-Forks generalisiert, damit neue Brands ohne Code-Änderung anlegbar sind.*
+- [ ] **Playwright @smoke** — nach dem Brand-Refactor (`1831116`) sind die `@smoke`-Brand-Tests kaputt (siehe "Offen Punkt 2" im Abschnitt "Brand-Refactor" unten). PHPUnit/Vitest jedoch grün.
+- [x] **Brand-Refactor umgesetzt** (`1831116`, `config/brands.php`-Route) — siehe Abschnitt "Brand-Refactor" unten. *2 offene Punkte vor Push: Datenmigration + E2E-Tests.*
 - [ ] **PR: Per-Gallery Licensing Override** (später). Architektur-Refactor:
   - Neue Gallery-Spalte `licensing_mode` (nullable = inherit Brand-Setting).
   - Mixed-Cart-Problem: Warenkorb mit Fotos aus Volume- und Scope-Licensing-Galerien.
@@ -76,142 +76,87 @@
 
 
 
-## Multi-Tenant-Fertigstellung — Generalisierung der SRP-Forks (2026-07-14)
+## Brand-Refactor — SRP entfernt, config-Driven (Commit `1831116`, 2026-07-14)
 
-> **Strategie-Pivot:** Die ursprüngliche "SRP-Stilllegung = auf RP kollabieren" wird verworfen. Sie wäre anti-Multi-Tenant (neue Brands fielen immer auf RP zurück). Stattdessen: SRP-Forks **generalisieren** auf `BrandConfig`/DB-Driven, sodass **Brand anlegen = DB-Zeile in `brands` + optional ein daisyUI-Theme** ist — kein Refactoring bestehender Code-Forks pro neue Marke.
->
-> Stand: Exploration des aktuellen `main` (inkl. Refactor `4075ad8` "DB-driven brand config"). **Noch nichts umgesetzt** — alle SRP-Referenzen intakt.
+> **Umgesetzt** in Commit `1831116` (auf `main`, 1 ahead of origin, ungepusht). Strategie weicht vom ursprünglich dokumentierten Plan ab — siehe "Strategie-Historie" unten. **2 offene Punkte** vor Push (Datenmigration + E2E-Tests).
 
-### Status-Check: Was bereits pro-Tenant funktioniert (kein Handlungsbedarf)
+### Was der Commit tatsächlich gemacht hat
 
-| Aspekt | Mechanismus | Beweis |
-|--------|-------------|--------|
-| **Features pro Brand** | `features` JSON auf `brands`-Tabelle (`coupons`, `orgs`, `volume_licensing`) | `V027__create_brands_table.php`, `BrandConfig::hasFeature()` (`Values/BrandConfig.php:29`) |
-| **Pricing-Settings pro Brand** | `settings`-Tabelle mit `brand`-Spalte; `SettingResolver::get()` scoped nach Current-Brand, Fallback auf `rp` | `SettingResolver.php:23-37` |
-| **Pricing-Strategie pro Brand** | Setting `pricing_strategy` aktiviert `VolumeLicensingStrategy` — **nicht** mehr `isSrp()`-gebunden (Refactor `4a291ed`) | `VolumeLicensingStrategy.php`, `useLicensingMode.ts` |
-| **Frontend-Bezug** | `/api/settings/brand-config` liefert alles, `useBrandConfig()` (SWR) | `brandRegistry.ts:42-52` |
-| **Brand-Isolation** | `BrandRegistry` + `BrandContextMiddleware` + `forCurrentBrand()`-Scopes | bestätigte Stärke (s. Bestätigte Stärken) |
+Der Commit implementiert eine **statische `config/brands.php`**-Route (statt der ursprünglich geplanten DB-Tabelle-Erweiterung) und **entfernt SRP vollständig** (statt `Brand::SRP` zu erhalten):
 
-**Antwort auf User-Frage "Pricing pro Tenant konfigurierbar?": Ja, vollständig umgesetzt.**
+| Maßnahme | Detail |
+|----------|--------|
+| **`config/brands.php` neu** | Statische Brand-Konfiguration (aktuell nur `rp`), felder: `name`, `theme`, `hostnames`, `features`, `frontend_url`, `from_address`, `from_name`, `accounting_email`, `primary_color`, `secondary_color`. |
+| **`brands`-Tabelle gedroppt** | `V029__drop_brands_table.php` — `Schema::dropIfExists('brands')`. `V030` erweitert `contracts.brand` auf `VARCHAR(20)`. |
+| **`Brand::SRP`-Enum-Case entfernt** | `app/Enums/Brand.php` nur noch `case B2B = 'rp'`. `prefix()`/`domain()` vereinfacht. |
+| **`BrandConfig` Value Object erweitert** | +6 Felder: `frontendUrl`, `fromAddress`, `fromName`, `accountingEmail`, `primaryColor`, `secondaryColor`. |
+| **`BrandRegistry` auf config umgestellt** | `loadAllConfigs()` liest `config('brands')` statt DB; `hardcodedConfig()` entfernt; `isSrp()` → `currentId()`; `fromHost()`-`buy.`-Fallback ersetzt durch `*.localhost`-Dev-Fallback. |
+| **`AsBrand`-Cast neu** | `app/Casts/AsBrand.php` — `Brand::tryFrom($value) ?? $value` (liefert rohen String bei unbekannten Werten). Auf 14 Models angewandt. |
+| **Backend-Forks generalisiert** | `AbstractBrandAwareMailable`, `InvoiceController`, `InvoiceMail`, `ContractPdfService`, `SettingResolver` — `isSrp` entfernt, auf `BrandConfig`-Felder umgestellt. |
+| **`UpdateUserRequest` dynamisch** | `Rule::in(array_keys(config('brands')))` statt `in:rp,srp`. |
+| **PDF-Blade** | `isSrp`-Ternaries → feste RP-Farben (`#1E5631`/`#A4B494`). |
+| **Frontend** | `brandRegistry.ts` Dev-Fallback `*.localhost`, `themeMap` nur `rp`, daisyUI `srp-*`-Themes entfernt, Typen → `string`. |
+| **Gelöscht** | `SrpSettingsSeeder.php`, `app/Models/Brand.php`, `frontend/public/brands/srp/*` (10 Assets), 5 SRP-only Testfiles, `SettingsBrandPrefixTest.php`. |
 
-### Strategie-Entscheidungen (User, 14.07.2026)
+### Verifikation (Stand 14.07.2026)
 
-- SRP-Forks werden **generalisiert** (`BrandConfig`/DB-getrieben), **NICHT** auf RP kollabiert.
-- `Brand::SRP`-Enum-Case, `brands`-DB-Zeile (SRP), Scoping-Middleware, Multi-Brand-Maschinerie **bleiben erhalten**.
-- **Operational-Felder** (`frontend_url`, `from_address`, `from_name`, `accounting_email`) → neue Spalten auf `brands`-Tabelle (Migration V029). Single Source of Truth.
-- **Farben NICHT generalisiert** — PDF-Farben und daisyUI-Themes bleiben hardcoded/templatet. Begründung (User): zu großer Theme-Refactor für marginalen Nutzen. Wer später Brand-spezifische Farben will → eigenes Ticket.
-- Keine Datenmigration bestehender SRP-Daten. Keine Domain-Stilllegung `buy.reisinger.pictures`.
+| Suite | Ergebnis |
+|-------|----------|
+| **PHPUnit** | ✅ 973 passed (2279 Assertions), 36.62s |
+| **Vitest** | ✅ 469 passed (46 Files), 3.13s |
+| **ESLint** | ✅ `--max-warnings 0` |
+| **Build (tsc+vite)** | ✅ 931ms |
+| **Playwright @smoke** | ❌ **nicht lauffähig** — siehe offener Punkt 2 |
 
-### 1. Schema — `brands`-Tabelle erweitern (Migration V029)
+`grep`-Verifikation (Production-Code): Keine fatalen Referenzen auf `Brand::SRP`, `isSrp()`, `BrandModel`, `SrpSettingsSeeder` — alle sauber entfernt. 13 `brand`-Spalten in der Live-DB = `VARCHAR(20)` (konsistent).
 
-- [ ] **Neue Migration V029** — Spalten hinzufügen (alle nullable, daoptional pro Brand):
-  - `frontend_url` (nullable string) — pro-Brand Frontend-URL (ersetzt `config('app.frontend_url_srp')`).
-  - `from_address` (nullable string) — Mail-Absender-Adresse (ersetzt `config('mail.from_srp.address')`).
-  - `from_name` (nullable string) — Mail-Absender-Name (ersetzt `config('mail.from_srp.name')`).
-  - `accounting_email` (nullable string) — BCC-Accounting (ersetzt `config('services.accounting_email_srp')`).
-- [ ] **Default-Werte** für bestehende `rp`- und `srp`-Zeilen aus aktuellen Config-Keys befüllen (RP: `portal.reisinger.pictures`, SRP: `buy.reisinger.pictures`).
-- [ ] **Migration-Policy-Check:** V028 ist die letzte deployte Migration. V029 als neue separate Migration (nicht V028 erweitern, da V028 live). Vor Deployment ggf. mit anderen ≥V025 konsolidieren.
-- [ ] **Deprecation-Notiz:** `config/app.php:65 frontend_url_srp`, `config/mail.php:42-45 from_srp`, `config/services.php:53-54 accounting_email_*` werden zu totem Code nach Generalisierung. Entfernen im selben PR.
+### 🔴 Offen — vor Push zu lösen
 
-### 2. `BrandConfig` Value Object erweitern (`backend/app/Values/BrandConfig.php`)
+#### 1. Datenmigration für 63 verwaiste `brand='srp'`-Zeilen fehlt
 
-- [ ] Neue readonly-Felder: `?string $frontendUrl`, `?string $fromAddress`, `?string $fromName`, `?string $accountingEmail`.
-- [ ] `backend/app/Models/Brand.php::toConfig()` — DB-Spalten → Value Object mappen.
-- [ ] `backend/app/Support/BrandRegistry.php::hardcodedConfig()` L130-149 — Fallback-Configs für `rp`/`srp` um neue Felder ergänzen (für Tests / Missing-Table-Szenario).
-
-### 3. Backend Production-Forks generalisieren (`=== 'srp'` → `$config->...`)
-
-- [ ] **`AbstractBrandAwareMailable.php:27-56`** — drei Methoden auf `BrandConfig` umstellen:
-  - `brandFrontendUrl()` L27-33: `$this->brand?->value === 'srp' ? config('app.frontend_url_srp') : config('app.frontend_url')` → `BrandRegistry::configForBrand($this->brand?->value)?->frontendUrl ?? config('app.frontend_url')`.
-  - `brandBcc()` L40-44: Ternary → `$config?->accountingEmail ?? config('services.accounting_email')`.
-  - `applyBrandFrom()` L46-56: SRP-Zweig → `$config?->fromAddress ?? config('mail.from.address')`.
-- [ ] **`BrandRegistry.php`** — `fromHost()` L24-26: Produktions-Fallback `str_starts_with('buy.') → Brand::SRP` **entfernen** (DB-Pfad via `resolveConfigFromHost()` matched die `hostnames`-Spalte). Stattdessen **Dev-Fallback auf `.localhost`-Subdomains** einführen: matched `*.localhost` → Brand aus Subdomain ableiten (`srp.localhost → srp`, `acme.localhost → acme`). Erlaubt lokales Testen/Debuggen neuer Brands ohne DB-Konfig/hosts-Eintrag. `isSrp()` L61-64 **entfernen** (anti-Multi-Tenant, keine Caller nach Phase 3).
-- [ ] **`SettingResolver.php:18-21`** — `isSrp()`-Wrapper entfernen. Class-Docblock L8-15 von `srp_*`-Prefix-Historie bereinigen.
-- [ ] **`InvoiceController.php`** — L35 `'isSrp' => $brand->value === 'srp'` löschen; L73 `$isSrp = ...` + L83 `'isSrp' => $isSrp` löschen.
-- [ ] **`ContractPdfService.php:56`** — `'isSrp' => $brand->value === 'srp'` löschen.
-- [ ] **`InvoiceMail.php:44`** — `'isSrp' => $this->brand?->value === 'srp'` löschen.
-- [ ] **`UpdateUserRequest.php:28`** — `in:rp,srp` → dynamisch gegen `brands`-Tabelle: `Rule::in(\App\Models\Brand::pluck('id'))`. Comments L26, L56, L61 bereinigen.
-- [ ] **`ProcessCollectiveInvoices.php:12`** — Signatur-Helptext `rp|srp` → `rp` (oder dynamisch).
-
-### 4. PDF Blade Views — Farben hardcoded, `isSrp`-Variable entfernen
-
-> **Entscheidung (User):** PDF-Farben bleiben hardcoded RP-Palette. Keine Theme-Generalisierung in diesem PR.
-
-- [ ] **`resources/views/pdf/header.blade.php:8-9`** — Ternaries auflösen zu festen Farben (`#1E5631` primary / `#A4B494` secondary). `$isSrp`-Variable nicht mehr referenzieren.
-- [ ] **`resources/views/pdf/invoice.blade.php:7-8`** — Ternaries → fest. L28: `isSrp` aus `@include('pdf.header', ...)` entfernen.
-- [ ] **`resources/views/pdf/manual_offer.blade.php:7-8,27`** — gleiches Pattern.
-- [ ] **`resources/views/pdf/contract_signatures.blade.php:33`** — `isSrp` aus `@include` entfernen.
-
-### 5. Frontend Generalisierung
-
-- [ ] **`frontend/src/logic/brandRegistry.ts`**
-  - L4 `BrandId = string` bleibt locker (bereits korrekt für N-Brands).
-  - L23-26 `themeMap`: `srp`-Eintrag **behalten** (SRP-Theme existiert). Für neue Brands → Theme-Name aus `brand-config` API (`config.theme`) statt hartes `themeMap`-Lookup. `getBrandTheme` auf Config-getrieben umstellen.
-  - L30-36 `getBrandFromHostname`: `buy.`/`srp.localhost`-Branch **entfernen** — Brand-Auflösung erfolgt bereits via `/api/settings/brand-config` (DB-getrieben). Hostname-Detection nur noch Default `rp` als Pre-Boot-Fallback.
-- [ ] **`frontend/index.html:11-14`** — Boot-Script: `brand = host.startsWith('buy.') ? 'srp' : 'rp'` → Production-Pfad defaultet auf `rp`; **Dev-Fallback für `*.localhost`** (z.B. `srp.localhost → srp`, `acme.localhost → acme`) zur lokalen Brand-Subdomain-Ableitung. `themeColors.srp` entfernen (Theme wird nach React-Mount via `useBrandConfig()` korrigiert). Mit `BrandRegistry::fromHost()` synchron halten (gleiche Dev-Fallback-Logik).
-- [ ] **Frontend-Typen `'rp' | 'srp' | null` → `string | null`:**
-  - `UserPermissionsModal.tsx` L13, L33, L42, L128 — Union → `string`. L132 `<option value="srp">` **entfernen** (oder dynamisch aus `/api/brands` rendern — Entscheidung: hardcoded entfernen, Folgeticket für dynamische Brand-Auswahl). L37 Comment bereinigen.
-  - `ManagementUserView.tsx:33` — `brand: 'rp' | 'srp' | null` → `string | null`.
-  - `useUsers.ts:26-28,54,61` — `brand?: 'rp' | 'srp' | null` → `string | null`.
-  - `ManagementFtpInbox.tsx:8-11` — `brandLabels`-Map: `srp`-Eintrag entfernen oder auf dynamische Brand-Labels umstellen.
-- [ ] **`CouponInput.tsx:1-11`** — Stale Docblock bereinigen (entfernt fälschliche `useBrand().isSrp`-Referenz; tatsächlicher Guard ist `useLicensingMode()`).
-- [ ] **`vite.config.ts:46`** — `buy.localhost` aus `allowedHosts` entfernen.
-- [ ] **`index.css:62-114,117`** — `srp-light`/`srp-dark` daisyUI-Themes **behalten** (SRP-Theme als Beispiel).
-
-### 6. Tests (intern gestaffelt: DELETE → SEARCH-AND-REPLACE → REWRITE)
-
-**6a. SRP-only Test-Files LÖSCHEN (4):**
-- [ ] `backend/tests/Feature/SrpSettingsSeederTest.php`
-- [ ] `backend/tests/Feature/Checkout/CheckoutServiceSrpTest.php` — *VolumeLicensingStrategy bleibt produktiv; Logik bleibt durch `VolumeLicensingStrategyTest.php` covered (wird in 6c genericisiert).*
-- [ ] `frontend/tests/e2e/brand/srp-dashboard.spec.ts`
-- [ ] `frontend/tests/e2e/client/srp-volume-pricing.spec.ts`
-
-**6b. SEARCH-AND-REPLACE (generische Fixture-Tests):** `Brand::SRP`/`'srp'` bleibt als gültige zweite Brand-Fixture (SRP-Case existiert ja weiter!), aber `isSrp()`-Assertionen entfernen.
-- [ ] Backend: `CouponServiceTest.php` (54), `CouponControllerTest.php` (17), `CheckoutServiceTest.php` (10), `BrandQueueResetTest.php` (3), `Authorization/AccessControlServiceTest.php` (3), `FtpImportTest.php` (2), `TextSnippetControllerTest.php` (2), `Contract/ContractControllerTest.php` (1), `CustomerControllerTest.php` (1), `CheckoutStripeErrorTest.php` (1).
-- [ ] E2E: `coupon-admin-crud.spec.ts`, `coupon-gallery-scope.spec.ts`, `coupon-checkout-revalidation.spec.ts`.
-
-**6c. REWRITE — Isolation-Tests (Entscheidung: "Behalten & anpassen"):** Generische Scoping/Leak-Assertions bleiben erhalten (Multi-Brand-Maschinerie existiert weiter), nur SRP-spezifische Assertions entfernen (`isSrp()`-Aufrufe, PDF-Farb-Assertions, "SRP hat Volume-Licensing"-Hardcoding).
-- [ ] `BrandRegistryTest.php` — `isSrp`-Tests entfernen; `fromHost`-Tests generalisieren (DB-getrieben statt `buy.`-Fallback).
-- [ ] `SettingResolverTest.php` — `isSrp()`-Tests entfernen; Brand-Scoped Read/Write-Tests bleiben.
-- [ ] `SettingsBrandPrefixTest.php` — `srp_*`-Prefix-Logik-Tests reviewen (Prefix-Mapping wird deprecated).
-- [ ] `BrandLeakTest.php` — Brand-Leak-Konzept bleibt (reconstruct-from-order, not host); SRP-spezifische Assertionen generalisieren.
-- [ ] `Auth/BrandLoginTest.php` — Cross-Brand-Login bleibt gültig (SRP als zweite Brand); Assertions generalisieren.
-- [ ] `BrandScopingTest.php`, `SitemapControllerTest.php` — Brand-Scoping-Tests bleiben, SRP als zweite Brand.
-- [ ] `CheckoutCouponRevalidationTest.php` — von SRP-brand-hardcoded auf `pricing_strategy=volume_licensing` Setting umstellen.
-- [ ] `Pricing/VolumeLicensingStrategyTest.php` — genericisieren: `Brand::SRP` setUp → `Brand::B2B` + `pricing_strategy=volume_licensing` Setting.
-- [ ] `AuthControllerTest.php`, `OrgOrganizationCoreTest.php` — Cross-Brand-Assertions reviewen.
-- [ ] E2E-Helper `E2ESessionHelper.ts:34-35,46,84` — `brand?: 'rp' | 'srp'` → `brand?: string`; `buy.localhost`-Referer nur wenn SRP-Fixture gebraucht.
-- [ ] E2E: `brand-isolation.spec.ts`, `gallery-brand-scoping.spec.ts`, `brand-theming.spec.ts`, `brand-e2e-infra.spec.ts`, `brand-conflict.spec.ts`, `brand-favicon.spec.ts` anpassen.
-- [ ] Vitest: `brandRegistry.test.ts`, `useBrand.test.ts` — `getBrandFromHostname` SRP-Tests entfernen (DB-getrieben); Theme-Tests generalisieren.
-
-### 7. SRP-Seeder & Daten — BEHALTEN
-
-- [ ] `backend/database/seeders/SrpSettingsSeeder.php` + Aufruf in `DatabaseSeeder.php:73-78` — **behalten** (SRP als Beispiel-Brand in DB bleibt erhalten laut Strategie).
-- [ ] `frontend/public/brands/srp/` Static Assets — **behalten** (SRP-Theme existiert).
-
-### 8. DoD-Validierung (nach Umsetzung)
-
-```bash
-export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
-cd backend && php artisan test
-cd frontend && pnpm vitest run
-cd frontend && pnpm lint:fix && pnpm build
-cd frontend && pnpm test:e2e:smoke   # Timeout 900000ms
+**Befund:** V029 dropt nur die `brands`-Tabelle, migriert aber **nicht** die Fremddaten. In der Live-DB existieren noch:
 ```
+products: 16, settings: 38, license_use_cases: 4, license_modifiers: 3, customers: 1, text_snippets: 1  (= 63 Zeilen)
+```
+**Auswirkung:** Der `AsBrand`-Cast liefert für `'srp'` den rohen String (kein Crash), aber jede `forCurrentBrand()`/`where('brand', ...)`-Query matched nur `'rp'` → die SRP-Daten sind **still unsichtbar** (38 Settings, 16 Produkte etc. werden nie geladen).
 
-### 9. Folgearbeiten (NICHT Teil dieses Plans)
+- [ ] **Neue Migration V031** — `UPDATE <table> SET brand='rp' WHERE brand='srp'` für alle 14 `brand`-Spalten-Tabellen (`orders`, `invoice_snapshots`, `users`, `galleries`, `gallery_groups`, `orgs`, `products`, `license_use_cases`, `license_modifiers`, `settings`, `customers`, `text_snippets`, `coupons`, `contracts`). Vorher klären, ob SRP-Daten übernommen oder bewusst verworfen werden (38 Settings überschreiben evtl. RP-Werte — Konfliktprüfung nötig, insb. bei `settings` mit gleichem `key`).
+- [ ] **`V029.down()` ist leer** (recreatet `brands`-Tabelle nicht) — akzeptabel, aber dokumentieren dass V029 nicht sauber reversibel ist.
 
-- [ ] **Admin-UI zum Anlegen neuer Brands** (CRUD auf `brands`-Tabelle) — dann ist "Brand anlegen ohne Code" Realität.
+#### 2. E2E-Tests kaputt (`@smoke` betroffen)
+
+**Befund:** 7 Specs rufen `createIsolatedUser('...', { brand: 'srp' })` auf → das PUT `/api/management/users` wird **422** ablehnen, weil `UpdateUserRequest` jetzt nur noch `['rp']` akzeptiert (`config('brands.php')`). `E2ESessionHelper.ts:34` `loginAs`/`createIsolatedUser` haben noch `brand?: string` mit `buy.localhost`-Referer-Pfad. Betroffen:
+
+- [ ] **`brand-isolation.spec.ts`** — enthält `@smoke`-Test (L21 "Admin sees B2B Mandanten section") + 4× `@regression`. Brand-Isolation-Konzept ist mit Single-Brand obsolet → **Spec löschen** ODER umschreiben als Single-Brand-Regression (z.B. dass `brand:'srp'` vom Backend mit 422 abgelehnt wird). Beachte: `UserPermissionUpdateTest.php` (PHPUnit) deckt die Super-Admin-null-brand-Logik bereits ab → E2E-Coverage für dieses Konzept vorhanden.
+- [ ] **`gallery-brand-scoping.spec.ts`** (3× `@feature:brand:scoping`) — Spec löschen (Single-Brand → kein Cross-Brand-Redirect mehr) ODER umschreiben.
+- [ ] **`brand-conflict.spec.ts`** (`@feature:brand:isolation`) — Spec löschen (Cross-Brand-Login-Konzept obsolet).
+- [ ] **`brand-theming.spec.ts`, `brand-favicon.spec.ts`, `brand-e2e-infra.spec.ts`** — SRP-spezifisch (asserten `data-brand='srp'`, `buy.localhost`-Assets). Löschen oder auf `rp` umschreiben.
+- [ ] **`download-invoice-brand-leak.spec.ts`** — prüfen ob noch relevant (Brand-Leak-Konzept, Single-Brand).
+- [ ] **Coupon-Specs** (`coupon-admin-crud.spec.ts`, `coupon-gallery-scope.spec.ts`, `coupon-checkout-revalidation.spec.ts`) — `brand: 'srp'`-Fixture → `brand: 'rp'` umstellen (Funktionalität bleibt, nur Brand-Fixture ändert). PHPUnit-Coverage der Coupon-Logik vorhanden (`CouponControllerTest` 20 Tests, `CouponServiceTest`, `CheckoutCouponRevalidationTest`).
+- [ ] **`E2ESessionHelper.ts:34,46,84`** — `buy.localhost`-Referer-Pfad entfernen; `brand`-Option nur noch für Dev-Fallback nötig.
+- [ ] **Nach Fix: `pnpm test:e2e:smoke` laufen lassen** (Timeout 900000ms) — muss grün sein vor Push.
+
+**Hinweis:** PHPUnit-Coverage für Brand-Scoping/Isolation/Login existiert weiterhin (`BrandLoginTest`, `BrandQueueResetTest`, `BrandScopingTest`, `OrgIsolationTest`, `AccessControlServiceTest` — alle grün). E2E-Brand-Isolation-Tests sind weitgehend redundant → Löschen ist vertretbar.
+
+### 🟡 Kleine Lücken (optional, nicht blockierend)
+
+- [ ] **`ShootingCalculatorModal.tsx:17-20`** — `calcMode` nutzt noch `'rp'`/`'srp'` als Tarif-Labels ("Standard"/"Flex"). Funktional OK (keine Brand-Logik), aber Comment L17 ("Both available on every brand") ist stale. Umbenennung optional (`'srp'`→`'flex'`).
+- [ ] **`VolumeLicensingStrategy.php:78,89,90`** — Invoice-Tier-Labels noch `'srp'`/`'SRP Lizenz'` (optional → `'volume'`/`'Volume Lizenz'`).
+- [ ] **Commit auf `main`** (nicht Feature-Branch) — vor Push ggf. auf Branch legen.
+
+### Strategie-Historie (dokumentiert zur Nachvollziehbarkeit)
+
+1. **Ursprünglich:** "SRP-Stilllegung = auf RP kollabieren" → verworfen (anti-Multi-Tenant).
+2. **Geplanter Pivot (14.07.):** "brands-Tabelle erweitern, `Brand::SRP` erhalten, BrandConfig-getrieben" → **nicht umgesetzt**.
+3. **Tatsächlich umgesetzt (`1831116`):** `config/brands.php` (statisch), `Brand::SRP` entfernt, `brands`-Tabelle gedroppt. Neue Brand = Config-File-Eintrag + optionaler Enum-Case (Code-Änderung nötig, keine reine DB-Zeile).
+
+### Folgearbeiten (separat)
+
+- [ ] **Admin-UI zum Anlegen neuer Brands** (CRUD auf `config/brands.php` — erfordert Config-Write-Layer).
 - [ ] **Per-Gallery Licensing Override** (separater PR, Mixed-Cart-Problem).
-- [ ] **Theme-Override pro Brand** (falls PDF/daisyUI-Farben später doch dynamisch gewünscht).
-- [ ] **`features/`-Dokumentation** der Multi-Tenant-Architektur (neuer SOLL-Zustand: BrandConfig-getrieben statt `isSrp`-Forks).
-- [ ] **`ShootingCalculatorModal.tsx` calcMode-Labels** `'rp'`→`'standard'`, `'srp'`→`'flex'` (optional, NOT load-bearing).
-- [ ] **`VolumeLicensingStrategy.php:78,89,90`** Invoice-Labels `'srp'`→`'volume'`, `'SRP Lizenz'`→`'Volume Lizenz'` (optional).
-
-### Geklärte Entscheidungen (User, 14.07.2026)
-
-- **Hostname-Fallback:** Produktions-Fallback `str_starts_with('buy.') → Brand::SRP` wird **entfernt** (DB-Pfad reicht). Stattdessen **Dev-Fallback auf `*.localhost`-Subdomains** (z.B. `srp.localhost → srp`, `acme.localhost → acme`), damit lokal neue Brands ohne DB-Konfiguration testbar sind. Synchron in `BrandRegistry::fromHost()` und `frontend/index.html` Boot-Script halten.
-- **`brands`-Editierbarkeit:** Neue Brands ausschließlich via **Migration/Seeder** anlegen (kein Admin-UI in diesem PR). Passt zur bisherigen Praxis (V027 legt rp/srp per Migration an). Admin-CRUD ist optionaler Folgeschritt (siehe Folgearbeiten).
+- [ ] **Theme-Override pro Brand** (falls PDF/daisyUI-Farben später doch dynamisch).
+- [ ] **`features/`-Dokumentation** der `config/brands.php`-Architektur (neuer SOLL-Zustand).
+- [ ] **Vor Push:** Commit ggf. auf Feature-Branch legen, E2E-Smoke grün.
 
 ---
 

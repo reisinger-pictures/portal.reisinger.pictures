@@ -10,13 +10,4 @@ test.describe('Brand data-theme and data-brand attributes', () => {
         await expect(html).toHaveAttribute('data-brand', 'rp');
         await expect(html).toHaveAttribute('data-theme', /^(b2b-light|b2b-dark|reisinger-light)$/);
     });
-
-    test('SRP domain has correct theme attributes', { tag: ['@regression', '@feature:brand'] }, async ({ page }) => {
-        test.setTimeout(30000);
-        await page.goto('http://buy.localhost:4321/');
-
-        const html = page.locator('html');
-        await expect(html).toHaveAttribute('data-brand', 'srp');
-        await expect(html).toHaveAttribute('data-theme', /^srp-/);
-    });
 });

@@ -7,6 +7,7 @@ use App\Models\Order;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\InvoiceMail;
 use Illuminate\Support\Facades\Log;
+use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\Cache;
 
 class WebhookController extends Controller
@@ -106,7 +107,7 @@ class WebhookController extends Controller
             if ($order && $order->status !== 'disputed') {
                 $order->update(['status' => 'disputed']);
                 $this->clearPurchasedCache($order);
-                Mail::to(env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'))
+                Mail::to(BrandRegistry::configOrDefault()->accountingEmail ?? 'accounting@reisinger.pictures')
                     ->send(new \App\Mail\CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$order->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
             }
         } elseif ($event->type === 'charge.refunded') {

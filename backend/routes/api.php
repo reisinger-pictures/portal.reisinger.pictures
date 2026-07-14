@@ -36,7 +36,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
-$throttleLimit = env('AUTH_THROTTLE_LIMIT', 9999);
+$throttleLimit = config('app.throttle_auth', 5);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
     Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
@@ -98,10 +98,10 @@ Route::get('/photos/{id}/context', [SearchController::class, 'photoContext'])->n
 Route::get('/galleries/{slug}', [GalleryFrontendController::class, 'show'])->name('api.galleries.show');
 Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])->name('api.media.serve')->where('filename', '.*');
 
-$downloadThrottle = env('DOWNLOAD_THROTTLE', 9999);
+$downloadThrottle = config('app.throttle_download', 60);
 Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', [DownloadController::class, 'downloadSingle'])->name('api.photos.download');
 Route::get('/orders/quote-decode', [QuoteController::class, 'decodeQuoteLink'])->name('api.orders.quote-decode');
-Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
+Route::middleware('throttle:' . config('app.throttle_zip_download', 3) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
 
 Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
@@ -122,7 +122,7 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');
     Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
     Route::get('/orders/{id}/invoice', [InvoiceController::class, 'downloadInvoice'])->name('api.orders.invoice');
-    Route::middleware('throttle:' . env('ZIP_DOWNLOAD_THROTTLE', 9999) . ',1')->get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
+    Route::middleware('throttle:' . config('app.throttle_zip_download', 3) . ',1')->get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
     Route::delete('/photos/{id}', [PhotoController::class, 'destroy'])->name('api.photos.destroy');
     Route::get('/payouts/my-statements', [\App\Http\Controllers\PayoutController::class, 'myStatements'])->name('api.payouts.my-statements');
 

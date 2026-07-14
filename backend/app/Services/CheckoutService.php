@@ -322,7 +322,7 @@ class CheckoutService {
             $order->update(['ip_address' => $request->ip(), 'stripe_payment_intent_id' => $paymentResult['id']]);
         } catch (\Throwable $e) {
             $order->update(['status' => 'cancelled']);
-            Mail::to(env('ACCOUNTING_EMAIL'))->queue(new CustomMail('Zahlungsfehler', 'Bestellung ' . $order->id . ' konnte nicht bezahlt werden: ' . $e->getMessage()));
+            Mail::to(BrandRegistry::configOrDefault()->accountingEmail)->queue(new CustomMail('Zahlungsfehler', 'Bestellung ' . $order->id . ' konnte nicht bezahlt werden: ' . $e->getMessage()));
             return response()->json(['error' => 'Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.'], 502);
         }
         return response()->json(['success' => true, 'requires_action' => true, 'client_secret' => $paymentResult['client_secret'], 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);

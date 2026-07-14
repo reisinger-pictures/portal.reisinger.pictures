@@ -10,13 +10,4 @@ test.describe('Brand favicon and manifest', () => {
         await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /\/brands\/rp\//);
         await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', /.+/);
     });
-
-    test('SRP domain loads SRP favicon and manifest', { tag: ['@feature:brand'] }, async ({ page }) => {
-        test.setTimeout(30000);
-        await page.goto('http://buy.localhost:4321/');
-
-        await expect(page.locator('link[rel="icon"][sizes="32x32"]')).toHaveAttribute('href', /\/brands\/srp\//);
-        await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /\/brands\/srp\//);
-        await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', /.+/);
-    });
 });

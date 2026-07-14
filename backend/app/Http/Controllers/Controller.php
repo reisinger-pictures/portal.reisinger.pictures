@@ -11,7 +11,7 @@ abstract class Controller
     protected function respondWithToken($token, $additionalData = [])
     {
         $ttl = Auth::guard('api')->factory()->getTTL();
-        $secure = env('APP_ENV') !== 'local';
+        $secure = !app()->environment('local');
 
         $cookie = cookie(
             'rp_jwt',

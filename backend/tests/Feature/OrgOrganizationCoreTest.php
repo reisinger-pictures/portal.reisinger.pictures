@@ -162,31 +162,7 @@ class OrgOrganizationCoreTest extends TestCase
             ->assertStatus(403);
     }
 
-    // ──────────────────────────────────────────────
-    // N11: is_customer_manager = is_org_admin (Alias)
-    // ──────────────────────────────────────────────
 
-    public function test_is_customer_manager_is_alias_for_is_org_admin(): void
-    {
-        $org = Org::factory()->create(['invoice_frequency' => 'immediate']);
-        $user = User::factory()->create(['org_id' => $org->id]);
-        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
-
-        $this->assertTrue($user->is_org_admin);
-        $this->assertSame($user->is_org_admin, $user->is_customer_manager);
-    }
-
-    public function test_me_endpoint_returns_is_customer_manager(): void
-    {
-        $ctx = $this->orgAdminContext();
-
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->getJson('/api/auth/me');
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('is_org_admin', true);
-        $response->assertJsonPath('is_customer_manager', true);
-    }
 
     // ──────────────────────────────────────────────
     // N12: StatsController scoped per org_id

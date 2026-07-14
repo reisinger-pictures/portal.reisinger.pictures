@@ -44,18 +44,22 @@ class GalleryFrontendController extends Controller
 
         $photos = $gallery->photos()->paginate(50);
 
-        $photos->getCollection()->transform(function ($photo) use ($gallery, $user) {
+        $photoIds = $photos->getCollection()->pluck('id')->toArray();
+        $ratings = collect();
+
+        if ($user && !empty($photoIds)) {
+            $ratingQuery = DB::table('ratings')->whereIn('photo_id', $photoIds);
+            if ($user->id) {
+                $ratingQuery->where('user_id', $user->id);
+            } else {
+                $ratingQuery->where('guest_id', $user->guest_id);
+            }
+            $ratings = $ratingQuery->get()->keyBy('photo_id');
+        }
+
+        $photos->getCollection()->transform(function ($photo) use ($user, $ratings) {
             if ($user) {
-                $rating = DB::table('ratings')
-                    ->where('photo_id', $photo->id)
-                    ->where(function($q) use ($user) {
-                        if ($user->id) {
-                            $q->where('user_id', $user->id);
-                        } else {
-                            $q->where('guest_id', $user->guest_id);
-                        }
-                    })
-                    ->first();
+                $rating = $ratings->get($photo->id);
                 $photo->rating = $rating ? (int) $rating->rating : null;
                 $photo->comment = $rating ? $rating->comment : '';
             } else {

@@ -9,7 +9,7 @@ test.describe('Coupon Admin CRUD', () => {
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
-        srpAdmin = await helper.createIsolatedUser('admin', { brand: 'srp' });
+        srpAdmin = await helper.createIsolatedUser('admin', { brand: 'rp' });
     });
 
     test.afterEach(async () => {
@@ -18,11 +18,11 @@ test.describe('Coupon Admin CRUD', () => {
 
     test('Admin can create a fixed global coupon', { tag: ['@feature:admin:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
-        await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
-        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
+        await auth.login(srpAdmin.email, srpAdmin.password, 'http://localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
 
         const couponCode = `FIXED-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
         const createRes = await request.post('/api/management/coupons', {
             data: { code: couponCode, type: 'fixed', value: 15, scope_type: 'global', active: true },
             headers: couHeaders,
@@ -39,11 +39,11 @@ test.describe('Coupon Admin CRUD', () => {
 
     test('Admin can create organisation-scoped coupon', { tag: ['@feature:admin:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
-        await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
-        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
+        await auth.login(srpAdmin.email, srpAdmin.password, 'http://localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
 
         const couponOrgCode = `ORG-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
         const orgRes = await request.post('/api/management/coupons', {
             data: { code: couponOrgCode, type: 'fixed', value: 10, scope_type: 'global', active: true },
             headers: couHeaders,
@@ -60,11 +60,11 @@ test.describe('Coupon Admin CRUD', () => {
 
     test('Admin can delete a used coupon', { tag: ['@feature:admin:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
-        await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
-        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
+        await auth.login(srpAdmin.email, srpAdmin.password, 'http://localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
 
         const couponCode = `USED-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
         await request.post('/api/management/coupons', {
             data: { code: couponCode, type: 'fixed', value: 5, scope_type: 'global', active: true, used_count: 1 },
             headers: couHeaders,
@@ -93,11 +93,11 @@ test.describe('Coupon Admin CRUD', () => {
 
     test('Admin can toggle coupon active/inactive', { tag: ['@feature:admin:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
-        await auth.login(srpAdmin.email, srpAdmin.password, 'http://buy.localhost:4321/');
-        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'srp' });
+        await auth.login(srpAdmin.email, srpAdmin.password, 'http://localhost:4321/');
+        const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
 
         const toggleCouponCode = `TOGGLE-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://buy.localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
         const toggleRes = await request.post('/api/management/coupons', {
             data: { code: toggleCouponCode, type: 'percentage', value: 10, scope_type: 'global', active: true },
             headers: couHeaders,

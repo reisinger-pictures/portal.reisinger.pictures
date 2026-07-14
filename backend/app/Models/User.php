@@ -30,7 +30,7 @@ class User extends Authenticatable implements JWTSubject
         'id', 'name', 'email', 'brand', 'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
         'current_ftp_gallery_id', 'ftp_slug',
         'created_at', 'is_admin', 'is_photographer',
-        'is_pending', 'is_org_admin', 'is_customer_manager', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
+        'is_pending', 'is_org_admin', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
     ];
 
     protected $fillable = [
@@ -87,8 +87,7 @@ class User extends Authenticatable implements JWTSubject
     public function getIsAdminAttribute(): bool { return $this->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists(); }
     public function getIsOrgAdminAttribute(): bool { return $this->roles()->where('name', UserRole::ORG_ADMIN->value)->exists() && $this->org_id !== null; }
 
-    /** @deprecated Use is_org_admin instead. */
-    public function getIsCustomerManagerAttribute(): bool { return $this->getIsOrgAdminAttribute(); }
+
     public function getIsPowerUserAttribute(): bool { return $this->roles()->where('name', UserRole::POWER_USER->value)->exists(); }
 
     public function getAllowedGalleryIds(): array

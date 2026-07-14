@@ -39,7 +39,7 @@ return [
     |
     */
 
-    'debug' => (bool) env('APP_DEBUG', true),
+    'debug' => (bool) env('APP_DEBUG', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -130,5 +130,10 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+
+    'throttle_auth' => env('AUTH_THROTTLE_LIMIT', 5),
+    'throttle_api' => (int) env('API_THROTTLE_LIMIT', 120),
+    'throttle_download' => env('DOWNLOAD_THROTTLE', 60),
+    'throttle_zip_download' => env('ZIP_DOWNLOAD_THROTTLE', 3),
 
 ];
