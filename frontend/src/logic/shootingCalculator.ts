@@ -124,8 +124,7 @@ export function calculateB2CFlexPrice(input: B2CFlexInput): ShootingPriceResult 
     let privacyFee = 0;
 
     if (input.type === 'nude' && input.isFullyPrivate) {
-        // Formel: Basis-Aufpreis + (Zusatzbilder * reduzierter Bildpreis-Faktor)
-        privacyFee = privacyBase + (input.extraImages * Math.round(extraImageCost / 3));
+        privacyFee = privacyBase;
     }
 
     const total = basePrice + setupFee + extraImagesFee + privacyFee;

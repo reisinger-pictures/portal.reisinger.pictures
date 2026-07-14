@@ -1,4 +1,4 @@
-import {expect, FrameLocator, Page} from '@playwright/test';
+import {expect, FrameLocator, Locator, Page} from '@playwright/test';
 import {CreditCard} from './CreditCardHelper';
 
 export interface ResolvedStripeFrames {
@@ -39,7 +39,7 @@ export class StripeHelper {
             'iframe[title*="card number" i], iframe[title*="kartennummer" i]'
         ).first();
 
-        let resolvedCardInput: FrameLocator;
+        let resolvedCardInput: Locator;
         try {
             resolvedCardInput = cardNumberFrame.locator('input').first();
             await resolvedCardInput.waitFor({state: 'visible', timeout: 5000});

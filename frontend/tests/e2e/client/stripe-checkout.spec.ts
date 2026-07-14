@@ -137,7 +137,7 @@ test.describe('Stripe Checkout Workflow', () => {
 
     test('Positive Flow: Handles successful payment via Visa', { tag: ['@smoke', '@feature:client:checkout'] }, async ({page}) => {
         test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
-        const {stripeFrame} = await navigateToStripeIframe(page);
+        await navigateToStripeIframe(page);
 
         await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa);
         await expect(page.getByRole('button', {name: 'Jetzt bezahlen'})).toBeEnabled({ timeout: 10000 });

@@ -106,99 +106,105 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                     {calcMode === 'flex' ? <Trans>Flex Tarif Rechner</Trans> : <Trans>Standard Tarif Rechner</Trans>}
                 </h3>
 
-                <div className="tabs tabs-boxed mb-4 w-full flex bg-base-200">
-                    <button type="button" className={`tab flex-1 ${!useStandard ? 'tab-active font-bold' : ''}`} onClick={() => setUseStandard(false)}><Trans>Flex Tarif</Trans></button>
-                    <button type="button" className={`tab flex-1 ${useStandard ? 'tab-active font-bold' : ''}`} onClick={() => setUseStandard(true)}><Trans>Standard Tarif</Trans></button>
-                </div>
+                <div className="tabs tabs-lift">
+                    <input type="radio" name="calc_tabs" className="tab" aria-label="Flex Tarif"
+                           checked={!useStandard} onChange={() => setUseStandard(false)} />
+                    <div className="tab-content bg-base-100 border-base-300 p-4">
+                        <div className="space-y-4">
+                            <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                                <label className="label font-bold text-sm mb-1">Bereich</label>
+                                <select className="select select-bordered w-full" value={srpType} onChange={e => {
+                                    setSrpType(e.target.value as 'portrait' | 'couple' | 'nude');
+                                    if (e.target.value !== 'nude') setSrpPrivate(false);
+                                }}>
+                                    <option value="portrait">Portrait</option>
+                                    <option value="couple">Pärchen</option>
+                                    <option value="nude">Akt & Boudoir</option>
+                                </select>
+                            </div>
+                            <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                                <label className="label font-bold text-sm mb-1">Setup</label>
+                                <select className="select select-bordered w-full" value={srpSetup}
+                                        onChange={e => setSrpSetup(e.target.value as 'outdoor' | 'outdoor_flash' | 'indoor')}>
+                                    <option value="outdoor">Outdoor (Natur)</option>
+                                    <option value="outdoor_flash">Mobiles Blitz-Setup (+50€)</option>
+                                    <option value="indoor">Fotostudio (+50€)</option>
+                                </select>
+                            </div>
+                            <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                                <div className="label">
+                                    <span className="label-text font-bold">Zusätzliche Bilder</span>
+                                    <span className="label-text-alt font-mono">{srpExtra} Stk.</span>
+                                </div>
+                                <input type="range" min="0" max="50" step="1" className="range range-primary w-full"
+                                       value={srpExtra} onChange={e => setSrpExtra(parseInt(e.target.value) || 0)}/>
+                            </div>
+                            {srpType === 'nude' && (
+                                <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                                    <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
+                                        <input type="checkbox" className="checkbox checkbox-primary shrink-0"
+                                               checked={srpPrivate} onChange={e => setSrpPrivate(e.target.checked)}/>
+                                        <div>
+                                            <span className="label-text font-bold block">Online-Verbot (Privacy Fee)</span>
+                                            <span className="label-text-alt opacity-70 block mt-1 leading-tight text-wrap">Absolutes Veröffentlichungsverbot (+200€)</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-                {calcMode === 'flex' ? (
-                    <div className="space-y-4">
-                        <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="label font-bold text-sm mb-1">Bereich</label>
-                            <select className="select select-bordered w-full" value={srpType} onChange={e => {
-                                setSrpType(e.target.value as 'portrait' | 'couple' | 'nude');
-                                if (e.target.value !== 'nude') setSrpPrivate(false);
-                            }}>
-                                <option value="portrait">Portrait</option>
-                                <option value="couple">Pärchen</option>
-                                <option value="nude">Akt & Boudoir</option>
-                            </select>
-                        </div>
-                        <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="label font-bold text-sm mb-1">Setup</label>
-                            <select className="select select-bordered w-full" value={srpSetup}
-                                    onChange={e => setSrpSetup(e.target.value as 'outdoor' | 'outdoor_flash' | 'indoor')}>
-                                <option value="outdoor">Outdoor (Natur)</option>
-                                <option value="outdoor_flash">Mobiles Blitz-Setup (+50€)</option>
-                                <option value="indoor">Fotostudio (+50€)</option>
-                            </select>
-                        </div>
-                        <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="label font-bold text-sm mb-1">Zusätzliche Bilder (+15€/Stk)</label>
-                            <input type="number" min="0" step="1" className="input input-bordered w-full font-mono"
-                                   value={srpExtra} onChange={e => setSrpExtra(parseInt(e.target.value) || 0)}/>
-                        </div>
-                        {srpType === 'nude' && (
+                    <input type="radio" name="calc_tabs" className="tab" aria-label="Standard Tarif"
+                           checked={useStandard} onChange={() => setUseStandard(true)} />
+                    <div className="tab-content bg-base-100 border-base-300 p-4">
+                        <div className="space-y-4">
+                            <div
+                                className="grid grid-cols-2 gap-4 bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                                <div className="form-control">
+                                    <label className="label font-bold text-sm mb-1"><span className="label-text font-bold">Dauer (Min.)</span></label>
+                                    <input type="number" step="15" className="input input-bordered font-mono"
+                                           value={calcDuration}
+                                           onChange={e => setCalcDuration(parseInt(e.target.value) || 0)}/>
+                                </div>
+                                <div className="form-control">
+                                    <label className="label font-bold text-sm mb-1"><span className="label-text font-bold">Inkl. Bilder</span></label>
+                                    <input type="number" min="0" step="1" className="input input-bordered font-mono" value={calcImages}
+                                           onChange={e => setCalcImages(parseInt(e.target.value) || 0)}/>
+                                </div>
+                            </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                     <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                           checked={srpPrivate} onChange={e => setSrpPrivate(e.target.checked)}/>
-                                    <div>
-                                        <span className="label-text font-bold block">Online-Verbot (Privacy Fee)</span>
-                                        <span className="label-text-alt opacity-70 block mt-1 leading-tight text-wrap">Absolutes Veröffentlichungsverbot (+200€ zzgl. 5€/Extra-Bild)</span>
-                                    </div>
+                                           checked={calcIsOutdoor} onChange={e => setCalcIsOutdoor(e.target.checked)}/>
+                                    <span className="label-text font-bold">Outdoor-Shooting (Bildpreis: {Math.round((parseFloat(terms?.calc_outdoor_multiplier || '0.5')) * 100)}%)</span>
                                 </label>
                             </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div
-                            className="grid grid-cols-2 gap-4 bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <div className="form-control">
-                                <label className="label font-bold text-sm mb-1"><span className="label-text font-bold">Dauer (Min.)</span></label>
-                                <input type="number" step="15" className="input input-bordered font-mono"
-                                       value={calcDuration}
-                                       onChange={e => setCalcDuration(parseInt(e.target.value) || 0)}/>
+                            <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                                <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
+                                    <input type="checkbox" className="checkbox checkbox-primary shrink-0"
+                                           checked={calcIsFlatrate} onChange={e => setCalcIsFlatrate(e.target.checked)}/>
+                                    <span className="label-text font-bold">Reportage-Paket (+{Math.round((parseFloat(terms?.calc_flatrate_multiplier || '1.2') - 1) * 100)}% Aufschlag)</span>
+                                </label>
                             </div>
-                            <div className="form-control">
-                                <label className="label font-bold text-sm mb-1"><span className="label-text font-bold">Inkl. Bilder</span></label>
-                                <input type="number" min="0" step="1" className="input input-bordered font-mono" value={calcImages}
-                                       onChange={e => setCalcImages(parseInt(e.target.value) || 0)}/>
+                            <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                                <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
+                                    <input type="checkbox" className="checkbox checkbox-primary shrink-0"
+                                           checked={calcIsReorder} onChange={e => setCalcIsReorder(e.target.checked)}/>
+                                    <span className="label-text font-bold">Nachbestellung (keine Setup-Gebühr)</span>
+                                </label>
                             </div>
-                        </div>
-                        <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
-                                <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                       checked={calcIsOutdoor} onChange={e => setCalcIsOutdoor(e.target.checked)}/>
-                                <span className="label-text font-bold">Outdoor-Shooting (Bildpreis: {Math.round((parseFloat(terms?.calc_outdoor_multiplier || '0.5')) * 100)}%)</span>
-                            </label>
-                        </div>
-                        <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
-                                <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                       checked={calcIsFlatrate} onChange={e => setCalcIsFlatrate(e.target.checked)}/>
-                                <span className="label-text font-bold">Reportage-Paket (+{Math.round((parseFloat(terms?.calc_flatrate_multiplier || '1.2') - 1) * 100)}% Aufschlag)</span>
-                            </label>
-                        </div>
-                        <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
-                                <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                       checked={calcIsReorder} onChange={e => setCalcIsReorder(e.target.checked)}/>
-                                <span className="label-text font-bold">Nachbestellung (keine Setup-Gebühr)</span>
-                            </label>
-                        </div>
-                        <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                            <label className="label font-bold text-sm mb-1">Rabatt-Stufe</label>
-                            <select className="select select-bordered w-full" value={calcDiscount}
-                                    onChange={e => setCalcDiscount(e.target.value as ShootingDiscount)}>
-                                <option value="0">Kein Rabatt (0%)</option>
-                                <option value="33">Studentenrabatt (33%)</option>
-                                <option value="50">Special Deal OGs (50%)</option>
-                            </select>
+                            <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
+                                <label className="label font-bold text-sm mb-1">Rabatt-Stufe</label>
+                                <select className="select select-bordered w-full" value={calcDiscount}
+                                        onChange={e => setCalcDiscount(e.target.value as ShootingDiscount)}>
+                                    <option value="0">Kein Rabatt (0%)</option>
+                                    <option value="33">Studentenrabatt (33%)</option>
+                                    <option value="50">Special Deal OGs (50%)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
-                )}
+                </div>
 
                 <div
                     className="bg-primary/5 p-4 rounded-box mt-8 border border-primary/20 flex justify-between items-center">

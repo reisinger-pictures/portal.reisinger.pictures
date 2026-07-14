@@ -154,6 +154,6 @@ describe('calculateB2CFlexPrice', () => {
         expect(calculateB2CFlexPrice({ type: 'nude', setup: 'outdoor', extraImages: 0, isFullyPrivate: true })).toEqual({ packagePrice: 349, finalPrice: 349, discountAbsolute: 0 });
     });
     it('calculates nude indoor private correctly', () => {
-        expect(calculateB2CFlexPrice({ type: 'nude', setup: 'indoor', extraImages: 10, isFullyPrivate: true })).toEqual({ packagePrice: 599, finalPrice: 599, discountAbsolute: 0 });
+        expect(calculateB2CFlexPrice({ type: 'nude', setup: 'indoor', extraImages: 10, isFullyPrivate: true })).toEqual({ packagePrice: 549, finalPrice: 549, discountAbsolute: 0 });
     });
 });
