@@ -32,11 +32,11 @@ class FtpImportTest extends TestCase {
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
-        $srpGallery = Gallery::factory()->create(['brand' => Brand::SRP]);
+        $otherGallery = Gallery::factory()->create(['brand' => 'test-brand']);
 
         $token = auth('api')->login($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/management/ftp/target', ['gallery_id' => $srpGallery->id]);
+            ->postJson('/api/management/ftp/target', ['gallery_id' => $otherGallery->id]);
 
         $response->assertStatus(403);
     }
@@ -59,8 +59,8 @@ class FtpImportTest extends TestCase {
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
-        $srpGallery = Gallery::factory()->create(['brand' => Brand::SRP]);
-        $user->update(['current_ftp_gallery_id' => $srpGallery->id]);
+        $otherGallery = Gallery::factory()->create(['brand' => 'test-brand']);
+        $user->update(['current_ftp_gallery_id' => $otherGallery->id]);
 
         $token = auth('api')->login($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])

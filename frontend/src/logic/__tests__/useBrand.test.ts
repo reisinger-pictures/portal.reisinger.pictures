@@ -23,8 +23,8 @@ describe('useBrand', () => {
         });
     }
 
-    it('returns rp brand for portal hostname', () => {
-        mockHostname('portal.localhost');
+    it('returns rp brand for production hostname', () => {
+        mockHostname('portal.reisinger.pictures');
         const { result } = renderHook(() => useBrand());
         expect(result.current.brand).toBe('rp');
     });
@@ -35,28 +35,40 @@ describe('useBrand', () => {
         expect(result.current.brand).toBe('rp');
     });
 
-    it('returns srp brand for buy.reisinger.pictures hostname', () => {
+    it('defaults to rp for production hostname', () => {
         mockHostname('buy.reisinger.pictures');
+        const { result } = renderHook(() => useBrand());
+        expect(result.current.brand).toBe('rp');
+    });
+
+    it('resolves srp for srp.localhost via dev fallback', () => {
+        mockHostname('srp.localhost');
         const { result } = renderHook(() => useBrand());
         expect(result.current.brand).toBe('srp');
     });
 
-    it('returns srp brand for buy.localhost', () => {
+    it('resolves brand from *.localhost subdomain', () => {
         mockHostname('buy.localhost');
         const { result } = renderHook(() => useBrand());
-        expect(result.current.brand).toBe('srp');
+        expect(result.current.brand).toBe('buy');
     });
 
     it('returns correct logo paths for rp', () => {
-        mockHostname('portal.localhost');
+        mockHostname('portal.reisinger.pictures');
         const { result } = renderHook(() => useBrand());
         expect(result.current.logoSrc).toBe('/brands/rp/android-chrome-192x192.png');
     });
 
-    it('returns correct logo paths for srp', () => {
-        mockHostname('buy.localhost');
+    it('returns correct logo paths for srp dev brand', () => {
+        mockHostname('srp.localhost');
         const { result } = renderHook(() => useBrand());
         expect(result.current.logoSrc).toBe('/brands/srp/android-chrome-192x192.png');
+    });
+
+    it('returns correct logo paths for buy dev brand', () => {
+        mockHostname('buy.localhost');
+        const { result } = renderHook(() => useBrand());
+        expect(result.current.logoSrc).toBe('/brands/buy/android-chrome-192x192.png');
     });
 
     it('returns features from brand config', () => {
@@ -68,6 +80,6 @@ describe('useBrand', () => {
     it('handles case-insensitive hostname matching', () => {
         mockHostname('BUY.LOCALHOST');
         const { result } = renderHook(() => useBrand());
-        expect(result.current.brand).toBe('srp');
+        expect(result.current.brand).toBe('buy');
     });
 });

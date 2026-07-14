@@ -30,7 +30,7 @@ class Customer extends Model
     ];
 
     protected $casts = [
-        'brand' => Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
         'birthdate' => 'date:Y-m-d',
     ];
 
@@ -39,7 +39,7 @@ class Customer extends Model
      */
     public function scopeForCurrentBrand(Builder $query): Builder
     {
-        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentOrDefault()->value);
+        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentId());
     }
 
     public function toSearchableArray()

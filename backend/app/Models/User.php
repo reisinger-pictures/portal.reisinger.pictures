@@ -57,7 +57,7 @@ class User extends Authenticatable implements JWTSubject
 
     protected $casts = [
         'can_edit_metadata' => 'boolean',
-        'brand' => Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
     ];
 
     public function getJWTIdentifier() { return $this->getKey(); }

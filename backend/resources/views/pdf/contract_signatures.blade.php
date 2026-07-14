@@ -30,7 +30,7 @@
     </style>
 </head>
 <body>
-    @include('pdf.header', ['title' => 'VERTRAG', 'bankHolder' => $bankHolder, 'isSrp' => $isSrp ?? false, 'pfx' => $pfx ?? ''])
+    @include('pdf.header', ['title' => 'VERTRAG', 'bankHolder' => $bankHolder, 'pfx' => $pfx ?? ''])
 
     <table class="invoice-details">
         <tr>

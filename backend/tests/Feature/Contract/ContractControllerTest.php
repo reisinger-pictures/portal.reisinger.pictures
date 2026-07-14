@@ -51,7 +51,7 @@ class ContractControllerTest extends TestCase
 
         Contract::factory()->create(['brand' => Brand::B2B]);
         Contract::factory()->create(['brand' => Brand::B2B]);
-        Contract::factory()->create(['brand' => Brand::SRP]);
+        Contract::factory()->create(['brand' => 'test-brand']);
 
         $response = $this->withHeaders($headers)->getJson('/api/management/contracts');
         $response->assertStatus(200);

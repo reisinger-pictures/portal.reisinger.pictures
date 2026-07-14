@@ -54,7 +54,7 @@ class Gallery extends Model
         'is_public' => 'boolean',
         'is_live' => 'boolean',
         'allow_client_metadata_edit' => 'boolean',
-        'brand' => Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
         'apply_metadata_to_photos' => 'boolean',
         'expires_at' => 'datetime',
         'is_free_download' => 'boolean',

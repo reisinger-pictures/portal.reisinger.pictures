@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
+use App\Values\BrandConfig;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -17,15 +18,26 @@ class BrandQueueResetTest extends TestCase
      */
     public function test_brand_reset_lifecycle_between_jobs(): void
     {
-        // ── Job 1: SRP context ──
-        BrandRegistry::set(Brand::SRP);
-        $this->assertSame(Brand::SRP, BrandRegistry::current());
+        // ── Job 1: test-brand context ──
+        $testBrand = new BrandConfig(
+            id: 'test-brand',
+            name: 'Test Brand',
+            theme: 'rp',
+            portalName: 'Test Portal',
+            impressumUrl: null,
+            logoPath: null,
+            features: [],
+            hostnames: [],
+            isActive: true,
+        );
+        BrandRegistry::set($testBrand);
+        $this->assertSame('test-brand', BrandRegistry::config()?->id);
 
         // ── Queue::before() fires before next job ──
         BrandRegistry::reset();
         $this->assertNull(BrandRegistry::current());
 
-        // ── Job 2: B2B context (no stale SRP) ──
+        // ── Job 2: B2B context (no stale test-brand) ──
         BrandRegistry::set(Brand::B2B);
         $this->assertSame(Brand::B2B, BrandRegistry::current());
     }
@@ -46,9 +58,20 @@ class BrandQueueResetTest extends TestCase
 
     public function test_consecutive_brand_sets_after_reset(): void
     {
+        $testBrand = new BrandConfig(
+            id: 'test-brand',
+            name: 'Test Brand',
+            theme: 'rp',
+            portalName: 'Test Portal',
+            impressumUrl: null,
+            logoPath: null,
+            features: [],
+            hostnames: [],
+            isActive: true,
+        );
         BrandRegistry::set(Brand::B2B);
         BrandRegistry::reset();
-        BrandRegistry::set(Brand::SRP);
+        BrandRegistry::set($testBrand);
         BrandRegistry::reset();
         BrandRegistry::set(Brand::B2B);
 

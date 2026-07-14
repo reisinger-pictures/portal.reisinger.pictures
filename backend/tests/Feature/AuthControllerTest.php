@@ -68,7 +68,7 @@ class AuthControllerTest extends TestCase {
     public function test_password_reset_on_wrong_brand_returns_403_and_does_not_change_password() {
         // B-09: Brand-Check before password mutation.
         $user = User::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'password' => null,
         ]);
 
@@ -80,7 +80,7 @@ class AuthControllerTest extends TestCase {
         ]);
 
         // BrandRegistry is set to B2B (default from TestCase setUp),
-        // but the user has brand=srp → mismatch.
+        // but the user has brand=test-brand → mismatch.
         $response = $this->postJson('/api/auth/reset-password', [
             'email' => $user->email,
             'token' => $tokenValue,

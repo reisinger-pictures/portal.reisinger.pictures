@@ -9,9 +9,15 @@
   <script>
     (function() {
       var host = window.location.hostname.toLowerCase();
-      var brand = host.startsWith('buy.') || host === 'srp.localhost' || host.endsWith('.srp.localhost') ? 'srp' : 'rp';
-      var themeColors = { rp: '#2A9D8F', srp: '#8940FA' };
-      var themeColor = themeColors[brand] || themeColors.rp;
+      var brand = 'rp';
+      // Dev fallback: *.localhost → brand from subdomain
+      if ((host.endsWith('.localhost') || host === 'localhost') && !host.startsWith('localhost')) {
+        var parts = host.split('.');
+        if (parts.length >= 2 && parts[0] !== 'localhost' && parts[0].length > 0) {
+          brand = parts[0];
+        }
+      }
+      var themeColor = '#2A9D8F';
       var head = document.head;
       
       var links = [

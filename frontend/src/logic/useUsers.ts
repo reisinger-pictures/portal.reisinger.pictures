@@ -23,9 +23,7 @@ export interface UserDetailed extends Omit<User, 'roles'> {
     is_super_admin: boolean;
     can_edit_metadata: boolean;
     flatrate_level: 'none' | 'web' | 'print' | 'original';
-    // Brand assignment per U-02: 'rp' | 'srp' for all brand-bound accounts. null is reserved
-    // exclusively for the cross-brand Super-Admin (florian@reisinger.pictures).
-    brand?: 'rp' | 'srp' | null;
+    brand?: string | null;
     can_purchase_upgrades?: boolean;
     roles: Role[];
     gallery_groups: GalleryGroup[];
@@ -51,7 +49,7 @@ export function useUsers() {
         await mutateUsers();
     };
 
-    const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string, brand: 'rp' | 'srp' | null, canPurchaseUpgrades: boolean) => {
+    const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string, brand: string | null, canPurchaseUpgrades: boolean) => {
         await apiMutate(`/api/management/users/${id}`, 'PUT', {
             role_ids,
             gallery_group_ids,

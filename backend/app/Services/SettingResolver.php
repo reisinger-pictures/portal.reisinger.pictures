@@ -8,18 +8,12 @@ use App\Support\BrandRegistry;
 /**
  * Brand-scoped settings resolver.
  *
- * Settings isolation now uses the `brand` column on the `settings` table instead
- * of a key-prefix (`srp_*`). Reads scope by (key, brand), falling back to the
- * canonical B2B ('rp') row when no brand-specific row exists. See spec §3.2
- * (features/infrastructure/14-per-brand-catalog.md).
+ * Settings isolation uses the `brand` column on the `settings` table.
+ * Reads scope by (key, brand), falling back to the canonical B2B ('rp')
+ * row when no brand-specific row exists.
  */
 class SettingResolver
 {
-    public function isSrp(): bool
-    {
-        return BrandRegistry::isSrp();
-    }
-
     public function get(string $key, mixed $default = null): mixed
     {
         $brand = BrandRegistry::currentOrDefault()->value;

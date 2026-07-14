@@ -22,20 +22,26 @@ export interface BrandConfig {
 
 const themeMap: Record<string, { light: string; dark: string }> = {
     rp: {light: 'reisinger-light', dark: 'b2b-dark'},
-    srp: {light: 'srp-light', dark: 'srp-dark'},
 };
 
 const defaultTheme = {light: 'reisinger-light', dark: 'b2b-dark'};
 
 export function getBrandFromHostname(hostname: string): BrandId {
     const h = hostname.toLowerCase();
-    if (h.startsWith('buy.') || h === 'srp.localhost' || h.endsWith('.srp.localhost')) {
-        return 'srp';
+    // Dev fallback: *.localhost → brand from subdomain
+    if (h.endsWith('.localhost') || h === 'localhost') {
+        const parts = h.split('.');
+        if (parts.length >= 2 && parts[0] !== 'localhost') {
+            return parts[0];
+        }
     }
     return 'rp';
 }
 
-export function getBrandTheme(brand: BrandId): { light: string; dark: string } {
+export function getBrandTheme(brand: BrandId, config?: BrandConfig | null): { light: string; dark: string } {
+    if (config?.theme) {
+        return {light: `${config.theme}-light`, dark: `${config.theme}-dark`};
+    }
     return themeMap[brand] ?? defaultTheme;
 }
 
@@ -54,7 +60,7 @@ export function useBrandConfig() {
 export function useBrand() {
     const brand = getBrandFromHostname(window.location.hostname);
     const {config} = useBrandConfig();
-    const theme = getBrandTheme(brand);
+    const theme = getBrandTheme(brand, config);
 
     return {
         brand,

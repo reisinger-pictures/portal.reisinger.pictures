@@ -14,6 +14,7 @@ use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CouponService;
 use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
+use App\Values\BrandConfig;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -27,7 +28,18 @@ class CouponServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        BrandRegistry::set(Brand::SRP);
+        $testBrand = new BrandConfig(
+            id: 'test-brand',
+            name: 'Test Brand',
+            theme: 'rp',
+            portalName: 'Test Portal',
+            impressumUrl: null,
+            logoPath: null,
+            features: [],
+            hostnames: [],
+            isActive: true,
+        );
+        BrandRegistry::set($testBrand);
         $this->service = new CouponService();
     }
 
@@ -44,7 +56,7 @@ class CouponServiceTest extends TestCase
     public function test_finds_valid_global_coupon(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'TEST10',
             'type' => 'percentage',
             'value' => 10,
@@ -52,7 +64,7 @@ class CouponServiceTest extends TestCase
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('TEST10', Brand::SRP);
+        [$found, $error] = $this->service->findValidCoupon('TEST10', Brand::B2B);
 
         $this->assertNotNull($found);
         $this->assertNull($error);
@@ -62,12 +74,12 @@ class CouponServiceTest extends TestCase
     public function test_rejects_wrong_brand(): void
     {
         Coupon::factory()->create([
-            'brand' => 'rp',
-            'code' => 'RPONLY',
+            'brand' => 'test-brand',
+            'code' => 'TBONLY',
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('RPONLY', Brand::SRP);
+        [$found, $error] = $this->service->findValidCoupon('TBONLY', Brand::B2B);
 
         $this->assertNull($found);
         $this->assertNotNull($error);
@@ -77,13 +89,13 @@ class CouponServiceTest extends TestCase
     public function test_rejects_expired_coupon(): void
     {
         Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'EXPIRED',
             'active' => true,
             'expires_at' => Carbon::now()->subDay(),
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('EXPIRED', Brand::SRP);
+        [$found, $error] = $this->service->findValidCoupon('EXPIRED', Brand::B2B);
 
         $this->assertNull($found);
         $this->assertStringContainsString('expired', $error);
@@ -92,14 +104,14 @@ class CouponServiceTest extends TestCase
     public function test_rejects_maxed_out_coupon(): void
     {
         Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'MAXED',
             'active' => true,
             'max_uses_global' => 5,
             'used_count' => 5,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('MAXED', Brand::SRP);
+        [$found, $error] = $this->service->findValidCoupon('MAXED', Brand::B2B);
 
         $this->assertNull($found);
         $this->assertStringContainsString('usage limit', $error);
@@ -108,12 +120,12 @@ class CouponServiceTest extends TestCase
     public function test_rejects_inactive_coupon(): void
     {
         Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'INACTIVE',
             'active' => false,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('INACTIVE', Brand::SRP);
+        [$found, $error] = $this->service->findValidCoupon('INACTIVE', Brand::B2B);
 
         $this->assertNull($found);
         $this->assertStringContainsString('not active', $error);
@@ -122,14 +134,14 @@ class CouponServiceTest extends TestCase
     public function test_accepts_gallery_scoped_coupon_when_gallery_matches(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'GALLERY',
             'scope_type' => 'gallery',
             'scope_id' => 42,
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('GALLERY', Brand::SRP, 42);
+        [$found, $error] = $this->service->findValidCoupon('GALLERY', Brand::B2B, 42);
 
         $this->assertNotNull($found);
         $this->assertNull($error);
@@ -138,14 +150,14 @@ class CouponServiceTest extends TestCase
     public function test_rejects_gallery_scoped_coupon_when_gallery_does_not_match(): void
     {
         Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'GALLERY',
             'scope_type' => 'gallery',
             'scope_id' => 42,
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('GALLERY', Brand::SRP, 99);
+        [$found, $error] = $this->service->findValidCoupon('GALLERY', Brand::B2B, 99);
 
         $this->assertNull($found);
         $this->assertStringContainsString('not valid', $error);
@@ -154,14 +166,14 @@ class CouponServiceTest extends TestCase
     public function test_accepts_meta_gallery_scoped_coupon_when_meta_gallery_matches(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'META',
             'scope_type' => 'meta_gallery',
             'scope_id' => 7,
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('META', Brand::SRP, null, 7);
+        [$found, $error] = $this->service->findValidCoupon('META', Brand::B2B, null, 7);
 
         $this->assertNotNull($found);
         $this->assertNull($error);
@@ -170,14 +182,14 @@ class CouponServiceTest extends TestCase
     public function test_rejects_meta_gallery_scoped_coupon_when_meta_gallery_does_not_match(): void
     {
         Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'META',
             'scope_type' => 'meta_gallery',
             'scope_id' => 7,
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('META', Brand::SRP, null, 99);
+        [$found, $error] = $this->service->findValidCoupon('META', Brand::B2B, null, 99);
 
         $this->assertNull($found);
         $this->assertStringContainsString('not valid', $error);
@@ -189,7 +201,7 @@ class CouponServiceTest extends TestCase
 
     public function test_apply_fixed_discount(): void
     {
-        $coupon = Coupon::factory()->fixed(5.00)->create(['brand' => 'srp', 'active' => true]);
+        $coupon = Coupon::factory()->fixed(5.00)->create(['brand' => 'rp', 'active' => true]);
         $items = $this->makePricedItems(10, 2500); // 10 × 2500 = 25000
         $total = 25000;
 
@@ -202,7 +214,7 @@ class CouponServiceTest extends TestCase
 
     public function test_apply_fixed_discount_does_not_go_below_zero(): void
     {
-        $coupon = Coupon::factory()->fixed(999999.00)->create(['brand' => 'srp', 'active' => true]);
+        $coupon = Coupon::factory()->fixed(999999.00)->create(['brand' => 'rp', 'active' => true]);
         $items = $this->makePricedItems(1, 1000);
         $total = 1000;
 
@@ -214,7 +226,7 @@ class CouponServiceTest extends TestCase
 
     public function test_apply_percentage_discount(): void
     {
-        $coupon = Coupon::factory()->percentage(10)->create(['brand' => 'srp', 'active' => true]);
+        $coupon = Coupon::factory()->percentage(10)->create(['brand' => 'rp', 'active' => true]);
         $items = $this->makePricedItems(10, 2500); // 10 × 2500 = 25000
         $total = 25000;
 
@@ -228,7 +240,7 @@ class CouponServiceTest extends TestCase
     public function test_apply_percentage_with_max_items_limits_to_cheapest(): void
     {
         // 50% off the 3 cheapest items
-        $coupon = Coupon::factory()->percentageWithMaxItems(50, 3)->create(['brand' => 'srp', 'active' => true]);
+        $coupon = Coupon::factory()->percentageWithMaxItems(50, 3)->create(['brand' => 'rp', 'active' => true]);
         $items = $this->makePricedItems(5, [3000, 2500, 2000, 1500, 1000]);
         $total = 10000; // 3000+2500+2000+1500+1000
 
@@ -242,7 +254,7 @@ class CouponServiceTest extends TestCase
     public function test_apply_percentage_with_max_items_greater_than_count(): void
     {
         // 50% off the 10 cheapest items, but only 3 items exist
-        $coupon = Coupon::factory()->percentageWithMaxItems(50, 10)->create(['brand' => 'srp', 'active' => true]);
+        $coupon = Coupon::factory()->percentageWithMaxItems(50, 10)->create(['brand' => 'rp', 'active' => true]);
         $items = $this->makePricedItems(3, [1000, 2000, 3000]);
         $total = 6000;
 
@@ -255,7 +267,7 @@ class CouponServiceTest extends TestCase
 
     public function test_apply_percentage_without_max_items_applies_to_entire_cart(): void
     {
-        $coupon = Coupon::factory()->percentage(10)->create(['brand' => 'srp', 'active' => true]);
+        $coupon = Coupon::factory()->percentage(10)->create(['brand' => 'rp', 'active' => true]);
         $items = $this->makePricedItems(5, [3000, 2500, 2000, 1500, 1000]);
         $total = 10000;
 
@@ -273,7 +285,7 @@ class CouponServiceTest extends TestCase
     public function test_increment_usage(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'USAGE',
             'used_count' => 0,
         ]);
@@ -290,9 +302,11 @@ class CouponServiceTest extends TestCase
 
     public function test_strategy_with_coupon_code_applies_discount(): void
     {
+        BrandRegistry::set(Brand::B2B);
+
         $coupon = Coupon::factory()->percentage(10)->create([
-            'brand' => 'srp',
-            'code' => 'SRP10',
+            'brand' => 'rp',
+            'code' => 'RP10',
             'active' => true,
         ]);
 
@@ -300,7 +314,7 @@ class CouponServiceTest extends TestCase
         $user = User::factory()->create();
 
         $items = $this->buildStrategyItems(10, false);
-        $result = $strategy->calculateCart($items, $user, 'SRP10');
+        $result = $strategy->calculateCart($items, $user, 'RP10');
 
         // 10 items × 2500 (tier2) = 25000, minus 10% = 22500
         $this->assertSame(22500, $result['totalCents']);
@@ -322,16 +336,8 @@ class CouponServiceTest extends TestCase
         $this->assertNull($result['couponId']);
     }
 
-    public function test_brand_isolation_srp_coupon_not_applied_in_non_srp_context(): void
+    public function test_strategy_applies_coupon_with_matching_brand(): void
     {
-        // Create a B2B coupon
-        Coupon::factory()->percentage(10)->create([
-            'brand' => 'rp',
-            'code' => 'RP10',
-            'active' => true,
-        ]);
-
-        // Set brand to B2B context
         BrandRegistry::set(Brand::B2B);
 
         $strategy = new VolumeLicensingStrategy(new SettingResolver(), new CouponService());
@@ -339,20 +345,13 @@ class CouponServiceTest extends TestCase
 
         $items = $this->buildStrategyItems(10, false);
 
-        // Even though coupon is passed, brand won't match the current context
-        // Normally the findValidCoupon checks brand against current brand
-        // But here we're testing the strategy integration
-        // Re-set to SRP for this test to check isolation
-        BrandRegistry::set(Brand::SRP);
-
-        // Create an SRP coupon that should work
         Coupon::factory()->percentage(10)->create([
-            'brand' => 'srp',
-            'code' => 'SRP10',
+            'brand' => 'rp',
+            'code' => 'WORK10',
             'active' => true,
         ]);
 
-        $result = $strategy->calculateCart($items, $user, 'SRP10');
+        $result = $strategy->calculateCart($items, $user, 'WORK10');
 
         $this->assertSame(22500, $result['totalCents']);
         $this->assertNotNull($result['couponId']);
@@ -365,7 +364,7 @@ class CouponServiceTest extends TestCase
     public function test_rejects_per_account_maxed_out(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'PERACCT',
             'active' => true,
             'max_uses_global' => null,
@@ -380,7 +379,7 @@ class CouponServiceTest extends TestCase
             'used_count' => 2,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('PERACCT', Brand::SRP, null, null, $user->id);
+        [$found, $error] = $this->service->findValidCoupon('PERACCT', Brand::B2B, null, null, $user->id);
 
         $this->assertNull($found);
         $this->assertStringContainsString('usage limit', $error);
@@ -389,7 +388,7 @@ class CouponServiceTest extends TestCase
     public function test_accepts_below_per_account_limit(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'PEROK',
             'active' => true,
             'max_uses_global' => null,
@@ -404,7 +403,7 @@ class CouponServiceTest extends TestCase
             'used_count' => 1,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('PEROK', Brand::SRP, null, null, $user->id);
+        [$found, $error] = $this->service->findValidCoupon('PEROK', Brand::B2B, null, null, $user->id);
 
         $this->assertNotNull($found);
         $this->assertNull($error);
@@ -422,14 +421,14 @@ class CouponServiceTest extends TestCase
         $photographer->photographerGalleries()->attach($gallery->id);
 
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'PHOTOVALID',
             'active' => true,
             'scope_type' => 'photographer',
             'created_by' => $photographer->id,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('PHOTOVALID', Brand::SRP, $gallery->id);
+        [$found, $error] = $this->service->findValidCoupon('PHOTOVALID', Brand::B2B, $gallery->id);
 
         $this->assertNotNull($found);
         $this->assertNull($error);
@@ -444,14 +443,14 @@ class CouponServiceTest extends TestCase
         $photographer->photographerGalleries()->attach($galleryA->id);
 
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'PHOTOINVALID',
             'active' => true,
             'scope_type' => 'photographer',
             'created_by' => $photographer->id,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('PHOTOINVALID', Brand::SRP, $galleryB->id);
+        [$found, $error] = $this->service->findValidCoupon('PHOTOINVALID', Brand::B2B, $galleryB->id);
 
         $this->assertNull($found);
         $this->assertStringContainsString('not valid', $error);
@@ -470,14 +469,14 @@ class CouponServiceTest extends TestCase
         $user->save();
 
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'ORGVALID',
             'scope_type' => 'organisation',
             'scope_id' => $org->id,
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('ORGVALID', Brand::SRP, null, null, $user->id);
+        [$found, $error] = $this->service->findValidCoupon('ORGVALID', Brand::B2B, null, null, $user->id);
 
         $this->assertNotNull($found);
         $this->assertNull($error);
@@ -493,14 +492,14 @@ class CouponServiceTest extends TestCase
         $user->save();
 
         Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'ORGWRONG',
             'scope_type' => 'organisation',
             'scope_id' => $orgA->id,
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('ORGWRONG', Brand::SRP, null, null, $user->id);
+        [$found, $error] = $this->service->findValidCoupon('ORGWRONG', Brand::B2B, null, null, $user->id);
 
         $this->assertNull($found);
         $this->assertStringContainsString('not valid for your account', $error);
@@ -512,14 +511,14 @@ class CouponServiceTest extends TestCase
         $user = User::factory()->create(); // no org attached
 
         Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'ORGNOTENANT',
             'scope_type' => 'organisation',
             'scope_id' => $org->id,
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('ORGNOTENANT', Brand::SRP, null, null, $user->id);
+        [$found, $error] = $this->service->findValidCoupon('ORGNOTENANT', Brand::B2B, null, null, $user->id);
 
         $this->assertNull($found);
         $this->assertStringContainsString('not valid for your account', $error);
@@ -530,14 +529,14 @@ class CouponServiceTest extends TestCase
         $org = Org::factory()->create();
 
         Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'ORGAUTH',
             'scope_type' => 'organisation',
             'scope_id' => $org->id,
             'active' => true,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('ORGAUTH', Brand::SRP, null, null, null);
+        [$found, $error] = $this->service->findValidCoupon('ORGAUTH', Brand::B2B, null, null, null);
 
         $this->assertNull($found);
         $this->assertStringContainsString('not valid for your account', $error);
@@ -550,7 +549,7 @@ class CouponServiceTest extends TestCase
     public function test_increment_usage_with_per_account(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'INCPER',
             'max_uses_global' => null,
             'max_uses_per_account' => 5,
@@ -571,7 +570,7 @@ class CouponServiceTest extends TestCase
     public function test_combined_global_and_per_account_limits(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'COMBINED',
             'active' => true,
             'max_uses_global' => 5,
@@ -586,7 +585,7 @@ class CouponServiceTest extends TestCase
             'used_count' => 2,
         ]);
 
-        [$found, $error] = $this->service->findValidCoupon('COMBINED', Brand::SRP, null, null, $user->id);
+        [$found, $error] = $this->service->findValidCoupon('COMBINED', Brand::B2B, null, null, $user->id);
 
         $this->assertNull($found);
         $this->assertStringContainsString('usage limit', $error);
@@ -599,7 +598,7 @@ class CouponServiceTest extends TestCase
     public function test_lock_and_revalidate_success(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'LOCKOK',
             'active' => true,
             'used_count' => 0,
@@ -616,7 +615,7 @@ class CouponServiceTest extends TestCase
     public function test_lock_and_revalidate_global_maxed_out(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'LOCKMAX',
             'active' => true,
             'max_uses_global' => 5,
@@ -632,7 +631,7 @@ class CouponServiceTest extends TestCase
     public function test_lock_and_revalidate_per_account_maxed_out(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'LOCKPER',
             'active' => true,
             'max_uses_per_account' => 2,
@@ -655,7 +654,7 @@ class CouponServiceTest extends TestCase
     public function test_lock_and_revalidate_ignores_per_account_when_null_user(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'LOCKNULL',
             'active' => true,
             'max_uses_per_account' => 2,
@@ -674,7 +673,7 @@ class CouponServiceTest extends TestCase
     public function test_lock_and_revalidate_coupon_when_coupon_deleted(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'DELETE',
             'active' => true,
             'used_count' => 0,
@@ -692,7 +691,7 @@ class CouponServiceTest extends TestCase
     public function test_increment_usage_multiple_increments_for_same_user(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'MULTIINC',
             'max_uses_per_account' => 3,
             'max_uses_global' => 100,

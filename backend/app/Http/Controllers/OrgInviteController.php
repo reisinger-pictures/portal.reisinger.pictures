@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Brand;
 use Illuminate\Http\Request;
 use App\Models\Org;
 use App\Models\OrgInvite;
@@ -37,7 +38,8 @@ class OrgInviteController extends Controller
             'expires_at' => now()->addDays(7)
         ]);
 
-        $link = BrandRegistry::frontendUrl($org->brand) . '/org-invite/' . $token;
+        $orgBrand = $org->brand instanceof Brand ? $org->brand : BrandRegistry::currentOrDefault();
+        $link = BrandRegistry::frontendUrl($orgBrand) . '/org-invite/' . $token;
         Mail::to($request->email)->queue(new OrgInviteMail($org->name, $link));
 
         return response()->json(['success' => true]);

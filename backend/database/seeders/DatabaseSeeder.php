@@ -69,13 +69,8 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Sport', 'parent_id' => $wien->id, 'is_public' => true]
         );
 
-        // --- Per-brand catalog, settings, CRM seed (spec §5) ---
-        // B2B ('rp') = canonical/existing data; SRP ('srp') = placeholder copy
+        // --- Per-brand catalog, settings, CRM seed ---
         $this->seedCatalogForBrand(Brand::B2B);
-        $this->seedCatalogForBrand(Brand::SRP);
-
-        // T-18: SRP-spezifische Settings (Volumen-Staffel + RP-Defaults kopieren)
-        $this->call(SrpSettingsSeeder::class);
 
         // Neu: Trigger den Location Import direkt im Seed
         $this->command->info('Starte Smart Assistance Import...');

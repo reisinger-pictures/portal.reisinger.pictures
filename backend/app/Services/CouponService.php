@@ -27,7 +27,7 @@ class CouponService
      */
     public function findValidCoupon(
         string $code,
-        Brand $brand,
+        Brand|string $brand,
         int|string|null $galleryId = null,
         int|string|null $metaGalleryId = null,
         int|string|null $userId = null,

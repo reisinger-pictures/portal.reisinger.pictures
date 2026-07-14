@@ -9,6 +9,7 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use App\Values\BrandConfig;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,15 +22,15 @@ class CheckoutCouponRevalidationTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware(BrandContextMiddleware::class);
-        BrandRegistry::set(Brand::SRP);
+        BrandRegistry::set(Brand::B2B);
 
-        \App\Models\Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'srp'], ['value' => 'volume_licensing']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'srp'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'srp'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'srp'], ['value' => 'Teststreet 1']);
+        \App\Models\Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        \App\Models\Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
 
         \App\Models\LicenseUseCase::forceCreate(['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']);
-        \App\Models\LicenseUseCase::forceCreate(['id' => '00000000-0000-0000-0000-000000000000', 'name' => 'Web', 'base_price' => 3000, 'flatrate_tier' => 'web', 'brand' => 'srp']);
+        \App\Models\LicenseUseCase::forceCreate(['id' => '00000000-0000-0000-0000-000000000000', 'name' => 'Web', 'base_price' => 3000, 'flatrate_tier' => 'web', 'brand' => 'rp']);
     }
 
     protected function tearDown(): void
@@ -76,7 +77,7 @@ class CheckoutCouponRevalidationTest extends TestCase
     public function test_checkout_rejects_expired_coupon(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'EXPCHECK',
             'type' => 'percentage',
             'value' => 10,
@@ -106,7 +107,7 @@ class CheckoutCouponRevalidationTest extends TestCase
     public function test_checkout_rejects_maxed_out_coupon(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'MAXCHECK',
             'type' => 'percentage',
             'value' => 10,
@@ -141,7 +142,7 @@ class CheckoutCouponRevalidationTest extends TestCase
     public function test_checkout_with_valid_percentage_coupon_succeeds(): void
     {
         $coupon = Coupon::factory()->percentage(10)->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'VALID10',
             'active' => true,
         ]);
@@ -173,7 +174,7 @@ class CheckoutCouponRevalidationTest extends TestCase
     public function test_checkout_increments_coupon_usage_per_account(): void
     {
         $coupon = Coupon::factory()->percentage(10)->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'INCR',
             'active' => true,
             'max_uses_global' => 5,
@@ -205,7 +206,7 @@ class CheckoutCouponRevalidationTest extends TestCase
     public function test_concurrent_checkout_race_condition_blocks_second_request(): void
     {
         $coupon = Coupon::factory()->percentage(10)->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'code' => 'RACE',
             'active' => true,
             'max_uses_global' => 1,

@@ -32,7 +32,7 @@ class Order extends Model
         'stripe_fee_cents' => 'integer',
         'coupon_discount_cents' => 'integer',
         'is_quote_request' => 'boolean',
-        'brand' => Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
     ];
 
     public function coupon()

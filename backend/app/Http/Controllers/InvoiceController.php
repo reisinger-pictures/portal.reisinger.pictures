@@ -25,6 +25,8 @@ class InvoiceController extends Controller
         \App\Support\BrandRegistry::set($brand);
 
         try {
+            $brandConfig = \App\Support\BrandRegistry::configForBrand($brand->value);
+
             return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', [
                 'order' => $order,
                 'snapshot' => $order->invoiceSnapshot,
@@ -32,8 +34,9 @@ class InvoiceController extends Controller
                 'bankHolder' => $resolver->get('bank_holder'),
                 'bankIban' => $resolver->get('bank_iban'),
                 'bankBic' => $resolver->get('bank_bic'),
-                'isSrp' => $brand->value === 'srp',
                 'pfx' => $brand->prefix(),
+                'primaryColor' => $brandConfig?->primaryColor ?? '#1E5631',
+                'secondaryColor' => $brandConfig?->secondaryColor ?? '#A4B494',
             ])->download($order->invoiceSnapshot->invoice_number . '.pdf');
         } finally {
             \App\Support\BrandRegistry::set($previousBrand);
@@ -70,8 +73,8 @@ class InvoiceController extends Controller
         $viewName = $isOffer ? 'pdf.manual_offer' : 'pdf.invoice';
         $bankDetails = $this->invoiceService->getBankDetails();
 
-        $isSrp = \App\Support\BrandRegistry::configOrDefault()->id === 'srp';
         $pfx = \App\Support\BrandRegistry::prefix();
+        $brandConfig = \App\Support\BrandRegistry::configOrDefault();
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
             'title' => $docTitle,
@@ -80,8 +83,9 @@ class InvoiceController extends Controller
             'bankHolder' => $bankDetails['holder'],
             'bankIban' => $bankDetails['iban'],
             'bankBic' => $bankDetails['bic'],
-            'isSrp' => $isSrp,
             'pfx' => $pfx,
+            'primaryColor' => $brandConfig->primaryColor,
+            'secondaryColor' => $brandConfig->secondaryColor,
         ]);
 
         $output = $pdf->output();

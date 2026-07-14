@@ -5,7 +5,7 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
-test.describe('Gallery-Scoped Coupons (SRP)', () => {
+test.describe('Gallery-Scoped Coupons', () => {
     let helper: E2ESessionHelper;
     let photogUser: { email: string; password: string; id: string };
     let srpAdmin: { email: string; password: string; id: string };

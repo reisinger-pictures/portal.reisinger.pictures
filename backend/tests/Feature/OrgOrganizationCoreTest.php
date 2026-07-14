@@ -210,7 +210,7 @@ class OrgOrganizationCoreTest extends TestCase
     {
         $org = Org::factory()->create([
             'domain' => 'srp-company.com',
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'auto_join_policy' => 'immediate',
             'invoice_frequency' => 'immediate',
         ]);

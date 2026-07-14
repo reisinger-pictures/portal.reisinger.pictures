@@ -18,13 +18,13 @@ class Setting extends Model
     protected $keyType = 'string';
 
     protected $fillable = ['key', 'value', 'brand'];
-    protected $casts = ['brand' => Brand::class];
+    protected $casts = ['brand' => \App\Casts\AsBrand::class];
 
     /**
      * Scope to the current brand (host-derived). See spec §3.2 / §3.3.
      */
     public function scopeForCurrentBrand(Builder $query): Builder
     {
-        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentOrDefault()->value);
+        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentId());
     }
 }

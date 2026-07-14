@@ -22,7 +22,7 @@ class VolumeLicensingStrategyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        BrandRegistry::set(Brand::SRP);
+        BrandRegistry::set(Brand::B2B);
         $this->strategy = new VolumeLicensingStrategy(new SettingResolver());
     }
 
@@ -35,11 +35,11 @@ class VolumeLicensingStrategyTest extends TestCase
     public function test_calculate_cart_applies_volume_discount_at_threshold(): void
     {
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
             ['value' => '5']
         );
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
             ['value' => '10']
         );
 
@@ -55,11 +55,11 @@ class VolumeLicensingStrategyTest extends TestCase
     public function test_calculate_cart_applies_higher_discount_at_higher_threshold(): void
     {
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
             ['value' => '5']
         );
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
             ['value' => '10']
         );
 
@@ -75,11 +75,11 @@ class VolumeLicensingStrategyTest extends TestCase
     public function test_calculate_cart_below_lowest_threshold_no_discount(): void
     {
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
             ['value' => '5']
         );
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
             ['value' => '10']
         );
 
@@ -94,11 +94,11 @@ class VolumeLicensingStrategyTest extends TestCase
     public function test_tier_breakdown_is_generated_correctly(): void
     {
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
             ['value' => '5']
         );
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
             ['value' => '10']
         );
 
@@ -126,11 +126,11 @@ class VolumeLicensingStrategyTest extends TestCase
     public function test_quote_items_are_excluded_from_count(): void
     {
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
             ['value' => '5']
         );
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
             ['value' => '10']
         );
 
@@ -149,16 +149,16 @@ class VolumeLicensingStrategyTest extends TestCase
     public function test_coupon_integration_with_fixed_discount(): void
     {
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
             ['value' => '5']
         );
         Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'srp'],
+            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
             ['value' => '10']
         );
 
         $coupon = Coupon::factory()->fixed(10.00)->create([
-            'brand' => 'srp',
+            'brand' => 'rp',
             'active' => true,
         ]);
 

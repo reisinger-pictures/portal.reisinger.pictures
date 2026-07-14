@@ -18,7 +18,7 @@ class SitemapController extends Controller
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
         
         Gallery::where('is_public', true)
-            ->where('brand', BrandRegistry::current())
+            ->where('brand', BrandRegistry::currentId())
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
@@ -49,7 +49,7 @@ class SitemapController extends Controller
         
         Photo::whereHas('gallery', function ($query) {
             $query->where('is_public', true)
-                ->where('brand', BrandRegistry::current())
+                ->where('brand', BrandRegistry::currentId())
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 });

@@ -1,13 +1,11 @@
 /**
- * CouponInput – B2C coupon entry field for the SRP cart (SRP-01 / Phase F).
+ * CouponInput – coupon entry field for volume-licensed checkouts.
  *
  * Renders a daisyUI `join` input group for entering a coupon code, plus
  * a result panel that reflects the validation state of `useCoupon()`.
  *
- * Visibility: this component is only rendered on the SRP brand
- * (`useBrand().isSrp === true`). On RP, it short-circuits to `null`.
- *
- * @see features/ecommerce/08-srp-coupon-system.md
+ * Visibility: this component is only rendered when licensing mode is
+ * `volume_licensing` (gated by `useLicensingMode()`).
  */
 
 import {useState, useCallback} from 'react';

@@ -179,10 +179,10 @@ class AccessControlServiceTest extends TestCase
 
     public function test_brand_scoping_filters_other_brand_galleries(): void
     {
-        $galleryA = Gallery::factory()->create(['brand' => 'srp']);
+        $galleryA = Gallery::factory()->create(['brand' => 'test-brand']);
         $galleryB = Gallery::factory()->create(['brand' => 'rp']);
 
-        $user = User::factory()->create(['brand' => 'srp']);
+        $user = User::factory()->create(['brand' => 'test-brand']);
         $user->galleries()->attach([$galleryA->id, $galleryB->id]);
 
         $ids = $this->service->getAllowedGalleryIds($user);
@@ -194,7 +194,7 @@ class AccessControlServiceTest extends TestCase
     public function test_brand_scoping_rejects_null_brand_galleries(): void
     {
         $gallery = Gallery::factory()->create(['brand' => null]);
-        $user = User::factory()->create(['brand' => 'srp']);
+        $user = User::factory()->create(['brand' => 'test-brand']);
         $user->galleries()->attach($gallery);
 
         $ids = $this->service->getAllowedGalleryIds($user);

@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\UserRole;
 use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -23,9 +24,7 @@ class UpdateUserRequest extends FormRequest
             'can_edit_metadata' => 'boolean',
             'flatrate_level' => 'nullable|string|in:none,web,print,original',
             'can_purchase_upgrades' => 'boolean',
-            // Brand: 'rp', 'srp', or null (cross-brand only for Super-Admin).
-            // U-02: non-super-admin roles MUST have a brand set; super-admin MUST have brand=null.
-            'brand' => 'nullable|string|in:rp,srp'
+            'brand' => ['nullable', 'string', Rule::in(array_keys(config('brands', [])))]
         ];
     }
 
@@ -53,12 +52,12 @@ class UpdateUserRequest extends FormRequest
                         );
                     }
                 } else {
-                    // Non-super-admin: brand must be 'rp' or 'srp' (never null).
                     $brand = $this->input('brand');
                     if ($brand === null || $brand === '') {
+                        $brandIds = implode(', ', array_keys(config('brands', [])));
                         $this->validator->errors()->add(
                             'brand',
-                            'Für diese Rolle ist eine Brand-Zuweisung (rp oder srp) erforderlich.'
+                            "Für diese Rolle ist eine Brand-Zuweisung ({$brandIds}) erforderlich."
                         );
                     }
                 }

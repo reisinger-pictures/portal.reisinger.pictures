@@ -7,6 +7,7 @@ use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\Gallery;
 use App\Models\Photo;
 use App\Support\BrandRegistry;
+use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -36,9 +37,9 @@ class SitemapControllerTest extends TestCase
             'is_public' => true,
             'brand' => Brand::B2B,
         ]);
-        $srp = Gallery::factory()->create([
+        $testBrandGallery = Gallery::factory()->create([
             'is_public' => true,
-            'brand' => Brand::SRP,
+            'brand' => 'test-brand',
         ]);
 
         $response = $this->get('/api/sitemap-galleries.xml');
@@ -46,21 +47,32 @@ class SitemapControllerTest extends TestCase
         $response->assertStatus(200);
         $content = $response->getContent();
         $this->assertStringContainsString(htmlspecialchars($b2b->full_path), $content);
-        $this->assertStringNotContainsString(htmlspecialchars($srp->full_path), $content);
+        $this->assertStringNotContainsString(htmlspecialchars($testBrandGallery->full_path), $content);
     }
 
     public function test_sitemap_galleries_respects_brand_isolation()
     {
         $this->withoutMiddleware(BrandContextMiddleware::class);
-        BrandRegistry::set(Brand::SRP);
+        $testBrand = new BrandConfig(
+            id: 'test-brand',
+            name: 'Test Brand',
+            theme: 'rp',
+            portalName: 'Test Portal',
+            impressumUrl: null,
+            logoPath: null,
+            features: [],
+            hostnames: [],
+            isActive: true,
+        );
+        BrandRegistry::set($testBrand);
 
         Gallery::factory()->create([
             'is_public' => true,
             'brand' => Brand::B2B,
         ]);
-        $srp = Gallery::factory()->create([
+        $testBrandGallery = Gallery::factory()->create([
             'is_public' => true,
-            'brand' => Brand::SRP,
+            'brand' => 'test-brand',
         ]);
 
         $response = $this->get('/api/sitemap-galleries.xml');
@@ -69,7 +81,7 @@ class SitemapControllerTest extends TestCase
 
         $response->assertStatus(200);
         $content = $response->getContent();
-        $this->assertStringContainsString(htmlspecialchars($srp->full_path), $content);
+        $this->assertStringContainsString(htmlspecialchars($testBrandGallery->full_path), $content);
         $this->assertStringNotContainsString('rp/', $content);
     }
 
@@ -121,7 +133,18 @@ class SitemapControllerTest extends TestCase
     public function test_sitemap_images_respects_brand_isolation()
     {
         $this->withoutMiddleware(BrandContextMiddleware::class);
-        BrandRegistry::set(Brand::SRP);
+        $testBrand = new BrandConfig(
+            id: 'test-brand',
+            name: 'Test Brand',
+            theme: 'rp',
+            portalName: 'Test Portal',
+            impressumUrl: null,
+            logoPath: null,
+            features: [],
+            hostnames: [],
+            isActive: true,
+        );
+        BrandRegistry::set($testBrand);
 
         $b2bGallery = Gallery::factory()->create([
             'is_public' => true,
@@ -131,12 +154,12 @@ class SitemapControllerTest extends TestCase
             'gallery_id' => $b2bGallery->id,
         ]);
 
-        $srpGallery = Gallery::factory()->create([
+        $testBrandGallery = Gallery::factory()->create([
             'is_public' => true,
-            'brand' => Brand::SRP,
+            'brand' => 'test-brand',
         ]);
-        $srpPhoto = Photo::factory()->create([
-            'gallery_id' => $srpGallery->id,
+        $testBrandPhoto = Photo::factory()->create([
+            'gallery_id' => $testBrandGallery->id,
         ]);
 
         $response = $this->get('/api/sitemap-images.xml');
@@ -145,7 +168,7 @@ class SitemapControllerTest extends TestCase
 
         $response->assertStatus(200);
         $content = $response->getContent();
-        $this->assertStringContainsString('/api/media/' . $srpGallery->id . '/' . $srpPhoto->filename, $content);
+        $this->assertStringContainsString('/api/media/' . $testBrandGallery->id . '/' . $testBrandPhoto->filename, $content);
         $this->assertStringNotContainsString('/api/media/' . $b2bGallery->id, $content);
     }
 

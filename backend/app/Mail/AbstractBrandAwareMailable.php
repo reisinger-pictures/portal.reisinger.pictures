@@ -26,8 +26,10 @@ abstract class AbstractBrandAwareMailable extends Mailable implements ShouldQueu
 
     protected function brandFrontendUrl(): string
     {
-        if ($this->brand?->value === 'srp') {
-            return rtrim(config('app.frontend_url_srp', 'https://buy.reisinger.pictures'), '/');
+        $config = $this->brand ? BrandRegistry::configForBrand($this->brand->value) : null;
+
+        if ($config?->frontendUrl) {
+            return rtrim($config->frontendUrl, '/');
         }
 
         return rtrim(config('app.frontend_url'), '/');
@@ -40,18 +42,17 @@ abstract class AbstractBrandAwareMailable extends Mailable implements ShouldQueu
 
     protected function brandBcc(): string
     {
-        $key = $this->brand?->value === 'srp' ? 'accounting_email_srp' : 'accounting_email_rp';
+        $config = $this->brand ? BrandRegistry::configForBrand($this->brand->value) : null;
 
-        return config("services.{$key}", env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'));
+        return $config?->accountingEmail ?? config('services.accounting_email', 'accounting@reisinger.pictures');
     }
 
     protected function applyBrandFrom(): void
     {
-        if ($this->brand?->value === 'srp') {
-            $this->from(
-                config('mail.from_srp.address', config('mail.from.address')),
-                config('mail.from_srp.name', config('mail.from.name'))
-            );
+        $config = $this->brand ? BrandRegistry::configForBrand($this->brand->value) : null;
+
+        if ($config?->fromAddress) {
+            $this->from($config->fromAddress, $config->fromName ?? config('mail.from.name'));
         } else {
             $this->from(config('mail.from.address'), config('mail.from.name'));
         }

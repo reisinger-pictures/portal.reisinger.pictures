@@ -126,7 +126,7 @@ class CustomerControllerTest extends TestCase
     public function test_customers_are_brand_scoped()
     {
         Customer::factory()->count(2)->create(['brand' => Brand::B2B]);
-        Customer::factory()->count(1)->create(['brand' => Brand::SRP]);
+        Customer::factory()->count(1)->create(['brand' => 'test-brand']);
 
         $response = $this->actingAs($this->superAdmin, 'api')
             ->getJson('/api/management/customers');

@@ -55,7 +55,8 @@ class CouponController extends Controller
         }
 
         if ($user->is_admin) {
-            if ($coupon->brand->value !== BrandRegistry::currentOrDefault()->value) {
+                $couponBrandValue = $coupon->brand instanceof Brand ? $coupon->brand->value : $coupon->brand;
+                if ($couponBrandValue !== BrandRegistry::currentId()) {
                 abort(403, 'Forbidden');
             }
             return;
@@ -102,7 +103,7 @@ class CouponController extends Controller
         $user = auth()->user();
         $validated = $request->validated();
 
-        $validated['brand'] = BrandRegistry::currentOrDefault()->value;
+        $validated['brand'] = BrandRegistry::currentId();
 
         // Photographer restrictions
         if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
@@ -215,7 +216,7 @@ class CouponController extends Controller
         $user = auth()->user();
         $validated = $request->validated();
 
-        $validated['brand'] = BrandRegistry::currentOrDefault()->value;
+        $validated['brand'] = BrandRegistry::currentId();
         $validated['scope_type'] = 'gallery';
         $validated['scope_id'] = $galleryId;
 
@@ -242,7 +243,8 @@ class CouponController extends Controller
         $group = GalleryGroup::findOrFail($groupId);
         $brand = BrandRegistry::currentOrDefault();
 
-        if ($group->brand !== null && $group->brand->value !== $brand->value) {
+        $groupBrandValue = $group->brand instanceof Brand ? $group->brand->value : $group->brand;
+        if ($group->brand !== null && $groupBrandValue !== $brand->value) {
             return response()->json(['error' => 'Not found.'], 404);
         }
 
@@ -286,14 +288,15 @@ class CouponController extends Controller
         $group = GalleryGroup::findOrFail($groupId);
         $brand = BrandRegistry::currentOrDefault();
 
-        if ($group->brand !== null && $group->brand->value !== $brand->value) {
+        $groupBrandValue = $group->brand instanceof Brand ? $group->brand->value : $group->brand;
+        if ($group->brand !== null && $groupBrandValue !== $brand->value) {
             return response()->json(['error' => 'Not found.'], 404);
         }
 
         $user = auth()->user();
         $validated = $request->validated();
 
-        $validated['brand'] = BrandRegistry::currentOrDefault()->value;
+        $validated['brand'] = BrandRegistry::currentId();
         $validated['scope_type'] = 'meta_gallery';
         $validated['scope_id'] = $groupId;
 
@@ -324,16 +327,13 @@ class CouponController extends Controller
             return response()->json(['valid' => false, 'error' => $validator->errors()->first()], 422);
         }
 
-        $brand = BrandRegistry::current();
-        if ($brand === null) {
-            return response()->json(['valid' => false, 'error' => 'No brand context available.'], 400);
-        }
+        $brandId = BrandRegistry::currentId();
 
         $userId = auth()->id();
 
         [$coupon, $error] = $this->couponService->findValidCoupon(
             $request->input('code'),
-            $brand,
+            $brandId,
             $request->input('gallery_id'),
             $request->input('meta_gallery_id'),
             $userId,
@@ -370,7 +370,8 @@ class CouponController extends Controller
         $gallery = Gallery::findOrFail($galleryId);
         $brand = BrandRegistry::currentOrDefault();
 
-        if ($gallery->brand !== null && $gallery->brand->value !== $brand->value) {
+        $galleryBrandValue = $gallery->brand instanceof Brand ? $gallery->brand->value : $gallery->brand;
+        if ($gallery->brand !== null && $galleryBrandValue !== $brand->value) {
             abort(404, 'Not found.');
         }
 

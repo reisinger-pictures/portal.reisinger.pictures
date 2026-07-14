@@ -10,10 +10,9 @@ interface UserPermissionsModalProps {
     flatGroups: FlatGroup[];
     flatGalleries: Gallery[];
     onClose: () => void;
-    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'srp' | null, canPurchaseUpgrades: boolean) => Promise<void>;
+    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: string | null, canPurchaseUpgrades: boolean) => Promise<void>;
 }
 
-// U-02: Only Super-Admin is cross-brand (brand=null). All other roles are brand-bound.
 const SUPER_ADMIN_ROLE_NAME = UserRole.SUPER_ADMIN;
 
 export default function UserPermissionsModal({
@@ -30,16 +29,14 @@ export default function UserPermissionsModal({
 
     const [canEditMeta, setCanEditMeta] = useState<boolean>(user.can_edit_metadata || false);
     const [flatrateLevel, setFlatrateLevel] = useState<string>(user.flatrate_level || 'none');
-    const [brand, setBrand] = useState<'rp' | 'srp' | null>(user.brand ?? null);
+    const [brand, setBrand] = useState<string | null>(user.brand ?? null);
     const [canPurchaseUpgrades, setCanPurchaseUpgrades] = useState<boolean>(user.can_purchase_upgrades ?? false);
 
-    // U-02: Only Super-Admin role forces brand=null (cross-brand). All other roles are
-    // brand-bound — the user MUST pick 'rp' or 'srp'.
     const selectedRoleNames = (roles ?? [])
         .filter(r => selRoles.includes(r.id))
         .map(r => r.name);
     const isSuperAdmin = selectedRoleNames.includes(SUPER_ADMIN_ROLE_NAME);
-    const effectiveBrand: 'rp' | 'srp' | null = isSuperAdmin ? null : brand;
+    const effectiveBrand: string | null = isSuperAdmin ? null : brand;
 
     // When toggling roles, adjust brand for the super-admin transition.
     const toggleItem = useCallback((arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
@@ -125,11 +122,10 @@ export default function UserPermissionsModal({
                         className="select select-bordered w-full"
                         value={effectiveBrand ?? ''}
                         disabled={isSuperAdmin}
-                        onChange={e => setBrand((e.target.value || null) as 'rp' | 'srp' | null)}
+                        onChange={e => setBrand(e.target.value || null)}
                     >
                         <option value=""><Trans>Übergreifend (cross-brand, nur Super-Admin)</Trans></option>
                         <option value="rp"><Trans>Portal (reisinger.pictures)</Trans></option>
-                        <option value="srp"><Trans>SRP (buy.reisinger.pictures)</Trans></option>
                     </select>
                     <span className="label-text-alt opacity-70 mt-1 pl-1">
                         {isSuperAdmin

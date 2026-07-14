@@ -13,6 +13,7 @@ use App\Models\Role;
 use App\Models\Org;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use Tests\TestCase;
@@ -28,7 +29,18 @@ class CouponControllerTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware(BrandContextMiddleware::class);
-        BrandRegistry::set(Brand::SRP);
+        $testBrand = new BrandConfig(
+            id: 'test-brand',
+            name: 'Test Brand',
+            theme: 'rp',
+            portalName: 'Test Portal',
+            impressumUrl: null,
+            logoPath: null,
+            features: [],
+            hostnames: [],
+            isActive: true,
+        );
+        BrandRegistry::set($testBrand);
 
         $this->superAdmin = User::factory()->create();
         $this->superAdmin->roles()->attach(
@@ -67,13 +79,13 @@ class CouponControllerTest extends TestCase
         $response->assertJsonPath('success', true);
         $this->assertDatabaseHas('coupons', [
             'code' => 'WELCOME10',
-            'brand' => 'srp',
+            'brand' => 'test-brand',
         ]);
     }
 
     public function test_super_admin_can_list_coupons(): void
     {
-        Coupon::factory()->count(3)->create(['brand' => 'srp']);
+        Coupon::factory()->count(3)->create(['brand' => 'test-brand']);
 
         $response = $this->withHeaders($this->authHeaders())
             ->getJson('/api/management/coupons');
@@ -85,7 +97,7 @@ class CouponControllerTest extends TestCase
     public function test_super_admin_can_update_coupon(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'code' => 'OLDCODE',
             'value' => 5,
         ]);
@@ -110,7 +122,7 @@ class CouponControllerTest extends TestCase
     public function test_super_admin_can_delete_unused_coupon(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'code' => 'DELETE',
             'used_count' => 0,
         ]);
@@ -126,7 +138,7 @@ class CouponControllerTest extends TestCase
     public function test_super_admin_can_delete_used_coupon(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'code' => 'USED',
             'used_count' => 3,
         ]);
@@ -153,7 +165,7 @@ class CouponControllerTest extends TestCase
         $token = auth('api')->login($admin);
 
         // Admin should have access to coupon management (via management middleware)
-        Coupon::factory()->count(2)->create(['brand' => 'srp']);
+        Coupon::factory()->count(2)->create(['brand' => 'test-brand']);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
             ->getJson('/api/management/coupons');
@@ -170,16 +182,16 @@ class CouponControllerTest extends TestCase
         );
         $token = auth('api')->login($admin);
 
-        Coupon::factory()->count(3)->create(['brand' => 'srp']);
+        Coupon::factory()->count(3)->create(['brand' => 'test-brand']);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
             ->getJson('/api/management/coupons');
 
         $response->assertStatus(200);
         $response->assertJsonCount(3, 'data');
-        // Verify all returned coupons have the SRP brand
+        // Verify all returned coupons have the test-brand brand
         foreach ($response->json('data') as $coupon) {
-            $this->assertSame('srp', $coupon['brand']);
+            $this->assertSame('test-brand', $coupon['brand']);
         }
     }
 
@@ -191,14 +203,14 @@ class CouponControllerTest extends TestCase
         );
         $token = auth('api')->login($admin);
 
-        // Create SRP coupons and RP (B2B) coupons
-        Coupon::factory()->count(2)->create(['brand' => 'srp']);
+        // Create test-brand coupons and RP (B2B) coupons
+        Coupon::factory()->count(2)->create(['brand' => 'test-brand']);
         Coupon::factory()->count(3)->create(['brand' => 'rp']);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
             ->getJson('/api/management/coupons');
 
-        // Current brand context is SRP, so only SRP coupons should be visible
+        // Current brand context is test-brand, so only test-brand coupons should be visible
         $response->assertStatus(200);
         $response->assertJsonCount(2, 'data');
     }
@@ -367,7 +379,7 @@ class CouponControllerTest extends TestCase
 
         // Create a coupon with used_count > 0
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'code' => 'USED_BY_PHOTO',
             'used_count' => 2,
             'created_by' => $photographer->id,
@@ -394,7 +406,7 @@ class CouponControllerTest extends TestCase
         $token = auth('api')->login($admin);
 
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'code' => 'ADMINUSED',
             'used_count' => 5,
         ]);
@@ -413,7 +425,7 @@ class CouponControllerTest extends TestCase
 
     public function test_create_coupon_with_organisation_scope(): void
     {
-        $org = Org::factory()->create(['brand' => Brand::SRP]);
+        $org = Org::factory()->create(['brand' => 'test-brand']);
 
         $response = $this->withHeaders($this->authHeaders())
             ->postJson('/api/management/coupons', [
@@ -481,7 +493,7 @@ class CouponControllerTest extends TestCase
 
         // Create coupons scoped to this gallery
         Coupon::factory()->count(2)->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'scope_type' => 'gallery',
             'scope_id' => $gallery->id,
         ]);
@@ -525,7 +537,7 @@ class CouponControllerTest extends TestCase
 
         // Create coupons scoped to this meta_gallery
         Coupon::factory()->count(2)->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'scope_type' => 'meta_gallery',
             'scope_id' => $group->id,
         ]);
@@ -544,7 +556,7 @@ class CouponControllerTest extends TestCase
     public function test_validate_coupon_returns_valid(): void
     {
         Coupon::factory()->percentage(10)->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'code' => 'VALID10',
             'active' => true,
         ]);
@@ -595,7 +607,7 @@ class CouponControllerTest extends TestCase
     public function test_validate_coupon_with_scope_gallery(): void
     {
         $coupon = Coupon::factory()->create([
-            'brand' => 'srp',
+            'brand' => 'test-brand',
             'code' => 'SCOPED',
             'scope_type' => 'gallery',
             'scope_id' => 'test-gallery-uuid',

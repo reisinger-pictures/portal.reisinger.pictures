@@ -67,7 +67,7 @@ class Coupon extends Model
         'created_by' => 'string',
         'active' => 'boolean',
         'expires_at' => 'datetime',
-        'brand' => Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
     ];
 
     // ──────────────────────────────────────────────
@@ -90,12 +90,12 @@ class Coupon extends Model
 
     public function scopeForCurrentBrand(Builder $query): Builder
     {
-        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentOrDefault()->value);
+        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentId());
     }
 
-    public function scopeByBrand(Builder $query, Brand $brand): Builder
+    public function scopeByBrand(Builder $query, Brand|string $brand): Builder
     {
-        return $query->where($query->getQuery()->from . '.brand', $brand->value);
+        return $query->where($query->getQuery()->from . '.brand', $brand instanceof Brand ? $brand->value : $brand);
     }
 
     public function scopeForCreator(Builder $query, User $user): Builder

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class ProcessCollectiveInvoices extends Command
 {
-    protected $signature = 'app:process-collective-invoices {--frequency=monthly : Billing frequency (monthly|quarterly)} {--brand= : Optional brand filter (rp|srp)}';
+    protected $signature = 'app:process-collective-invoices {--frequency=monthly : Billing frequency (monthly|quarterly)} {--brand= : Optional brand filter (brand ID from brands table)}';
     protected $description = 'Generiert Sammelrechnungen automatisch am Monats- oder Quartalsende.';
 
     public function handle(InvoiceService $invoiceService)

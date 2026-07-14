@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <title>@if(str_starts_with($snapshot->invoice_number, 'L-')) Lieferschein @else Rechnung @endif {{ $snapshot->invoice_number }}</title>
     @php
-        $primaryColor = $isSrp ? '#2A9D8F' : '#1E5631';
-        $secondaryColor = $isSrp ? '#2A9D8F' : '#A4B494';
+        $primaryColor = $primaryColor ?? '#1E5631';
+        $secondaryColor = $secondaryColor ?? '#A4B494';
     @endphp
     <style>
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; font-size: 13px; line-height: 1.5; }
@@ -25,7 +25,7 @@
     </style>
 </head>
 <body>
-    @include('pdf.header', ['title' => str_starts_with($snapshot->invoice_number, 'L-') ? 'LIEFERSCHEIN' : 'RECHNUNG', 'bankHolder' => $bankHolder, 'isSrp' => $isSrp, 'pfx' => $pfx])
+    @include('pdf.header', ['title' => str_starts_with($snapshot->invoice_number, 'L-') ? 'LIEFERSCHEIN' : 'RECHNUNG', 'bankHolder' => $bankHolder, 'pfx' => $pfx])
 
     <table class="invoice-details">
         <tr>

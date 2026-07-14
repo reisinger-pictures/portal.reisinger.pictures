@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Brand;
 use App\Models\Org;
 use App\Models\Order;
 use App\Models\InvoiceSnapshot;
@@ -66,7 +67,8 @@ class InvoiceService
             $billingZip = $initiator ? $initiator->billing_zip : ($fallbackUser->billing_zip ?? '0000');
             $billingCity = $initiator ? $initiator->billing_city : ($fallbackUser->billing_city ?? 'Unbekannt');
 
-            $brand = $org->brand?->value ?? $openOrders->first()->brand ?? \App\Enums\Brand::B2B->value;
+            $brand = $org->brand ?? $openOrders->first()->brand ?? \App\Enums\Brand::B2B;
+            $brand = $brand instanceof Brand ? $brand->value : $brand;
 
             $collectiveOrder = Order::create([
                 'user_id' => $initiator ? $initiator->id : ($fallbackUser->id ?? null),

@@ -65,7 +65,7 @@ class CouponUpdateRequest extends FormRequest
             }
 
             if (!empty($data['code'])) {
-                $brandValue = BrandRegistry::currentOrDefault()->value;
+                $brandValue = BrandRegistry::currentId();
                 $id = $req->route('id');
                 $query = Coupon::where('brand', $brandValue)->where('code', $data['code']);
                 if ($id) {

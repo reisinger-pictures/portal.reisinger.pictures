@@ -23,7 +23,8 @@ class AuthController extends Controller
         $user = User::where('email', $credentials['email'])->first();
         if ($user && $user->password && Hash::check($credentials['password'], $user->password)) {
             // U-01: Brand-Mismatch check — cross-brand only for Super-Admin (brand=null).
-            if ($user->brand !== null && $user->brand !== BrandRegistry::currentOrDefault()) {
+            $userBrandValue = $user->brand instanceof Brand ? $user->brand->value : $user->brand;
+            if ($user->brand !== null && $userBrandValue !== BrandRegistry::currentId()) {
                 return response()->json([
                     'error' => 'Dieser Account ist für ein anderes Portal registriert.',
                 ], 403);
@@ -56,7 +57,8 @@ class AuthController extends Controller
 
             if ($org) {
                 // Brand check: org brand must match the current request brand
-                if ($org->brand !== null && $org->brand !== BrandRegistry::currentOrDefault()) {
+                $orgBrandValue = $org->brand instanceof Brand ? $org->brand->value : $org->brand;
+                if ($org->brand !== null && $orgBrandValue !== BrandRegistry::currentId()) {
                     return response()->json(['error' => 'Registrierung für diese Domain ist auf diesem Portal nicht möglich.'], 403);
                 }
 
@@ -123,7 +125,8 @@ class AuthController extends Controller
         }
 
         // U-01: Brand-Mismatch check — same as in login().
-        if ($user->brand !== null && $user->brand !== BrandRegistry::currentOrDefault()) {
+        $userBrandValue = $user->brand instanceof Brand ? $user->brand->value : $user->brand;
+        if ($user->brand !== null && $userBrandValue !== BrandRegistry::currentId()) {
             return response()->json([
                 'error' => 'Dieser Account ist für ein anderes Portal registriert.',
             ], 403);
@@ -139,7 +142,7 @@ class AuthController extends Controller
         $emailParts = explode('@', $user->email);
         $domain = $emailParts[1] ?? null;
         $org = $domain ? \App\Models\Org::where('domain', $domain)->first() : null;
-        if ($org && $org->auto_join_policy === \App\Enums\AutoJoinPolicy::IMMEDIATE && !$user->org_id && ($org->brand === null || $org->brand === BrandRegistry::currentOrDefault())) {
+        if ($org && $org->auto_join_policy === \App\Enums\AutoJoinPolicy::IMMEDIATE && !$user->org_id && ($org->brand === null || ($org->brand instanceof Brand ? $org->brand->value : $org->brand) === BrandRegistry::currentId())) {
             // Assign role from org's default_role_id, fallback to client
             $roleId = $org->default_role_id;
             if (!$roleId) {
@@ -216,7 +219,7 @@ class AuthController extends Controller
             'ftp_slug' => $user->ftp_slug,
             'flatrate_level' => $user->flatrate_level,
 
-            'brand' => $user->brand?->value,
+            'brand' => $user->brand instanceof Brand ? $user->brand->value : $user->brand,
             'is_cross_brand' => $user->brand === null,
 
             'is_super_admin' => $user->is_super_admin,

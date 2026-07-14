@@ -14,6 +14,12 @@ readonly class BrandConfig
         public array $features,
         public array $hostnames,
         public bool $isActive = true,
+        public ?string $frontendUrl = null,
+        public ?string $fromAddress = null,
+        public ?string $fromName = null,
+        public ?string $accountingEmail = null,
+        public string $primaryColor = '#1E5631',
+        public string $secondaryColor = '#A4B494',
     ) {}
 
     public function prefix(): string

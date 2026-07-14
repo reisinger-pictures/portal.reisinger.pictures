@@ -44,6 +44,8 @@ class ContractPdfService
         $ageLabel = \App\Support\AgeHelper::format($contract->billing_details['birthdate'] ?? null, $contract->created_at?->format('Y-m-d'));
         $brand = BrandRegistry::resolveFromContract($contract);
 
+        $config = BrandRegistry::configForBrand($brand->value);
+
         $pdf = Pdf::loadView('pdf.contract_signatures', [
             'contract' => $contract,
             'items' => $processed['items'],
@@ -53,9 +55,10 @@ class ContractPdfService
             'bankBic' => $bankDetails['bic'],
             'signers' => $signers,
             'offerMarker' => $offerMarker,
-            'isSrp' => $brand->value === 'srp',
             'pfx' => $brand->prefix(),
             'ageLabel' => $ageLabel,
+            'primaryColor' => $config?->primaryColor ?? '#1E5631',
+            'secondaryColor' => $config?->secondaryColor ?? '#A4B494',
         ]);
 
         return $pdf->output();

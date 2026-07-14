@@ -34,6 +34,8 @@ class InvoiceMail extends AbstractBrandAwareMailable
             $this->applyBrandFrom();
             $resolver = app(SettingResolver::class);
 
+            $brandConfig = $this->brand ? BrandRegistry::configForBrand($this->brand->value) : null;
+
             $pdf = Pdf::loadView('pdf.invoice', [
                 'order' => $this->order,
                 'snapshot' => $this->snapshot,
@@ -41,8 +43,9 @@ class InvoiceMail extends AbstractBrandAwareMailable
                 'bankHolder' => $resolver->get('bank_holder'),
                 'bankIban' => $resolver->get('bank_iban'),
                 'bankBic' => $resolver->get('bank_bic'),
-                'isSrp' => $this->brand?->value === 'srp',
                 'pfx' => $this->brand?->prefix() ?? '',
+                'primaryColor' => $brandConfig?->primaryColor ?? '#1E5631',
+                'secondaryColor' => $brandConfig?->secondaryColor ?? '#A4B494',
             ]);
 
             $mail = $this->subject('Ihre Rechnung ' . $this->snapshot->invoice_number)

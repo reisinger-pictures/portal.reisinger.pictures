@@ -43,7 +43,7 @@ export default defineConfig(() => {
         server: {
             host: '0.0.0.0',
             port: 4321,
-            allowedHosts: ['portal.localhost', 'buy.localhost'],
+            allowedHosts: ['portal.localhost'],
             proxy: {
                 '/api': {
                     target: process.env.VITE_API_PROXY || 'https://portal.test',

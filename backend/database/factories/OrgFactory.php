@@ -26,8 +26,5 @@ class OrgFactory extends Factory
         return $this->state(fn (array $attributes) => ['invoice_frequency' => 'immediate']);
     }
 
-    public function srp(): static
-    {
-        return $this->state(fn (array $attributes) => ['brand' => Brand::SRP->value]);
-    }
+
 }

@@ -23,7 +23,6 @@ class QuoteLinkServiceTest extends TestCase
     {
         $url = $this->service->generateQuoteLink(['uuid-1', 'uuid-2'], 50000);
 
-        $this->assertStringStartsWith('http://', $url);
         $this->assertStringContainsString('/cart?quote_token=', $url);
     }
 

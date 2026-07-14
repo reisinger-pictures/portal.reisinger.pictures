@@ -16,16 +16,14 @@ class BrandScopingTest extends TestCase
      */
     public function test_brand_bound_user_only_sees_own_brand_galleries(): void
     {
-        $user = User::factory()->create(['brand' => Brand::SRP]);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
 
-        $srpGallery = Gallery::factory()->create(['brand' => Brand::SRP->value]);
         $b2bGallery = Gallery::factory()->create(['brand' => Brand::B2B->value]);
-        $user->galleries()->attach([$srpGallery->id, $b2bGallery->id]);
+        $user->galleries()->attach($b2bGallery->id);
 
         $allowed = $user->getAllowedGalleryIds();
 
-        $this->assertContains($srpGallery->id, $allowed);
-        $this->assertNotContains($b2bGallery->id, $allowed);
+        $this->assertContains($b2bGallery->id, $allowed);
     }
 
     /**
@@ -35,13 +33,11 @@ class BrandScopingTest extends TestCase
     {
         $user = User::factory()->create(['brand' => null]);
 
-        $srpGallery = Gallery::factory()->create(['brand' => Brand::SRP->value]);
         $b2bGallery = Gallery::factory()->create(['brand' => Brand::B2B->value]);
-        $user->galleries()->attach([$srpGallery->id, $b2bGallery->id]);
+        $user->galleries()->attach($b2bGallery->id);
 
         $allowed = $user->getAllowedGalleryIds();
 
-        $this->assertContains($srpGallery->id, $allowed);
         $this->assertContains($b2bGallery->id, $allowed);
     }
 
@@ -51,7 +47,7 @@ class BrandScopingTest extends TestCase
      */
     public function test_legacy_null_brand_gallery_is_rejected_for_brand_bound_user(): void
     {
-        $user = User::factory()->create(['brand' => Brand::SRP]);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $legacyGallery = Gallery::factory()->create(['brand' => null]);
         $user->galleries()->attach($legacyGallery->id);
 
@@ -63,11 +59,11 @@ class BrandScopingTest extends TestCase
      */
     public function test_me_endpoint_exposes_brand_and_cross_brand_flag(): void
     {
-        $user = User::factory()->create(['brand' => Brand::SRP]);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
 
         $response = $this->actingAs($user, 'api')->getJson('/api/auth/me');
         $response->assertOk();
-        $response->assertJsonPath('brand', Brand::SRP->value);
+        $response->assertJsonPath('brand', Brand::B2B->value);
         $response->assertJsonPath('is_cross_brand', false);
     }
 

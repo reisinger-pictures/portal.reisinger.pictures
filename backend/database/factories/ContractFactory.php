@@ -62,7 +62,7 @@ class ContractFactory extends Factory
         }
 
         return [
-            'brand' => $this->faker->randomElement([Brand::B2B, Brand::SRP]),
+            'brand' => Brand::B2B,
             'status' => $this->faker->randomElement(['draft', 'active', 'closed', 'cancelled']),
             'billing_details' => $billingDetails,
             'items' => $items,

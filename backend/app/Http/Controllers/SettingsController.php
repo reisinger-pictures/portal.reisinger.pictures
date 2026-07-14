@@ -119,6 +119,8 @@ class SettingsController extends Controller
             'impressum_url' => $config->impressumUrl,
             'logo_path' => $config->logoPath,
             'features' => (object) $config->features,
+            'primary_color' => $config->primaryColor,
+            'secondary_color' => $config->secondaryColor,
         ]);
     }
 

@@ -26,7 +26,7 @@ class Contract extends Model
         'closes_at' => 'datetime',
         'expires_at' => 'datetime',
         'content_version' => 'integer',
-        'brand' => \App\Enums\Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
     ];
 
     public function signers()

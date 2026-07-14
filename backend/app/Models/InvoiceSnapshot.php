@@ -31,7 +31,7 @@ class InvoiceSnapshot extends Model
         'total_net' => 'integer',
         'total_gross' => 'integer',
         'tax_rate' => 'decimal:2',
-        'brand' => Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
     ];
 
     public function order()

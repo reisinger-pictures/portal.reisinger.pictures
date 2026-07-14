@@ -84,14 +84,14 @@ class CouponStoreRequest extends FormRequest
                 $validator->errors()->add('value', 'Percentage value must not exceed 100.');
             }
 
-            $brandValue = BrandRegistry::currentOrDefault()->value;
+            $brandValue = BrandRegistry::currentId();
             $query = Coupon::where('brand', $brandValue)->where('code', $data['code'] ?? '');
             if ($query->exists()) {
                 $validator->errors()->add('code', 'A coupon with this code already exists for this brand.');
             }
 
             if (($data['scope_type'] ?? null) === 'organisation') {
-                $orgExists = Org::where('id', $data['scope_id'] ?? '')->where('brand', $brandValue)->exists();
+                $orgExists = Org::where('id', $data['scope_id'] ?? '')->where('brand', BrandRegistry::currentId())->exists();
                 if (!$orgExists) {
                     $validator->errors()->add('scope_id', 'Org not found for this brand.');
                 }

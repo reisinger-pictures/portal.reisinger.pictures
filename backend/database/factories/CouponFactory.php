@@ -16,7 +16,7 @@ class CouponFactory extends Factory
     public function definition(): array
     {
         return [
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
             'code' => strtoupper($this->faker->bothify('COUPON-????-####')),
             'type' => $this->faker->randomElement(['fixed', 'percentage']),
             'value' => $this->faker->randomFloat(2, 1, 50),

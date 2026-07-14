@@ -32,7 +32,7 @@ class GalleryGroup extends Model
         'is_editorial_only' => 'boolean',
         'is_hidden' => 'boolean',
         'restricted_photographers' => 'boolean',
-        'brand' => Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
     ];
 
     protected static function booted()
@@ -93,25 +93,25 @@ class GalleryGroup extends Model
                 if (!empty($groupIds)) {
                     GalleryGroup::whereIn('id', $groupIds)
                         ->where(function ($q) use ($group) {
-                            $q->where('brand', '!=', $group->brand->value)
-                              ->orWhereNull('brand');
+                        $q->where('brand', '!=', $group->brand)
+                          ->orWhereNull('brand');
                         })
-                        ->update(['brand' => $group->brand->value]);
+                        ->update(['brand' => $group->brand]);
 
                     Gallery::whereIn('gallery_group_id', $groupIds)
                         ->where(function ($q) use ($group) {
-                            $q->where('brand', '!=', $group->brand->value)
+                            $q->where('brand', '!=', $group->brand)
                               ->orWhereNull('brand');
                         })
-                        ->update(['brand' => $group->brand->value]);
+                        ->update(['brand' => $group->brand]);
                 }
 
                 Gallery::where('gallery_group_id', $group->id)
                     ->where(function ($q) use ($group) {
-                        $q->where('brand', '!=', $group->brand->value)
+                        $q->where('brand', '!=', $group->brand)
                           ->orWhereNull('brand');
                     })
-                    ->update(['brand' => $group->brand->value]);
+                    ->update(['brand' => $group->brand]);
             }
         });
         static::deleted(function () {

@@ -30,7 +30,7 @@ export default function ManagementUserView() {
             ? roles?.filter(r => r.name !== UserRole.SUPER_ADMIN)
             : roles?.filter(r => [UserRole.POWER_USER, UserRole.CLIENT, UserRole.CUSTOMER_MANAGER].includes(r.name)));
 
-    const handleSaveUser = async (id: string, selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: 'rp' | 'srp' | null, canPurchaseUpgrades: boolean) => {
+    const handleSaveUser = async (id: string, selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: string | null, canPurchaseUpgrades: boolean) => {
         try {
             await updateUser(id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, brand, canPurchaseUpgrades);
             showToast('success', t`Nutzerrechte gespeichert.`);

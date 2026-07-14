@@ -7,7 +7,6 @@ import { useUI } from '../components/UIContext';
 
 const brandLabels: Record<string, string> = {
     rp: 'Reisinger Pictures',
-    srp: 'buy.reisinger.pictures',
 };
 
 function BrandBadge({brand}: {brand?: string | null}) {

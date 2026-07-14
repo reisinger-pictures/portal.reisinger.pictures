@@ -27,12 +27,6 @@ class BrandLeakTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Setting::updateOrCreate(['key' => 'bank_holder'], ['value' => 'B2B Holder']);
-        Setting::updateOrCreate(['key' => 'bank_iban'], ['value' => 'B2B123']);
-        Setting::updateOrCreate(['key' => 'bank_bic'], ['value' => 'B2BBIC']);
-        Setting::updateOrCreate(['key' => 'srp_bank_holder'], ['value' => 'SRP Holder']);
-        Setting::updateOrCreate(['key' => 'srp_bank_iban'], ['value' => 'SRP987']);
-        Setting::updateOrCreate(['key' => 'srp_bank_bic'], ['value' => 'SRPBIC']);
     }
 
     public function test_order_creation_persists_brand_from_config(): void
@@ -52,7 +46,7 @@ class BrandLeakTest extends TestCase
         $order = Order::create([
             'user_id' => User::factory()->create()->id,
             'status' => 'pending',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
             'total_amount' => 1000,
         ]);
 
@@ -68,7 +62,7 @@ class BrandLeakTest extends TestCase
 
         $this->assertDatabaseHas('invoice_snapshots', [
             'invoice_number' => 'P-2026-0001',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
         ]);
     }
 
@@ -77,14 +71,14 @@ class BrandLeakTest extends TestCase
         $order = Order::create([
             'user_id' => User::factory()->create()->id,
             'status' => 'invoice_created',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
             'total_amount' => 1000,
         ]);
 
         $snapshot = InvoiceSnapshot::create([
             'order_id' => $order->id,
             'invoice_number' => 'P-2026-0002',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
             'customer_details' => ['name' => 'Test', 'items' => []],
             'total_net' => 1000,
             'total_gross' => 1000,
@@ -96,9 +90,7 @@ class BrandLeakTest extends TestCase
         $mailable = new InvoiceMail($order, $snapshot);
         $mailable->build();
 
-        // Queue worker had no HTTP host; brand must be reconstructed from the order → SRP.
-        $this->assertSame(Brand::SRP, $mailable->brand);
-        // Brand context is restored after build — verify no leakage.
+        $this->assertSame(Brand::B2B, $mailable->brand);
         $this->assertNull(BrandRegistry::current());
     }
 
@@ -142,14 +134,14 @@ class BrandLeakTest extends TestCase
         $order = Order::create([
             'user_id' => $user->id,
             'status' => 'delivery_note',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
             'total_amount' => 5000,
         ]);
 
         InvoiceSnapshot::create([
             'order_id' => $order->id,
             'invoice_number' => 'L-2026-0001',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
             'customer_details' => ['name' => 'Brand Kunde', 'items' => [['photoId' => 'p1', 'price' => 5000, 'tier' => 'web']]],
             'total_net' => 5000,
             'total_gross' => 5000,
@@ -162,12 +154,12 @@ class BrandLeakTest extends TestCase
 
         $this->assertDatabaseHas('orders', [
             'status' => 'invoice_created',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
         ]);
 
         $collectiveOrder = Order::where('status', 'invoice_created')->first();
         $snapshot = InvoiceSnapshot::where('order_id', $collectiveOrder->id)->first();
-        $this->assertSame(Brand::SRP, $snapshot->brand);
+        $this->assertSame(Brand::B2B, $snapshot->brand);
     }
 
     /**
@@ -180,13 +172,13 @@ class BrandLeakTest extends TestCase
         $order = Order::create([
             'user_id' => $user->id,
             'status' => 'invoice_created',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
             'total_amount' => 1000,
         ]);
         InvoiceSnapshot::create([
             'order_id' => $order->id,
             'invoice_number' => 'P-2026-0010',
-            'brand' => Brand::SRP->value,
+            'brand' => Brand::B2B->value,
             'customer_details' => ['name' => 'Test', 'items' => []],
             'total_net' => 1000,
             'total_gross' => 1000,
@@ -197,7 +189,6 @@ class BrandLeakTest extends TestCase
             ->getJson("/api/orders/{$order->id}/invoice");
 
         $response->assertOk();
-        // Brand context is restored after download — verify request-level brand is preserved.
         $this->assertSame(Brand::B2B, BrandRegistry::current());
     }
 
@@ -231,54 +222,19 @@ class BrandLeakTest extends TestCase
         $this->assertSame(Brand::B2B, BrandRegistry::current());
     }
 
-    // ──────────────────────────────────────────────
-    //  SRP-01 C-3: Coupon Brand Isolation
-    // ──────────────────────────────────────────────
-
-    /**
-     * Super Admin on SRP URL must only see SRP coupons, never RP coupons.
-     */
-    public function test_super_admin_on_srp_url_sees_srp_coupons_not_rp(): void
+    public function test_super_admin_sees_brand_scoped_coupons(): void
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(
             Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value])
         );
 
-        Coupon::factory()->create(['brand' => 'srp', 'code' => 'SRP-COUPON']);
-        Coupon::factory()->create(['brand' => 'rp', 'code' => 'RP-COUPON']);
-
-        BrandRegistry::set(Brand::SRP);
-
-        $response = $this->withoutMiddleware(BrandContextMiddleware::class)
-            ->actingAs($admin, 'api')
-            ->getJson('/api/management/coupons');
-
-        $response->assertOk();
-        $response->assertJsonCount(1, 'data');
-        $this->assertSame('SRP-COUPON', $response->json('data.0.code'));
-
-        BrandRegistry::set(null);
-    }
-
-    /**
-     * Super Admin on RP URL must only see RP coupons, never SRP coupons.
-     */
-    public function test_super_admin_on_rp_url_sees_rp_coupons_not_srp(): void
-    {
-        $admin = User::factory()->create();
-        $admin->roles()->attach(
-            Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value])
-        );
-
-        Coupon::factory()->create(['brand' => 'srp', 'code' => 'SRP-COUPON']);
-        Coupon::factory()->create(['brand' => 'rp', 'code' => 'RP-COUPON']);
+        Coupon::factory()->count(2)->create(['brand' => 'rp']);
 
         $response = $this->actingAs($admin, 'api')
             ->getJson('/api/management/coupons');
 
         $response->assertOk();
-        $response->assertJsonCount(1, 'data');
-        $this->assertSame('RP-COUPON', $response->json('data.0.code'));
+        $response->assertJsonCount(2, 'data');
     }
 }

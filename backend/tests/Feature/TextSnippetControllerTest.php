@@ -102,7 +102,7 @@ class TextSnippetControllerTest extends TestCase
     public function test_snippets_are_brand_scoped()
     {
         TextSnippet::factory()->count(2)->create(['brand' => Brand::B2B]);
-        TextSnippet::factory()->count(1)->create(['brand' => Brand::SRP]);
+        TextSnippet::factory()->count(1)->create(['brand' => 'test-brand']);
 
         $response = $this->actingAs($this->superAdmin, 'api')
             ->getJson('/api/management/text-snippets');
@@ -143,6 +143,6 @@ class TextSnippetControllerTest extends TestCase
     {
         TextSnippet::factory()->create(['shortcut' => 'global-unique', 'brand' => Brand::B2B]);
         $this->expectException(\Illuminate\Database\QueryException::class);
-        TextSnippet::factory()->create(['shortcut' => 'global-unique', 'brand' => Brand::SRP]);
+        TextSnippet::factory()->create(['shortcut' => 'global-unique', 'brand' => 'test-brand']);
     }
 }

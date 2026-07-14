@@ -24,7 +24,7 @@ class Org extends Model
     ];
 
     protected $casts = [
-        'brand' => Brand::class,
+        'brand' => \App\Casts\AsBrand::class,
         'can_purchase_upgrades' => 'boolean',
         'auto_join_policy' => \App\Enums\AutoJoinPolicy::class,
     ];
