@@ -15,9 +15,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     const {terms} = useLicenseTerms();
 
     const [useStandard, setUseStandard] = useState(true);
-    // calcMode selects between the "Flex" (srp) and "Standard" (rp) calculators.
-    // Both are available on every brand so admins can build any package type.
-    const calcMode = useStandard ? 'rp' : 'srp';
+    const calcMode = useStandard ? 'rp' : 'flex';
 
     // --- RP State ---
     const [calcDuration, setCalcDuration] = useState<number>(90);
@@ -39,7 +37,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
     let finalPriceEuro = 0;
     let discountAbsolute = 0;
 
-    if (calcMode === 'srp') {
+        if (calcMode === 'flex') {
         const res = calculateB2CFlexPrice({
             type: srpType,
             setup: srpSetup,
@@ -72,7 +70,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
         let desc: string;
         let notes: string;
 
-        if (calcMode === 'srp') {
+    if (calcMode === 'flex') {
             const types = {portrait: t`Portrait`, couple: t`Pärchen`, nude: t`Akt & Boudoir`};
             const setups = {outdoor: t`Outdoor (Natur)`, outdoor_flash: t`Mobiles Blitz-Setup`, indoor: t`Fotostudio`};
             desc = `B2C Flex-Shooting (${types[srpType]})`;
@@ -105,7 +103,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                 </button>
                 <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--calculator text-primary"></span>
-                    {calcMode === 'srp' ? <Trans>Flex Tarif Rechner</Trans> : <Trans>Standard Tarif Rechner</Trans>}
+                    {calcMode === 'flex' ? <Trans>Flex Tarif Rechner</Trans> : <Trans>Standard Tarif Rechner</Trans>}
                 </h3>
 
                 <div className="tabs tabs-boxed mb-4 w-full flex bg-base-200">
@@ -113,7 +111,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                     <button type="button" className={`tab flex-1 ${useStandard ? 'tab-active font-bold' : ''}`} onClick={() => setUseStandard(true)}><Trans>Standard Tarif</Trans></button>
                 </div>
 
-                {calcMode === 'srp' ? (
+                {calcMode === 'flex' ? (
                     <div className="space-y-4">
                         <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                             <label className="label font-bold text-sm mb-1">Bereich</label>

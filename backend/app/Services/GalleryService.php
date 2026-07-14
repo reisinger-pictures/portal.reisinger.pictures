@@ -121,6 +121,7 @@ class GalleryService
                 'default_state' => $data['default_state'] ?? null,
                 'default_country' => $data['default_country'] ?? null,
                 'default_iso_country' => $data['default_iso_country'] ?? null,
+                'licensing_mode' => $data['licensing_mode'] ?? null,
             ]);
 
             if ($user && $user->is_photographer) {

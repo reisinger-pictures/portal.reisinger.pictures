@@ -26,20 +26,27 @@ describe('brandRegistry', () => {
     describe('getBrandTheme', () => {
         it('returns correct theme for rp', () => {
             const theme = getBrandTheme('rp');
-            expect(theme.light).toBe('reisinger-light');
-            expect(theme.dark).toBe('b2b-dark');
+            expect(theme.light).toBe('rp-light');
+            expect(theme.dark).toBe('rp-dark');
         });
 
         it('falls back to default theme for srp (removed brand)', () => {
             const theme = getBrandTheme('srp');
-            expect(theme.light).toBe('reisinger-light');
-            expect(theme.dark).toBe('b2b-dark');
+            expect(theme.light).toBe('rp-light');
+            expect(theme.dark).toBe('rp-dark');
+        });
+
+        it('derives theme from brand config when available', () => {
+            const config = {theme: 'rp'} as any;
+            const theme = getBrandTheme('rp', config);
+            expect(theme.light).toBe('rp-light');
+            expect(theme.dark).toBe('rp-dark');
         });
 
         it('falls back to default theme for unknown brand', () => {
             const theme = getBrandTheme('unknown');
-            expect(theme.light).toBe('reisinger-light');
-            expect(theme.dark).toBe('b2b-dark');
+            expect(theme.light).toBe('rp-light');
+            expect(theme.dark).toBe('rp-dark');
         });
     });
 });

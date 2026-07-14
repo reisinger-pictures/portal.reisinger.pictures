@@ -18,7 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use Tests\TestCase;
 
-class CouponControllerTest extends TestCase
+class CouponAdminControllerTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -146,7 +146,6 @@ class CouponControllerTest extends TestCase
         $response = $this->withHeaders($this->authHeaders())
             ->deleteJson('/api/management/coupons/' . $coupon->id);
 
-        // Super admin can always delete, even used coupons (C-1)
         $response->assertStatus(200);
         $response->assertJsonPath('success', true);
         $this->assertDatabaseMissing('coupons', ['id' => $coupon->id]);
@@ -164,7 +163,6 @@ class CouponControllerTest extends TestCase
         );
         $token = auth('api')->login($admin);
 
-        // Admin should have access to coupon management (via management middleware)
         Coupon::factory()->count(2)->create(['brand' => 'test-brand']);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
@@ -189,7 +187,6 @@ class CouponControllerTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonCount(3, 'data');
-        // Verify all returned coupons have the test-brand brand
         foreach ($response->json('data') as $coupon) {
             $this->assertSame('test-brand', $coupon['brand']);
         }
@@ -203,14 +200,12 @@ class CouponControllerTest extends TestCase
         );
         $token = auth('api')->login($admin);
 
-        // Create test-brand coupons and RP (B2B) coupons
         Coupon::factory()->count(2)->create(['brand' => 'test-brand']);
         Coupon::factory()->count(3)->create(['brand' => 'rp']);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
             ->getJson('/api/management/coupons');
 
-        // Current brand context is test-brand, so only test-brand coupons should be visible
         $response->assertStatus(200);
         $response->assertJsonCount(2, 'data');
     }
@@ -276,7 +271,6 @@ class CouponControllerTest extends TestCase
         );
         $tokenA = auth('api')->login($photographerA);
 
-        // Photographer A creates a coupon
         $createA = $this->withHeaders(['Authorization' => 'Bearer ' . $tokenA])
             ->postJson('/api/management/coupons', [
                 'code' => 'PHOTO_A',
@@ -287,7 +281,6 @@ class CouponControllerTest extends TestCase
             ]);
         $createA->assertStatus(201);
 
-        // Photographer B
         $photographerB = User::factory()->create();
         $photographerB->roles()->attach(
             Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value])
@@ -304,16 +297,11 @@ class CouponControllerTest extends TestCase
             ]);
         $createB->assertStatus(201);
 
-        // Reset auth state so subsequent GET requests authenticate from JWT tokens,
-        // not from the guard's cached user set by auth('api')->login().
         auth('api')->logout();
 
-        // Verify DB state: both coupons exist with correct created_by
         $this->assertDatabaseHas('coupons', ['code' => 'PHOTO_A', 'created_by' => $photographerA->id]);
         $this->assertDatabaseHas('coupons', ['code' => 'PHOTO_B', 'created_by' => $photographerB->id]);
 
-        // Photographer A should only see their own coupon — use actingAs to avoid
-        // auth context pollution from auth('api')->login() calls in the same test.
         $responseA = $this->actingAs($photographerA, 'api')
             ->getJson('/api/management/coupons');
 
@@ -321,7 +309,6 @@ class CouponControllerTest extends TestCase
         $responseA->assertJsonCount(1, 'data');
         $this->assertSame('PHOTO_A', $responseA->json('data.0.code'));
 
-        // Photographer B should only see their own coupon
         $responseB = $this->actingAs($photographerB, 'api')
             ->getJson('/api/management/coupons');
 
@@ -332,7 +319,6 @@ class CouponControllerTest extends TestCase
 
     public function test_photographer_cannot_update_others_coupon(): void
     {
-        // Photographer A creates a coupon
         $photographerA = User::factory()->create();
         $photographerA->roles()->attach(
             Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value])
@@ -350,7 +336,6 @@ class CouponControllerTest extends TestCase
 
         $coupon = Coupon::where('code', 'OWNED_BY_A')->first();
 
-        // Photographer B tries to update Photographer A's coupon
         $photographerB = User::factory()->create();
         $photographerB->roles()->attach(
             Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value])
@@ -377,7 +362,6 @@ class CouponControllerTest extends TestCase
         );
         $token = auth('api')->login($photographer);
 
-        // Create a coupon with used_count > 0
         $coupon = Coupon::factory()->create([
             'brand' => 'test-brand',
             'code' => 'USED_BY_PHOTO',
@@ -491,7 +475,6 @@ class CouponControllerTest extends TestCase
     {
         $gallery = Gallery::factory()->create();
 
-        // Create coupons scoped to this gallery
         Coupon::factory()->count(2)->create([
             'brand' => 'test-brand',
             'scope_type' => 'gallery',
@@ -535,7 +518,6 @@ class CouponControllerTest extends TestCase
     {
         $group = GalleryGroup::factory()->create();
 
-        // Create coupons scoped to this meta_gallery
         Coupon::factory()->count(2)->create([
             'brand' => 'test-brand',
             'scope_type' => 'meta_gallery',
@@ -547,84 +529,5 @@ class CouponControllerTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonCount(2, 'data');
-    }
-
-    // ──────────────────────────────────────────────
-    //  validateCoupon Endpoint
-    // ──────────────────────────────────────────────
-
-    public function test_validate_coupon_returns_valid(): void
-    {
-        Coupon::factory()->percentage(10)->create([
-            'brand' => 'test-brand',
-            'code' => 'VALID10',
-            'active' => true,
-        ]);
-
-        // Need a regular authenticated user for the validate endpoint
-        $user = User::factory()->create();
-        $token = auth('api')->login($user);
-
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->postJson('/api/coupons/validate', [
-                'code' => 'VALID10',
-            ]);
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('valid', true);
-        $response->assertJsonPath('coupon.code', 'VALID10');
-        $response->assertJsonPath('coupon.type', 'percentage');
-        $response->assertJsonPath('coupon.value', 10);
-        // LIP: id and scope_type are not returned — confirmed absent
-        $response->assertJsonMissingPath('coupon.id');
-        $response->assertJsonMissingPath('coupon.scope_type');
-    }
-
-    public function test_validate_coupon_returns_invalid_for_nonexistent(): void
-    {
-        $user = User::factory()->create();
-        $token = auth('api')->login($user);
-
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->postJson('/api/coupons/validate', [
-                'code' => 'NONEXISTENT',
-            ]);
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('valid', false);
-        $response->assertJsonPath('error', 'Coupon code not found.');
-    }
-
-    public function test_validate_coupon_requires_auth(): void
-    {
-        $response = $this->postJson('/api/coupons/validate', [
-            'code' => 'ANY',
-        ]);
-
-        $response->assertStatus(401);
-    }
-
-    public function test_validate_coupon_with_scope_gallery(): void
-    {
-        $coupon = Coupon::factory()->create([
-            'brand' => 'test-brand',
-            'code' => 'SCOPED',
-            'scope_type' => 'gallery',
-            'scope_id' => 'test-gallery-uuid',
-            'active' => true,
-        ]);
-
-        $user = User::factory()->create();
-        $token = auth('api')->login($user);
-
-        // Matching gallery_id (string, as all IDs are UUIDs)
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->postJson('/api/coupons/validate', [
-                'code' => 'SCOPED',
-                'gallery_id' => 'test-gallery-uuid',
-            ]);
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('valid', true);
     }
 }

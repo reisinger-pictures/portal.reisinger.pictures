@@ -89,7 +89,9 @@ describe('WatermarkSettingsCard', () => {
             svgUrl: '/brand.svg',
             portalName: 'Test Portal',
             impressumUrl: '',
-            theme: { light: 'reisinger-light', dark: 'b2b-dark' },
+            theme: { light: 'rp-light', dark: 'rp-dark' },
+            primaryColor: '#1E5631',
+            secondaryColor: '#A4B494',
         });
 
         // --- default fetch: return a valid SVG blob ---

@@ -1,12 +1,18 @@
-# SRP Volume Pricing — Konzept (Soll-Zustand)
+# SRP Volume Pricing — Konzept (Historical)
 
-> **Status:** Soll-Zustand. Beschreibt das mengenbasierte Volumen-Preismodell für das SRP-Portal.
-> Verknüpft: `AGENTS.todo.md` T-20.
-> Erstellt 2026-07-01.
+> **Status:** Historical (2026-07-14). Beschreibt das mengenbasierte Volumen-Preismodell, das
+> ursprünglich für das SRP-Portal konzipiert wurde.
+> **Wichtig:** Das SRP-Portal und der `Brand::SRP`-Enum-Case wurden in Commit `1831116` entfernt.
+> Die Volume-Pricing-Logik lebt als `VolumeLicensingStrategy` weiter (siehe
+> `features/infrastructure/17-pricing-strategy-pattern.md`), ist aber nun ein **generisches**
+> Preismodell, das pro Brand oder (geplant, F2) pro Gallery aktiviert werden kann — nicht mehr
+> SRP-exklusiv.
+> Verknüpft: `AGENTS.todo.md` F5.
+> Erstellt 2026-07-01, Update 2026-07-14.
 
 ## 1. Kontext
 
-Das SRP-Portal (`story.reisinger.pictures`) ist ein reduziertes B2C-Portal. Im Gegensatz zum B2B-Portal
+Das geplante SRP-Portal (`story.reisinger.pictures`) war ein reduziertes B2C-Portal. Im Gegensatz zum B2B-Portal
 gibt es kein Lizenz-Katalog-System (`license_use_cases`, `license_modifiers`). Stattdessen gilt ein
 einfaches, mengenbasiertes Volumen-Preismodell:
 
@@ -71,3 +77,4 @@ Wenn die Settings nicht gesetzt sind, werden die Hardcoded-Defaults verwendet:
 - Dieses Dokument beschreibt nur das **Backend**-Preismodell.
 - Das Frontend (Warenkorb-Anzeige, Preis-Berechnung clientseitig) ist nicht Teil dieses Dokuments.
 - Die Architektur (Strategy-Pattern) wird in `features/infrastructure/17-pricing-strategy-pattern.md` beschrieben.
+- Dieses Dokument ist **historical** — die aktuelle Implementierung verwendet die generic `VolumeLicensingStrategy` (siehe `17-pricing-strategy-pattern.md`). Die Konfigurations-Keys (`srp_price_per_image_tier*`) wurden noch nicht umbenannt; das ist ein geplanter Cleanup, wenn SRP-Referenzen vollständig getilgt werden.

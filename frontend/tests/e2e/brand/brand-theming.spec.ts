@@ -8,6 +8,6 @@ test.describe('Brand data-theme and data-brand attributes', () => {
 
         const html = page.locator('html');
         await expect(html).toHaveAttribute('data-brand', 'rp');
-        await expect(html).toHaveAttribute('data-theme', /^(b2b-light|b2b-dark|reisinger-light)$/);
+        await expect(html).toHaveAttribute('data-theme', /^(rp-light|rp-dark|reisinger-light)$/);
     });
 });

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Brand;
+use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,7 +20,7 @@ class Gallery extends Model
         'is_public', 'allow_client_metadata_edit', 'apply_metadata_to_photos',
         'default_title', 'default_description', 'default_keywords',
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
-        'org_ids', 'brand',
+        'org_ids', 'brand', 'licensing_mode', 'effective_licensing_mode',
         'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers'
     ];
 
@@ -47,6 +48,7 @@ class Gallery extends Model
         'default_country',
         'default_iso_country',
         'brand',
+        'licensing_mode',
         'expires_at'
     ];
 
@@ -63,8 +65,18 @@ class Gallery extends Model
         'restricted_photographers' => 'boolean',
     ];
 
-    // Dieses Attribut wird bei JSON-Responses automatisch angehängt
-    protected $appends = ['full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'org_ids'];
+    protected $appends = ['full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'org_ids', 'effective_licensing_mode'];
+
+    public function getEffectiveLicensingModeAttribute(): string
+    {
+        if ($this->licensing_mode !== null) {
+            return $this->licensing_mode;
+        }
+
+        return Setting::where('key', 'pricing_strategy')
+            ->where('brand', BrandRegistry::currentOrDefault())
+            ->value('value') ?? 'scope_licensing';
+    }
 
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
@@ -93,8 +105,6 @@ class Gallery extends Model
         $path = $this->slug;
         $group = $this->galleryGroup;
 
-        // R-03: Zyklus-Schutz — verhindert Endlosrekursion bei zirkulärer oder selbstreferenzieller
-        // parent_id-Kette. Defensiv, schützt auch vor bereits vorhandenen fehlerhaften Daten.
         $visited = [];
 
         while ($group) {

@@ -14,6 +14,17 @@ use Illuminate\Support\Str;
 
 class ContractJoinController extends Controller
 {
+    private ContractTemplateService $contractTemplateService;
+    private ContractAuditService $contractAuditService;
+    private ContractCloseService $contractCloseService;
+
+    public function __construct(ContractTemplateService $contractTemplateService, ContractAuditService $contractAuditService, ContractCloseService $contractCloseService)
+    {
+        $this->contractTemplateService = $contractTemplateService;
+        $this->contractAuditService = $contractAuditService;
+        $this->contractCloseService = $contractCloseService;
+    }
+
     public function check($token)
     {
         $contract = Contract::where('join_token', $token)->first();
@@ -77,14 +88,14 @@ class ContractJoinController extends Controller
                 ]);
             }
 
-            $result = app(ContractTemplateService::class)->createInstance($contract, [
+            $result = $this->contractTemplateService->createInstance($contract, [
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'roles' => $validated['roles'],
                 'personal_token' => $personalToken,
             ]);
 
-            app(ContractAuditService::class)->log($result['instance']->id, $result['signer']->id, 'opened', $request);
+            $this->contractAuditService->log($result['instance']->id, $result['signer']->id, 'opened', $request);
 
             return response()->json([
                 'personal_token' => $personalToken,
@@ -106,7 +117,7 @@ class ContractJoinController extends Controller
             ->where('status', 'joined')
             ->first();
         if ($existingJoined) {
-            app(ContractAuditService::class)->log($contract->id, $existingJoined->id, 'opened', $request);
+            $this->contractAuditService->log($contract->id, $existingJoined->id, 'opened', $request);
             return response()->json([
                 'personal_token' => $existingJoined->personal_token,
                 'name' => $existingJoined->name,
@@ -123,7 +134,7 @@ class ContractJoinController extends Controller
             'status' => 'joined',
         ]);
 
-        app(ContractAuditService::class)->log($contract->id, $signer->id, 'opened', $request);
+        $this->contractAuditService->log($contract->id, $signer->id, 'opened', $request);
 
         return response()->json([
             'personal_token' => $personalToken,
@@ -145,7 +156,7 @@ class ContractJoinController extends Controller
             return response()->json(['error' => 'Der Vertrag nimmt keine Unterschriften mehr an'], 410);
         }
 
-        app(ContractAuditService::class)->log($signer->contract_id, $signer->id, 'heartbeat', request());
+        $this->contractAuditService->log($signer->contract_id, $signer->id, 'heartbeat', request());
 
         return response()->json([
             'contract' => [
@@ -174,7 +185,7 @@ class ContractJoinController extends Controller
             return response()->json(null, 404);
         }
 
-        app(ContractAuditService::class)->log($signer->contract_id, $signer->id, 'page_exit', request());
+        $this->contractAuditService->log($signer->contract_id, $signer->id, 'page_exit', request());
 
         return response()->json(null, 204);
     }
@@ -213,13 +224,13 @@ class ContractJoinController extends Controller
             return response()->json(['error' => 'Der Vertrag wurde geändert. Bitte laden Sie die Seite neu und lesen Sie die aktuelle Version.'], 409);
         }
 
-        app(ContractAuditService::class)->log($signer->contract_id, $signer->id, 'signed', $request);
+        $this->contractAuditService->log($signer->contract_id, $signer->id, 'signed', $request);
 
         $signer->refresh();
         if ($signer->contract->template_id !== null) {
             $signer->contract->status = 'closed';
             $signer->contract->save();
-            app(ContractCloseService::class)->close($signer->contract);
+            $this->contractCloseService->close($signer->contract);
         }
 
         return response()->json(['success' => true, 'message' => 'Vertrag erfolgreich unterschrieben']);

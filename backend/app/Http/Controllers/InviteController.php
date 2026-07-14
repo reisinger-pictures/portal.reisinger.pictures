@@ -130,6 +130,7 @@ class InviteController extends Controller
             'sub' => 'guest_' . $guestId,
             'guest_id' => $guestId,
             'guest_name' => $guestName,
+            'guest_invite_id' => $invite->id,
             'transient_galleries' => $transientGalleries,
             'transient_meta_galleries' => $transientMetaGalleries
         ])->make();
@@ -161,6 +162,10 @@ class InviteController extends Controller
         if (\Illuminate\Support\Facades\Gate::denies('manage', $invite->gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
 
         \App\Models\GalleryInvite::destroy($id);
+
+        $ttl = \Illuminate\Support\Facades\Auth::guard('api')->factory()->getTTL();
+        \Illuminate\Support\Facades\Cache::put('blacklisted_invite_' . $id, true, now()->addMinutes($ttl));
+
         return response()->json(['success' => true]);
     }
 }

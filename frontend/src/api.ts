@@ -184,6 +184,8 @@ export interface Gallery {
     created_at?: string;
     org_ids?: string[];
     brand?: string | null;
+    licensing_mode?: string | null;
+    effective_licensing_mode?: string;
 }
 
 // Canonical auth-context user (`/api/auth/me`). `roles` is the role-name list.

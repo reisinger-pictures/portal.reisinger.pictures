@@ -26,7 +26,7 @@ vi.mock('../../logic/usePermissions', () => ({
 }));
 
 vi.mock('../../logic/useBrand', () => ({
-    useBrand: vi.fn(() => ({ brand: 'rp', features: { coupons: true, orgs: true }, config: null, logoSrc: '', portalName: 'Test', impressumUrl: '', theme: { light: 'reisinger-light', dark: 'b2b-dark' } })),
+    useBrand: vi.fn(() => ({ brand: 'rp', features: { coupons: true, orgs: true }, config: null, logoSrc: '', portalName: 'Test', impressumUrl: '', theme: { light: 'rp-light', dark: 'rp-dark' }, primaryColor: '#1E5631', secondaryColor: '#A4B494' })),
 }));
 
 vi.mock('../../logic/usePhotoSwipe', () => ({

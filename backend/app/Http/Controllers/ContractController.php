@@ -6,6 +6,7 @@ use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\UpdateContractRequest;
 use App\Enums\Brand;
 use App\Models\Contract;
+use App\Services\ContractAuditService;
 use App\Services\ContractCloseService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
@@ -13,6 +14,15 @@ use Illuminate\Support\Str;
 
 class ContractController extends Controller
 {
+    private ContractAuditService $contractAuditService;
+    private ContractCloseService $contractCloseService;
+
+    public function __construct(ContractAuditService $contractAuditService, ContractCloseService $contractCloseService)
+    {
+        $this->contractAuditService = $contractAuditService;
+        $this->contractCloseService = $contractCloseService;
+    }
+
     public function index(Request $request)
     {
         $query = Contract::with('signers')
@@ -73,7 +83,7 @@ class ContractController extends Controller
 
         if ($contract->wasChanged() && $contract->status === 'active') {
             $contract->increment('content_version');
-            app(\App\Services\ContractAuditService::class)->log(
+            $this->contractAuditService->log(
                 $contract->id,
                 null,
                 'modified',
@@ -139,7 +149,7 @@ class ContractController extends Controller
         $contract->status = 'closed';
         $contract->save();
 
-        app(ContractCloseService::class)->close($contract);
+        $this->contractCloseService->close($contract);
 
         return response()->json([
             'success' => true,

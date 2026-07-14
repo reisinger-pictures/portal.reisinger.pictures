@@ -11,7 +11,7 @@
 @plugin "@tailwindcss/typography";
 
 @plugin "daisyui/theme" {
-    name: "b2b-light";
+    name: "rp-light";
     default: true;
     prefersdark: false;
     --color-base-100: oklch(100% 0 0);
@@ -36,7 +36,7 @@
 }
 
 @plugin "daisyui/theme" {
-    name: "b2b-dark";
+    name: "rp-dark";
     prefersdark: true;
     --color-base-100: oklch(18% 0.005 250);
     --color-base-200: oklch(22% 0.005 250);
@@ -60,7 +60,7 @@
 }
 
 @plugin "daisyui" {
-    themes: b2b-light --default, b2b-dark --prefers-dark;
+    themes: rp-light --default, rp-dark --prefers-dark;
 }
 
 @plugin "@iconify/tailwind4" {

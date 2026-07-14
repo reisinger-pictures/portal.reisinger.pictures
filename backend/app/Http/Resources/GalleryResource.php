@@ -16,6 +16,8 @@ class GalleryResource extends JsonResource {
             'is_public' => $this->is_public,
             'expires_at' => $this->expires_at,
             'created_at' => $this->created_at,
+            'licensing_mode' => $this->licensing_mode,
+            'effective_licensing_mode' => $this->effective_licensing_mode,
         ];
     }
 }

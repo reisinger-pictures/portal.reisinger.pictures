@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 use ZipStream\ZipStream;
 
-class DownloadController extends Controller
+class PhotoDownloadController extends Controller
 {
     public function __construct(
         private readonly ImageProcessor $imageProcessor,

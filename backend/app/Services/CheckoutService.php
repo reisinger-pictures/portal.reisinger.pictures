@@ -1,13 +1,18 @@
 <?php
 namespace App\Services;
 use App\Contracts\PricingStrategy;
+use App\Models\Gallery;
 use App\Models\Order;
 use App\Models\InvoiceSnapshot;
 use App\Models\LicenseUseCase;
 use App\Models\Photo;
+use App\Pricing\ScopeLicensingStrategy;
+use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CouponService;
+use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\CustomMail;
 use App\Mail\InvoiceMail;
@@ -36,7 +41,6 @@ class CheckoutService {
             $appliedCoupon = null;
 
             if ($quoteToken !== null) {
-                // Custom price path — price comes from verified token, NOT from request
                 $offerTokenService = app(\App\Services\OfferTokenService::class);
                 $tokenPayload = $offerTokenService->verify($quoteToken);
                 if ($tokenPayload === null) {
@@ -51,13 +55,26 @@ class CheckoutService {
                 $lineItems = $this->buildQuoteLineItems($tokenPayload);
                 $customConditions = $tokenPayload['rights_text'] ?? null;
             } else {
-                // Normal pricing path
                 $couponCode = $request->input('coupon_code');
-                if ($this->strategy->supportsCoupons() && $couponCode !== null) {
-                    $appliedCoupon = $this->resolveCoupon($couponCode, $request->items, $user);
+
+                $groups = $this->groupItemsByLicensingMode($strategyItems);
+
+                $hasVolumeGroup = isset($groups['volume_licensing']);
+
+                if (count($groups) > 1) {
+                    if ($hasVolumeGroup && $couponCode !== null) {
+                        $appliedCoupon = $this->resolveCoupon($couponCode, $request->items, $user);
+                    }
+
+                    $pricingResult = $this->calculateMultiStrategyCart($groups, $user, $hasVolumeGroup ? $couponCode : null);
+                } else {
+                    if ($this->strategy->supportsCoupons() && $couponCode !== null) {
+                        $appliedCoupon = $this->resolveCoupon($couponCode, $request->items, $user);
+                    }
+
+                    $pricingResult = $this->strategy->calculateCart($strategyItems, $user, $this->strategy->supportsCoupons() ? $couponCode : null);
                 }
 
-                $pricingResult = $this->strategy->calculateCart($strategyItems, $user, $this->strategy->supportsCoupons() ? $couponCode : null);
                 $totalNetCents = $pricingResult['totalCents'];
                 $couponDiscountCents = (int) ($pricingResult['discountCents'] ?? 0);
 
@@ -131,6 +148,7 @@ class CheckoutService {
                 'license_use_case_id' => $item['useCaseId'] ?? '',
                 'license_modifier_ids' => $item['modifierIds'] ?? [],
                 'is_quote' => $isItemQuote,
+                'gallery_id' => $photo->gallery_id,
             ];
 
             if ($isItemQuote) {
@@ -139,6 +157,57 @@ class CheckoutService {
         }
 
         return [$strategyItems, $isQuoteRequest];
+    }
+
+    private function groupItemsByLicensingMode(array $strategyItems): array
+    {
+        $groups = [];
+        foreach ($strategyItems as $item) {
+            $gallery = Gallery::find($item['gallery_id']);
+            $mode = $gallery ? $gallery->effective_licensing_mode : 'scope_licensing';
+            $groups[$mode][] = $item;
+        }
+        return $groups;
+    }
+
+    private function calculateMultiStrategyCart(array $groups, $user, ?string $couponCode): array
+    {
+        $allItems = [];
+        $totalCents = 0;
+        $discountCents = 0;
+        $couponId = null;
+        $allTierBreakdown = [];
+
+        foreach ($groups as $mode => $groupItems) {
+            $strategy = match ($mode) {
+                'volume_licensing' => new VolumeLicensingStrategy(
+                    app(SettingResolver::class),
+                    $this->couponService
+                ),
+                default => new ScopeLicensingStrategy(),
+            };
+
+            $groupCouponCode = $strategy->supportsCoupons() ? $couponCode : null;
+            $result = $strategy->calculateCart($groupItems, $user, $groupCouponCode);
+
+            $allItems = array_merge($allItems, $result['items']);
+            $totalCents += $result['totalCents'];
+            $discountCents += (int) ($result['discountCents'] ?? 0);
+            if (!empty($result['couponId'])) {
+                $couponId = $result['couponId'];
+            }
+            if (!empty($result['tier_breakdown'])) {
+                $allTierBreakdown = array_merge($allTierBreakdown, $result['tier_breakdown']);
+            }
+        }
+
+        return [
+            'items' => $allItems,
+            'totalCents' => $totalCents,
+            'discountCents' => $discountCents,
+            'couponId' => $couponId,
+            'tier_breakdown' => $allTierBreakdown,
+        ];
     }
 
     private function resolveCoupon(?string $couponCode, array $items, $user): ?\App\Models\Coupon
@@ -322,7 +391,12 @@ class CheckoutService {
             $order->update(['ip_address' => $request->ip(), 'stripe_payment_intent_id' => $paymentResult['id']]);
         } catch (\Throwable $e) {
             $order->update(['status' => 'cancelled']);
-            Mail::to(BrandRegistry::configOrDefault()->accountingEmail)->queue(new CustomMail('Zahlungsfehler', 'Bestellung ' . $order->id . ' konnte nicht bezahlt werden: ' . $e->getMessage()));
+            Log::error('Stripe payment failed for order {order_id}: {message}', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+            Mail::to(BrandRegistry::configOrDefault()->accountingEmail)->queue(new CustomMail('Zahlungsfehler', 'Bestellung ' . $order->id . ' konnte nicht bezahlt werden. Ein technischer Fehler ist aufgetreten. Bitte kontaktieren Sie den Support.'));
             return response()->json(['error' => 'Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.'], 502);
         }
         return response()->json(['success' => true, 'requires_action' => true, 'client_secret' => $paymentResult['client_secret'], 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);

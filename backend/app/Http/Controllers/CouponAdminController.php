@@ -2,31 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Brand;
 use App\Http\Requests\CouponStoreRequest;
 use App\Http\Requests\CouponUpdateRequest;
+use App\Http\Resources\CouponResource;
 use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
-use App\Enums\Brand;
-use App\Http\Resources\CouponResource;
 use App\Services\CouponService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
-/**
- * Admin CRUD + public validation for coupons (SRP-01).
- *
- * Role-based access:
- *  - super_admin: full CRUD, brand-filtered via host (C-1)
- *  - admin: brand-bound CRUD (own brand only)
- *  - photographer: own coupons only, restricted fields
- *
- * @see features/ecommerce/08-srp-coupon-system.md
- */
-class CouponController extends Controller
+class CouponAdminController extends Controller
 {
     private CouponService $couponService;
 
@@ -39,13 +29,6 @@ class CouponController extends Controller
     //  Role-Based Authorization Helper
     // ──────────────────────────────────────────────
 
-    /**
-     * Authorize that the current user can act on the given coupon.
-     *
-     *  - super_admin: always allowed
-     *  - admin: only if coupon brand matches current brand context
-     *  - photographer: only if coupon was created by this user
-     */
     private function authorizeCoupon(Coupon $coupon): void
     {
         $user = auth()->user();
@@ -55,8 +38,8 @@ class CouponController extends Controller
         }
 
         if ($user->is_admin) {
-                $couponBrandValue = $coupon->brand instanceof Brand ? $coupon->brand->value : $coupon->brand;
-                if ($couponBrandValue !== BrandRegistry::currentId()) {
+            $couponBrandValue = $coupon->brand instanceof Brand ? $coupon->brand->value : $coupon->brand;
+            if ($couponBrandValue !== BrandRegistry::currentId()) {
                 abort(403, 'Forbidden');
             }
             return;
@@ -84,7 +67,6 @@ class CouponController extends Controller
         $query = Coupon::forCurrentBrand()
             ->orderBy('created_at', 'desc');
 
-        // Photographer sees only their own coupons
         if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
             $query->where('coupons.created_by', $user->getKey());
         }
@@ -105,7 +87,6 @@ class CouponController extends Controller
 
         $validated['brand'] = BrandRegistry::currentId();
 
-        // Photographer restrictions
         if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
             $validated['created_by'] = $user->id;
             unset($validated['max_uses_global']);
@@ -129,7 +110,6 @@ class CouponController extends Controller
         $user = auth()->user();
         $validated = $request->validated();
 
-        // Photographer restrictions
         if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
             unset($validated['max_uses_global']);
             $validated['active'] = true;
@@ -151,7 +131,6 @@ class CouponController extends Controller
 
         $user = auth()->user();
 
-        // super_admin and admin can always delete; others only if unused
         if (!$user->is_super_admin && !$user->is_admin && $coupon->used_count > 0) {
             return response()->json([
                 'success' => false,
@@ -168,17 +147,13 @@ class CouponController extends Controller
     //  Gallery Coupons: List + Create
     // ──────────────────────────────────────────────
 
-    /**
-     * List coupons scoped to a specific gallery.
-     */
     public function galleryCoupons(Request $request, string $galleryId): JsonResponse
     {
         $gallery = $this->findAndVerifyGallery($galleryId);
 
         $perPage = min((int) $request->query('per_page', 20), 100);
 
-        // Photographers who have access to this gallery via photographer_galleries pivot
-        $photographerIds = \Illuminate\Support\Facades\DB::table('photographer_galleries')
+        $photographerIds = DB::table('photographer_galleries')
             ->where('gallery_id', $galleryId)
             ->pluck('user_id')
             ->toArray();
@@ -206,9 +181,6 @@ class CouponController extends Controller
         return response()->json($coupons);
     }
 
-    /**
-     * Create a coupon pre-scoped to a specific gallery.
-     */
     public function storeGalleryCoupon(CouponStoreRequest $request, string $galleryId): JsonResponse
     {
         $gallery = $this->findAndVerifyGallery($galleryId);
@@ -235,9 +207,6 @@ class CouponController extends Controller
     //  GalleryGroup Coupons: List + Create
     // ──────────────────────────────────────────────
 
-    /**
-     * List coupons scoped to a specific gallery group.
-     */
     public function groupCoupons(Request $request, string $groupId): JsonResponse
     {
         $group = GalleryGroup::findOrFail($groupId);
@@ -280,9 +249,6 @@ class CouponController extends Controller
         return response()->json($coupons);
     }
 
-    /**
-     * Create a coupon pre-scoped to a specific gallery group.
-     */
     public function storeGroupCoupon(CouponStoreRequest $request, string $groupId): JsonResponse
     {
         $group = GalleryGroup::findOrFail($groupId);
@@ -312,59 +278,9 @@ class CouponController extends Controller
     }
 
     // ──────────────────────────────────────────────
-    //  Public: Validate coupon (for frontend preview)
-    // ──────────────────────────────────────────────
-
-    public function validateCoupon(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'code' => 'required|string|max:50',
-            'gallery_id' => 'nullable|string',
-            'meta_gallery_id' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['valid' => false, 'error' => $validator->errors()->first()], 422);
-        }
-
-        $brandId = BrandRegistry::currentId();
-
-        $userId = auth()->id();
-
-        [$coupon, $error] = $this->couponService->findValidCoupon(
-            $request->input('code'),
-            $brandId,
-            $request->input('gallery_id'),
-            $request->input('meta_gallery_id'),
-            $userId,
-        );
-
-        if ($coupon === null) {
-            return response()->json(['valid' => false, 'error' => $error]);
-        }
-
-        $sampleTotalCents = 10000;
-        $sampleItems = [['priceCents' => $sampleTotalCents, 'itemId' => 'sample']];
-        $result = $this->couponService->applyCoupon($coupon, $sampleItems, $sampleTotalCents);
-
-        return response()->json([
-            'valid' => true,
-            'coupon' => [
-                'code' => $coupon->code,
-                'type' => $coupon->type,
-                'value' => $coupon->value,
-            ],
-            'discount_cents' => $result['discountCents'],
-        ]);
-    }
-
-    // ──────────────────────────────────────────────
     //  Helpers
     // ──────────────────────────────────────────────
 
-    /**
-     * Find a gallery and verify it belongs to the current brand.
-     */
     private function findAndVerifyGallery(string $galleryId): Gallery
     {
         $gallery = Gallery::findOrFail($galleryId);

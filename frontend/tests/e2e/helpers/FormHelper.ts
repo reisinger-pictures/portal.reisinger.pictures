@@ -1,6 +1,7 @@
-import {FrameLocator, Page} from '@playwright/test';
+import {Page} from '@playwright/test';
 import {CreditCard} from './CreditCardHelper';
 import {ModalHelper} from './ModalHelper';
+import {StripeHelper} from './StripeHelper';
 
 export interface FillGalleryModalParams {
     name?: string;
@@ -110,35 +111,7 @@ export class FormHelper {
         if (params.copyright) await this.page.locator('.form-control').filter({hasText: 'Standard-Urheber'}).locator('input').fill(params.copyright);
     }
 
-    async fillStripeForm(frame: FrameLocator, card: CreditCard) {
-        const cardNumberInput = frame.locator('input[autocomplete="cc-number"], input[name="cardnumber"], input[name="number"]').first();
-        const expDateInput = frame.locator('input[autocomplete="cc-exp"], input[name="exp-date"], input[name="expiry"]').first();
-        const cvcInput = frame.locator('input[autocomplete="cc-csc"], input[name="cvc"]').first();
-
-        // Desktop: Stripe Payment Element rendert jedes Feld in einem separaten Iframe.
-        // Fallback: Suche Felder in ihren dedizierten Stripe-Iframes via page-Ebene.
-        const desktopCardFrame = this.page.frameLocator(
-            'iframe[title*="card number" i], iframe[title*="kartennummer" i]'
-        ).first();
-        const desktopExpiryFrame = this.page.frameLocator(
-            'iframe[title*="expiration date" i], iframe[title*="expiry" i], iframe[title*="expiration" i], iframe[title*="ablauf" i]'
-        ).first();
-        const desktopCvcFrame = this.page.frameLocator(
-            'iframe[title*="security code" i], iframe[title*="cvc" i], iframe[title*="sicherheitscode" i]'
-        ).first();
-
-        await cardNumberInput.fill(card.number).catch(() =>
-            desktopCardFrame.locator('input').first().fill(card.number)
-        );
-        await expDateInput.fill(card.exp).catch(() =>
-            desktopExpiryFrame.locator('input').first().fill(card.exp)
-        );
-        await cvcInput.fill(card.cvc).catch(() =>
-            desktopCvcFrame.locator('input').first().fill(card.cvc)
-        );
-
-        // Anti-Flakiness: Blur erzwingt Stripe-interne Validierung.
-        await this.page.locator('body').blur().catch(() => {});
-        // Stripe braucht asynchrone Validierungszeit - kann nicht direkt abgewartet werden
+    async fillStripeForm(_stripeFrame: unknown, card: CreditCard) {
+        await StripeHelper.fillStripeForm(this.page, card);
     }
 }

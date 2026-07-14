@@ -26,7 +26,8 @@ const gallerySchema = z.object({
     org_ids: z.array(z.string()),
     is_free_download: z.boolean().optional(),
     is_editorial_only: z.boolean().optional(),
-    is_hidden: z.boolean().optional()
+    is_hidden: z.boolean().optional(),
+    licensing_mode: z.string().optional()
 });
 type GalleryFormValues = z.infer<typeof gallerySchema>;
 
@@ -49,7 +50,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
         defaultValues: {
-            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', org_ids: [], is_free_download: false, is_editorial_only: false, is_hidden: false
+            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', org_ids: [], is_free_download: false, is_editorial_only: false, is_hidden: false, licensing_mode: ''
         }
     });
 
@@ -67,7 +68,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 expires_at: editingGallery?.expires_at ? editingGallery.expires_at.split('T')[0] : '',
                 is_free_download: !!editingGallery?.is_free_download,
                 is_editorial_only: !!editingGallery?.is_editorial_only,
-                is_hidden: !!editingGallery?.is_hidden
+                is_hidden: !!editingGallery?.is_hidden,
+                licensing_mode: editingGallery?.licensing_mode || ''
             });
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);
@@ -91,7 +93,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         const metaOpts = { 
             is_free_download: data.is_free_download,
             is_editorial_only: data.is_editorial_only,
-            is_hidden: data.is_hidden
+            is_hidden: data.is_hidden,
+            licensing_mode: data.licensing_mode || null
         };
 
         try {
@@ -226,6 +229,15 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 <select {...register('gallery_group_id')} className="select select-bordered w-full">
                     <option value="">-- <Trans>Oberste Ebene (Root)</Trans> --</option>
                     {availableGroups.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
+                </select>
+            </div>
+
+            <div className="form-control w-full mb-4">
+                <label className="label"><span className="label-text font-bold"><Trans>Lizenzierungsmodus</Trans></span></label>
+                <select {...register('licensing_mode')} className="select select-bordered w-full">
+                    <option value=""><Trans>Brand-Standard</Trans></option>
+                    <option value="scope_licensing"><Trans>Scope-Lizenzierung</Trans></option>
+                    <option value="volume_licensing"><Trans>Volume-Lizenzierung</Trans></option>
                 </select>
             </div>
 

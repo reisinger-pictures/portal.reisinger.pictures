@@ -18,13 +18,15 @@ export interface BrandConfig {
     impressum_url: string | null;
     logo_path: string | null;
     features: BrandFeatures;
+    primary_color: string;
+    secondary_color: string;
 }
 
 const themeMap: Record<string, { light: string; dark: string }> = {
-    rp: {light: 'reisinger-light', dark: 'b2b-dark'},
+    rp: {light: 'rp-light', dark: 'rp-dark'},
 };
 
-const defaultTheme = {light: 'reisinger-light', dark: 'b2b-dark'};
+const defaultTheme = {light: 'rp-light', dark: 'rp-dark'};
 
 export function getBrandFromHostname(hostname: string): BrandId {
     const h = hostname.toLowerCase();
@@ -71,6 +73,8 @@ export function useBrand() {
         impressumUrl: config?.impressum_url ?? null,
         features: config?.features ?? {},
         theme,
+        primaryColor: config?.primary_color ?? '#1E5631',
+        secondaryColor: config?.secondary_color ?? '#A4B494',
     };
 }
 

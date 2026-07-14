@@ -22,6 +22,11 @@ class TransientUserProvider extends EloquentUserProvider
                 return null;
             }
             if ($payload) {
+                $inviteId = $payload->get('guest_invite_id');
+                if ($inviteId && \Illuminate\Support\Facades\Cache::has('blacklisted_invite_' . $inviteId)) {
+                    \Illuminate\Support\Facades\Cache::put('blacklisted_' . $identifier, true, now()->addMinutes(config('jwt.ttl', 240)));
+                    return null;
+                }
                 $user = new User();
                 $user->id = null; // Explicitly null for DB-less guest
                 $user->name = $payload->get('guest_name') ?? 'Gast';

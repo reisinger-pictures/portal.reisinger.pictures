@@ -92,7 +92,7 @@ class User extends Authenticatable implements JWTSubject
 
     public function getAllowedGalleryIds(): array
     {
-        return app(\App\Services\AccessControlService::class)->getAllowedGalleryIds($this);
+        return $this->accessControlService()->getAllowedGalleryIds($this);
     }
 
     public function canPhotographerAccessGallery($galleryId): bool
@@ -109,7 +109,7 @@ class User extends Authenticatable implements JWTSubject
 
         $groupIds = $this->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
         if (!empty($groupIds)) {
-            $allGroupIds = app(\App\Services\AccessControlService::class)->getSubGroupIds($groupIds);
+            $allGroupIds = $this->accessControlService()->getSubGroupIds($groupIds);
             if (in_array($gallery->gallery_group_id, $allGroupIds)) return true;
         }
 
@@ -159,5 +159,10 @@ class User extends Authenticatable implements JWTSubject
             }
         }
         return false;
+    }
+
+    private function accessControlService(): \App\Services\AccessControlService
+    {
+        return app(\App\Services\AccessControlService::class);
     }
 }

@@ -6,6 +6,7 @@ import { FormHelper } from '../helpers/FormHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
+import { StripeHelper } from '../helpers/StripeHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 
 test.describe('Quote Checkout Workflow', () => {
@@ -123,37 +124,9 @@ test.describe('Quote Checkout Workflow', () => {
         // --- 5. Stripe-Zahlung (Visa 4242) ---
         await expect(page.locator('h2:has-text("Zahlung abschließen")')).toBeVisible({ timeout: 15000 });
 
-        const stripeFrame = page.frameLocator('iframe[title*="payment" i], iframe[title*="secure" i], iframe[title*="sichere" i]').first();
+        const stripeFrames = await StripeHelper.resolveStripeIframes(page);
 
-        const cardInput = stripeFrame.locator('input[autocomplete="cc-number"], input[name="cardnumber"], input[name="number"]').first();
-
-        try {
-            await cardInput.waitFor({ state: 'visible', timeout: 5000 });
-        } catch {
-            const cardTab = stripeFrame.getByRole('tab', { name: /Card|Kreditkarte|Karte/i }).or(stripeFrame.getByRole('button', { name: /Card|Kreditkarte|Karte/i })).first();
-            try {
-                await cardTab.waitFor({ state: 'visible', timeout: 5000 });
-                await cardTab.click();
-                await expect(cardInput).toBeVisible({ timeout: 10000 });
-            } catch {
-            }
-        }
-
-        const cardNumberFrame = page.frameLocator(
-            'iframe[title*="card number" i], iframe[title*="kartennummer" i]'
-        ).first();
-
-        let resolvedCardInput;
-        try {
-            resolvedCardInput = cardNumberFrame.locator('input').first();
-            await resolvedCardInput.waitFor({ state: 'visible', timeout: 5000 });
-        } catch {
-            resolvedCardInput = cardInput;
-        }
-
-        await expect(resolvedCardInput).toBeVisible({ timeout: 15000 });
-
-        await form.fillStripeForm(stripeFrame, CreditCardHelper.successVisa);
+        await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa, stripeFrames);
         await expect(page.getByRole('button', { name: 'Jetzt bezahlen' })).toBeEnabled({ timeout: 10000 });
         const payButton = page.getByRole('button', { name: 'Jetzt bezahlen' });
         await payButton.evaluate(el => (el as HTMLButtonElement).click());

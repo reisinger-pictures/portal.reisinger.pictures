@@ -31,7 +31,9 @@ vi.mock('../../logic/useBrand', () => ({
         svgUrl: '/brands/rp/safari-pinned-tab.svg',
         portalName: 'Reisinger Foto Portal',
         impressumUrl: 'https://reisinger.pictures/impressum/',
-        theme: { light: 'reisinger-light', dark: 'b2b-dark' },
+        theme: { light: 'rp-light', dark: 'rp-dark' },
+        primaryColor: '#1E5631',
+        secondaryColor: '#A4B494',
     })),
 }));
 
@@ -358,7 +360,9 @@ describe('Volume licensing admin navigation', () => {
             svgUrl: '/brands/rp/safari-pinned-tab.svg',
             portalName: 'Reisinger Foto Portal',
             impressumUrl: 'https://reisinger.pictures/impressum/',
-            theme: { light: 'reisinger-light', dark: 'b2b-dark' },
+            theme: { light: 'rp-light', dark: 'rp-dark' },
+            primaryColor: '#1E5631',
+            secondaryColor: '#A4B494',
         });
     });
 

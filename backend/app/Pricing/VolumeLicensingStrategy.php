@@ -75,8 +75,8 @@ class VolumeLicensingStrategy implements PricingStrategy
                 $pricedItems[] = [
                     'itemId' => $itemId,
                     'priceCents' => 0,
-                    'tier' => 'srp',
-                    'useCaseName' => 'Anfrage',
+'tier' => 'volume',
+                'useCaseName' => 'Anfrage',
                     'modifierNames' => [],
                     'galleryId' => $galleryId,
                 ];
@@ -86,8 +86,8 @@ class VolumeLicensingStrategy implements PricingStrategy
             $pricedItems[] = [
                 'itemId' => $itemId,
                 'priceCents' => $perImagePriceCents,
-                'tier' => 'srp',
-                'useCaseName' => 'SRP Lizenz',
+                'tier' => 'volume',
+                'useCaseName' => 'Volume Lizenz',
                 'modifierNames' => [],
                 'galleryId' => $galleryId,
             ];

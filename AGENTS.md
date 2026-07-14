@@ -27,6 +27,7 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
   * `AGENTS.todo.md` = **temporäre Task-Liste** + Code-Review-Notizen + Bug-Analysen + Session-Tracking. Alles, was nur für die aktuelle Session oder den nächsten PR relevant ist, gehört hierher, **nicht** in `features/`.
   * Code-Reviews, temporäre Analysen und Diskussionen → `AGENTS.todo.md`. Nur wenn ein neuer SOLL-Zustand definiert wird → `features/`.
 * **Task & Test Tracking:** Every feature requires actionable TODOs in `AGENTS.todo.md`. You MUST explicitly include TODOs for writing test cases (PHPUnit for backend, Playwright for E2E).
+* **Zero Pre-existing Failures Policy (STRICT):** Pre-existing Test-Failures (PHPUnit, Vitest, Playwright) MÜSSEN immer behoben werden, bevor neue Arbeit beginnt. Ein "pre-existing" Label oder Ausrede ist nicht erlaubt — jeder Fehlerblock wird analysiert und gefixt, oder als akzeptiertes Risiko in `features/` dokumentiert. Dies gilt auch für flaky Tests: Diese werden bis zur Stabilisierung debugged.
 
 ## 2. E2E Tag Policy (STRICT)
 
@@ -84,7 +85,7 @@ export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
 cd backend && php artisan test
 
 # Frontend Unit (pnpm, NICHT npm)
-cd frontend && pnpm vitest run
+cd frontend && pnpm run test:run
 
 # Frontend Lint + Build (pnpm, NICHT npm)
 cd frontend && pnpm lint:fix && pnpm build
@@ -138,3 +139,38 @@ npx playwright test --last-failed
 ## 6. Database Setup Policy (STRICT)
 
 Nach `php artisan migrate:fresh` MUSS `php artisan db:seed` (oder `--seed` Flag) ausgeführt werden. Ohne Seed existiert kein Admin-User — Login und Auth sind tot. Der `DatabaseSeeder` legt den Admin via `firstOrCreate` mit `ADMIN_EMAIL`/`ADMIN_PASSWORD` an.
+
+## 7. Security Risk Register (Accepted Risks)
+
+Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11). **Nicht regredieren** — falls der jeweilige Guard entfernt wird, sofort fixen:
+
+- **[C1] Hardcoded `JWT_SECRET`-Fallback** — `backend/config/jwt.php:18`. Deployment-Guard in `docker-compose.yml` fängt Production ab; nur Dev-/Test-Keys betroffen.
+- **[C2] Hardcoded `APP_KEY`-Fallback** — `backend/config/app.php:110`. Gleiche Begründung wie C1.
+- **[C3] Stripe Test-Secret committed** — `backend/.env.testing:18`. Test-Account, niedriges Risiko.
+- **[C4] Live Stripe-Publishable-Key committed** — `frontend/.env` (`!.env`-Negation). Publishable = niedrigkritisch, Hygiene-Footgun.
+
+Offene Security-TODOs (M6, L2) siehe `AGENTS.todo.md`. M1–M5, M7–M9, L1, L3–L5 sind erledigt (Commit `0f10091` + Session 2026-07-14).
+
+### Abgeschlossene Security-Hardening (2026-07-11, Historie)
+
+- C5: XSS via `dangerouslySetInnerHTML` → `sanitizeHtml.ts` (DOMPurify)
+- C6: Stripe-Webhook Underpayment-Guard → `amount_received < total_amount`-Check
+- H1: Text-Snippet-Preview XSS → Defense-in-depth via `sanitizeHtml()`
+- H2: IDOR Notification Opt-In → `canAccessGallery()` Guards
+- H3: IDOR `MailController::finishRating` → `canAccessGallery($gallery->id)` Guard
+- H4: `ManagementMiddleware` null-deref → Null-Check + `auth('api')`
+- H6: Security-Header-Middleware → `SetSecurityHeaders.php`
+- H7: V025-Migrations-Split → hinfällig (V026 live)
+
+## 8. Bestätigte Stärken (nicht regredieren)
+
+- Brand-/Org-Isolation (`BrandRegistry` + `BrandContextMiddleware` + `forCurrentBrand()`-Scopes)
+- httpOnly-Cookie-Auth (kein Token in localStorage/sessionStorage, deduped Refresh)
+- Keine Raw-SQL mit User-Input, Shell-Outs via `Process` mit Array-Args
+- `$fillable`-Disziplin (kein `$guarded=[]`, kein `Model::create($request->all())`)
+- Bildupload mehrstufig validiert (`image`-Rule + `mimes` + `exiftool`-MIME-Check)
+- File-Delivery auth-gated (`FileDeliveryController`)
+- Frontend-Disziplin (0× `any`/`@ts-ignore`/`eslint-disable`, Zod-Resolver auf allen Forms, `lint --max-warnings 0`)
+- Preisberechnung server-autoritativ (signiertes Offer-Token)
+- HTML-Sanitize beim Persistieren (Symfony `HtmlSanitizer`) + beim Render (DOMPurify)
+- Vertragssigning mit optimistischer Concurrency (`content_version` in UPDATE-WHERE)

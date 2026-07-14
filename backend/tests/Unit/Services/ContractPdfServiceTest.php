@@ -84,6 +84,48 @@ class ContractPdfServiceTest extends TestCase
         $this->assertStringContainsString('%PDF-1.4', $result);
     }
 
+    public function test_pdf_uses_brand_colors_from_config()
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'closed',
+            'billing_details' => ['name' => 'Test', 'email' => 'test@test.de'],
+            'items' => [['type' => 'item', 'description' => 'Test', 'qty' => 1, 'price' => 1000]],
+            'discounts' => [],
+            'terms_html' => '<p>AGB</p>',
+        ]);
+
+        ContractSigner::factory()->signed()->create([
+            'contract_id' => $contract->id,
+        ]);
+
+        $manualInvoiceMock = $this->mock(ManualInvoiceService::class);
+        $manualInvoiceMock->shouldReceive('processItems')->once()->andReturn([
+            'items' => [['type' => 'item', 'filename' => 'Test', 'qty' => 1, 'price' => 1000, 'row_total' => 1000]],
+            'total' => 1000,
+        ]);
+        $manualInvoiceMock->shouldReceive('getBankDetails')->once()->andReturn([
+            'holder' => 'Bank', 'iban' => 'DE00', 'bic' => 'BIC',
+        ]);
+
+        $offerTokenMock = $this->mock(OfferTokenService::class);
+        $offerTokenMock->shouldReceive('issue')->once()->andReturn('test.jwt.payload');
+
+        $domPdfMock = \Mockery::mock(\Barryvdh\DomPDF\PDF::class);
+        $domPdfMock->shouldReceive('output')->once()->andReturn('%PDF-1.4 brand-colors');
+        Pdf::shouldReceive('loadView')
+            ->once()
+            ->with('pdf.contract_signatures', \Mockery::on(function ($data) {
+                $this->assertEquals('#1E5631', $data['primaryColor']);
+                $this->assertEquals('#A4B494', $data['secondaryColor']);
+                return true;
+            }))
+            ->andReturn($domPdfMock);
+
+        $result = app(ContractPdfService::class)->generate($contract);
+
+        $this->assertStringContainsString('%PDF-1.4', $result);
+    }
+
     public function test_pdf_contains_offer_marker()
     {
         $contract = Contract::factory()->create([

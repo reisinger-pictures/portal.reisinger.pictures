@@ -82,4 +82,11 @@ describe('useBrand', () => {
         const { result } = renderHook(() => useBrand());
         expect(result.current.brand).toBe('buy');
     });
+
+    it('returns default brand colors for unknown brand', () => {
+        mockHostname('unknown.localhost');
+        const { result } = renderHook(() => useBrand());
+        expect(result.current.primaryColor).toBe('#1E5631');
+        expect(result.current.secondaryColor).toBe('#A4B494');
+    });
 });

@@ -4,9 +4,12 @@ use App\Http\Controllers\AIController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\ContractJoinController;
-use App\Http\Controllers\CouponController;
+use App\Http\Controllers\CouponAdminController;
+use App\Http\Controllers\CouponCheckoutController;
+use App\Http\Controllers\ContractDownloadController;
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\DownloadController;
+use App\Http\Controllers\InvoiceDownloadController;
+use App\Http\Controllers\PhotoDownloadController;
 use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\GalleryController;
@@ -99,9 +102,9 @@ Route::get('/galleries/{slug}', [GalleryFrontendController::class, 'show'])->nam
 Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])->name('api.media.serve')->where('filename', '.*');
 
 $downloadThrottle = config('app.throttle_download', 60);
-Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', [DownloadController::class, 'downloadSingle'])->name('api.photos.download');
+Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', [PhotoDownloadController::class, 'downloadSingle'])->name('api.photos.download');
 Route::get('/orders/quote-decode', [QuoteController::class, 'decodeQuoteLink'])->name('api.orders.quote-decode');
-Route::middleware('throttle:' . config('app.throttle_zip_download', 3) . ',1')->get('/galleries/{galleryId}/download-zip', [DownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
+Route::middleware('throttle:' . config('app.throttle_zip_download', 3) . ',1')->get('/galleries/{galleryId}/download-zip', [PhotoDownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
 
 Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
@@ -121,8 +124,8 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata'])->name('api.photos.revert');
     Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');
     Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
-    Route::get('/orders/{id}/invoice', [InvoiceController::class, 'downloadInvoice'])->name('api.orders.invoice');
-    Route::middleware('throttle:' . config('app.throttle_zip_download', 3) . ',1')->get('/orders/{id}/download-zip', [DownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
+    Route::get('/orders/{id}/invoice', [InvoiceDownloadController::class, 'downloadInvoice'])->name('api.orders.invoice');
+    Route::middleware('throttle:' . config('app.throttle_zip_download', 3) . ',1')->get('/orders/{id}/download-zip', [PhotoDownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
     Route::delete('/photos/{id}', [PhotoController::class, 'destroy'])->name('api.photos.destroy');
     Route::get('/payouts/my-statements', [\App\Http\Controllers\PayoutController::class, 'myStatements'])->name('api.payouts.my-statements');
 
@@ -132,7 +135,7 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText'])->name('api.ai.generate-metadata-text');
 
     // Coupon validation (public, auth-required)
-    Route::post('/coupons/validate', [CouponController::class, 'validateCoupon'])->name('api.coupons.validate')->middleware('throttle:coupon-validate');
+    Route::post('/coupons/validate', [CouponCheckoutController::class, 'validateCoupon'])->name('api.coupons.validate')->middleware('throttle:coupon-validate');
 });
 
 Route::middleware(['auth:api', 'management'])->group(function () {
@@ -196,6 +199,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::post('/management/contracts/{id}/open', [ContractController::class, 'open'])->name('api.management.contracts.open');
         Route::post('/management/contracts/{id}/close', [ContractController::class, 'close'])->name('api.management.contracts.close');
         Route::get('/management/contracts/{id}/instances', [ContractController::class, 'instances'])->name('api.management.contracts.instances');
+        Route::get('/management/contracts/{id}/download', [ContractDownloadController::class, 'downloadContract'])->name('api.management.contracts.download');
     });
 
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo'])->name('api.management.settings.system');
@@ -238,16 +242,16 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     });
 
     // SRP-01: Coupon management (super_admin, admin, photographer)
-    Route::get('/management/coupons', [CouponController::class, 'index'])->name('api.management.coupons.index');
-    Route::post('/management/coupons', [CouponController::class, 'store'])->name('api.management.coupons.store');
-    Route::put('/management/coupons/{id}', [CouponController::class, 'update'])->name('api.management.coupons.update');
-    Route::delete('/management/coupons/{id}', [CouponController::class, 'destroy'])->name('api.management.coupons.destroy');
+    Route::get('/management/coupons', [CouponAdminController::class, 'index'])->name('api.management.coupons.index');
+    Route::post('/management/coupons', [CouponAdminController::class, 'store'])->name('api.management.coupons.store');
+    Route::put('/management/coupons/{id}', [CouponAdminController::class, 'update'])->name('api.management.coupons.update');
+    Route::delete('/management/coupons/{id}', [CouponAdminController::class, 'destroy'])->name('api.management.coupons.destroy');
 
     // SRP-01: Gallery/Group coupon endpoints
-    Route::get('/management/galleries/{id}/coupons', [CouponController::class, 'galleryCoupons'])->name('api.management.galleries.coupons');
-    Route::post('/management/galleries/{id}/coupons', [CouponController::class, 'storeGalleryCoupon'])->name('api.management.galleries.coupons.store');
-    Route::get('/management/gallery-groups/{id}/coupons', [CouponController::class, 'groupCoupons'])->name('api.management.gallery-groups.coupons');
-    Route::post('/management/gallery-groups/{id}/coupons', [CouponController::class, 'storeGroupCoupon'])->name('api.management.gallery-groups.coupons.store');
+    Route::get('/management/galleries/{id}/coupons', [CouponAdminController::class, 'galleryCoupons'])->name('api.management.galleries.coupons');
+    Route::post('/management/galleries/{id}/coupons', [CouponAdminController::class, 'storeGalleryCoupon'])->name('api.management.galleries.coupons.store');
+    Route::get('/management/gallery-groups/{id}/coupons', [CouponAdminController::class, 'groupCoupons'])->name('api.management.gallery-groups.coupons');
+    Route::post('/management/gallery-groups/{id}/coupons', [CouponAdminController::class, 'storeGroupCoupon'])->name('api.management.gallery-groups.coupons.store');
 
     Route::get('/management/stats', [StatsController::class, 'index'])->name('api.management.stats');
     Route::get('/management/logs', [StatsController::class, 'logs'])->name('api.management.logs');

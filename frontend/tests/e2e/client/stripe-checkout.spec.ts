@@ -5,6 +5,7 @@ import {CreditCardHelper} from '../helpers/CreditCardHelper';
 import {FormHelper} from '../helpers/FormHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
+import {StripeHelper} from '../helpers/StripeHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 
 test.describe('Stripe Checkout Workflow', () => {
@@ -97,51 +98,16 @@ test.describe('Stripe Checkout Workflow', () => {
 
         await expect(page.locator('h2:has-text("Zahlung abschließen")')).toBeVisible({timeout: 15000});
 
-        // Finde explizit das Payment Element Iframe (Ignoriere unsichtbare Tracking-Iframes)
-        const stripeFrame = page.frameLocator('iframe[title*="payment" i], iframe[title*="secure" i], iframe[title*="sichere" i]').first();
+        const stripeFrames = await StripeHelper.resolveStripeIframes(page);
 
-        const cardInput = stripeFrame.locator('input[autocomplete="cc-number"], input[name="cardnumber"], input[name="number"]').first();
-
-        try {
-            // Pruefen ob das Eingabefeld ohnehin schon direkt sichtbar ist (Default bei manchen Locales)
-            await cardInput.waitFor({ state: 'visible', timeout: 5000 });
-        } catch {
-            // Falls nicht sichtbar, versuche den "Card" Tab zu finden und zu klicken
-            const cardTab = stripeFrame.getByRole('tab', { name: /Card|Kreditkarte|Karte/i }).or(stripeFrame.getByRole('button', { name: /Card|Kreditkarte|Karte/i })).first();
-            try {
-                await cardTab.waitFor({ state: 'visible', timeout: 5000 });
-                await cardTab.click();
-                // Nach Tab-Klick braucht Stripe einen Render-Cycle fuer das Iframe
-                await expect(cardInput).toBeVisible({ timeout: 10000 });
-            } catch {
-                // Ignorieren, falls kein Tab existiert
-            }
-        }
-
-        // Desktop: Stripe rendert das Card-Input nach Tab-Klick in einem separaten, dedizierten Iframe
-        const cardNumberFrame = page.frameLocator(
-            'iframe[title*="card number" i], iframe[title*="kartennummer" i]'
-        ).first();
-
-        let resolvedCardInput;
-        try {
-            resolvedCardInput = cardNumberFrame.locator('input').first();
-            await resolvedCardInput.waitFor({ state: 'visible', timeout: 5000 });
-        } catch {
-            resolvedCardInput = cardInput;
-        }
-
-        // Warte final auf das Eingabefeld
-        await expect(resolvedCardInput).toBeVisible({timeout: 15000});
-
-        return {stripeFrame, form, orderId};
+        return {stripeFrame: stripeFrames.stripeFrame, form, orderId};
     };
 
     test('Negative Flow: Handles generic decline and insufficient funds via inline alert', { tag: ['@feature:client:checkout'] }, async ({page}) => {
         test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
-        const {stripeFrame, form} = await navigateToStripeIframe(page);
+        const {stripeFrame} = await navigateToStripeIframe(page);
 
-        await form.fillStripeForm(stripeFrame, CreditCardHelper.genericDecline);
+        await StripeHelper.fillStripeForm(page, CreditCardHelper.genericDecline);
         await expect(page.getByRole('button', {name: 'Jetzt bezahlen'})).toBeEnabled({ timeout: 10000 });
 
         // Button direkt über JavaScript anklicken (zuverlässiger bei Desktop Layout-Problemen)
@@ -158,7 +124,7 @@ test.describe('Stripe Checkout Workflow', () => {
         await page.locator('.toast button').click().catch(() => {
         });
 
-        await form.fillStripeForm(stripeFrame, CreditCardHelper.insufficientFunds);
+        await StripeHelper.fillStripeForm(page, CreditCardHelper.insufficientFunds);
         await expect(page.getByRole('button', {name: 'Jetzt bezahlen'}).first()).toBeEnabled({ timeout: 10000 });
         const payButton2 = page.getByRole('button', {name: 'Jetzt bezahlen'});
         await payButton2.evaluate(el => (el as HTMLButtonElement).click());
@@ -171,9 +137,9 @@ test.describe('Stripe Checkout Workflow', () => {
 
     test('Positive Flow: Handles successful payment via Visa', { tag: ['@smoke', '@feature:client:checkout'] }, async ({page}) => {
         test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
-        const {stripeFrame, form} = await navigateToStripeIframe(page);
+        const {stripeFrame} = await navigateToStripeIframe(page);
 
-        await form.fillStripeForm(stripeFrame, CreditCardHelper.successVisa);
+        await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa);
         await expect(page.getByRole('button', {name: 'Jetzt bezahlen'})).toBeEnabled({ timeout: 10000 });
         const payButton = page.getByRole('button', {name: 'Jetzt bezahlen'});
         await payButton.evaluate(el => (el as HTMLButtonElement).click());

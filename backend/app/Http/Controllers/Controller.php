@@ -22,7 +22,7 @@ abstract class Controller
             $secure,
             true,
             false,
-            $secure ? 'None' : 'Lax'
+            'Lax'
         );
 
         $responseBody = array_merge([

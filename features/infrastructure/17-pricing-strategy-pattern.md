@@ -1,17 +1,21 @@
 # Pricing Strategy Pattern — Architektur (Soll-Zustand)
 
-> **Status:** Soll-Zustand. Beschreibt die Architektur des Strategy-Patterns zur Entkopplung der
-> Preislogik für B2B (RP) und SRP.
-> Verknüpft: `AGENTS.todo.md` T-20, `features/infrastructure/16-srp-volume-pricing.md`.
-> Erstellt 2026-07-01.
+> **Status:** Current (2026-07-14). Beschreibt die Architektur des Strategy-Patterns zur
+> Entkopplung der Preislogik. Das SRP-Portal wurde entfernt (Commit `1831116`); der
+> VolumeLicensingStrategy-Name bleibt als generische Volumen-Preislogik erhalten.
+> Verknüpft: `AGENTS.todo.md` F5, `features/infrastructure/16-srp-volume-pricing.md` (historical),
+> `features/infrastructure/21-brand-config-driven.md`.
+> Erstellt 2026-07-01, Update 2026-07-14.
 
 ## 1. Kontext
 
 Bisher gibt es eine einzige Preislogik in `PricingService::calculateItemPriceCents()`, die auf
-`license_use_cases` und `license_modifiers` basiert (B2B-Modell). Für das SRP-Portal wird ein
-vollständig anderes Preismodell benötigt (mengenbasiertes Volumen-Pricing).
+`license_use_cases` und `license_modifiers` basiert (B2B-Modell). Für ein B2C-Portal wird ein
+vollständig anderes Preismodell benötigt (mengenbasiertes Volumen-Pricing). Das ehemalige SRP-Portal
+wurde entfernt (Commit `1831116`), aber die generische Volume-Logik bleibt als alternative Strategie
+erhalten.
 
-Um die beiden Modelle sauber zu trennen und zukünftige Preismodelle zu ermöglichen, wird das
+Um die Modelle sauber zu trennen und zukünftige Preismodelle zu ermöglichen, wird das
 **Strategy-Pattern** eingeführt.
 
 ## 2. Architektur
@@ -29,7 +33,7 @@ Um die beiden Modelle sauber zu trennen und zukünftige Preismodelle zu ermögli
                   │                               │
     ┌─────────────────────────────┐  ┌─────────────────────────────┐
     │   ScopeLicensingStrategy    │  │    VolumeLicensingStrategy  │
-    │   (B2B / RP)                │  │   (SRP)                     │
+     │   (B2B / RP)                │  │   (generic volume)          │
     │                             │  │                             │
     │   Einzelitem-Preis via      │  │   Mengenbasiert, retroaktiv  │
     │   LicenseUseCase +          │  │   über gesamten Warenkorb   │
@@ -83,7 +87,7 @@ interface PricingStrategy
 - Summiert die Einzelpreise auf
 - Enthält die `guardBrand()`-Logik (Defense-in-Depth)
 
-#### VolumeLicensingStrategy (SRP)
+#### VolumeLicensingStrategy (generic volume)
 - Zählt alle Nicht-Quote-Items
 - Ermittelt den Volumen-Tier anhand der Gesamtmenge
 - Wendet den Tier-Preis retroaktiv auf **alle** Nicht-Quote-Items an
@@ -122,7 +126,59 @@ $this->app->bind(PricingStrategy::class, function ($app) {
 
 ## 3. Vorteile
 
-- **Trennung der Preismodelle**: RP und SRP haben unabhängige Implementierungen
+- **Trennung der Preismodelle**: B2B (scope-based) und B2C (volume-based) haben unabhängige Implementierungen
 - **Erweiterbarkeit**: Neue Preismodelle können durch Hinzufügen weiterer Strategien integriert werden
 - **Testbarkeit**: Jede Strategie kann isoliert getestet werden
 - **Keine Brand-If-Abfragen**: Die Strategie-Auswahl erfolgt zentral im ServiceProvider
+
+## 4. Resolution — Wie die Strategie ausgewählt wird
+
+Die Strategy-Resolution erfolgt im `AppServiceProvider::register()` zur Laufzeit:
+
+1. Die `pricing_strategy`-Einstellung wird aus der `settings`-Tabelle gelesen (brand-scoped via `BrandRegistry::currentOrDefault()`).
+2. Der Wert steuert den `match`-Ausdruck, der die entsprechende Strategy-Instanz erzeugt.
+3. Strategie-Hardcoding: `'volume_licensing'` → `VolumeLicensingStrategy`, alles andere → `ScopeLicensingStrategy`.
+
+Interaktion mit der Brand-Architektur (`config/brands.php`):
+- `config/brands.php` enthält ein `features.volume_licensing`-Flag, das dokumentiert, ob eine Brand die Volume-Logik nutzen *kann*.
+- Die tatsächliche Runtime-Entscheidung liegt in der `settings`-Tabelle (brand-scoped), nicht in der Config-Datei. Das erlaubt Runtime-Umschaltung ohne Code-Deployment und ist die Grundlage für den geplanten Per-Gallery-Override (F2).
+
+```
+features/brands.php (doc flag)
+      │
+      ▼ (documentation only)
+settings.pricing_strategy → AppServiceProvider → PricingStrategy binding
+      │
+      ▼ (brand-scoped)
+VolumeLicensingStrategy or ScopeLicensingStrategy
+```
+
+## 5. Planned: Per-Gallery Override (F2)
+
+> **Status:** Geplant, siehe `AGENTS.todo.md` F2. Nicht implementiert.
+
+### Ziel
+Galleries sollen einen eigenen `licensing_mode` erhalten, der das Brand-weite `pricing_strategy`-Setting überschreibt.
+
+### Ist-Zustand
+- `pricing_strategy` ist ein globales Brand-Setting → alle Galleries einer Brand teilen denselben Modus.
+- `Gallery`-Model hat keine Licensing-Spalte.
+- Frontend-Hook `useLicensingMode()` liest den Modus ohne Gallery-Kontext.
+
+### Geplante Änderung
+
+**a) Migration:** `licensing_mode VARCHAR(20) NULL` auf `galleries` (null = Brand-Setting gilt, Werte: `'scope_licensing'`, `'volume_licensing'`).
+
+**b) Resolution refactorn:** Die aktuelle DI-Bindung im `AppServiceProvider` ist request-scoped und kann nicht pro Cart-Item entscheiden. Ansätze:
+- `CheckoutService` gruppiert Items nach `licensing_mode` der zugehörigen Gallery und ruft `calculateCart()` pro Gruppe auf.
+- Oder: `PricingStrategy` um eine `calculateItem()`-Methode erweitern.
+
+**c) Mixed-Cart-Problem:** Ein Cart kann Items aus Galleries mit unterschiedlichen Modes enthalten. Lösung s.o. — Gruppierung im `CheckoutService`.
+
+**d) Frontend:** `useLicensingMode(galleryId?)` erweitern, `GET /api/settings/license-terms?gallery_id=X` Endpoint.
+
+## 6. Strategy History (for traceability)
+
+1. **2026-07-01:** Dokument erstellt — zwei Strategien: `ScopeLicensingStrategy` (RP/B2B) und `VolumeLicensingStrategy` (SRP/B2C).
+2. **2026-07-14 (Commit `1831116`):** SRP-Portal und `Brand::SRP` entfernt. VolumeLicensingStrategy bleibt als generische Volume-Logik. Strategy-Auswahl läuft über `pricing_strategy`-DB-Setting (brand-scoped).
+3. **Geplant (F2):** Per-Gallery `licensing_mode`-Override.

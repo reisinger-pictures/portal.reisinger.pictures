@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Gallery;
 use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\File;
@@ -129,11 +130,19 @@ class SettingsController extends Controller
      * Öffentlich (Gallery-/License-Selector-/Calculator-Flows). Sensible Billing-/Impressum-Daten
      * liegen bewusst im separaten, auth-geschützten Endpunkt getBillingDetails() (SRP-Trennung).
      */
-    public function getLicenseTerms(SettingResolver $resolver)
+    public function getLicenseTerms(Request $request, SettingResolver $resolver)
     {
-        // R-01 (naming/SRP): values are read brand-scoped via the resolver (spec §3.2/§6).
-        // Response JSON key names are preserved (incl. `srp_*`) for frontend backward-compat;
-        // the DATA SOURCE is now the resolver with unprefixed keys + the brand column.
+        $galleryId = $request->query('gallery_id');
+
+        $pricingStrategy = $resolver->get('pricing_strategy') ?? 'scope_licensing';
+
+        if ($galleryId !== null) {
+            $gallery = Gallery::find($galleryId);
+            if ($gallery !== null) {
+                $pricingStrategy = $gallery->effective_licensing_mode;
+            }
+        }
+
         return response()->json([
             'editorial' => $resolver->get('term_editorial'),
             'commercial' => $resolver->get('term_commercial'),
@@ -157,7 +166,7 @@ class SettingsController extends Controller
                 'srp_setup_fee' => $resolver->get('setup_fee'),
                 'srp_privacy_fee' => $resolver->get('privacy_fee'),
                 'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
-                'pricing_strategy' => $resolver->get('pricing_strategy') ?? 'scope_licensing',
+                'pricing_strategy' => $pricingStrategy,
         ]);
     }
 
