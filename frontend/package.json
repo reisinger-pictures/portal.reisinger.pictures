@@ -6,8 +6,8 @@
     "packageManager": "pnpm@9.15.4",
     "scripts": {
         "dev": "vite",
-        "prebuild": "tsc -b",
-        "build": "vite build",
+    "prebuild": "tsc -b && node scripts/check-i18n.mjs",
+    "build": "vite build",
         "preview": "vite preview",
         "lint": "eslint . --max-warnings 0",
         "lint:fix": "eslint . --fix --max-warnings 0",
@@ -19,8 +19,9 @@
         "test": "vitest",
         "test:run": "vitest run",
         "test:watch": "vitest",
-        "lingui:extract": "lingui extract",
-        "lingui:compile": "lingui compile"
+    "lingui:extract": "lingui extract",
+    "lingui:compile": "lingui compile",
+    "check:i18n": "node scripts/check-i18n.mjs"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.4.0",

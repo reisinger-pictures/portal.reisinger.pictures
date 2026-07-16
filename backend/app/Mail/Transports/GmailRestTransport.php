@@ -47,11 +47,33 @@ class GmailRestTransport extends AbstractTransport
 
             $accessToken = $tokenResponse->json('access_token');
 
-            // 2. E-Mail via REST API senden
+            // 2. E-Mail via REST API senden.
+            // Der Gmail upload-Endpoint erwartet MULTIPART/RELATED (Content-Type
+            // message/rfc822 für den Raw-Teil) — ein reiner JSON-Body mit 'raw'
+            // wird mit "Media type 'application/json' is not supported" (400)
+            // abgelehnt. Wir bauen den Multipart-Body manuell auf.
+            $boundary = 'boundary_' . bin2hex(random_bytes(16));
+            $rawRfc822 = $email->toString();
+
+            $multipartBody = implode("\r\n", [
+                '--' . $boundary,
+                'Content-Type: application/json; charset=UTF-8',
+                '',
+                json_encode(['raw' => $base64Url]),
+                '--' . $boundary,
+                'Content-Type: message/rfc822',
+                '',
+                $rawRfc822,
+                '--' . $boundary . '--',
+                '',
+            ]);
+
             $sendResponse = Http::withToken($accessToken)
-                ->post('https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send', [
-                    'raw' => $base64Url
-                ]);
+                ->withHeaders([
+                    'Content-Type' => 'multipart/related; boundary="' . $boundary . '"',
+                ])
+                ->withBody($multipartBody, 'multipart/related; boundary="' . $boundary . '"')
+                ->post('https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart');
 
             if (!$sendResponse->successful()) {
                 throw new Exception('Gmail REST API rejected the message: ' . $sendResponse->body());
