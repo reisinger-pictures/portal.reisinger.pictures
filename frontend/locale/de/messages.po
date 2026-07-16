@@ -104,6 +104,14 @@ msgid "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
 msgstr "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
 
 #: src/ui/client/components/CartItemList.tsx
+msgid "{nextCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {nextLabel}"
+msgstr "{nextCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {nextLabel}"
+
+#: src/ui/client/components/VolumeLicensingCard.tsx
+msgid "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
+msgstr "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
+
+#: src/ui/client/components/CartItemList.tsx
 msgid "{pricePerItemStr} pro Bild (Tier {tierNum})"
 msgstr "{pricePerItemStr} pro Bild (Tier {tierNum})"
 
@@ -262,8 +270,8 @@ msgstr "Ab 20 Bilder"
 #: src/ui/management/components/TextSnippetModal.tsx
 #: src/ui/management/components/UserPermissionsModal.tsx
 #: src/ui/management/ManagementOrdersView.tsx
-#: src/ui/management/ManagementTenantDetailView.tsx
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Abbrechen"
 msgstr "Abbrechen"
 
@@ -271,7 +279,7 @@ msgstr "Abbrechen"
 msgid "Ablaufdatum"
 msgstr "Ablaufdatum"
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Ablehnen"
 msgstr "Ablehnen"
 
@@ -287,7 +295,7 @@ msgstr "Abonnierte Einzel-Galerien"
 msgid "Abonnierte Ordner (Meta-Galerien)"
 msgstr "Abonnierte Ordner (Meta-Galerien)"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Abrechnung"
 msgstr "Abrechnung"
 
@@ -307,11 +315,11 @@ msgstr "Abrechnungslauf starten?"
 msgid "Abschließen"
 msgstr "Abschließen"
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Account aktivieren & Beitreten"
 msgstr "Account aktivieren & Beitreten"
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Account erstellen"
 msgstr "Account erstellen"
 
@@ -544,7 +552,7 @@ msgstr "Ausbezahlt"
 msgid "Ausständig / Angebot"
 msgstr "Ausständig / Angebot"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Ausstehende Lieferscheine werden nun gebündelt, eine P-Rechnungsnummer erzeugt und als PDF an deine E-Mail versendet."
 msgstr "Ausstehende Lieferscheine werden nun gebündelt, eine P-Rechnungsnummer erzeugt und als PDF an deine E-Mail versendet."
 
@@ -573,16 +581,16 @@ msgstr "Auswertungen"
 msgid "Auszahlung"
 msgstr "Auszahlung"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Auszustellende Sammelrechnung"
 msgstr "Auszustellende Sammelrechnung"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Auto-Join Domain"
 msgstr "Auto-Join Domain"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Auto-Join Policy"
 msgstr "Auto-Join Policy"
 
@@ -595,12 +603,12 @@ msgid "Automatischer Refresh für Besucher alle 10 Sekunden."
 msgstr "Automatischer Refresh für Besucher alle 10 Sekunden."
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
-msgid "B2C Flex-Paket"
-msgstr "B2C Flex-Paket"
+#~ msgid "B2C Flex-Paket"
+#~ msgstr "B2C Flex-Paket"
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
-msgid "B2C Flex-Paket Rechner"
-msgstr "B2C Flex-Paket Rechner"
+#~ msgid "B2C Flex-Paket Rechner"
+#~ msgstr "B2C Flex-Paket Rechner"
 
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "Backend:"
@@ -642,7 +650,7 @@ msgstr "Beigetreten"
 msgid "Beim Download hochauflösender Bilder wird Ihr Name bzw. Ihre Kennung sowie ein Verweis auf unsere Nutzungsbedingungen technisch in die Metadaten (IPTC/EXIF) der Bilddatei eingebettet. Dies dient dem Schutz vor unautorisierter Weitergabe und Leaks."
 msgstr "Beim Download hochauflösender Bilder wird Ihr Name bzw. Ihre Kennung sowie ein Verweis auf unsere Nutzungsbedingungen technisch in die Metadaten (IPTC/EXIF) der Bilddatei eingebettet. Dies dient dem Schutz vor unautorisierter Weitergabe und Leaks."
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Beitreten & Fortfahren"
 msgstr "Beitreten & Fortfahren"
 
@@ -909,6 +917,10 @@ msgstr "Bitte wähle eine Rolle"
 msgid "Brand-Logo konnte nicht geladen werden."
 msgstr "Brand-Logo konnte nicht geladen werden."
 
+#: src/ui/components/GalleryModal.tsx
+msgid "Brand-Standard"
+msgstr "Brand-Standard"
+
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Brand-Zuweisung"
 msgstr "Brand-Zuweisung"
@@ -1023,7 +1035,7 @@ msgstr "DE"
 msgid "Deaktivieren"
 msgstr "Deaktivieren"
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Deaktiviert"
 msgstr "Deaktiviert"
 
@@ -1046,7 +1058,7 @@ msgstr "Dein Logo wird als Wasserzeichen zentriert über das Originalbild gelegt
 #: src/ui/ContractJoinView.tsx
 #: src/ui/InviteView.tsx
 #: src/ui/management/components/ProfileSettingsCard.tsx
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Dein Name"
 msgstr "Dein Name"
 
@@ -1066,13 +1078,13 @@ msgstr "Dein Warenkorb ist leer."
 msgid "Deine Berechtigung erlaubt keine Upgrade-Käufe."
 msgstr "Deine Berechtigung erlaubt keine Upgrade-Käufe."
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Deine Bestellungen können über die Organisation abgerechnet werden"
 msgstr "Deine Bestellungen können über die Organisation abgerechnet werden"
 
 #: src/ui/ContractJoinView.tsx
 #: src/ui/InviteView.tsx
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Deine E-Mail"
 msgstr "Deine E-Mail"
 
@@ -1122,7 +1134,7 @@ msgstr "Der Gast wird direkt ohne Anmeldung durchgewunken."
 msgid "Der Medieninhaber übernimmt keine Haftung für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte dieser Website. Trotz sorgfältiger Kontrolle wird keine Haftung für die Inhalte externer Links übernommen. Für den Inhalt verlinkter Seiten sind ausschließlich deren Betreiber verantwortlich."
 msgstr "Der Medieninhaber übernimmt keine Haftung für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte dieser Website. Trotz sorgfältiger Kontrolle wird keine Haftung für die Inhalte externer Links übernommen. Für den Inhalt verlinkter Seiten sind ausschließlich deren Betreiber verantwortlich."
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen und wird automatisch dieser Organisation zugewiesen."
 msgstr "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen und wird automatisch dieser Organisation zugewiesen."
 
@@ -1183,7 +1195,7 @@ msgid "Dieser Bereich ist aktuell für <0>alle Fotografen</0> freigegeben. Du mu
 msgstr "Dieser Bereich ist aktuell für <0>alle Fotografen</0> freigegeben. Du musst keine expliziten Zuweisungen vornehmen."
 
 #: src/ui/InviteView.tsx
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Dieser Einladungslink ist ungültig oder abgelaufen."
 msgstr "Dieser Einladungslink ist ungültig oder abgelaufen."
 
@@ -1219,11 +1231,15 @@ msgstr "Downloads Gesamt"
 msgid "Du bist aktuell keinen speziellen Ordnern oder privaten Galerien zugewiesen."
 msgstr "Du bist aktuell keinen speziellen Ordnern oder privaten Galerien zugewiesen."
 
-#: src/ui/TenantInviteView.tsx
-msgid "Du bist dabei, <0>{tenantName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
-msgstr "Du bist dabei, <0>{tenantName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
+#: src/ui/OrgInviteView.tsx
+msgid "Du bist dabei, <0>{orgName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
+msgstr "Du bist dabei, <0>{orgName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
 
 #: src/ui/TenantInviteView.tsx
+#~ msgid "Du bist dabei, <0>{tenantName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
+#~ msgstr "Du bist dabei, <0>{tenantName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
+
+#: src/ui/OrgInviteView.tsx
 msgid "Du erhältst Zugriff auf freigeschaltete Galerien"
 msgstr "Du erhältst Zugriff auf freigeschaltete Galerien"
 
@@ -1239,14 +1255,18 @@ msgstr "Du hast bisher noch keine Abrechnungen erhalten."
 msgid "Du hast noch keine eigenen Galerien oder Bilder."
 msgstr "Du hast noch keine eigenen Galerien oder Bilder."
 
+#: src/ui/OrgInviteView.tsx
+msgid "Du wurdest eingeladen, der Organisation <0>{orgName}</0> beizutreten."
+msgstr "Du wurdest eingeladen, der Organisation <0>{orgName}</0> beizutreten."
+
 #: src/ui/TenantInviteView.tsx
-msgid "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten."
-msgstr "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten."
+#~ msgid "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten."
+#~ msgstr "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten."
 
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "E-Mail"
 msgstr "E-Mail"
 
@@ -1256,7 +1276,7 @@ msgstr "E-Mail (wird angedruckt)"
 
 #: src/ui/components/SidebarLoginForm.tsx
 #: src/ui/management/components/CreateUserModal.tsx
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "E-Mail Adresse"
 msgstr "E-Mail Adresse"
 
@@ -1301,19 +1321,19 @@ msgstr "Eingeladen"
 msgid "Einkäufe & Anfragen"
 msgstr "Einkäufe & Anfragen"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Einladen"
 msgstr "Einladen"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Einladung erfolgreich versendet."
 msgstr "Einladung erfolgreich versendet."
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Einladung erforderlich"
 msgstr "Einladung erforderlich"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Einladung Senden"
 msgstr "Einladung Senden"
 
@@ -1325,7 +1345,7 @@ msgstr "Einladung widerrufen?"
 msgid "Einladung wirklich widerrufen? Der Link funktioniert dann nicht mehr."
 msgstr "Einladung wirklich widerrufen? Der Link funktioniert dann nicht mehr."
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Einladung zu Organisation"
 msgstr "Einladung zu Organisation"
 
@@ -1339,7 +1359,7 @@ msgstr "Einladungslink..."
 
 #: src/ui/components/Sidebar.tsx
 #: src/ui/management/ManagementDashboard.tsx
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Einstellungen"
 msgstr "Einstellungen"
 
@@ -1428,13 +1448,17 @@ msgstr "Erstelle ein unverbindliches Angebot für Kunden."
 msgid "Erstelle eine freie PDF-Rechnung."
 msgstr "Erstelle eine freie PDF-Rechnung."
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Erstellen"
 msgstr "Erstellen"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Erstellt"
 msgstr "Erstellt"
+
+#: src/ui/management/ManagementContractView.tsx
+msgid "Erstellt am"
+msgstr "Erstellt am"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Erstellt:"
@@ -1477,7 +1501,7 @@ msgstr "Fehler bei der Stadt-Validierung für \"{detectedCity}\"."
 msgid "Fehler beim Auslesen."
 msgstr "Fehler beim Auslesen."
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Fehler beim Beitreten."
 msgstr "Fehler beim Beitreten."
 
@@ -1489,7 +1513,7 @@ msgstr "Fehler beim Beitritt."
 msgid "Fehler beim Checkout."
 msgstr "Fehler beim Checkout."
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Fehler beim Erstellen"
 msgstr "Fehler beim Erstellen"
 
@@ -1574,6 +1598,10 @@ msgstr "Fehler beim Senden"
 msgid "Fehler beim Senden der Benachrichtigung."
 msgstr "Fehler beim Senden der Benachrichtigung."
 
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "Fehler beim Senden: {mailError}"
+msgstr "Fehler beim Senden: {mailError}"
+
 #: src/ui/ResetPassword.tsx
 msgid "Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen."
 msgstr "Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen."
@@ -1617,7 +1645,7 @@ msgstr "Fehler beim Speichern."
 msgid "Fehler beim Umschalten"
 msgstr "Fehler beim Umschalten"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Fehler beim Versenden der Einladung."
 msgstr "Fehler beim Versenden der Einladung."
 
@@ -1672,6 +1700,10 @@ msgstr "Flatrate"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Flatrate-Pools"
 msgstr "Flatrate-Pools"
+
+#: src/ui/management/components/ShootingCalculatorModal.tsx
+msgid "Flex Tarif Rechner"
+msgstr "Flex Tarif Rechner"
 
 #: src/ui/client/DeliveryView.tsx
 msgid "Format"
@@ -1946,6 +1978,10 @@ msgstr "Gutscheincode gelöscht"
 msgid "Gutscheincode löschen?"
 msgstr "Gutscheincode löschen?"
 
+#: src/ui/management/ManagementCouponsView.tsx
+msgid "Gutscheincodes erfordern Volume-Licensing als Preisstrategie."
+msgstr "Gutscheincodes erfordern Volume-Licensing als Preisstrategie."
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Gutscheincodes können eingelöst werden"
 msgstr "Gutscheincodes können eingelöst werden"
@@ -1955,8 +1991,8 @@ msgid "Gutscheincodes sind deaktiviert"
 msgstr "Gutscheincodes sind deaktiviert"
 
 #: src/ui/management/ManagementCouponsView.tsx
-msgid "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
-msgstr "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
+#~ msgid "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
+#~ msgstr "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
 
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Gutschrift erstellt (Bitte Rechnung legen)"
@@ -1971,8 +2007,12 @@ msgid "Hallo <0>{inviteName}</0>, bitte gib das Galerie-Passwort ein."
 msgstr "Hallo <0>{inviteName}</0>, bitte gib das Galerie-Passwort ein."
 
 #: src/ui/management/ManagementOrdersView.tsx
-msgid "Hallo, hier ist mein Angebot für Ihre speziellen Rechte..."
-msgstr "Hallo, hier ist mein Angebot für Ihre speziellen Rechte..."
+#~ msgid "Hallo, hier ist mein Angebot für Ihre speziellen Rechte..."
+#~ msgstr "Hallo, hier ist mein Angebot für Ihre speziellen Rechte..."
+
+#: src/ui/management/ManagementOrdersView.tsx
+msgid "Hallo, hier ist mein Angebot..."
+msgstr "Hallo, hier ist mein Angebot..."
 
 #: src/ui/management/ManagementStructureView.tsx
 msgid "Hauptverzeichnis (Ohne Ordner)"
@@ -2014,7 +2054,7 @@ msgstr "Ich habe den Vertrag gelesen und stimme allen Bedingungen verbindlich zu
 
 #: src/ui/ContractJoinView.tsx
 #: src/ui/InviteView.tsx
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Ich habe die <0>Datenschutzerklärung</0> gelesen und akzeptiert."
 msgstr "Ich habe die <0>Datenschutzerklärung</0> gelesen und akzeptiert."
 
@@ -2102,6 +2142,10 @@ msgstr "Inkludiertes Flatrate-Level"
 msgid "Inklusive"
 msgstr "Inklusive"
 
+#: src/ui/management/ManagementContractView.tsx
+msgid "Instanzen"
+msgstr "Instanzen"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "IPTC Metadaten"
 msgstr "IPTC Metadaten"
@@ -2123,6 +2167,10 @@ msgstr "Jahr"
 msgid "Jeder Account benötigt eine Brand-Zuweisung (U-02)."
 msgstr "Jeder Account benötigt eine Brand-Zuweisung (U-02)."
 
+#: src/ui/management/ManagementContractView.tsx
+msgid "Jeder Unterzeichner erhält eine eigene Instanz"
+msgstr "Jeder Unterzeichner erhält eine eigene Instanz"
+
 #: src/ui/client/components/StripeCheckoutForm.tsx
 msgid "Jetzt bezahlen"
 msgstr "Jetzt bezahlen"
@@ -2130,6 +2178,10 @@ msgstr "Jetzt bezahlen"
 #: src/ui/management/ManagementContractView.tsx
 msgid "Join-Link"
 msgstr "Join-Link"
+
+#: src/ui/management/ManagementContractView.tsx
+msgid "Join-Link gültig bis"
+msgstr "Join-Link gültig bis"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Kalkulieren & Antworten"
@@ -2155,7 +2207,7 @@ msgstr "Keine"
 msgid "Keine Angabe"
 msgstr "Keine Angabe"
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Keine Auto-Join Domain"
 msgstr "Keine Auto-Join Domain"
 
@@ -2236,6 +2288,10 @@ msgstr "Keine Kunden gefunden."
 msgid "Keine Nutzer gefunden, die \"{searchTerm}\" entsprechen."
 msgstr "Keine Nutzer gefunden, die \"{searchTerm}\" entsprechen."
 
+#: src/ui/components/GalleryModal.tsx
+msgid "Keine Organisationen verfügbar"
+msgstr "Keine Organisationen verfügbar"
+
 #: src/ui/SearchView.tsx
 msgid "Keine passenden Fotos gefunden."
 msgstr "Keine passenden Fotos gefunden."
@@ -2265,7 +2321,6 @@ msgid "Keine Schlagwörter"
 msgstr "Keine Schlagwörter"
 
 #: src/ui/components/GalleryGroupModal.tsx
-#: src/ui/components/GalleryModal.tsx
 msgid "Keine spezifische Organisation"
 msgstr "Keine spezifische Organisation"
 
@@ -2329,7 +2384,7 @@ msgstr "KI-Vorschlag geladen — jetzt prüfen und speichern."
 msgid "KI-Vorschlag geladen."
 msgstr "KI-Vorschlag geladen."
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "kollege@firma.de"
 msgstr "kollege@firma.de"
 
@@ -2555,6 +2610,10 @@ msgstr "Lizenz wählen"
 msgid "Lizenzierte Bilder als ZIP herunterladen"
 msgstr "Lizenzierte Bilder als ZIP herunterladen"
 
+#: src/ui/components/GalleryModal.tsx
+msgid "Lizenzierungsmodus"
+msgstr "Lizenzierungsmodus"
+
 #: src/ui/components/SidebarLoginForm.tsx
 msgid "Login"
 msgstr "Login"
@@ -2582,7 +2641,7 @@ msgstr "Lokal:"
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 #: src/ui/management/ManagementTextSnippetsView.tsx
 #: src/ui/PhotoDetailView.tsx
 msgid "Löschen"
@@ -2655,6 +2714,10 @@ msgstr "Mehr laden"
 #: src/ui/management/ManagementContractView.tsx
 msgid "Mehrere Rollen pro Unterzeichner erlauben"
 msgstr "Mehrere Rollen pro Unterzeichner erlauben"
+
+#: src/ui/management/ManagementContractView.tsx
+msgid "Mehrere Unterzeichner auf einem Vertrag"
+msgstr "Mehrere Unterzeichner auf einem Vertrag"
 
 #: src/ui/ContractJoinView.tsx
 msgid "Mehrfachauswahl möglich"
@@ -2747,7 +2810,7 @@ msgstr "Mindestens 2 Zeichen"
 msgid "Mindestens 3 Zeichen"
 msgstr "Mindestens 3 Zeichen"
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Mindestens 8 Zeichen"
 msgstr "Mindestens 8 Zeichen"
 
@@ -2838,12 +2901,20 @@ msgid "Muss positiv sein"
 msgstr "Muss positiv sein"
 
 #: src/ui/management/ManagementContractView.tsx
+msgid "Nach Ablauf kann niemand mehr über den Link beitreten"
+msgstr "Nach Ablauf kann niemand mehr über den Link beitreten"
+
+#: src/ui/management/ManagementContractView.tsx
 msgid "Nach dem Schließen können keine weiteren Unterzeichner beitreten oder unterschreiben. Fortfahren?"
 msgstr "Nach dem Schließen können keine weiteren Unterzeichner beitreten oder unterschreiben. Fortfahren?"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Nach dem Start kann der Vertrag nicht mehr bearbeitet werden. Der generierte Join-Link wird an die Unterzeichner weitergegeben. Fortfahren?"
 msgstr "Nach dem Start kann der Vertrag nicht mehr bearbeitet werden. Der generierte Join-Link wird an die Unterzeichner weitergegeben. Fortfahren?"
+
+#: src/ui/management/ManagementContractView.tsx
+msgid "Nach dem Start kann die Vorlage über den Join-Link von mehreren Personen signiert werden. Jeder Unterzeichner erhält eine eigene Vertragsinstanz. Fortfahren?"
+msgstr "Nach dem Start kann die Vorlage über den Join-Link von mehreren Personen signiert werden. Jeder Unterzeichner erhält eine eigene Vertragsinstanz. Fortfahren?"
 
 #: src/ui/management/components/EmailComposerModal.tsx
 msgid "Nachricht"
@@ -2871,7 +2942,7 @@ msgstr "Nachricht Senden"
 msgid "Name"
 msgstr "Name"
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Name (z.B. Firma XYZ)"
 msgstr "Name (z.B. Firma XYZ)"
 
@@ -2934,11 +3005,11 @@ msgstr "Neue Galerie"
 msgid "Neue Meta-Galerie erstellen"
 msgstr "Neue Meta-Galerie erstellen"
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Neue Organisation"
 msgstr "Neue Organisation"
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Neue Organisation anlegen"
 msgstr "Neue Organisation anlegen"
 
@@ -3018,8 +3089,8 @@ msgstr "Nicht verfügbar"
 #~ msgstr "Noch {0} {1} bis {2}"
 
 #: src/ui/client/components/CartItemList.tsx
-msgid "Noch {nextCount} {nextPlural} bis {nextLabel}"
-msgstr "Noch {nextCount} {nextPlural} bis {nextLabel}"
+#~ msgid "Noch {nextCount} {nextPlural} bis {nextLabel}"
+#~ msgstr "Noch {nextCount} {nextPlural} bis {nextLabel}"
 
 #. placeholder {0}: nextTierCount === 1 ? '' : 'er'
 #: src/ui/client/components/VolumeLicensingCard.tsx
@@ -3027,8 +3098,8 @@ msgstr "Noch {nextCount} {nextPlural} bis {nextLabel}"
 #~ msgstr "Noch {nextTierCount} Bild{0} bis zum nächsten Rabatt:"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
-msgid "Noch {nextTierCount} Bild{nextTierPlural} bis zum nächsten Rabatt:"
-msgstr "Noch {nextTierCount} Bild{nextTierPlural} bis zum nächsten Rabatt:"
+#~ msgid "Noch {nextTierCount} Bild{nextTierPlural} bis zum nächsten Rabatt:"
+#~ msgstr "Noch {nextTierCount} Bild{nextTierPlural} bis zum nächsten Rabatt:"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Noch keine Bestellungen im System."
@@ -3081,7 +3152,7 @@ msgstr "Nutzer angelegt! Eine E-Mail zur Einrichtung wurde verschickt."
 msgid "Nutzer anlegen & Einladen"
 msgstr "Nutzer anlegen & Einladen"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Nutzer in Organisation einladen"
 msgstr "Nutzer in Organisation einladen"
 
@@ -3100,6 +3171,10 @@ msgstr "Nutzer-Zugriff verwalten"
 #: src/ui/management/ManagementUserView.tsx
 msgid "Nutzerrechte gespeichert."
 msgstr "Nutzerrechte gespeichert."
+
+#: src/ui/management/ManagementOrdersView.tsx
+msgid "Nutzungsrechte (optional)"
+msgstr "Nutzungsrechte (optional)"
 
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Ø Sterne"
@@ -3125,7 +3200,7 @@ msgstr "Offen (Jeder Fotograf hat Zugriff)"
 msgid "Offen / Rechnung"
 msgstr "Offen / Rechnung"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Offene Lieferscheine"
 msgstr "Offene Lieferscheine"
 
@@ -3145,7 +3220,7 @@ msgstr "Öffentliche Entdeckungen"
 msgid "Öffnen"
 msgstr "Öffnen"
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "ohne @"
 msgstr "ohne @"
 
@@ -3186,7 +3261,7 @@ msgstr "Ordner erfolgreich gelöscht."
 msgid "Ordner ist leer."
 msgstr "Ordner ist leer."
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Org-Administratoren sehen deine Bestellungen"
 msgstr "Org-Administratoren sehen deine Bestellungen"
 
@@ -3195,24 +3270,24 @@ msgstr "Org-Administratoren sehen deine Bestellungen"
 msgid "Organisation"
 msgstr "Organisation"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Organisation aktualisiert."
 msgstr "Organisation aktualisiert."
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Organisation erstellt"
 msgstr "Organisation erstellt"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Organisation löschen?"
 msgstr "Organisation löschen?"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Organisation nicht gefunden."
 msgstr "Organisation nicht gefunden."
 
 #: src/ui/components/Sidebar.tsx
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Organisationen"
 msgstr "Organisationen"
 
@@ -3220,11 +3295,11 @@ msgstr "Organisationen"
 msgid "Organisations-Filter"
 msgstr "Organisations-Filter"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Organisations-Name"
 msgstr "Organisations-Name"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Organisations-Verwaltung"
 msgstr "Organisations-Verwaltung"
 
@@ -3288,7 +3363,7 @@ msgstr "Passwort bestätigen"
 msgid "Passwort erforderlich"
 msgstr "Passwort erforderlich"
 
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "Passwort festlegen"
 msgstr "Passwort festlegen"
 
@@ -3370,8 +3445,8 @@ msgid "Preis / Stück"
 msgstr "Preis / Stück"
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
-msgid "Premium Tarif"
-msgstr "Premium Tarif"
+#~ msgid "Premium Tarif"
+#~ msgstr "Premium Tarif"
 
 #: src/ui/client/DeliveryView.tsx
 msgid "Print (A4)"
@@ -3473,7 +3548,7 @@ msgstr "Rechnung"
 msgid "Rechnung als PDF herunterladen"
 msgstr "Rechnung als PDF herunterladen"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Rechnungs-Rhythmus"
 msgstr "Rechnungs-Rhythmus"
 
@@ -3543,15 +3618,15 @@ msgstr "Sammelansicht aller Fotos. Uploads sind nur in den Untergalerien möglic
 #~ msgid "Sammelrechnung {0} mit {1} Positionen erfolgreich erstellt."
 #~ msgstr "Sammelrechnung {0} mit {1} Positionen erfolgreich erstellt."
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Sammelrechnung {invoiceNumber} mit {processedOrders} Positionen erfolgreich erstellt."
 msgstr "Sammelrechnung {invoiceNumber} mit {processedOrders} Positionen erfolgreich erstellt."
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Sammelrechnung erstellen"
 msgstr "Sammelrechnung erstellen"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Sammelrechnung erstellen?"
 msgstr "Sammelrechnung erstellen?"
 
@@ -3577,6 +3652,10 @@ msgstr "Schließen"
 msgid "Scope"
 msgstr "Scope"
 
+#: src/ui/components/GalleryModal.tsx
+msgid "Scope-Lizenzierung"
+msgstr "Scope-Lizenzierung"
+
 #: src/ui/components/Pagination.tsx
 msgid "Seite {page} von {lastPage}"
 msgstr "Seite {page} von {lastPage}"
@@ -3584,6 +3663,10 @@ msgstr "Seite {page} von {lastPage}"
 #: src/ui/ContractSignView.tsx
 msgid "Seite neu laden"
 msgstr "Seite neu laden"
+
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "Sendet eine Test-E-Mail über den konfigurierten Mailer an deine eigene (Administrator-)Adresse."
+msgstr "Sendet eine Test-E-Mail über den konfigurierten Mailer an deine eigene (Administrator-)Adresse."
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Server:"
@@ -3614,8 +3697,8 @@ msgid "Shares gesamt:"
 msgstr "Shares gesamt:"
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
-msgid "Shooting-Paket Kalkulator"
-msgstr "Shooting-Paket Kalkulator"
+#~ msgid "Shooting-Paket Kalkulator"
+#~ msgstr "Shooting-Paket Kalkulator"
 
 #: src/ui/components/Sidebar.tsx
 msgid "Shop-Bestellungen"
@@ -3637,7 +3720,11 @@ msgstr "Sichtbarkeits-Vorgabe"
 msgid "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
 msgstr "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "SMTP-Verbindungstest"
+msgstr "SMTP-Verbindungstest"
+
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Sofort (automatisch)"
 msgstr "Sofort (automatisch)"
 
@@ -3658,8 +3745,8 @@ msgstr "Sonderanfrage (Angebot)"
 #: src/ui/management/components/ProductModal.tsx
 #: src/ui/management/components/TextSnippetModal.tsx
 #: src/ui/management/components/UserPermissionsModal.tsx
-#: src/ui/management/ManagementTenantDetailView.tsx
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 #: src/ui/PhotoDetailView.tsx
 msgid "Speichern"
 msgstr "Speichern"
@@ -3681,8 +3768,8 @@ msgid "Spezifischer Bild-Kontext"
 msgstr "Spezifischer Bild-Kontext"
 
 #: src/ui/management/components/UserPermissionsModal.tsx
-msgid "SRP (buy.reisinger.pictures)"
-msgstr "SRP (buy.reisinger.pictures)"
+#~ msgid "SRP (buy.reisinger.pictures)"
+#~ msgstr "SRP (buy.reisinger.pictures)"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
@@ -3712,7 +3799,11 @@ msgstr "Standard"
 msgid "Standard Lizenz"
 msgstr "Standard Lizenz"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/components/ShootingCalculatorModal.tsx
+msgid "Standard Tarif Rechner"
+msgstr "Standard Tarif Rechner"
+
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Standard-Flatrate-Level"
 msgstr "Standard-Flatrate-Level"
 
@@ -3723,6 +3814,10 @@ msgstr "Standard-Metadaten beim Upload anwenden"
 #: src/ui/management/components/ProfileSettingsCard.tsx
 msgid "Standard-Urheber (IPTC Copyright)"
 msgstr "Standard-Urheber (IPTC Copyright)"
+
+#: src/ui/management/ManagementContractView.tsx
+msgid "Standard-Vertrag"
+msgstr "Standard-Vertrag"
 
 #: src/ui/management/components/ProductModal.tsx
 msgid "Standard-Wert"
@@ -3840,6 +3935,14 @@ msgstr "Teile diesen Link mit den Unterzeichnern:"
 msgid "Telefon: [Telefonnummer]"
 msgstr "Telefon: [Telefonnummer]"
 
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "Test-E-Mail gesendet an {sentTo}."
+msgstr "Test-E-Mail gesendet an {sentTo}."
+
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "Test-E-Mail senden"
+msgstr "Test-E-Mail senden"
+
 #: src/ui/management/components/TextSnippetModal.tsx
 msgid "Textbaustein bearbeiten"
 msgstr "Textbaustein bearbeiten"
@@ -3896,6 +3999,7 @@ msgstr "Top Domains"
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/components/ProductModal.tsx
+#: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Typ"
@@ -3964,6 +4068,7 @@ msgid "Unbekannt"
 msgstr "Unbekannt"
 
 #: src/ui/components/ErrorBoundary.tsx
+#: src/ui/management/ManagementSettingsView.tsx
 msgid "Unbekannter Fehler"
 msgstr "Unbekannter Fehler"
 
@@ -4064,6 +4169,7 @@ msgid "Version wiederherstellen?"
 msgstr "Version wiederherstellen?"
 
 #: src/ui/ContractSignView.tsx
+#: src/ui/management/ManagementContractView.tsx
 msgid "Vertrag"
 msgstr "Vertrag"
 
@@ -4131,6 +4237,10 @@ msgstr "Vertragsperiode starten"
 msgid "Vertragsperiode wurde gestartet."
 msgstr "Vertragsperiode wurde gestartet."
 
+#: src/ui/management/ManagementContractView.tsx
+msgid "Vertragstyp"
+msgstr "Vertragstyp"
+
 #: src/ui/ContractJoinView.tsx
 msgid "Vertraulich ansehen & unterschreiben"
 msgstr "Vertraulich ansehen & unterschreiben"
@@ -4155,7 +4265,7 @@ msgstr "Verwalte Flatrate-Pools und Fotografen-Auszahlungen."
 msgid "Verwalte hier, für welche Galerien und Ordner du E-Mail-Updates erhalten möchtest."
 msgstr "Verwalte hier, für welche Galerien und Ordner du E-Mail-Updates erhalten möchtest."
 
-#: src/ui/management/ManagementTenantsView.tsx
+#: src/ui/management/ManagementOrgsView.tsx
 msgid "Verwalte Organisationen, deren Mitarbeiter und Sammelrechnungen."
 msgstr "Verwalte Organisationen, deren Mitarbeiter und Sammelrechnungen."
 
@@ -4195,6 +4305,10 @@ msgstr "Via Magic Link"
 msgid "Vielen Dank, {signerName}."
 msgstr "Vielen Dank, {signerName}."
 
+#: src/ui/components/GalleryModal.tsx
+msgid "Volume-Lizenzierung"
+msgstr "Volume-Lizenzierung"
+
 #. placeholder {0}: volumeLicensing.tier
 #: src/ui/client/components/CartItemList.tsx
 #~ msgid "Volumenpreis (Tier {0})"
@@ -4211,6 +4325,10 @@ msgstr "Vor- & Nachname"
 #: src/ui/management/components/ManagementGalleryActions.tsx
 msgid "Vorgaben..."
 msgstr "Vorgaben..."
+
+#: src/ui/management/ManagementContractView.tsx
+msgid "Vorlage"
+msgstr "Vorlage"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Vorschau"
@@ -4347,7 +4465,7 @@ msgstr "Wird durch Meta-Galerie erzwungen"
 msgid "Wird nicht in Suchergebnissen oder Feeds gelistet."
 msgstr "Wird nicht in Suchergebnissen oder Feeds gelistet."
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten)."
 msgstr "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten)."
 
@@ -4377,7 +4495,7 @@ msgstr "z.B. Hochzeitsreportage im Wiener Burggarten, Mai 2026, Paar vor histori
 
 #: src/ui/ContractJoinView.tsx
 #: src/ui/InviteView.tsx
-#: src/ui/TenantInviteView.tsx
+#: src/ui/OrgInviteView.tsx
 msgid "z.B. Maria Muster"
 msgstr "z.B. Maria Muster"
 
@@ -4470,16 +4588,19 @@ msgstr "Ziel-ID"
 msgid "Zugeordnete Galerien"
 msgstr "Zugeordnete Galerien"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Zugeordnete Nutzer"
 msgstr "Zugeordnete Nutzer"
 
 #: src/ui/components/GalleryGroupModal.tsx
-#: src/ui/components/GalleryModal.tsx
 msgid "Zugeordnete Organisation (Verschieben)"
 msgstr "Zugeordnete Organisation (Verschieben)"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/components/GalleryModal.tsx
+msgid "Zugeordnete Organisationen"
+msgstr "Zugeordnete Organisationen"
+
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Zugewiesene Meta-Galerien"
 msgstr "Zugewiesene Meta-Galerien"
 
@@ -4558,15 +4679,15 @@ msgstr "Zusatztexte / Sonderkonditionen"
 msgid "Zustimmung erforderlich"
 msgstr "Zustimmung erforderlich"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Zuweisungen"
 msgstr "Zuweisungen"
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Zuweisungen gespeichert."
 msgstr "Zuweisungen gespeichert."
 
-#: src/ui/management/ManagementTenantDetailView.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Zuweisungen speichern"
 msgstr "Zuweisungen speichern"
 
