@@ -53,7 +53,37 @@ services:
     command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
 
   backend:
-    image: ghcr.io/reisi007/php-apache-mod2rewrite-exiftool-maria-pdo:8.5
+    build:
+      dockerfile_inline: |
+        FROM php:8.5-apache
+
+        RUN apt-get update && apt-get install -y \
+            libapache2-mod-xsendfile \
+            libicu-dev \
+            libfreetype6-dev \
+            libjpeg62-turbo-dev \
+            libpng-dev \
+            libwebp-dev \
+            libzip-dev \
+            libimage-exiftool-perl \
+            --no-install-recommends \
+            && docker-php-ext-configure intl \
+            && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+            && docker-php-ext-install -j$(nproc) intl gd zip exif pdo_mysql \
+            && rm -r /var/lib/apt/lists/*
+
+        RUN a2enmod rewrite xsendfile
+
+        RUN echo "XSendFile On\nXSendFilePath /var/www" > /etc/apache2/conf-available/xsendfile.conf \
+            && a2enconf xsendfile
+
+        WORKDIR /var/www/html
+        RUN chown -R www-data:www-data /var/www/html
+
+        RUN echo "memory_limit = 1024M" > /usr/local/etc/php/conf.d/portal.ini \
+            && echo "upload_max_filesize = 64M" >> /usr/local/etc/php/conf.d/portal.ini \
+            && echo "post_max_size = 64M" >> /usr/local/etc/php/conf.d/portal.ini \
+            && echo "max_execution_time = 600" >> /usr/local/etc/php/conf.d/portal.ini
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
