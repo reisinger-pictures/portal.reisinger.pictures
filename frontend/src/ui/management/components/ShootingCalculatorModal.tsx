@@ -42,7 +42,11 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
             type: srpType,
             setup: srpSetup,
             extraImages: srpExtra,
-            isFullyPrivate: srpPrivate
+            isFullyPrivate: srpPrivate,
+            srp_base_price: terms?.srp_base_price ? String(Number(terms.srp_base_price) / 100) : undefined,
+            srp_setup_fee: terms?.srp_setup_fee ? String(Number(terms.srp_setup_fee) / 100) : undefined,
+            srp_privacy_fee: terms?.srp_privacy_fee ? String(Number(terms.srp_privacy_fee) / 100) : undefined,
+            srp_extra_image_fee: terms?.srp_extra_image_fee ? String(Number(terms.srp_extra_image_fee) / 100) : undefined,
         });
         packagePriceEuro = res.packagePrice;
         finalPriceEuro = res.finalPrice;

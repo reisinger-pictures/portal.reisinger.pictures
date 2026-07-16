@@ -35,10 +35,10 @@ function mapApiToForm(terms: { [key: string]: string | undefined }): CalculatorS
         calc_images_per_hour: safeParseInt(terms.calc_images_per_hour, DEFAULT_IMAGES_PER_HOUR),
         calc_outdoor_multiplier: safeParseFloat(terms.calc_outdoor_multiplier, parseFloat(DEFAULT_OUTDOOR_MULTIPLIER)) * 100,
         calc_flatrate_surcharge: Math.round((flatrateMultiplier - 1) * 100),
-        srp_base_price: safeParseFloat(terms.srp_base_price, DEFAULT_SRP_BASE_PRICE),
-        srp_setup_fee: safeParseFloat(terms.srp_setup_fee, DEFAULT_SRP_SETUP_FEE),
-        srp_privacy_fee: safeParseFloat(terms.srp_privacy_fee, DEFAULT_SRP_PRIVACY_FEE),
-        srp_extra_image_fee: safeParseFloat(terms.srp_extra_image_fee, DEFAULT_SRP_EXTRA_IMAGE_FEE),
+        srp_base_price: safeParseFloat(terms.srp_base_price, DEFAULT_SRP_BASE_PRICE) / 100,
+        srp_setup_fee: safeParseFloat(terms.srp_setup_fee, DEFAULT_SRP_SETUP_FEE) / 100,
+        srp_privacy_fee: safeParseFloat(terms.srp_privacy_fee, DEFAULT_SRP_PRIVACY_FEE) / 100,
+        srp_extra_image_fee: safeParseFloat(terms.srp_extra_image_fee, DEFAULT_SRP_EXTRA_IMAGE_FEE) / 100,
     };
 }
 
@@ -49,10 +49,10 @@ function mapFormToApi(data: CalculatorSettingsFormValues): Record<string, number
         calc_images_per_hour: data.calc_images_per_hour,
         calc_outdoor_multiplier: data.calc_outdoor_multiplier / 100,
         calc_flatrate_multiplier: 1 + (data.calc_flatrate_surcharge / 100),
-        srp_base_price: data.srp_base_price,
-        srp_setup_fee: data.srp_setup_fee,
-        srp_privacy_fee: data.srp_privacy_fee,
-        srp_extra_image_fee: data.srp_extra_image_fee,
+        srp_base_price: Math.round(data.srp_base_price * 100),
+        srp_setup_fee: Math.round(data.srp_setup_fee * 100),
+        srp_privacy_fee: Math.round(data.srp_privacy_fee * 100),
+        srp_extra_image_fee: Math.round(data.srp_extra_image_fee * 100),
     };
 }
 

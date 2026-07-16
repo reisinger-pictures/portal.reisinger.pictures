@@ -104,7 +104,8 @@ class DatabaseSeeder extends Seeder
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_images_per_hour', 'brand' => $brandCode], ['value' => '6']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_outdoor_multiplier', 'brand' => $brandCode], ['value' => '0.5']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_flatrate_multiplier', 'brand' => $brandCode], ['value' => '1.2']);
-        // Per-image license base prices (used by SRP/Calculator; defaults match V010 comments).
+        // Per-image license base prices (used by SRP/Calculator). Values are stored in CENTS
+        // (the frontend CalculatorSettingsCard divides srp_* by 100 for Euro display).
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'base_price', 'brand' => $brandCode], ['value' => '8000']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'setup_fee', 'brand' => $brandCode], ['value' => '5000']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'privacy_fee', 'brand' => $brandCode], ['value' => '20000']);
