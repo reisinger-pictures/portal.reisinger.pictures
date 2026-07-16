@@ -11,6 +11,8 @@ readonly class BrandConfig
         public string $portalName,
         public ?string $impressumUrl,
         public ?string $logoPath,
+        public ?string $logoEmailPath,
+        public ?string $logoEmailPath2x,
         public array $features,
         public array $hostnames,
         public bool $isActive = true,

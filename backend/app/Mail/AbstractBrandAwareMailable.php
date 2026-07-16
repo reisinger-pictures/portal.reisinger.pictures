@@ -37,7 +37,10 @@ abstract class AbstractBrandAwareMailable extends Mailable implements ShouldQueu
 
     protected function brandLogoUrl(): string
     {
-        return $this->brandFrontendUrl() . '/android-chrome-192x192.png';
+        $config = $this->brand ? BrandRegistry::configForBrand($this->brand->value) : null;
+        $logoPath = $config?->logoEmailPath ?? '/brands/rp/logo-email-64.png';
+
+        return $this->brandFrontendUrl() . $logoPath;
     }
 
     protected function brandBcc(): string

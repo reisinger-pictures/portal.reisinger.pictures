@@ -7,6 +7,8 @@ return [
         'portal_name' => 'Reisinger Foto Portal',
         'impressum_url' => 'https://reisinger.pictures/impressum/',
         'logo_path' => '/brands/rp/android-chrome-192x192.png',
+        'logo_email_path' => '/brands/rp/logo-email-64.png',
+        'logo_email_path_2x' => '/brands/rp/logo-email-128.png',
         'hostnames' => [
             'portal.reisinger.pictures',
             'rp.localhost',

@@ -162,6 +162,8 @@ class BrandRegistry
             portalName: $data['portal_name'] ?? $id,
             impressumUrl: $data['impressum_url'] ?? null,
             logoPath: $data['logo_path'] ?? null,
+            logoEmailPath: $data['logo_email_path'] ?? null,
+            logoEmailPath2x: $data['logo_email_path_2x'] ?? null,
             features: $data['features'] ?? [],
             hostnames: $data['hostnames'] ?? [],
             isActive: $data['is_active'] ?? true,
