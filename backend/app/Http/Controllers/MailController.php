@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\CustomMail;
 use App\Mail\RatingFinishedMail;
+use App\Mail\TestMail;
 use App\Support\BrandRegistry;
 
 class MailController extends Controller
@@ -50,6 +51,19 @@ class MailController extends Controller
         }
 
         return response()->json(['success' => true, 'notified_count' => $count]);
+    }
+
+    // Super-Admin SMTP-Verbindungstest: sendet eine Test-Mail an die eigene (eingeloggte) Adresse.
+    public function sendTest(Request $request)
+    {
+        $user = auth('api')->user();
+        if (!$user || !$user->email) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        Mail::to($user->email)->queue(new TestMail($user->email));
+
+        return response()->json(['success' => true, 'sent_to' => $user->email]);
     }
 
     // Kunde meldet "Ich bin fertig"

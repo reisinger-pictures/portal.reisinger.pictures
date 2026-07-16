@@ -5,8 +5,11 @@ import LicenseCatalogSettings from './components/LicenseCatalogSettings';
 import BillingDetailsCard from './components/BillingDetailsCard';
 import useSWR from 'swr';
 import {fetcher, SystemInfo} from '../../api';
+import {useState} from 'react';
 import {useBillingDetails} from '../../logic/useLicenseTerms';
 import {usePermissions} from '../../logic/usePermissions';
+import {apiMutate, TestEmailResponse} from '../../api';
+import {useUI} from '../components/UIContext';
 import CalculatorSettingsCard from './components/CalculatorSettingsCard';
 
 declare const __APP_BUILD_TIME__: string;
@@ -16,6 +19,22 @@ export default function ManagementSettingsView() {
     const {billingDetails, isLoading: termsLoading} = useBillingDetails();
     const {isSuperAdmin} = usePermissions();
     const {data: sysInfo} = useSWR<SystemInfo>('/api/management/settings/system', fetcher);
+    const {showToast} = useUI();
+    const [sendingTestMail, setSendingTestMail] = useState(false);
+
+    const handleSendTestMail = async () => {
+        if (!isSuperAdmin) return;
+        setSendingTestMail(true);
+        try {
+            const data = await apiMutate<TestEmailResponse>('/api/management/settings/test-email', 'POST', {});
+            const sentTo = data.sent_to;
+            showToast('success', t`Test-E-Mail gesendet an ${sentTo}.`);
+        } catch (err: unknown) {
+            const mailError = err instanceof Error ? err.message : t`Unbekannter Fehler`;
+            showToast('error', t`Fehler beim Senden: ${mailError}`);
+        }
+        setSendingTestMail(false);
+    };
 
     let reactTime = 'Unbekannt';
     if (typeof __APP_BUILD_TIME__ !== 'undefined') {
@@ -47,6 +66,27 @@ export default function ManagementSettingsView() {
             <WatermarkSettingsCard/>
 
             <CalculatorSettingsCard/>
+
+            {isSuperAdmin && (
+                <div className="card bg-base-100 border border-base-300 shadow-sm">
+                    <div className="card-body">
+                        <h2 className="card-title text-xl"><Trans>SMTP-Verbindungstest</Trans></h2>
+                        <p className="text-sm opacity-70"><Trans>Sendet eine Test-E-Mail über den konfigurierten Mailer an deine eigene (Administrator-)Adresse.</Trans></p>
+                        <div className="card-actions justify-end">
+                            <button
+                                className="btn btn-primary"
+                                data-testid="send-test-email"
+                                disabled={sendingTestMail}
+                                onClick={handleSendTestMail}
+                            >
+                                {sendingTestMail
+                                    ? <span className="loading loading-spinner"></span>
+                                    : <Trans>Test-E-Mail senden</Trans>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="mt-8 pt-8 border-t border-base-300">
                 <div

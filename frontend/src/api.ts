@@ -252,6 +252,7 @@ export interface Order { id: string; user_id?: string; status: string; is_quote_
 export interface CheckoutResponse { success?: boolean; requires_action?: boolean; client_secret?: string; invoice_number: string; order_id?: string; }
 export interface RedeemInviteResponse { full_path?: string; message?: string; requires_mail_verification?: boolean; }
 export interface SendMailResponse { success: boolean; notified_count: number; }
+export interface TestEmailResponse { success: boolean; sent_to: string; }
 export interface GenerateInviteResponse { success: boolean; link: string; }
 export interface InviteData { id: string; name: string; token: string; }
 export interface RatingData { lr_uuid?: string; filename?: string; avg_rating?: number; all_comments?: string; thumb_url?: string; user_id?: string; name?: string; email?: string; rated_count?: number; }

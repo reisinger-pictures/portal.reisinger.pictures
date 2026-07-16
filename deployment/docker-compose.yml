@@ -85,7 +85,27 @@ services:
       - LOG_CHANNEL=stderr
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      # ---
+      # E-Mail-Versand (SMTP vs. Gmail REST)
+      # Standard ist klassisches SMTP. Setze in der .env (bzw. Umgebung):
+      #   MAIL_MAILER=smtp
+      #   MAIL_HOST=smtp.dein-server.tld
+      #   MAIL_PORT=587
+      #   MAIL_ENCRYPTION=tls
+      #   MAIL_USERNAME=dein-user
+      #   MAIL_PASSWORD=dein-passwort
+      #   MAIL_FROM_ADDRESS=noreply@reisinger.pictures
+      #   MAIL_FROM_NAME=Reisinger Foto Portal
+      # Der Gmail-REST-Transport (OAUTH_*-Vars) ist nur aktiv, wenn
+      # MAIL_MAILER=gmail_rest gesetzt ist. Für Produktion reicht SMTP —
+      # die OAUTH_*-Variablen können dann leer bleiben.
+      # ---
       - MAIL_MAILER=${MAIL_MAILER}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}

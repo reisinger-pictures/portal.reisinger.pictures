@@ -200,6 +200,9 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::post('/management/contracts/{id}/close', [ContractController::class, 'close'])->name('api.management.contracts.close');
         Route::get('/management/contracts/{id}/instances', [ContractController::class, 'instances'])->name('api.management.contracts.instances');
         Route::get('/management/contracts/{id}/download', [ContractDownloadController::class, 'downloadContract'])->name('api.management.contracts.download');
+
+        // Super-Admin SMTP-Verbindungstest: sendet eine Test-Mail an die eigene Adresse.
+        Route::post('/management/settings/test-email', [MailController::class, 'sendTest'])->name('api.management.settings.test-email');
     });
 
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo'])->name('api.management.settings.system');
