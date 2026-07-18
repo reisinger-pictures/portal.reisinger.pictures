@@ -2,26 +2,18 @@ return {
     LrSdkVersion = 8.0,
     LrToolkitIdentifier = 'portal.reisinger.portal',
     LrPluginName = 'Reisinger Foto Portal',
-    VERSION = { major = 1, minor = 1, revision = 0, build = 0, display = "1.1.0" },
+    VERSION = { major = 1, minor = 1, revision = 1, build = 0, display = "1.1.1" },
 
     LrPluginInfoProvider = 'PluginInfoProvider.lua',
 
     LrExportMenuItems = {
         {
-            title = "Bewertungs-Galerien verwalten (B2B)...",
-            file = "RpSelectionManager.lua",
+            title = "Bewertungs-Galerien verwalten...",
+            file = "SelectionManager.lua",
         },
         {
-            title = "Delivery-Galerien verwalten (B2B)...",
-            file = "RpDeliveryManager.lua",
-        },
-        {
-            title = "Bewertungs-Galerien verwalten (SRP)...",
-            file = "SrpSelectionManager.lua",
-        },
-        {
-            title = "Delivery-Galerien verwalten (SRP)...",
-            file = "SrpDeliveryManager.lua",
+            title = "Delivery-Galerien verwalten...",
+            file = "DeliveryManager.lua",
         }
     }
 }

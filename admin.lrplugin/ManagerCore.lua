@@ -15,11 +15,11 @@ local Utils = require "Utils"
 local MetaGalleryDialog = require "MetaGalleryDialog"
 local GalleryDialog = require "GalleryDialog"
 local InviteDialog = require "InviteDialog"
+local RatingStatusDialog = require "RatingStatusDialog"
 
 return function(mode, baseUrl)
     LrTasks.startAsyncTask(function()
         Api.setBaseUrl(baseUrl)
-        local brandName = string.find(baseUrl, "story%.reisinger%.pictures") and "SRP" or "B2B"
         local catalog = LrApplication.activeCatalog()
         local targetPhotos = catalog:getTargetPhotos()
         local photoCount = #targetPhotos
@@ -65,7 +65,7 @@ return function(mode, baseUrl)
                     local contents = f:column {
                         spacing = f:control_spacing(),
                         f:static_text { 
-                            title = loginFailed and ("Bitte Zugangsdaten für " .. brandName .. " Portal prüfen.") or ("Bitte für " .. brandName .. " Portal anmelden."), 
+                            title = loginFailed and ("Bitte Zugangsdaten für das Reisinger Foto Portal prüfen.") or ("Bitte für das Reisinger Foto Portal anmelden."),
                             text_color = loginFailed and import 'LrColor'(0.8, 0, 0) or nil,
                             margin_bottom = 5 
                         },
@@ -76,7 +76,7 @@ return function(mode, baseUrl)
                     }
 
                     local res = LrDialogs.presentModalDialog {
-                        title = Api.getTitle("Login erforderlich (" .. brandName .. ")"),
+                        title = Api.getTitle("Login erforderlich (Reisinger Foto Portal)"),
                         contents = contents,
                         actionVerb = "Anmelden",
                         cancelVerb = "Abbrechen"
@@ -245,35 +245,25 @@ return function(mode, baseUrl)
                 table.insert(uiElements, f:row {
                     f:spacer { width = 130 },
                     f:push_button {
-                        title = "Bewertungen synchronisieren...",
+                        title = "Bewertungen ansehen & synchronisieren...",
                         enabled = LrView.bind{key="hasGallery", bind_to_object=props},
                         action = function()
-                            LrTasks.startAsyncTask(function()
-                                local resData, stat = Api.call("/api/management/galleries/" .. props.selectedGalleryId .. "/export", "GET", nil, jwt)
-                                if stat == 200 and resData then
-                                    catalog:withWriteAccessDo("Bewertungen synchronisieren", function()
-                                        local matchCount = 0
-                                        for _, item in ipairs(resData) do
-                                            if item.lr_uuid then
-                                                local photo = catalog:findPhotoByUuid(item.lr_uuid)
-                                                if photo then
-                                                    matchCount = matchCount + 1
-                                                    if item.avg_rating then photo:setRawMetadata("rating", tonumber(item.avg_rating)) end
-                                                    if item.all_comments and item.all_comments ~= "" then photo:setRawMetadata("instructions", item.all_comments) end
-                                                end
-                                            end
-                                        end
-                                        LrDialogs.message(Api.getTitle("Synchronisation abgeschlossen"), matchCount .. " Bilder wurden aktualisiert.", "info")
-                                    end)
+                            local selectedGal = nil
+                            for _, g in ipairs(props.galleries) do
+                                if g.value == props.selectedGalleryId and g.raw then
+                                    selectedGal = g.raw
+                                    break
                                 end
-                            end)
+                            end
+                            local galName = selectedGal and selectedGal.name or "Galerie"
+                            RatingStatusDialog(props.selectedGalleryId, galName, jwt, handleReload)
                         end
                     }
                 })
             end
 
             local result = LrDialogs.presentModalDialog {
-                title = Api.getTitle((mode == "selection" and "Bewertungs-Galerie Manager" or "Delivery-Galerie Manager") .. " (" .. brandName .. ")"),
+                title = Api.getTitle((mode == "selection" and "Bewertungs-Galerie Manager" or "Delivery-Galerie Manager") .. " (Reisinger Foto Portal)"),
                 resizable = true,
                 contents = f:column(uiElements),
                 actionVerb = "Upload starten",
@@ -357,13 +347,13 @@ return function(mode, baseUrl)
 
                             logMsg("Starte Upload für UUID: " .. tostring(lrUuid) .. " (Backend generiert nun UUID-Filenames)")
                             
-                            local resBody, resHeaders = LrHttp.postMultipart(Api.baseUrl .. "/api/management/upload", {
+                            local resBody, status = Api.uploadMultipart("/api/management/upload", {
                                 { name = "gallery_id", value = tostring(props.selectedGalleryId) },
                                 { name = "lr_uuid",    value = lrUuid },
+                                { name = "replace",    value = "1" },
                                 { name = "file",       fileName = filename, filePath = path, contentType = "image/jpeg" }
-                            }, { { field = "Authorization", value = "Bearer " .. jwt } })
+                            }, jwt)
 
-                            local status = resHeaders and resHeaders.status
                             logMsg("HTTP Status: " .. tostring(status))
 
                             if status == 200 then 
@@ -371,7 +361,7 @@ return function(mode, baseUrl)
                                 LrFileUtils.delete(path) 
                             else 
                                 errorCount = errorCount + 1
-                                local errDetail = resBody or (resHeaders and resHeaders.error and resHeaders.error.localizedMessage) or "Unbekannter Fehler"
+                                local errDetail = resBody or ("HTTP " .. tostring(status))
                                 logMsg("UPLOAD FEHLER: " .. tostring(errDetail))
                                 LrFunctionContext.callWithContext("UploadError", function(cx)
                                     local viewFactory = LrView.osFactory()
@@ -394,6 +384,12 @@ return function(mode, baseUrl)
                         progress:setPortionComplete(i, photoCount)
                     end
                     progress:done()
+
+                    -- Temp-Dir aufräumen bei komplett erfolgreichem Upload
+                    if errorCount == 0 then
+                        local rmOk, rmErr = LrFileUtils.delete(galleryUploadDir)
+                        if not rmOk then logMsg("Konnte Temp-Dir nicht löschen: " .. tostring(rmErr)) end
+                    end
                     
                     local selectedGalPath = ""
                     for _, g in ipairs(props.galleries) do
@@ -411,7 +407,8 @@ return function(mode, baseUrl)
                             "Schließen"
                         )
                         if confirm == "ok" and selectedGalPath ~= "" then
-                            local url = Api.baseUrl .. "/" .. selectedGalPath
+                            local galPath = selectedGalPath:gsub("^/", "")
+                            local url = Api.baseUrl .. "/" .. galPath
                             LrHttp.openUrlInBrowser(url)
                         end
                     else

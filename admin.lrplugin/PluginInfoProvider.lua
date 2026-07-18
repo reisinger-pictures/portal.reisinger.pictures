@@ -10,21 +10,12 @@ return {
         
         return {
             {
-                title = "Portal API Einstellungen (B2B & SRP)",
+                title = "Portal API Einstellungen",
                 
                 f:row {
-                    f:static_text { title = "B2B (reisinger.pictures):", width = 150 },
-                    f:edit_field {
-                        value = LrView.bind { key = "baseUrlRp", bind_to_object = prefs },
-                        fill_horizontal = 1
-                    }
-                },
-
-                f:row {
-                    f:static_text { title = "SRP (buy.reisinger.pictures):", width = 150 },
-                    f:edit_field {
-                        value = LrView.bind { key = "baseUrlSrp", bind_to_object = prefs },
-                        fill_horizontal = 1
+                    f:checkbox {
+                        title = "Lokale Entwicklungsumgebung nutzen (localhost:4321)",
+                        value = LrView.bind { key = "useLocal", bind_to_object = prefs }
                     }
                 },
 
@@ -49,31 +40,12 @@ return {
                 f:row {
                     f:spacer { width = 150 },
                     f:push_button {
-                        title = "Login testen (B2B)",
+                        title = "Login testen",
                         action = function()
                             LrTasks.startAsyncTask(function()
-                                local url = (prefs.baseUrlRp and #prefs.baseUrlRp > 0) and prefs.baseUrlRp or "https://portal.reisinger.pictures"
-                                local token, err, detail = Api.login(url)
+                                local token, err, detail = Api.login()
                                 if token then
-                                    LrDialogs.message("Erfolg!", "Verbindung zum B2B-Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")
-                                else
-                                    LrDialogs.message("Fehlgeschlagen", "Fehler: " .. tostring(err) .. "\n\n" .. tostring(detail), "critical")
-                                end
-                            end)
-                        end
-                    }
-                },
-                
-                f:row {
-                    f:spacer { width = 150 },
-                    f:push_button {
-                        title = "Login testen (SRP)",
-                        action = function()
-                            LrTasks.startAsyncTask(function()
-                                local url = (prefs.baseUrlSrp and #prefs.baseUrlSrp > 0) and prefs.baseUrlSrp or "https://buy.reisinger.pictures"
-                                local token, err, detail = Api.login(url)
-                                if token then
-                                    LrDialogs.message("Erfolg!", "Verbindung zum SRP-Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")
+                                    LrDialogs.message("Erfolg!", "Verbindung zum Portal erfolgreich hergestellt.\nDer Token wird ab sofort automatisch verwaltet.", "info")
                                 else
                                     LrDialogs.message("Fehlgeschlagen", "Fehler: " .. tostring(err) .. "\n\n" .. tostring(detail), "critical")
                                 end
@@ -84,7 +56,7 @@ return {
                 
                 f:row {
                     f:static_text { title = "Hinweis:", width = 150 },
-                    f:static_text { title = "Deine Fotografen-Zugangsdaten. Gleiche Credentials für beide Portale." }
+                    f:static_text { title = "Deine Fotografen-Zugangsdaten für das Portal." }
                 }
             }
         }

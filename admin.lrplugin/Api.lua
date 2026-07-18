@@ -1,5 +1,6 @@
 local LrHttp = import 'LrHttp'
 local LrPrefs = import 'LrPrefs'
+local LrTasks = import 'LrTasks'
 local json = require "json"
 
 local Api = {}
@@ -27,13 +28,23 @@ function Api.call(endpoint, method, payload, jwt)
     local resBody, resHeaders
     local fullUrl = Api.baseUrl .. endpoint
     
-    if method == "GET" then
-        resBody, resHeaders = LrHttp.get(fullUrl, headers)
-    elseif method == "PUT" or method == "DELETE" then
-        table.insert(headers, { field = "X-HTTP-Method-Override", value = method })
-        resBody, resHeaders = LrHttp.post(fullUrl, payloadStr, headers)
-    else
-        resBody, resHeaders = LrHttp.post(fullUrl, payloadStr, headers)
+    for retry = 0, 1 do
+        if method == "GET" then
+            resBody, resHeaders = LrHttp.get(fullUrl, headers)
+        elseif method == "PUT" or method == "DELETE" then
+            table.insert(headers, { field = "X-HTTP-Method-Override", value = method })
+            resBody, resHeaders = LrHttp.post(fullUrl, payloadStr, headers)
+        else
+            resBody, resHeaders = LrHttp.post(fullUrl, payloadStr, headers)
+        end
+        
+        local status = resHeaders and resHeaders.status or 500
+        local isServerError = (status >= 500) or (resHeaders and resHeaders.error)
+        if retry == 0 and isServerError then
+            LrTasks.sleep(2)
+        else
+            break
+        end
     end
     
     local status = resHeaders and resHeaders.status or 500
@@ -45,20 +56,14 @@ function Api.call(endpoint, method, payload, jwt)
     return data, status, resBody, resHeaders
 end
 
-function Api.login(overrideBaseUrl)
+function Api.login()
     local prefs = LrPrefs.prefsForPlugin()
     if not prefs.apiUser or not prefs.apiPass then return nil, "Keine Zugangsdaten eingegeben.", "" end
+    Api.setBaseUrl(prefs.useLocal and "http://localhost:4321" or "https://portal.reisinger.pictures")
     local payload = { email = prefs.apiUser, password = prefs.apiPass }
     local data, status, resBody, resHeaders
 
-    if overrideBaseUrl then
-        local saved = Api.baseUrl
-        Api.baseUrl = overrideBaseUrl
-        data, status, resBody, resHeaders = Api.call("/api/auth/login", "POST", payload, nil)
-        Api.baseUrl = saved
-    else
-        data, status, resBody, resHeaders = Api.call("/api/auth/login", "POST", payload, nil)
-    end
+    data, status, resBody, resHeaders = Api.call("/api/auth/login", "POST", payload, nil)
     
     local token = data and data.access_token
     
@@ -79,12 +84,32 @@ function Api.login(overrideBaseUrl)
     if status == 200 and token then return token, nil, nil end
     
     local err = (data and data.error) or "Unbekannter API Fehler"
-    local effectiveUrl = overrideBaseUrl or Api.baseUrl
-    local detail = "Status: " .. tostring(status) .. "\nURL: " .. effectiveUrl .. "/api/auth/login\n"
+    local detail = "Status: " .. tostring(status) .. "\nURL: " .. Api.baseUrl .. "/api/auth/login\n"
     if resBody and resBody ~= "" then detail = detail .. "Body: " .. string.sub(resBody, 1, 300) end
     if resHeaders and resHeaders.error then detail = detail .. "\nCurl Error: " .. tostring(resHeaders.error.localizedMessage) end
     
     return nil, err, detail
+end
+
+function Api.uploadMultipart(endpoint, formFields, jwt)
+    local fullUrl = Api.baseUrl .. endpoint
+    local headers = { { field = "Authorization", value = "Bearer " .. jwt } }
+
+    local resBody, resHeaders = LrHttp.postMultipart(fullUrl, formFields, headers)
+    local status = resHeaders and resHeaders.status or 500
+
+    if status >= 500 or (resHeaders and resHeaders.error) then
+        LrTasks.sleep(2)
+        resBody, resHeaders = LrHttp.postMultipart(fullUrl, formFields, headers)
+        status = resHeaders and resHeaders.status or 500
+    end
+
+    if status >= 200 and status < 300 then
+        return resBody, status
+    else
+        local errDetail = resHeaders and resHeaders.error and resHeaders.error.localizedMessage or (resBody or "HTTP " .. tostring(status))
+        return nil, errDetail
+    end
 end
 
 function Api.checkRole(jwt)
