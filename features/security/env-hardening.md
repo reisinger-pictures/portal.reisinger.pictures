@@ -91,13 +91,20 @@ pnpm install
 
 ## Verbleibendes Risiko (akzeptiert)
 
-- **Git-History:** Die alten Secrets (`sk_test_…`, `pk_live_…`, DB-Passwort)
-  liegen noch in der Commit-History (`5816326`, `0f10091`, `ab3d638`, …).
-  Vor dem Going-Public MÜSSEN die Stripe-Keys rotiert werden (Stripe-Dashboard).
-  Ein History-Rewrite wurde bewusst unterlassen (Nutzer-Entscheid "minimal").
+- **Git-History:** ✅ Bereinigt (2026-07-21). Alle 3 Secrets wurden mit
+  `git-filter-repo --replace-text` in allen 133 Commits durch `*_REDACTED`-
+  Platzhalter ersetzt, force-push zu GitHub, Reflog expired, GC mit
+  `--prune=now`. Verifikation via `git log -S` (leer) + vollständiger Blob-Scan.
+  Backup der Original-History: `portal-backup-20260721-133753.bundle` (lokal).
+  Bei Verlust des Backups ist die Original-History unwiederbringlich.
 - **`phpunit.xml`-Credentials:** localhost Fixtures, akzeptiert.
 - **C1/C2 (`APP_KEY`/`JWT_SECRET` Fallbacks):** weiterhin akzeptiert, Deployment-Guard
   fängt Production ab. Siehe `AGENTS.md` §7.
+- **GitHub-Cache (Hinweis, nicht blockierend):** GitHub speichert Referenzen auf
+  alte Commits u.U. noch in internen Caches (Pull Requests, Reflogs serverseitig).
+  Da das Repo nie öffentlich war und Secret-Scanning deaktiviert war, ist das
+  Risiko minimal. Bei Going-Public trotzdem empfohlen: Stripe-Keys rotieren
+  (Stripe-Dashboard) als Belt-and-Suspenders.
 
 ## DoD / Verifikation
 

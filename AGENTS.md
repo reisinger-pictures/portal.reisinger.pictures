@@ -148,7 +148,8 @@ Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11). **Nicht regredi
 - **[C2] Hardcoded `APP_KEY`-Fallback** — `backend/config/app.php:110`. Gleiche Begründung wie C1.
 - **[C3] ✅ RESOLVED (2026-07-21)** — `backend/.env.testing` gelöscht; redundante Test-Credentials werden nur in `phpunit.xml` (localhost Fixtures) gehalten. Siehe auch C3b.
 - **[C3b] ✅ RESOLVED (2026-07-21)** — Hardcoded `sk_test`/`pk_test`-Fallback in `backend/config/services.php` entfernt. `STRIPE_*`-Env ist nun verpflichtend (Tests verwenden `Config::set()`-Mocks).
-- **[C4] ✅ RESOLVED (2026-07-21)** — `frontend/.env` (pk_live) und `frontend/.env.local` (pk_test) untracked; `!.env`/`!.env.local`-Negationen aus `frontend/.gitignore` entfernt. Nur `.env.example`/`.env.local.example` (mit Platzhaltern) committed. **Vor Going-Public: Stripe-Keys rotieren** (alte Werte liegen noch in der Git-History).
+- **[C4] ✅ RESOLVED (2026-07-21)** — `frontend/.env` (pk_live) und `frontend/.env.local` (pk_test) untracked; `!.env`/`!.env.local`-Negationen aus `frontend/.gitignore` entfernt. Nur `.env.example`/`.env.local.example` (mit Platzhaltern) committed.
+- **[C5-history] ✅ RESOLVED (2026-07-21)** — Git-History mit `git-filter-repo` bereinigt: alle 3 Secrets (`pk_live`, `pk_test`, `sk_test`) in allen 133 Commits durch `*_REDACTED`-Platzhalter ersetzt. Force-Push zu GitHub, Reflog expired, GC mit `--prune=now`. Verifikation via `git log -S` (leer) + Blob-Scan. Backup: `portal-backup-20260721-133753.bundle`. Siehe `features/security/env-hardening.md`.
 
 Offene Security-TODOs (M6, L2) siehe `AGENTS.todo.md`. M1–M5, M7–M9, L1, L3–L5 sind erledigt (Commit `0f10091` + Session 2026-07-14).
 

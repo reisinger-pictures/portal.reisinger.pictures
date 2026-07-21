@@ -47,3 +47,7 @@ out/
 .playwright-mcp
 ai_test_report.txt
 ses_*.json
+
+# History-rewrite artifacts (contains real secrets — never commit)
+.history-replacements.txt
+portal-backup-*.bundle
