@@ -44,8 +44,8 @@ Several config files ship with hardcoded fallback values for **zero-config local
 
 | Config Key | File | Default Value |
 |---|---|---|
-| `APP_KEY` | `config/app.php` | `base64:APP_KEY_REDACTED` |
-| `JWT_SECRET` | `config/jwt.php` | `JWT_SECRET_REDACTED` |
+| `APP_KEY` | `config/app.php` | `base64:jQkBT0mi24S6wKESY5wMW44SUl2HO5Mu+JwzPK/pnHQ=` |
+| `JWT_SECRET` | `config/jwt.php` | `rC2PoXX5CAbw8Ubbr5E58BPsxVo5WZQSaytUuo7vhaQ=` |
 | `STRIPE_KEY` | `config/services.php` | `pk_test_...` (dev-mode only) |
 | `STRIPE_SECRET` | `config/services.php` | `sk_test_...` (dev-mode only) |
 | `DB_PASSWORD` | `config/database.php` | `admin` |
@@ -59,7 +59,7 @@ Several config files ship with hardcoded fallback values for **zero-config local
 > **Rule for contributors:** Never rely on these defaults for security. Always set real secrets in `.env` for staging/production. The defaults are for local dev only.
 
 ## 9. Produktion-Sicherheits-Gatekeeper
-- **Validierung:** Der `backend-init`-Container verweigert den Start in 'production', wenn die Standard-Schlüssel (APP_KEY oder JWT_SECRET) aus der Dokumentation/Entwicklung erkannt werden.
+- **Validierung:** Der `backend-init`-Container verweigert den Start in 'production', wenn `APP_KEY` oder `JWT_SECRET` nicht gesetzt sind (leer). Die Prüfung erfolgt generisch ohne hartcodierte Schlüsselwerte, um eine erneute Exposition über das Repository zu vermeiden.
 - **Start-Delay:** `backend-init` wartet aktiv 15 Sekunden auf die MariaDB-Bereitschaft (First-Boot), um Race-Conditions bei der Migration zu verhindern.
 
 

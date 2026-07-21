@@ -50,7 +50,7 @@ return [
         'model' => env('AI_MODEL', 'gpt-4o'),
     ],
 
-    'accounting_email' => env('ACCOUNTING_EMAIL', 'accounting@reisinger.pictures'),
+    'accounting_email' => env('ACCOUNTING_EMAIL'),
 
     'proxy_delivery_header' => env('PROXY_DELIVERY_HEADER'),
 ];

@@ -79,7 +79,7 @@ test.describe('Gallery Invite Link Workflow', () => {
         
         const uniqueId = () => Math.random().toString(36).substring(2, 10);
         const galleryName = `Password Test ${uniqueId()}`;
-        const password = 'TEST_PASSWORD_REDACTED';
+        const password = `test-pwd-${uniqueId()}`;
 
         // 1. Photographer creates gallery WITH password
         await auth.login(testUser.email, testUser.password);

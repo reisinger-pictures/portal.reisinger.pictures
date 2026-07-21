@@ -134,8 +134,8 @@ services:
       sh -c "
       
       if [ "$APP_ENV" = "production" ]; then
-        if [ "$APP_KEY" = "base64:APP_KEY_REDACTED" ] || [ "$JWT_SECRET" = "JWT_SECRET_REDACTED" ]; then
-          echo 'FATAL: Standard-Entwicklungsschluessel in Produktion erkannt. Start abgebrochen!';
+        if [ -z "$APP_KEY" ] || [ -z "$JWT_SECRET" ]; then
+          echo 'FATAL: APP_KEY oder JWT_SECRET ist nicht gesetzt. Produktion verweigert den Start!';
           exit 1;
         fi;
       fi;

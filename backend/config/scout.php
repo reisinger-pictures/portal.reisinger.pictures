@@ -15,7 +15,7 @@ return [
 
     'meilisearch' => [
         'host' => env('MEILISEARCH_HOST', 'http://localhost:7700'),
-        'key' => env('MEILISEARCH_KEY', 'local_meili_secret'),
+        'key' => env('MEILISEARCH_KEY'),
 
         'index-settings' => [
             \App\Models\Photo::class => [

@@ -91,20 +91,18 @@ pnpm install
 
 ## Verbleibendes Risiko (akzeptiert)
 
-- **Git-History:** ✅ Bereinigt (2026-07-21). Alle 3 Secrets wurden mit
-  `git-filter-repo --replace-text` in allen 133 Commits durch `*_REDACTED`-
-  Platzhalter ersetzt, force-push zu GitHub, Reflog expired, GC mit
-  `--prune=now`. Verifikation via `git log -S` (leer) + vollständiger Blob-Scan.
-  Backup der Original-History: `portal-backup-20260721-133753.bundle` (lokal).
-  Bei Verlust des Backups ist die Original-History unwiederbringlich.
+- **Git-History (Stripe-Keys):** ✅ Bereinigt (2026-07-21). 3 Stripe-Secrets mit
+  `git-filter-repo --replace-text` durch `*_REDACTED` ersetzt. Force-Push zu
+  GitHub. Backup: `portal-backup-20260721-133753.bundle`.
+- **Git-History (APP_KEY/JWT_SECRET/Test-Password):** ✅ Bereinigt (2026-07-21).
+  2. `git-filter-repo`-Durchlauf: `backend/.env.local` aus History entfernt,
+  APP_KEY/JWT_SECRET-Fallbacks und `SuperSecret123!` durch `*_REDACTED` ersetzt.
+  Verifikation via `git log -S` (alle Patterns leer). Force-Push erforderlich.
+  Backup: `portal-backup-20260721-155854.bundle`.
 - **`phpunit.xml`-Credentials:** localhost Fixtures, akzeptiert.
-- **C1/C2 (`APP_KEY`/`JWT_SECRET` Fallbacks):** weiterhin akzeptiert, Deployment-Guard
-  fängt Production ab. Siehe `AGENTS.md` §7.
-- **GitHub-Cache (Hinweis, nicht blockierend):** GitHub speichert Referenzen auf
-  alte Commits u.U. noch in internen Caches (Pull Requests, Reflogs serverseitig).
-  Da das Repo nie öffentlich war und Secret-Scanning deaktiviert war, ist das
-  Risiko minimal. Bei Going-Public trotzdem empfohlen: Stripe-Keys rotieren
-  (Stripe-Dashboard) als Belt-and-Suspenders.
+- **C1/C2 (`APP_KEY`/`JWT_SECRET` Fallbacks):** ✅ RESOLVED (2026-07-21) — Schlüssel rotiert.
+  Deployment-Guard in `docker-compose.yml` prüft nun generisch auf leere Werte
+  statt auf konkrete Strings — keine erneute Exposition über das Repository möglich.
 
 ## DoD / Verifikation
 
