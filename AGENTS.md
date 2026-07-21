@@ -146,8 +146,9 @@ Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11). **Nicht regredi
 
 - **[C1] Hardcoded `JWT_SECRET`-Fallback** — `backend/config/jwt.php:18`. Deployment-Guard in `docker-compose.yml` fängt Production ab; nur Dev-/Test-Keys betroffen.
 - **[C2] Hardcoded `APP_KEY`-Fallback** — `backend/config/app.php:110`. Gleiche Begründung wie C1.
-- **[C3] Stripe Test-Secret committed** — `backend/.env.testing:18`. Test-Account, niedriges Risiko.
-- **[C4] Live Stripe-Publishable-Key committed** — `frontend/.env` (`!.env`-Negation). Publishable = niedrigkritisch, Hygiene-Footgun.
+- **[C3] ✅ RESOLVED (2026-07-21)** — `backend/.env.testing` gelöscht; redundante Test-Credentials werden nur in `phpunit.xml` (localhost Fixtures) gehalten. Siehe auch C3b.
+- **[C3b] ✅ RESOLVED (2026-07-21)** — Hardcoded `sk_test`/`pk_test`-Fallback in `backend/config/services.php` entfernt. `STRIPE_*`-Env ist nun verpflichtend (Tests verwenden `Config::set()`-Mocks).
+- **[C4] ✅ RESOLVED (2026-07-21)** — `frontend/.env` (pk_live) und `frontend/.env.local` (pk_test) untracked; `!.env`/`!.env.local`-Negationen aus `frontend/.gitignore` entfernt. Nur `.env.example`/`.env.local.example` (mit Platzhaltern) committed. **Vor Going-Public: Stripe-Keys rotieren** (alte Werte liegen noch in der Git-History).
 
 Offene Security-TODOs (M6, L2) siehe `AGENTS.todo.md`. M1–M5, M7–M9, L1, L3–L5 sind erledigt (Commit `0f10091` + Session 2026-07-14).
 
