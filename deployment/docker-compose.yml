@@ -53,7 +53,7 @@ services:
     command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
 
   backend:
-    image: ghcr.io/reisi007/portal-base:8.5
+    image: ghcr.io/reisi007/php-base:8.5
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
@@ -123,44 +123,34 @@ services:
       - STRIPE_KEY=${STRIPE_KEY}
       - STRIPE_SECRET=${STRIPE_SECRET}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - PROXY_DELIVERY_HEADER=${PROXY_DELIVERY_HEADER}
+      - PROXY_DELIVERY_HEADER=X-Accel-Redirect
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/up"]
+      test: ["CMD-SHELL", "pgrep php-fpm || exit 1"]
       interval: "30s"
       timeout: 10s
       retries: 3
       start_period: 40s
     command: >
       sh -c "
-      
-      if [ "$APP_ENV" = "production" ]; then
-        if [ -z "$APP_KEY" ] || [ -z "$JWT_SECRET" ]; then
+      if [ \"$APP_ENV\" = \"production\" ]; then
+        if [ -z \"$APP_KEY\" ] || [ -z \"$JWT_SECRET\" ]; then
           echo 'FATAL: APP_KEY oder JWT_SECRET ist nicht gesetzt. Produktion verweigert den Start!';
           exit 1;
         fi;
       fi;
-      
-      if [ -z "$APP_KEY" ]; then php artisan key:generate --force; fi;
-      if [ -z "$JWT_SECRET" ]; then php artisan jwt:secret --force; fi;
-      
-      if ! grep -q '/var/www/html/public' /etc/apache2/sites-available/000-default.conf; then
-        sed -ri -e 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/*.conf;
-        sed -ri -e 's!/var/www/!/var/www/html/public!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf;
-      fi;
-      
+      if [ -z \"$APP_KEY\" ]; then php artisan key:generate --force; fi;
+      if [ -z \"$JWT_SECRET\" ]; then php artisan jwt:secret --force; fi;
       php artisan optimize;
       php artisan migrate --force;
       php artisan scout:sync-index-settings;
       php artisan queue:restart;
       php artisan admin:update;
-      
       echo 'Starte Hintergrund-Prozesse...';
       php artisan app:import-locations &
       php artisan queue:work --tries=3 &
       (while true; do php artisan schedule:run >> /dev/null 2>&1; sleep 60; done) &
-      
-      echo 'Starte Webserver...';
-      apache2-foreground
+      echo 'Starte PHP-FPM...';
+      exec php-fpm
       "
     networks:
       portal_internal:
@@ -171,9 +161,6 @@ services:
     image: nginx:alpine
     container_name: portal_frontend
     restart: unless-stopped
-    depends_on:
-      backend:
-        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/"]
       interval: "30s"

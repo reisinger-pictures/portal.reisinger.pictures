@@ -8,7 +8,7 @@ status: active
 
 ## 1. Portainer & Docker Stack
 - The project is deployed as a Docker stack via **Portainer**.
-- **Automated Init:** The initialization logic is embedded directly into the `command` block of the `backend` container. It waits for the database to be ready, generates missing application keys (`APP_KEY`, `JWT_SECRET`), and runs `php artisan migrate --force` before starting the background workers and the Apache webserver. 
+- **Automated Init:** The initialization logic is embedded directly into the `command` block of the `backend` container. It waits for the database to be ready, generates missing application keys (`APP_KEY`, `JWT_SECRET`), and runs `php artisan migrate --force` before starting the background workers and PHP-FPM. 
 
 ## 2. Environment Variables
 - All configuration is managed via Portainer environment variables, overriding the `.env` file.
@@ -16,19 +16,20 @@ status: active
 
 ## 3. Frontend & Routing
 - The frontend is built statically (`pnpm build`) and served via Nginx.
-- A Reverse Proxy (e.g., Nginx Proxy Manager / Traefik) handles routing:
-  - `/api/*` -> `portal_backend` (Port 80)
-  - `/*` -> `portal_frontend` (Port 80)
+- Caddy (zentraler Reverse Proxy) handled routing:
+  - `/api/*` -> `portal_backend` (PHP-FPM via FastCGI auf Port 9000)
+  - `/*` -> `portal_frontend` (nginx, Port 80)
 
-
-## 4. On-The-Fly Webserver-Konfiguration (Apache DocumentRoot Patching)
-- **Problem:** Das Basis-Image `ghcr.io/reisi007/...` erwartet den DocumentRoot unter `/var/www/html`, Laravel benötigt jedoch `/var/www/html/public`.
-- **Lösung:** Anstatt eines eigenen Dockerfiles wird die Konfiguration beim Start des "backend"-Containers via `sed`-Befehl im Docker-Command überschrieben.
-- **Implementierung (Idempotent):** In der `docker-compose.yml` wird vor der Ausführung von `sed` mit `grep` geprüft, ob die Ersetzung bereits stattgefunden hat. Dadurch überlebt der Container auch reguläre Neustarts (z.B. via Portainer) ohne 403-Fehler.
+## 4. Caddy + PHP-FPM Architektur (Apache abgelöst)
+- **Basis-Image:** `ghcr.io/reisi007/php-base:8.5` (ersetzt `portal-base`)
+- **Webserver:** PHP-FPM statt Apache – Caddy spricht via FastCGI-Protokoll mit dem Backend
+- **File Delivery:** `X-Accel-Redirect` statt `X-Sendfile` – Caddy fängt den Header via `handle_response` ab und serviert Dateien direkt von der Festplatte
+- **Pfad-Mapping:** Der `PROXY_DELIVERY_HEADER` ist fest auf `X-Accel-Redirect` gesetzt. Der Pfad `/var/www/photos/...` wird in Caddy via `handle_path` auf das gemountete Volume `/srv/photos` umgeschrieben
+- **Vorteil:** Kein Apache mehr – einheitliche PHP-FPM-Images für alle Projekte (form2email + portal)
 
 ## 5. Split-Domain-Deployment-Strategie
 - **Pfad-Trennung:** Das Backend liegt unter `/home/webadmin/websites/api-portal.reisinger.pictures`, das Frontend unter `/home/webadmin/websites/web-portal.reisinger.pictures`.
-- **NPM Routing:** Der Nginx Proxy Manager routet die Location `/api` explizit an die feste IP des Backend-Containers (172.18.0.31) im `webnet`.
+- **Caddy Routing:** Caddy routet `/api*` per FastCGI an `portal_backend:9000`
 
 ## 6. Externer FTP-Mount & Pfad-Konfiguration
 - **Storage:** Der FTP-Ordner liegt außerhalb der App-Verzeichnisse unter `/home/webadmin/websites/ftp`.
@@ -59,8 +60,7 @@ Several config files ship with hardcoded fallback values for **zero-config local
 > **Rule for contributors:** Never rely on these defaults for security. Always set real secrets in `.env` for staging/production. The defaults are for local dev only.
 
 ## 9. Produktion-Sicherheits-Gatekeeper
-- **Validierung:** Der `backend-init`-Container verweigert den Start in 'production', wenn `APP_KEY` oder `JWT_SECRET` nicht gesetzt sind (leer). Die Prüfung erfolgt generisch ohne hartcodierte Schlüsselwerte, um eine erneute Exposition über das Repository zu vermeiden.
-- **Start-Delay:** `backend-init` wartet aktiv 15 Sekunden auf die MariaDB-Bereitschaft (First-Boot), um Race-Conditions bei der Migration zu verhindern.
+- **Validierung:** Der `backend`-Container verweigert den Start in 'production', wenn `APP_KEY` oder `JWT_SECRET` nicht gesetzt sind (leer). Die Prüfung erfolgt generisch ohne hartcodierte Schlüsselwerte, um eine erneute Exposition über das Repository zu vermeiden.
 
 
 ## 10. Meilisearch Upgrade — Deployment Procedure
@@ -87,5 +87,5 @@ Das `app:search-rebuild`-Command flushed alle 5 Indizes (Photo, Gallery, Locatio
 ## 11. OPcache & Live-Updates (Rclone Sync)
 - **Die Falle:** Wenn PHP-Dateien im laufenden Betrieb über `rclone` (z.B. durch die `sync.bat`) auf den Produktionsserver synchronisiert werden, greifen Backend-Änderungen unter Umständen nicht sofort.
 - **Der Grund:** In Produktionsumgebungen ist der PHP OPcache aus Performancegründen scharf geschaltet (meist `opcache.validate_timestamps=0`). PHP liest geänderte Dateien nicht neu von der Festplatte ein, sondern nutzt den alten Bytecode aus dem RAM.
-- **Die Lösung:** Nach einem Rclone-Sync von Backend-Dateien muss der Apache/PHP-Container zwingend neu gestartet werden, um den Cache zu leeren:
+- **Die Lösung:** Nach einem Rclone-Sync von Backend-Dateien muss der PHP-Container (PHP-FPM) zwingend neu gestartet werden, um den Cache zu leeren:
   `docker restart portal_backend`
