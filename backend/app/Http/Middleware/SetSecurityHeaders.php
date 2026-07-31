@@ -10,8 +10,8 @@ use Symfony\Component\HttpFoundation\Response;
  * Sets baseline security headers on every API response.
  *
  * No CSP is applied here: this serves a pure JSON API consumed by a separate
- * SPA, and CSP is enforced at the frontend reverse proxy (nginx). Adding it
- * here would have no effect on the browser's document policy.
+ * SPA, and CSP is enforced at the edge in the Caddyfile (portal.reisinger.pictures
+ * block). Adding it here would have no effect on the browser's document policy.
  */
 class SetSecurityHeaders
 {

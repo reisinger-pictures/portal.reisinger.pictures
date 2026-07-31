@@ -15,10 +15,11 @@ status: active
 - Key variables include database credentials (`DB_ROOT_PASSWORD`), Meilisearch keys (`MEILI_MASTER_KEY`), and SMTP settings (e.g., Gmail App Passwords).
 
 ## 3. Frontend & Routing
-- The frontend is built statically (`pnpm build`) and served via Nginx.
-- Caddy (zentraler Reverse Proxy) handled routing:
+- The frontend is built statically (`pnpm build`) and served **directly by Caddy** (kein nginx-Container mehr, seit 2026-07-31).
+- Caddy (zentraler Reverse Proxy) handles the routing:
   - `/api/*` -> `portal_backend` (PHP-FPM via FastCGI auf Port 9000)
-  - `/*` -> `portal_frontend` (nginx, Port 80)
+  - `/*` -> statische `dist/` via `spa`-Snippet (Root: `/srv/websites/web-portal.reisinger.pictures/dist`, Symlink auf `/home/webadmin/websites/web-portal.reisinger.pictures`)
+- **CSP & X-Frame-Options** werden im Caddyfile gesetzt (Block `portal.reisinger.pictures`). Achtung: Der `Content-Security-Policy`-Header enthält einen `sha256`-Hash des Inline-Brand-Scripts aus `frontend/index.html`. Wird dieses Script geändert, muss der Hash im Caddyfile neu berechnet werden (`openssl dgst -sha256 -binary | base64`).
 
 ## 4. Caddy + PHP-FPM Architektur (Apache abgelöst)
 - **Basis-Image:** `ghcr.io/reisi007/php-base:8.5` (ersetzt `portal-base`)
@@ -27,8 +28,9 @@ status: active
 - **Pfad-Mapping:** Der `PROXY_DELIVERY_HEADER` ist fest auf `X-Accel-Redirect` gesetzt. Der Pfad `/var/www/photos/...` wird in Caddy via `handle_path` auf das gemountete Volume `/srv/photos` umgeschrieben
 - **Vorteil:** Kein Apache mehr – einheitliche PHP-FPM-Images für alle Projekte (form2email + portal)
 
-## 5. Split-Domain-Deployment-Strategie
+## 5. Deployment-Pfade (Server-Dateisystem)
 - **Pfad-Trennung:** Das Backend liegt unter `/home/webadmin/websites/api-portal.reisinger.pictures`, das Frontend unter `/home/webadmin/websites/web-portal.reisinger.pictures`.
+- **Hinweis:** `api-portal.reisinger.pictures` ist lediglich ein Deployment-Pfad auf dem Server-Dateisystem und **keine DNS-Subdomain** — die API wird same-origin unter `portal.reisinger.pictures/api/*` ausgeliefert.
 - **Caddy Routing:** Caddy routet `/api*` per FastCGI an `portal_backend:9000`
 
 ## 6. Externer FTP-Mount & Pfad-Konfiguration

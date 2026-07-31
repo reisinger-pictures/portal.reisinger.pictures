@@ -14,7 +14,7 @@ class SystemMiscTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_x_accel_redirect_header_is_present_for_nginx()
+    public function test_x_accel_redirect_header_is_present_for_caddy()
     {
         Storage::fake('photos');
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'is_free_download' => true]);
@@ -22,7 +22,7 @@ class SystemMiscTest extends TestCase
         
         Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, 'dummy content');
         
-        // Simuliere Nginx Proxy Konfiguration
+        // Simuliere Caddy Proxy Konfiguration
         Config::set('services.proxy_delivery_header', 'X-Accel-Redirect');
         
         $response = $this->get('/api/media/' . $gallery->slug . '/' . $photo->id . '.jpg');

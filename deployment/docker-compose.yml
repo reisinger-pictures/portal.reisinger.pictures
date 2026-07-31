@@ -157,28 +157,6 @@ services:
       webnet:
         ipv4_address: 172.18.0.31
 
-  frontend:
-    image: nginx:alpine
-    container_name: portal_frontend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
-      interval: "30s"
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-    volumes:
-      - /home/webadmin/websites/web-portal.reisinger.pictures/dist:/usr/share/nginx/html:ro
-      - /home/webadmin/websites/web-portal.reisinger.pictures/config/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    networks:
-      portal_internal:
-      webnet:
-        ipv4_address: 172.18.0.30
-
 networks:
   webnet:
     external: true

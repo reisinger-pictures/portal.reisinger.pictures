@@ -116,7 +116,7 @@ Cache-Control: private, max-age=31536000, immutable
 - `max-age=31536000`: 1-year browser cache.
 - `immutable`: The resource will not change during its freshness lifetime — browser can skip conditional revalidation.
 
-## 8. Proxy Delivery via X-Sendfile
+## 8. Proxy Delivery via X-Accel-Redirect (Caddy handle_response)
 
 If the environment variable `PROXY_DELIVERY_HEADER` is set, the controller uses **zero-copy delivery**:
 
@@ -125,9 +125,9 @@ $headers[$proxyHeader] = $path;
 return response()->make('', 200, $headers);
 ```
 
-- The web server (Apache `mod_xsendfile` / Nginx `X-Accel-Redirect`) takes over file delivery.
+- Caddy intercepts the X-Accel-Redirect header via handle_response and serves the files directly from disk (see features/infrastructure/01-deployment.md §4).
 - PHP process is freed immediately — no memory overhead for large files.
-- The header name is configurable (e.g., `X-Sendfile`, `X-Accel-Redirect`).
+- The header name is generically configurable (e.g., `X-Sendfile`, `X-Accel-Redirect`); in production `PROXY_DELIVERY_HEADER` is fixed to `X-Accel-Redirect`.
 
 When `PROXY_DELIVERY_HEADER` is NOT set, `response()->file($path, $headers)` is used (PHP reads and streams the file).
 

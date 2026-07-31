@@ -11,9 +11,5 @@ rclone sync ./backend reisinger.pictures:/api-portal.reisinger.pictures --filter
 echo "🎨 Sync: Frontend (dist)..."
 rclone sync ./frontend/dist reisinger.pictures:/web-portal.reisinger.pictures/dist --transfers=128 --track-renames --progress
 
-# 3. Web Bereich (Frontend Config)
-echo "⚙️ Sync: Nginx Config..."
-rclone copy ./frontend/nginx.conf reisinger.pictures:/web-portal.reisinger.pictures/config/
-
 echo ""
 echo "✅ Sync abgeschlossen!"
