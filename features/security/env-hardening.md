@@ -100,6 +100,17 @@ pnpm install
   Verifikation via `git log -S` (alle Patterns leer). Force-Push erforderlich.
   Backup: `portal-backup-20260721-155854.bundle`.
 - **`phpunit.xml`-Credentials:** localhost Fixtures, akzeptiert.
+- **Stripe-abhängige Checkout/Payout-Tests (2026-07-31):** `OrderCheckoutTest`
+  (2 Tests), `PayoutSystemTest` (1 Test) und `Coupon/CheckoutCouponRevalidationTest`
+  (3 Tests) benötigen einen **echten** Stripe-Test-Secret-Key, da sie ausgehende
+  `PaymentIntent`-Calls an die Stripe-API auslösen. Mit Platzhalter
+  `sk_test_<your_stripe_secret_key>` (`.env:59`) schlagen sie mit HTTP 401
+  fehl. Ein Mock ist nur über Container-Binding (`StripePaymentService`/`CheckoutService`)
+  möglich — payment-kritisch, außerhalb des Email-Template-Scopes. **Akzeptiert,**
+  bis ein gültiger `STRIPE_SECRET` in der lokalen `.env` hinterlegt oder die
+  Service-Mock-Strategie etabliert ist. Nachweis: Analyse vom 2026-07-31,
+  71 vorbestehende Fehler auf 6 reduziert (Rest vorbestehend, Root Cause
+  `BrandConfig::__construct` fehlende Parameter-Defaults — gefixt).
 - **C1/C2 (`APP_KEY`/`JWT_SECRET` Fallbacks):** ✅ RESOLVED (2026-07-21) — Schlüssel rotiert.
   Deployment-Guard in `docker-compose.yml` prüft nun generisch auf leere Werte
   statt auf konkrete Strings — keine erneute Exposition über das Repository möglich.
