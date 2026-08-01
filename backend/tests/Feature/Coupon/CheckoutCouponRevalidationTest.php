@@ -13,14 +13,17 @@ use App\Values\BrandConfig;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Tests\Support\MocksStripeClient;
 
 class CheckoutCouponRevalidationTest extends TestCase
 {
     use RefreshDatabase;
+    use MocksStripeClient;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->mockStripePaymentIntentSuccess();
         $this->withoutMiddleware(BrandContextMiddleware::class);
         BrandRegistry::set(Brand::B2B);
 
@@ -35,6 +38,7 @@ class CheckoutCouponRevalidationTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->resetStripeHttpClient();
         BrandRegistry::set(null);
         parent::tearDown();
     }
