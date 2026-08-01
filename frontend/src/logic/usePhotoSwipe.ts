@@ -1,11 +1,16 @@
 import { useEffect, useRef } from 'react';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
 import 'photoswipe/style.css';
+import { trackEvent, TRACKING_EVENTS } from './tracking';
 
 interface UsePhotoSwipeOptions {
     galleryRef: React.RefObject<HTMLElement | null>;
     trigger: string | number | boolean;
     onInit?: (lightbox: PhotoSwipeLightbox) => void;
+}
+
+function currentPhotoId(lightbox: PhotoSwipeLightbox): string | undefined {
+    return (lightbox.pswp?.currSlide?.data?.element as HTMLElement | undefined)?.dataset.photoId;
 }
 
 export function usePhotoSwipe({ galleryRef, trigger, onInit }: UsePhotoSwipeOptions) {
@@ -33,6 +38,7 @@ export function usePhotoSwipe({ galleryRef, trigger, onInit }: UsePhotoSwipeOpti
                     name: 'custom-caption', order: 9, isButton: false, appendTo: 'wrapper', html: '',
                     onInit: (el) => {
                         lightbox!.pswp!.on('change', () => {
+                            trackEvent(TRACKING_EVENTS.photo_view, { photo_id: currentPhotoId(lightbox!) });
                             const currSlideElement = lightbox!.pswp!.currSlide?.data?.element;
                             if (currSlideElement) {
                                 const title = currSlideElement.getAttribute('data-title') || '';
@@ -68,6 +74,10 @@ export function usePhotoSwipe({ galleryRef, trigger, onInit }: UsePhotoSwipeOpti
                         });
                     }
                 });
+            });
+
+            lightbox.on('afterInit', () => {
+                trackEvent(TRACKING_EVENTS.photo_swipe_open);
             });
 
             if (onInit) {

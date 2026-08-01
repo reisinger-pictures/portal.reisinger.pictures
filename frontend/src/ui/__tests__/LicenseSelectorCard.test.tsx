@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import LicenseSelectorCard from '../client/components/LicenseSelectorCard';
+import { TRACKING_EVENTS } from '../../logic/tracking';
 
 vi.mock('../../logic/useLicenseCatalog', () => ({
     useLicenseCatalog: vi.fn(),
@@ -131,6 +132,11 @@ describe('LicenseSelectorCard', () => {
         });
     });
 
+    afterEach(() => {
+        delete window.trackEvent;
+        vi.restoreAllMocks();
+    });
+
     it('shows loading spinner while catalog is loading', () => {
         vi.mocked(useLicenseCatalog).mockReturnValue({
             catalog: undefined,
@@ -203,6 +209,25 @@ describe('LicenseSelectorCard', () => {
         expect(showToast).toHaveBeenCalledWith('success', 'In den Warenkorb gelegt');
     });
 
+    it('fires add_to_cart tracking event when adding to cart', async () => {
+        const user = userEvent.setup();
+        const trackSpy = vi.fn();
+        window.trackEvent = trackSpy;
+
+        vi.mocked(useAuth).mockReturnValue({
+            ...defaultAuth,
+            user: { id: 'u1', name: 'Test', email: 'test@test.com', is_super_admin: false, is_admin: false, is_photographer: false, is_pending: false, can_edit_metadata: false, roles: ['power_user'], flatrate_level: 'none' as const },
+        });
+
+        renderCard();
+        await user.click(screen.getByText('In den Warenkorb'));
+
+        expect(trackSpy).toHaveBeenCalledWith(
+            TRACKING_EVENTS.add_to_cart,
+            expect.objectContaining({ photo_id: 'p1', is_quote: false }),
+        );
+    });
+
     it('shows Admin Download button for staff users', () => {
         vi.mocked(usePermissions).mockReturnValue({
             isStaff: true,
@@ -221,6 +246,35 @@ describe('LicenseSelectorCard', () => {
 
         renderCard();
         expect(screen.getByText('Admin Download')).toBeInTheDocument();
+    });
+
+    it('fires photo_download tracking event when clicking Admin Download', async () => {
+        const user = userEvent.setup();
+        const trackSpy = vi.fn();
+        window.trackEvent = trackSpy;
+
+        vi.mocked(usePermissions).mockReturnValue({
+            isStaff: true,
+            isAdmin: true,
+            isSuperAdmin: false,
+            isPhotographer: true,
+            isOrgAdmin: false,
+            showOrgsSection: false,
+            canEditMetadata: true,
+            isPowerUser: false,
+            canAccessB2BFeatures: false,
+            showCRM: false,
+            showInvoicing: false,
+            showPayouts: false,
+        });
+
+        renderCard();
+        await user.click(screen.getByText('Admin Download'));
+
+        expect(trackSpy).toHaveBeenCalledWith(
+            TRACKING_EVENTS.photo_download,
+            expect.objectContaining({ photo_id: 'p1', tier: 'original', scope: 'single' }),
+        );
     });
 
     it('shows Sonderanfrage section for users who can buy', () => {

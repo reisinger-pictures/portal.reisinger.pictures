@@ -11,6 +11,7 @@ import { CartProvider } from './logic/CartProvider';
 import { setGlobalErrorCallback } from './api';
 import { t } from "@lingui/core/macro";
 import { I18nProvider } from './logic/I18nProvider';
+import { usePageViewTracking } from './logic/usePageViewTracking';
 
 const ResetPassword = lazy(() => import('./ui/ResetPassword'));
 const ProtectedDashboard = lazy(() => import('./ui/ProtectedDashboard'));
@@ -76,6 +77,12 @@ const GlobalSWRConfig = ({ children }: GlobalSWRConfigProps) => {
     );
 };
 
+/** Sendet bei jedem Route-Wechsel einen virtuellen Pageview an den Tracker. */
+function PageViewTracker() {
+    usePageViewTracking();
+    return null;
+}
+
 export default function App() {
     return (
         <ErrorBoundary fallback={<div className="flex h-screen items-center justify-center p-8">
@@ -86,6 +93,7 @@ export default function App() {
                 <CartProvider>
                 <GlobalSWRConfig>
                     <Suspense fallback={<SuspenseFallback />}>
+                        <PageViewTracker />
                         <Routes>
                             <Route path="/reset-password" element={<ResetPassword/>}/>
 

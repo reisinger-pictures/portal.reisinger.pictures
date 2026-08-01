@@ -5,6 +5,7 @@ import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
 import {formatMoney} from '../../../logic/utils';
 import {useVolumeLicensing} from '../../../logic/useVolumeLicensing';
+import {trackEvent, TRACKING_EVENTS} from '../../../logic/tracking';
 
 export interface VolumeLicensingCardProps {
     photo: Photo;
@@ -30,6 +31,13 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             tier: 'original',
             galleryId: photo.gallery_id,
             price: pricePerItemCents,
+        });
+        trackEvent(TRACKING_EVENTS.add_to_cart, {
+            photo_id: photo.id,
+            tier: 'original',
+            price_cents: pricePerItemCents,
+            is_quote: false,
+            volume_licensing: true,
         });
         showToast('success', 'In den Warenkorb gelegt');
         onAddToCart();

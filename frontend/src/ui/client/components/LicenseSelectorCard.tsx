@@ -11,6 +11,7 @@ import {useLicenseCatalog} from '../../../logic/useLicenseCatalog';
 import {useSearchParams} from 'react-router-dom';
 import {formatMoney} from '../../../logic/utils';
 import {ResolutionTier} from '../../../logic/pricingLogic';
+import {trackEvent, TRACKING_EVENTS} from '../../../logic/tracking';
 
 export interface LicenseSelectorCardProps {
     photo: Photo;
@@ -103,6 +104,13 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
             modifierNames: activeModifiers.map(m => m.name),
             price: finalPrice
         });
+        trackEvent(TRACKING_EVENTS.add_to_cart, {
+            photo_id: photo.id,
+            tier: selectedUseCase.flatrate_tier,
+            price_cents: finalPrice,
+            use_case: selectedUseCase.name,
+            is_quote: false,
+        });
         showToast('success', t`In den Warenkorb gelegt`);
     };
 
@@ -110,6 +118,12 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
         addToCart({
             photoId: photo.id, filename: photo.title || 'Bild ' + photo.id.substring(0, 8), thumb_url: photo.thumb_url,
             tier: 'original' as ResolutionTier, price: 0, isQuote: true, notes: quoteNote
+        });
+        trackEvent(TRACKING_EVENTS.add_to_cart, {
+            photo_id: photo.id,
+            tier: 'original',
+            price_cents: 0,
+            is_quote: true,
         });
         showToast('info', t`Angebot zum Warenkorb hinzugefügt`);
         setQuoteNote('');
@@ -196,7 +210,9 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                     {/* Primärer Aktions-Button */}
                     {finalPrice === 0 ? (
                         <a href={`/api/photos/${photo.id}/download?tier=${photo?.gallery?.effective_is_free_download ? 'original' : selectedUseCase?.flatrate_tier}`}
-                           target="_blank" className="btn btn-success btn-md text-white w-full shadow-sm"><span
+                           target="_blank"
+                           onClick={() => trackEvent(TRACKING_EVENTS.photo_download, { photo_id: photo.id, tier: photo?.gallery?.effective_is_free_download ? 'original' : selectedUseCase?.flatrate_tier, scope: 'single' })}
+                           className="btn btn-success btn-md text-white w-full shadow-sm"><span
                             className="iconify mdi--download text-lg"></span> <Trans>Download</Trans></a>
                     ) : canBuy ? (
                         <button onClick={handleAddToCart}
@@ -214,6 +230,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                     {hasFullAccess && (
                         <a href={`/api/photos/${photo.id}/download?tier=original`}
                            target="_blank"
+                           onClick={() => trackEvent(TRACKING_EVENTS.photo_download, { photo_id: photo.id, tier: 'original', scope: 'single' })}
                            className="btn btn-outline btn-neutral btn-sm w-full shadow-sm mt-1">
                             <span className="iconify mdi--shield-check-outline text-lg"></span> <Trans>Admin Download</Trans>
                         </a>

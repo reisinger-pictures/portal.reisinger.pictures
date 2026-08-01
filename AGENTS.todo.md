@@ -25,7 +25,23 @@ Commit `e341216`. Caddy liefert `dist/` direkt via `import spa` + CSP/XFO (mit k
 | Suite | Result |
 |-------|--------|
 | PHPUnit | ✅ 999 passed (2423 assertions) — vorher 5 Stripe-Checkout-Tests fehlerhaft (echter Stripe-Call mit Platzhalter-Key im lokalen `.env`). Fix: `tests/Support/MocksStripeClient.php` (Trait, `ApiRequestor::setHttpClient`), eingesetzt in `OrderCheckoutTest` + `CheckoutCouponRevalidationTest`; Debug-`dump()` aus `OrderCheckoutTest` entfernt. |
-| Vitest | ✅ 476 passed (47 files) |
+| Vitest | ✅ 492 passed (50 files) |
 | ESLint | ✅ `pnpm lint:fix --max-warnings 0` |
 | Build (tsc+vite) | ✅ |
-| Playwright `@smoke` | ⚠️ 36–37/42 grün. Rests: 2× Stripe-E2E (benötigt echte Stripe-Test-Keys im lokalen Backend-`.env` — Platzhalter `sk_test_<your…>`), 2× Mailpit-Password-Reset-Token-Timing (Flaky unter 8-Worker-Parallelität), 1× Structure-Tree (Flaky, isoliert grün). Lokale Auth-Throttle für E2E auf `AUTH_THROTTLE_LIMIT=1000` angehoben (`.env`, untracked). |
+| Playwright `@smoke` | ⚠️ nicht ausführbar (Server offline: `ERR_CONNECTION_REFUSED localhost:4321`) — kein Code-induzierter Fehler |
+
+## ✅ Session 2026-08-01 — Tracking-Integration (stats.reisinger.pictures) — ABGESCHLOSSEN
+
+Tracker-Skript (`x7k2p.js`) war bereits in `index.html` eingebunden, aber ohne Custom-Events. Implementiert:
+
+- `src/logic/tracking.ts` — typisierter Wrapper um `window.trackEvent` (Guard, Event-Name-Konstanten)
+- `src/logic/usePageViewTracking.ts` + `PageViewTracker` in `App.tsx` — virtuelle Pageviews bei SPA-Route-Wechsel
+- Foto-Interaktionen: `photo_view` (Lightbox-Slide via `usePhotoSwipe`, PhotoDetailView), `photo_swipe_open` (Lightbox-Open), `photo_download` (Zip-Download in `DeliveryView`, Einzel-Download + Admin-Download in `LicenseSelectorCard`)
+- Warenkorb-Funnel: `add_to_cart` (LicenseSelectorCard + VolumeLicensingCard), `remove_from_cart` (`CartProvider`), `checkout_started`/`checkout_succeeded`/`checkout_failed` (`ClientCartView`)
+- Tests: `tracking.test.ts`, `usePageViewTracking.test.tsx`
+
+**Follow-up (gleiche Session):**
+- Rating-Event `photo_rated` (photo_id, rating, has_comment) zentral in `useGallery.ratePhoto()` ergänzt — deckt Grid-Rating (`GridPhotoActions`), Lightbox-Bridge (`DaisyUIRatingBridge`) und Keyboard-Rating (`SelectionView`) ab.
+- Integration/Component-Tests ergänzt: `useGallery.test.ts` (photo_rated ×2), `LicenseSelectorCard.test.tsx` (add_to_cart, photo_download via Admin-Download), `usePhotoSwipe.test.tsx` (photo_swipe_open, photo_view ×2, via gemocktem `PhotoSwipeLightbox` mit `vi.hoisted`).
+
+**Offen/Note:** E2E `@smoke` lokal nicht lauffähig, weil Frontend-Dev-/Backend-Server nicht laufen. Events sind nur bei Nutzer-Interaktion sinnvoll messbar — vor Deployment `test:e2e` auf laufendem Stack ausführen.
