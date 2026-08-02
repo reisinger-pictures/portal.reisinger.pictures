@@ -1,3 +1,6 @@
 # Env files are untracked. Only the *.example templates are committed
 # (see root .gitignore allowlist). Never negate-ignore real .env files here —
 # doing so forces Git to track real secrets.
+
+# Vitest v8 coverage report (pnpm test:coverage)
+coverage/
