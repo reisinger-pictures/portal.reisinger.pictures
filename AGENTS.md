@@ -197,3 +197,13 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- **WICHTIG — Community-Labeling mit lokalem LLM (Ollama):** Graphify nutzt Ollama + lokales Modell `gemma4:e4b-ud-q4` (`UD-Q4_K_XL.gguf`, 5.1 GB) für LLM-gestützte Community-Namen (kommt ohne API-Key aus). Persistiert über Umgebungsvariable:
+  ```bash
+  export OLLAMA_MODEL=gemma4:e4b-ud-q4   # sonst Rollback auf qwen2.5-coder:7b
+  export OLLAMA_HOST=http://localhost:11434   # nur falls Ollama nicht auf localhost läuft
+  ```
+  Community-Namen (re)generieren (nach Refactors/Clustering):
+  ```bash
+  graphify label . --backend ollama --model gemma4:e4b-ud-q4
+  ```
+  Details: Der `graphify`-Hook (post-commit/post-checkout) ist rein AST-basiert und braucht KEIN LLM. Die `--backend ollama --model ...`-Flags sind nur bei manuellem `graphify label`/`extract` nötig.

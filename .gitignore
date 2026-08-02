@@ -51,3 +51,5 @@ ses_*.json
 # History-rewrite artifacts (contains real secrets — never commit)
 .history-replacements.txt
 portal-backup-*.bundle
+# graphify knowledge graph (regenerated on every commit via hook; tracked via merge driver .gitattributes)
+graphify-out/
