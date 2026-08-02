@@ -26,7 +26,7 @@ test.describe('Super Admin SMTP Test Mail', () => {
         auth = new AuthHelper(page);
         sidebar = new SidebarHelper(page);
         mailpit = new MailpitHelper(request);
-        await mailpit.deleteAllMessages();
+        await mailpit.deleteMessagesFor(testUser.email);
     });
 
     test('Super Admin can send a test email and receive it', { tag: ['@smoke', '@feature:admin'] }, async ({ page }) => {

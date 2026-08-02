@@ -16,6 +16,7 @@ export interface Project {
     package: string | null;
     price_cents: number;
     payment_status: string;
+    linked_photo_job_id: string | null;
 }
 
 export interface ProjectInput {
@@ -32,8 +33,9 @@ export function useProjectsBoard() {
     const { data, isLoading, error, mutate } = useSWR<{ projects: Project[] }>('/api/management/projects', fetcher);
 
     const create = async (input: ProjectInput) => {
-        await apiMutate('/api/management/projects', 'POST', input);
+        const res = await apiMutate<{ project: Project }>('/api/management/projects', 'POST', input);
         await mutate();
+        return res.project.id;
     };
 
     const update = async (id: string, input: ProjectInput) => {
@@ -51,5 +53,10 @@ export function useProjectsBoard() {
         await mutate();
     };
 
-    return { projects: data?.projects, isLoading, error, create, update, move, remove };
+    const handoff = async (id: string) => {
+        await apiMutate(`/api/management/projects/${id}/handoff`, 'POST', {});
+        await mutate();
+    };
+
+    return { projects: data?.projects, isLoading, error, create, update, move, remove, handoff };
 }

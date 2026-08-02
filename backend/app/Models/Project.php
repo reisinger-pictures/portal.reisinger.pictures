@@ -54,7 +54,7 @@ class Project extends Model
     protected static function booted()
     {
         static::saving(function ($project) {
-            $allowedStatuses = ['anfrage', 'angebot', 'beauftragt', 'rechnung', 'bezahlt'];
+            $allowedStatuses = ['anfrage', 'angebot', 'beauftragt', 'rechnung', 'bezahlt', 'storniert'];
             if (!in_array($project->status, $allowedStatuses)) {
                 throw new \InvalidArgumentException("Ungültiger Projektstatus: {$project->status}");
             }

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PhotoJobStatus;
+use App\Models\LightroomCatalog;
 use App\Models\PhotoJob;
 use App\Support\BrandRegistry;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -16,6 +19,32 @@ class PhotoJobBoardController extends Controller
         if (!$user->is_super_admin && !$user->is_photographer) {
             abort(403, 'Forbidden');
         }
+    }
+
+    /**
+     * Flag each photo job with `lightroom_catalog_is_mine` so the frontend can
+     * hide catalog names that belong to a different user's catalog list.
+     * Handles both a Collection and a single model (normalized to a Collection).
+     */
+    private function applyCatalogPrivacy(Model|Collection $jobs): Model|Collection
+    {
+        $viewer = Auth::guard('api')->user();
+        $ownCatalogNames = LightroomCatalog::ownedBy($viewer)
+            ->pluck('name')
+            ->map(fn ($name) => (string) $name)
+            ->flip();
+
+        $isSingle = $jobs instanceof Model;
+        $items = $isSingle ? collect([$jobs]) : $jobs;
+
+        foreach ($items as $photoJob) {
+            $catalog = $photoJob->lightroom_catalog;
+            $photoJob->lightroom_catalog_is_mine = $catalog !== null
+                && $catalog !== ''
+                && $ownCatalogNames->has((string) $catalog);
+        }
+
+        return $isSingle ? $items->first() : $items;
     }
 
     private function scopedQuery(User $user): \Illuminate\Database\Eloquent\Builder
@@ -44,7 +73,7 @@ class PhotoJobBoardController extends Controller
             ->orderBy('position')
             ->get();
 
-        return response()->json(['photo_jobs' => $photoJobs]);
+        return response()->json(['photo_jobs' => $this->applyCatalogPrivacy($photoJobs)]);
     }
 
     public function store(Request $request)
@@ -71,7 +100,7 @@ class PhotoJobBoardController extends Controller
             'position' => $maxPosition + 1,
         ]));
 
-        return response()->json(['photo_job' => $photoJob->load('owner', 'assignee')], 201);
+        return response()->json(['photo_job' => $this->applyCatalogPrivacy($photoJob->load('owner', 'assignee'))], 201);
     }
 
     public function update(Request $request, $id)
@@ -93,7 +122,7 @@ class PhotoJobBoardController extends Controller
 
         $photoJob->fill($validated)->save();
 
-        return response()->json(['photo_job' => $photoJob->load('owner', 'assignee')]);
+        return response()->json(['photo_job' => $this->applyCatalogPrivacy($photoJob->load('owner', 'assignee'))]);
     }
 
     public function move(Request $request, $id)
@@ -104,7 +133,7 @@ class PhotoJobBoardController extends Controller
         $photoJob = $this->scopedQuery($user)->findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:shooting,culling,bearbeitung,export,veroeffentlicht',
+            'status' => 'required|string|in:shooting,culling,bearbeitung,export,veroeffentlicht,abgebrochen',
             'position' => 'required|integer|min:0',
         ]);
 
@@ -123,7 +152,7 @@ class PhotoJobBoardController extends Controller
             ]);
         }
 
-        return response()->json(['photo_job' => $photoJob->load('owner', 'assignee')]);
+        return response()->json(['photo_job' => $this->applyCatalogPrivacy($photoJob->load('owner', 'assignee'))]);
     }
 
     public function destroy($id)

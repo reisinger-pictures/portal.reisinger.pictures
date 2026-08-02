@@ -17,7 +17,7 @@ import { apiMutate, fetcher } from '../../api';
 const owner = { id: 'u1', name: 'Florian' };
 const mockJobs = {
     photo_jobs: [
-        { id: 'j1', status: 'shooting', position: 0, owner, assignee: null, created_at: '2026-08-02T10:00:00Z', title: 'Hochzeit Müller', lightroom_catalog: '2026-08', total_count: 1200, selected_count: 400, target_gallery_id: null, is_private: false },
+        { id: 'j1', status: 'shooting', position: 0, owner, assignee: null, created_at: '2026-08-02T10:00:00Z', title: 'Hochzeit Müller', lightroom_catalog: '2026-08', lightroom_catalog_is_mine: true, total_count: 1200, selected_count: 400, target_gallery_id: null, is_private: false },
     ],
 };
 
@@ -38,6 +38,7 @@ describe('useProductionBoard', () => {
         expect(useSWR).toHaveBeenCalledWith('/api/management/photo-jobs', fetcher);
         expect(result.current.photoJobs).toHaveLength(1);
         expect(result.current.photoJobs?.[0].title).toBe('Hochzeit Müller');
+        expect(result.current.photoJobs?.[0].lightroom_catalog_is_mine).toBe(true);
     });
 
     it('shows loading state', () => {
@@ -61,6 +62,7 @@ describe('useProductionBoard', () => {
             isLoading: false,
             mutate,
         } as never);
+        vi.mocked(apiMutate).mockResolvedValue({ photo_job: { id: 'new-1' } } as never);
 
         const { result } = renderHook(() => useProductionBoard());
         await result.current.create({ title: 'Neuer Job' });
@@ -98,5 +100,35 @@ describe('useProductionBoard', () => {
 
         await result.current.remove('j1');
         expect(apiMutate).toHaveBeenCalledWith('/api/management/photo-jobs/j1', 'DELETE');
+    });
+
+    it('move propagates api errors and does not reload', async () => {
+        const mutate = vi.fn();
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate,
+        } as never);
+        vi.mocked(apiMutate).mockRejectedValue(new Error('Netzwerkfehler'));
+
+        const { result } = renderHook(() => useProductionBoard());
+        await expect(result.current.move('j1', 'culling', 2)).rejects.toThrow('Netzwerkfehler');
+        expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('remove propagates api errors and does not reload', async () => {
+        const mutate = vi.fn();
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate,
+        } as never);
+        vi.mocked(apiMutate).mockRejectedValue(new Error('Löschen fehlgeschlagen'));
+
+        const { result } = renderHook(() => useProductionBoard());
+        await expect(result.current.remove('j1')).rejects.toThrow('Löschen fehlgeschlagen');
+        expect(mutate).not.toHaveBeenCalled();
     });
 });

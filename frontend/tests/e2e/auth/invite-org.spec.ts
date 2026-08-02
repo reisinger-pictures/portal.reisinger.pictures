@@ -11,7 +11,7 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
         const loginRes = await request.post('/api/auth/login', {
-            data: { email: 'florian@reisinger.pictures', password: 'admin' },
+            data: { email: 'admin@example.com', password: 'admin' },
             headers: { 'Accept': 'application/json' }
         });
         const cookies = loginRes.headers()['set-cookie'];

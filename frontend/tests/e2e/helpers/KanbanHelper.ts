@@ -10,12 +10,16 @@ export class KanbanHelper {
     /**
      * Gibt die Spalten-Container-Locator zurück, gescoped über `main` (Semantic Locator Scoping).
      * `exact: false` weil der Spalten-Header das Label zusammen mit dem Counter-Badge rendert (z.B. "Anfrage0").
+     * Seit der Hybrid-Grid-UX (V026) sind Spalten `w-full min-w-0` (kein fixer `w-72`); der stabile
+     * Anker ist der Header-Text innerhalb der Spalten-Box (`bg-base-200 rounded-box border`).
+     * `kanban-grid`-Scope verhindert Fehl-Anker über substring-Kollisionen (z.B. h1 "Bildbearbeitung" ⊃ "Bearbeitung").
      */
     column(label: string) {
         return this.main()
+            .locator('.kanban-grid')
             .getByText(label, { exact: false })
             .first()
-            .locator('xpath=ancestor::div[contains(@class,"w-72")][1]');
+            .locator('xpath=ancestor::div[contains(@class,"bg-base-200")][contains(@class,"rounded-box")][1]');
     }
 
     async expectColumn(label: string) {
@@ -38,7 +42,7 @@ export class KanbanHelper {
 
     async expectFieldError(labelText: string, message: string) {
         const modal = this.page.locator('.modal-open');
-        await expect(modal.locator(`.form-control:has-text("${labelText}")`)).toContainText(message);
+        await expect(modal.locator(`.form-control:has-text("${labelText}")`).first()).toContainText(message);
     }
 
     async submit() {
@@ -70,26 +74,45 @@ export class KanbanHelper {
         const ey = tb.y + (tb.height * 0.7);
 
         if (opts?.touch) {
-            await card.dispatchEvent('pointerdown', {
-                pointerId: 1, pointerType: 'touch', isPrimary: true, bubbles: true, clientX: sx, clientY: sy,
-            });
-            await this.page.waitForTimeout(80);
+            // Echte Touch-Pointer-Events via CDP (Input.dispatchTouchEvent): Synthetische
+            // dispatchEvent()-PointerEvents umgehen die Browser-Pointer-Pipeline und
+            // aktivieren dnd-kit's PointerSensor nicht (setPointerCapture wird ignoriert).
+            const client = await this.page.context().newCDPSession(this.page);
+            await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: sx, y: sy }] });
+            // dnd-kit PointerSensor: für pointerType 'touch' gilt ein Delay-ActivationConstraint
+            // (250ms + 5ms Toleranz) — der Touch muss gehalten werden, bevor die Bewegung startet.
+            await this.page.waitForTimeout(320);
             const steps = 12;
             for (let i = 1; i <= steps; i++) {
-                await this.page.locator('body').dispatchEvent('pointermove', {
-                    pointerId: 1, pointerType: 'touch', isPrimary: true, bubbles: true,
-                    clientX: sx + ((ex - sx) * i) / steps, clientY: sy + ((ey - sy) * i) / steps,
+                await client.send('Input.dispatchTouchEvent', {
+                    type: 'touchMove',
+                    touchPoints: [{ x: sx + ((ex - sx) * i) / steps, y: sy + ((ey - sy) * i) / steps }],
                 });
                 await this.page.waitForTimeout(22);
             }
-            await target.dispatchEvent('pointerup', {
-                pointerId: 1, pointerType: 'touch', isPrimary: true, bubbles: true,
-                clientX: ex, clientY: ey,
-            });
+            await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            await client.detach();
         } else {
             await this.page.mouse.move(sx, sy);
             await this.page.mouse.down();
-            await this.page.mouse.move(ex, ey, { steps: 18 });
+            const vp = this.page.viewportSize();
+            let dropPoint = { x: ex, y: ey };
+            if (vp && (ey > vp.height - 12 || ey < 0)) {
+                // Mobile Stapellayout: Ziel-Spalte liegt außerhalb des Viewports.
+                // Pointer am unteren Viewport-Rand verweilen lassen → dnd-kit auto-scrollt,
+                // dann live zur aktuellen Zielposition ziehen.
+                let targetBox = await target.boundingBox();
+                for (let i = 0; i < 80 && targetBox; i++) {
+                    await this.page.mouse.move(ex > vp.width / 2 ? vp.width - 12 : 12, vp.height - 12);
+                    await this.page.waitForTimeout(40);
+                    targetBox = await target.boundingBox();
+                    if (targetBox && targetBox.y > 0 && targetBox.y + targetBox.height <= vp.height) {
+                        dropPoint = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height * 0.7 };
+                        break;
+                    }
+                }
+            }
+            await this.page.mouse.move(dropPoint.x, dropPoint.y, { steps: 10 });
             await this.page.mouse.up();
         }
 

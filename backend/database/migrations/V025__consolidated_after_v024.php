@@ -79,7 +79,7 @@ return new class extends Migration
             $table->unsignedInteger('selected_count')->default(0);
             $table->foreignUuid('target_gallery_id')->nullable()->constrained('galleries')->nullOnDelete();
             $table->boolean('is_private')->default(false);
-            $table->enum('status', ['shooting', 'culling', 'bearbeitung', 'export', 'veroeffentlicht'])->default('shooting');
+            $table->enum('status', ['shooting', 'culling', 'bearbeitung', 'export', 'veroeffentlicht', 'abgebrochen'])->default('shooting');
             $table->unsignedInteger('position')->default(0);
             $table->timestamps();
         });
@@ -96,7 +96,7 @@ return new class extends Migration
             $table->string('package', 255)->nullable();
             $table->unsignedInteger('price_cents')->nullable();
             $table->enum('payment_status', ['open', 'partly_paid', 'paid'])->default('open');
-            $table->enum('status', ['anfrage', 'angebot', 'beauftragt', 'rechnung', 'bezahlt'])->default('anfrage');
+            $table->enum('status', ['anfrage', 'angebot', 'beauftragt', 'rechnung', 'bezahlt', 'storniert'])->default('anfrage');
             $table->unsignedInteger('position')->default(0);
             $table->foreignUuid('linked_photo_job_id')->nullable()->constrained('photo_jobs')->nullOnDelete();
             $table->timestamps();
@@ -112,6 +112,16 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
 
             $table->index(['item_type', 'item_id']);
+        });
+
+        Schema::create('lightroom_catalogs', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('user_id')->constrained('users')->onDelete('cascade');
+            $table->string('name', 255);
+            $table->unsignedInteger('position')->default(0);
+            $table->timestamps();
+
+            $table->unique(['user_id', 'name']);
         });
 
         // ══════════════════════════════════════════════════════════════
@@ -403,6 +413,7 @@ return new class extends Migration
 
         // Reverse V033: drop kanban tables
         Schema::dropIfExists('workflow_logs');
+        Schema::dropIfExists('lightroom_catalogs');
         Schema::dropIfExists('projects');
         Schema::dropIfExists('photo_jobs');
 

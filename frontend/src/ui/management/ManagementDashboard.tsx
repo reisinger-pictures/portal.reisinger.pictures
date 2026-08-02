@@ -26,6 +26,7 @@ import ManagementPayoutsView from './ManagementPayoutsView';
 import ManagementCouponsView from './ManagementCouponsView';
 import ManagementContractView from './ManagementContractView';
 import ManagementProjectsBoard from './ManagementProjectsBoard';
+import ManagementBoardsView from './ManagementBoardsView';
 import PhotographerPayoutsView from '../photographer/PhotographerPayoutsView';
 import PhotographerProductionBoard from '../photographer/PhotographerProductionBoard';
 import PhotographerTeamModal from './components/PhotographerTeamModal';
@@ -65,6 +66,7 @@ function DashboardView({
                 {currentView === 'my-payouts' && <PhotographerPayoutsView/>}
                 {currentView === 'admin-projects' && <ManagementProjectsBoard/>}
                 {currentView === 'production' && <PhotographerProductionBoard/>}
+                {currentView === 'boards' && <ManagementBoardsView/>}
             </ErrorBoundary>
             <PhotographerTeamModal isOpen={!!teamModalNode} onClose={() => onTeamModalChange(null)}
                                    item={teamModalNode}
@@ -82,7 +84,7 @@ export default function ManagementDashboard() {
     const pathView = location.pathname.replace('/', '');
     const currentView = pathView || 'structure';
     const {canAccessB2BFeatures, isSuperAdmin, isPhotographer} = usePermissions();
-    const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts', 'admin-contracts', 'admin-projects', 'production'].includes(currentView);
+    const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts', 'admin-contracts', 'admin-projects', 'production', 'boards'].includes(currentView);
 
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const {user} = useAuth();

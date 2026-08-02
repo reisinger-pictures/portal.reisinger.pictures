@@ -16,13 +16,15 @@ vi.mock('../components/UIContext', () => ({
 }));
 
 vi.mock('../components/KanbanBoard', () => ({
-    default: ({ title, items, renderCard }: {
+    default: ({ title, columns, items, renderCard }: {
         title: string;
+        columns: Array<{ status: string; label: string }>;
         items: Array<{ id: string; status: string }>;
         renderCard: (item: { id: string; status: string }) => React.ReactNode;
     }) => (
         <div>
             <h1>{title}</h1>
+            {columns.map(c => <div key={c.status}>{c.label}</div>)}
             {items.map(item => <div key={item.id} data-testid="job-card">{renderCard(item)}</div>)}
         </div>
     ),
@@ -41,11 +43,16 @@ const job = {
     created_at: '2026-08-02T10:00:00Z',
     title: 'Hochzeit Sommer',
     lightroom_catalog: null,
+    lightroom_catalog_is_mine: false,
     total_count: 0,
     selected_count: 0,
     target_gallery_id: null,
     is_private: false,
 };
+
+function jobWith(overrides: Record<string, unknown>) {
+    return { ...job, ...overrides };
+}
 
 describe('PhotographerProductionBoard', () => {
     beforeEach(() => {
@@ -69,9 +76,44 @@ describe('PhotographerProductionBoard', () => {
         expect(screen.getByText('Bildbearbeitung')).toBeInTheDocument();
     });
 
+    it('renders the Abgebrochen column', () => {
+        renderWithProviders(<PhotographerProductionBoard />);
+        expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
+    });
+
     it('renders a job card when data is present', () => {
         renderWithProviders(<PhotographerProductionBoard />);
         expect(screen.getByText('Hochzeit Sommer')).toBeInTheDocument();
+    });
+
+    it('shows the catalog name when it belongs to the viewer', () => {
+        vi.mocked(useProductionBoard).mockReturnValue({
+            photoJobs: [jobWith({ lightroom_catalog: '2026-08', lightroom_catalog_is_mine: true })],
+            isLoading: false,
+            error: undefined,
+            create: vi.fn(),
+            update: vi.fn(),
+            move: vi.fn(),
+            remove: vi.fn(),
+        } as never);
+
+        renderWithProviders(<PhotographerProductionBoard />);
+        expect(screen.getByText('2026-08')).toBeInTheDocument();
+    });
+
+    it('hides the catalog name for foreign catalogs', () => {
+        vi.mocked(useProductionBoard).mockReturnValue({
+            photoJobs: [jobWith({ lightroom_catalog: 'Fremder Katalog', lightroom_catalog_is_mine: false })],
+            isLoading: false,
+            error: undefined,
+            create: vi.fn(),
+            update: vi.fn(),
+            move: vi.fn(),
+            remove: vi.fn(),
+        } as never);
+
+        renderWithProviders(<PhotographerProductionBoard />);
+        expect(screen.queryByText('Fremder Katalog')).not.toBeInTheDocument();
     });
 
     it('shows a spinner while loading', () => {

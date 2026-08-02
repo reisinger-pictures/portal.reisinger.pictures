@@ -8,7 +8,7 @@ export class AuthHelper {
         this.network = new NetworkHelper(page);
     }
 
-    async login(email = 'florian@reisinger.pictures', password = 'admin', loginUrl?: string) {
+    async login(email = 'admin@example.com', password = 'admin', loginUrl?: string) {
         await this.page.goto(loginUrl ?? '/');
 
         await expect(this.page.getByTestId('app-loader').first()).toBeHidden({ timeout: 5000 });

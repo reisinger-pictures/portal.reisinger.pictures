@@ -18,7 +18,7 @@ export class E2ESessionHelper {
     private async ensureAdminLogin() {
         if (this.adminToken) return;
         const loginRes = await this.request.post('/api/auth/login', {
-            data: { email: 'florian@reisinger.pictures', password: 'admin' },
+            data: { email: process.env.ADMIN_EMAIL || 'admin@example.com', password: process.env.ADMIN_PASSWORD || 'admin' },
             headers: { 'Accept': 'application/json' }
         });
         if (!loginRes.ok()) throw new Error('Admin login failed: ' + await loginRes.text());

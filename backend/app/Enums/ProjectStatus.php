@@ -13,6 +13,7 @@ enum ProjectStatus: string
     case BEAUFTRAGT = 'beauftragt';
     case RECHNUNG = 'rechnung';
     case BEZAHLT = 'bezahlt';
+    case STORNIERT = 'storniert';
 
     /** The status a new project is created in. */
     public static function initial(): self

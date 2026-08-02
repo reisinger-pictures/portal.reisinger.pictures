@@ -117,6 +117,40 @@ describe('computePermissions', () => {
         });
     });
 
+    describe('board access', () => {
+        it('canAccessProductionBoard is true for photographer or super admin', () => {
+            expect(computePermissions(user({ is_photographer: true })).canAccessProductionBoard).toBe(true);
+            expect(computePermissions(user({ is_super_admin: true })).canAccessProductionBoard).toBe(true);
+            expect(computePermissions(user({ is_admin: true })).canAccessProductionBoard).toBe(false);
+            expect(computePermissions(user({})).canAccessProductionBoard).toBe(false);
+        });
+
+        it('canAccessProjectsBoard is true for admin (incl super admin) only', () => {
+            expect(computePermissions(user({ is_admin: true })).canAccessProjectsBoard).toBe(true);
+            expect(computePermissions(user({ is_super_admin: true, is_admin: true })).canAccessProjectsBoard).toBe(true);
+            expect(computePermissions(user({ is_photographer: true })).canAccessProjectsBoard).toBe(false);
+            expect(computePermissions(user({})).canAccessProjectsBoard).toBe(false);
+        });
+
+        it('super admin serialized per API contract gets access to both boards', () => {
+            const p = computePermissions(user({ is_super_admin: true, is_admin: true }));
+            expect(p.canAccessProjectsBoard).toBe(true);
+            expect(p.canAccessProductionBoard).toBe(true);
+        });
+
+        it('super admin without the is_admin flag loses projects board access', () => {
+            const p = computePermissions(user({ is_super_admin: true, is_admin: false }));
+            expect(p.canAccessProjectsBoard).toBe(false);
+            expect(p.canAccessProductionBoard).toBe(true);
+        });
+
+        it('staff role combinations without board roles still expose no board', () => {
+            const p = computePermissions(user({ is_org_admin: true }));
+            expect(p.canAccessProjectsBoard).toBe(false);
+            expect(p.canAccessProductionBoard).toBe(false);
+        });
+    });
+
     describe('magic link / guest scenarios', () => {
         it('transient user without roles gets no permissions', () => {
             const transientUser = user({

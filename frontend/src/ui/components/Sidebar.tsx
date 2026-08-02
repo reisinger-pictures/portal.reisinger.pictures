@@ -23,7 +23,7 @@ interface SidebarProps {
 export default function Sidebar(props: SidebarProps) {
     const { logoSrc, portalName, impressumUrl, features } = useBrand();
     const {user, logout} = useAuth();
-    const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isOrgAdmin, showOrgsSection } = usePermissions();
+    const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isOrgAdmin, showOrgsSection, canAccessProductionBoard } = usePermissions();
     const licensingMode = useLicensingMode();
     const isVolumeLicensing = licensingMode === 'volume_licensing';
     const navigate = useNavigate();
@@ -66,7 +66,7 @@ export default function Sidebar(props: SidebarProps) {
                         {isPhotographer && (
                             <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--folder-multiple text-lg"></span> <Trans>Galerien & Ordner</Trans></Link></li>
                         )}
-                        {isPhotographer && (
+                        {canAccessProductionBoard && (
                             <li><Link to="/production" className={props.currentView === 'production' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--image-edit text-lg"></span> <Trans>Bildbearbeitung</Trans></Link></li>
                         )}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> <Trans>Suche & Entdecken</Trans></Link></li>
@@ -74,7 +74,12 @@ export default function Sidebar(props: SidebarProps) {
                         {isAdmin && (
                             <>
                                 <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Büro & Dokumente</Trans></li>
-                                <li><Link to="/admin-projects" className={props.currentView === 'admin-projects' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-column text-lg"></span> <Trans>Projekte</Trans></Link></li>
+                                {isSuperAdmin && (
+                                    <li><Link to="/boards?tab=projects" className={props.currentView === 'boards' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-column text-lg"></span> <Trans>Workflow</Trans></Link></li>
+                                )}
+                                {isAdmin && !isSuperAdmin && (
+                                    <li><Link to="/admin-projects" className={props.currentView === 'admin-projects' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-column text-lg"></span> <Trans>Projekte</Trans></Link></li>
+                                )}
                                 <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> <Trans>Shop-Bestellungen</Trans></Link></li>
                                 <li><Link to="/admin-payouts" className={props.currentView === 'admin-payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> <Trans>Payouts & Abrechnung</Trans></Link></li>
                                 {isSuperAdmin && (

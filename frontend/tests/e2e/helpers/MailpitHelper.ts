@@ -6,22 +6,28 @@ export class MailpitHelper {
 
     constructor(private request: APIRequestContext) {}
 
-    async deleteAllMessages() {
-        await this.request.delete(`${this.baseUrl}/messages`);
+    async deleteMessagesFor(email: string) {
+        await this.request.delete(`${this.baseUrl}/search?query=${encodeURIComponent(`to:"${email}"`)}`);
     }
 
     async getMessageForEmail(email: string) {
-        for (let i = 0; i < 15; i++) {
-            const response = await this.request.get(`${this.baseUrl}/messages?query=${encodeURIComponent(email)}`);
+        for (let i = 0; i < 20; i++) {
+            // Mailpit paginiert die Message-Liste (Default-Limit ~50). Unter
+            // paralleler Playwright-Last füllt sich die Mailbox schnell — die
+            // Ziel-Mail darf nicht aus der ersten Seite rutschen, sonst wird sie
+            // nie gefunden. Daher explizites hohes Limit + präziser Empfänger-Filter.
+            const response = await this.request.get(`${this.baseUrl}/messages?query=${encodeURIComponent(`to:"${email}"`)}&limit=1000`);
             const data = await response.json();
             if (data.messages && data.messages.length > 0) {
-                const msg = data.messages.find((m: MailpitMessage) => JSON.stringify(m.To).includes(email));
+                const msg = data.messages.find((m: MailpitMessage) =>
+                    m.To?.some((recipient: {Address?: string}) => recipient.Address === email)
+                );
                 if (msg) {
                     const detailResponse = await this.request.get(`${this.baseUrl}/message/${msg.ID}`);
                     return await detailResponse.json();
                 }
             }
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
         return null;
     }

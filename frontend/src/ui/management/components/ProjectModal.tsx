@@ -1,14 +1,18 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useUI } from '../../components/UIContext';
+import AutocompleteInput from '../../components/AutocompleteInput';
+import { Customer } from '../../../api';
 import { Project, ProjectInput } from '../../../logic/useProjectsBoard';
 import { useUsers } from '../../../logic/useUsers';
 
 const priceMessage = t`Bitte einen gültigen Betrag eingeben`;
+
+export interface BoardStatusOption { value: string; label: string; }
 
 const projectSchema = z.object({
     client_name: z.string().min(1, t`Kundenname ist erforderlich`),
@@ -20,6 +24,7 @@ const projectSchema = z.object({
         { message: priceMessage }
     ),
     payment_status: z.string().optional(),
+    status: z.string().optional(),
     assignee_id: z.string().optional(),
 });
 
@@ -29,8 +34,10 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     defaultStatus: string;
+    statusOptions: BoardStatusOption[];
     editing?: Project | null;
-    onSave: (payload: ProjectInput) => Promise<void>;
+    onSave: (payload: ProjectInput & { status?: string }) => Promise<void>;
+    initial?: { client_name?: string; email?: string };
 }
 
 const paymentOptions = [
@@ -39,8 +46,8 @@ const paymentOptions = [
     { value: 'paid', label: t`Bezahlt` },
 ];
 
-export default function ProjectModal({ isOpen, onClose, editing, onSave }: Props) {
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProjectFormValues>({
+export default function ProjectModal({ isOpen, onClose, editing, onSave, initial, defaultStatus, statusOptions }: Props) {
+    const { register, control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<ProjectFormValues>({
         resolver: zodResolver(projectSchema),
         defaultValues: {
             client_name: '',
@@ -49,6 +56,7 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave }: Props
             package: '',
             price_eur: '',
             payment_status: 'open',
+            status: '',
             assignee_id: '',
         },
     });
@@ -58,16 +66,17 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave }: Props
     useEffect(() => {
         if (isOpen) {
             reset({
-                client_name: editing?.client_name ?? '',
-                email: editing?.email ?? '',
+                client_name: editing?.client_name ?? initial?.client_name ?? '',
+                email: editing?.email ?? initial?.email ?? '',
                 phone: editing?.phone ?? '',
                 package: editing?.package ?? '',
                 price_eur: editing?.price_cents != null ? String(editing.price_cents / 100) : '',
                 payment_status: editing?.payment_status ?? 'open',
+                status: editing?.status ?? defaultStatus ?? '',
                 assignee_id: editing?.assignee?.id ?? '',
             });
         }
-    }, [isOpen, editing, reset]);
+    }, [isOpen, editing, initial, defaultStatus, reset]);
 
     if (!isOpen) return null;
 
@@ -84,8 +93,9 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave }: Props
         if (data.assignee_id) {
             input.assignee_id = data.assignee_id;
         }
+        const payload: ProjectInput & { status?: string } = { ...input, status: data.status || undefined };
         try {
-            await onSave(input);
+            await onSave(payload);
             onClose();
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : t`Speichern fehlgeschlagen`);
@@ -102,8 +112,31 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave }: Props
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold"><Trans>Kundenname</Trans></span></label>
-                            <input required type="text" {...register('client_name')} className={`input input-bordered ${errors.client_name ? 'input-error' : ''}`} />
+                            {editing ? (
+                                <>
+                                    <label className="label"><span className="label-text font-bold"><Trans>Kundenname</Trans></span></label>
+                                    <input required type="text" {...register('client_name')} className={`input input-bordered ${errors.client_name ? 'input-error' : ''}`} />
+                                </>
+                            ) : (
+                                <Controller
+                                    name="client_name"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <AutocompleteInput<Customer>
+                                            label={t`Kundenname`}
+                                            required
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                            onSelect={(c) => {
+                                                field.onChange(c.name || '');
+                                                setValue('email', c.email || '');
+                                            }}
+                                            endpoint="/api/management/customers?q="
+                                            mapResponse={(data) => data.map(c => ({ id: c.id, title: c.name || c.company || t`Unbekannt`, subtitle: c.email || '', raw: c }))}
+                                        />
+                                    )}
+                                />
+                            )}
                             {errors.client_name && <span className="text-error text-xs mt-1">{errors.client_name.message}</span>}
                         </div>
                         <div className="form-control">
@@ -131,6 +164,12 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave }: Props
                             <label className="label"><span className="label-text font-bold"><Trans>Zahlungsstatus</Trans></span></label>
                             <select {...register('payment_status')} className="select select-bordered">
                                 {paymentOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold"><Trans>Status</Trans></span></label>
+                            <select {...register('status')} className="select select-bordered">
+                                {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
                         </div>
                         <div className="form-control">

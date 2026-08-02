@@ -9,7 +9,7 @@ test.describe('Teardown Integrity Validation', () => {
 
         // Als Super-Admin anmelden um die DB abzufragen
         const loginRes = await request.post('/api/auth/login', {
-            data: {email: 'florian@reisinger.pictures', password: 'admin'},
+            data: {email: 'admin@example.com', password: 'admin'},
             headers: {'Accept': 'application/json'}
         });
         const adminToken = loginRes.headers()['set-cookie'];

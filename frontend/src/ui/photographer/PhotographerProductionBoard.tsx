@@ -14,11 +14,17 @@ const columns: KanbanColumnDef[] = [
     { status: 'bearbeitung', label: t`Bearbeitung` },
     { status: 'export', label: t`Export` },
     { status: 'veroeffentlicht', label: t`Veröffentlicht` },
+    { status: 'abgebrochen', label: t`Abgebrochen` },
 ];
 
-export default function PhotographerProductionBoard() {
+interface PhotographerProductionBoardProps {
+    embedded?: boolean;
+}
+
+export default function PhotographerProductionBoard({ embedded = false }: PhotographerProductionBoardProps) {
     const { photoJobs, isLoading, error, create, update, move, remove } = useProductionBoard();
-    const { canAccessProductionBoard } = usePermissions();
+    const { canAccessProductionBoard, isSuperAdmin } = usePermissions();
+    const disallowDrag = !isSuperAdmin;
     const { showToast, confirm } = useUI();
 
     const [modalOpen, setModalOpen] = useState(false);
@@ -81,21 +87,21 @@ export default function PhotographerProductionBoard() {
                 {label}
                 <span className="badge badge-ghost badge-sm">{items.filter(i => i.status === status).length}</span>
             </div>
-            <button type="button" className="btn btn-circle btn-xs btn-ghost" title={t`Neuer Auftrag`} onClick={() => openNew(status)}>
+            <button type="button" className="btn btn-primary btn-sm btn-circle border-0" title={t`Neuer Auftrag`} onClick={() => openNew(status)}>
                 <span className="iconify mdi--plus"></span>
             </button>
         </div>
     );
 
     const renderCard = (item: PhotoJob) => (
-        <div className="card card-body p-3 bg-base-100 shadow-sm border border-base-300 rounded-lg hover:border-primary">
+        <div className={`card card-body p-3 bg-base-100 shadow-sm border border-base-300 rounded-lg hover:border-primary ${item.status === 'abgebrochen' ? 'opacity-70' : ''}`}>
             <div className="flex items-start justify-between gap-2">
                 <div className="font-semibold leading-tight">{item.title}</div>
                 <button type="button" className="btn btn-circle btn-xs btn-ghost" onClick={() => handleDelete(item)}>
                     <span className="iconify mdi--trash-can-outline text-error"></span>
                 </button>
             </div>
-            {item.lightroom_catalog && <div className="text-xs opacity-60">{item.lightroom_catalog}</div>}
+            {item.lightroom_catalog_is_mine === true && item.lightroom_catalog && <div className="text-xs opacity-60">{item.lightroom_catalog}</div>}
             {(item.total_count > 0 || item.selected_count > 0) && (
                 <div className="text-xs text-base-content/70">
                     {item.selected_count} / {item.total_count} {t`Bilder`}
@@ -126,11 +132,14 @@ export default function PhotographerProductionBoard() {
                 }}
                 renderColumnHeader={renderColumnHeader}
                 renderCard={renderCard}
+                disallowDrag={disallowDrag}
+                embedded={embedded}
             />
             <PhotoJobModal
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
                 defaultStatus={defaultStatus}
+                statusOptions={columns.map(c => ({ value: c.status, label: c.label }))}
                 editing={editing}
                 onSave={handleSave}
             />

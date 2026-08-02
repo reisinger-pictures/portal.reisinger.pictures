@@ -167,4 +167,156 @@ class ProjectBoardTest extends TestCase
     {
         $this->getJson('/api/management/projects')->assertStatus(401);
     }
+
+    public function test_update_changes_fields_and_keeps_owner_without_workflow_log(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id, 'price_cents' => 0]);
+
+        $response = $this->withHeaders($headers)->putJson("/api/management/projects/{$project->id}", [
+            'client_name' => 'Neuer Kunde',
+            'price_cents' => 99900,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('project.client_name', 'Neuer Kunde');
+        $response->assertJsonPath('project.price_cents', 99900);
+        $response->assertJsonPath('project.owner_id', $admin->id);
+        $this->assertDatabaseHas('projects', [
+            'id' => $project->id,
+            'client_name' => 'Neuer Kunde',
+            'price_cents' => 99900,
+            'owner_id' => $admin->id,
+        ]);
+        $this->assertDatabaseMissing('workflow_logs', [
+            'item_type' => 'project',
+            'item_id' => $project->id,
+        ]);
+    }
+
+    public function test_update_rejects_unrelated_item_with_404(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $otherUser = User::factory()->create();
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $otherUser->id]);
+
+        $this->withHeaders($headers)->putJson("/api/management/projects/{$project->id}", [
+            'client_name' => 'Hijack',
+        ])->assertStatus(404);
+    }
+
+    public function test_update_rejects_negative_price_with_422(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id]);
+
+        $this->withHeaders($headers)->putJson("/api/management/projects/{$project->id}", [
+            'price_cents' => -5,
+        ])->assertStatus(422);
+    }
+
+    public function test_destroy_removes_item_but_keeps_workflow_log(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id, 'status' => 'anfrage']);
+
+        $this->withHeaders($headers)->patchJson("/api/management/projects/{$project->id}/move", [
+            'status' => 'angebot',
+            'position' => 0,
+        ])->assertStatus(200);
+
+        $this->withHeaders($headers)->deleteJson("/api/management/projects/{$project->id}")->assertStatus(200);
+
+        $this->assertDatabaseMissing('projects', ['id' => $project->id]);
+        $this->assertDatabaseHas('workflow_logs', [
+            'item_type' => 'project',
+            'item_id' => $project->id,
+            'to_status' => 'angebot',
+        ]);
+    }
+
+    public function test_assignee_can_move_item_owned_by_other_user(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $otherUser = User::factory()->create();
+        $project = Project::factory()->create([
+            'brand' => Brand::B2B,
+            'owner_id' => $otherUser->id,
+            'assignee_id' => $admin->id,
+            'status' => 'anfrage',
+        ]);
+
+        $this->withHeaders($headers)->patchJson("/api/management/projects/{$project->id}/move", [
+            'status' => 'angebot',
+            'position' => 0,
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('projects', [
+            'id' => $project->id,
+            'status' => 'angebot',
+            'owner_id' => $otherUser->id,
+        ]);
+    }
+
+    public function test_move_to_storniert_is_accepted_and_logged(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id]);
+
+        $response = $this->withHeaders($headers)->patchJson("/api/management/projects/{$project->id}/move", [
+            'status' => 'storniert',
+            'position' => 3,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('project.status', 'storniert');
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'status' => 'storniert']);
+        $this->assertDatabaseHas('workflow_logs', [
+            'item_type' => 'project',
+            'item_id' => $project->id,
+            'from_status' => 'anfrage',
+            'to_status' => 'storniert',
+            'user_id' => $admin->id,
+        ]);
+    }
+
+    public function test_move_rejects_invalid_status_with_422(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id]);
+
+        $this->withHeaders($headers)->patchJson("/api/management/projects/{$project->id}/move", [
+            'status' => 'garbage',
+            'position' => 0,
+        ])->assertStatus(422);
+    }
+
+    public function test_move_requires_position(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id]);
+
+        $this->withHeaders($headers)->patchJson("/api/management/projects/{$project->id}/move", [
+            'status' => 'angebot',
+        ])->assertStatus(422);
+    }
+
+    public function test_unauthenticated_gets_401_on_all_endpoints(): void
+    {
+        $id = (string) \Illuminate\Support\Str::uuid();
+
+        $this->getJson('/api/management/projects')->assertStatus(401);
+        $this->postJson('/api/management/projects', ['client_name' => 'X'])->assertStatus(401);
+        $this->putJson("/api/management/projects/{$id}", ['client_name' => 'X'])->assertStatus(401);
+        $this->patchJson("/api/management/projects/{$id}/move", ['status' => 'anfrage', 'position' => 0])->assertStatus(401);
+        $this->deleteJson("/api/management/projects/{$id}")->assertStatus(401);
+    }
 }

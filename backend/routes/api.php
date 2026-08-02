@@ -17,6 +17,7 @@ use App\Http\Controllers\GalleryFrontendController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\InviteController;
 use App\Http\Controllers\LicenseCatalogController;
+use App\Http\Controllers\LightroomCatalogController;
 use App\Http\Controllers\MailController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
@@ -265,6 +266,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/projects', [ProjectBoardController::class, 'store'])->name('api.management.projects.store');
     Route::put('/management/projects/{id}', [ProjectBoardController::class, 'update'])->name('api.management.projects.update');
     Route::patch('/management/projects/{id}/move', [ProjectBoardController::class, 'move'])->name('api.management.projects.move');
+    Route::post('/management/projects/{id}/handoff', [ProjectBoardController::class, 'handoff'])->name('api.management.projects.handoff');
     Route::delete('/management/projects/{id}', [ProjectBoardController::class, 'destroy'])->name('api.management.projects.destroy');
 
     Route::get('/management/photo-jobs', [PhotoJobBoardController::class, 'index'])->name('api.management.photo-jobs.index');
@@ -272,5 +274,10 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::put('/management/photo-jobs/{id}', [PhotoJobBoardController::class, 'update'])->name('api.management.photo-jobs.update');
     Route::patch('/management/photo-jobs/{id}/move', [PhotoJobBoardController::class, 'move'])->name('api.management.photo-jobs.move');
     Route::delete('/management/photo-jobs/{id}', [PhotoJobBoardController::class, 'destroy'])->name('api.management.photo-jobs.destroy');
+
+    Route::get('/management/lightroom-catalogs', [LightroomCatalogController::class, 'index'])->name('api.management.lightroom-catalogs.index');
+    Route::post('/management/lightroom-catalogs', [LightroomCatalogController::class, 'store'])->name('api.management.lightroom-catalogs.store');
+    Route::put('/management/lightroom-catalogs/{id}', [LightroomCatalogController::class, 'update'])->name('api.management.lightroom-catalogs.update');
+    Route::delete('/management/lightroom-catalogs/{id}', [LightroomCatalogController::class, 'destroy'])->name('api.management.lightroom-catalogs.destroy');
 
 });

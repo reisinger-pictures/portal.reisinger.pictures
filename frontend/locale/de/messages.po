@@ -277,6 +277,10 @@ msgstr "Ab 20 Bilder"
 msgid "Abbrechen"
 msgstr "Abbrechen"
 
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Abgebrochen"
+msgstr "Abgebrochen"
+
 #: src/ui/components/GalleryModal.tsx
 msgid "Ablaufdatum"
 msgstr "Ablaufdatum"
@@ -346,6 +350,7 @@ msgstr "Akt & Boudoir"
 msgid "Aktion"
 msgstr "Aktion"
 
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
@@ -463,7 +468,12 @@ msgstr "Angebot ausständig"
 msgid "Angebot erfolgreich angefragt!"
 msgstr "Angebot erfolgreich angefragt!"
 
+#: src/logic/useProjectPdfDrop.ts
+msgid "Angebot erkannt – Felder vorbefüllt"
+msgstr "Angebot erkannt – Felder vorbefüllt"
+
 #: src/ui/management/components/invoice/InvoiceDragDropZone.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Angebot hier ablegen"
 msgstr "Angebot hier ablegen"
 
@@ -855,6 +865,7 @@ msgid "Bild öffnen"
 msgstr "Bild öffnen"
 
 #: src/ui/components/Sidebar.tsx
+#: src/ui/management/ManagementBoardsView.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Bildbearbeitung"
 msgstr "Bildbearbeitung"
@@ -950,6 +961,7 @@ msgid "Bitte hinterlege deine Firmendaten in den"
 msgstr "Bitte hinterlege deine Firmendaten in den"
 
 #: src/logic/useInvoiceDragDrop.ts
+#: src/logic/useProjectPdfDrop.ts
 msgid "Bitte lade eine gültige PDF-Datei hoch."
 msgstr "Bitte lade eine gültige PDF-Datei hoch."
 
@@ -1151,6 +1163,10 @@ msgstr "Deine Bestellungen können über die Organisation abgerechnet werden"
 #: src/ui/OrgInviteView.tsx
 msgid "Deine E-Mail"
 msgstr "Deine E-Mail"
+
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Deine Lightroom-Kataloge"
+msgstr "Deine Lightroom-Kataloge"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Deine Lizenzen"
@@ -1572,6 +1588,7 @@ msgid "Fehler bei der Stadt-Validierung für \"{detectedCity}\"."
 msgstr "Fehler bei der Stadt-Validierung für \"{detectedCity}\"."
 
 #: src/logic/usePdfExtraction.ts
+#: src/logic/useProjectPdfDrop.ts
 msgid "Fehler beim Auslesen."
 msgstr "Fehler beim Auslesen."
 
@@ -1690,6 +1707,7 @@ msgstr "Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen."
 
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
 #: src/ui/management/components/GalleryAccessModal.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -2112,6 +2130,7 @@ msgstr "Hier werden die ursprünglichen Metadaten gespeichert, <0>bevor</0> ein 
 msgid "Hinweistext (Gültigkeit & Annahme)"
 msgstr "Hinweistext (Gültigkeit & Annahme)"
 
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
 #: src/ui/management/components/GalleryAccessModal.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
 #: src/ui/management/ManagementContractView.tsx
@@ -2178,6 +2197,10 @@ msgstr "Impressum & Bankdaten unvollständig!"
 #: src/ui/components/Sidebar.tsx
 msgid "Impressum & Datenschutz"
 msgstr "Impressum & Datenschutz"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "In Bildbearbeitung übernehmen"
+msgstr "In Bildbearbeitung übernehmen"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 #: src/ui/client/components/VolumeLicensingCard.tsx
@@ -2273,6 +2296,22 @@ msgstr "Kalkulieren & Antworten"
 msgid "Kalkulieren & E-Mail senden"
 msgstr "Kalkulieren & E-Mail senden"
 
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Katalog aktualisiert"
+msgstr "Katalog aktualisiert"
+
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Katalog gelöscht"
+msgstr "Katalog gelöscht"
+
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Katalog hinzugefügt"
+msgstr "Katalog hinzugefügt"
+
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Katalog löschen?"
+msgstr "Katalog löschen?"
+
 #: src/ui/management/components/ProductModal.tsx
 msgid "Katalog-Eintrag bearbeiten"
 msgstr "Katalog-Eintrag bearbeiten"
@@ -2280,6 +2319,10 @@ msgstr "Katalog-Eintrag bearbeiten"
 #: src/ui/client/ClientCartView.tsx
 msgid "Kauf auf Rechnung"
 msgstr "Kauf auf Rechnung"
+
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Kein Katalog"
+msgstr "Kein Katalog"
 
 #: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
@@ -2690,6 +2733,10 @@ msgstr "Letzte Aktivitäten"
 msgid "Lightroom-Katalog"
 msgstr "Lightroom-Katalog"
 
+#: src/ui/management/components/LightroomCatalogSettings.tsx
+#~ msgid "Lightroom-Kataloge"
+#~ msgstr "Lightroom-Kataloge"
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "Link kopieren"
 msgstr "Link kopieren"
@@ -2758,6 +2805,7 @@ msgstr "Lokal:"
 msgid "Löschen"
 msgstr "Löschen"
 
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Löschen fehlgeschlagen"
@@ -2995,6 +3043,10 @@ msgstr "Möchtest du diesen Baustein wirklich löschen?"
 msgid "Möchtest du diesen Eintrag wirklich entfernen?"
 msgstr "Möchtest du diesen Eintrag wirklich entfernen?"
 
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Möchtest du diesen Katalog wirklich löschen?"
+msgstr "Möchtest du diesen Katalog wirklich löschen?"
+
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Möchtest du diesen Kunden wirklich aus dem CRM entfernen?"
 msgstr "Möchtest du diesen Kunden wirklich aus dem CRM entfernen?"
@@ -3057,6 +3109,7 @@ msgid "Nachricht Senden"
 msgstr "Nachricht Senden"
 
 #: src/ui/components/GalleryGroupModal.tsx
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
 #: src/ui/management/components/CreateUserModal.tsx
 #: src/ui/management/components/InviteModal.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
@@ -3085,6 +3138,7 @@ msgstr "Name der Galerie"
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
 #: src/ui/management/components/CreateUserModal.tsx
 #: src/ui/management/components/ProductModal.tsx
 #: src/ui/management/components/ProfileSettingsCard.tsx
@@ -3189,6 +3243,10 @@ msgstr "Neuer Baustein"
 msgid "Neuer Eintrag"
 msgstr "Neuer Eintrag"
 
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Neuer Katalog"
+msgstr "Neuer Katalog"
+
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Neuer Kunde"
 msgstr "Neuer Kunde"
@@ -3265,6 +3323,10 @@ msgstr "Noch keine Downloads aufgezeichnet."
 #: src/ui/management/components/InviteModal.tsx
 msgid "Noch keine Einladungen"
 msgstr "Noch keine Einladungen"
+
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Noch keine Lightroom-Kataloge angelegt."
+msgstr "Noch keine Lightroom-Kataloge angelegt."
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Noch keine Pools berechnet."
@@ -3664,10 +3726,15 @@ msgid "Projekt gelöscht"
 msgstr "Projekt gelöscht"
 
 #: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Projekt in Bildbearbeitung übernommen"
+msgstr "Projekt in Bildbearbeitung übernommen"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Projekt löschen?"
 msgstr "Projekt löschen?"
 
 #: src/ui/components/Sidebar.tsx
+#: src/ui/management/ManagementBoardsView.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Projekte"
 msgstr "Projekte"
@@ -4029,9 +4096,11 @@ msgstr "Statistiken & Audit-Logs"
 
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
+#: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/RatingStatusModal.tsx
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementCouponsView.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Status"
 msgstr "Status"
@@ -4055,6 +4124,7 @@ msgstr "Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG."
 
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementOrdersView.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Storniert"
 msgstr "Storniert"
 
@@ -4228,6 +4298,14 @@ msgstr "Übergeordnete Meta-Galerie"
 msgid "Übergreifend (cross-brand, nur Super-Admin)"
 msgstr "Übergreifend (cross-brand, nur Super-Admin)"
 
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Übernahme fehlgeschlagen"
+msgstr "Übernahme fehlgeschlagen"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Übernommen"
+msgstr "Übernommen"
+
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 msgid "Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten."
 msgstr "Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten."
@@ -4265,6 +4343,7 @@ msgid "Unbegrenzt:"
 msgstr "Unbegrenzt:"
 
 #: src/ui/components/PhotoHistoryModal.tsx
+#: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
@@ -4463,6 +4542,10 @@ msgstr "Vertraulich ansehen & unterschreiben"
 msgid "Verwalte deine Geschäftskontakte für Rechnungen und Angebote."
 msgstr "Verwalte deine Geschäftskontakte für Rechnungen und Angebote."
 
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "Verwalte deine Lightroom-Kataloge. Sie werden dir bei der Zuweisung in der Bildbearbeitung angeboten und sind nur für dich sichtbar."
+msgstr "Verwalte deine Lightroom-Kataloge. Sie werden dir bei der Zuweisung in der Bildbearbeitung angeboten und sind nur für dich sichtbar."
+
 #: src/ui/management/ManagementStructureView.tsx
 msgid "Verwalte deine Ordner und Galerien."
 msgstr "Verwalte deine Ordner und Galerien."
@@ -4495,6 +4578,10 @@ msgstr "Verwalte Vorlagen für Verträge und Sonderkonditionen."
 #: src/ui/components/Sidebar.tsx
 msgid "Verwaltung"
 msgstr "Verwaltung"
+
+#: src/ui/management/components/LightroomCatalogSettings.tsx
+#~ msgid "Verwaltung der Lightroom-Kataloge, die Aufträgen in der Bildbearbeitung zugewiesen werden können."
+#~ msgstr "Verwaltung der Lightroom-Kataloge, die Aufträgen in der Bildbearbeitung zugewiesen werden können."
 
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -4682,6 +4769,15 @@ msgstr "Wird nicht in Suchergebnissen oder Feeds gelistet."
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten)."
 msgstr "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten)."
+
+#: src/ui/components/Sidebar.tsx
+#: src/ui/management/ManagementBoardsView.tsx
+msgid "Workflow"
+msgstr "Workflow"
+
+#: src/ui/components/LightroomCatalogsProfileCard.tsx
+msgid "z.B. 2026-08"
+msgstr "z.B. 2026-08"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "z.B. 2500.00"

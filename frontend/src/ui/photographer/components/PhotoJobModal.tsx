@@ -8,6 +8,7 @@ import { useUI } from '../../components/UIContext';
 import { PhotoJob, PhotoJobInput } from '../../../logic/useProductionBoard';
 import { useUsers } from '../../../logic/useUsers';
 import { useProtectedGalleries } from '../../../logic/useGalleries';
+import { useLightroomCatalogs } from '../../../logic/useLightroomCatalogs';
 import type { Gallery } from '../../../api';
 import type { GalleryGroup } from '../../../logic/useGalleries';
 
@@ -19,6 +20,8 @@ function collectGalleries(groups: { galleries?: Gallery[]; children?: GalleryGro
     return acc;
 }
 const countMessage = t`Bitte eine gültige Anzahl eingeben`;
+
+export interface BoardStatusOption { value: string; label: string; }
 
 const photoJobSchema = z.object({
     title: z.string().min(1, t`Titel ist erforderlich`),
@@ -32,6 +35,7 @@ const photoJobSchema = z.object({
         { message: countMessage }
     ),
     target_gallery_id: z.string().optional(),
+    status: z.string().optional(),
     is_private: z.boolean().optional(),
     assignee_id: z.string().optional(),
 });
@@ -42,11 +46,12 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     defaultStatus: string;
+    statusOptions: BoardStatusOption[];
     editing?: PhotoJob | null;
-    onSave: (payload: PhotoJobInput) => Promise<void>;
+    onSave: (payload: PhotoJobInput & { status?: string }) => Promise<void>;
 }
 
-export default function PhotoJobModal({ isOpen, onClose, editing, onSave }: Props) {
+export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaultStatus, statusOptions }: Props) {
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PhotoJobFormValues>({
         resolver: zodResolver(photoJobSchema),
         defaultValues: {
@@ -55,6 +60,7 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave }: Prop
             total_count: '',
             selected_count: '',
             target_gallery_id: '',
+            status: '',
             is_private: false,
             assignee_id: '',
         },
@@ -62,7 +68,9 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave }: Prop
     const { showToast } = useUI();
     const { users } = useUsers();
     const { tree } = useProtectedGalleries();
+    const { lightroomCatalogs, error: catalogsError } = useLightroomCatalogs();
     const galleries = tree ? [...(tree.root_galleries ?? []), ...collectGalleries(tree.groups ?? [], [])] : undefined;
+    const catalogOptions = catalogsError ? [] : (lightroomCatalogs ?? []);
 
     useEffect(() => {
         if (isOpen) {
@@ -72,11 +80,12 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave }: Prop
                 total_count: editing?.total_count != null ? String(editing.total_count) : '',
                 selected_count: editing?.selected_count != null ? String(editing.selected_count) : '',
                 target_gallery_id: editing?.target_gallery_id ?? '',
+                status: editing?.status ?? defaultStatus ?? '',
                 is_private: editing?.is_private ?? false,
                 assignee_id: editing?.assignee?.id ?? '',
             });
         }
-    }, [isOpen, editing, reset]);
+    }, [isOpen, editing, defaultStatus, reset]);
 
     if (!isOpen) return null;
 
@@ -94,8 +103,9 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave }: Prop
         if (data.assignee_id) {
             input.assignee_id = data.assignee_id;
         }
+        const payload: PhotoJobInput & { status?: string } = { ...input, status: data.status || undefined };
         try {
-            await onSave(input);
+            await onSave(payload);
             onClose();
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : t`Speichern fehlgeschlagen`);
@@ -118,7 +128,10 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave }: Prop
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Lightroom-Katalog</Trans></span></label>
-                            <input type="text" {...register('lightroom_catalog')} className="input input-bordered" />
+                            <select {...register('lightroom_catalog')} className="select select-bordered">
+                                <option value=""><Trans>Kein Katalog</Trans></option>
+                                {catalogOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Ziel-Galerie</Trans></span></label>
@@ -142,6 +155,12 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave }: Prop
                             <select {...register('assignee_id')} className="select select-bordered">
                                 <option value=""><Trans>Keine Zuweisung</Trans></option>
                                 {users?.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold"><Trans>Status</Trans></span></label>
+                            <select {...register('status')} className="select select-bordered">
+                                {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
                         </div>
                         <div className="form-control">

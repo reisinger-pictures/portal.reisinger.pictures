@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Enums\Brand;
 use App\Enums\ProjectStatus;
+use App\Enums\PhotoJobStatus;
+use App\Models\PhotoJob;
 use App\Models\Project;
 use App\Support\BrandRegistry;
 use App\Models\User;
@@ -107,7 +109,7 @@ class ProjectBoardController extends Controller
         $project = $this->scopedQuery($user)->findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:anfrage,angebot,beauftragt,rechnung,bezahlt',
+            'status' => 'required|string|in:anfrage,angebot,beauftragt,rechnung,bezahlt,storniert',
             'position' => 'required|integer|min:0',
         ]);
 
@@ -127,6 +129,38 @@ class ProjectBoardController extends Controller
         }
 
         return response()->json(['project' => $project->load('owner', 'assignee')]);
+    }
+
+    public function handoff(Request $request, $id)
+    {
+        $user = Auth::guard('api')->user();
+        if (!$user->is_super_admin) {
+            abort(403, 'Forbidden');
+        }
+
+        $project = $this->scopedQuery($user)->findOrFail($id);
+
+        if ($project->linked_photo_job_id) {
+            abort(422, 'already_handed_off');
+        }
+
+        $projectBrand = $project->brand instanceof Brand ? $project->brand->value : (string) $project->brand;
+        $maxPosition = PhotoJob::query()
+            ->where('brand', $projectBrand)
+            ->max('position') ?? -1;
+
+        $photoJob = PhotoJob::create([
+            'brand' => $projectBrand,
+            'owner_id' => $user->id,
+            'title' => $project->client_name,
+            'status' => PhotoJobStatus::SHOOTING->value,
+            'position' => $maxPosition + 1,
+        ]);
+
+        $project->linked_photo_job_id = $photoJob->id;
+        $project->save();
+
+        return response()->json(['photo_job' => $photoJob->load('owner', 'assignee')], 201);
     }
 
     public function destroy($id)

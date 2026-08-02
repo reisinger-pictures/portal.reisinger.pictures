@@ -11,6 +11,9 @@ Artisan::command('inspire', function () {
 // Führe die Bereinigung täglich um 03:00 Uhr nachts aus
 Schedule::command('app:cleanup-galleries')->dailyAt('03:00');
 
+// Board-Cleanup (Projekte + Photo-Jobs in Endstatus)
+Schedule::command('app:cleanup-board-items')->dailyAt('06:00');
+
 // Storage Lifecycle & Cache Registry
 Schedule::command('app:downscale-editorial')->dailyAt('04:00');
 Schedule::command('app:cleanup-derivatives')->dailyAt('05:00');

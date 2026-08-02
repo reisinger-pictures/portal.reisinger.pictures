@@ -112,6 +112,9 @@
 @utility join-badge {
     @apply join-item bg-primary/15 border border-primary/30 px-2 text-sm flex items-center text-primary font-semibold;
 }
+@utility kanban-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
 
 @layer utilities {
     .input {

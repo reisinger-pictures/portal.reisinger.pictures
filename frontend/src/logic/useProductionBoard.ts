@@ -12,6 +12,7 @@ export interface PhotoJob {
     created_at: string;
     title: string;
     lightroom_catalog: string | null;
+    lightroom_catalog_is_mine: boolean;
     total_count: number;
     selected_count: number;
     target_gallery_id: string | null;
@@ -32,8 +33,9 @@ export function useProductionBoard() {
     const { data, isLoading, error, mutate } = useSWR<{ photo_jobs: PhotoJob[] }>('/api/management/photo-jobs', fetcher);
 
     const create = async (input: PhotoJobInput) => {
-        await apiMutate('/api/management/photo-jobs', 'POST', input);
+        const res = await apiMutate<{ photo_job: PhotoJob }>('/api/management/photo-jobs', 'POST', input);
         await mutate();
+        return res.photo_job.id;
     };
 
     const update = async (id: string, input: PhotoJobInput) => {

@@ -19,6 +19,7 @@ interface Props<T> {
     placeholder?: string;
     disabled?: boolean;
     className?: string;
+    required?: boolean;
 }
 
 export default function AutocompleteInput<T>({
@@ -30,7 +31,8 @@ export default function AutocompleteInput<T>({
                                                  mapResponse,
                                                  placeholder,
                                                  disabled,
-                                                 className
+                                                 className,
+                                                 required
                                              }: Props<T>) {
     const [, startTransition] = useTransition();
     const [query, setQuery] = useState(() => value || '');
@@ -102,6 +104,7 @@ export default function AutocompleteInput<T>({
                     aria-autocomplete="list"
                     aria-activedescendant={activeIndex >= 0 ? `autocomplete-option-${activeIndex}` : undefined}
                     aria-controls="autocomplete-listbox"
+                    required={required}
                     value={query}
                     onChange={e => {
                         setQuery(e.target.value);

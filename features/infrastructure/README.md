@@ -19,3 +19,4 @@
 * [Pricing strategy pattern](17-pricing-strategy-pattern.md)
 * [JWT offer tokens](18-jwt-offer-tokens.md)
 * [SettingResolver](20-setting-resolver.md)
+* [Per-User Settings Pattern](26-per-user-settings.md)

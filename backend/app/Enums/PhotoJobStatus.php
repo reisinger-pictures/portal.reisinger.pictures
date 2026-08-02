@@ -13,6 +13,7 @@ enum PhotoJobStatus: string
     case BEARBEITUNG = 'bearbeitung';
     case EXPORT = 'export';
     case VEROEFFENTLICHT = 'veroeffentlicht';
+    case ABGEBROCHEN = 'abgebrochen';
 
     /** @return self */
     public static function initial(): self

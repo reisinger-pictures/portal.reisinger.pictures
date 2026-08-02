@@ -37,7 +37,7 @@ export function computePermissions(user: User | null | undefined): Permissions {
         isPowerUser,
         canAccessB2BFeatures,
         canAccessProjectsBoard: isAdmin,
-        canAccessProductionBoard: isPhotographer,
+        canAccessProductionBoard: isPhotographer || isSuperAdmin,
         showOrgsSection: canAccessB2BFeatures,
         showCRM: canAccessB2BFeatures,
         showInvoicing: canAccessB2BFeatures,

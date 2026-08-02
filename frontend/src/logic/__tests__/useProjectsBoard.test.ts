@@ -17,8 +17,8 @@ import { apiMutate, fetcher } from '../../api';
 const owner = { id: 'u1', name: 'Florian' };
 const mockProjects = {
     projects: [
-        { id: 'p1', status: 'anfrage', position: 0, owner, assignee: null, created_at: '2026-08-02T10:00:00Z', client_name: 'Muster GmbH', email: 'info@muster.de', phone: null, package: null, price_cents: 0, payment_status: 'open' },
-        { id: 'p2', status: 'beauftragt', position: 0, owner, assignee: { id: 'u2', name: 'Max' }, created_at: '2026-08-01T10:00:00Z', client_name: 'Beispiel AG', email: '', phone: '0123', package: 'Hochzeit', price_cents: 150000, payment_status: 'paid' },
+        { id: 'p1', status: 'anfrage', position: 0, owner, assignee: null, created_at: '2026-08-02T10:00:00Z', client_name: 'Muster GmbH', email: 'info@muster.de', phone: null, package: null, price_cents: 0, payment_status: 'open', linked_photo_job_id: null },
+        { id: 'p2', status: 'beauftragt', position: 0, owner, assignee: { id: 'u2', name: 'Max' }, created_at: '2026-08-01T10:00:00Z', client_name: 'Beispiel AG', email: '', phone: '0123', package: 'Hochzeit', price_cents: 150000, payment_status: 'paid', linked_photo_job_id: 'pj-1' },
     ],
 };
 
@@ -62,6 +62,7 @@ describe('useProjectsBoard', () => {
             isLoading: false,
             mutate,
         } as never);
+        vi.mocked(apiMutate).mockResolvedValue({ project: { id: 'new-1' } } as never);
 
         const { result } = renderHook(() => useProjectsBoard());
         await result.current.create({ client_name: 'Neu GmbH' });
@@ -99,5 +100,66 @@ describe('useProjectsBoard', () => {
 
         await result.current.remove('p1');
         expect(apiMutate).toHaveBeenCalledWith('/api/management/projects/p1', 'DELETE');
+    });
+
+    it('move propagates api errors and does not reload', async () => {
+        const mutate = vi.fn();
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate,
+        } as never);
+        vi.mocked(apiMutate).mockRejectedValue(new Error('Netzwerkfehler'));
+
+        const { result } = renderHook(() => useProjectsBoard());
+        await expect(result.current.move('p1', 'angebot', 0)).rejects.toThrow('Netzwerkfehler');
+        expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('remove propagates api errors and does not reload', async () => {
+        const mutate = vi.fn();
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate,
+        } as never);
+        vi.mocked(apiMutate).mockRejectedValue(new Error('Löschen fehlgeschlagen'));
+
+        const { result } = renderHook(() => useProjectsBoard());
+        await expect(result.current.remove('p1')).rejects.toThrow('Löschen fehlgeschlagen');
+        expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('handoff posts to the handoff endpoint and reloads', async () => {
+        const mutate = vi.fn();
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate,
+        } as never);
+        vi.mocked(apiMutate).mockResolvedValue({} as never);
+
+        const { result } = renderHook(() => useProjectsBoard());
+        await result.current.handoff('p1');
+        expect(apiMutate).toHaveBeenCalledWith('/api/management/projects/p1/handoff', 'POST', {});
+        expect(mutate).toHaveBeenCalled();
+    });
+
+    it('handoff propagates api errors and does not reload', async () => {
+        const mutate = vi.fn();
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate,
+        } as never);
+        vi.mocked(apiMutate).mockRejectedValue(new Error('Übernahme fehlgeschlagen'));
+
+        const { result } = renderHook(() => useProjectsBoard());
+        await expect(result.current.handoff('p1')).rejects.toThrow('Übernahme fehlgeschlagen');
+        expect(mutate).not.toHaveBeenCalled();
     });
 });
