@@ -58,6 +58,8 @@ describe('WysiwygEditor', () => {
             canEditMetadata: false,
             isPowerUser: false,
             canAccessB2BFeatures: false,
+            canAccessProjectsBoard: false,
+            canAccessProductionBoard: false,
             showCRM: false,
             showInvoicing: false,
             showPayouts: false,

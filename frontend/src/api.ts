@@ -106,7 +106,7 @@ export const fetcher = async <T>(url: string): Promise<T> => {
     throw new Error('Server hat kein valides JSON zurückgegeben.');
 };
 
-export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> => {
+export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown): Promise<T> => {
     let res: Response;
     try {
         res = await fetch(url, {

@@ -266,12 +266,14 @@ msgstr "Ab 20 Bilder"
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/components/ProductModal.tsx
+#: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #: src/ui/management/components/TextSnippetModal.tsx
 #: src/ui/management/components/UserPermissionsModal.tsx
 #: src/ui/management/ManagementOrdersView.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
 #: src/ui/management/ManagementOrgsView.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Abbrechen"
 msgstr "Abbrechen"
 
@@ -440,10 +442,12 @@ msgid "Anforderungen des Kunden:"
 msgstr "Anforderungen des Kunden:"
 
 #: src/ui/client/ClientOrdersView.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Anfrage"
 msgstr "Anfrage"
 
 #: src/ui/management/ManagementOrdersView.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Angebot"
 msgstr "Angebot"
 
@@ -538,6 +542,26 @@ msgstr "Auf X günstigste Bilder beschränken"
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Aufnahmedatum"
 msgstr "Aufnahmedatum"
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Auftrag aktualisiert"
+msgstr "Auftrag aktualisiert"
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Auftrag angelegt"
+msgstr "Auftrag angelegt"
+
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Auftrag bearbeiten"
+msgstr "Auftrag bearbeiten"
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Auftrag gelöscht"
+msgstr "Auftrag gelöscht"
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Auftrag löschen?"
+msgstr "Auftrag löschen?"
 
 #: src/ui/Privacy.tsx
 msgid "Aus Gründen der Datensparsamkeit und zur Einhaltung der DSGVO protokollieren wir"
@@ -641,6 +665,14 @@ msgstr "Baustein..."
 #: src/ui/management/ManagementTextSnippetsView.tsx
 msgid "Bearbeiten"
 msgstr "Bearbeiten"
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Bearbeitung"
+msgstr "Bearbeitung"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Beauftragt"
+msgstr "Beauftragt"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Beigetreten"
@@ -784,7 +816,9 @@ msgstr "Bewertungen..."
 msgid "Bewertungs-Galerien sind zwingend privat."
 msgstr "Bewertungs-Galerien sind zwingend privat."
 
+#: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/ManagementOrdersView.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Bezahlt"
 msgstr "Bezahlt"
 
@@ -820,14 +854,24 @@ msgstr "Bild löschen?"
 msgid "Bild öffnen"
 msgstr "Bild öffnen"
 
+#: src/ui/components/Sidebar.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Bildbearbeitung"
+msgstr "Bildbearbeitung"
+
 #: src/ui/PhotoDetailView.tsx
 msgid "Bilddetails"
 msgstr "Bilddetails"
 
 #: src/ui/management/ManagementGalleryView.tsx
 #: src/ui/management/ManagementMetaGalleryView.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Bilder"
 msgstr "Bilder"
+
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Bilder gesamt"
+msgstr "Bilder gesamt"
 
 #: src/ui/management/components/UploadDropzone.tsx
 msgid "Bilder hierher ziehen"
@@ -844,6 +888,10 @@ msgstr "Bilder in der Warteschlange"
 #: src/ui/management/components/UploadDropzone.tsx
 msgid "Bilder mit gleichem Dateinamen überschreiben"
 msgstr "Bilder mit gleichem Dateinamen überschreiben"
+
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Bilder selektiert"
+msgstr "Bilder selektiert"
 
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Bilder ZIP"
@@ -868,6 +916,18 @@ msgstr "Bitte alle Titel/Namen bei den Leistungen ausfüllen."
 #: src/ui/client/ClientCartView.tsx
 msgid "Bitte bestätige den Verzicht auf das Widerrufsrecht."
 msgstr "Bitte bestätige den Verzicht auf das Widerrufsrecht."
+
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Bitte eine gültige Anzahl eingeben"
+msgstr "Bitte eine gültige Anzahl eingeben"
+
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Bitte eine gültige E-Mail angeben"
+msgstr "Bitte eine gültige E-Mail angeben"
+
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Bitte einen gültigen Betrag eingeben"
+msgstr "Bitte einen gültigen Betrag eingeben"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Bitte einen gültigen Betrag eingeben."
@@ -980,6 +1040,10 @@ msgstr "Coupon löschen?"
 #: src/ui/management/ManagementMetaGalleryView.tsx
 msgid "Coupons"
 msgstr "Coupons"
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Culling"
+msgstr "Culling"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Darf maximal 999 sein"
@@ -1154,6 +1218,11 @@ msgstr "Der Schutz Ihrer Daten ist uns wichtig. Nachfolgend informieren wir Sie 
 msgid "Detaillierte Auswertungen (Bild-Bewertungen)"
 msgstr "Detaillierte Auswertungen (Bild-Bewertungen)"
 
+#: src/ui/management/ManagementProjectsBoard.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Details"
+msgstr "Details"
+
 #: src/ui/client/DeliveryView.tsx
 msgid "Details & Metadaten"
 msgstr "Details & Metadaten"
@@ -1263,6 +1332,7 @@ msgstr "Du wurdest eingeladen, der Organisation <0>{orgName}</0> beizutreten."
 #~ msgid "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten."
 #~ msgstr "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten."
 
+#: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
@@ -1472,6 +1542,10 @@ msgstr "Erweiterte Rechte als Angebot beim Fotografen anfragen"
 msgid "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
 msgstr "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
 
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Export"
+msgstr "Export"
+
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Favoriten"
 msgstr "Favoriten"
@@ -1525,6 +1599,10 @@ msgstr "Fehler beim Generieren (Bitte Eingaben prüfen)."
 msgid "Fehler beim Laden der Abrechnungen."
 msgstr "Fehler beim Laden der Abrechnungen."
 
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Fehler beim Laden der Aufträge."
+msgstr "Fehler beim Laden der Aufträge."
+
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Fehler beim Laden der Bestellungen."
 msgstr "Fehler beim Laden der Bestellungen."
@@ -1557,6 +1635,10 @@ msgstr "Fehler beim Laden der Kunden."
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Fehler beim Laden der Payouts."
 msgstr "Fehler beim Laden der Payouts."
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Fehler beim Laden der Projekte."
+msgstr "Fehler beim Laden der Projekte."
 
 #: src/ui/management/ManagementDashboard.tsx
 msgid "Fehler beim Laden der Sidebar."
@@ -2199,7 +2281,13 @@ msgstr "Katalog-Eintrag bearbeiten"
 msgid "Kauf auf Rechnung"
 msgstr "Kauf auf Rechnung"
 
+#: src/ui/management/ManagementProjectsBoard.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Kein Zugriff auf dieses Board."
+msgstr "Kein Zugriff auf dieses Board."
+
 #: src/ui/components/GalleryGroupModal.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Keine"
 msgstr "Keine"
 
@@ -2335,6 +2423,11 @@ msgstr "Keine Vorgabe (Unterordner entscheiden selbst)"
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Keine vorherigen Versionen gefunden."
 msgstr "Keine vorherigen Versionen gefunden."
+
+#: src/ui/management/components/ProjectModal.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Keine Zuweisung"
+msgstr "Keine Zuweisung"
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Keywords"
@@ -2488,6 +2581,14 @@ msgstr "Kundenansicht"
 msgid "Kundenbetreuer"
 msgstr "Kundenbetreuer"
 
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Kundenname"
+msgstr "Kundenname"
+
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Kundenname ist erforderlich"
+msgstr "Kundenname ist erforderlich"
+
 #: src/ui/management/components/TextSnippetModal.tsx
 msgid "Kürzel ist erforderlich"
 msgstr "Kürzel ist erforderlich"
@@ -2543,6 +2644,10 @@ msgstr "Laravel Update:"
 msgid "Läuft ab"
 msgstr "Läuft ab"
 
+#: src/ui/components/KanbanBoard.tsx
+msgid "Leer"
+msgstr "Leer"
+
 #: src/ui/components/GalleryModal.tsx
 msgid "Leer = Aktuelles behalten"
 msgstr "Leer = Aktuelles behalten"
@@ -2580,6 +2685,10 @@ msgstr "Leistungsdatum / Zeitraum"
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Letzte Aktivitäten"
 msgstr "Letzte Aktivitäten"
+
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Lightroom-Katalog"
+msgstr "Lightroom-Katalog"
 
 #: src/ui/management/components/InviteModal.tsx
 msgid "Link kopieren"
@@ -2642,10 +2751,17 @@ msgstr "Lokal:"
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/management/ManagementTextSnippetsView.tsx
 #: src/ui/PhotoDetailView.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Löschen"
 msgstr "Löschen"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Löschen fehlgeschlagen"
+msgstr "Löschen fehlgeschlagen"
 
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -2822,9 +2938,17 @@ msgstr "Mit deiner Unterschrift bestätigst du, den Vertrag gelesen zu haben und
 msgid "Mobiles Blitz-Setup"
 msgstr "Mobiles Blitz-Setup"
 
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Möchtest du das Projekt \"{name}\" wirklich löschen?"
+msgstr "Möchtest du das Projekt \"{name}\" wirklich löschen?"
+
 #: src/ui/client/SelectionView.tsx
 msgid "Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird benachrichtigt."
 msgstr "Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird benachrichtigt."
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Möchtest du den Auftrag \"{title}\" wirklich löschen?"
+msgstr "Möchtest du den Auftrag \"{title}\" wirklich löschen?"
 
 #. placeholder {0}: coupon.code
 #: src/ui/management/components/GalleryCouponsTab.tsx
@@ -3017,6 +3141,10 @@ msgstr "Neue Organisation anlegen"
 msgid "Neuen Abrechnungslauf starten"
 msgstr "Neuen Abrechnungslauf starten"
 
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Neuen Auftrag anlegen"
+msgstr "Neuen Auftrag anlegen"
+
 #: src/ui/management/components/ProductModal.tsx
 msgid "Neuen Eintrag anlegen"
 msgstr "Neuen Eintrag anlegen"
@@ -3049,6 +3177,10 @@ msgstr "Neuen Textbaustein anlegen"
 msgid "Neuen Vertrag erstellen"
 msgstr "Neuen Vertrag erstellen"
 
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Neuer Auftrag"
+msgstr "Neuer Auftrag"
+
 #: src/ui/management/ManagementTextSnippetsView.tsx
 msgid "Neuer Baustein"
 msgstr "Neuer Baustein"
@@ -3072,6 +3204,14 @@ msgstr "Neuer Vertrag"
 #: src/ui/ResetPassword.tsx
 msgid "Neues Passwort"
 msgstr "Neues Passwort"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Neues Projekt"
+msgstr "Neues Projekt"
+
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Neues Projekt anlegen"
+msgstr "Neues Projekt anlegen"
 
 #: src/ui/SearchView.tsx
 msgid "Neueste Entdeckungen"
@@ -3189,6 +3329,8 @@ msgid "oder auf den Button klicken, um Dateien auszuwählen"
 msgstr "oder auf den Button klicken, um Dateien auszuwählen"
 
 #: src/ui/management/components/PhotographerTeamModal.tsx
+#: src/ui/management/components/ProjectModal.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Offen"
 msgstr "Offen"
 
@@ -3342,6 +3484,10 @@ msgstr "Österreich"
 msgid "Outdoor (Natur)"
 msgstr "Outdoor (Natur)"
 
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Paket"
+msgstr "Paket"
+
 #: src/ui/management/ManagementManualInvoiceView.tsx
 msgid "Paket-Kalkulator"
 msgstr "Paket-Kalkulator"
@@ -3440,6 +3586,10 @@ msgstr "Power-User"
 msgid "Preis"
 msgstr "Preis"
 
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Preis (€)"
+msgstr "Preis (€)"
+
 #: src/ui/management/components/invoice/InvoiceItemsTable.tsx
 msgid "Preis / Stück"
 msgstr "Preis / Stück"
@@ -3459,6 +3609,11 @@ msgstr "Print (bis A4)"
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Print bis 4000px (2.00x)"
 msgstr "Print bis 4000px (2.00x)"
+
+#: src/ui/photographer/components/PhotoJobModal.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Privat"
+msgstr "Privat"
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Privat (Nur mit Link / Passwort)"
@@ -3491,6 +3646,31 @@ msgstr "Profil & Standardwerte"
 #: src/ui/management/components/ProfileSettingsCard.tsx
 msgid "Profil aktualisiert"
 msgstr "Profil aktualisiert"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Projekt aktualisiert"
+msgstr "Projekt aktualisiert"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Projekt angelegt"
+msgstr "Projekt angelegt"
+
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Projekt bearbeiten"
+msgstr "Projekt bearbeiten"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Projekt gelöscht"
+msgstr "Projekt gelöscht"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Projekt löschen?"
+msgstr "Projekt löschen?"
+
+#: src/ui/components/Sidebar.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Projekte"
+msgstr "Projekte"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
@@ -3541,6 +3721,7 @@ msgid "React Build:"
 msgstr "React Build:"
 
 #: src/ui/client/ClientOrdersView.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Rechnung"
 msgstr "Rechnung"
 
@@ -3696,6 +3877,10 @@ msgstr "Shares / Info"
 msgid "Shares gesamt:"
 msgstr "Shares gesamt:"
 
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Shooting"
+msgstr "Shooting"
+
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #~ msgid "Shooting-Paket Kalkulator"
 #~ msgstr "Shooting-Paket Kalkulator"
@@ -3743,13 +3928,20 @@ msgstr "Sonderanfrage (Angebot)"
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/components/ProductModal.tsx
+#: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/TextSnippetModal.tsx
 #: src/ui/management/components/UserPermissionsModal.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
 #: src/ui/management/ManagementOrgsView.tsx
 #: src/ui/PhotoDetailView.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Speichern"
 msgstr "Speichern"
+
+#: src/ui/management/components/ProjectModal.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Speichern fehlgeschlagen"
+msgstr "Speichern fehlgeschlagen"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Sperrt kommerzielle Lizenzen im Checkout explizit für dieses Bild."
@@ -3927,9 +4119,18 @@ msgstr "System Info"
 msgid "System-Einstellungen"
 msgstr "System-Einstellungen"
 
+#: src/ui/management/components/ProjectModal.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
+msgid "Teilbezahlt"
+msgstr "Teilbezahlt"
+
 #: src/ui/management/ManagementContractView.tsx
 msgid "Teile diesen Link mit den Unterzeichnern:"
 msgstr "Teile diesen Link mit den Unterzeichnern:"
+
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Telefon"
+msgstr "Telefon"
 
 #: src/ui/Impressum.tsx
 msgid "Telefon: [Telefonnummer]"
@@ -3962,6 +4163,7 @@ msgstr "Textbausteine"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Titel"
 msgstr "Titel"
 
@@ -3980,6 +4182,7 @@ msgstr "Titel / Name"
 #~ msgstr "Titel / Name *"
 
 #: src/ui/management/components/TextSnippetModal.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Titel ist erforderlich"
 msgstr "Titel ist erforderlich"
 
@@ -4064,6 +4267,8 @@ msgstr "Unbegrenzt:"
 #: src/ui/components/PhotoHistoryModal.tsx
 #: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
+#: src/ui/management/ManagementProjectsBoard.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Unbekannt"
 msgstr "Unbekannt"
 
@@ -4163,6 +4368,15 @@ msgstr "URL Slug"
 #: src/ui/ContractSignView.tsx
 msgid "Verbindliche Unterzeichnung"
 msgstr "Verbindliche Unterzeichnung"
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Veröffentlicht"
+msgstr "Veröffentlicht"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Verschieben fehlgeschlagen"
+msgstr "Verschieben fehlgeschlagen"
 
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Version wiederherstellen?"
@@ -4563,6 +4777,10 @@ msgstr "Zahlungspflichtig abschließen"
 msgid "Zahlungspflichtig bestellen"
 msgstr "Zahlungspflichtig bestellen"
 
+#: src/ui/management/components/ProjectModal.tsx
+msgid "Zahlungsstatus"
+msgstr "Zahlungsstatus"
+
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Zahlungsziel / Fälligkeitstext"
 msgstr "Zahlungsziel / Fälligkeitstext"
@@ -4575,6 +4793,10 @@ msgstr "Zeitpunkt"
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Zeitraum"
 msgstr "Zeitraum"
+
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Ziel-Galerie"
+msgstr "Ziel-Galerie"
 
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Ziel-Galerie auswählen"
@@ -4674,6 +4896,11 @@ msgstr "Zusätzlicher Kontext für KI"
 #: src/ui/management/ManagementManualInvoiceView.tsx
 msgid "Zusatztexte / Sonderkonditionen"
 msgstr "Zusatztexte / Sonderkonditionen"
+
+#: src/ui/management/components/ProjectModal.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Zuständig"
+msgstr "Zuständig"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Zustimmung erforderlich"

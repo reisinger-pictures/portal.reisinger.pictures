@@ -24,7 +24,9 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\PhotoController;
+use App\Http\Controllers\PhotoJobBoardController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SitemapController;
@@ -258,5 +260,17 @@ Route::middleware(['auth:api', 'management'])->group(function () {
 
     Route::get('/management/stats', [StatsController::class, 'index'])->name('api.management.stats');
     Route::get('/management/logs', [StatsController::class, 'logs'])->name('api.management.logs');
+
+    Route::get('/management/projects', [ProjectBoardController::class, 'index'])->name('api.management.projects.index');
+    Route::post('/management/projects', [ProjectBoardController::class, 'store'])->name('api.management.projects.store');
+    Route::put('/management/projects/{id}', [ProjectBoardController::class, 'update'])->name('api.management.projects.update');
+    Route::patch('/management/projects/{id}/move', [ProjectBoardController::class, 'move'])->name('api.management.projects.move');
+    Route::delete('/management/projects/{id}', [ProjectBoardController::class, 'destroy'])->name('api.management.projects.destroy');
+
+    Route::get('/management/photo-jobs', [PhotoJobBoardController::class, 'index'])->name('api.management.photo-jobs.index');
+    Route::post('/management/photo-jobs', [PhotoJobBoardController::class, 'store'])->name('api.management.photo-jobs.store');
+    Route::put('/management/photo-jobs/{id}', [PhotoJobBoardController::class, 'update'])->name('api.management.photo-jobs.update');
+    Route::patch('/management/photo-jobs/{id}/move', [PhotoJobBoardController::class, 'move'])->name('api.management.photo-jobs.move');
+    Route::delete('/management/photo-jobs/{id}', [PhotoJobBoardController::class, 'destroy'])->name('api.management.photo-jobs.destroy');
 
 });

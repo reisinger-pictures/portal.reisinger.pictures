@@ -10,7 +10,75 @@
 
 ---
 
-## ✅ Session 2026-07-31 — nginx → Caddy-Direktauslieferung (Migration) — ABGESCHLOSSEN
+## 🔴 PRIO 1 — Kanban-Board «Projekte» + «Bildbearbeitung» (NEU, PHASE 1)
+
+> **Ziel-SOLL-Doku:** noch zu erstellen → `features/b2b/11-kanban-board.md`.
+> **Stack:** React 19 + DaisyUI + React Router, Backend Laravel. DnD: **`@dnd-kit/react`** (v0.5.0, installiert) — bewusst NUR dieses Paket, KEIN `@dnd-kit/core` + `@dnd-kit/sortable`.
+
+### Rollen- & Sichtbarkeits-Matrix (freigegeben 2026-08-02)
+
+| Board | Zugriff (Rollenzuordnung) | Sichtbarkeit |
+|-------|--------------------------|--------------|
+| **Projekte** (kaufmännisch) | `super_admin`, `admin` | Super-Admin → alle Items; Admin → nur eigene |
+| **Bildbearbeitung** (Produktion) | `super_admin`, `photographer` | Super-Admin → alle Items; Fotograf → nur eigene |
+
+**Owner-Modell:** `created_by` (beim Anlegen = Ersteller) + optionales `assignee_id` (Reassign/Übergabe).
+**Sichtbarkeits-Query:** `super_admin → getAll(); sonst → where(created_by = me OR assignee = me)`.
+**Board-Zugriffs-Gate:** Projekte-Board nur admin/super_admin; Produktions-Board nur photographer/super_admin.
+
+### Erweiterung der DnD-Logik (eigener Task, siehe Migration unten)
+Die bestehende DnD-Landschaft nutzt native `dataTransfer.files`-Drops (PDF/Image-Upload) — diese bleiben OS-Level und sind nicht das Terrain von `@dnd-kit/react` (Element-/Card-Drag). Der Kanban-Card-Drag nutzt dagegen `@dnd-kit/react`. File-Drop-Zonen ggf. bewusst als native Ausnahme belassen (siehe Migrations-TODO).
+
+### Datenmodell (NEUE, separate Migrationen — V033 ff.)
+- `projects` (kaufmännisches Board): id UUID, `brand`, `owner_id`, `assignee_id?`, `client_name`, `email`, `phone`, `package` / `price_cents`, `payment_status` (`open|partly_paid|paid`), `status` (Enum → 5 Spalten), `position`, `linked_photo_job_id?`, Timestamps
+- `photo_jobs` (Produktions-Board): id UUID, `brand`, `owner_id`, `assignee_id?`, `title`, `lightroom_catalog`, `total_count`, `selected_count`, `target_gallery_id?`, `is_private`, `status` (Enum → 5), `position`, Timestamps
+- `workflow_logs` (polymorph, Phase-2-Stats): id UUID, `item_type` (`project|photo_job`), `item_id`, `from_status`, `to_status`, `user_id`, `created_at`
+
+Status-Enums (`ProjectStatus`, `PhotoJobStatus`) als PHP-Enums → Spalten-Layout stabil.
+
+### Backend
+- 2 Modelle + 2 Enums + `WorkflowLog`-Model.
+- `ProjectBoardController` + `PhotoJobBoardController` (Resource unter `/api/board/…`), middleware `management`.
+- Owner/Assignee-Scoping-Service + Board-Rollen-Gates (analog `canAccessGallery`), `forCurrentBrand()`-Scope.
+- PHPUnit `tests/Feature/Board/`: CRUD, Statuswechsel→Log, Owner-Scoping, Rollen-Gate, Brand-Isolation, Reassign.
+
+### Frontend
+- `ui/management/ManagementProjectsBoard.tsx` (+Route `/projects`) + `ui/photographer/PhotographerProductionBoard.tsx` (+Route `/production`).
+- Einbindung `ManagementDashboard`-Weiche + `Sidebar` (neues Menü-Modul).
+- `@dnd-kit/react` für Card-Drag zwischen Spalten (mobile/touch-faehig), optimistisches Update.
+- Formulare: `react-hook-form` + `@hookform/resolvers/zod`, `required`-Attribute, Pflichtmarkierung via `index.css`-Mechanik (kein `(optional)`).
+- Statuswechsel via Board-Update-POST + `workflow_logs`-Eintrag + Toast.
+- Vitest (Logic/Hook, DnD-Handler) + Playwright E2E mit Tags (`@smoke`, `@feature:board`, `@mobile`).
+
+### Migrations-TODO für DnD (auf `@dnd-kit/react`)
+- [ ] **MVP:** Kanban-Card-Drag = `@dnd-kit/react` (einheitliche DnD-Orchestrierung).
+- [ ] **Migriere `useInvoiceDragDrop` + `InvoiceDragDropZone`** (`src/logic/useInvoiceDragDrop.ts`, `src/ui/management/ManagementManualInvoiceView.tsx`): von `onDragOver/onDrop/dataTransfer.files` auf `@dnd-kit/react` File-Drop-Flow umziehen, wo sinnvoll — sonst als dokumentierte native Ausnahme belassen. Achtung: `@dnd-kit` optimiert für Element-Drag, Datei-Drops laufen nativer `dataTransfer`; ggf. als Drop-Zone bewusst belassen.
+- [ ] **New Angebot-Feature**: sobald Implementierung beginnt, auf `@dnd-kit/react` setzen (nicht `@dnd-kit/core`+`sortable`).
+- [ ] `UploadDropzone` (`src/ui/management/components/UploadDropzone.tsx`): prüfen, ob eine gemeinsame Drop-Basis mit Invoice-Drop erstellt werden soll → s.o. gleiche Entscheidung.
+
+### API-Vertrag (Freigabe SOLL — Backend & Frontend MUST align)
+Alle Routen in `['auth:api','management']`-Gruppe, Präfix `/api/management`. Item-JSON (beide Boards) liefert: `id, status, position, owner:{id,name}, assignee:{id,name}|null, created_at` + board-spezifische Felder.
+
+- **Projekte** (`/api/management/projects`, nur admin/super_admin):
+  - `GET` → `{projects: [...]}` · `POST` (owner = current user, brand via BrandRegistry, status=Anfrage, position=end) → 201 · `PUT /{id}` · `PATCH /{id}/move` (body `status`, `position`) → schreibt `workflow_logs` + Toast-Verhalen · `DELETE /{id}`
+- **Produktion** (`/api/management/photo-jobs`, super_admin/photographer):
+  - `GET` → `{photo_jobs: [...]}` · `POST` · `PUT /{id}` · `PATCH /{id}/move` · `DELETE /{id}`
+- **Wichtig:** `ManagementMiddleware` um Präfix `api/management/photo-jobs*` für Photographer erweitern.
+- **Sichtbarkeit Backend:** `super_admin → alle; sonst → where(owner_id = me OR assignee_id = me)`. Board-Gate: projects nur admin/super_admin, photo-jobs nur photographer(→super_admin via super_admin-middleware-drüber oder Gate).
+
+- **Enums:** `app/Enums/ProjectStatus.php` = `{anfrage, angebot, beauftragt, rechnung, bezahlt}`; `app/Enums/PhotoJobStatus.php` = `{shooting, culling, bearbeitung, export, veroeffentlicht}` (Keys engl., Labels/UI deutsch).
+- **Migration:** STRICTLY befolgt §3 Policy: Als Build-Agent dokumentiere ich hier — Umsetzung fragt NICHT erneut, es wurde 2026-08-02 freigegeben: **NEUE separate Migration(en)**, Nummern V033 ff. (users-FK `owner_id`/`assignee_id` via `foreignUuid`).
+
+### DnD-Vertrag (@dnd-kit/react, NUR Paket `@dnd-kit/react`)
+- Board-Views nutzen `DragDropProvider` + `useDroppable` (Spalten) + `useDraggable`/`useSortable` (Karten) + `DragOverlay`. Bei Status-/Positionswechsel `PATCH /position`.
+- Kein `@dnd-kit/core`/`@dnd-kit/sortable`. File-Drop (Invoice/Upload) bleibt native `dataTransfer`.
+
+### DoD
+Backend `php artisan test` grün; Frontend `pnpm lint:fix --max-warnings 0` + `pnpm build` grün; Vitest grün; Playwright `@smoke` grün. Kein `any`/`@ts-ignore`/`eslint-disable`/Tailwind-Dynamic-Class/`.style`/localStorage-Injektion.
+
+---
+
+## ✅ Session 2026-07-31 — nginx & Caddy-Direktauslieferung (Migration) — ABGESCHLOSSEN
 
 Commit `e341216`. Caddy liefert `dist/` direkt via `import spa` + CSP/XFO (mit korrektem `sha256`-Hash fürs Inline-Script + `js.stripe.com`), nginx-Container entfernt. Alle Tasks + Doku-Fixes (K1, K2, M1/M2, I1, I2, I3) verifiziert. `SystemMiscTest` grün. Deploy-Sequenz (Server) siehe Commit-Message — außerhalb dieser Session.
 

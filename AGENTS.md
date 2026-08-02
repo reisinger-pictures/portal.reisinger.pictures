@@ -69,11 +69,13 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
 The system and workflow are managed via a Main/Secondary Model architecture to prevent context pollution:
 * **Main Model (Planner & Reviewer):** Has the full project context. Analyzes the problem, designs the architecture, updates documentation, and reviews implementations. Delegates isolated coding tasks to the Secondary Model by providing only the necessary files and specific instructions.
 * **Secondary Model (Implementer):** Runs in a fresh, isolated context. Receives specific instructions and target files from the Main Model, implements the changes, and generates the patch script.
-* **Build-Agent (STRICT):** Ein Build-Agent darf **ausschließlich** `AGENTS.todo.md` und `AGENTS.md` lesen und bearbeiten. Jede weitere Datei (Code, Tests, Templates) ist tabu. Seine Aufgabe ist:
+* **Build-Agent (STRICT):** Ein Build-Agent ist **ausschließlich Orchestrator**. Er darf **bis auf kleine Edits** (Korrektur von Tippfehlern, Sicherheits-/Policy-Anpassungen in `AGENTS.md`/`AGENTS.todo.md` selbst) nur `AGENTS.todo.md` und `AGENTS.md` (sowie direkt dort referenzierte Dateien) lesen und bearbeiten. Jede weitere Datei (Code, Tests, Templates, Komponenten) ist tabu — diese MÜSSEN an Subagenten delegiert werden. Seine Aufgabe ist:
   1. Anforderungen in der **Planungsphase** analysieren und in `AGENTS.todo.md` als actionable TODOs dokumentieren.
   2. Umsetzungen an Subagenten (Implementer) **delegieren** — der Build-Agent schreibt selbst keinen Code.
-  3. Die Umsetzung von **anderen Subagenten verifizieren** lassen (Review, Tests, Build).
-  Diese Regel wurde am 2026-07-31 etabliert und darf nicht umgangen werden.
+  3. Sofern fachlich sinnvoll **parallel delegieren** (unabhängige Tasks gleichzeitig an mehrere Implementer) — für den Koordination-/Token-Footprint prüfen.
+  4. Jede Umsetzung von einem **separaten Subagenten verifizieren** lassen (Review, Tests, Build) — der Verifikator ist NIE der Implementer desselben Tasks.
+  5. Bei visuellen Prüfungen (Layout, Screenshots, Bilder, Screenshots-Analyse) den **`vision`-Subagenten** nutzen.
+  Diese Regel wurde am 2026-07-31 etabliert, am 2026-08-02 konkretisiert und darf nicht umgangen werden.
 * **E2E Execution (STRICT):** Playwright-Tests per Tag ausführen (siehe §2). Bei jedem Code-Change: `test:e2e:smoke`. Vor Deployment: `test:e2e` (full suite). Für Wiederholung fehlgeschlagener Tests: `npx playwright test --last-failed`.
 * **Workflow-Reihenfolge für Test-Fixes (STRICT):**
   * 1. Dokumentieren (SOLL in `features/`, Bug-Analyse)
@@ -182,3 +184,16 @@ Offene Security-TODOs (M6, L2) siehe `AGENTS.todo.md`. M1–M5, M7–M9, L1, L3�
 - Preisberechnung server-autoritativ (signiertes Offer-Token)
 - HTML-Sanitize beim Persistieren (Symfony `HtmlSanitizer`) + beim Render (DOMPurify)
 - Vertragssigning mit optimistischer Concurrency (`content_version` in UPDATE-WHERE)
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
