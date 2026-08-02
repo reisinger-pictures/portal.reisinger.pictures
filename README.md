@@ -55,20 +55,3 @@ Danach Laravel Herd einmal neu starten, damit PHP-FPM die Tools findet. Ohne die
 
 ### Stripe Webhooks (Lokal Testen)
 Führe `stripe listen --forward-to localhost:8000/api/webhooks/stripe` aus und trage das ausgegebene `STRIPE_WEBHOOK_SECRET` in die `.env` Datei im Backend ein.
-
-### Graphify: Community-Labeling mit lokalem Ollama-Modell
-
-Graphify nutzt Ollama + das lokale Modell `gemma4:e4b-ud-q4` (UD-Q4_K_XL.gguf, 5.1 GB) für LLM-gestützte Community-Namen — ohne API-Key.
-
-**Persistierung** (sonst Rollback auf `qwen2.5-coder:7b`):
-```bash
-export OLLAMA_MODEL=gemma4:e4b-ud-q4
-export OLLAMA_HOST=http://localhost:11434   # nur falls Ollama nicht auf localhost läuft
-```
-
-**Community-Namen (re)generieren** (nach Refactors/Clustering):
-```bash
-graphify label . --backend ollama --model gemma4:e4b-ud-q4
-```
-
-Der `graphify update .` nach Code-Änderungen ist rein AST-basiert und braucht **kein** LLM; die Flags oben sind nur für `graphify label`/`extract` nötig.

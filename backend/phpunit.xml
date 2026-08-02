@@ -14,7 +14,15 @@
     </testsuites>
     <source>
         <include>
-            <directory>app</directory>
+            <directory suffix=".php">app</directory>
+            <file>app/Models/Project.php</file>
+            <file>app/Models/PhotoJob.php</file>
+            <file>app/Models/WorkflowLog.php</file>
+            <file>app/Http/Controllers/ProjectBoardController.php</file>
+            <file>app/Http/Controllers/PhotoJobBoardController.php</file>
+            <file>app/Enums/ProjectStatus.php</file>
+            <file>app/Enums/PhotoJobStatus.php</file>
+            <file>app/Enums/PaymentStatus.php</file>
         </include>
     </source>
     <php>

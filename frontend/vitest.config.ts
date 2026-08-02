@@ -14,5 +14,23 @@ export default defineConfig({
     css: true,
     // console.error aus erwarteten Fehlerpfaden in Tests unterdrücken
     printConsole: false,
+    coverage: {
+      provider: 'v8',
+      include: [
+        'src/logic/useProjectsBoard.ts',
+        'src/logic/useProductionBoard.ts',
+        'src/logic/useProjectPdfDrop.ts',
+        'src/logic/usePermissions.ts',
+        'src/ui/components/KanbanBoard.tsx',
+        'src/ui/management/ManagementBoardsView.tsx',
+        'src/ui/management/ManagementProjectsBoard.tsx',
+        'src/ui/photographer/PhotographerProductionBoard.tsx',
+        'src/ui/management/components/ProjectModal.tsx',
+        'src/ui/photographer/components/PhotoJobModal.tsx',
+      ],
+      exclude: ['**/*.test.*', '**/node_modules/**', '**/dist/**'],
+      reporter: ['text', 'html'],
+      reportsDirectory: 'coverage',
+    },
   },
 });

@@ -46,10 +46,9 @@ out/
 # AI Test Runner
 .playwright-mcp
 ai_test_report.txt
-ses_*.json
+ses_*.json+
+.env*
 
 # History-rewrite artifacts (contains real secrets — never commit)
 .history-replacements.txt
 portal-backup-*.bundle
-# graphify knowledge graph (regenerated on every commit via hook; tracked via merge driver .gitattributes)
-graphify-out/

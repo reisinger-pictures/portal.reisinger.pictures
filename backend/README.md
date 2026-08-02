@@ -27,6 +27,18 @@ Da wir eine maßgeschneiderte SaaS-Architektur verwenden, weicht dieses Setup in
   php artisan scout:sync-index-settings
   ```
 
+## 4b. Code Coverage (PHPUnit + Herd Xdebug)
+* **Coverage-Treiber:** Herd liefert Xdebug 3.5 als vorkompilierte Extension mit. Für PHP 8.5 ist sie über `/Applications/Herd.app/Contents/Resources/xdebug/xdebug-85-arm64.so` verfügbar. In `/Users/florianreisinger/Library/Application Support/Herd/config/php/85/xdebug.ini` wird sie geladen (Architektur beachten: `-arm64` vs `-x86`). `xdebug.mode=off` hält die Performance-Auswirkung für alle normalen Läufe bei null.
+* **Ausführen:** Coverage ist nur aktiv, wenn der Mode beim Lauf gesetzt wird:
+  ```bash
+  # Kanban-Board-Feature
+  cd backend && XDEBUG_MODE=coverage php artisan test --filter="PhotoJobBoardTest|ProjectBoardTest" --coverage
+  # Detailreicher Text-Report (Methoden/Lines pro Datei)
+  XDEBUG_MODE=coverage php vendor/bin/phpunit --filter="PhotoJobBoardTest|ProjectBoardTest" --coverage-text
+  ```
+* **phpunit.xml `<source>`:** Alle `app/`-Dateien sind eingebunden; uncovered Files werden standardmäßig mitgezählt (PHPUnit 10+ prozessiert uncovered Files automatisch — `processUncoveredFiles` ist obsolet und würde die XML-Validierung brechen). Die Board-relevanten Dateien (Models, Controller, Enums) sind zusätzlich explizit gelistet.
+* **Einschränkungen:** `php artisan test --coverage` rendert das Collision-Dashboard nur in einem TTY; für gespeicherte/gepipete Ausgaben bitte direkt `php vendor/bin/phpunit --coverage-text` nutzen. Branch-/Pfad-Coverage wird von PHPUnit CLI standardmäßig nicht gesammelt — sie erfordert `CodeCoverage::enableBranchAndPathCoverage()` programmatisch.
+
 ## 5. DSGVO & Immutable Audit Logs
 * **Keine IP-Adressen:** Um der DSGVO vollständig zu entsprechen, werden in der `download_logs`-Tabelle **keine IP-Adressen** gespeichert.
 * **Immutable Logs (Denormalisierung):** Wenn eine Galerie oder ein User hart aus der Datenbank gelöscht wird (Hard Delete), werden die Fremdschlüssel in den Logs auf `NULL` gesetzt (`ON DELETE SET NULL`). Damit die Langzeit-Statistik trotzdem erhalten bleibt, speichert das Log beim Anlegen Denormalisierungs-Snapshots (`gallery_name_snapshot`, `user_name_snapshot`).
