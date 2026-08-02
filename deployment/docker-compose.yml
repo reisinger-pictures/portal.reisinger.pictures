@@ -125,7 +125,7 @@ services:
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - PROXY_DELIVERY_HEADER=X-Accel-Redirect
     healthcheck:
-      test: ["CMD-SHELL", "pgrep php-fpm || exit 1"]
+      test: ["CMD-SHELL", "kill -0 1 2>/dev/null && grep -q php-fpm /proc/1/cmdline"]
       interval: "30s"
       timeout: 10s
       retries: 3
