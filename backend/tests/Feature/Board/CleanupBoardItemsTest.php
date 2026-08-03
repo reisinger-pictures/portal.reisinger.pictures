@@ -68,6 +68,47 @@ class CleanupBoardItemsTest extends TestCase
         $this->assertDatabaseMissing('photo_jobs', ['id' => $photoJob->id]);
     }
 
+    public function test_old_terminal_photo_job_referenced_by_project_is_kept(): void
+    {
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::VEROEFFENTLICHT->value]);
+        $this->backdate($photoJob, 40);
+
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'status' => ProjectStatus::RECHNUNG->value, 'linked_photo_job_id' => $photoJob->id]);
+
+        $this->artisan('app:cleanup-board-items')->assertSuccessful();
+
+        $this->assertDatabaseHas('photo_jobs', ['id' => $photoJob->id]);
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'linked_photo_job_id' => $photoJob->id]);
+    }
+
+    public function test_old_abgebrochen_photo_job_referenced_by_project_is_kept(): void
+    {
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::ABGEBROCHEN->value]);
+        $this->backdate($photoJob, 40);
+
+        Project::factory()->create(['brand' => Brand::B2B, 'status' => ProjectStatus::ANFRAGE->value, 'linked_photo_job_id' => $photoJob->id]);
+
+        $this->artisan('app:cleanup-board-items')->assertSuccessful();
+
+        $this->assertDatabaseHas('photo_jobs', ['id' => $photoJob->id]);
+    }
+
+    public function test_referenced_terminal_job_is_kept_while_unreferenced_terminal_job_is_deleted(): void
+    {
+        $referenced = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::VEROEFFENTLICHT->value]);
+        $this->backdate($referenced, 40);
+
+        $orphaned = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::VEROEFFENTLICHT->value]);
+        $this->backdate($orphaned, 40);
+
+        Project::factory()->create(['brand' => Brand::B2B, 'status' => ProjectStatus::RECHNUNG->value, 'linked_photo_job_id' => $referenced->id]);
+
+        $this->artisan('app:cleanup-board-items')->assertSuccessful();
+
+        $this->assertDatabaseHas('photo_jobs', ['id' => $referenced->id]);
+        $this->assertDatabaseMissing('photo_jobs', ['id' => $orphaned->id]);
+    }
+
     public function test_young_terminal_item_is_kept(): void
     {
         $project = Project::factory()->create(['brand' => Brand::B2B, 'status' => ProjectStatus::BEZAHLT->value]);

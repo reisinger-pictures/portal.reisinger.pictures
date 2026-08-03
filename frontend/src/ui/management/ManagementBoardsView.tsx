@@ -1,14 +1,26 @@
 import { Trans } from "@lingui/react/macro";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { usePermissions } from "../../logic/usePermissions";
 import ManagementProjectsBoard from "./ManagementProjectsBoard";
 import PhotographerProductionBoard from "../photographer/PhotographerProductionBoard";
 
+function resolveBoardTab(requested: string | null, canAccessProjects: boolean, canAccessProduction: boolean): string {
+    if (requested === "projects" && canAccessProjects) return "projects";
+    if (requested === "production" && canAccessProduction) return "production";
+    return canAccessProjects ? "projects" : "production";
+}
+
 export default function ManagementBoardsView() {
-    const { isSuperAdmin } = usePermissions();
+    const { isSuperAdmin, canAccessProjectsBoard, canAccessProductionBoard } = usePermissions();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const tab = searchParams.get("tab") ?? "projects";
+    const tab = resolveBoardTab(searchParams.get("tab"), canAccessProjectsBoard, canAccessProductionBoard);
+
+    if (searchParams.get("tab") !== tab) {
+        const params = new URLSearchParams(searchParams);
+        params.set("tab", tab);
+        return <Navigate to={`/boards?${params.toString()}`} replace />;
+    }
 
     const selectTab = (next: string) => {
         const params = new URLSearchParams(searchParams);

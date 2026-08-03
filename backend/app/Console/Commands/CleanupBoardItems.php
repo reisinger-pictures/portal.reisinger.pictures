@@ -35,8 +35,12 @@ class CleanupBoardItems extends Command
         }
 
         $photoJobCount = 0;
+        $referencedPhotoJobIds = Project::whereNotNull('linked_photo_job_id')
+                                        ->pluck('linked_photo_job_id');
+
         $photoJobs = PhotoJob::whereIn('status', ['veroeffentlicht', 'abgebrochen'])
                              ->where('updated_at', '<', $cutoffDate)
+                             ->whereNotIn('id', $referencedPhotoJobIds)
                              ->get();
 
         foreach ($photoJobs as $photoJob) {

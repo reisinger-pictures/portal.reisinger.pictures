@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Brand;
+use App\Enums\PaymentStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\PhotoJobStatus;
 use App\Models\PhotoJob;
@@ -67,6 +68,7 @@ class ProjectBoardController extends Controller
             'linked_photo_job_id' => 'nullable|exists:photo_jobs,id',
             'notes' => 'nullable|string',
             'status' => 'nullable|string|in:' . implode(',', array_column(ProjectStatus::cases(), 'value')),
+            'payment_status' => 'string|in:' . implode(',', array_column(PaymentStatus::cases(), 'value')),
         ]);
 
         $status = $validated['status'] ?? ProjectStatus::initial()->value;
@@ -76,7 +78,7 @@ class ProjectBoardController extends Controller
             'brand' => BrandRegistry::currentOrDefault(),
             'owner_id' => $user->id,
             'status' => $status,
-            'payment_status' => 'open',
+            'payment_status' => $validated['payment_status'] ?? PaymentStatus::OPEN->value,
             'position' => $maxPosition + 1,
         ]));
 
@@ -100,6 +102,7 @@ class ProjectBoardController extends Controller
             'linked_photo_job_id' => 'nullable|exists:photo_jobs,id',
             'notes' => 'nullable|string',
             'status' => 'sometimes|string|in:' . implode(',', array_column(ProjectStatus::cases(), 'value')),
+            'payment_status' => 'sometimes|string|in:' . implode(',', array_column(PaymentStatus::cases(), 'value')),
         ]);
 
         $oldStatus = $project->status;

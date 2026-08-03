@@ -229,7 +229,7 @@ Route-Basis `/api/management/photo-jobs` (nur `super_admin` / `photographer`):
 
 - **Handoff (Projekte-Karte, nur `super_admin`):** Button „In Bildbearbeitung übernehmen" → `handoff`-API → Toast + `mutate()`. Bei gesetztem `linked_photo_job_id` stattdessen Badge („Übernommen" / Link zur Produktion).
 - **Lightroom-Katalog-Select (Photo-Job-Formular):** Optionen = **eigene** Kataloge des Users (`useLightroomCatalogs`). Beim Editieren fremder Kataloge bleibt der Rohwert erhalten (kein Clearen).
-- **Katalog-Anzeige (Produktions-Board-Karte):** Katalogzeile nur rendern, wenn `lightroom_catalog_is_mine`; sonst nur die Personenzeile (owner/assignee).
+- **Katalog-Anzeige (Produktions-Board-Karte):** Katalogzeile rendern, wenn `lightroom_catalog_is_mine` **oder** Viewer ist `super_admin`; sonst nur die Personenzeile (owner/assignee). Super-Admin hat als übergreifender Overseer immer die Katalog-Info sichtbar.
 - **Profil:** Card „Lightroom-Kataloge" in `UserProfileView` (nur Fotograf/Super-Admin) — add/edit/delete der eigenen Liste.
 
 ### Hooks & Permissions
@@ -257,6 +257,7 @@ Abgeschlossene oder abgebrochene Items werden **automatisch hart gelöscht**, um
 - **Grace:** `env('BOARD_CLEANUP_GRACE_DAYS', 30)` Tage.
 - Löschung ist **hart** (kein Soft-Delete), mit `Log::info`-Eintrag pro Item + Konsolen-Zählung.
 - Nur Items in den gelisteten Status sind betroffen — aktive Items bleiben unabhängig vom Alter erhalten.
+- **Referenzschutz (Handoff):** `photo_jobs`, die von einem noch existierenden Projekt via `linked_photo_job_id` referenziert werden (§5.1), werden **übersprungen** — die Handoff-Referenz schützt den Job vor hartem Löschen, auch wenn er bereits `veroeffentlicht`/`abgebrochen` ist und die Grace überschritten hat. Erst wenn das referenzierende Projekt selbst (z.B. via Cleanup oder manuell) gelöscht wurde, ist der Job wieder ein Kandidat.
 - Brand-Isolation gilt: Es werden Items aller Brands bereinigt (Command ist nicht user-/brand-gebunden).
 
 > **Wichtig für Datenkonsistenz:** Terminale Status (`storniert`, `abgebrochen`) UND Endstatus (`bezahlt`, `veroeffentlicht`) sind deshalb **nicht** für längere Retrospektiven verfügbar. `workflow_logs` bleiben als Historie erhalten (§9).
@@ -277,11 +278,12 @@ Lightroom-Kataloge sind **pro Fotograf** verwaltet — kein Brand-Scope, keine g
   - `PUT`/`DELETE`: self-only — fremde IDs → 404 (auch für `super_admin`).
 - Verwaltung in **„Mein Profil"** (`UserProfileView`, Card „Lightroom-Kataloge"): add/edit/delete der eigenen Liste. Die Photo-Job-Formular-Selectbox liest aus den **eigenen** Katalogen des Users.
 
-### 8.2 Datenschutz-Anzeigeregel
+### 8.2 Katalog-Anzeigeregel (Display-Layer Convenience — keine Server-Secrecy)
 
-- `photo_jobs.lightroom_catalog` **bleibt ein String** (kein FK, kein Schema-Change).
-- Der Server setzt pro Photo-Job-Serialisierung (index/store/update/move) `lightroom_catalog_is_mine` = (Job-Katalog ∈ eigene Katalog-Namen des Viewers).
-- Der Rohwert bleibt im Payload (Form-Roundtrip ohne Edit-Datenverlust) — die **UI** rendert die Katalogzeile nur bei `is_mine`; sonst erscheint nur der Name der verantwortlichen Person (owner/assignee). Kein Katalogname-Leak über User-Grenzen.
+- `photo_jobs.lightroom_catalog` **bleibt ein String** (kein FK, kein Schema-Change) und wird **immer** im Payload serialisiert — für den Form-Roundtrip des Edit-Modals (Select-Optionen).
+- Der Server setzt pro Photo-Job-Serialisierung (index/store/update/move) `lightroom_catalog_is_mine` = (Job-Katalog ∈ eigene Katalog-Namen des Viewers). Das Flag ist ein **Display-Convenience-Flag**, keine Sicherheitsgrenze: Es entscheidet nur, was die UI standardmäßig ausgibt.
+- Die **UI** rendert die Katalogzeile für Fotografen nur bei `is_mine` (Fremdkataloge ausgeblendet); **`super_admin` sieht die Katalogzeile immer** (übergreifender Overseer, besitzt i.d.R. keine eigenen Kataloge).
+- **Keine Server-Secrecy:** Da der Rohwert im Payload liegt, ist die Anzeigeregel nicht als Schutz vor Datenausleitung zu verstehen (ein modifizierter Client könnte den Namen stets auslesen) — sie ist reine UX-Konvention, damit fremde Katalog-Namen nicht ungewollt prominent auf der Karte erscheinen.
 
 ---
 

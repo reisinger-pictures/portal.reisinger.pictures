@@ -103,7 +103,7 @@ export default function PhotographerProductionBoard({ embedded = false }: Photog
                     <span className="iconify mdi--trash-can-outline text-error"></span>
                 </button>
             </div>
-            {item.lightroom_catalog_is_mine === true && item.lightroom_catalog && (
+            {(item.lightroom_catalog_is_mine === true || isSuperAdmin) && item.lightroom_catalog && (
                 <div className="flex flex-wrap items-center gap-1 mt-1">
                     <span className="badge badge-ghost">{item.lightroom_catalog}</span>
                 </div>

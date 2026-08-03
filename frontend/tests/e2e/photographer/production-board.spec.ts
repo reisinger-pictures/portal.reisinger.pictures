@@ -38,6 +38,49 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.expectColumn('Abgebrochen');
     });
 
+    test('R3: Photographer, der /boards ohne Tab-Parameter direkt aufruft, landet auf dem Bildbearbeitungs-Board (kein Dead-End)', { tag: ['@feature:board', '@regression'] }, async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const kanban = new KanbanHelper(page);
+        await auth.login(photographer.email, photographer.password);
+        await page.goto('/boards');
+        await expect(page).toHaveURL(/\/boards\?tab=production$/);
+        await expect(page.locator('main .kanban-grid')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByText('Kein Zugriff auf dieses Board.')).toHaveCount(0);
+        await kanban.expectColumn('Shooting');
+        await kanban.expectColumn('Bearbeitung');
+        await kanban.expectColumn('Veröffentlicht');
+    });
+
+    test('R4: Super-Admin sieht den Katalog-Badge auch ohne eigenen Lightroom-Katalog', { tag: ['@feature:board', '@regression'] }, async ({ page, request }) => {
+        const superAdmin = await helper.createIsolatedUser('super_admin');
+        const catalogName = `Fremd-Katalog-${Math.random().toString(36).substring(2, 8)}`;
+        const title = `R4-Katalog-Badge ${catalogName}`;
+
+        // Job per API anlegen: Super-Admin besitzt keinen Katalog → Flag muss false bleiben
+        // (Display-Convenience, keine Server-Secrecy), der Rohwert bleibt im Payload erhalten.
+        const adminCookie = await helper.loginAs(superAdmin.email, superAdmin.password);
+        const createRes = await request.post('/api/management/photo-jobs', {
+            data: { title, lightroom_catalog: catalogName },
+            headers: { 'Accept': 'application/json', 'Cookie': adminCookie },
+        });
+        expect(createRes.ok()).toBeTruthy();
+        expect((await createRes.json()).photo_job.lightroom_catalog_is_mine).toBe(false);
+
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        const kanban = new KanbanHelper(page);
+        await auth.login(superAdmin.email, superAdmin.password);
+        await sidebar.navigateTo('Bildbearbeitung');
+        await expect(page).toHaveURL(/\/boards\?tab=production/);
+        await expect(page.locator('main .kanban-grid')).toBeVisible({ timeout: 15000 });
+
+        const card = page.locator('main').getByText(title, { exact: false }).first()
+            .locator('xpath=ancestor::div[contains(@class,"card")][1]');
+        await expect(card).toBeVisible({ timeout: 10000 });
+        await expect(card.locator('.badge').filter({ hasText: catalogName })).toBeVisible();
+        await kanban.expectColumn('Shooting');
+    });
+
     test('Pflichtfeld-Validierung: Titel ist erforderlich', { tag: ['@smoke'] }, async ({ page }) => {
         const { kanban } = await setup(page, photographer);
         await kanban.openCreateModal('Shooting', 'Neuer Auftrag');

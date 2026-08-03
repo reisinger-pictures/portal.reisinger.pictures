@@ -76,6 +76,11 @@ function getStatusSelect() {
     return within(formControl).getByRole('combobox') as HTMLSelectElement;
 }
 
+function getPaymentStatusSelect() {
+    const formControl = screen.getByText('Zahlungsstatus').closest('.form-control') as HTMLElement;
+    return within(formControl).getByRole('combobox') as HTMLSelectElement;
+}
+
 describe('ProjectModal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -128,6 +133,31 @@ describe('ProjectModal', () => {
         await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status: 'bezahlt' }));
+    });
+
+    it('submits the selected payment status when creating a project', async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn().mockResolvedValue(undefined);
+
+        renderWithProviders(
+            <ProjectModal
+                isOpen
+                onClose={vi.fn()}
+                defaultStatus="angebot"
+                statusOptions={statusOptions}
+                onSave={onSave}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(getPaymentStatusSelect().value).toBe('open');
+        });
+
+        await user.selectOptions(getPaymentStatusSelect(), 'paid');
+        await user.type(getClientNameInput(), 'Max Mustermann');
+        await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ payment_status: 'paid' }));
     });
 
     it('resets the status to the new defaultStatus when reopened for a different column', async () => {

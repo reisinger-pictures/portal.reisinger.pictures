@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Project;
 use App\Enums\Brand;
+use App\Enums\PaymentStatus;
 use App\Enums\ProjectStatus;
 use App\Support\BrandRegistry;
 
@@ -504,6 +505,111 @@ class ProjectBoardTest extends TestCase
             'item_type' => 'project',
             'item_id' => $p2->id,
         ]);
+    }
+
+    public function test_store_persists_payment_status(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/projects', [
+            'client_name' => 'Testkunde',
+            'payment_status' => PaymentStatus::PAID->value,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('project.payment_status', PaymentStatus::PAID->value);
+        $this->assertDatabaseHas('projects', [
+            'client_name' => 'Testkunde',
+            'payment_status' => PaymentStatus::PAID->value,
+        ]);
+    }
+
+    public function test_store_defaults_payment_status_to_open_without_value(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/projects', [
+            'client_name' => 'Testkunde',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('project.payment_status', PaymentStatus::OPEN->value);
+        $this->assertDatabaseHas('projects', [
+            'client_name' => 'Testkunde',
+            'payment_status' => PaymentStatus::OPEN->value,
+        ]);
+    }
+
+    public function test_update_persists_and_overrides_payment_status(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id, 'payment_status' => 'open']);
+
+        $response = $this->withHeaders($headers)->putJson("/api/management/projects/{$project->id}", [
+            'payment_status' => PaymentStatus::PARTLY_PAID->value,
+        ]);
+        $response->assertStatus(200);
+        $response->assertJsonPath('project.payment_status', PaymentStatus::PARTLY_PAID->value);
+        $this->assertDatabaseHas('projects', [
+            'id' => $project->id,
+            'payment_status' => PaymentStatus::PARTLY_PAID->value,
+        ]);
+
+        $override = $this->withHeaders($headers)->putJson("/api/management/projects/{$project->id}", [
+            'payment_status' => PaymentStatus::PAID->value,
+        ]);
+        $override->assertStatus(200);
+        $this->assertDatabaseHas('projects', [
+            'id' => $project->id,
+            'payment_status' => PaymentStatus::PAID->value,
+        ]);
+    }
+
+    public function test_update_rejects_invalid_payment_status_with_422(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id]);
+
+        $this->withHeaders($headers)->putJson("/api/management/projects/{$project->id}", [
+            'payment_status' => 'bezahlt',
+        ])->assertStatus(422);
+    }
+
+    public function test_store_rejects_invalid_payment_status_with_422(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+
+        $this->withHeaders($headers)->postJson('/api/management/projects', [
+            'client_name' => 'Testkunde',
+            'payment_status' => 'bezahlt',
+        ])->assertStatus(422);
+    }
+
+    public function test_update_rejects_null_payment_status_with_422(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+        $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $admin->id]);
+
+        $this->withHeaders($headers)->putJson("/api/management/projects/{$project->id}", [
+            'payment_status' => null,
+        ])->assertStatus(422);
+    }
+
+    public function test_store_rejects_null_payment_status_with_422(): void
+    {
+        $admin = $this->createAdmin();
+        $headers = $this->authHeaders($admin);
+
+        $this->withHeaders($headers)->postJson('/api/management/projects', [
+            'client_name' => 'Testkunde',
+            'payment_status' => null,
+        ])->assertStatus(422);
     }
 
     private function assertColumnDense(array $projects, string $status): void

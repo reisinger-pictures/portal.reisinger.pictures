@@ -22,6 +22,30 @@ Sobald Implementierung eines neuen Angebots-Features beginnt, auf `@dnd-kit/reac
 
 ---
 
+## ✅ ERLEDIGT — REVIEW-Findings — Kanban-Boards (Review 2026-08-03, Commits 4ae39e1..685a843)
+
+Alle 4 Findings gefixt + unabhängig verifiziert (Session 2026-08-03). Gates: Backend `php artisan test` 1088 passed/0 failed, Vitest 585 passed, `lint:fix`/`build` grün, E2E @smoke 54 passed.
+
+| # | Severity | Fix (uncommitted) | Tests |
+|---|----------|-------------------|-------|
+| **R1** | moderat | `payment_status` wird in `ProjectBoardController::store()/update()` gegen `PaymentStatus::cases()` validiert + persistiert (`store`: `?? OPEN`, `update`: `fill()`). Kein anderer Writer. Modal-Select-Werte passen zum Enum. | `ProjectBoardTest` (5 neue) + `ProjectModal.test.tsx` |
+| **R2** | niedrig–moderat | `CleanupBoardItems` pluckt `linked_photo_job_id` nach der Projekt-Löschung und exkludiert via `whereNotIn` → referenzierte Endstatus-Jobs bleiben erhalten, Orphans weiter löschbar. | `CleanupBoardItemsTest` (3 neue) |
+| **R3** | niedrig | `ManagementBoardsView` löst den effektiven Tab per `resolveBoardTab()` während des Renderings aus Permissions (kein useEffect) → Fotograf ohne `?tab` landet auf Production-Board statt "Kein Zugriff". Super-Admin-Default bleibt `projects`. | 2 Vitest + E2E `production-board.spec.ts` |
+| **R4** | niedrig–moderat | Badge-Bedingung `|| isSuperAdmin` in `PhotographerProductionBoard.tsx:106`; Flag-Semantik unverändert; Doc §8.2 als Display-Layer-Convenience (keine Server-Secrecy) formuliert. | `PhotoJobBoardTest` (1), `PhotographerProductionBoard.test.tsx`, E2E |
+
+**LOW-Hardening-Notizen — ✅ ERLEDIGT (2026-08-03, final verifiziert):**
+- **R1-Edge:** `payment_status`-Rule jetzt ohne `nullable` in `store()` (`ProjectBoardController.php:71`) und `update()` (`:105`) → explizites `null` → 422 statt 500/201. Tests: `test_store_rejects_null_payment_status_with_422` + `test_update_rejects_null_payment_status_with_422`.
+- **R3-Kosmetik:** `ManagementBoardsView` normalisiert die URL per render-time `<Navigate replace />` (Pattern wie `ProtectedRoute`) → effektiver Tab steht immer in der URL (Fotograf: `/boards?tab=production`, Super-Admin: `/boards?tab=projects`).
+
+**Übrige Notes (Stand unverändert):**
+- `workflow_logs` fehlt bei Modal-Statuswechseln (durch Test `test_update_accepts_status_without_workflow_log` bewusst) — Audit-Trail ist pfadabhängig.
+- `move()` dupliziert Status-Listen hartkodiert, `store()/update()` leiten sie aus Enums ab → Drift-Risiko bei neuen Status. `PaymentStatus`-Enum ungenutzt (`Project.php:63`).
+- Nach Konsolidierung wieder 2 undeployte Migrationen (V025 + V026) → vor Deploy zu EINER Migration zusammenfassen (Migration Policy).
+- ~~V025 `down()` setzt `invoice_snapshots.tax_rate` zurück auf `NOT NULL DEFAULT 20`~~ — **Non-Issue (User-Entscheid 2026-08-03):** `down()` wird nie ausgeführt, bleibt als Regel leer.
+- `index()` sortiert `status` alphabetisch (`bezahlt` < `rechnung`) ≠ Board-Reihenfolge (nur API-Kosmetik).
+
+---
+
 ## 🔙 Backlog
 
 | Task | Beschreibung | Grund |

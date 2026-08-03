@@ -63,7 +63,7 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
   * Pflichtfelder MÜSSEN das `required`-HTML-Attribut tragen — der Star (`*`) wird automatisch via CSS angehängt (`.form-control:has(input[required]) .label-text::after`).
   * `(Optional)` oder `(optional)` in Labels ist **strikt verboten**. Optionale Felder werden schlicht ohne Zusatz gekennzeichnet.
   * Die CSS-Regel in `index.css` (`.form-control:has(input[required], select[required], textarea[required]) .label-text::after`) ist der zentrale Mechanismus und darf nicht umgangen werden.
-* **Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. V024 ist die letzte deployte Migration. Vor dem Deployment werden alle Nicht-Produktions-Migrationen (≥ V025) zu EINER konsolidierten Migration zusammengefasst. Diese Regel verhindert eine übermäßig fragmentierte Migrations-Historie.
+* **Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. V024 ist die letzte deployte Migration. Vor dem Deployment werden alle Nicht-Produktions-Migrationen (≥ V025) zu EINER konsolidierten Migration zusammengefasst. Diese Regel verhindert eine übermäßig fragmentierte Migrations-Historie. **`down()`-Methoden werden nie ausgeführt und können als Regel leer gelassen werden** (kein Reversal für konsolidierte Migrationen, etabliert 2026-08-03).
 
 ## 4. AI Agent Roles & Responsibilities
 The system and workflow are managed via a Main/Secondary Model architecture to prevent context pollution:
@@ -86,62 +86,76 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
 * **Max 3 Fix-Versuche für Tests (STRICT):** Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agent an den Benutzer zurückgeben mit einer Analyse was schiefgeht. Keine Endlos-Fix-Loops.
 
 ## 5. Test Commands
+
+**Backend** (PHP via Herd — PATH muss das PHP-Binary enthalten):
+
 ```bash
-# Backend (PHP via Herd: PATH muss php85 enthalten)
 export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
 cd backend && php artisan test
-
-# Frontend Unit (pnpm, NICHT npm)
-cd frontend && pnpm run test:run
-
-# Frontend Lint + Build (pnpm, NICHT npm)
-cd frontend && pnpm lint:fix && pnpm build
-
-# E2E (Playwright — full suite, nur vor Deployment)
-cd frontend
-npx playwright test
-
-# E2E (nur @smoke — nach jedem Code-Change)
-cd frontend
-npx playwright test --grep @smoke
-
-# E2E (nur spezifisches Feature, z.B. checkout)
-cd frontend
-npx playwright test --grep @feature:checkout
-
-# E2E (nur fehlgeschlagene wiederholen)
-cd frontend
-npx playwright test --last-failed
-
-# E2E Workflow:
-# 1. Nach jedem Code-Change: pnpm test:e2e:smoke
-# 2. Feature-spezifisch: npx playwright test --grep @feature:<name>
-# 3. Nur vor Deployment: npx playwright test (full suite)
-# 4. Flaky Tests in AGENTS.todo.md dokumentieren mit:
-#    - Datei + Testname
-#    - Fehlerursache (wenn bekannt)
-#    - "flaky" tag im Commit/PR
-#
-# Bug-Fixing: Bei fehlschlagenden E2E-Tests npx playwright test --last-failed
-# wiederholt ausführen, bis alle grün sind.
-
-# E2E Timeout Policy (STRICT):
-# - Vor jeder Session die aktuelle Minimallaufzeit messen: npx playwright test
-# - Timeout auf das Doppelte setzen (z.B. 7 min gemessen → 15 min Timeout)
-# - Diese Regel und die Laufzeit in AGENTS.todo.md dokumentieren
-# - Bei Änderungen an E2E-Tests neu messen und aktualisieren
-# Aktuelle Laufzeit (05.07.2026): ~7 min → Timeout: 15 min (900000ms)
-
-# Backend Parallel Testing (PHP):
-# Derzeit laufen ~500 PHP Tests sequenziell. Für schnellere Feedback-Loops:
-# 1. paratest installieren: composer require --dev brianium/paratest
-# 2. php artisan test --parallel (Laravel 11 built-in parallel runner)
-# 3. Prozesse: 8 (Ryzen-Kerne)
-# 
-# PHP Group-Strategy (noch nicht implementiert):
-# 1. Tests mit @group=smoke taggen für schnelle Regression
-# 2. Nur Feature-Tests bei Feature-Arbeit: php artisan test --testsuite=Feature --parallel
 ```
+
+**Frontend Unit** (pnpm, NICHT npm):
+
+```bash
+cd frontend && pnpm run test:run
+```
+
+**Frontend Lint + Build** (pnpm, NICHT npm):
+
+```bash
+cd frontend && pnpm lint:fix && pnpm build
+```
+
+**E2E (Playwright):**
+
+- Full suite, nur vor Deployment: `cd frontend && npx playwright test`
+- Nur @smoke, nach jedem Code-Change: `cd frontend && npx playwright test --grep @smoke`
+- Nur spezifisches Feature, z. B. checkout: `cd frontend && npx playwright test --grep @feature:checkout`
+- Nur fehlgeschlagene wiederholen: `cd frontend && npx playwright test --last-failed`
+
+**E2E Workflow:**
+
+1. Nach jedem Code-Change: `pnpm test:e2e:smoke`
+2. Feature-spezifisch: `npx playwright test --grep @feature:<name>`
+3. Nur vor Deployment: `npx playwright test` (full suite)
+4. Flaky Tests in AGENTS.todo.md dokumentieren mit:
+   - Datei + Testname
+   - Fehlerursache (wenn bekannt)
+   - `flaky` tag im Commit/PR
+
+Bug-Fixing: Bei fehlschlagenden E2E-Tests `npx playwright test --last-failed` wiederholt ausführen, bis alle grün sind.
+
+**E2E Timeout Policy (STRICT):**
+
+- Vor jeder Session die aktuelle Minimallaufzeit messen: `npx playwright test`
+- Timeout auf das Doppelte setzen (z. B. 7 min gemessen → 15 min Timeout)
+- Diese Regel und die Laufzeit in AGENTS.todo.md dokumentieren
+- Bei Änderungen an E2E-Tests neu messen und aktualisieren
+- Aktuelle Laufzeit (05.07.2026): ~7 min → Timeout: 15 min (900000 ms)
+
+**Backend Parallel Testing (PHP) — EINRICHTUNG AKTIV (2026-08-03):**
+
+`paratest` ist installiert (`brianium/paratest`). Die Test-Infra ist parallel-fähig:
+
+- Canonical Test-DB: `portal_test_db` (MariaDB :3307, aus `phpunit.xml`).
+- Worker-DBs: `php artisan test --parallel` legt pro Prozess automatisch `portal_test_db_test_<n>` an. `portal_user` hat die Wildcard-Grants `ON portal\_test\_db\_test\_%` + CREATE-Recht (verifiziert 2026-08-03).
+
+**KONKURRENZ-REGEL (STRICT, Subagenten):**
+
+- `RefreshDatabase` leert und re-migriert die DB bei jedem PHPUnit-Prozessstart. Mehrere gleichzeitige `php artisan test`-Läufe auf DERSELBEN DB kollidieren (Tabellen-Drop im Parallelbetrieb) → Kaskaden-Fehler.
+- Die volle Suite läuft IMMER NUR in EINEM Subagenten (einmal, canonical DB).
+- Subagenten, die Backend-Tests ausführen müssen, nutzen für Scoped-Runs (`--filter`) eine eigene Worker-DB, z. B.:
+
+```bash
+DB_DATABASE=portal_test_db_test_<task> php artisan test --filter <TestClass>
+```
+
+  (Anlegen der Worker-DB vorab via `docker exec portal_db_test mariadb ...`; der Name MUSS `portal_test_db_test_%` matchen, damit der Grant greift.)
+
+**PHP Group-Strategy (noch nicht implementiert):**
+
+1. Tests mit `@group=smoke` taggen für schnelle Regression
+2. Nur Feature-Tests bei Feature-Arbeit: `php artisan test --testsuite=Feature --parallel`
 
 ## 6. Database Setup Policy (STRICT)
 

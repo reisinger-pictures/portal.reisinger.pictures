@@ -518,6 +518,22 @@ class PhotoJobBoardTest extends TestCase
         $this->assertFalse($response->json('photo_jobs.0.lightroom_catalog_is_mine'));
     }
 
+    public function test_super_admin_without_own_catalogs_gets_flag_false_and_raw_name_kept(): void
+    {
+        $superAdmin = $this->createSuperAdmin();
+        $headers = $this->authHeaders($superAdmin);
+        $otherUser = User::factory()->create();
+
+        LightroomCatalog::factory()->create(['user_id' => $otherUser->id, 'name' => '2026-08']);
+        PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $otherUser->id, 'lightroom_catalog' => '2026-08']);
+
+        $response = $this->withHeaders($headers)->getJson('/api/management/photo-jobs');
+        $response->assertStatus(200);
+
+        $this->assertFalse($response->json('photo_jobs.0.lightroom_catalog_is_mine'));
+        $this->assertSame('2026-08', $response->json('photo_jobs.0.lightroom_catalog'));
+    }
+
     public function test_index_flags_null_catalog_as_not_mine(): void
     {
         $photographer = $this->createPhotographer();

@@ -59,6 +59,7 @@ describe('PhotographerProductionBoard', () => {
         vi.clearAllMocks();
         vi.mocked(usePermissions).mockReturnValue({
             canAccessProductionBoard: true,
+            isSuperAdmin: false,
         } as never);
         vi.mocked(useProductionBoard).mockReturnValue({
             photoJobs: [job],
@@ -114,6 +115,26 @@ describe('PhotographerProductionBoard', () => {
 
         renderWithProviders(<PhotographerProductionBoard />);
         expect(screen.queryByText('Fremder Katalog')).not.toBeInTheDocument();
+    });
+
+    it('shows the catalog name to super admins even for foreign catalogs', () => {
+        vi.mocked(usePermissions).mockReturnValue({
+            canAccessProductionBoard: true,
+            isSuperAdmin: true,
+        } as never);
+        vi.mocked(useProductionBoard).mockReturnValue({
+            photoJobs: [jobWith({ lightroom_catalog: 'Fremder Katalog', lightroom_catalog_is_mine: false })],
+            isLoading: false,
+            error: undefined,
+            create: vi.fn(),
+            update: vi.fn(),
+            move: vi.fn(),
+            remove: vi.fn(),
+        } as never);
+
+        renderWithProviders(<PhotographerProductionBoard />);
+        const badgeContent = screen.getByText('Fremder Katalog');
+        expect(badgeContent.closest('.badge')).not.toBeNull();
     });
 
     it('shows a spinner while loading', () => {
