@@ -21,16 +21,15 @@ class PhotoJob extends Model
         'total_count',
         'selected_count',
         'target_gallery_id',
-        'is_private',
         'status',
         'position',
+        'notes',
     ];
 
     protected $casts = [
         'brand' => AsBrand::class,
         'total_count' => 'integer',
         'selected_count' => 'integer',
-        'is_private' => 'boolean',
         'status' => 'string',
         'position' => 'integer',
     ];

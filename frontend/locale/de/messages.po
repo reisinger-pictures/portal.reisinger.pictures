@@ -3336,6 +3336,11 @@ msgstr "Noch keine Pools berechnet."
 msgid "Noch keine Verträge vorhanden."
 msgstr "Noch keine Verträge vorhanden."
 
+#: src/ui/management/components/ProjectModal.tsx
+#: src/ui/photographer/components/PhotoJobModal.tsx
+msgid "Notiz"
+msgstr "Notiz"
+
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
 #: src/ui/components/IptcMetadataEditor.tsx
@@ -3674,8 +3679,8 @@ msgstr "Print bis 4000px (2.00x)"
 
 #: src/ui/photographer/components/PhotoJobModal.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
-msgid "Privat"
-msgstr "Privat"
+#~ msgid "Privat"
+#~ msgstr "Privat"
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Privat (Nur mit Link / Passwort)"
@@ -4113,6 +4118,11 @@ msgstr "Status / Aktion"
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Status aktualisiert"
 msgstr "Status aktualisiert"
+
+#: src/ui/management/ManagementProjectsBoard.tsx
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Status ändern"
+msgstr "Status ändern"
 
 #: src/ui/management/components/PhotographerTeamModal.tsx
 msgid "Status gespeichert"

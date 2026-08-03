@@ -36,8 +36,8 @@ const photoJobSchema = z.object({
     ),
     target_gallery_id: z.string().optional(),
     status: z.string().optional(),
-    is_private: z.boolean().optional(),
     assignee_id: z.string().optional(),
+    notes: z.string().optional(),
 });
 
 type PhotoJobFormValues = z.infer<typeof photoJobSchema>;
@@ -61,8 +61,8 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
             selected_count: '',
             target_gallery_id: '',
             status: '',
-            is_private: false,
             assignee_id: '',
+            notes: '',
         },
     });
     const { showToast } = useUI();
@@ -81,8 +81,8 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
                 selected_count: editing?.selected_count != null ? String(editing.selected_count) : '',
                 target_gallery_id: editing?.target_gallery_id ?? '',
                 status: editing?.status ?? defaultStatus ?? '',
-                is_private: editing?.is_private ?? false,
                 assignee_id: editing?.assignee?.id ?? '',
+                notes: editing?.notes ?? '',
             });
         }
     }, [isOpen, editing, defaultStatus, reset]);
@@ -98,7 +98,7 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
             total_count: total,
             selected_count: selected,
             target_gallery_id: data.target_gallery_id || null,
-            is_private: data.is_private ?? false,
+            notes: data.notes || null,
         };
         if (data.assignee_id) {
             input.assignee_id = data.assignee_id;
@@ -123,51 +123,49 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control md:col-span-2">
                             <label className="label"><span className="label-text font-bold"><Trans>Titel</Trans></span></label>
-                            <input required type="text" {...register('title')} className={`input input-bordered ${errors.title ? 'input-error' : ''}`} />
+                            <input required type="text" {...register('title')} className={`input input-bordered w-full ${errors.title ? 'input-error' : ''}`} />
                             {errors.title && <span className="text-error text-xs mt-1">{errors.title.message}</span>}
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Lightroom-Katalog</Trans></span></label>
-                            <select {...register('lightroom_catalog')} className="select select-bordered">
+                            <select {...register('lightroom_catalog')} className="select select-bordered w-full">
                                 <option value=""><Trans>Kein Katalog</Trans></option>
                                 {catalogOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Ziel-Galerie</Trans></span></label>
-                            <select {...register('target_gallery_id')} className="select select-bordered">
+                            <select {...register('target_gallery_id')} className="select select-bordered w-full">
                                 <option value=""><Trans>Keine</Trans></option>
                                 {galleries?.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                             </select>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Bilder gesamt</Trans></span></label>
-                            <input type="number" min="0" step="1" {...register('total_count')} className={`input input-bordered ${errors.total_count ? 'input-error' : ''}`} />
+                            <input type="number" min="0" step="1" {...register('total_count')} className={`input input-bordered w-full ${errors.total_count ? 'input-error' : ''}`} />
                             {errors.total_count && <span className="text-error text-xs mt-1">{errors.total_count.message}</span>}
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Bilder selektiert</Trans></span></label>
-                            <input type="number" min="0" step="1" {...register('selected_count')} className={`input input-bordered ${errors.selected_count ? 'input-error' : ''}`} />
+                            <input type="number" min="0" step="1" {...register('selected_count')} className={`input input-bordered w-full ${errors.selected_count ? 'input-error' : ''}`} />
                             {errors.selected_count && <span className="text-error text-xs mt-1">{errors.selected_count.message}</span>}
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Zuständig</Trans></span></label>
-                            <select {...register('assignee_id')} className="select select-bordered">
+                            <select {...register('assignee_id')} className="select select-bordered w-full">
                                 <option value=""><Trans>Keine Zuweisung</Trans></option>
                                 {users?.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                             </select>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Status</Trans></span></label>
-                            <select {...register('status')} className="select select-bordered">
+                            <select {...register('status')} className="select select-bordered w-full">
                                 {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
                         </div>
-                        <div className="form-control">
-                            <label className="label cursor-pointer justify-start gap-3">
-                                <input type="checkbox" className="checkbox" {...register('is_private')} />
-                                <span className="label-text font-bold"><Trans>Privat</Trans></span>
-                            </label>
+                        <div className="form-control md:col-span-2">
+                            <label className="label"><span className="label-text font-bold"><Trans>Notiz</Trans></span></label>
+                            <textarea {...register('notes')} rows={3} className="textarea textarea-bordered w-full" />
                         </div>
                     </div>
                     <div className="modal-action">

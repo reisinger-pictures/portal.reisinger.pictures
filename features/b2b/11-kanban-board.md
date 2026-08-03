@@ -215,6 +215,11 @@ Route-Basis `/api/management/photo-jobs` (nur `super_admin` / `photographer`):
 - `DragDropProvider` + `useDroppable` (Spalten) + `useDraggable` / `useSortable` (Karten) + `DragOverlay`.
 - Bei Status-/Positionsänderung → `PATCH .../move`.
 
+### UX: Geräte- & Rollen-Support (SOLL)
+
+- **Drag & Drop nur am Desktop (≥768px) und nur für `super_admin`.** `disallowDrag = !isSuperAdmin || !useIsDesktop()` (beide Boards). Auf Mobilgeräten (Viewport < 768px, `window.matchMedia('(min-width: 768px)')`) und für alle anderen Rollen werden Karten ohne Drag-Handler gerendert.
+- **Status-Select in der Karte als Fallback (alle Geräte & Rollen):** Jede Karte trägt ein kompaktes `<select aria-label="Status ändern">` mit allen Spalten-Status. Die Auswahl ruft `move(id, status, position)` mit `position = Anzahl der Items der Zielspalte (ohne das verschobene Item)` auf → die Karte wird ans Ende der Zielspalte verschoben. Fehler → Toast. Dadurch bleibt die Statusänderung auch auf Mobile und für Nicht-Super-Admins vollständig nutzbar.
+
 ### Formulare
 
 - `react-hook-form` + `@hookform/resolvers/zod`.

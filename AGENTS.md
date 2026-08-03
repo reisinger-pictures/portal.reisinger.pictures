@@ -147,6 +147,8 @@ npx playwright test --last-failed
 
 Nach `php artisan migrate:fresh` MUSS `php artisan db:seed` (oder `--seed` Flag) ausgeführt werden. Ohne Seed existiert kein Admin-User — Login und Auth sind tot. Der `DatabaseSeeder` legt den Admin via `firstOrCreate` mit `ADMIN_EMAIL`/`ADMIN_PASSWORD` an.
 
+**Migration-Regel (STRICT):** Bei JEDER Migration gilt: **immer seeden**, nie nur migrieren. `php artisan migrate` (bzw. `migrate:fresh`) allein reicht nicht — anschließend IMMER `php artisan db:seed` (oder `--seed` Flag) ausführen, sonst funktioniert das Anmelden (Login/Auth) nicht, weil kein Admin-User existiert.
+
 ## 7. Security Risk Register (Accepted Risks)
 
 Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11). **Nicht regredieren** — falls der jeweilige Guard entfernt wird, sofort fixen:

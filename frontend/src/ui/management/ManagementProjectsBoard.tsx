@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useState, useCallback } from 'react';
 import { useProjectsBoard, Project, ProjectInput } from '../../logic/useProjectsBoard';
+import { useIsDesktop } from '../../logic/useMediaQuery';
 import { usePermissions } from '../../logic/usePermissions';
 import { useUI } from '../components/UIContext';
 import { useProjectPdfDrop } from '../../logic/useProjectPdfDrop';
@@ -23,11 +24,11 @@ const columns: KanbanColumnDef[] = [
 function paymentBadge(status: string) {
     switch (status) {
         case 'paid':
-            return <span className="badge badge-success badge-sm text-white"><Trans>Bezahlt</Trans></span>;
+            return <span className="badge badge-success text-white"><Trans>Bezahlt</Trans></span>;
         case 'partly_paid':
-            return <span className="badge badge-warning badge-sm"><Trans>Teilbezahlt</Trans></span>;
+            return <span className="badge badge-warning"><Trans>Teilbezahlt</Trans></span>;
         default:
-            return <span className="badge badge-ghost badge-sm"><Trans>Offen</Trans></span>;
+            return <span className="badge badge-ghost"><Trans>Offen</Trans></span>;
     }
 }
 
@@ -38,7 +39,8 @@ interface ManagementProjectsBoardProps {
 export default function ManagementProjectsBoard({ embedded = false }: ManagementProjectsBoardProps) {
     const { projects, isLoading, error, create, update, move, remove, handoff } = useProjectsBoard();
     const { canAccessProjectsBoard, isSuperAdmin } = usePermissions();
-    const disallowDrag = !isSuperAdmin;
+    const isDesktop = useIsDesktop();
+    const disallowDrag = !isSuperAdmin || !isDesktop;
     const { showToast, confirm } = useUI();
 
     const [modalOpen, setModalOpen] = useState(false);
@@ -145,14 +147,38 @@ export default function ManagementProjectsBoard({ embedded = false }: Management
                 {item.price_cents > 0 && <span className="font-bold text-sm">{formatMoney(item.price_cents)}</span>}
                 {paymentBadge(item.payment_status)}
             </div>
-            <div className="flex items-center gap-1 text-xs opacity-60 mt-1">
-                <span className="iconify mdi--account"></span>
-                {item.assignee ? item.assignee.name : (item.owner?.name ?? t`Unbekannt`)}
+            {item.notes && (
+                <div className="flex items-start gap-1 text-xs text-base-content/70 mt-1 min-w-0">
+                    <span className="iconify mdi--note-text-outline shrink-0"></span>
+                    <span className="tooltip line-clamp-2 min-w-0" data-tip={item.notes}>{item.notes}</span>
+                </div>
+            )}
+            <div className="flex items-center mt-1">
+                <span className="badge badge-outline gap-1">
+                    <span className="iconify mdi--account"></span>
+                    {item.assignee ? item.assignee.name : (item.owner?.name ?? t`Unbekannt`)}
+                </span>
             </div>
+            <select
+                className="select select-xs select-bordered mt-2 w-full"
+                aria-label={t`Status ändern`}
+                value={item.status}
+                onChange={(e) => {
+                    const newStatus = e.target.value;
+                    const endPosition = items.filter(i => i.status === newStatus && i.id !== item.id).length;
+                    move(item.id, newStatus, endPosition).catch((err: unknown) => {
+                        showToast('error', err instanceof Error ? err.message : t`Verschieben fehlgeschlagen`);
+                    });
+                }}
+            >
+                {columns.map(col => (
+                    <option key={col.status} value={col.status}>{col.label}</option>
+                ))}
+            </select>
             <div className="flex flex-wrap items-center gap-2 mt-2">
                 <button type="button" onClick={() => openEdit(item)} className="btn btn-xs btn-outline"><Trans>Details</Trans></button>
                 {isSuperAdmin && (item.linked_photo_job_id
-                    ? <span className="badge badge-success badge-sm"><Trans>Übernommen</Trans></span>
+                    ? <span className="badge badge-success"><Trans>Übernommen</Trans></span>
                     : (
                         <button type="button" onClick={() => handleHandoff(item)} className="btn btn-xs btn-outline btn-success">
                             <Trans>In Bildbearbeitung übernehmen</Trans>

@@ -1,5 +1,5 @@
 import { Trans } from "@lingui/react/macro";
-import {Link, useNavigate} from 'react-router-dom';
+import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 import { useBrand } from '../../logic/useBrand';
 import { usePermissions } from '../../logic/usePermissions';
 import { useLicensingMode } from '../../logic/useLicensingMode';
@@ -28,6 +28,10 @@ export default function Sidebar(props: SidebarProps) {
     const isVolumeLicensing = licensingMode === 'volume_licensing';
     const navigate = useNavigate();
     const { itemCount } = useCart();
+    const [searchParams] = useSearchParams();
+    const boardsTab = searchParams.get('tab');
+    const isBoardsProjects = props.currentView === 'boards' && boardsTab !== 'production';
+    const isBoardsProduction = props.currentView === 'boards' && boardsTab === 'production';
 
     const handleLogout = async () => {
         await logout();
@@ -67,7 +71,7 @@ export default function Sidebar(props: SidebarProps) {
                             <li><Link to="/galleries" className={props.currentView === 'galleries' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--folder-multiple text-lg"></span> <Trans>Galerien & Ordner</Trans></Link></li>
                         )}
                         {canAccessProductionBoard && (
-                            <li><Link to="/production" className={props.currentView === 'production' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--image-edit text-lg"></span> <Trans>Bildbearbeitung</Trans></Link></li>
+                            <li><Link to="/boards?tab=production" className={isBoardsProduction ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--image-edit text-lg"></span> <Trans>Bildbearbeitung</Trans></Link></li>
                         )}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> <Trans>Suche & Entdecken</Trans></Link></li>
 
@@ -75,7 +79,7 @@ export default function Sidebar(props: SidebarProps) {
                             <>
                                 <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Büro & Dokumente</Trans></li>
                                 {isSuperAdmin && (
-                                    <li><Link to="/boards?tab=projects" className={props.currentView === 'boards' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-column text-lg"></span> <Trans>Workflow</Trans></Link></li>
+                                    <li><Link to="/boards?tab=projects" className={isBoardsProjects ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-column text-lg"></span> <Trans>Workflow</Trans></Link></li>
                                 )}
                                 {isAdmin && !isSuperAdmin && (
                                     <li><Link to="/admin-projects" className={props.currentView === 'admin-projects' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--view-column text-lg"></span> <Trans>Projekte</Trans></Link></li>

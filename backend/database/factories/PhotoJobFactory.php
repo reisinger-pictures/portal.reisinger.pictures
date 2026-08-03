@@ -22,7 +22,6 @@ class PhotoJobFactory extends Factory
             'lightroom_catalog' => $this->faker->optional()->sentence(2),
             'total_count' => 0,
             'selected_count' => 0,
-            'is_private' => false,
             'status' => PhotoJobStatus::SHOOTING->value,
             'position' => 0,
         ];

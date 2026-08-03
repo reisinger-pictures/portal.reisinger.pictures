@@ -58,6 +58,7 @@ const unlinkedProject = {
     price_cents: 0,
     payment_status: 'open',
     linked_photo_job_id: null,
+    notes: null,
 };
 const linkedProject = {
     ...unlinkedProject,
@@ -68,6 +69,7 @@ const linkedProject = {
 
 function setupMocks(overrides: Record<string, unknown> = {}) {
     const handoff = vi.fn().mockResolvedValue(undefined);
+    const move = vi.fn().mockResolvedValue(undefined);
     const showToast = vi.fn();
     const confirm = vi.fn().mockResolvedValue(true);
 
@@ -82,7 +84,7 @@ function setupMocks(overrides: Record<string, unknown> = {}) {
         error: undefined,
         create: vi.fn(),
         update: vi.fn(),
-        move: vi.fn(),
+        move,
         remove: vi.fn(),
         handoff,
         ...overrides,
@@ -95,7 +97,7 @@ function setupMocks(overrides: Record<string, unknown> = {}) {
         setUnsavedChanges: vi.fn(),
     });
 
-    return { handoff, showToast, confirm };
+    return { handoff, move, showToast, confirm };
 }
 
 describe('ManagementProjectsBoard', () => {
@@ -106,7 +108,7 @@ describe('ManagementProjectsBoard', () => {
 
     it('renders the Storniert column', () => {
         renderWithProviders(<ManagementProjectsBoard />);
-        expect(screen.getByText('Storniert')).toBeInTheDocument();
+        expect(screen.getByText('Storniert', { selector: 'div' })).toBeInTheDocument();
     });
 
     it('renders a handoff button for super admins when the project is not linked', () => {
@@ -138,5 +140,53 @@ describe('ManagementProjectsBoard', () => {
 
         renderWithProviders(<ManagementProjectsBoard />);
         expect(screen.queryByText('In Bildbearbeitung übernehmen')).not.toBeInTheDocument();
+    });
+
+    it('renders the note preview with the full note as tooltip', () => {
+        const notes = 'Wichtige interne Notiz für das Projekt';
+        setupMocks({ projects: [{ ...unlinkedProject, notes }] });
+
+        renderWithProviders(<ManagementProjectsBoard />);
+
+        const notePreview = screen.getByText(notes);
+        expect(notePreview).toBeInTheDocument();
+        expect(notePreview).toHaveClass('tooltip');
+        expect(notePreview).toHaveAttribute('data-tip', notes);
+    });
+
+    it('renders the assignee as a badge with priority over the owner', () => {
+        setupMocks({
+            projects: [{ ...unlinkedProject, assignee: { id: 'u9', name: 'Sarah' } }],
+        });
+
+        renderWithProviders(<ManagementProjectsBoard />);
+
+        const badgeContent = screen.getByText('Sarah');
+        expect(badgeContent.closest('.badge')).not.toBeNull();
+        expect(screen.queryByText('Florian')).not.toBeInTheDocument();
+    });
+
+    it('renders a status select on each card and moves the project to the selected column', async () => {
+        const user = userEvent.setup();
+        const { move } = setupMocks();
+
+        renderWithProviders(<ManagementProjectsBoard />);
+
+        const selects = screen.getAllByLabelText('Status ändern');
+        expect(selects).toHaveLength(2);
+
+        await user.selectOptions(selects[0], 'bezahlt');
+
+        expect(move).toHaveBeenCalledWith('p1', 'bezahlt', 0);
+    });
+
+    it('falls back to the owner name inside the assignee badge', () => {
+        renderWithProviders(<ManagementProjectsBoard />);
+
+        const badges = screen.getAllByText('Florian');
+        expect(badges.length).toBeGreaterThan(0);
+        for (const badge of badges) {
+            expect(badge.closest('.badge')).not.toBeNull();
+        }
     });
 });

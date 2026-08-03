@@ -23,7 +23,8 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         const kanban = new KanbanHelper(page);
         await auth.login(user.email, user.password);
         await sidebar.navigateTo('Bildbearbeitung');
-        await expect(page.locator('main h1')).toContainText('Bildbearbeitung', { timeout: 15000 });
+        await expect(page).toHaveURL(/\/boards\?tab=production/);
+        await expect(page.locator('main .kanban-grid')).toBeVisible({ timeout: 15000 });
         return { kanban };
     }
 
@@ -60,6 +61,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
     });
 
     test('Admin verschiebt einen Auftrag per Drag & Drop', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
+        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
         const title = `Drag Auftrag ${Math.random().toString(36).substring(2, 8)}`;
@@ -76,6 +78,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
     });
 
     test('Admin verschiebt einen Auftrag in die Abgebrochen-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
+        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
         const title = `Abbruch ${Math.random().toString(36).substring(2, 8)}`;
@@ -93,6 +96,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
     });
 
     test('Admin löscht einen abgebrochenen Auftrag', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
+        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
         const title = `Abbruch Del ${Math.random().toString(36).substring(2, 8)}`;
@@ -118,10 +122,10 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await expect(page.locator('main').getByText(title, { exact: false })).toHaveCount(0, { timeout: 10000 });
     });
 
-    test('Mobile: Touch-Drag verschiebt einen Auftrag zwischen Spalten', { tag: ['@mobile', '@feature:kanban'] }, async ({ page }) => {
+    test('Mobile: Karten-Status-Select verschiebt einen Auftrag zwischen Spalten (Mobile-Fallback)', { tag: ['@mobile', '@feature:kanban'] }, async ({ page }) => {
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
-        const title = `Touch Auftrag ${Math.random().toString(36).substring(2, 8)}`;
+        const title = `Select Auftrag ${Math.random().toString(36).substring(2, 8)}`;
 
         await kanban.openCreateModal('Shooting', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
@@ -129,7 +133,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.waitForCreate('/api/management/photo-jobs');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(title, 'Culling', { touch: true });
+        await kanban.selectCardStatus(title, 'Culling');
 
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
     });

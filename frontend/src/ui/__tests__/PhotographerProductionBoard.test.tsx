@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
+import userEvent from '@testing-library/user-event';
 import PhotographerProductionBoard from '../photographer/PhotographerProductionBoard';
 
 vi.mock('../../logic/useProductionBoard', () => ({
@@ -47,7 +48,6 @@ const job = {
     total_count: 0,
     selected_count: 0,
     target_gallery_id: null,
-    is_private: false,
 };
 
 function jobWith(overrides: Record<string, unknown>) {
@@ -78,7 +78,7 @@ describe('PhotographerProductionBoard', () => {
 
     it('renders the Abgebrochen column', () => {
         renderWithProviders(<PhotographerProductionBoard />);
-        expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
+        expect(screen.getByText('Abgebrochen', { selector: 'div' })).toBeInTheDocument();
     });
 
     it('renders a job card when data is present', () => {
@@ -136,5 +136,82 @@ describe('PhotographerProductionBoard', () => {
         } as never);
         renderWithProviders(<PhotographerProductionBoard />);
         expect(screen.getByText(/Kein Zugriff/i)).toBeInTheDocument();
+    });
+
+    it('renders the Lightroom catalog as a badge when it belongs to the viewer', () => {
+        vi.mocked(useProductionBoard).mockReturnValue({
+            photoJobs: [jobWith({ lightroom_catalog: '2026-08', lightroom_catalog_is_mine: true })],
+            isLoading: false,
+            error: undefined,
+            create: vi.fn(),
+            update: vi.fn(),
+            move: vi.fn(),
+            remove: vi.fn(),
+        } as never);
+
+        renderWithProviders(<PhotographerProductionBoard />);
+
+        const badgeContent = screen.getByText('2026-08');
+        expect(badgeContent.closest('.badge')).not.toBeNull();
+    });
+
+    it('renders a status select on each job card and moves the job to the selected column', async () => {
+        const user = userEvent.setup();
+        const move = vi.fn().mockResolvedValue(undefined);
+        vi.mocked(useProductionBoard).mockReturnValue({
+            photoJobs: [job],
+            isLoading: false,
+            error: undefined,
+            create: vi.fn(),
+            update: vi.fn(),
+            move,
+            remove: vi.fn(),
+        } as never);
+
+        renderWithProviders(<PhotographerProductionBoard />);
+
+        const selects = screen.getAllByLabelText('Status ändern');
+        expect(selects).toHaveLength(1);
+
+        await user.selectOptions(selects[0], 'export');
+
+        expect(move).toHaveBeenCalledWith('j1', 'export', 0);
+    });
+
+    it('renders the note preview with the full note as tooltip', () => {
+        const notes = 'Dringend: Raw-Dateien sichern';
+        vi.mocked(useProductionBoard).mockReturnValue({
+            photoJobs: [jobWith({ notes })],
+            isLoading: false,
+            error: undefined,
+            create: vi.fn(),
+            update: vi.fn(),
+            move: vi.fn(),
+            remove: vi.fn(),
+        } as never);
+
+        renderWithProviders(<PhotographerProductionBoard />);
+
+        const notePreview = screen.getByText(notes);
+        expect(notePreview).toHaveClass('tooltip');
+        expect(notePreview).toHaveAttribute('data-tip', notes);
+    });
+
+    it('renders the assignee as a badge with priority over the owner', () => {
+        vi.mocked(useProductionBoard).mockReturnValue({
+            photoJobs: [jobWith({ assignee: { id: 'u9', name: 'Sarah' } })],
+            isLoading: false,
+            error: undefined,
+            create: vi.fn(),
+            update: vi.fn(),
+            move: vi.fn(),
+            remove: vi.fn(),
+        } as never);
+
+        renderWithProviders(<PhotographerProductionBoard />);
+
+        const badgeContent = screen.getByText('Sarah');
+        expect(badgeContent.closest('.badge')).not.toBeNull();
+        expect(screen.queryByText('Florian')).not.toBeInTheDocument();
     });
 });

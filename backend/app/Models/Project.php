@@ -26,6 +26,7 @@ class Project extends Model
         'status',
         'position',
         'linked_photo_job_id',
+        'notes',
     ];
 
     protected $casts = [

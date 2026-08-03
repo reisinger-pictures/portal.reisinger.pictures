@@ -17,7 +17,7 @@ import { apiMutate, fetcher } from '../../api';
 const owner = { id: 'u1', name: 'Florian' };
 const mockJobs = {
     photo_jobs: [
-        { id: 'j1', status: 'shooting', position: 0, owner, assignee: null, created_at: '2026-08-02T10:00:00Z', title: 'Hochzeit Müller', lightroom_catalog: '2026-08', lightroom_catalog_is_mine: true, total_count: 1200, selected_count: 400, target_gallery_id: null, is_private: false },
+        { id: 'j1', status: 'shooting', position: 0, owner, assignee: null, created_at: '2026-08-02T10:00:00Z', title: 'Hochzeit Müller', lightroom_catalog: '2026-08', lightroom_catalog_is_mine: true, total_count: 1200, selected_count: 400, target_gallery_id: null },
     ],
 };
 

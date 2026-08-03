@@ -251,6 +251,65 @@ describe('Sidebar', () => {
             expect(screen.queryByText('Einstellungen')).not.toBeInTheDocument();
         });
 
+        it('points the Bildbearbeitung link to /boards?tab=production instead of /production', () => {
+            vi.mocked(usePermissions).mockReturnValue({
+                ...defaultPermissions,
+                isStaff: true,
+                isAdmin: false,
+                isSuperAdmin: false,
+                isPhotographer: true,
+                isOrgAdmin: false,
+                showOrgsSection: false,
+                canAccessProductionBoard: true,
+            });
+            renderSidebar();
+
+            const link = screen.getByText('Bildbearbeitung').closest('a');
+            expect(link).toHaveAttribute('href', '/boards?tab=production');
+        });
+
+        it('marks the Bildbearbeitung link active on /boards?tab=production', () => {
+            vi.mocked(usePermissions).mockReturnValue({
+                ...defaultPermissions,
+                isStaff: true,
+                isAdmin: true,
+                isSuperAdmin: true,
+                isPhotographer: false,
+                isOrgAdmin: false,
+                showOrgsSection: false,
+                canAccessProductionBoard: true,
+            });
+            renderWithProviders(
+                <MemoryRouter initialEntries={['/boards?tab=production']}>
+                    <Sidebar currentView="boards" />
+                </MemoryRouter>,
+            );
+
+            expect(screen.getByText('Bildbearbeitung').closest('a')).toHaveClass('active');
+            expect(screen.getByText('Workflow').closest('a')).not.toHaveClass('active');
+        });
+
+        it('marks the Workflow link active and not the Bildbearbeitung link on /boards?tab=projects', () => {
+            vi.mocked(usePermissions).mockReturnValue({
+                ...defaultPermissions,
+                isStaff: true,
+                isAdmin: true,
+                isSuperAdmin: true,
+                isPhotographer: false,
+                isOrgAdmin: false,
+                showOrgsSection: false,
+                canAccessProductionBoard: true,
+            });
+            renderWithProviders(
+                <MemoryRouter initialEntries={['/boards?tab=projects']}>
+                    <Sidebar currentView="boards" />
+                </MemoryRouter>,
+            );
+
+            expect(screen.getByText('Workflow').closest('a')).toHaveClass('active');
+            expect(screen.getByText('Bildbearbeitung').closest('a')).not.toHaveClass('active');
+        });
+
         it('renders admin navigation', () => {
             vi.mocked(usePermissions).mockReturnValue({
                 isStaff: true,

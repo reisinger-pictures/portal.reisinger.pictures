@@ -17,6 +17,7 @@ export interface Project {
     price_cents: number;
     payment_status: string;
     linked_photo_job_id: string | null;
+    notes: string | null;
 }
 
 export interface ProjectInput {
@@ -27,6 +28,7 @@ export interface ProjectInput {
     price_cents?: number;
     payment_status?: string;
     assignee_id?: string;
+    notes?: string | null;
 }
 
 export function useProjectsBoard() {

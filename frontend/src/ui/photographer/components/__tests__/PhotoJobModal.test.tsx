@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../../../test-setup';
 import userEvent from '@testing-library/user-event';
 import PhotoJobModal from '../PhotoJobModal';
+import type { PhotoJob } from '../../../../logic/useProductionBoard';
 
 vi.mock('../../../../logic/useUsers', () => ({
     useUsers: vi.fn(),
@@ -30,6 +31,31 @@ const catalogs = [
     { id: 'c2', name: '2026-07', position: 1 },
 ];
 
+const statusOptions = [
+    { value: 'shooting', label: 'Shooting' },
+    { value: 'culling', label: 'Culling' },
+    { value: 'bearbeitung', label: 'Bearbeitung' },
+    { value: 'export', label: 'Export' },
+    { value: 'veroeffentlicht', label: 'Veröffentlicht' },
+    { value: 'abgebrochen', label: 'Abgebrochen' },
+];
+
+const editingPhotoJob: PhotoJob = {
+    id: 'j1',
+    status: 'veroeffentlicht',
+    position: 2,
+    owner: { id: 'o1', name: 'Owner' },
+    assignee: null,
+    created_at: '2026-01-01T00:00:00.000Z',
+    title: 'Hochzeit Sommer',
+    lightroom_catalog: null,
+    lightroom_catalog_is_mine: false,
+    total_count: 0,
+    selected_count: 0,
+    target_gallery_id: null,
+    notes: null,
+};
+
 function setupMocks(overrides: Record<string, unknown> = {}) {
     const showToast = vi.fn();
     vi.mocked(useUsers).mockReturnValue({ users: [] });
@@ -52,6 +78,11 @@ function setupMocks(overrides: Record<string, unknown> = {}) {
 function getCatalogSelect() {
     const formControl = screen.getByText('Lightroom-Katalog').closest('.form-control') as HTMLElement;
     return within(formControl).getByRole('combobox');
+}
+
+function getStatusSelect() {
+    const formControl = screen.getByText('Status').closest('.form-control') as HTMLElement;
+    return within(formControl).getByRole('combobox') as HTMLSelectElement;
 }
 
 describe('PhotoJobModal', () => {
@@ -116,5 +147,150 @@ describe('PhotoJobModal', () => {
         await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ lightroom_catalog: '2026-08' }));
+    });
+
+    it('submits the notes textarea as notes', async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn().mockResolvedValue(undefined);
+
+        renderWithProviders(
+            <PhotoJobModal
+                isOpen
+                onClose={vi.fn()}
+                defaultStatus="shooting"
+                statusOptions={[{ value: 'shooting', label: 'Shooting' }]}
+                onSave={onSave}
+            />,
+        );
+
+        const titleInput = screen.getByText('Titel').closest('.form-control')!.querySelector('input')!;
+        await user.type(titleInput, 'Hochzeit Sommer');
+
+        const notesTextarea = screen.getByText('Notiz').closest('.form-control')!.querySelector('textarea')!;
+        await user.type(notesTextarea, 'Wichtige Notiz für die Bearbeitung');
+        await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: 'Wichtige Notiz für die Bearbeitung' }));
+    });
+
+    it('submits notes as null when left empty', async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn().mockResolvedValue(undefined);
+
+        renderWithProviders(
+            <PhotoJobModal
+                isOpen
+                onClose={vi.fn()}
+                defaultStatus="shooting"
+                statusOptions={[{ value: 'shooting', label: 'Shooting' }]}
+                onSave={onSave}
+            />,
+        );
+
+        const titleInput = screen.getByText('Titel').closest('.form-control')!.querySelector('input')!;
+        await user.type(titleInput, 'Hochzeit Sommer');
+        await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: null }));
+    });
+
+    it('submits the defaultStatus when creating a new photo job', async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn().mockResolvedValue(undefined);
+
+        renderWithProviders(
+            <PhotoJobModal
+                isOpen
+                onClose={vi.fn()}
+                defaultStatus="culling"
+                statusOptions={statusOptions}
+                onSave={onSave}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(getStatusSelect().value).toBe('culling');
+        });
+
+        const titleInput = screen.getByText('Titel').closest('.form-control')!.querySelector('input')!;
+        await user.type(titleInput, 'Hochzeit Sommer');
+        await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status: 'culling' }));
+    });
+
+    it('submits the editing status when editing a photo job', async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn().mockResolvedValue(undefined);
+
+        renderWithProviders(
+            <PhotoJobModal
+                isOpen
+                onClose={vi.fn()}
+                defaultStatus="culling"
+                statusOptions={statusOptions}
+                editing={editingPhotoJob}
+                onSave={onSave}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(getStatusSelect().value).toBe('veroeffentlicht');
+        });
+
+        await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status: 'veroeffentlicht' }));
+    });
+
+    it('resets the status to the new defaultStatus when reopened for a different column', async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn().mockResolvedValue(undefined);
+
+        const { rerender } = renderWithProviders(
+            <PhotoJobModal
+                isOpen
+                onClose={vi.fn()}
+                defaultStatus="culling"
+                statusOptions={statusOptions}
+                onSave={onSave}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(getStatusSelect().value).toBe('culling');
+        });
+
+        rerender(
+            <PhotoJobModal
+                isOpen={false}
+                onClose={vi.fn()}
+                defaultStatus="culling"
+                statusOptions={statusOptions}
+                onSave={onSave}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+
+        rerender(
+            <PhotoJobModal
+                isOpen
+                onClose={vi.fn()}
+                defaultStatus="bearbeitung"
+                statusOptions={statusOptions}
+                onSave={onSave}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(getStatusSelect().value).toBe('bearbeitung');
+        });
+
+        const titleInput = screen.getByText('Titel').closest('.form-control')!.querySelector('input')!;
+        await user.type(titleInput, 'Hochzeit Sommer');
+        await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status: 'bearbeitung' }));
     });
 });

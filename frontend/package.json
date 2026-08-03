@@ -25,6 +25,7 @@
         "check:i18n": "node scripts/check-i18n.mjs"
     },
     "dependencies": {
+        "@dnd-kit/dom": "^0.5.0",
         "@dnd-kit/react": "^0.5.0",
         "@hookform/resolvers": "^5.4.0",
         "@lingui/babel-plugin-lingui-macro": "^6.6.0",

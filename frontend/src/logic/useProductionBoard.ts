@@ -16,7 +16,7 @@ export interface PhotoJob {
     total_count: number;
     selected_count: number;
     target_gallery_id: string | null;
-    is_private: boolean;
+    notes: string | null;
 }
 
 export interface PhotoJobInput {
@@ -25,8 +25,8 @@ export interface PhotoJobInput {
     total_count?: number;
     selected_count?: number;
     target_gallery_id?: string | null;
-    is_private?: boolean;
     assignee_id?: string;
+    notes?: string | null;
 }
 
 export function useProductionBoard() {

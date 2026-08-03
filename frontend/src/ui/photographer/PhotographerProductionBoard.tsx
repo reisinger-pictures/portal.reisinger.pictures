@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { useProductionBoard, PhotoJob, PhotoJobInput } from '../../logic/useProductionBoard';
+import { useIsDesktop } from '../../logic/useMediaQuery';
 import { usePermissions } from '../../logic/usePermissions';
 import { useUI } from '../components/UIContext';
 import KanbanBoard, { KanbanColumnDef } from '../components/KanbanBoard';
@@ -24,7 +25,8 @@ interface PhotographerProductionBoardProps {
 export default function PhotographerProductionBoard({ embedded = false }: PhotographerProductionBoardProps) {
     const { photoJobs, isLoading, error, create, update, move, remove } = useProductionBoard();
     const { canAccessProductionBoard, isSuperAdmin } = usePermissions();
-    const disallowDrag = !isSuperAdmin;
+    const isDesktop = useIsDesktop();
+    const disallowDrag = !isSuperAdmin || !isDesktop;
     const { showToast, confirm } = useUI();
 
     const [modalOpen, setModalOpen] = useState(false);
@@ -101,19 +103,44 @@ export default function PhotographerProductionBoard({ embedded = false }: Photog
                     <span className="iconify mdi--trash-can-outline text-error"></span>
                 </button>
             </div>
-            {item.lightroom_catalog_is_mine === true && item.lightroom_catalog && <div className="text-xs opacity-60">{item.lightroom_catalog}</div>}
+            {item.lightroom_catalog_is_mine === true && item.lightroom_catalog && (
+                <div className="flex flex-wrap items-center gap-1 mt-1">
+                    <span className="badge badge-ghost">{item.lightroom_catalog}</span>
+                </div>
+            )}
             {(item.total_count > 0 || item.selected_count > 0) && (
                 <div className="text-xs text-base-content/70">
                     {item.selected_count} / {item.total_count} {t`Bilder`}
                 </div>
             )}
-            <div className="flex flex-wrap items-center gap-1 mt-1">
-                {item.is_private && <span className="badge badge-ghost badge-sm"><Trans>Privat</Trans></span>}
+            {item.notes && (
+                <div className="flex items-start gap-1 text-xs text-base-content/70 mt-1 min-w-0">
+                    <span className="iconify mdi--note-text-outline shrink-0"></span>
+                    <span className="tooltip line-clamp-2 min-w-0" data-tip={item.notes}>{item.notes}</span>
+                </div>
+            )}
+            <div className="flex items-center mt-1">
+                <span className="badge badge-outline gap-1">
+                    <span className="iconify mdi--account"></span>
+                    {item.assignee ? item.assignee.name : (item.owner?.name ?? t`Unbekannt`)}
+                </span>
             </div>
-            <div className="flex items-center gap-1 text-xs opacity-60 mt-1">
-                <span className="iconify mdi--account"></span>
-                {item.assignee ? item.assignee.name : (item.owner?.name ?? t`Unbekannt`)}
-            </div>
+            <select
+                className="select select-xs select-bordered mt-2 w-full"
+                aria-label={t`Status ändern`}
+                value={item.status}
+                onChange={(e) => {
+                    const newStatus = e.target.value;
+                    const endPosition = items.filter(i => i.status === newStatus && i.id !== item.id).length;
+                    move(item.id, newStatus, endPosition).catch((err: unknown) => {
+                        showToast('error', err instanceof Error ? err.message : t`Verschieben fehlgeschlagen`);
+                    });
+                }}
+            >
+                {columns.map(col => (
+                    <option key={col.status} value={col.status}>{col.label}</option>
+                ))}
+            </select>
             <button type="button" onClick={() => openEdit(item)} className="mt-2 btn btn-xs btn-outline"><Trans>Details</Trans></button>
         </div>
     );

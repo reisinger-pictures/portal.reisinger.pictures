@@ -1,12 +1,13 @@
 import { t } from "@lingui/core/macro";
-import { ReactNode } from "react";
+import { ReactNode, useRef } from "react";
 import {
     DragDropProvider,
-    DragOverlay,
     type DragEndEvent,
+    type DragStartEvent,
     useDroppable,
 } from '@dnd-kit/react';
-import { useSortable } from '@dnd-kit/react/sortable';
+import { Feedback } from '@dnd-kit/dom';
+import { isSortable, useSortable } from '@dnd-kit/react/sortable';
 
 export interface BoardItem {
     id: string;
@@ -44,6 +45,7 @@ function SortableCard<T extends BoardItem>({ item, renderCard }: SortableCardPro
         data: { kind: 'card', item, status: item.status, position: item.position },
         index: item.position,
         group: item.status,
+        plugins: (defaults) => [...defaults, Feedback.configure({ dropAnimation: null })],
     });
 
     const draggingClass = isDragging ? 'opacity-30' : '';
@@ -51,6 +53,7 @@ function SortableCard<T extends BoardItem>({ item, renderCard }: SortableCardPro
     return (
         <div
             ref={ref}
+            data-testid="kanban-card"
             className={`relative cursor-grab touch-none select-none rounded-box ${draggingClass} ${dropClass}`}
         >
             {renderCard(item)}
@@ -110,8 +113,29 @@ export default function KanbanBoard<T extends BoardItem>({
     disallowDrag = false,
     embedded = false,
 }: KanbanBoardProps<T>) {
+    // Workaround für @dnd-kit "OptimisticSortingPlugin": Das Plugin verschiebt
+    // das Quell-Element physisch im DOM (insertAdjacentElement in die Zielspalte),
+    // ohne React zu informieren. Beim anschließenden SWR-Re-Render (mutate) kollidiert
+    // Reacts Reconciliation mit dem verschobenen Node → "removeChild"-NotFoundError,
+    // sobald in der Zielspalte bereits Karten liegen (dirty/überfüllte Spalten).
+    // Fix: Den Pre-Drag-Parent merken und das Element im onDragEnd zurück in den
+    // ursprünglichen Parent schieben, bevor der State-Update (mutate) re-rendert.
+    const sourceParentRef = useRef<Element | null>(null);
+
+    const handleDragStart = (event: DragStartEvent) => {
+        sourceParentRef.current = event.operation.source?.element?.parentElement ?? null;
+    };
+
     const handleDragEnd = (event: DragEndEvent) => {
         if (disallowDrag) return;
+
+        const sourceElement = event.operation.source?.element;
+        const prevParent = sourceParentRef.current;
+        sourceParentRef.current = null;
+        if (sourceElement && prevParent && sourceElement.parentElement !== prevParent) {
+            prevParent.appendChild(sourceElement);
+        }
+
         if (event.canceled) return;
         const source = event.operation.source;
         const target = event.operation.target;
@@ -119,23 +143,25 @@ export default function KanbanBoard<T extends BoardItem>({
         const sourceItem = source.data?.item as T | undefined;
         if (!sourceItem || !target) return;
 
-        const targetData = target.data as { kind?: string; status?: string } | undefined;
+        const targetData = target.data as { kind?: string } | undefined;
         let newStatus: string;
-        if (targetData?.kind === 'card') {
-            newStatus = targetData.status ?? sourceItem.status;
+        let insertIndex: number;
+
+        if (targetData?.kind === 'column') {
+            newStatus = String(target.id);
+            const columnItems = items
+                .filter(i => i.status === newStatus && i.id !== sourceItem.id)
+                .sort((a, b) => a.position - b.position);
+            insertIndex = columnItems.length;
+        } else if (isSortable(source)) {
+            newStatus = String(source.sortable.group ?? sourceItem.status);
+            insertIndex = source.sortable.index;
         } else {
             newStatus = String(target.id);
-        }
-
-        const columnItems = items
-            .filter(i => i.status === newStatus && i.id !== sourceItem.id)
-            .sort((a, b) => a.position - b.position);
-
-        let insertIndex = columnItems.length;
-        if (targetData?.kind === 'card') {
-            const targetId = String(target.id);
-            const idx = columnItems.findIndex(i => i.id === targetId);
-            if (idx !== -1) insertIndex = idx;
+            const columnItems = items
+                .filter(i => i.status === newStatus && i.id !== sourceItem.id)
+                .sort((a, b) => a.position - b.position);
+            insertIndex = columnItems.length;
         }
 
         onMove(sourceItem.id, newStatus, insertIndex);
@@ -143,7 +169,7 @@ export default function KanbanBoard<T extends BoardItem>({
 
     return (
         <div className={`max-w-screen-2xl mx-auto w-full ${embedded ? 'px-2 pb-6' : 'p-6 md:p-10'}`}>
-            <DragDropProvider onDragEnd={handleDragEnd}>
+            <DragDropProvider onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                 {!embedded && (
                     <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                         <h1 className="text-4xl font-bold flex items-center gap-3">
@@ -165,19 +191,6 @@ export default function KanbanBoard<T extends BoardItem>({
                         />
                     ))}
                 </div>
-                {!disallowDrag && (
-                    <DragOverlay>
-                        {(source) => {
-                            const item = source?.data?.item as T | undefined;
-                            if (!item) return null;
-                            return (
-                                <div className="w-full min-w-0 rotate-2 rounded-xl border border-primary/40 bg-base-100 shadow-xl">
-                                    {renderCard(item)}
-                                </div>
-                            );
-                        }}
-                    </DragOverlay>
-                )}
             </DragDropProvider>
         </div>
     );

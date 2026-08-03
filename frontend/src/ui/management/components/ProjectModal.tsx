@@ -26,6 +26,7 @@ const projectSchema = z.object({
     payment_status: z.string().optional(),
     status: z.string().optional(),
     assignee_id: z.string().optional(),
+    notes: z.string().optional(),
 });
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
@@ -58,6 +59,7 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
             payment_status: 'open',
             status: '',
             assignee_id: '',
+            notes: '',
         },
     });
     const { showToast } = useUI();
@@ -74,6 +76,7 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
                 payment_status: editing?.payment_status ?? 'open',
                 status: editing?.status ?? defaultStatus ?? '',
                 assignee_id: editing?.assignee?.id ?? '',
+                notes: editing?.notes ?? '',
             });
         }
     }, [isOpen, editing, initial, defaultStatus, reset]);
@@ -89,6 +92,7 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
             package: data.package || null,
             price_cents: priceEur != null ? Math.round(priceEur * 100) : undefined,
             payment_status: data.payment_status || 'open',
+            notes: data.notes || null,
         };
         if (data.assignee_id) {
             input.assignee_id = data.assignee_id;
@@ -115,7 +119,7 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
                             {editing ? (
                                 <>
                                     <label className="label"><span className="label-text font-bold"><Trans>Kundenname</Trans></span></label>
-                                    <input required type="text" {...register('client_name')} className={`input input-bordered ${errors.client_name ? 'input-error' : ''}`} />
+                                    <input required type="text" {...register('client_name')} className={`input input-bordered w-full ${errors.client_name ? 'input-error' : ''}`} />
                                 </>
                             ) : (
                                 <Controller
@@ -141,16 +145,20 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>E-Mail</Trans></span></label>
-                            <input type="email" {...register('email')} className="input input-bordered" />
+                            <input type="email" {...register('email')} className="input input-bordered w-full" />
                             {errors.email && <span className="text-error text-xs mt-1">{errors.email.message}</span>}
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Telefon</Trans></span></label>
-                            <input type="text" {...register('phone')} className="input input-bordered" />
+                            <input type="text" {...register('phone')} className="input input-bordered w-full" />
+                        </div>
+                        <div className="form-control md:col-span-2">
+                            <label className="label"><span className="label-text font-bold"><Trans>Notiz</Trans></span></label>
+                            <textarea {...register('notes')} rows={3} className="textarea textarea-bordered w-full" />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Paket</Trans></span></label>
-                            <input type="text" {...register('package')} className="input input-bordered" />
+                            <input type="text" {...register('package')} className="input input-bordered w-full" />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Preis (€)</Trans></span></label>
@@ -162,19 +170,19 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Zahlungsstatus</Trans></span></label>
-                            <select {...register('payment_status')} className="select select-bordered">
+                            <select {...register('payment_status')} className="select select-bordered w-full">
                                 {paymentOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Status</Trans></span></label>
-                            <select {...register('status')} className="select select-bordered">
+                            <select {...register('status')} className="select select-bordered w-full">
                                 {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold"><Trans>Zuständig</Trans></span></label>
-                            <select {...register('assignee_id')} className="select select-bordered">
+                            <select {...register('assignee_id')} className="select select-bordered w-full">
                                 <option value=""><Trans>Keine Zuweisung</Trans></option>
                                 {users?.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                             </select>

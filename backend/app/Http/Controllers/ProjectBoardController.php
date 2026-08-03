@@ -11,6 +11,7 @@ use App\Support\BrandRegistry;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ProjectBoardController extends Controller
 {
@@ -64,14 +65,17 @@ class ProjectBoardController extends Controller
             'price_cents' => 'nullable|integer|min:0',
             'assignee_id' => 'nullable|exists:users,id',
             'linked_photo_job_id' => 'nullable|exists:photo_jobs,id',
+            'notes' => 'nullable|string',
+            'status' => 'nullable|string|in:' . implode(',', array_column(ProjectStatus::cases(), 'value')),
         ]);
 
-        $maxPosition = $this->scopedQuery($user)->max('position') ?? -1;
+        $status = $validated['status'] ?? ProjectStatus::initial()->value;
+        $maxPosition = $this->scopedQuery($user)->where('status', $status)->max('position') ?? -1;
 
         $project = $this->scopedQuery($user)->create(array_merge($validated, [
             'brand' => BrandRegistry::currentOrDefault(),
             'owner_id' => $user->id,
-            'status' => ProjectStatus::ANFRAGE->value,
+            'status' => $status,
             'payment_status' => 'open',
             'position' => $maxPosition + 1,
         ]));
@@ -94,9 +98,30 @@ class ProjectBoardController extends Controller
             'price_cents' => 'nullable|integer|min:0',
             'assignee_id' => 'nullable|exists:users,id',
             'linked_photo_job_id' => 'nullable|exists:photo_jobs,id',
+            'notes' => 'nullable|string',
+            'status' => 'sometimes|string|in:' . implode(',', array_column(ProjectStatus::cases(), 'value')),
         ]);
 
-        $project->fill($validated)->save();
+        $oldStatus = $project->status;
+        $newStatus = $validated['status'] ?? $oldStatus;
+
+        if ($newStatus !== $oldStatus) {
+            DB::transaction(function () use ($user, $project, $oldStatus, $newStatus, $validated) {
+                $targetCount = $this->scopedQuery($user)
+                    ->where('status', $newStatus)
+                    ->where('id', '!=', $project->id)
+                    ->count();
+
+                $project->fill($validated);
+                $project->position = $targetCount;
+                $project->save();
+
+                $this->reindexColumn($user, $oldStatus);
+                $this->reindexColumn($user, $newStatus, $project->id, $targetCount);
+            });
+        } else {
+            $project->fill($validated)->save();
+        }
 
         return response()->json(['project' => $project->load('owner', 'assignee')]);
     }
@@ -114,21 +139,70 @@ class ProjectBoardController extends Controller
         ]);
 
         $oldStatus = $project->status;
-        $project->status = $validated['status'];
-        $project->position = $validated['position'];
-        $project->save();
+        $newStatus = $validated['status'];
 
-        if ($oldStatus !== $project->status) {
-            \App\Models\WorkflowLog::create([
-                'item_type' => 'project',
-                'item_id' => $project->id,
-                'from_status' => $oldStatus,
-                'to_status' => $project->status,
-                'user_id' => $user->id,
-            ]);
-        }
+        DB::transaction(function () use ($user, $project, $oldStatus, $newStatus, $validated) {
+            $targetCount = $this->scopedQuery($user)
+                ->where('status', $newStatus)
+                ->where('id', '!=', $project->id)
+                ->count();
+
+            $effectivePosition = min((int) $validated['position'], $targetCount);
+
+            $project->status = $newStatus;
+            $project->position = $effectivePosition;
+            $project->save();
+
+            if ($oldStatus !== $newStatus) {
+                $this->reindexColumn($user, $oldStatus);
+            }
+
+            $this->reindexColumn($user, $newStatus, $project->id, $effectivePosition);
+
+            if ($oldStatus !== $newStatus) {
+                \App\Models\WorkflowLog::create([
+                    'item_type' => 'project',
+                    'item_id' => $project->id,
+                    'from_status' => $oldStatus,
+                    'to_status' => $newStatus,
+                    'user_id' => $user->id,
+                ]);
+            }
+        });
 
         return response()->json(['project' => $project->load('owner', 'assignee')]);
+    }
+
+    /**
+     * Renumber one status column so positions are dense (0..n-1) and the order
+     * is stable. If a pinned item id is given, that item is forced to the
+     * pinned position and all other items keep their relative stable order.
+     */
+    private function reindexColumn(User $user, string $status, ?string $pinnedItemId = null, ?int $pinnedPosition = null): void
+    {
+        $query = $this->scopedQuery($user)->where('status', $status);
+
+        if ($pinnedItemId !== null) {
+            $query->where('id', '!=', $pinnedItemId);
+        }
+
+        $items = $query
+            ->orderBy('position')
+            ->orderBy('created_at')
+            ->orderBy('updated_at')
+            ->get();
+
+        $position = 0;
+        foreach ($items as $item) {
+            if ($pinnedItemId !== null && $position === $pinnedPosition) {
+                $position++;
+            }
+            if ((int) $item->position !== $position) {
+                $item->position = $position;
+                $item->save();
+            }
+            $position++;
+        }
     }
 
     public function handoff(Request $request, $id)
