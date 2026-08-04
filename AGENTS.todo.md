@@ -18,7 +18,25 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 
 ## 🟡 OFFEN — Neues Angebot-Feature (Futures-Hinweis)
 
-Sobald Implementierung eines neuen Angebots-Features beginnt, auf `@dnd-kit/react` setzen. (File-Drop Invoice/Upload bleibt dokumentiert nativ — `features/b2b/11-kanban-board.md`.)
+Sobald Implementierung eines neuen Angebots-Features beginnt, auf `@atlaskit/pragmatic-drag-and-drop` setzen. (File-Drop Invoice/Upload bleibt dokumentiert nativ — `features/b2b/11-kanban-board.md`.)
+
+---
+
+## 🟡 IN ARBEIT — Kanban-DnD auf `@atlaskit/pragmatic-drag-and-drop` migriert (Session 2026-08-04)
+
+**Status:** Fertig + verifiziert. Code + Unit-Tests + E2E grün: `pnpm lint:fix` (0 warnings), `pnpm build` grün, Vitest 591 passed, E2E `@feature:kanban` **12/12 passed** (Desktop Chrome), E2E `@smoke` **56/56 passed**.
+
+Umgestellt:
+- Deps: `@dnd-kit/dom`/`@dnd-kit/react` entfernt, `@atlaskit/pragmatic-drag-and-drop@2.0.1` + `@atlaskit/pragmatic-drag-and-drop-hitbox@2.0.0` ergänzt (`frontend/package.json`).
+- `KanbanBoard.tsx`: `DragDropProvider`/`useSortable`/`useDroppable` → `draggable()` + `dropTargetForElements()` (`/element/adapter`), `monitorForElements()` als zentraler Drop-Handler, `combine()`, `disableNativeDragPreview()`. HitBox-Drop (oberhalb/unterhalb Zielkarte) statt sortable-`index`. dnd-kit-`removeChild`-Workaround entfällt. UX-Goldstandard (aus `alexreardon/pragmatic-board`): `getIsSticky: () => true` auf allen Targets, in-flow `CardShadow` (kein Layout-Shift-Feedback-Loop), Originalkarte während Drag `hidden`, Floating-Preview via `setCustomNativeDragPreview` (originale Breite, in `I18nProvider` gewrappt, `rotate-2 opacity-95 shadow-2xl`).
+- `KanbanBoard.test.tsx`: Mocks auf pragmatic-Adapter umgestellt, 14 Tests (HitBox above/below, Column-Append, self-drop, non-card, canceled).
+- `KanbanHelper.ts` (E2E): `dragCard` nutzt **echte Maus-Events** (`page.mouse.move/down/up` → `Input.dispatchMouseEvent`), nicht `dragTo()` — der `dragTo()`-Shortcut berechnet den Drop-Punkt einmalig vor dem Hover und setzt die Scroll-Position zurück, sodass der in-flow Drop-Shadow das Layout live verschiebt und der Drop ins Leere fällt (v. a. bei parallelen Läufen auf dirty DB). Bewährter Ablauf aus dem dnd-kit-Helper (vorheriger Commit): `mouse.down()` am Quell-Zentrum → **danach** Ziel-Scroll-Reset → Drop-Punkt LIVE aus frischen Boxen der ersten Zielkarte auflösen → `mouse.move(steps)` → `mouse.up()`. Touch-CDP-Pfad entfernt (DnD ohnehin Desktop-only).
+- `projects-board.spec.ts`: `test.describe.configure({ mode: 'serial' })` — die Drag-Tests verändern das Board live und teilen dieselbe (dirty) DB + Anfrage-Spalte; Parallel-Läufe stören die Drags (Layout-Shift / verschobene Drop-Ziele).
+- `features/b2b/11-kanban-board.md` §6 DnD: Paket-Anforderung aktualisiert.
+
+**E2E-Nachweis (grün):** `cd frontend && npx playwright test --grep @feature:kanban` (Desktop Chrome) → 12 passed. Nach jedem Code-Change zusätzlich `test:e2e:smoke` → 56 passed.
+
+---
 
 ---
 

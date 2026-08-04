@@ -211,8 +211,10 @@ Route-Basis `/api/management/photo-jobs` (nur `super_admin` / `photographer`):
 
 ### Drag & Drop (DnD)
 
-- Paket: **`@dnd-kit/react` (NUR dieses Paket)**.
-- `DragDropProvider` + `useDroppable` (Spalten) + `useDraggable` / `useSortable` (Karten) + `DragOverlay`.
+- Paket: **`@atlaskit/pragmatic-drag-and-drop` (NUR dieses Paket)** — migriert von `@dnd-kit/react` am 2026-08-04.
+- `draggable()` + `dropTargetForElements()` (`/element/adapter`) für Karten, `dropTargetForElements()` für Spalten (Empty-State / Append), `monitorForElements()` als zentraler Drop-Handler im Board.
+- Karten sind `draggable` UND Drop-Target (HitBox: Drop oberhalb/unterhalb der Zielkarte → exakte `position`). Spalten-Drop → Append ans Ende. `combine()` bündelt Cleanups; `disableNativeDragPreview()` unterdrückt das native Drag-Preview (Quelle wird per `opacity-30` gedimmt, wie bisher).
+- Native-HTML5-DnD-Events (`dragstart`/`dragover`/`drop`) — kein DOM-Moving durch die Library (der dnd-kit `removeChild`-Workaround entfällt).
 - Bei Status-/Positionsänderung → `PATCH .../move`.
 
 ### UX: Geräte- & Rollen-Support (SOLL)

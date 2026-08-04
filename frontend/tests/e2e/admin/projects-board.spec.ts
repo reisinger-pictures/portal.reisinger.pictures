@@ -5,6 +5,12 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { KanbanHelper } from '../helpers/KanbanHelper';
 
 test.describe('Projekte-Board (Admin)', () => {
+    // Drag & Drop verändert das Board live (Karten werden eingefügt/verschoben) und die Tests
+    // teilen sich dieselbe (dirty) DB + dieselbe Anfrage-Spalte. Parallel würden sich die
+    // Drag-Versuche gegenseitig stören (Layout-Shift / verschobene Drop-Ziele) — siehe
+    // features/b2b/11-kanban-board.md (DnD). Deshalb: Datei seriell ausführen.
+    test.describe.configure({ mode: 'serial' });
+
     let helper: E2ESessionHelper;
     let admin = { email: '', password: '' };
 
@@ -135,7 +141,15 @@ test.describe('Projekte-Board (Admin)', () => {
 
         await kanban.expectCardOrder('Anfrage', names);
 
-        await kanban.dragCard(names[2], 'Anfrage', { position: 'top' });
+        await kanban.dragCard(names[2], 'Anfrage', {
+            position: 'top',
+            verify: async () => {
+                const cards = kanban.column('Anfrage').locator('[data-testid="kanban-card"]');
+                const boxC = await cards.filter({ hasText: names[2] }).first().boundingBox();
+                const boxA = await cards.filter({ hasText: names[0] }).first().boundingBox();
+                return !!boxC && !!boxA && boxC.y < boxA.y;
+            },
+        });
 
         await kanban.expectCardOrder('Anfrage', [names[2], names[0], names[1]]);
     });

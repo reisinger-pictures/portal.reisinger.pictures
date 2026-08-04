@@ -97,34 +97,64 @@ export class KanbanHelper {
 
     /**
      * Verschiebt eine Karte per Drag-and-Drop in die Zielspalte.
-     * Standard: Maus-Pointer-Events (dnd-kit PointerSensor). Mit `opts.touch` wird eine
-     * synthetische Touch-Pointer-Sequenz erzeugt (Mobile-Gesten). Mit `opts.position`
-     * wird die vertikale Drop-Position innerhalb der Zielspalte gewählt (`top` = oberer
-     * Bereich → Position 0, `bottom` = unterer Bereich → ans Ende).
+     *
+     * Nutzt ECHTE Maus-Events (`page.mouse.move/down/up` = Input.dispatchMouseEvent in
+     * Chromium): Der Browser erzeugt daraus native HTML5-DragEvents (dragstart/dragover/drop),
+     * die `@atlaskit/pragmatic-drag-and-drop` benötigt. Der `dragTo()`-Locator-Shortcut ist
+     * dafür NICHT geeignet — er berechnet den Drop-Punkt einmalig vor dem Hover und setzt
+     * die Scroll-Position zurück, sodass der in-flow Drop-Shadow das Layout live verschiebt
+     * und der Drop ins Leere fällt (v. a. bei parallelen Läufen auf dirty DB).
+     *
+     * Ablauf: Quelle in den Viewport scrollen → `mouse.down()` am Quell-Zentrum (Drag ist an
+     * der Quelle gebunden) → Ziel-Scroll-Reset → Drop-Punkt LIVE aus frischen Boxen der
+     * ersten Zielkarte auflösen → `mouse.move(steps)` → `mouse.up()`.
+     *
+     * Mit `opts.position` wird die vertikale Drop-Position innerhalb der Zielspalte gewählt
+     * (`top` = oberer Bereich → Position 0, `bottom` = unterer Bereich → ans Ende). Touch-DnD
+     * wird nicht simuliert — Drag & Drop ist laut SOLL nur am Desktop aktiv, Mobile nutzt den
+     * Status-Select-Fallback (`selectCardStatus`).
      */
-    async dragCard(cardText: string, targetLabel: string, opts?: { touch?: boolean; position?: 'top' | 'bottom' }) {
-        const card = this.main().getByText(cardText, { exact: false }).first();
+    async dragCard(cardText: string, targetLabel: string, opts?: {
+        position?: 'top' | 'bottom';
+        /** Optionaler positionsabhängiger Erfolgscheck (z.B. für Same-Column-Drags, wo
+         * `toContainText` immer wahr ist und die echte Position verifiziert werden muss). */
+        verify?: () => Promise<boolean>;
+    }) {
+        const card = this.cardWrapper(cardText);
         const target = this.column(targetLabel);
         await card.waitFor({ state: 'visible', timeout: 5000 });
 
         // Parallele Läufe auf geteilter (dirty) DB verändern das Board live (andere Tests
         // erzeugen/verschieben Karten) — Layout und Drop-Ziele können sich zwischen zwei
-        // Schritten verschieben. Bis zu 3 Versuche: Nach jedem Versuch wird geprüft, ob die
-        // Karte wirklich in der Zielspalte gelandet ist; sonst wird der Drag mit frischen
-        // Geometrien wiederholt. Die Abschluss-Assertion prüft unverändert die echte Position.
+        // Schritten verschieben. Bis zu 3 Versuche: Nach jedem Versuch wird geprüft, ob der
+        // Drag wirklich die gewünschte Position erreicht hat (via `verify` bzw. Sichtbarkeit
+        // in der Zielspalte); sonst wird der Drag mit frischen Geometrien wiederholt.
         const attempts = 3;
         for (let attempt = 1; attempt <= attempts; attempt++) {
             await this.performDragAttempt(card, target, cardText, targetLabel, opts);
             await this.page.waitForTimeout(400);
-            if ((await target.getByText(cardText, { exact: false }).count()) > 0) {
+            const ok = opts?.verify
+                ? await opts.verify()
+                : (await target.getByText(cardText, { exact: false }).count()) > 0;
+            if (ok) {
                 break;
             }
-            console.warn(`[KanbanHelper] dragCard "${cardText}" → ${targetLabel}: nach Versuch ${attempt}/${attempts} nicht in der Zielspalte — neuer Versuch`);
+            console.warn(`[KanbanHelper] dragCard "${cardText}" → ${targetLabel}: nach Versuch ${attempt}/${attempts} noch nicht am Ziel — neuer Versuch`);
             await this.page.waitForTimeout(700);
         }
 
         await expect(this.column(targetLabel)).toContainText(cardText, { timeout: 10000 });
         await expect(this.page.locator('.modal-open')).toHaveCount(0, { timeout: 5000 });
+    }
+
+    /**
+     * Der draggable Karten-Container (`data-testid="kanban-card"`). pragmatic-dnd registriert
+     * `draggable` auf diesem Wrapper — für den nativen Drag muss das Quell-Element genau das
+     * sein, auf dem `draggable="true"` gesetzt ist (bzw. ein Nachfahre davon).
+     */
+    private cardWrapper(cardText: string) {
+        return this.main().getByText(cardText, { exact: false }).first()
+            .locator('xpath=ancestor::div[@data-testid="kanban-card"][1]');
     }
 
     /** Führt einen einzelnen Drag-and-Drop-Versuch aus (kein Positions-Ergebnis-Statement). */
@@ -133,7 +163,7 @@ export class KanbanHelper {
         target: ReturnType<Page['locator']>,
         cardText: string,
         targetLabel: string,
-        opts?: { touch?: boolean; position?: 'top' | 'bottom' },
+        opts?: { position?: 'top' | 'bottom' },
     ) {
         // Die Quelle (neu angelegte Karte) liegt am Ende einer überfüllten Spalte (dirty DB /
         // parallele Tests) oft außerhalb des Viewports — mouse.down() würde dann kein Element
@@ -145,25 +175,20 @@ export class KanbanHelper {
         if (!cb || !tb) throw new Error(`dragCard: bounding boxes fehlen (card=${cardText}, target=${targetLabel})`);
 
         const sx = cb.x + cb.width / 2;
-        const sy = cb.y + (cb.height / 2);
-        const ex = tb.x + (tb.width / 2);
-        // Drop in den oberen Bereich der Zielspalte (direkt unter dem Spalten-Header).
-        // Die Spalten-Box ist im Grid `max-h-full` und bei dirty DB / parallelen Tests oft
-        // hoch bzw. überfüllt — 70% der Gesamthöhe liegt dann außerhalb des Viewports und der
-        // Drop landet im Nichts. Der obere Bereich ist dagegen (nach Auto-Scroll) immer
-        // sichtbar. Vorzugsweise wird direkt auf der ERSTEN Karte der Zielspalte gedroppt
-        // (stabil gegenüber exakten Header-Höhen und immer ein Sortable-Target) — nur bei
-        // leerer Zielspalte auf den leeren Drop-Container (→ append).
+        const sy = cb.y + cb.height / 2;
+        const ex = tb.x + tb.width / 2;
         const dropOffset = opts?.position === 'top' ? 70 : 90;
         const ey = tb.y + dropOffset;
         const vp = this.page.viewportSize();
         const safeTop = 40;
         const safeBottom = (vp?.height ?? 1000) - 40;
 
-        // Setzt das interne Scrollen des Ziel-Drop-Containers zurück, damit die erste Karte
+        // Setzt das interne Scrollen des Ziel-Drop-Containers auf 0, damit die erste Karte
         // (bzw. der leere Container) oben liegt und der Drop-Punkt sie wirklich trifft —
         // z.B. beim Reorder in derselben Spalte, deren Drop-Container durch
-        // scrollIntoViewIfNeeded auf die Quelle (unten) gescrollt wurde.
+        // scrollIntoViewIfNeeded auf die Quelle (unten) gescrollt wurde. WICHTIG: Erst NACH
+        // mouse.down() ausführen — der native Drag ist dann an der Quelle gebunden und ein
+        // Scroll-Reset des Containers hebt ihn nicht auf.
         const resetTargetScroll = async () => {
             const scrollable = target.locator('.overflow-y-auto');
             if (await scrollable.count()) {
@@ -187,94 +212,35 @@ export class KanbanHelper {
             return { x, y: colBox.y + dropOffset };
         };
 
-        if (opts?.touch) {
-            // Echte Touch-Pointer-Events via CDP (Input.dispatchTouchEvent): Synthetische
-            // dispatchEvent()-PointerEvents umgehen die Browser-Pointer-Pipeline und
-            // aktivieren dnd-kit's PointerSensor nicht (setPointerCapture wird ignoriert).
-            const client = await this.page.context().newCDPSession(this.page);
-            await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: sx, y: sy }] });
-            // dnd-kit PointerSensor: für pointerType 'touch' gilt ein Delay-ActivationConstraint
-            // (250ms + 5ms Toleranz) — der Touch muss gehalten werden, bevor die Bewegung startet.
-            await this.page.waitForTimeout(320);
-            await resetTargetScroll();
-            let curX = sx;
-            let curY = sy;
-            let endX = ex;
-            let endY = ey;
-            let inBand = !vp || (ey >= safeTop && ey <= safeBottom);
-            if (!inBand) {
-                // Zielpunkt außerhalb des Viewports: Touch am passenden Viewport-Rand halten
-                // → dnd-kit auto-scrollt die Seite; es genügt, dass der DROP-PUNKT sichtbar ist.
-                const scrollUp = ey < safeTop;
-                const edgeY = scrollUp ? 10 : vp!.height - 10;
-                const edgeX = ex > vp!.width / 2 ? vp!.width - 10 : 10;
-                const steps = 8;
-                for (let i = 1; i <= steps; i++) {
-                    await client.send('Input.dispatchTouchEvent', {
-                        type: 'touchMove',
-                        touchPoints: [{
-                            x: curX + ((edgeX - curX) * i) / steps,
-                            y: curY + ((edgeY - curY) * i) / steps,
-                        }],
-                    });
-                    await this.page.waitForTimeout(22);
-                }
-                curX = edgeX;
-                curY = edgeY;
-                for (let i = 0; i < 100; i++) {
-                    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: curX, y: curY }] });
-                    await this.page.waitForTimeout(30);
-                    const tb2 = await target.boundingBox();
-                    if (!tb2) break;
-                    const candidate = await resolveDropPoint(tb2);
-                    if (candidate.y >= safeTop && candidate.y <= safeBottom) {
-                        endX = candidate.x;
-                        endY = candidate.y;
-                        break;
-                    }
+        // Nativer HTML5-Drag über ECHTE Maus-Events (Input.dispatchMouseEvent in Chromium):
+        // mouse.move → mouse.down startet den Drag am Quell-Element (pragmatic-dnd hört auf
+        // native dragstart/dragover/drop), danach Scroll-Reset + live aufgelöster Drop-Punkt.
+        await this.page.mouse.move(sx, sy);
+        await this.page.mouse.down();
+        await resetTargetScroll();
+        let dropPoint = await resolveDropPoint(tb);
+        if (vp && (dropPoint.y < safeTop || dropPoint.y > safeBottom)) {
+            // Zielpunkt liegt außerhalb des Viewports (überfüllte Spalten / Seite durch
+            // Quelle-Scroll verschoben): Pointer am passenden Viewport-Rand verweilen lassen
+            // → der Browser auto-scrollt, dann live zur aktuellen Zielposition ziehen.
+            const scrollUp = dropPoint.y < safeTop;
+            const edgeY = scrollUp ? 12 : vp.height - 12;
+            const edgeX = dropPoint.x > vp.width / 2 ? vp.width - 12 : 12;
+            for (let i = 0; i < 100; i++) {
+                await this.page.mouse.move(edgeX, edgeY);
+                await this.page.waitForTimeout(30);
+                const targetBox = await target.boundingBox();
+                if (!targetBox) break;
+                const candidate = await resolveDropPoint(targetBox);
+                if (candidate.y >= safeTop && candidate.y <= safeBottom) {
+                    dropPoint = candidate;
+                    break;
                 }
             }
-            const steps = 12;
-            for (let i = 1; i <= steps; i++) {
-                await client.send('Input.dispatchTouchEvent', {
-                    type: 'touchMove',
-                    touchPoints: [{ x: curX + ((endX - curX) * i) / steps, y: curY + ((endY - curY) * i) / steps }],
-                });
-                await this.page.waitForTimeout(22);
-            }
-            await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-            await client.detach();
-            await this.waitForMove(4000);
-        } else {
-            await this.page.mouse.move(sx, sy);
-            await this.page.mouse.down();
-            await resetTargetScroll();
-            let dropPoint = await resolveDropPoint(tb);
-            if (vp && (dropPoint.y < safeTop || dropPoint.y > safeBottom)) {
-                // Zielpunkt liegt außerhalb des Viewports (Mobile-Stapellayout / überfüllte
-                // Spalten / Seite durch Quelle-Scroll verschoben): Pointer am passenden
-                // Viewport-Rand verweilen lassen → dnd-kit auto-scrollt, dann live zur
-                // aktuellen Zielposition ziehen. Es genügt, dass der DROP-PUNKT sichtbar ist —
-                // nicht die gesamte Spaltenhöhe (überfüllte Spalten werden nie komplett sichtbar).
-                const scrollUp = dropPoint.y < safeTop;
-                const edgeY = scrollUp ? 12 : vp.height - 12;
-                const edgeX = dropPoint.x > vp.width / 2 ? vp.width - 12 : 12;
-                for (let i = 0; i < 100; i++) {
-                    await this.page.mouse.move(edgeX, edgeY);
-                    await this.page.waitForTimeout(30);
-                    const targetBox = await target.boundingBox();
-                    if (!targetBox) break;
-                    const candidate = await resolveDropPoint(targetBox);
-                    if (candidate.y >= safeTop && candidate.y <= safeBottom) {
-                        dropPoint = candidate;
-                        break;
-                    }
-                }
-            }
-            await this.page.mouse.move(dropPoint.x, dropPoint.y, { steps: 10 });
-            await this.page.mouse.up();
-            await this.waitForMove(4000);
         }
+        await this.page.mouse.move(dropPoint.x, dropPoint.y, { steps: 10 });
+        await this.page.mouse.up();
+        await this.waitForMove(4000);
     }
 
     async waitForCreate(endpoint: string) {

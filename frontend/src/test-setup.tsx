@@ -4,8 +4,8 @@ import { afterEach } from 'vitest';
 import type { ReactElement } from 'react';
 import { I18nProvider } from './logic/I18nProvider';
 
-// jsdom ships no ResizeObserver; @dnd-kit/dom references it at module scope.
-// A minimal no-op observer keeps the real dnd-kit module importable in tests.
+// jsdom ships no ResizeObserver. A minimal no-op observer keeps modules that
+// reference it (e.g. charting libs) importable in tests.
 class MemoryResizeObserver implements ResizeObserver {
   private readonly callback: ResizeObserverCallback;
 

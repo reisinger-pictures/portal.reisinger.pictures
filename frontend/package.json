@@ -25,8 +25,8 @@
         "check:i18n": "node scripts/check-i18n.mjs"
     },
     "dependencies": {
-        "@dnd-kit/dom": "^0.5.0",
-        "@dnd-kit/react": "^0.5.0",
+        "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
+        "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
         "@hookform/resolvers": "^5.4.0",
         "@lingui/babel-plugin-lingui-macro": "^6.6.0",
         "@lingui/core": "^6.6.0",
