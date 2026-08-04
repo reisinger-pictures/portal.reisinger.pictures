@@ -26,6 +26,12 @@ updates:
     groups:
       docker-images:
         applies-to: version-updates
+    ignore:
+      # Meilisearch nur Patch-Releases (v1.48.x -> v1.48.x) - keine major/minor
+      - dependency-name: "getmeili/meilisearch"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
   - package-ecosystem: docker
     directory: "/"
     schedule: {interval: "weekly"}
