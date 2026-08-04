@@ -41,11 +41,21 @@ frontend/playwright/.cache/
 out/
 *.tsbuildinfo
 
+# Core dumps (z.B. QEMU-SIGSEGV bei php artisan serve im php-base-Container)
+core
+core.*
+
 # AI Test Runner
 .playwright-mcp
 ai_test_report.txt
 ses_*.json+
+
+# Env-Dateien: Default ignorieren, einzelne bewusst getrackte explizit erlauben
 .env*
+!.env.ci
+!.env.example
+!.env.local.example
+!.env.encrypted
 
 # History-rewrite artifacts (contains real secrets — never commit)
 .history-replacements.txt
