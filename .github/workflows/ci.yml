@@ -1,0 +1,248 @@
+name: CI
+
+# Push auf ALLE Branches (inkl. Dependabot-Branches wie
+# dependabot/npm_and_yarn/frontend/...): Dependabot-ausgelöste pull_request-Runs
+# erhalten KEINE Secrets und nur read-only GITHUB_TOKEN (werden wie Fork-PRs
+# behandelt). Da E2E Stripe-Test-Keys braucht, läuft die komplette CI-Logik über
+# `push`, damit Secrets verfügbar sind. `pull_request` deckt normale PRs ab.
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (PHPUnit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      mariadb:
+        image: mariadb:11.4
+        ports:
+          - 3307:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: portal_test_db
+          MYSQL_USER: portal_user
+          MYSQL_PASSWORD: admin
+        # Ports + Credentials matchen backend/phpunit.xml (DB_PORT=3307 ...)
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      meilisearch:
+        image: getmeili/meilisearch:v1.48.3
+        ports:
+          - 7701:7700
+        env:
+          MEILI_MASTER_KEY: test_meili_secret
+          MEILI_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, zip, pdo_mysql, bcmath, exif, gd
+          coverage: none
+      - name: Prepare environment
+        run: cp .env.example .env
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Generate app key
+        run: php artisan key:generate
+      - name: Run PHPUnit
+        run: php artisan test --no-ansi
+
+  frontend:
+    name: Frontend (Lint, Build, Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      # prebuild (tsc -b + check-i18n) läuft automatisch vor `pnpm build`
+      - name: Build
+        run: pnpm build
+      - name: Unit tests
+        run: pnpm test:run
+
+  e2e:
+    name: E2E (Playwright)
+    # Job-level `if` darf KEINEN secrets-Context lesen (offizielle Context
+    # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Secrets
+    # existieren nur bei push (inkl. dependabot-Branches) und bei PRs aus dem
+    # eigenen Repo (fork == false). Fork-PRs werden übersprungen - dort sind
+    # Secrets ohnehin nie verfügbar. Das tatsächliche Fehlen der Secrets wird
+    # im ersten Step geprüft (dort ist der secrets-Context erlaubt).
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    env:
+      # Zuordnung spiegelt backend/.env (lokales, funktionierendes E2E-Setup):
+      # STRIPE_KEY = pk_test (publishable), STRIPE_SECRET = sk_test (secret key).
+      # StripePaymentService nutzt config('services.stripe.secret') als API-Key.
+      STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
+      STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: admin
+    services:
+      mariadb:
+        image: mariadb:11.4
+        ports:
+          - 3307:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: portal_test_db
+          MYSQL_USER: portal_user
+          MYSQL_PASSWORD: admin
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      meilisearch:
+        image: getmeili/meilisearch:v1.48.3
+        ports:
+          - 7701:7700
+        env:
+          MEILI_MASTER_KEY: test_meili_secret
+          MEILI_ENV: development
+      mailpit:
+        image: axllent/mailpit
+        ports:
+          - 8025:8025
+          - 1025:1025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure Stripe test keys are configured
+        env:
+          STRIPE_SECRET_SET: ${{ secrets.STRIPE_SECRET != '' }}
+        run: |
+          if [ "$STRIPE_SECRET_SET" != "true" ]; then
+            echo "::error::STRIPE_SECRET (sk_test) / STRIPE_KEY (pk_test) / STRIPE_WEBHOOK_SECRET Secrets sind nicht konfiguriert - E2E kann nicht laufen."
+            exit 1
+          fi
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, zip, pdo_mysql, bcmath, exif, gd
+          coverage: none
+      - name: Prepare backend environment
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: Install backend dependencies
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Run migrations
+        working-directory: backend
+        run: php artisan migrate --force
+        env:
+          DB_PORT: 3307
+          DB_DATABASE: portal_test_db
+          DB_USERNAME: portal_user
+          DB_PASSWORD: admin
+          SCOUT_DRIVER: meilisearch
+          MEILISEARCH_HOST: http://127.0.0.1:7701
+          MEILISEARCH_KEY: test_meili_secret
+      - name: Seed database
+        working-directory: backend
+        # Full Seed: erzeugt den von den E2E-Specs erwarteten
+        # admin@example.com mit allen Rollen + Katalog. DatabaseSeeder ruft
+        # am Ende app:import-locations auf (Geonames-Download via HTTP).
+        run: php artisan db:seed --force
+        env:
+          ADMIN_EMAIL: admin@example.com
+          ADMIN_PASSWORD: admin
+          DB_PORT: 3307
+          DB_DATABASE: portal_test_db
+          DB_USERNAME: portal_user
+          DB_PASSWORD: admin
+          SCOUT_DRIVER: meilisearch
+          MEILISEARCH_HOST: http://127.0.0.1:7701
+          MEILISEARCH_KEY: test_meili_secret
+      - name: Start backend server
+        working-directory: backend
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8000 > /tmp/php-serve.log 2>&1 &
+          timeout 60s bash -c 'until curl -sf http://127.0.0.1:8000/api/ping > /dev/null; do sleep 1; done'
+        env:
+          DB_PORT: 3307
+          DB_DATABASE: portal_test_db
+          DB_USERNAME: portal_user
+          DB_PASSWORD: admin
+          SCOUT_DRIVER: meilisearch
+          MEILISEARCH_HOST: http://127.0.0.1:7701
+          MEILISEARCH_KEY: test_meili_secret
+          MAIL_MAILER: smtp
+          MAIL_HOST: 127.0.0.1
+          MAIL_PORT: 1025
+          MAIL_ENCRYPTION: ""
+          MAIL_FROM_ADDRESS: test@reisinger.pictures
+          QUEUE_CONNECTION: sync
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Start frontend dev server
+        working-directory: frontend
+        run: |
+          pnpm dev > /tmp/vite.log 2>&1 &
+          timeout 60s bash -c 'until curl -sf http://localhost:4321/ > /dev/null; do sleep 1; done'
+        env:
+          VITE_API_PROXY: http://127.0.0.1:8000
+          # Publik-Key = VITE_STRIPE_PUBLIC_KEY, sonst Fallback auf STRIPE_KEY
+          # (pk_test - Zuordnung entspricht backend/.env, siehe oben)
+          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY || secrets.STRIPE_KEY }}
+      - name: Run E2E tests
+        working-directory: frontend
+        run: pnpm test:e2e
+        env:
+          CI: "1"
+          ADMIN_EMAIL: admin@example.com
+          ADMIN_PASSWORD: admin
+      - name: Upload Playwright report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7
+      - name: Upload Playwright test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: frontend/test-results
+          retention-days: 7

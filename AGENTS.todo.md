@@ -118,3 +118,34 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 6. `.run`-Configs (s. Entscheidung 4).
 7. Doku: `README.md:15–34`, `CLAUDE.md:82–85,175,304`, `AGENTS.md:140–153`, `features/security/env-hardening.md:45–46`, `features/search/01-search-and-discovery.md:15–17` → neue Ports/Compose. Grep-Check: keine `3307|8026|1026|docker-compose.test.yml|docker-compose.local.yml`-Treffer mehr.
 8. Gesamtverifikation: `php artisan test` (ein Prozess), `php artisan test --parallel` (Worker-DBs auf 3306), `DB_DATABASE=portal_test_db_test_<x>`-Scoped-Run, `pnpm test:e2e:smoke`, `pnpm lint:fix && pnpm build`, Scout-Sync/Import (Meili-Indizes inkl. `test_`-Prefix).
+
+---
+
+## 🔄 DEPENDABOT + CI-Pipeline (2026-08-04, Entscheidungen interaktiv geklärt)
+
+**Ziel:** Dependabot wieder aktivieren (war aktiv bis PR #8, Config wurde entfernt) + CI-Build-Pipeline (lint/test/e2e) + Auto-Merge für grüne patch/minor-PRs. **Kein Branch Protection** (Entscheidung User).
+
+**Entscheidungen (2026-08-04):**
+1. **Gruppen nach Risiko:** `minor`+`patch` pro Ecosystem gebündelt in je einem PR; **Major-Updates einzeln** (eigener PR, manueller Review).
+2. **Ecosystems:** npm (`/frontend` + `/`), composer (`/backend`), docker (`/deployment` + `/` für local/test-compose). Schedule: **npm+composer täglich, docker wöchentlich**.
+3. **Auto-Merge:** ja für patch+minor **nur wenn CI grün** — da kein Branch Protection, via Workflow-Gate (`pull_request_target` + `dependabot/fetch-metadata` → update-type ≠ major → wait-on-check → `gh pr merge --squash`). Docker-Gruppen nie auto-mergen.
+4. **CI (`.github/workflows/ci.yml`):** 3 Jobs:
+   - `backend`: PHP 8.4, Service-Container **mariadb:11.4 (Port 3307)**, **meilisearch:v1.48.3 (7701)** → `composer install` → `php artisan test` (serial, kein Seed nötig — RefreshDatabase). Ports passen zu `phpunit.xml` (3307/7701/1026).
+   - `frontend`: Node 22 + pnpm 9.15.4 → `pnpm install --frozen-lockfile` → `pnpm lint` → `pnpm build` (inkl. tsc+check-i18n) → `pnpm test:run`.
+    - `e2e` (nur wenn `secrets.STRIPE_KEY` gesetzt): Services mariadb(3307)/meili(7701)/**mailpit(8025+1025)**; Backend `.env` generieren (APP_KEY/JWT_SECRET via `key:generate`, MAIL_PORT=1025, MEILI auf 7701, STRIPE_KEY=pk_test, STRIPE_SECRET=sk_test, STRIPE_WEBHOOK_SECRET); `migrate --force` + `db:seed` mit `ADMIN_EMAIL=admin@example.com` (E2E nutzt überall `admin@example.com/admin`, s. AuthHelper/E2ESessionHelper); `php artisan serve` auf 8000; Frontend `pnpm dev` auf 4321 mit `VITE_API_PROXY=http://127.0.0.1:8000` + `VITE_STRIPE_PUBLIC_KEY`; `npx playwright install --with-deps chromium`; `CI=1 pnpm test:e2e`.
+   - **Dependabot-PRs bekommen KEINE Secrets bei `pull_request`** (Fork-Treat) → CI auf `on: push` (alle Branches, dependabot-Branches sind in-repo) + `on: pull_request`; E2E-Job nur bei gesetzten Secrets. Stripe-Test-Keys als GitHub Secrets hinterlegen (Namen unten).
+   - **Seed-Risiko:** `DatabaseSeeder` ruft `app:import-locations` (GeoNames-Download, Netz) — im CI akzeptiert (Runner haben Internet), bei Flakiness Retry/log.
+5. **`.github/dependabot.yml`:** npm×2 + composer×2-Update (jeweils groups `update-types: [minor, patch]`; Major ungruppiert) + docker×2 (weekly, eine Gruppe). `open-pull-requests-limit: 8`, `labels: [dependencies]`, `versioning-strategy: auto`.
+6. **Repo-Settings (via gh API, nach Files-Merge):** Automated Security Fixes + Vulnerability Alerts aktivieren.
+
+**Stripe-Test-Keys als GitHub Secrets** (User legt an; Quelle `frontend/.env.local` pk_test + `backend/.env` sk_test/whsec_test): `STRIPE_KEY` (pk_test, publishable), `STRIPE_SECRET` (sk_test, secret API-Key — `StripePaymentService` liest `config('services.stripe.secret')` als API-Key), `STRIPE_WEBHOOK_SECRET` (whsec_test), `VITE_STRIPE_PUBLIC_KEY` (pk_test, redundant zu STRIPE_KEY). Konsistente Projekt-Konvention (`.env.example` + App): `STRIPE_KEY`=pk, `STRIPE_SECRET`=sk. `.env.production` wurde am 2026-08-04 an diese Konvention angeglichen (war invertiert, nur lokal genutzt).
+
+**Hinweis:** `.env.production`/`frontend/.env` sind **korrekt gitignored** (`.gitignore:50`) — kein Exposure (User-Frage geklärt 2026-08-04). Repo ist **public** → CI-Security: `pull_request_target` nur für actor==dependabot, kein Checkout untrusted Code.
+
+**TODO (Implementierung delegiert an Subagent):**
+- [ ] `.github/dependabot.yml` (Ecosystems, Groups, Schedule)
+- [ ] `.github/workflows/ci.yml` (backend/frontend/e2e)
+- [ ] `.github/workflows/automerge.yml` (Gate ohne Branch Protection)
+- [ ] Verification: actionlint/lint der YAMLs, Push auf Feature-Branch, CI-Runs beobachten, E2E-Job iterieren (Max-3-Regel)
+- [ ] Repo-Settings via gh API (automated-security-fixes, vulnerability-alerts)
+- [ ] Doku-Follow-up: `features/` SOLL-Notiz optional
