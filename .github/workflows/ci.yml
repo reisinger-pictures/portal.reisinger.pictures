@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: mbstring, intl, zip, pdo_mysql, bcmath, exif, gd
           coverage: none
       - name: Prepare environment
@@ -66,8 +66,51 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
       - name: Generate app key
         run: php artisan key:generate
+      - name: Grant parallel test DB permissions
+        # paratest legt pro Worker `portal_test_db_test_<n>` an; der von
+        # mariadb:11.4 angelegte portal_user hat nur Rechte auf portal_test_db.
+        run: |
+          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -proot -e \
+            "GRANT ALL PRIVILEGES ON \`portal\_test\_db\_test\_%\`.* TO 'portal_user'@'%'; FLUSH PRIVILEGES;"
+      - name: Run migrations
+        run: php artisan migrate --force
+        env:
+          DB_PORT: 3307
+          DB_DATABASE: portal_test_db
+          DB_USERNAME: portal_user
+          DB_PASSWORD: admin
+          SCOUT_DRIVER: meilisearch
+          MEILISEARCH_HOST: http://127.0.0.1:7701
+          MEILISEARCH_KEY: test_meili_secret
+      - name: Seed database
+        # DatabaseSeeder ruft am Ende app:import-locations auf (Geonames-Download).
+        run: php artisan db:seed --force
+        env:
+          ADMIN_EMAIL: admin@example.com
+          ADMIN_PASSWORD: admin
+          DB_PORT: 3307
+          DB_DATABASE: portal_test_db
+          DB_USERNAME: portal_user
+          DB_PASSWORD: admin
+          SCOUT_DRIVER: meilisearch
+          MEILISEARCH_HOST: http://127.0.0.1:7701
+          MEILISEARCH_KEY: test_meili_secret
       - name: Run PHPUnit
-        run: php artisan test --no-ansi
+        # Parallele Worker via paratest (4 Runner-Cores). pipefail laesst den Step
+        # fehlschlagen, wenn Tests rot sind (nicht das tee). Log fuer Summary-Step.
+        run: |
+          set -o pipefail
+          php artisan test --no-ansi --parallel 2>&1 | tee /tmp/phpunit.log
+      - name: Backend Test-Summary
+        if: always()
+        run: |
+          {
+            echo "## Backend (PHPUnit)"
+            echo ""
+            echo '```text'
+            tail -n 15 /tmp/phpunit.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   frontend:
     name: Frontend (Lint, Build, Vitest)
@@ -82,7 +125,7 @@ jobs:
           version: 9.15.4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Install dependencies
@@ -154,7 +197,7 @@ jobs:
           fi
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: mbstring, intl, zip, pdo_mysql, bcmath, exif, gd
           coverage: none
       - name: Prepare backend environment
@@ -217,7 +260,7 @@ jobs:
           version: 9.15.4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Install frontend dependencies
@@ -238,11 +281,25 @@ jobs:
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY || secrets.STRIPE_KEY }}
       - name: Run E2E tests
         working-directory: frontend
-        run: pnpm test:e2e
+        # `list`-Reporter fuer stdout-Zusammenfassung, `html` bleibt fuer den
+        # Artifact-Upload. pipefail -> rote Tests scheitern den Step.
+        run: |
+          set -o pipefail
+          pnpm test:e2e --reporter=list,html 2>&1 | tee /tmp/e2e.log
         env:
           CI: "1"
           ADMIN_EMAIL: admin@example.com
           ADMIN_PASSWORD: admin
+      - name: E2E Test-Summary
+        if: always()
+        run: |
+          {
+            echo "## E2E (Playwright)"
+            echo ""
+            echo '```text'
+            tail -n 20 /tmp/e2e.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload Playwright report
         if: always()
         continue-on-error: true
