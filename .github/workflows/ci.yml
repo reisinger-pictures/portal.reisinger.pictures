@@ -43,6 +43,11 @@ jobs:
         env:
           MEILI_MASTER_KEY: test_meili_secret
           MEILI_ENV: development
+      mailpit:
+        # phpunit.xml sendet via SMTP auf 127.0.0.1:1026
+        image: axllent/mailpit
+        ports:
+          - 1026:1025
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -148,12 +153,13 @@ jobs:
           coverage: none
       - name: Prepare backend environment
         working-directory: backend
-        run: |
-          cp .env.example .env
-          php artisan key:generate
+        run: cp .env.example .env
       - name: Install backend dependencies
         working-directory: backend
         run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Generate app key
+        working-directory: backend
+        run: php artisan key:generate
       - name: Run migrations
         working-directory: backend
         run: php artisan migrate --force
