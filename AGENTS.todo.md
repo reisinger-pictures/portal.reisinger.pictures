@@ -5,6 +5,7 @@
 > - Pricing-Strategy-Pattern: `features/infrastructure/17-pricing-strategy-pattern.md`
 > - Kanban-SOLL (Rollen-Matrix, DnD-Desktop-only, Status-Select): `features/b2b/11-kanban-board.md`
 > - Security-Risiken (C1–C4) & Stärken: `AGENTS.md` §7 / §8
+> - **Backlog-Ausarbeitung 2026-08-04:** Drei parallele Analyse-Aufträge (A1, F3, Stack-Konsolidierung) abgeschlossen — Pläne unten. Offene Fragen interaktiv geklärt (Entscheidungen dokumentiert). **Kein Code geändert.**
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 
@@ -16,10 +17,104 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 
 ---
 
-## 🔙 Backlog
+## 📋 AUSGEARBEITETE BACKLOG-PLÄNE (2026-08-04)
 
-| Task | Beschreibung | Grund |
-|------|-------------|-------|
-| **A1** | User-God-Entity entschärfen + Role-Prüfungen konsolidieren (AccessControlService). | Graphify-Analyse 2026-08-02. Größerer Refactor, separate Session. |
-| **F3** | Admin-UI für Brand-Einstellungen (nur Settings, kein Full-CRUD). | Architekturfrage ungeklärt (Config-Write-Layer vs DB-Revert). → `features/infrastructure/21-brand-config-driven.md` §Follow-up |
-| **Stack-Konsolidierung** | Ein Compose statt zwei (db 3306, mailpit 8025/1025, meili 7700 + search-test 7701); `docker-compose.test.yml` + `docker/test/` löschen; Configs (`backend/.env`, `phpunit.xml`) auf 3306/1025; nach `migrate:fresh` immer `db:seed`; `scripts/e2e-up.sh` idempotent + `.run`-Configs vereinheitlichen; Doku (README, AGENTS.md §5, e2e-test-strategy). | User-Auftrag 2026-08-02, Plan ausgearbeitet, Umsetzung offen. |
+> Nur Ausarbeitung (Planung) — noch **kein Code** geändert. Umsetzung erfolgt in separaten Sessions durch Implementer-Subagenten + Review durch Verifikator (AGENTS.md §4). **Offene Fragen wurden interaktiv geklärt (2026-08-04) und sind in den Plänen als Entscheidungen dokumentiert.**
+
+---
+
+### 🔙 A1 — User-God-Entity entschärfen + Role-Prüfungen konsolidieren
+
+**Ziel:** Rollen-/Autorisierungslogik aus `backend/app/Models/User.php` in einen **konsolidierten `AuthorizationService`** (Umbenennung von `AccessControlService`, Entscheidung 2026-08-04) überführen; Scatter (~170 direkte `is_*`-Prüfungen in 20+ Dateien) beseitigen; N+1 Role-Queries beheben. Serialisierung (`$visible`, `AuthController::me()`, `UserResource`) bleibt unverändert → kein API-Break.
+
+**Bestandsaufnahme (Kern):**
+- God-Entity: `User.php:24–128` — `getIsSuperAdminAttribute` (24–27), `getIsPendingAttribute` (80–84), `getIsPhotographerAttribute` (86), `getIsAdminAttribute` (87), `getIsOrgAdminAttribute` (88), `getIsPowerUserAttribute` (91), `getAllowedGalleryIds` (93–96), `canPhotographerAccessGallery` (98–117), `canAccessGallery` (119–128).
+- `hasPurchasedPhoto` (130–162) = Kauf-/Bestelllogik, **kein Rollen-Thema** → bewusst NICHT Teil von A1.
+- Scatter gruppiert: `is_admin` 53× (Controllers, Policies, Requests, Provider), `is_super_admin` 34×, `is_photographer` 41×, `is_org_admin` 18×, `canAccessGallery` 16×, `canPhotographerAccessGallery` 7×, `getAllowedGalleryIds` 8×.
+- **Rekursions-Falle:** `AccessControlService.php:57` ruft `$user->is_photographer` (Model-Accessor!) → sobald Accessor → Service delegiert, rekursiv. MUSS mitfixiert werden.
+- Gates in `AppServiceProvider.php:72–97` (`manage-catalog`, `manage-users`, `purchase-upgrades`) nutzen rohe `pluck('name')`-Blocklisten.
+
+**SOLL-Architektur:** Konsolidierter **`AuthorizationService`** (vorher `AccessControlService`) mit `hasRole(User, ...roles)`, `roleNames(User)`, `isSuperAdmin/isAdmin/isPhotographer/isPowerUser/isOrgAdmin/isPending/isClient/isPrivileged(User)`, `canAccessGallery(User, id)`, `canPhotographerAccessGallery(User, id)`, `canManageGallery(User, id)` (Komposit). **Regel: Service referenziert NIE `$user->is_*`-Accessor** (Rekursionsschutz); alle Prädikate via `$user->loadMissing('roles')`. Model wird dünne Delegation (1-Zeilen-Delegates), Relations bleiben.
+
+**Priorisierte Migrationsschritte (jeder einzeln grün testbar):**
+1. Service erweitern + umbenennen in `AuthorizationService` (rein additiv, keine Caller-Umbauten) — `AuthorizationServiceTest` (umbenannt aus `AccessControlServiceTest`).
+2. Model auf Delegation umstellen — Guard: `AuthorizationTest`, `UserPermissionLogicTest`, `GalleryTreeServiceTest:304`.
+3. Gates konsolidieren + Semantik verfeinern (`AppServiceProvider`) — Guard-Tests der Ist-Bool-Ergebnisse + neue `isClient`/`isPrivileged`.
+4. Middleware (`SuperAdminMiddleware:14`, `ManagementMiddleware:21,28,37`) — Guard: `RoleAbortTest`.
+5. Policies (`GalleryPolicy:15,20`, `PhotoPolicy:13,20,27,38,44,50` — 5×-Komposit `is_super_admin||is_admin||(is_photographer&&canPhotographerAccessGallery)` → `canManageGallery`).
+6. Controller nach Fachgebiet (6a–6f, je eigener Commit): User/Org → Gallery/Frontend/Image → PhotoDownload/FileDelivery → Search/Mail/Notification/CheckoutService → Requests → Rest.
+7. (Optional) `hasPurchasedPhoto` als eigener Backlog-Item extrahieren — NICHT in A1.
+
+**Test-Strategie:** `AuthorizationServiceTest` (alle Prädikate, Prezedenz, Guest), neuer N+1-Regressionstest, bestehende Suiten als Guard (s. Schritt 2), E2E-@smoke nach jedem Schritt.
+
+**Risiken:** Verhaltensdrift (`isAdmin` ⊃ `SuperAdmin`, `canAccessGallery`-Prezedenz), Model↔Service-Rekursion, Cache-Korrektheit (`unrestricted_photographer_gallery_ids`), `MailController.php:83–84` (`whereHas('roles')` ist Query, nicht pro-User-Check — darf NICHT in Service).
+
+**Entscheidungen (interaktiv geklärt 2026-08-04):**
+1. **Accessor bleiben dauerhaft** als dünne 1-Zeilen-Delegates im Model (kein API-Break, kein Frontend-PR). `$visible`/`me()`/`UserResource` unverändert. KEINE 2. Phase.
+2. **Umbenennen in `AuthorizationService`** (statt `AccessControlService`) — inkl. Test-Datei (`AccessControlServiceTest.php` → `AuthorizationServiceTest.php`) und allen Referenzen.
+3. **`ManagementMiddleware`: Path-Prefix-Logik bleibt in der Middleware**; nur die Rollen-Prädikate werden über den Service aufgelöst.
+4. **Controller-Migration (Schritt 6): eigene Commits je Fachgebiet (6a–6f), direkter Push nach master wenn Tests grün**; wo fachlich unabhängig, parallel an Subagenten delegieren, aber Commits sauber splitten.
+5. **Gates: Semantik verfeinern** (nicht 1:1) — `isClient`/`isPrivileged` und die Gate-Definitionen (`AppServiceProvider:79–97`) werden logisch neu modelliert; bestehende Bool-Ergebnisse je Gate vor der Umsetzung als Guard-Test einfrieren.
+
+---
+
+### 🔙 F3 — Admin-UI für Brand-Einstellungen (nur Settings, kein Full-CRUD)
+
+**Ziel:** Admin-UI zum Editieren konfigurierbarer Brand-Felder. **Architektur-Entscheidung (getroffen):** Option **B — DB-Overlay** auf bestehender `settings`-Tabelle (PK `(key, brand)`, V019); `config/brands.php` bleibt Default/Fallback. Config-Write-Layer (Option A) verworfen (nicht haltbar / Deploy überschreibt / kein Audit). Kein Migration-Bedarf (V028 bleibt frei).
+
+**Bestandsaufnahme (Kern):**
+- Overridable Whitelist: `name`, `portal_name`, `impressum_url`, `primary_color`, `secondary_color`, `frontend_url`, `from_address`, `from_name`, `accounting_email`, **`features.orgs`** (Entscheidung 2026-08-04). Config-only (NICHT overridable): `theme`, `logo_path*`, `hostnames`, `is_active`. Dead-Flags `features.coupons`/`features.volume_licensing` werden aus `config/brands.php` entfernt (real schaltet `pricing_strategy`).
+- Einbaupunkt: `BrandRegistry::buildFromArray()` (`BrandRegistry.php:156–177`) = Choke-Point aller 23 BrandConfig-Konsumenten (Middleware, Mails, Queue, public `brand-config`).
+- Queue: `BrandRegistry::clearCache()` zusätzlich im `Queue::before`-Hook (`AppServiceProvider.php:123–125`).
+- UI-Muster: `BillingDetailsCard.tsx` (react-hook-form + zodResolver, Load→Reset-Hydration, `disabled={!canEdit}`, showToast). Einbau als Card in `ManagementSettingsView.tsx:63–68`. Kein neuer Sidebar-Eintrag/Route nötig.
+
+**SOLL-API-Vertrag** (`routes/api.php` im `management`-Block):
+- `GET /api/management/brand-settings` → `{brands:[{id, editable_fields, defaults, overrides, effective}]}`.
+- `PUT /api/management/brand-settings/{brand}` (+ `super_admin` Middleware, Muster `api.php:183`) → partial Payload; `null`-Wert = Reset auf Config-Default (löscht DB-Row). Response `{success, effective}`.
+- Validierung: `StoreBrandSettingsRequest` (Route-Brand `Rule::in(array_keys(config('brands')))`; hex `regex:/^#[0-9a-fA-F]{6}$/`, email, url; Whitelist via `only()`). Frontend-Zod-Schema spiegelnd.
+- Write via `BrandSettingsService` (neuer Service) mit `Setting::updateOrCreate(['key','brand'])` — NICHT `SettingResolver::set()` (der hängt am Host-Kontext).
+
+**Umsetzungsplan (priorisiert):**
+1. `BrandSettingsService` + Merge in `buildFromArray()` + Queue-Cache-Clear — `BrandSettingsServiceTest`, `BrandRegistryTest`.
+2. Endpoint: `StoreBrandSettingsRequest`, `SettingsController::getBrandSettings/updateBrandSettings`, 2 Routen — `BrandSettingsControllerTest`.
+3. Frontend: `useBrandSettings.ts` + Vitest.
+4. `BrandSettingsCard.tsx` + Einbau in `ManagementSettingsView.tsx` — `pnpm lint:fix && pnpm build`.
+5. Playwright `brand-settings.spec.ts` (`@feature:admin:brand-settings`).
+6. Doku: `21-brand-config-driven.md` (§Follow-up F3 → Implementiert), `features/infrastructure/22-brand-settings-overlay.md` (SOLL, nach Implementierung).
+
+**Test-Strategie:** PHPUnit (401/403/200-Matrix, Persistenz mit brand='rp' + `brand_config.*`-Key, 422-Fälle, null-Reset, Merge-Precedence, public `brand-config` reflektiert Override, kein Cross-Brand-Leak); Vitest (Hook, Zod-Schema); Playwright (Super-Admin ändern→persistiert, ungültige Hex→Client-Validierung, Reset, Plain-Admin read-only).
+
+**Entscheidungen (interaktiv geklärt 2026-08-04):**
+1. **features.orgs wird DB-overridable** (Whitelist erhält `features.orgs`; Sidebar-Gating `Sidebar.tsx:110` wird darüber gesteuert). **Dead-Flags `features.coupons` + `features.volume_licensing` werden aus `config/brands.php` entfernt** (real schaltet das DB-Setting `pricing_strategy` — `ManagementCouponsView.tsx:85`). `theme` bleibt config-only (Frontend-Theme-Abhängigkeit).
+2. **Logos (`logo_path*`) bleiben config-only** (Upload = eigener Scope, nicht F3).
+3. **Audit: Ja — einfacher Laravel-Log-Eintrag** bei jedem Brand-Settings-Write (User, Brand, geänderte Felder), da `Setting::$timestamps = false`.
+
+---
+
+### 🔙 Stack-Konsolidierung — Ein Compose statt zwei
+
+**Ziel:** Ein `docker-compose.yml` im Root (Default-Name); `docker-compose.local.yml` + `docker-compose.test.yml` + `docker/test/` löschen; Configs/`.run`/Doku auf einen Port-Satz; `scripts/e2e-up.sh` (existiert NICHT → neu, idempotent).
+
+**Zielbild (SOLL, angepasst an Entscheidungen 2026-08-04):** Ein `docker-compose.yml` im Root mit **generischen Container-Namen** (mysql, mailpit, meili), Standard-Ports, `SCOUT_PREFIX=test_` für Test-Meili-Indizes. **Kein `search-test`-Service.** Grants via `docker/init/01-init.sql` (Portal-Test-DB + Wildcard). Details in den Entscheidungen unten.
+
+**Wichtig (Ist-Zustand):** `backend/.env:27` nutzt `DB_PORT=3307` bei `DB_DATABASE=portal_dev_db` → Dev-Backend läuft heute gegen den **Test-Container**; Local-Container (3306) faktisch ungenutzt. Dev-Daten liegen in Volume `portalreisingerpictures_db_data_test`.
+
+**Risiken:** Dev-Datenverlust (Entscheidung: Option B akzeptiert → Dev-Daten werden verworfen), Parallelbetrieb bricht ohne Wildcard-Grant (Init + e2e-up), Meili-Prefix-Trennung (SCOUT_PREFIX=test_ — Indexnamen `test_photos` etc. sauber getrennt), Port-Kollisionen (erst beide Stacks stoppen), `.run`-Stop-Bug.
+
+**Entscheidungen (interaktiv geklärt 2026-08-04):**
+1. **Option B: frischer Start** — Dev-Daten (alte Volume `portalreisingerpictures_db_data_test`) werden **verworfen**. Danach zwingend `migrate:fresh --seed` (AGENTS.md §6). Kein Volume-Kopierschritt. Schritt 3 (Datenmigration) entfällt.
+2. **Ein Meilisearch auf 7700** (`search-test`-Service + Port 7701 entfallen). Tests via `SCOUT_PREFIX=test_` (getrennte Indizes `test_photos`, `test_galleries`, …). `phpunit.xml`: `MEILISEARCH_HOST=http://127.0.0.1:7700`, einheitlicher Key (`local_meili_secret`), `SCOUT_PREFIX=test_` ergänzen. Dev nutzt unpräfixte Indizes. Scout-Re-Import (`scout:sync-index-settings` + `scout:import`) nach Setup.
+3. **Geteilte Mailpit-Instanz 8025/1025** für Dev + PHPUnit. `backend/tests/Support/MailpitAssertions.php:9` → 8025; E2E-`MailpitHelper` (8025) unverändert. Filterung per Empfänger.
+4. **.run-Configs: „Start/Stop Docker (Test)" löschen**; „Start/Stop Docker (Dev)" → `docker compose up -d`/`down`; §9-Namenskonvention anwenden. „DB Migration (Test)" um `--seed` ergänzen.
+5. **Generische Container-Namen** (`mysql`, `mailpit`, `meili`?) + Standard-Ports (3306/7700/8025+1025) für lokale Konsistenz und Duplizierbarkeit in anderen Projekten. **Keine separate globale Infra-Compose** — andere Projekte duplizieren die Compose (User-Präferenz: „lieber duplizieren, globale Infra-Compose potenziell nervig"). Konkrete Namen/Volumes bei der Umsetzung in der Planungsphase festlegen.
+
+**Korrigierter Umsetzungsplan (angepasst an Entscheidungen):**
+0. Beide alten Stacks down (`--project-name portal_local` + `portal_test`).
+1. Neues `docker-compose.yml` (ein Meili-Service, generische Namen, `docker/init/01-init.sql` mit `CREATE DATABASE IF NOT EXISTS portal_test_db` + `GRANT ALL ON portal_test_db.*` + Wildcard `portal_test_db\_test\_%`); alte Compose-Dateien + `docker/test/` löschen — `docker compose config --quiet`.
+2. `docker compose up -d` (frisches Volume → Init-Script läuft) + Grant-Check (`SHOW GRANTS FOR 'portal_user'@'%'`).
+3. `migrate:fresh --seed` (Dev-DB aufbauen) — Login mit `florian@reisinger.pictures` verifizieren.
+4. Configs: `backend/.env` + `.env.example` DB_PORT 3306; `phpunit.xml` DB_PORT 3306, MAIL_PORT 1025, MEILISEARCH_HOST 7700, MEILISEARCH_KEY `local_meili_secret`, `SCOUT_PREFIX=test_`; `tests/Support/MailpitAssertions.php:9` 8025.
+5. `scripts/e2e-up.sh` neu (idempotent: `up -d` → DB-Ready-Wait → Grants → optional `--fresh`+Seed).
+6. `.run`-Configs (s. Entscheidung 4).
+7. Doku: `README.md:15–34`, `CLAUDE.md:82–85,175,304`, `AGENTS.md:140–153`, `features/security/env-hardening.md:45–46`, `features/search/01-search-and-discovery.md:15–17` → neue Ports/Compose. Grep-Check: keine `3307|8026|1026|docker-compose.test.yml|docker-compose.local.yml`-Treffer mehr.
+8. Gesamtverifikation: `php artisan test` (ein Prozess), `php artisan test --parallel` (Worker-DBs auf 3306), `DB_DATABASE=portal_test_db_test_<x>`-Scoped-Run, `pnpm test:e2e:smoke`, `pnpm lint:fix && pnpm build`, Scout-Sync/Import (Meili-Indizes inkl. `test_`-Prefix).
