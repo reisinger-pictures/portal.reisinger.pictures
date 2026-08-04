@@ -1,18 +1,14 @@
 /**
- * CouponInput – coupon entry field for volume-licensed checkouts.
+ * CouponInput – coupon entry field for the client checkout.
  *
  * Renders a daisyUI `join` input group for entering a coupon code, plus
  * a result panel that reflects the validation state of `useCoupon()`.
- *
- * Visibility: this component is only rendered when licensing mode is
- * `volume_licensing` (gated by `useLicensingMode()`).
  */
 
 import {useState, useCallback} from 'react';
 import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
 import useCoupon from '../../../logic/useCoupon';
-import {useLicensingMode} from '../../../logic/useLicensingMode';
 import {formatMoney} from '../../../logic/utils';
 
 interface CouponInputProps {
@@ -20,7 +16,6 @@ interface CouponInputProps {
 }
 
 export default function CouponInput({galleryId}: CouponInputProps) {
-    const licensingMode = useLicensingMode();
     const {couponCode, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon({galleryId});
     const [inputValue, setInputValue] = useState<string>('');
 
@@ -33,11 +28,6 @@ export default function CouponInput({galleryId}: CouponInputProps) {
         removeCoupon();
         setInputValue('');
     }, [removeCoupon]);
-
-    // Coupons are coupled to volume licensing (VolumeLicensingStrategy.supportsCoupons()).
-    if (licensingMode !== 'volume_licensing') {
-        return null;
-    }
 
     return (
         <div

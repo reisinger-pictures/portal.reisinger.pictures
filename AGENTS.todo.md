@@ -17,6 +17,17 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 
 ---
 
+## 🟡 OFFEN (Future) — pricing_strategy als Brand-Setting in der UI konfigurierbar
+
+**Kontext (Entscheidung 2026-08-04):** Coupon-Feature ist vom Lizenzmodus entkoppelt („offer both" — beide Lizenzmodelle immer mit Coupons; Gates in `Sidebar.tsx`/`ManagementCouponsView.tsx`/`CouponInput.tsx` entfernt). Langfristig soll das Brand-weite `pricing_strategy` (inkl. Coupon-Verfügbarkeit) per **Admin-UI konfigurierbar** sein.
+
+**Umsetzung (Future-TODO, dokumentiert in `features/infrastructure/17-pricing-strategy-pattern.md` §7):**
+- DB-Overlay-Muster (Option B, wie F3): `settings`-Tabelle (PK `(key, brand)`, V019), `config/brands.php` = Default/Fallback.
+- Setting `pricing_strategy` je Brand in der Admin-UI editierbar (`BrandSettingsService`/`SettingsController`, Choke-Point `BrandRegistry::buildFromArray()`).
+- Per-Gallery-Override (F2, `galleries.licensing_mode`) bleibt und hat Vorrang vor dem Brand-Setting.
+
+---
+
 ## 📋 AUSGEARBEITETE BACKLOG-PLÄNE (2026-08-04)
 
 > Nur Ausarbeitung (Planung) — noch **kein Code** geändert. Umsetzung erfolgt in separaten Sessions durch Implementer-Subagenten + Review durch Verifikator (AGENTS.md §4). **Offene Fragen wurden interaktiv geklärt (2026-08-04) und sind in den Plänen als Entscheidungen dokumentiert.**

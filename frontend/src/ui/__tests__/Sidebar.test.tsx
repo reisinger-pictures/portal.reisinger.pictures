@@ -7,7 +7,6 @@ import { useAuth } from '../../logic/useAuth';
 import { usePermissions } from '../../logic/usePermissions';
 import { useCart } from '../../logic/CartContext';
 import { useBrand } from '../../logic/useBrand';
-import { useLicensingMode } from '../../logic/useLicensingMode';
 
 // --------------------------------------------------------------------------
 // Mocks
@@ -35,10 +34,6 @@ vi.mock('../../logic/useBrand', () => ({
         primaryColor: '#1E5631',
         secondaryColor: '#A4B494',
     })),
-}));
-
-vi.mock('../../logic/useLicensingMode', () => ({
-    useLicensingMode: vi.fn(() => 'scope_licensing'),
 }));
 
 vi.mock('../../logic/useAuth', () => ({
@@ -395,9 +390,8 @@ describe('Sidebar', () => {
     });
 });
 
-describe('Volume licensing admin navigation', () => {
+describe('Marketing admin navigation', () => {
     beforeEach(() => {
-        vi.mocked(useLicensingMode).mockReturnValue('volume_licensing');
         vi.mocked(useAuth).mockReturnValue({
             user: { ...mockUser, is_admin: true },
             isLoading: false,
@@ -431,7 +425,7 @@ describe('Volume licensing admin navigation', () => {
         });
     });
 
-    it('shows "Gutscheincode" link when isStaff, isAdmin, and volume licensing is active', () => {
+    it('shows "Gutscheincode" link when isStaff and isAdmin', () => {
         renderSidebar();
 
         expect(screen.getByText('Gutscheincode')).toBeInTheDocument();
@@ -448,13 +442,6 @@ describe('Volume licensing admin navigation', () => {
             isOrgAdmin: false,
             showOrgsSection: false,
         });
-        renderSidebar();
-
-        expect(screen.queryByText('Gutscheincode')).not.toBeInTheDocument();
-    });
-
-    it('hides "Gutscheincode" link when licensing is scope_licensing', () => {
-        vi.mocked(useLicensingMode).mockReturnValue('scope_licensing');
         renderSidebar();
 
         expect(screen.queryByText('Gutscheincode')).not.toBeInTheDocument();

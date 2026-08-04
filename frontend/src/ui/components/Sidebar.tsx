@@ -2,7 +2,6 @@ import { Trans } from "@lingui/react/macro";
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 import { useBrand } from '../../logic/useBrand';
 import { usePermissions } from '../../logic/usePermissions';
-import { useLicensingMode } from '../../logic/useLicensingMode';
 import SidebarLoginForm from './SidebarLoginForm';
 import {useAuth} from '../../logic/useAuth';
 import {Gallery, GalleryGroup, GalleryTreeResponse} from '../../logic/useGalleries';
@@ -24,8 +23,6 @@ export default function Sidebar(props: SidebarProps) {
     const { logoSrc, portalName, impressumUrl, features } = useBrand();
     const {user, logout} = useAuth();
     const { isStaff, isAdmin, isSuperAdmin, isPhotographer, isOrgAdmin, showOrgsSection, canAccessProductionBoard } = usePermissions();
-    const licensingMode = useLicensingMode();
-    const isVolumeLicensing = licensingMode === 'volume_licensing';
     const navigate = useNavigate();
     const { itemCount } = useCart();
     const [searchParams] = useSearchParams();
@@ -99,7 +96,7 @@ export default function Sidebar(props: SidebarProps) {
                             </>
                         )}
 
-                        {isAdmin && isVolumeLicensing && (
+                        {isAdmin && (
                             <>
                                 <li className="menu-title opacity-50 text-xs uppercase tracking-widest mt-4"><Trans>Marketing</Trans></li>
                                 <li><Link to="/admin-coupons" className={props.currentView === 'admin-coupons' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--ticket-percent text-lg"></span> <Trans>Gutscheincode</Trans></Link></li>

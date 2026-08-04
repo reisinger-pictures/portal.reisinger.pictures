@@ -7,7 +7,6 @@ import useSWRMutation from 'swr/mutation';
 import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import { useAuth } from '../../logic/useAuth';
-import { useLicensingMode } from '../../logic/useLicensingMode';
 import ErrorMessage from '../components/ErrorMessage';
 import { formatMoney } from '../../logic/utils';
 import CouponFormDrawer, { type Coupon } from './components/CouponFormDrawer';
@@ -64,7 +63,6 @@ const formatExpiry = (iso: string | undefined): string => {
 };
 
 export default function ManagementCouponsView() {
-    const licensingMode = useLicensingMode();
     const { user } = useAuth();
     const { showToast, confirm } = useUI();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -81,20 +79,6 @@ export default function ManagementCouponsView() {
     );
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
-
-    if (licensingMode !== 'volume_licensing') {
-        return (
-            <div className="p-6 md:p-10 max-w-3xl mx-auto w-full">
-                <div className="bg-base-100 border border-base-300 rounded-box p-10 shadow-sm text-center">
-                    <span className="iconify mdi--ticket-percent-outline text-5xl text-primary mb-4 inline-block"></span>
-                    <h1 className="text-3xl font-bold mb-2"><Trans>Gutscheincode</Trans></h1>
-                    <p className="opacity-70">
-                        <Trans>Gutscheincodes erfordern Volume-Licensing als Preisstrategie.</Trans>
-                    </p>
-                </div>
-            </div>
-        );
-    }
 
     const openCreate = () => {
         setEditingCoupon(null);

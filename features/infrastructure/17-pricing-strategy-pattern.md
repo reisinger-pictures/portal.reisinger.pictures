@@ -182,3 +182,35 @@ Galleries sollen einen eigenen `licensing_mode` erhalten, der das Brand-weite `p
 1. **2026-07-01:** Dokument erstellt — zwei Strategien: `ScopeLicensingStrategy` (RP/B2B) und `VolumeLicensingStrategy` (SRP/B2C).
 2. **2026-07-14 (Commit `1831116`):** SRP-Portal und `Brand::SRP` entfernt. VolumeLicensingStrategy bleibt als generische Volume-Logik. Strategy-Auswahl läuft über `pricing_strategy`-DB-Setting (brand-scoped).
 3. **Geplant (F2):** Per-Gallery `licensing_mode`-Override.
+
+## 7. Coupons unabhängig vom Lizenzmodus (2026-08-04)
+
+> **Entscheidung:** Das Coupon-Feature wird **nicht mehr** vom Brand-weiten `pricing_strategy`-Setting
+> (`scope_licensing` vs. `volume_licensing`) abhängig gemacht. Beide Lizenzmodelle werden **immer**
+> mit Coupons angeboten („offer both"). Keine globale Umstellung des `pricing_strategy`-Defaults.
+
+### Ist-Zustand (nach Entkopplung)
+
+- **Backend:** Coupon-Routen/Controller (`CouponAdminController`, `CouponCheckoutController`) hatten nie ein
+  `pricing_strategy`-Gate — nur das Frontend war gekoppelt.
+- **Frontend:** `useLicensingMode()`-Gates in `Sidebar.tsx` (Admin-Nav „Marketing" → „Gutscheincode"),
+  `ManagementCouponsView.tsx` (Placeholder „Gutscheincodes erfordern Volume-Licensing …") und
+  `CouponInput.tsx` (Client-Cart, Rendern nur bei `volume_licensing`) wurden **entfernt**.
+  Coupon-UI wird nun unabhängig vom Lizenzmodus angezeigt.
+- `useLicensingMode()` bleibt erhalten und wird weiterhin genutzt für **Preis-Logik/-Anzeige**
+  (`PhotoDetailView.tsx`, `ManagementGalleryView.tsx`, `ManagementMetaGalleryView.tsx`).
+
+### Long-term Roadmap: Brand-Setting in der UI konfigurierbar
+
+> **Status: Future-TODO — dokumentiert 2026-08-04, nicht implementiert.**
+
+Langfristig soll das **Brand-weite `pricing_strategy`** (inkl. der Coupon-Verfügbarkeit) als
+**Brand-Einstellung über die Admin-UI konfigurierbar** sein (analog F3 / `features/infrastructure/21-brand-config-driven.md`
+und `22-brand-settings-overlay.md`).
+
+- Umsetzung erfolgt über das **DB-Overlay**-Muster (Option B): `settings`-Tabelle (PK `(key, brand)`, V019),
+  `config/brands.php` bleibt Default/Fallback; Whitelist über `BrandRegistry::buildFromArray()`-Choke-Point.
+- Neues/geplantes Setting: `pricing_strategy` je Brand in der UI editierbar.
+- Dabei bleibt der Per-Gallery-Override (F2, `galleries.licensing_mode`) erhalten und hat Vorrang vor dem
+  Brand-Setting.
+
