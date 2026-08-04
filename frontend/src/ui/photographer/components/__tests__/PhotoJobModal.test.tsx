@@ -32,17 +32,16 @@ const catalogs = [
 ];
 
 const statusOptions = [
-    { value: 'shooting', label: 'Shooting' },
+    { value: 'importiert', label: 'Importiert' },
     { value: 'culling', label: 'Culling' },
     { value: 'bearbeitung', label: 'Bearbeitung' },
-    { value: 'export', label: 'Export' },
-    { value: 'veroeffentlicht', label: 'Veröffentlicht' },
+    { value: 'exportiert', label: 'Exportiert' },
     { value: 'abgebrochen', label: 'Abgebrochen' },
 ];
 
 const editingPhotoJob: PhotoJob = {
     id: 'j1',
-    status: 'veroeffentlicht',
+    status: 'exportiert',
     position: 2,
     owner: { id: 'o1', name: 'Owner' },
     assignee: null,
@@ -96,8 +95,8 @@ describe('PhotoJobModal', () => {
             <PhotoJobModal
                 isOpen
                 onClose={vi.fn()}
-                defaultStatus="shooting"
-                statusOptions={[{ value: 'shooting', label: 'Shooting' }]}
+                defaultStatus="importiert"
+                statusOptions={[{ value: 'importiert', label: 'Importiert' }]}
                 onSave={vi.fn()}
             />,
         );
@@ -115,8 +114,8 @@ describe('PhotoJobModal', () => {
             <PhotoJobModal
                 isOpen
                 onClose={vi.fn()}
-                defaultStatus="shooting"
-                statusOptions={[{ value: 'shooting', label: 'Shooting' }]}
+                defaultStatus="importiert"
+                statusOptions={[{ value: 'importiert', label: 'Importiert' }]}
                 onSave={vi.fn()}
             />,
         );
@@ -134,8 +133,8 @@ describe('PhotoJobModal', () => {
             <PhotoJobModal
                 isOpen
                 onClose={vi.fn()}
-                defaultStatus="shooting"
-                statusOptions={[{ value: 'shooting', label: 'Shooting' }]}
+                defaultStatus="importiert"
+                statusOptions={[{ value: 'importiert', label: 'Importiert' }]}
                 onSave={onSave}
             />,
         );
@@ -157,8 +156,8 @@ describe('PhotoJobModal', () => {
             <PhotoJobModal
                 isOpen
                 onClose={vi.fn()}
-                defaultStatus="shooting"
-                statusOptions={[{ value: 'shooting', label: 'Shooting' }]}
+                defaultStatus="importiert"
+                statusOptions={[{ value: 'importiert', label: 'Importiert' }]}
                 onSave={onSave}
             />,
         );
@@ -181,8 +180,8 @@ describe('PhotoJobModal', () => {
             <PhotoJobModal
                 isOpen
                 onClose={vi.fn()}
-                defaultStatus="shooting"
-                statusOptions={[{ value: 'shooting', label: 'Shooting' }]}
+                defaultStatus="importiert"
+                statusOptions={[{ value: 'importiert', label: 'Importiert' }]}
                 onSave={onSave}
             />,
         );
@@ -235,12 +234,12 @@ describe('PhotoJobModal', () => {
         );
 
         await waitFor(() => {
-            expect(getStatusSelect().value).toBe('veroeffentlicht');
+            expect(getStatusSelect().value).toBe('exportiert');
         });
 
         await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
-        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status: 'veroeffentlicht' }));
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status: 'exportiert' }));
     });
 
     it('resets the status to the new defaultStatus when reopened for a different column', async () => {

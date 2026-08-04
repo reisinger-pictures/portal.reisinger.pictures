@@ -52,7 +52,7 @@ class PhotoJob extends Model
     protected static function booted()
     {
         static::saving(function ($photoJob) {
-            $allowedStatuses = ['shooting', 'culling', 'bearbeitung', 'export', 'veroeffentlicht', 'abgebrochen'];
+            $allowedStatuses = array_column(PhotoJobStatus::cases(), 'value');
             if (!in_array($photoJob->status, $allowedStatuses)) {
                 throw new \InvalidArgumentException("Ungültiger Bildbearbeitungsstatus: {$photoJob->status}");
             }

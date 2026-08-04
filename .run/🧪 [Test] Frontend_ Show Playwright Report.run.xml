@@ -1,11 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="🔍 [Wartung] Meilisearch Sync &amp; Import" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="php artisan scout:sync-index-settings &amp;&amp; php artisan scout:import &quot;App\Models\Photo&quot; &amp;&amp; php artisan scout:import &quot;App\Models\Gallery&quot;" />
+  <configuration default="false" name="🧪 [Test] Frontend: Show Playwright Report" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="npx playwright show-report" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />
     <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="false" />
-    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/backend" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/frontend" />
     <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
     <option name="INTERPRETER_PATH" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />

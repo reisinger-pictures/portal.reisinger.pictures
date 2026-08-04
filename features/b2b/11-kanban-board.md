@@ -13,9 +13,9 @@ Diese Datei ist die verbindliche Referenz für die Implementierung des Kanban-Fe
 Zwei kanban-ähnliche Boards für Workflow-Transparenz im B2B-Bereich:
 
 - **Projekte-Board** (kaufmännisch): `anfrage → angebot → beauftragt → rechnung → bezahlt` (+ terminal `storniert`).
-- **Bildbearbeitungs-Board** (Produktion): `shooting → culling → bearbeitung → export → veroeffentlicht` (+ terminal `abgebrochen`).
+- **Bildbearbeitungs-Board** (Produktion): `importiert → culling → bearbeitung → exportiert` (+ terminal `abgebrochen`).
 
-Terminale Status (`storniert` / `abgebrochen`) und Endstatus (`bezahlt` / `veroeffentlicht`) unterliegen der Auto-Cleanup-Policy (§7).
+Terminale Status (`storniert` / `abgebrochen`) und Endstatus (`bezahlt` / `exportiert`) unterliegen der Auto-Cleanup-Policy (§7).
 
 Die Boards visualisieren den Fortschritt von eingehender Anfrage bis zur Auslieferung. Sie sind der zentrale operative Überblick für Admin (kaufmännisch) und Fotograf (Produktion).
 
@@ -119,12 +119,16 @@ enum ProjectStatus: string
 
 enum PhotoJobStatus: string
 {
-    case SHOOTING        = 'shooting';
+    case IMPORTIERT      = 'importiert';
     case CULLING         = 'culling';
     case BEARBEITUNG     = 'bearbeitung';
-    case EXPORT          = 'export';
-    case VEROEFFENTLICHT = 'veroeffentlicht';
+    case EXPORTIERT      = 'exportiert';
     case ABGEBROCHEN     = 'abgebrochen';
+
+    public static function initial(): self
+    {
+        return self::IMPORTIERT;
+    }
 }
 
 enum PaymentStatus: string
@@ -187,7 +191,7 @@ Route-Basis `/api/management/photo-jobs` (nur `super_admin` / `photographer`):
 
 `POST /api/management/projects/{id}/handoff` — **nur `super_admin`**.
 
-- Erzeugt einen `photo_job`: `brand` = Project-Brand, `owner_id` = aktueller User, `title` = `client_name`, `status` = `shooting`, `position` = `max+1` (brand-weit).
+- Erzeugt einen `photo_job`: `brand` = Project-Brand, `owner_id` = aktueller User, `title` = `client_name`, `status` = `PhotoJobStatus::initial()` (`importiert`), `position` = `max+1` (brand-weit).
 - Setzt `project.linked_photo_job_id` auf die neue Photo-Job-ID.
 - Ist bereits ein `linked_photo_job_id` gesetzt → **422** (`already_handed_off`, kein Doppel-Handoff).
 - Antwort: `{ "photo_job": {...} }` (201).
@@ -243,7 +247,7 @@ Route-Basis `/api/management/photo-jobs` (nur `super_admin` / `photographer`):
 
 ---
 
-## 7. Auto-Cleanup (Terminale Status + 30d-Grace)
+## 7. Auto-Cleanup (Terminale Status + 7d-Grace)
 
 Abgeschlossene oder abgebrochene Items werden **automatisch hart gelöscht**, um Board-Hygiene zu gewährleisten (freigegeben 2026-08-02).
 
@@ -254,15 +258,15 @@ Abgeschlossene oder abgebrochene Items werden **automatisch hart gelöscht**, um
 | Tabelle | Status (terminal/End) | Bedingung |
 |---|---|---|
 | `projects` | `bezahlt`, `storniert` | `updated_at` älter als Grace |
-| `photo_jobs` | `veroeffentlicht`, `abgebrochen` | `updated_at` älter als Grace |
+| `photo_jobs` | `exportiert`, `abgebrochen` | `updated_at` älter als Grace |
 
-- **Grace:** `env('BOARD_CLEANUP_GRACE_DAYS', 30)` Tage.
+- **Grace:** `env('BOARD_CLEANUP_GRACE_DAYS', 7)` Tage.
 - Löschung ist **hart** (kein Soft-Delete), mit `Log::info`-Eintrag pro Item + Konsolen-Zählung.
 - Nur Items in den gelisteten Status sind betroffen — aktive Items bleiben unabhängig vom Alter erhalten.
-- **Referenzschutz (Handoff):** `photo_jobs`, die von einem noch existierenden Projekt via `linked_photo_job_id` referenziert werden (§5.1), werden **übersprungen** — die Handoff-Referenz schützt den Job vor hartem Löschen, auch wenn er bereits `veroeffentlicht`/`abgebrochen` ist und die Grace überschritten hat. Erst wenn das referenzierende Projekt selbst (z.B. via Cleanup oder manuell) gelöscht wurde, ist der Job wieder ein Kandidat.
+- **Referenzschutz (Handoff):** `photo_jobs`, die von einem noch existierenden Projekt via `linked_photo_job_id` referenziert werden (§5.1), werden **übersprungen** — die Handoff-Referenz schützt den Job vor hartem Löschen, auch wenn er bereits `exportiert`/`abgebrochen` ist und die Grace überschritten hat. Erst wenn das referenzierende Projekt selbst (z.B. via Cleanup oder manuell) gelöscht wurde, ist der Job wieder ein Kandidat.
 - Brand-Isolation gilt: Es werden Items aller Brands bereinigt (Command ist nicht user-/brand-gebunden).
 
-> **Wichtig für Datenkonsistenz:** Terminale Status (`storniert`, `abgebrochen`) UND Endstatus (`bezahlt`, `veroeffentlicht`) sind deshalb **nicht** für längere Retrospektiven verfügbar. `workflow_logs` bleiben als Historie erhalten (§9).
+> **Wichtig für Datenkonsistenz:** Terminale Status (`storniert`, `abgebrochen`) UND Endstatus (`bezahlt`, `exportiert`) sind deshalb **nicht** für längere Retrospektiven verfügbar. `workflow_logs` bleiben als Historie erhalten (§9).
 
 ---
 

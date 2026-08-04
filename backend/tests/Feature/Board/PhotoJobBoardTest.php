@@ -92,11 +92,11 @@ class PhotoJobBoardTest extends TestCase
 
         $response->assertStatus(201);
         $response->assertJsonPath('photo_job.owner_id', $photographer->id);
-        $response->assertJsonPath('photo_job.status', PhotoJobStatus::SHOOTING->value);
+        $response->assertJsonPath('photo_job.status', PhotoJobStatus::IMPORTIERT->value);
         $response->assertJsonPath('photo_job.brand', Brand::B2B->value);
         $this->assertDatabaseHas('photo_jobs', [
             'owner_id' => $photographer->id,
-            'status' => 'shooting',
+            'status' => 'importiert',
             'position' => 0,
         ]);
     }
@@ -160,7 +160,7 @@ class PhotoJobBoardTest extends TestCase
         $this->assertDatabaseHas('workflow_logs', [
             'item_type' => 'photo_job',
             'item_id' => $photoJob->id,
-            'from_status' => 'shooting',
+            'from_status' => 'importiert',
             'to_status' => 'culling',
             'user_id' => $photographer->id,
         ]);
@@ -173,7 +173,7 @@ class PhotoJobBoardTest extends TestCase
         $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id]);
 
         $this->withHeaders($headers)->patchJson("/api/management/photo-jobs/{$photoJob->id}/move", [
-            'status' => 'shooting',
+            'status' => 'importiert',
             'position' => 5,
         ])->assertStatus(200);
 
@@ -253,7 +253,7 @@ class PhotoJobBoardTest extends TestCase
     {
         $photographer = $this->createPhotographer();
         $headers = $this->authHeaders($photographer);
-        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting']);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert']);
 
         $this->withHeaders($headers)->patchJson("/api/management/photo-jobs/{$photoJob->id}/move", [
             'status' => 'culling',
@@ -279,7 +279,7 @@ class PhotoJobBoardTest extends TestCase
             'brand' => Brand::B2B,
             'owner_id' => $otherUser->id,
             'assignee_id' => $photographer->id,
-            'status' => 'shooting',
+            'status' => 'importiert',
         ]);
 
         $this->withHeaders($headers)->patchJson("/api/management/photo-jobs/{$photoJob->id}/move", [
@@ -311,7 +311,7 @@ class PhotoJobBoardTest extends TestCase
         $this->assertDatabaseHas('workflow_logs', [
             'item_type' => 'photo_job',
             'item_id' => $photoJob->id,
-            'from_status' => 'shooting',
+            'from_status' => 'importiert',
             'to_status' => 'abgebrochen',
             'user_id' => $photographer->id,
         ]);
@@ -329,6 +329,82 @@ class PhotoJobBoardTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_move_rejects_legacy_shooting_status_with_422(): void
+    {
+        $photographer = $this->createPhotographer();
+        $headers = $this->authHeaders($photographer);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id]);
+
+        $this->withHeaders($headers)->patchJson("/api/management/photo-jobs/{$photoJob->id}/move", [
+            'status' => 'shooting',
+            'position' => 0,
+        ])->assertStatus(422);
+    }
+
+    public function test_move_rejects_legacy_export_status_with_422(): void
+    {
+        $photographer = $this->createPhotographer();
+        $headers = $this->authHeaders($photographer);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id]);
+
+        $this->withHeaders($headers)->patchJson("/api/management/photo-jobs/{$photoJob->id}/move", [
+            'status' => 'export',
+            'position' => 0,
+        ])->assertStatus(422);
+    }
+
+    public function test_move_rejects_legacy_veroeffentlicht_status_with_422(): void
+    {
+        $photographer = $this->createPhotographer();
+        $headers = $this->authHeaders($photographer);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id]);
+
+        $this->withHeaders($headers)->patchJson("/api/management/photo-jobs/{$photoJob->id}/move", [
+            'status' => 'veroeffentlicht',
+            'position' => 0,
+        ])->assertStatus(422);
+    }
+
+    public function test_store_rejects_legacy_statuses_with_422(): void
+    {
+        $photographer = $this->createPhotographer();
+        $headers = $this->authHeaders($photographer);
+
+        $this->withHeaders($headers)->postJson('/api/management/photo-jobs', [
+            'title' => 'Legacy',
+            'status' => 'shooting',
+        ])->assertStatus(422);
+
+        $this->withHeaders($headers)->postJson('/api/management/photo-jobs', [
+            'title' => 'Legacy',
+            'status' => 'export',
+        ])->assertStatus(422);
+
+        $this->withHeaders($headers)->postJson('/api/management/photo-jobs', [
+            'title' => 'Legacy',
+            'status' => 'veroeffentlicht',
+        ])->assertStatus(422);
+    }
+
+    public function test_update_rejects_legacy_statuses_with_422(): void
+    {
+        $photographer = $this->createPhotographer();
+        $headers = $this->authHeaders($photographer);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id]);
+
+        $this->withHeaders($headers)->putJson("/api/management/photo-jobs/{$photoJob->id}", [
+            'status' => 'shooting',
+        ])->assertStatus(422);
+
+        $this->withHeaders($headers)->putJson("/api/management/photo-jobs/{$photoJob->id}", [
+            'status' => 'export',
+        ])->assertStatus(422);
+
+        $this->withHeaders($headers)->putJson("/api/management/photo-jobs/{$photoJob->id}", [
+            'status' => 'veroeffentlicht',
+        ])->assertStatus(422);
+    }
+
     public function test_unauthenticated_gets_401_on_all_endpoints(): void
     {
         $id = (string) \Illuminate\Support\Str::uuid();
@@ -336,7 +412,7 @@ class PhotoJobBoardTest extends TestCase
         $this->getJson('/api/management/photo-jobs')->assertStatus(401);
         $this->postJson('/api/management/photo-jobs', ['title' => 'X'])->assertStatus(401);
         $this->putJson("/api/management/photo-jobs/{$id}", ['title' => 'X'])->assertStatus(401);
-        $this->patchJson("/api/management/photo-jobs/{$id}/move", ['status' => 'shooting', 'position' => 0])->assertStatus(401);
+        $this->patchJson("/api/management/photo-jobs/{$id}/move", ['status' => 'importiert', 'position' => 0])->assertStatus(401);
         $this->deleteJson("/api/management/photo-jobs/{$id}")->assertStatus(401);
     }
 
@@ -363,10 +439,10 @@ class PhotoJobBoardTest extends TestCase
 
         $other = $this->withHeaders($headers)->postJson('/api/management/photo-jobs', [
             'title' => 'Job C',
-            'status' => PhotoJobStatus::SHOOTING->value,
+            'status' => PhotoJobStatus::IMPORTIERT->value,
         ]);
         $other->assertStatus(201);
-        $other->assertJsonPath('photo_job.status', 'shooting');
+        $other->assertJsonPath('photo_job.status', 'importiert');
         $other->assertJsonPath('photo_job.position', 0);
     }
 
@@ -389,14 +465,14 @@ class PhotoJobBoardTest extends TestCase
         $photographer = $this->createPhotographer();
         $headers = $this->authHeaders($photographer);
 
-        $j1 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 0]);
-        $j2 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 0]);
-        $j3 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 5]);
+        $j1 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 0]);
+        $j2 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 0]);
+        $j3 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 5]);
         $j4 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'culling', 'position' => 0]);
         $j5 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'culling', 'position' => 0]);
 
         $this->withHeaders($headers)->patchJson("/api/management/photo-jobs/{$j4->id}/move", [
-            'status' => 'shooting',
+            'status' => 'importiert',
             'position' => 1,
         ])->assertStatus(200);
 
@@ -405,7 +481,7 @@ class PhotoJobBoardTest extends TestCase
         $second = $this->withHeaders($headers)->getJson('/api/management/photo-jobs');
         $second->assertStatus(200);
 
-        $this->assertColumnDense($first->json('photo_jobs'), 'shooting');
+        $this->assertColumnDense($first->json('photo_jobs'), 'importiert');
         $this->assertColumnDense($first->json('photo_jobs'), 'culling');
         $this->assertSame($first->json('photo_jobs'), $second->json('photo_jobs'));
     }
@@ -415,19 +491,19 @@ class PhotoJobBoardTest extends TestCase
         $photographer = $this->createPhotographer();
         $headers = $this->authHeaders($photographer);
 
-        PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 0]);
-        PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 1]);
-        $target = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 2]);
+        PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 0]);
+        PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 1]);
+        $target = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 2]);
 
         $this->withHeaders($headers)->patchJson("/api/management/photo-jobs/{$target->id}/move", [
-            'status' => 'shooting',
+            'status' => 'importiert',
             'position' => 99,
         ])->assertStatus(200);
 
         $response = $this->withHeaders($headers)->getJson('/api/management/photo-jobs');
         $response->assertStatus(200);
 
-        $this->assertColumnDense($response->json('photo_jobs'), 'shooting');
+        $this->assertColumnDense($response->json('photo_jobs'), 'importiert');
         $targetPosition = collect($response->json('photo_jobs'))->firstWhere('id', $target->id)['position'];
         $this->assertSame(2, $targetPosition);
     }
@@ -439,12 +515,12 @@ class PhotoJobBoardTest extends TestCase
         $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id]);
 
         $response = $this->withHeaders($headers)->putJson("/api/management/photo-jobs/{$photoJob->id}", [
-            'status' => 'export',
+            'status' => 'exportiert',
         ]);
 
         $response->assertStatus(200);
-        $response->assertJsonPath('photo_job.status', 'export');
-        $this->assertDatabaseHas('photo_jobs', ['id' => $photoJob->id, 'status' => 'export']);
+        $response->assertJsonPath('photo_job.status', 'exportiert');
+        $this->assertDatabaseHas('photo_jobs', ['id' => $photoJob->id, 'status' => 'exportiert']);
         $this->assertDatabaseMissing('workflow_logs', [
             'item_type' => 'photo_job',
             'item_id' => $photoJob->id,
@@ -456,9 +532,9 @@ class PhotoJobBoardTest extends TestCase
         $photographer = $this->createPhotographer();
         $headers = $this->authHeaders($photographer);
 
-        $j1 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 0]);
-        $j2 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 0]);
-        $j3 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'shooting', 'position' => 5]);
+        $j1 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 0]);
+        $j2 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 0]);
+        $j3 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'importiert', 'position' => 5]);
         $j4 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'culling', 'position' => 0]);
         $j5 = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $photographer->id, 'status' => 'culling', 'position' => 0]);
 
@@ -471,7 +547,7 @@ class PhotoJobBoardTest extends TestCase
         $second = $this->withHeaders($headers)->getJson('/api/management/photo-jobs');
         $second->assertStatus(200);
 
-        $this->assertColumnDense($first->json('photo_jobs'), 'shooting');
+        $this->assertColumnDense($first->json('photo_jobs'), 'importiert');
         $this->assertColumnDense($first->json('photo_jobs'), 'culling');
         $this->assertSame($first->json('photo_jobs'), $second->json('photo_jobs'));
 

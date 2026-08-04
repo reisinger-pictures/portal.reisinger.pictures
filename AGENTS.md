@@ -63,7 +63,7 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
   * Pflichtfelder MÜSSEN das `required`-HTML-Attribut tragen — der Star (`*`) wird automatisch via CSS angehängt (`.form-control:has(input[required]) .label-text::after`).
   * `(Optional)` oder `(optional)` in Labels ist **strikt verboten**. Optionale Felder werden schlicht ohne Zusatz gekennzeichnet.
   * Die CSS-Regel in `index.css` (`.form-control:has(input[required], select[required], textarea[required]) .label-text::after`) ist der zentrale Mechanismus und darf nicht umgangen werden.
-* **Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. V024 ist die letzte deployte Migration. Vor dem Deployment werden alle Nicht-Produktions-Migrationen (≥ V025) zu EINER konsolidierten Migration zusammengefasst. Diese Regel verhindert eine übermäßig fragmentierte Migrations-Historie. **`down()`-Methoden werden nie ausgeführt und können als Regel leer gelassen werden** (kein Reversal für konsolidierte Migrationen, etabliert 2026-08-03).
+* **Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. **V027 ist die letzte (deploy-bereite) Migration** (V025–V026 wurden 2026-08-04 deployed; V027 verifiziert in `portal_test_db`). Neue Schema-Änderungen erfolgen daher als separate Migrationen ab V028. **`down()`-Methoden werden nie ausgeführt und können als Regel leer gelassen werden** (etabliert 2026-08-03).
 
 ## 4. AI Agent Roles & Responsibilities
 The system and workflow are managed via a Main/Secondary Model architecture to prevent context pollution:
@@ -200,3 +200,29 @@ Offene Security-TODOs (M6, L2) siehe `AGENTS.todo.md`. M1–M5, M7–M9, L1, L3�
 - Preisberechnung server-autoritativ (signiertes Offer-Token)
 - HTML-Sanitize beim Persistieren (Symfony `HtmlSanitizer`) + beim Render (DOMPurify)
 - Vertragssigning mit optimistischer Concurrency (`content_version` in UPDATE-WHERE)
+
+## 9. IntelliJ Run-Configs (.run) — Benennungs-Konvention (STRICT)
+
+Alle Run-Configs in `.run/*.run.xml` folgen einem einheitlichen Schema (etabliert 2026-08-04):
+
+- **Format:** `<Emoji> [<Kategorie>] <Name>.run.xml` — Dateiname UND internes `<configuration name="...">`-Attribut.
+- **Ein Emoji pro Kategorie** (thematisch, verbindlich) — **Ausnahme `[Run]`:**
+
+| Kategorie | Emoji |
+|---|---|
+| `[Setup]` | ⚙️ |
+| `[Run]` | **pro Ziel thematisch** — Docker 🐳, Frontend ⚡, Stripe 💳 |
+| `[Build]` | 🔨 |
+| `[Test]` | 🧪 |
+| `[AI]` | ✨ |
+| `[Wartung]` | 🔧 |
+| `[Deploy]` | 🚀 |
+| `[Core]` | 🛑 |
+| `[Gefahr]` | 🧨 |
+
+- **`[Run]` = Ausnahme (per-Config):** Start Docker, Start Frontend und Stripe-Tunnel sind konzeptionell **unterschiedliche Kategorien**, auch wenn sie den gleichen `[Run]`-Tag tragen → jedes Run-Ziel bekommt sein eigenes thematisches Emoji. Alle anderen Kategorien nutzen genau ein Emoji.
+
+- **macOS-Regel:** `:` ist in Dateinamen verboten → im Dateinamen wird `: ` als `_ ` geschrieben (`Backend_ Import Locations.run.xml` ↔ intern `name="⚙️ [Setup] Backend: Import Locations"`). Das interne `name`-Attribut trägt immer `: `.
+- **Konsistenz:** Dateiname und internes `name` müssen synchron sein (Name ohne `.run.xml`-Endung). Neue Configs MÜSSEN diesem Schema folgen.
+- **Sprache:** gemischt erlaubt (deutsche Kategorien `[Wartung]`, `[Gefahr]` und Task-Namen wie „generieren" bleiben).
+

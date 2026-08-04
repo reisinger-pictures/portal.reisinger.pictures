@@ -156,7 +156,7 @@ class PhotoJobBoardController extends Controller
         $photoJob = $this->scopedQuery($user)->findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:shooting,culling,bearbeitung,export,veroeffentlicht,abgebrochen',
+            'status' => 'required|string|in:' . implode(',', array_column(PhotoJobStatus::cases(), 'value')),
             'position' => 'required|integer|min:0',
         ]);
 

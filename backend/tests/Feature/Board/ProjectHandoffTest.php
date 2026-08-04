@@ -68,7 +68,7 @@ class ProjectHandoffTest extends TestCase
 
         $response->assertStatus(201);
         $response->assertJsonPath('photo_job.title', 'Testkunde');
-        $response->assertJsonPath('photo_job.status', PhotoJobStatus::SHOOTING->value);
+        $response->assertJsonPath('photo_job.status', PhotoJobStatus::initial()->value);
         $response->assertJsonPath('photo_job.brand', Brand::B2B->value);
         $response->assertJsonPath('photo_job.owner_id', $superAdmin->id);
 

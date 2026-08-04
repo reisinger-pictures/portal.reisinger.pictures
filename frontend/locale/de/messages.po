@@ -1559,8 +1559,12 @@ msgid "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erst
 msgstr "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
 
 #: src/ui/photographer/PhotographerProductionBoard.tsx
-msgid "Export"
-msgstr "Export"
+#~ msgid "Export"
+#~ msgstr "Export"
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Exportiert"
+msgstr "Exportiert"
 
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Favoriten"
@@ -2184,6 +2188,10 @@ msgstr "Im Warenkorb"
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Import abgeschlossen. {processedCount} Bilder wurden verschoben."
 msgstr "Import abgeschlossen. {processedCount} Bilder wurden verschoben."
+
+#: src/ui/photographer/PhotographerProductionBoard.tsx
+msgid "Importiert"
+msgstr "Importiert"
 
 #: src/ui/Impressum.tsx
 msgid "Impressum"
@@ -3950,8 +3958,8 @@ msgid "Shares gesamt:"
 msgstr "Shares gesamt:"
 
 #: src/ui/photographer/PhotographerProductionBoard.tsx
-msgid "Shooting"
-msgstr "Shooting"
+#~ msgid "Shooting"
+#~ msgstr "Shooting"
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #~ msgid "Shooting-Paket Kalkulator"
@@ -4459,8 +4467,8 @@ msgid "Verbindliche Unterzeichnung"
 msgstr "Verbindliche Unterzeichnung"
 
 #: src/ui/photographer/PhotographerProductionBoard.tsx
-msgid "Veröffentlicht"
-msgstr "Veröffentlicht"
+#~ msgid "Veröffentlicht"
+#~ msgstr "Veröffentlicht"
 
 #: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx

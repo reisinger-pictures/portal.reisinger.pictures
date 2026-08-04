@@ -37,7 +37,7 @@ import { usePermissions } from '../../logic/usePermissions';
 const owner = { id: 'u1', name: 'Florian' };
 const job = {
     id: 'j1',
-    status: 'shooting',
+    status: 'importiert',
     position: 0,
     owner,
     assignee: null,
@@ -77,9 +77,14 @@ describe('PhotographerProductionBoard', () => {
         expect(screen.getByText('Bildbearbeitung')).toBeInTheDocument();
     });
 
-    it('renders the Abgebrochen column', () => {
+    it('renders the Importiert, Culling, Bearbeitung, Exportiert and Abgebrochen columns', () => {
         renderWithProviders(<PhotographerProductionBoard />);
+        expect(screen.getByText('Importiert', { selector: 'div' })).toBeInTheDocument();
+        expect(screen.getByText('Culling', { selector: 'div' })).toBeInTheDocument();
+        expect(screen.getByText('Bearbeitung', { selector: 'div' })).toBeInTheDocument();
+        expect(screen.getByText('Exportiert', { selector: 'div' })).toBeInTheDocument();
         expect(screen.getByText('Abgebrochen', { selector: 'div' })).toBeInTheDocument();
+        expect(screen.queryByText('Veröffentlicht', { selector: 'div' })).not.toBeInTheDocument();
     });
 
     it('renders a job card when data is present', () => {
@@ -194,9 +199,9 @@ describe('PhotographerProductionBoard', () => {
         const selects = screen.getAllByLabelText('Status ändern');
         expect(selects).toHaveLength(1);
 
-        await user.selectOptions(selects[0], 'export');
+        await user.selectOptions(selects[0], 'exportiert');
 
-        expect(move).toHaveBeenCalledWith('j1', 'export', 0);
+        expect(move).toHaveBeenCalledWith('j1', 'exportiert', 0);
     });
 
     it('renders the note preview with the full note as tooltip', () => {

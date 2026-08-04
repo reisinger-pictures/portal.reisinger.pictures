@@ -1,5 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="stripe: webhook tunnel" type="NodeJSConfigurationType" path-to-js-file="stripe_tunnel.mjs" working-dir="$PROJECT_DIR$">
-    <method v="2" />
-  </configuration>
-</component>

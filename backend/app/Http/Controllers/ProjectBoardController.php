@@ -230,7 +230,7 @@ class ProjectBoardController extends Controller
             'brand' => $projectBrand,
             'owner_id' => $user->id,
             'title' => $project->client_name,
-            'status' => PhotoJobStatus::SHOOTING->value,
+            'status' => PhotoJobStatus::initial()->value,
             'position' => $maxPosition + 1,
         ]);
 

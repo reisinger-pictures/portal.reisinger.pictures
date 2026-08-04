@@ -50,7 +50,7 @@ class CleanupBoardItemsTest extends TestCase
 
     public function test_old_terminal_photo_job_is_deleted(): void
     {
-        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::VEROEFFENTLICHT->value]);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::EXPORTIERT->value]);
         $this->backdate($photoJob, 40);
 
         $this->artisan('app:cleanup-board-items')->assertSuccessful();
@@ -70,7 +70,7 @@ class CleanupBoardItemsTest extends TestCase
 
     public function test_old_terminal_photo_job_referenced_by_project_is_kept(): void
     {
-        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::VEROEFFENTLICHT->value]);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::EXPORTIERT->value]);
         $this->backdate($photoJob, 40);
 
         $project = Project::factory()->create(['brand' => Brand::B2B, 'status' => ProjectStatus::RECHNUNG->value, 'linked_photo_job_id' => $photoJob->id]);
@@ -95,10 +95,10 @@ class CleanupBoardItemsTest extends TestCase
 
     public function test_referenced_terminal_job_is_kept_while_unreferenced_terminal_job_is_deleted(): void
     {
-        $referenced = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::VEROEFFENTLICHT->value]);
+        $referenced = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::EXPORTIERT->value]);
         $this->backdate($referenced, 40);
 
-        $orphaned = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::VEROEFFENTLICHT->value]);
+        $orphaned = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::EXPORTIERT->value]);
         $this->backdate($orphaned, 40);
 
         Project::factory()->create(['brand' => Brand::B2B, 'status' => ProjectStatus::RECHNUNG->value, 'linked_photo_job_id' => $referenced->id]);
@@ -112,14 +112,34 @@ class CleanupBoardItemsTest extends TestCase
     public function test_young_terminal_item_is_kept(): void
     {
         $project = Project::factory()->create(['brand' => Brand::B2B, 'status' => ProjectStatus::BEZAHLT->value]);
-        $this->backdate($project, 10);
+        $this->backdate($project, 5);
 
-        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::VEROEFFENTLICHT->value]);
-        $this->backdate($photoJob, 10);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::EXPORTIERT->value]);
+        $this->backdate($photoJob, 5);
 
         $this->artisan('app:cleanup-board-items')->assertSuccessful();
 
         $this->assertDatabaseHas('projects', ['id' => $project->id]);
+        $this->assertDatabaseHas('photo_jobs', ['id' => $photoJob->id]);
+    }
+
+    public function test_exportiert_photo_job_older_than_grace_is_deleted(): void
+    {
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::EXPORTIERT->value]);
+        $this->backdate($photoJob, 10);
+
+        $this->artisan('app:cleanup-board-items')->assertSuccessful();
+
+        $this->assertDatabaseMissing('photo_jobs', ['id' => $photoJob->id]);
+    }
+
+    public function test_young_exportiert_photo_job_is_kept(): void
+    {
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::EXPORTIERT->value]);
+        $this->backdate($photoJob, 5);
+
+        $this->artisan('app:cleanup-board-items')->assertSuccessful();
+
         $this->assertDatabaseHas('photo_jobs', ['id' => $photoJob->id]);
     }
 
@@ -128,7 +148,7 @@ class CleanupBoardItemsTest extends TestCase
         $project = Project::factory()->create(['brand' => Brand::B2B, 'status' => ProjectStatus::ANFRAGE->value]);
         $this->backdate($project, 100);
 
-        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::SHOOTING->value]);
+        $photoJob = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => PhotoJobStatus::IMPORTIERT->value]);
         $this->backdate($photoJob, 100);
 
         $this->artisan('app:cleanup-board-items')->assertSuccessful();
@@ -143,9 +163,9 @@ class CleanupBoardItemsTest extends TestCase
         $this->backdate($project, 40);
         $storniert = Project::factory()->create(['brand' => Brand::B2B, 'status' => 'storniert']);
         $this->backdate($storniert, 40);
-        $published = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => 'veroeffentlicht']);
+        $published = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => 'exportiert']);
         $this->backdate($published, 40);
-        $active = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => 'shooting']);
+        $active = PhotoJob::factory()->create(['brand' => Brand::B2B, 'status' => 'importiert']);
         $this->backdate($active, 40);
 
         $this->artisan('app:cleanup-board-items')

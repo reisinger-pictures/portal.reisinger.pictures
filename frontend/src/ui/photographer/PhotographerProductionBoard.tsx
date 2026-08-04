@@ -10,11 +10,10 @@ import ErrorMessage from '../components/ErrorMessage';
 import PhotoJobModal from './components/PhotoJobModal';
 
 const columns: KanbanColumnDef[] = [
-    { status: 'shooting', label: t`Shooting` },
+    { status: 'importiert', label: t`Importiert` },
     { status: 'culling', label: t`Culling` },
     { status: 'bearbeitung', label: t`Bearbeitung` },
-    { status: 'export', label: t`Export` },
-    { status: 'veroeffentlicht', label: t`Veröffentlicht` },
+    { status: 'exportiert', label: t`Exportiert` },
     { status: 'abgebrochen', label: t`Abgebrochen` },
 ];
 

@@ -22,7 +22,7 @@ class PhotoJobFactory extends Factory
             'lightroom_catalog' => $this->faker->optional()->sentence(2),
             'total_count' => 0,
             'selected_count' => 0,
-            'status' => PhotoJobStatus::SHOOTING->value,
+            'status' => PhotoJobStatus::IMPORTIERT->value,
             'position' => 0,
         ];
     }

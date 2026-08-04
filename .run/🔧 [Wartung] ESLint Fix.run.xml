@@ -1,9 +1,9 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="🔨 [Build] Build Frontend (Vite)" type="js.build_tools.npm">
+  <configuration default="false" name="🔧 [Wartung] ESLint Fix" type="js.build_tools.npm">
     <package-json value="$PROJECT_DIR$/frontend/package.json" />
     <command value="run" />
     <scripts>
-      <script value="build" />
+      <script value="lint:fix" />
     </scripts>
     <node-interpreter value="project" />
     <envs />

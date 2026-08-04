@@ -15,7 +15,7 @@ class CleanupBoardItems extends Command
 
     public function handle()
     {
-        $graceDays = env('BOARD_CLEANUP_GRACE_DAYS', 30);
+        $graceDays = env('BOARD_CLEANUP_GRACE_DAYS', 7);
         $cutoffDate = Carbon::now()->subDays($graceDays);
 
         $projectCount = 0;
@@ -38,7 +38,7 @@ class CleanupBoardItems extends Command
         $referencedPhotoJobIds = Project::whereNotNull('linked_photo_job_id')
                                         ->pluck('linked_photo_job_id');
 
-        $photoJobs = PhotoJob::whereIn('status', ['veroeffentlicht', 'abgebrochen'])
+        $photoJobs = PhotoJob::whereIn('status', ['exportiert', 'abgebrochen'])
                              ->where('updated_at', '<', $cutoffDate)
                              ->whereNotIn('id', $referencedPhotoJobIds)
                              ->get();

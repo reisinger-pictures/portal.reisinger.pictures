@@ -8,16 +8,15 @@ namespace App\Enums;
  */
 enum PhotoJobStatus: string
 {
-    case SHOOTING = 'shooting';
+    case IMPORTIERT = 'importiert';
     case CULLING = 'culling';
     case BEARBEITUNG = 'bearbeitung';
-    case EXPORT = 'export';
-    case VEROEFFENTLICHT = 'veroeffentlicht';
+    case EXPORTIERT = 'exportiert';
     case ABGEBROCHEN = 'abgebrochen';
 
     /** @return self */
     public static function initial(): self
     {
-        return self::SHOOTING;
+        return self::IMPORTIERT;
     }
 }

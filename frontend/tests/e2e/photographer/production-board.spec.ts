@@ -30,11 +30,10 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
 
     test('Photographer wird das Bildbearbeitungs-Board mit allen Spalten angezeigt', { tag: ['@smoke'] }, async ({ page }) => {
         const { kanban } = await setup(page, photographer);
-        await kanban.expectColumn('Shooting');
+        await kanban.expectColumn('Importiert');
         await kanban.expectColumn('Culling');
         await kanban.expectColumn('Bearbeitung');
-        await kanban.expectColumn('Export');
-        await kanban.expectColumn('Veröffentlicht');
+        await kanban.expectColumn('Exportiert');
         await kanban.expectColumn('Abgebrochen');
     });
 
@@ -46,9 +45,8 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await expect(page).toHaveURL(/\/boards\?tab=production$/);
         await expect(page.locator('main .kanban-grid')).toBeVisible({ timeout: 15000 });
         await expect(page.getByText('Kein Zugriff auf dieses Board.')).toHaveCount(0);
-        await kanban.expectColumn('Shooting');
+        await kanban.expectColumn('Importiert');
         await kanban.expectColumn('Bearbeitung');
-        await kanban.expectColumn('Veröffentlicht');
     });
 
     test('R4: Super-Admin sieht den Katalog-Badge auch ohne eigenen Lightroom-Katalog', { tag: ['@feature:board', '@regression'] }, async ({ page, request }) => {
@@ -78,12 +76,12 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
             .locator('xpath=ancestor::div[contains(@class,"card")][1]');
         await expect(card).toBeVisible({ timeout: 10000 });
         await expect(card.locator('.badge').filter({ hasText: catalogName })).toBeVisible();
-        await kanban.expectColumn('Shooting');
+        await kanban.expectColumn('Importiert');
     });
 
     test('Pflichtfeld-Validierung: Titel ist erforderlich', { tag: ['@smoke'] }, async ({ page }) => {
         const { kanban } = await setup(page, photographer);
-        await kanban.openCreateModal('Shooting', 'Neuer Auftrag');
+        await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.submit();
         await kanban.expectFieldError('Titel', 'Titel ist erforderlich');
     });
@@ -92,7 +90,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         const { kanban } = await setup(page, photographer);
         const title = `E2E Auftrag ${Math.random().toString(36).substring(2, 8)}`;
 
-        await kanban.openCreateModal('Shooting', 'Neuer Auftrag');
+        await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
         await kanban.fillField('Bilder gesamt', '24');
         await kanban.submit();
@@ -109,7 +107,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         const { kanban } = await setup(page, superAdmin);
         const title = `Drag Auftrag ${Math.random().toString(36).substring(2, 8)}`;
 
-        await kanban.openCreateModal('Shooting', 'Neuer Auftrag');
+        await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
         await kanban.submit();
         await kanban.waitForCreate('/api/management/photo-jobs');
@@ -126,7 +124,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         const { kanban } = await setup(page, superAdmin);
         const title = `Abbruch ${Math.random().toString(36).substring(2, 8)}`;
 
-        await kanban.openCreateModal('Shooting', 'Neuer Auftrag');
+        await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
         await kanban.submit();
         await kanban.waitForCreate('/api/management/photo-jobs');
@@ -144,7 +142,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         const { kanban } = await setup(page, superAdmin);
         const title = `Abbruch Del ${Math.random().toString(36).substring(2, 8)}`;
 
-        await kanban.openCreateModal('Shooting', 'Neuer Auftrag');
+        await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
         await kanban.submit();
         await kanban.waitForCreate('/api/management/photo-jobs');
@@ -170,7 +168,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         const { kanban } = await setup(page, superAdmin);
         const title = `Select Auftrag ${Math.random().toString(36).substring(2, 8)}`;
 
-        await kanban.openCreateModal('Shooting', 'Neuer Auftrag');
+        await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
         await kanban.submit();
         await kanban.waitForCreate('/api/management/photo-jobs');
