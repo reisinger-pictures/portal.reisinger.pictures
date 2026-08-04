@@ -6,43 +6,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Reisinger Foto Portal</title>
 
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#1E5631" />
+  <meta name="msapplication-TileColor" content="#1E5631" />
+  <meta name="theme-color" content="#1E5631" />
+
   <script>
     (function() {
       var host = window.location.hostname.toLowerCase();
-      var brand = 'rp';
-      // Dev fallback: *.localhost → brand from subdomain
-      if ((host.endsWith('.localhost') || host === 'localhost') && !host.startsWith('localhost')) {
-        var parts = host.split('.');
-        if (parts.length >= 2 && parts[0] !== 'localhost' && parts[0].length > 0) {
-          brand = parts[0];
-        }
-      }
-      var themeColor = '#1E5631';
-      var head = document.head;
-      
-      var links = [
-        { rel: 'apple-touch-icon', sizes: '180x180', href: '/brands/' + brand + '/apple-touch-icon.png' },
-        { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/brands/' + brand + '/favicon-32x32.png' },
-        { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/brands/' + brand + '/favicon-16x16.png' },
-        { rel: 'manifest', href: '/brands/' + brand + '/site.webmanifest' },
-        { rel: 'mask-icon', href: '/brands/' + brand + '/safari-pinned-tab.svg', color: themeColor }
-      ];
-      
-      links.forEach(function(attr) {
-        var el = document.createElement('link');
-        for (var k in attr) el.setAttribute(k, attr[k]);
-        head.appendChild(el);
-      });
-      
-      var metas = [
-        { name: 'msapplication-TileColor', content: themeColor },
-        { name: 'theme-color', content: themeColor }
-      ];
-      
-      metas.forEach(function(attr) {
-        var el = document.createElement('meta');
-        for (var k in attr) el.setAttribute(k, attr[k]);
-        head.appendChild(el);
+      if (!(host.endsWith('.localhost') || host === 'localhost')) return;
+      var parts = host.split('.');
+      var brand = (parts[0] !== 'localhost' && parts[0].length > 0) ? parts[0] : 'rp';
+      var files = ['favicon.ico', 'favicon-32x32.png', 'favicon-16x16.png', 'apple-touch-icon.png', 'site.webmanifest', 'safari-pinned-tab.svg'];
+      files.forEach(function(f) {
+        var el = document.querySelector('link[href="/' + f + '"]');
+        if (el) el.href = '/brands/' + brand + '/' + f;
       });
     })();
   </script>
