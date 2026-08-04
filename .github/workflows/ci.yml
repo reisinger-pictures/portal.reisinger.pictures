@@ -79,46 +79,71 @@ jobs:
             composer install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
         run: docker exec php php artisan key:generate
+      - name: Grant parallel test DB permissions
+        # paratest legt pro Worker `portal_test_db_test_<n>` an; der von
+        # mariadb:11.4 angelegte portal_user hat nur Rechte auf portal_test_db.
+        # Laravel erzeugt Worker-DBs via CREATE DATABASE -> globales CREATE noetig.
+        run: |
+          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -proot -e \
+            "GRANT ALL PRIVILEGES ON \`portal\_test\_db\_test\_%\`.* TO 'portal_user'@'%'; GRANT CREATE ON *.* TO 'portal_user'@'%'; FLUSH PRIVILEGES;"
       - name: Run migrations
         run: docker exec php php artisan migrate --force
       - name: Seed database
         # DatabaseSeeder ruft am Ende app:import-locations auf (Geonames-Download).
         run: docker exec php php artisan db:seed --force
       - name: Run PHPUnit
-        # Serie (kein --parallel): das Prod-Image ghcr.io/reisi007/php-base:8.5
-        # enthaelt kein ext-pcntl, paratest kann darin keine Worker forken.
-        # pipefail laesst den Step fehlschlagen, wenn Tests rot sind (nicht das
-        # tee). Log fuer Summary-Step.
+        # Parallele Worker via paratest (php-base:8.5 enthaelt seit dem
+        # Rebuild ext-pcntl + posix). pipefail laesst den Step fehlschlagen,
+        # wenn Tests rot sind (nicht das tee). Log fuer Summary-Step.
         run: |
           set -o pipefail
-          docker exec php php artisan test --no-ansi 2>&1 | tee /tmp/phpunit.log
+          docker exec php php artisan test --no-ansi --parallel 2>&1 | tee /tmp/phpunit.log
       - name: Backend Test-Summary
         if: always()
-        # Job-Summary im CI-Run (wie Vitest sie automatisch schreibt): Status +
-        # Abschlusszeile der Suite (Tests/Assertions/Errors/Failures) + Liste
-        # der fehlgeschlagenen Tests. ANSI-Codes werden vorher entfernt.
         run: |
           CLEAN=$(sed -e 's/\x1b\[[0-9;]*m//g' /tmp/phpunit.log 2>/dev/null || true)
+          # Parse results: "Tests: 42, Assertions: 120, Errors: 1, Failures: 2"
+          # or "OK (42 tests, 120 assertions)"
+          SUMMARY=$(grep -E '^Tests:|OK \(' <<< "$CLEAN" | tail -n 1)
+          TESTS=$(echo "$SUMMARY" | sed -n 's/.*Tests: \([0-9]*\).*/\1/p; s/.*OK (\([0-9]*\) tests.*/\1/p')
+          ASSERTIONS=$(echo "$SUMMARY" | sed -n 's/.*Assertions: \([0-9]*\).*/\1/p; s/.*OK ([0-9]* tests, \([0-9]*\) assertions.*/\1/p')
+          ERRORS=$(echo "$SUMMARY" | sed -n 's/.*Errors: \([0-9]*\).*/\1/p')
+          FAILURES=$(echo "$SUMMARY" | sed -n 's/.*Failures: \([0-9]*\).*/\1/p')
+          TESTS=${TESTS:-0}
+          ASSERTIONS=${ASSERTIONS:-0}
+          ERRORS=${ERRORS:-0}
+          FAILURES=${FAILURES:-0}
+          TOTAL=$((ERRORS + FAILURES))
+          if [ "$TOTAL" -eq 0 ]; then
+            STATUS_ICON="✅"
+            STATUS_TEXT="PASS"
+          else
+            STATUS_ICON="❌"
+            STATUS_TEXT="FAIL"
+          fi
           {
             echo "## Backend (PHPUnit)"
             echo ""
-            if grep -qE '^(OK \(|PASS Tests)' <<< "$CLEAN"; then
-              echo "**Result:** PASS"
-            else
-              echo "**Result:** FAIL"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Status | $STATUS_ICON $STATUS_TEXT |"
+            echo "| Tests | $TESTS total |"
+            echo "| Assertions | $ASSERTIONS total |"
+            if [ "$ERRORS" -gt 0 ]; then
+              echo "| Errors | ❌ $ERRORS |"
             fi
-            echo ""
-            echo '```text'
-            grep -E '^(Tests:|OK \(|PASS |FAILED |ERRORS!|FAILURES!)' <<< "$CLEAN" | tail -n 3
-            echo '```'
+            if [ "$FAILURES" -gt 0 ]; then
+              echo "| Failures | ❌ $FAILURES |"
+            fi
             FAILED=$(grep -E '^\s*[0-9]+\) ' <<< "$CLEAN" | tail -n 10)
             if [ -n "$FAILED" ]; then
               echo ""
-              echo "**Failed tests:**"
+              echo "<details><summary>Failed tests</summary>"
               echo ""
               echo '```text'
               echo "$FAILED"
               echo '```'
+              echo "</details>"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -287,24 +312,49 @@ jobs:
           ADMIN_PASSWORD: admin
       - name: E2E Test-Summary
         if: always()
-        # Job-Summary im CI-Run (wie Vitest sie automatisch schreibt):
-        # Abschlusszeilen des list-Reporters (passed/failed/did not run) +
-        # Liste der fehlgeschlagenen Tests.
         run: |
+          PASSED=$(grep -oP '^\s*\K\d+(?= passed)' /tmp/e2e.log 2>/dev/null | tail -n 1)
+          FAILED=$(grep -oP '^\s*\K\d+(?= failed)' /tmp/e2e.log 2>/dev/null | tail -n 1)
+          FLAKY=$(grep -oP '^\s*\K\d+(?= flaky)' /tmp/e2e.log 2>/dev/null | tail -n 1)
+          SKIPPED=$(grep -oP '^\s*\K\d+(?= did not run)' /tmp/e2e.log 2>/dev/null | tail -n 1)
+          PASSED=${PASSED:-0}
+          FAILED=${FAILED:-0}
+          FLAKY=${FLAKY:-0}
+          SKIPPED=${SKIPPED:-0}
+          TOTAL=$((PASSED + FAILED))
+          if [ "$FAILED" -eq 0 ]; then
+            STATUS_ICON="✅"
+            STATUS_TEXT="PASS"
+          else
+            STATUS_ICON="❌"
+            STATUS_TEXT="FAIL"
+          fi
           {
             echo "## E2E (Playwright)"
             echo ""
-            echo '```text'
-            grep -E '^\s*[0-9]+ (passed|failed|flaky|did not run)|error was not a part' /tmp/e2e.log 2>/dev/null | tail -n 6
-            echo '```'
-            FAILED=$(grep -E '^\s*[0-9]+\) \[' /tmp/e2e.log 2>/dev/null | tail -n 10)
-            if [ -n "$FAILED" ]; then
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Status | $STATUS_ICON $STATUS_TEXT |"
+            echo "| Passed | ✅ $PASSED |"
+            if [ "$FAILED" -gt 0 ]; then
+              echo "| Failed | ❌ $FAILED |"
+            fi
+            if [ "$FLAKY" -gt 0 ]; then
+              echo "| Flaky | ⚠️ $FLAKY |"
+            fi
+            if [ "$SKIPPED" -gt 0 ]; then
+              echo "| Skipped | ⏭️ $SKIPPED |"
+            fi
+            echo "| Total | $TOTAL |"
+            FAILED_TESTS=$(grep -E '^\s*[0-9]+\) \[' /tmp/e2e.log 2>/dev/null | tail -n 10)
+            if [ -n "$FAILED_TESTS" ]; then
               echo ""
-              echo "**Failed tests:**"
+              echo "<details><summary>Failed tests</summary>"
               echo ""
               echo '```text'
-              echo "$FAILED"
+              echo "$FAILED_TESTS"
               echo '```'
+              echo "</details>"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload Playwright report
