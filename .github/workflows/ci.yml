@@ -17,6 +17,11 @@ jobs:
   backend:
     name: Backend (PHPUnit)
     runs-on: ubuntu-latest
+    env:
+      # .env.example hat JWT_SECRET= leer; ohne Signing-Key -> 500 auf allen
+      # Auth-Endpoints (C1-Hardening: kein Fallback im Config). Test-Key nur
+      # fuer CI, Produktion nutzt `php artisan jwt:secret`.
+      JWT_SECRET: 2d093d84542d70f133a1689afb5866bed31edd1b520ce8c02ea9d25559fb0834
     defaults:
       run:
         working-directory: backend
@@ -107,6 +112,7 @@ jobs:
       STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
       STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
       STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      JWT_SECRET: 2d093d84542d70f133a1689afb5866bed31edd1b520ce8c02ea9d25559fb0834
       ADMIN_EMAIL: admin@example.com
       ADMIN_PASSWORD: admin
     services:
