@@ -155,6 +155,19 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      - name: Fingerprint Stripe publishable key (debug)
+        env:
+          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+          STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
+        run: |
+          echo "vite_pk_md5: $(printf '%s' "${VITE_STRIPE_PUBLIC_KEY}" | md5sum | cut -d' ' -f1)"
+          echo "vite_pk_len: ${#VITE_STRIPE_PUBLIC_KEY}"
+          echo "vite_pk_prefix: ${VITE_STRIPE_PUBLIC_KEY:0:12}"
+          echo "vite_pk_last4: ${VITE_STRIPE_PUBLIC_KEY: -4}"
+          echo "stripe_key_md5: $(printf '%s' "${STRIPE_KEY}" | md5sum | cut -d' ' -f1)"
+          echo "stripe_key_len: ${#STRIPE_KEY}"
+          echo "stripe_key_prefix: ${STRIPE_KEY:0:12}"
+          echo "stripe_key_placeholder: $(echo "$STRIPE_KEY" | grep -c 'ci_placeholder' || true)"
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.4
