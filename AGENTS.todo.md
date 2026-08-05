@@ -11,6 +11,27 @@
 
 ---
 
+## ✅ GELÖST — CI-Stripe-Failures (401 + "Postleitzahl ist ungültig") — 2 Root-Causes (2026-08-05)
+
+**Finaler Run `30995040128` grün:** Backend + Frontend + alle 4 E2E-Jobs (3 Shards à 88 + Kanban 33) = 297 passed, 0 failed, 0 flaky, ~9 min E2E-Wall-Time.
+
+1. **CI-401 `Invalid API Key provided: sk_test_************der>`** → `php artisan serve --no-reload`:
+   - Laravel `ServeCommand` filtert Env-Vars raus, die nicht in `$passthroughVariables` stehen (nur `APP_ENV`/`PATH`/XDEBUG/…), **sobald `.env` existiert** (kein `--no-reload`). Das per Container-`-e` injizierte `STRIPE_SECRET` fehlt in der Liste → Serverprozess fällt auf den `.env.ci`-Platzhalter `sk_test_<ci_placeholder>` zurück → Stripe 401. `der>` = last4 von `<ci_placeholder>` (Stripe maskiert den Key: `sk_test_` + Sterne + last4).
+   - **Beweis:** Pipeline-Nachstellung im arm64-Build des php-base-Images (QEMU-SIGSEGV durch nativem arm64-Build umgangen): ohne `--no-reload` wird `STRIPE_SECRET` im ServeCommand-Child auf `false` gesetzt (gefiltert), mit `--no-reload` überlebt es (len 107). Fingerprint/Dump (`php -r`) zeigt den echten Key, der serve-Prozess nicht — daher die scheinbare Contradiction.
+   - Fix in `ci.yml` "Start backend server": `--no-reload` (mit Kommentar als Regressionsschutz).
+2. **"Postleitzahl ist ungültig" / "Your ZIP is invalid" (nach 401-Fix)** → Billing-Adresse an Stripe übergeben:
+   - Stripe PaymentElement sammelt eine PLZ mit **US-Default-Country**; österreichische PLZ `1010` (4-stellig) ist dafür invalide. Nur in CI reproduzierbar (Pipeline-Replica lokal 6/6 in beiden Locales/Workern).
+   - Fix: `ClientCartView` speichert die Checkout-Billing-Adresse (`setCheckoutBilling`) → `StripeCheckoutForm` übergibt `billingDetails.address` (line1, postal_code, city, `country: 'AT'`) an das PaymentElement. Unit-Test ergänzt (`StripeCheckoutForm.test.tsx`).
+
+**Nebenfunde/-Fixes (im selben Zuge):**
+- **Kanban-Flakes deterministisch gefixt:** dedizierter serieller Kanban-Shard (`--grep 'projects-board|production-board' --workers=1`) + `production-board.spec.ts` `mode: 'serial'` (projects-board hatte es schon) + `waitForDelete`-**Race** (Promise VOR "Löschen"-Klick registrieren, analog `94c3fd6`). Die Flakes kamen von `fullyParallel` auf derselben DB im Shard.
+- **Sharding (behalten):** 3 parallele Shards (`--workers=2`, `--grep-invert` kanban) + 1 Kanban-Shard. Nicht weiter aufteilen (Setup-Dominanz); nicht weniger (längere Wall-Time); Kanban nicht in parallele Shards integrieren (DB-Interferenz zwischen den beiden Board-Dateien).
+- **de-AT-Locale-Experiment (`b77d532`) brachte NICHTS** (ZIP-Fehler blieb, nur Meldung deutsch) → **zurückgerollt** (`a1af17e`). Deutsche Decline-Regex in `stripe-checkout.spec.ts` blieb (harmlos, robust für beide Locales).
+- **Keys verifiziert unverändert:** GitHub-Secrets == lokal (pk `pk_test_51TJ…JRJ8` md5 `869894885b…`, sk `sk_test_51TJ…vPQD` md5 `4f1bf871…`). Kein Restricted-Key.
+- **Nicht gelöst/offen:** `metadata.spec.ts:31` + `metadata-defaults.spec.ts:38` (Location-Autocomplete "Salzburg"/"Graz") flaky in CI, lokal grün → separate Beobachtung.
+
+---
+
 ## 🟡 OFFEN — CI-E2E-Run 30954666385: Flakes analysiert (2026-08-05)
 
 **Run:** 286 passed, **9 failed, 2 flaky**. Lokal reproduziert (Herd, Vite :4321):
