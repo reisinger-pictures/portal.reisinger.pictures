@@ -5,6 +5,12 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { KanbanHelper } from '../helpers/KanbanHelper';
 
 test.describe('Bildbearbeitungs-Board (Photographer)', () => {
+    // Drag & Drop / Status-Select verändern das Board live; die Tests teilen sich
+    // dieselbe Spalte. `fullyParallel: true` (playwright.config) würde die Tests
+    // dieser Datei parallel ausführen -> Layout-Shift / verschobene Drop-Ziele.
+    // Datei seriell ausführen (analog projects-board.spec.ts).
+    test.describe.configure({ mode: 'serial' });
+
     let helper: E2ESessionHelper;
     let photographer = { email: '', password: '' };
 
