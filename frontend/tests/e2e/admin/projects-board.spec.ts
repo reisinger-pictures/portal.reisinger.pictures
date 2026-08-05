@@ -82,9 +82,12 @@ test.describe('Projekte-Board (Admin)', () => {
 
         const confirmModal = page.locator('.modal-global');
         await expect(confirmModal).toBeVisible();
+        // Promise VOR dem Klick registrieren — sonst verpasst waitForResponse die
+        // (schnelle) DELETE-Response (Race: Board leer, aber Response schon weg).
+        const deletePromise = kanban.waitForDelete('/api/management/projects');
         await confirmModal.getByRole('button', { name: 'Löschen' }).click();
+        await deletePromise;
 
-        await kanban.waitForDelete('/api/management/projects');
         await expect(page.locator('.toast')).toContainText('Projekt gelöscht');
         await expect(page.locator('main').getByText(clientName, { exact: false })).toHaveCount(0, { timeout: 10000 });
     });
@@ -190,9 +193,11 @@ test.describe('Projekte-Board (Admin)', () => {
 
         const confirmModal = page.locator('.modal-global');
         await expect(confirmModal).toBeVisible();
+        // Promise VOR dem Klick registrieren (Race: DELETE-Response schneller als Listener).
+        const deletePromise = kanban.waitForDelete('/api/management/projects');
         await confirmModal.getByRole('button', { name: 'Löschen' }).click();
+        await deletePromise;
 
-        await kanban.waitForDelete('/api/management/projects');
         await expect(page.locator('.toast')).toContainText('Projekt gelöscht');
         await expect(page.locator('main').getByText(clientName, { exact: false })).toHaveCount(0, { timeout: 10000 });
     });

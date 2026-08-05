@@ -22,6 +22,17 @@
 
 ---
 
+## 🟡 OFFEN — CI-E2E-Run 30979963995: Stripe weiter rot, projects-board-Race gefixt (2026-08-05)
+
+**Run:** 287 passed, **7 failed, 1 flaky, 2 did not run.**
+- ✅ **manual-documents + empty-feed-Filter waren grün** (deterministische Fixes halten).
+- ✅ **projects-board:69/173 (Race) — GEFIXT:** CI-Snapshot zeigte leeres Board → DELETE lief bereits, aber `waitForResponse` war erst NACH dem „Löschen"-Klick registriert und verpasste die Response. Fix: Promise **vor** Klick registrieren (beide Delete-Tests). Volle Spec lokal 11/11 grün.
+- ❌ **Stripe weiter rot (6×, Desktop+Mobile):** `stripe-checkout:110/142` + `quote-checkout:33`; jetzt **3 Attempts** (describe-retries: 2) je Test, alle failed → deterministisch. **Neuer Validate-Step (read+write) war grün** (balance=200), aber `paymentIntents->create` (write) schlägt im eigentlichen Flow fehl → Verdacht **Restricted-Key** (Read ja / Write nein) oder Rate-Limit. Nächster Run: Validate-Step testet jetzt explizit `payment_intents create` (write) + „Dump backend log" (60 Zeilen `storage/logs/laravel.log` mit echter Stripe-Exception aus `CheckoutService::respondBasedOnPayment` catch).
+- Lokale Repro im php-base-Container (QEMU, Apple Silicon): curl `api.stripe.com/v1/balance` = 200, Stripe-SDK `paymentIntents->create` (Dev-Key aus `backend/.env`) = **OK** → Container-Netz/SSL/SDK sind nicht die Ursache; Diff ist der CI-Secret.
+- **Falls Validate-Step (write) rot:** CI-Secret `STRIPE_SECRET` prüfen — muss die **volle sk_test** aus `backend/.env` sein, nicht ein Restricted-Key (Restricted Keys: `/v1/balance` liest ok, aber `payment_intents`-Write fehlt → exakt das Symptom).
+
+---
+
 ## 🟡 OFFEN — Kanban: PDF-Drop auf Projekte-Seite — E2E-Test fehlt
 
 Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email/amount/package, verdrahtet in `ManagementProjectsBoard.tsx`). **Offen: E2E-Verifikation** — kein Test in `frontend/tests/e2e/admin/projects-board.spec.ts`.

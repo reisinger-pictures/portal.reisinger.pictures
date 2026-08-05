@@ -230,18 +230,27 @@ jobs:
             echo "::error::STRIPE_SECRET (sk_test) / STRIPE_KEY (pk_test) / STRIPE_WEBHOOK_SECRET Secrets sind nicht konfiguriert - E2E kann nicht laufen."
             exit 1
           fi
-      - name: Validate Stripe API key
+      - name: Validate Stripe API key (read + write)
         env:
           STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
         run: |
-          HTTP_CODE=$(curl -s -o /tmp/stripe-balance.json -w '%{http_code}' \
+          HTTP_CODE=$(curl -sS -o /tmp/stripe-balance.json -w '%{http_code}' \
             -H "Authorization: Bearer ${STRIPE_SECRET}" \
             https://api.stripe.com/v1/balance)
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Stripe-API-Antwort ${HTTP_CODE}: $(cat /tmp/stripe-balance.json)"
+            echo "::error::Stripe balance (read) ${HTTP_CODE}: $(cat /tmp/stripe-balance.json)"
             exit 1
           fi
-          echo "Stripe API key valid (HTTP 200)"
+          echo "Stripe read (balance) OK"
+          HTTP_CODE=$(curl -sS -o /tmp/stripe-pi.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${STRIPE_SECRET}" \
+            https://api.stripe.com/v1/payment_intents \
+            -d "amount=100" -d "currency=eur" -d "idempotency_key=ci_validate_${GITHUB_RUN_ID}")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Stripe payment_intents create (write) ${HTTP_CODE}: $(cat /tmp/stripe-pi.json)"
+            exit 1
+          fi
+          echo "Stripe write (payment_intents create) OK"
       # Backend laeuft im Prod-Image ghcr.io/reisi007/php-base:8.5 (PHP 8.5 +
       # exiftool) - identisch zur Prod-Runtime. Composer ueber composer:latest.
       # CI-Env steht in backend/.env.ci (-> .env); nur die Stripe-Test-Keys
@@ -322,6 +331,9 @@ jobs:
           CI: "1"
           ADMIN_EMAIL: admin@example.com
           ADMIN_PASSWORD: admin
+      - name: Dump backend log (Stripe exceptions)
+        if: always()
+        run: docker exec php bash -c 'tail -n 60 storage/logs/laravel.log 2>/dev/null' || echo "no backend log"
       - name: E2E Test-Summary
         if: always()
         run: |
