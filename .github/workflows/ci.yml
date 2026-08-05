@@ -294,6 +294,9 @@ jobs:
         # admin@example.com mit allen Rollen + Katalog. DatabaseSeeder ruft
         # am Ende app:import-locations auf (Geonames-Download via HTTP).
         run: docker exec php php artisan db:seed --force
+      - name: Fingerprint backend Stripe config (debug)
+        run: |
+          docker exec php php -r 'require "/app/backend/vendor/autoload.php"; $app=require "/app/backend/bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $s=config("services.stripe.secret"); $s=(string)$s; echo "prefix: " . substr($s,0,12) . PHP_EOL; echo "len: " . strlen($s) . PHP_EOL; echo "last4: " . substr($s,-4) . PHP_EOL; echo "md5: " . md5($s) . PHP_EOL; echo "has_placeholder: " . (str_contains($s,"<ci_placeholder>")?"yes":"no") . PHP_EOL; echo "has_newline: " . (str_contains($s,"\n")?"yes":"no") . PHP_EOL; echo "has_space: " . (str_contains($s," ")?"yes":"no") . PHP_EOL;'
       - name: Start backend server
         working-directory: backend
         run: |
