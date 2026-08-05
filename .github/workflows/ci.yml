@@ -174,7 +174,9 @@ jobs:
         run: pnpm test:run
 
   e2e:
-    name: E2E (Playwright)
+    # 3 Shards = 3 parallele Runner; jeder Shard hat eigenes Backend (eigener
+    # `php`-Container) + eigenen Vite-Dev-Server -> keine Port-Konflikte.
+    name: E2E (Playwright) — shard ${{ matrix.shard }}/3
     # Job-level `if` darf KEINEN secrets-Context lesen (offizielle Context
     # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Secrets
     # existieren nur bei push (inkl. dependabot-Branches) und bei PRs aus dem
@@ -183,6 +185,10 @@ jobs:
     # im ersten Step geprüft (dort ist der secrets-Context erlaubt).
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       # Zuordnung spiegelt backend/.env (lokales, funktionierendes E2E-Setup):
       # STRIPE_KEY = pk_test (publishable), STRIPE_SECRET = sk_test (secret key).
@@ -234,9 +240,6 @@ jobs:
         env:
           STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
         run: |
-          echo "secret md5: $(printf '%s' "${STRIPE_SECRET}" | md5sum | cut -d' ' -f1)"
-          echo "secret len: ${#STRIPE_SECRET}"
-          echo "secret last4: ${STRIPE_SECRET: -4}"
           HTTP_CODE=$(curl -sS -o /tmp/stripe-balance.json -w '%{http_code}' \
             -H "Authorization: Bearer ${STRIPE_SECRET}" \
             https://api.stripe.com/v1/balance)
@@ -297,13 +300,16 @@ jobs:
         # admin@example.com mit allen Rollen + Katalog. DatabaseSeeder ruft
         # am Ende app:import-locations auf (Geonames-Download via HTTP).
         run: docker exec php php artisan db:seed --force
-      - name: Fingerprint backend Stripe config (debug)
-        run: |
-          docker exec php php -r 'require "/app/backend/vendor/autoload.php"; $app=require "/app/backend/bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $s=(string)config("services.stripe.secret"); echo "config_md5: " . md5($s) . PHP_EOL; echo "config_len: " . strlen($s) . PHP_EOL; echo "config_last4: " . substr($s,-4) . PHP_EOL; $inst=app(App\Services\StripePaymentService::class); $r=new ReflectionClass($inst); $prop=$r->getProperty("stripe"); $prop->setAccessible(true); $client=$prop->getValue($inst); $ak=(string)$client->getApiKey(); echo "client_api_key_md5: " . md5($ak) . PHP_EOL; echo "client_api_key_len: " . strlen($ak) . PHP_EOL; echo "client_api_key_last4: " . substr($ak,-4) . PHP_EOL; try { $res=$client->paymentIntents->create(["amount"=>150000,"currency"=>"eur","metadata"=>["order_id"=>"ci-debug"],"receipt_email"=>"ci-debug@test.local"],["idempotency_key"=>"pi_ci_debug_".$app->environment()]); echo "SDK_CALL_OK: " . substr($res->id,0,8) . PHP_EOL; } catch (\Throwable $e) { echo "SDK_CALL_ERR_CLASS: " . get_class($e) . PHP_EOL; echo "SDK_CALL_ERR_HTTP: " . (method_exists($e,"getHttpStatus") ? $e->getHttpStatus() : "n/a") . PHP_EOL; echo "sdk_msg_md5: " . md5($e->getMessage()) . PHP_EOL; echo "sdk_msg_tail: " . substr($e->getMessage(), -20) . PHP_EOL; }'
       - name: Start backend server
         working-directory: backend
+        # WICHTIG: `--no-reload` NICHT entfernen! Laravels ServeCommand filtert
+        # sonst alle Env-Vars heraus, die nicht in `$passthroughVariables`
+        # stehen (APP_ENV, PATH, XDEBUG, ...). STRIPE_SECRET wird per
+        # Container-Env (-e) injiziert und fehlt in dieser Liste -> ohne
+        # --no-reload bekommt der Serverprozess den `.env.ci`-Platzhalter
+        # `sk_test_<ci_placeholder>` -> Stripe 401. Fix: 2026-08-05.
         run: |
-          docker exec php php artisan serve --host=127.0.0.1 --port=8000 > /tmp/php-serve.log 2>&1 &
+          docker exec php php artisan serve --host=127.0.0.1 --port=8000 --no-reload > /tmp/php-serve.log 2>&1 &
           timeout 60s bash -c 'until curl -sf http://127.0.0.1:8000/api/ping > /dev/null; do sleep 1; done'
       - uses: pnpm/action-setup@v4
         with:
@@ -335,18 +341,11 @@ jobs:
         # Artifact-Upload. pipefail -> rote Tests scheitern den Step.
         run: |
           set -o pipefail
-          pnpm test:e2e --reporter=list,html 2>&1 | tee /tmp/e2e.log
+          pnpm test:e2e --shard=${{ matrix.shard }}/3 --reporter=list,html 2>&1 | tee /tmp/e2e.log
         env:
           CI: "1"
           ADMIN_EMAIL: admin@example.com
           ADMIN_PASSWORD: admin
-      - name: Dump backend log (Stripe exceptions)
-        if: always()
-        run: |
-          echo "--- config('services.stripe.secret') prefix in backend container ---"
-          docker exec php php -r 'require "/app/backend/vendor/autoload.php"; $app=require "/app/backend/bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $s=config("services.stripe.secret"); echo "config prefix: " . substr((string)$s,0,12) . " (len " . strlen((string)$s) . ")" . PHP_EOL; echo "getenv prefix: " . substr((string)getenv("STRIPE_SECRET"),0,12) . " (len " . strlen((string)getenv("STRIPE_SECRET")) . ")" . PHP_EOL;' 2>&1 || echo "config inspect failed"
-          echo "--- Stripe payment failures in laravel.log ---"
-          docker exec php bash -c 'grep -a "Stripe payment failed" storage/logs/laravel.log 2>/dev/null | tail -n 5' || echo "no Stripe failures logged"
       - name: E2E Test-Summary
         if: always()
         run: |
@@ -399,13 +398,13 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-shard${{ matrix.shard }}
           path: frontend/playwright-report
           retention-days: 7
       - name: Upload Playwright test results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-test-results
+          name: playwright-test-results-shard${{ matrix.shard }}
           path: frontend/test-results
           retention-days: 7
