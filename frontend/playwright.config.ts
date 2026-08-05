@@ -18,22 +18,7 @@ export default defineConfig({
         video: 'off',
     },
     projects: [
-        {
-            name: 'Desktop Chrome',
-            use: {
-                ...devices['Desktop Chrome'],
-                viewport: {width: 1920, height: 950},
-                locale: 'de-AT',
-                timezoneId: 'Europe/Vienna',
-            },
-        },
-        {
-            name: 'Mobile Chrome',
-            use: {
-                ...devices['Galaxy A55'],
-                locale: 'de-AT',
-                timezoneId: 'Europe/Vienna',
-            },
-        },
+        {name: 'Desktop Chrome', use: {...devices['Desktop Chrome'], viewport: {width: 1920, height: 950},}},
+        {name: 'Mobile Chrome', use: {...devices['Galaxy A55']}},
     ],
 });

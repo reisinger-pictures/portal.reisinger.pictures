@@ -64,6 +64,20 @@ describe('StripeCheckoutForm', () => {
         expect(options.defaultValues.billingDetails.email).toBe('test@example.com');
     });
 
+    it('includes billing address (AT) in PaymentElement default values when provided', () => {
+        renderWithProviders(<StripeCheckoutForm {...defaultProps}
+                                               billingAddress={{line1: 'Quote Str 1', postalCode: '1010', city: 'Wien'}} />);
+
+        const element = screen.getByTestId('payment-element');
+        const options = JSON.parse(element.getAttribute('data-options') || '{}');
+        expect(options.defaultValues.billingDetails.address).toEqual({
+            line1: 'Quote Str 1',
+            postal_code: '1010',
+            city: 'Wien',
+            country: 'AT',
+        });
+    });
+
     it('renders submit button', () => {
         renderForm();
 

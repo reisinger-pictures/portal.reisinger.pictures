@@ -9,10 +9,11 @@ export interface StripeCheckoutFormProps {
     orderId: string;
     defaultEmail?: string;
     defaultName?: string;
+    billingAddress?: {line1: string; postalCode: string; city: string};
     onSuccess: (webhookSuccess: boolean) => void;
 }
 
-export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSuccess}: StripeCheckoutFormProps) {
+export function StripeCheckoutForm({orderId, defaultEmail, defaultName, billingAddress, onSuccess}: StripeCheckoutFormProps) {
     const stripe = useStripe();
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -87,7 +88,22 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, onSucces
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <PaymentElement options={{defaultValues: {billingDetails: {name: defaultName, email: defaultEmail}}}}/>
+            <PaymentElement options={{
+                defaultValues: {
+                    billingDetails: {
+                        name: defaultName,
+                        email: defaultEmail,
+                        ...(billingAddress ? {
+                            address: {
+                                line1: billingAddress.line1,
+                                postal_code: billingAddress.postalCode,
+                                city: billingAddress.city,
+                                country: 'AT',
+                            },
+                        } : {}),
+                    },
+                },
+            }}/>
             <button type="submit" disabled={isProcessing || !stripe} className="btn btn-primary w-full btn-lg">
                 {isProcessing ? <span className="loading loading-spinner"></span> : <Trans>Jetzt bezahlen</Trans>}
             </button>

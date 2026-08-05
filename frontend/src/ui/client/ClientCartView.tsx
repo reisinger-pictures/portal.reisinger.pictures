@@ -50,6 +50,7 @@ export default function ClientCartView() {
     const navigate = useNavigate();
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+    const [checkoutBilling, setCheckoutBilling] = useState<{line1: string; postalCode: string; city: string} | null>(null);
 
     const [searchParams] = useSearchParams();
     const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'invoice'>('stripe');
@@ -180,6 +181,10 @@ export default function ClientCartView() {
             if (response.requires_action && response.client_secret) {
                 setClientSecret(response.client_secret);
                 if (response.order_id) setPendingOrderId(response.order_id);
+                // Billing-Adresse an Stripe übergeben: Stripe sammelt sonst eine
+                // PLZ mit US-Default-Country -> "Postleitzahl ist ungültig" für
+                // österreichische PLZ wie 1010 (CI-reproduzierbar, lokal nicht).
+                setCheckoutBilling({line1: data.billing_street, postalCode: data.billing_zip, city: data.billing_city});
                 showToast('info', t`Bitte schließe die Zahlung ab.`);
             } else if (response.success) {
                 const invoiceNumber = response.invoice_number;
@@ -234,6 +239,7 @@ export default function ClientCartView() {
                                     <Elements stripe={stripePromise} options={{clientSecret}}>
                                         <StripeCheckoutForm orderId={pendingOrderId!} defaultEmail={user?.email}
                                                             defaultName={user?.billing_name || user?.name}
+                                                            billingAddress={checkoutBilling ?? undefined}
                                                             onSuccess={(webhookSuccess) => {
                                                                 if (webhookSuccess) {
                                                                     showToast('success', t`Zahlung erfolgreich! Rechnung wurde versendet.`);
