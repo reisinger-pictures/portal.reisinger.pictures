@@ -162,9 +162,11 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
 
         const confirmModal = page.locator('.modal-global');
         await expect(confirmModal).toBeVisible();
+        // Promise VOR dem Klick registrieren (Race: DELETE-Response schneller als
+        // Listener -> waitForResponse Timeout). Analog projects-board.spec.ts.
+        const deletePromise = kanban.waitForDelete('/api/management/photo-jobs');
         await confirmModal.getByRole('button', { name: 'Löschen' }).click();
-
-        await kanban.waitForDelete('/api/management/photo-jobs');
+        await deletePromise;
         await expect(page.locator('.toast')).toContainText('Auftrag gelöscht');
         await expect(page.locator('main').getByText(title, { exact: false })).toHaveCount(0, { timeout: 10000 });
     });
