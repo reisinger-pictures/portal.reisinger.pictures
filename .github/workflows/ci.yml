@@ -244,9 +244,11 @@ jobs:
           echo "Stripe read (balance) OK"
           HTTP_CODE=$(curl -sS -o /tmp/stripe-pi.json -w '%{http_code}' \
             -H "Authorization: Bearer ${STRIPE_SECRET}" \
-            -H "Idempotency-Key: ci_validate_${GITHUB_RUN_ID}" \
+            -H "Idempotency-Key: pi_ci_validate_${GITHUB_RUN_ID}" \
             https://api.stripe.com/v1/payment_intents \
-            -d "amount=100" -d "currency=eur")
+            -d "amount=150000" -d "currency=eur" \
+            -d "receipt_email=e2e-ci-validate@example.com" \
+            -d "metadata[order_id]=ci_validate")
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::error::Stripe payment_intents create (write) ${HTTP_CODE}: $(cat /tmp/stripe-pi.json)"
             exit 1
@@ -334,7 +336,11 @@ jobs:
           ADMIN_PASSWORD: admin
       - name: Dump backend log (Stripe exceptions)
         if: always()
-        run: docker exec php bash -c 'tail -n 60 storage/logs/laravel.log 2>/dev/null' || echo "no backend log"
+        run: |
+          echo "--- config('services.stripe.secret') prefix in backend container ---"
+          docker exec php php -r 'require "/app/backend/vendor/autoload.php"; $app=require "/app/backend/bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $s=config("services.stripe.secret"); echo "config prefix: " . substr((string)$s,0,12) . " (len " . strlen((string)$s) . ")" . PHP_EOL; echo "getenv prefix: " . substr((string)getenv("STRIPE_SECRET"),0,12) . " (len " . strlen((string)getenv("STRIPE_SECRET")) . ")" . PHP_EOL;' 2>&1 || echo "config inspect failed"
+          echo "--- Stripe payment failures in laravel.log ---"
+          docker exec php bash -c 'grep -a "Stripe payment failed" storage/logs/laravel.log 2>/dev/null | tail -n 5' || echo "no Stripe failures logged"
       - name: E2E Test-Summary
         if: always()
         run: |
