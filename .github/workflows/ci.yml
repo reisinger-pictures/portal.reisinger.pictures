@@ -244,8 +244,9 @@ jobs:
           echo "Stripe read (balance) OK"
           HTTP_CODE=$(curl -sS -o /tmp/stripe-pi.json -w '%{http_code}' \
             -H "Authorization: Bearer ${STRIPE_SECRET}" \
+            -H "Idempotency-Key: ci_validate_${GITHUB_RUN_ID}" \
             https://api.stripe.com/v1/payment_intents \
-            -d "amount=100" -d "currency=eur" -d "idempotency_key=ci_validate_${GITHUB_RUN_ID}")
+            -d "amount=100" -d "currency=eur")
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::error::Stripe payment_intents create (write) ${HTTP_CODE}: $(cat /tmp/stripe-pi.json)"
             exit 1
