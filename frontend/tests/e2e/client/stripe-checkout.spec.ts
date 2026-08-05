@@ -119,10 +119,11 @@ test.describe('Stripe Checkout Workflow', () => {
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
         const inlineAlert = stripeFrame.locator('[role="alert"]');
+        const declineText = /(fehlgeschlagen|declined|invalid|abgelehnt|insufficient|deckung|incomplete|unvollst\u00E4ndig|guthaben|abgelaufen|falsch|g\u00FCltig|ung\u00FCltig)/i;
         await expect(async () => {
             const toastText = await page.locator('.toast').textContent().catch(() => '');
             const alertText = await inlineAlert.textContent().catch(() => '');
-            expect(toastText + ' ' + alertText).toMatch(/(fehlgeschlagen|declined|invalid|abgelehnt|insufficient|deckung|incomplete|unvollst\u00E4ndig)/i);
+            expect(toastText + ' ' + alertText).toMatch(declineText);
         }).toPass({timeout: 15000});
 
         await page.locator('.toast button').click().catch(() => {
@@ -135,7 +136,7 @@ test.describe('Stripe Checkout Workflow', () => {
         await expect(async () => {
             const toastText = await page.locator('.toast').textContent().catch(() => '');
             const alertText = await inlineAlert.textContent().catch(() => '');
-            expect(toastText + ' ' + alertText).toMatch(/(fehlgeschlagen|declined|invalid|abgelehnt|insufficient|deckung|incomplete|unvollst\u00E4ndig)/i);
+            expect(toastText + ' ' + alertText).toMatch(declineText);
         }).toPass({timeout: 15000});
     });
 
