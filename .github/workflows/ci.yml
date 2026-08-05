@@ -234,6 +234,9 @@ jobs:
         env:
           STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
         run: |
+          echo "secret md5: $(printf '%s' "${STRIPE_SECRET}" | md5sum | cut -d' ' -f1)"
+          echo "secret len: ${#STRIPE_SECRET}"
+          echo "secret last4: ${STRIPE_SECRET: -4}"
           HTTP_CODE=$(curl -sS -o /tmp/stripe-balance.json -w '%{http_code}' \
             -H "Authorization: Bearer ${STRIPE_SECRET}" \
             https://api.stripe.com/v1/balance)
@@ -296,7 +299,7 @@ jobs:
         run: docker exec php php artisan db:seed --force
       - name: Fingerprint backend Stripe config (debug)
         run: |
-          docker exec php php -r 'require "/app/backend/vendor/autoload.php"; $app=require "/app/backend/bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $s=config("services.stripe.secret"); $s=(string)$s; echo "prefix: " . substr($s,0,12) . PHP_EOL; echo "len: " . strlen($s) . PHP_EOL; echo "last4: " . substr($s,-4) . PHP_EOL; echo "md5: " . md5($s) . PHP_EOL; echo "has_placeholder: " . (str_contains($s,"<ci_placeholder>")?"yes":"no") . PHP_EOL; echo "has_newline: " . (str_contains($s,"\n")?"yes":"no") . PHP_EOL; echo "has_space: " . (str_contains($s," ")?"yes":"no") . PHP_EOL;'
+          docker exec php php -r 'require "/app/backend/vendor/autoload.php"; $app=require "/app/backend/bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $s=(string)config("services.stripe.secret"); echo "config_md5: " . md5($s) . PHP_EOL; echo "config_len: " . strlen($s) . PHP_EOL; $r=new ReflectionClass(App\Services\StripePaymentService::class); $inst=app(App\Services\StripePaymentService::class); $prop=$r->getProperty("stripe"); $prop->setAccessible(true); $client=$prop->getValue($inst); $clientRef=new ReflectionClass($client); $kp=null; foreach ($clientRef->getProperties() as $p) { if (stripos($p->getName(),"key")!==false || stripos($p->getName(),"api")!==false) { $p->setAccessible(true); $v=$p->getValue($client); if (is_string($v)) { echo "client_prop_" . $p->getName() . "_md5: " . md5($v) . PHP_EOL; echo "client_prop_" . $p->getName() . "_len: " . strlen($v) . PHP_EOL; } } } echo "config_prefix: " . substr($s,0,12) . PHP_EOL; echo "config_last4: " . substr($s,-4) . PHP_EOL;'
       - name: Start backend server
         working-directory: backend
         run: |
