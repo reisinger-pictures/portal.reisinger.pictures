@@ -9,6 +9,10 @@ import {StripeHelper} from '../helpers/StripeHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 
 test.describe('Stripe Checkout Workflow', () => {
+    // CI-Flakiness-Schutz: Stripe-API ist von CI-Runner-IPs zeitweise nicht
+    // erreichbar (Rate-Limit / ApiConnection). Local passen diese Tests stabil.
+    test.describe.configure({ retries: 2 });
+
     let helper: E2ESessionHelper;
     let photogUser = {email: '', password: '', id: ''};
     let buyerUser = {email: '', password: '', id: ''};

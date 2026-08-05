@@ -160,7 +160,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await calcModal.locator('.form-control', { hasText: 'Inkl. Bilder' }).locator('input').fill('6');
         
         // 50% OG Rabatt auswählen
-        await calcModal.locator('select').selectOption('50');
+        await calcModal.locator('.form-control', { hasText: 'Rabatt-Stufe' }).locator('select').selectOption('50');
         
         // Berechnen & Hinzufügen klicken
         await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();

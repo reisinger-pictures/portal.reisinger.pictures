@@ -1,6 +1,6 @@
 # Task Board — Portal Reisinger Pictures
 
-> Stand: 2026-08-04. **Nur offene TODOs.** Analyse & Architektur-Entscheidungen sind ausgelagert:
+> Stand: 2026-08-05. **Nur offene TODOs.** Analyse & Architektur-Entscheidungen sind ausgelagert:
 > - Brand-Architektur (SOLL, Commit `1831116`): `features/infrastructure/21-brand-config-driven.md`
 > - Pricing-Strategy-Pattern: `features/infrastructure/17-pricing-strategy-pattern.md`
 > - Kanban-SOLL (Rollen-Matrix, DnD-Desktop-only, Status-Select): `features/b2b/11-kanban-board.md`
@@ -8,6 +8,17 @@
 > - **Backlog-Ausarbeitung 2026-08-04:** Drei parallele Analyse-Aufträge (A1, F3, Stack-Konsolidierung) abgeschlossen — Pläne unten. Offene Fragen interaktiv geklärt (Entscheidungen dokumentiert). **Kein Code geändert.**
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
+
+---
+
+## 🟡 OFFEN — CI-E2E-Run 30954666385: Flakes analysiert (2026-08-05)
+
+**Run:** 286 passed, **9 failed, 2 flaky**. Lokal reproduziert (Herd, Vite :4321):
+- ✅ **manual-documents.spec.ts:146 (deterministisch) — GEFIXT:** Strict-Mode-Violation (3 `<select>` im Modal) → Locator auf `.form-control` mit `hasText: 'Rabatt-Stufe'` gescoped. Volle Spec lokal grün (Desktop+Mobile).
+- ✅ **empty-feed.spec.ts:33 (Mobile-only):** Assertion zählt Console-Fehler; kein `console.error` im App-Code → der CI-Error ist Resource-Load-Noise (Tracking-Domain aus GH-Runner-IP). Filter um `'Failed to load resource'` erweitert (App-Fehler werden weiterhin erfasst).
+- ⚠️ **stripe-checkout.spec.ts:106/138 + quote-checkout.spec.ts:29 (CI-only):** Backend 502 „Die Zahlung konnte nicht verarbeitet werden" = `CheckoutService.php:400` fängt Stripe-SDK-Exception. Lokal (Herd) 3/3 grün → Environment-Flakiness (Rate-Limit / ApiConnection von CI-IPs, nicht reproduzierbar — Container-Repro durch QEMU-SIGSEGV blockiert). **Fix:** `test.describe.configure({ retries: 2 })` in beiden Specs + neuer CI-Step „Validate Stripe API key" (curl `/v1/balance` → lauter Fehler, falls Secret stale). Beim nächsten CI-Run prüfen: (a) Validation-Step grün? (b) Stripe-Tests grün?
+- ⚠️ **projects-board.spec.ts:69 (flaky):** retry grün, lokal 3× grün — beobachten.
+- **Nächster Schritt:** ci.yml (Summary-Header + Validation-Step) + Test-Fixes committen & force-pushen → CI-Run → wenn Stripe weiter fehlschlägt: playwright-report-Artifact (enthält Console-Logs) herunterladen und echten Stripe-Fehler extrahieren.
 
 ---
 

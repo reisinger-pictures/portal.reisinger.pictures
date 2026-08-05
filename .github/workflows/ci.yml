@@ -124,7 +124,7 @@ jobs:
           {
             echo "## Backend (PHPUnit)"
             echo ""
-            echo "| | |"
+            echo "| Metrik | Wert |"
             echo "|---|---|"
             echo "| Status | $STATUS_ICON $STATUS_TEXT |"
             echo "| Tests | $TESTS total |"
@@ -230,6 +230,18 @@ jobs:
             echo "::error::STRIPE_SECRET (sk_test) / STRIPE_KEY (pk_test) / STRIPE_WEBHOOK_SECRET Secrets sind nicht konfiguriert - E2E kann nicht laufen."
             exit 1
           fi
+      - name: Validate Stripe API key
+        env:
+          STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/stripe-balance.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${STRIPE_SECRET}" \
+            https://api.stripe.com/v1/balance)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Stripe-API-Antwort ${HTTP_CODE}: $(cat /tmp/stripe-balance.json)"
+            exit 1
+          fi
+          echo "Stripe API key valid (HTTP 200)"
       # Backend laeuft im Prod-Image ghcr.io/reisi007/php-base:8.5 (PHP 8.5 +
       # exiftool) - identisch zur Prod-Runtime. Composer ueber composer:latest.
       # CI-Env steht in backend/.env.ci (-> .env); nur die Stripe-Test-Keys
@@ -332,7 +344,7 @@ jobs:
           {
             echo "## E2E (Playwright)"
             echo ""
-            echo "| | |"
+            echo "| Metrik | Wert |"
             echo "|---|---|"
             echo "| Status | $STATUS_ICON $STATUS_TEXT |"
             echo "| Passed | ✅ $PASSED |"
