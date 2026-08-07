@@ -5,7 +5,7 @@
  * a result panel that reflects the validation state of `useCoupon()`.
  */
 
-import {useState, useCallback} from 'react';
+import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
 import useCoupon from '../../../logic/useCoupon';
@@ -19,15 +19,15 @@ export default function CouponInput({galleryId}: CouponInputProps) {
     const {couponCode, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon({galleryId});
     const [inputValue, setInputValue] = useState<string>('');
 
-    const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         await applyCoupon(inputValue);
-    }, [applyCoupon, inputValue]);
+    };
 
-    const handleRemove = useCallback(() => {
+    const handleRemove = () => {
         removeCoupon();
         setInputValue('');
-    }, [removeCoupon]);
+    };
 
     return (
         <div

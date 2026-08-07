@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import {useEffect, useCallback} from 'react';
+import {useEffect} from 'react';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
 import {useForm} from 'react-hook-form';
@@ -77,7 +77,7 @@ export default function CalculatorSettingsCard() {
         }
     }, [terms, reset]);
 
-    const onSubmit = useCallback(async (data: CalculatorSettingsFormValues) => {
+    const onSubmit = async (data: CalculatorSettingsFormValues) => {
         try {
             await updateTerms({
                 ...mapFormToApi(data),
@@ -89,7 +89,7 @@ export default function CalculatorSettingsCard() {
         } catch {
             showToast('error', 'Fehler beim Speichern.');
         }
-    }, [terms, updateTerms, showToast]);
+    };
 
     return (
         <div className="card bg-base-100 border border-base-300 shadow-sm">

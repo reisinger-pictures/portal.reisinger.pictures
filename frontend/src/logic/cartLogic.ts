@@ -71,3 +71,19 @@ export function loadCartItems(saved: string | null): CartLoadResult {
     console.warn('LocalStorage Cart Mismatch:', validation.error);
     return {items: [], error: 'schema'};
 }
+
+/**
+ * Reine Persistenz-Logik (aus CartProvider extrahiert, verhaltensgleich): schreibt den Cart
+ * nur dann nach localStorage, wenn er nicht leer ist oder ein alter Cart existiert.
+ * Gibt true bei Erfolg zurück, false bei einem Storage-Fehler.
+ */
+export function persistCartItems(key: string, items: CartItem[]): boolean {
+    try {
+        if (items.length > 0 || localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify(items));
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}

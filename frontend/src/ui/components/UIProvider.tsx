@@ -1,8 +1,6 @@
-import { useState, ReactNode, useCallback, useEffect, useRef } from 'react';
+import { useState, ReactNode, useEffect, useRef } from 'react';
 import { UIContext, Toast, ConfirmOptions } from './UIContext';
 import { useFocusTrap } from '../../logic/useFocusTrap';
-
-let toastIdCounter = 0;
 
 export interface UIProviderProps {
     children: ReactNode;
@@ -25,23 +23,23 @@ export default function UIProvider({ children }: UIProviderProps) {
         hasUnsavedRef.current = hasUnsavedChanges;
     }, [hasUnsavedChanges]);
 
-    const showToast = useCallback((type: 'success' | 'error' | 'info', text: string) => {
-        const id = ++toastIdCounter;
+    const showToast = (type: 'success' | 'error' | 'info', text: string) => {
+        const id = crypto.randomUUID();
         setToasts(prev => [...prev, { id, type, text }]);
         setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== id));
         }, 4000);
-    }, []);
+    };
 
-    const setUnsavedChanges = useCallback((value: boolean) => {
+    const setUnsavedChanges = (value: boolean) => {
         setHasUnsavedChanges(value);
-    }, []);
+    };
 
-    const confirm = useCallback((options: ConfirmOptions) => {
+    const confirm = (options: ConfirmOptions) => {
         return new Promise<boolean>((resolve) => {
             setConfirmState({ options, resolve });
         });
-    }, []);
+    };
 
     const handleConfirm = (result: boolean) => {
         if (confirmState) {

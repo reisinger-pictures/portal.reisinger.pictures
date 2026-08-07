@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import {useState, useCallback, useRef} from 'react';
+import {useState, useRef} from 'react';
 import {usePermissions} from '../../logic/usePermissions';
 import {useUI} from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
@@ -55,7 +55,7 @@ export default function ManagementContractView() {
     const [isSaving, setIsSaving] = useState(false);
     const [joinLink, setJoinLink] = useState<string | null>(null);
 
-    const resetForm = useCallback(() => {
+    const resetForm = () => {
         setItems([{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
         setDiscounts([]);
         setTermsHtml('');
@@ -67,9 +67,9 @@ export default function ManagementContractView() {
         setExpiresAt('');
         setInstances([]);
         setJoinLink(null);
-    }, []);
+    };
 
-    const loadContract = useCallback((contract: Contract) => {
+    const loadContract = (contract: Contract) => {
         setItems(contract.items.length > 0 ? contract.items.map(toInvoiceItem) : [{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
         setDiscounts(contract.discounts.map(toInvoiceDiscount));
         setTermsHtml(contract.terms_html || '');
@@ -80,7 +80,7 @@ export default function ManagementContractView() {
         setContractType(contract.type || 'contract');
         setExpiresAt(contract.expires_at || '');
         setJoinLink(null);
-    }, []);
+    };
 
     const instancesReqIdRef = useRef(0);
 

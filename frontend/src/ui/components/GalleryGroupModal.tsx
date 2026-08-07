@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { GalleryGroup, FlatGroup, GalleryGroupExtraOpts } from '../../logic/useGalleries';
@@ -91,7 +91,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         }
     };
 
-    const parentGroupOptions = useMemo(() => {
+    const parentGroupOptions = (() => {
         const result: FlatGroup[] = [];
         let skipDepth = -1;
         for (const g of availableGroups) {
@@ -106,7 +106,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
             result.push(g);
         }
         return result;
-    }, [availableGroups, editingGroup]);
+    })();
 
     if (!isOpen) return null;
     if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;

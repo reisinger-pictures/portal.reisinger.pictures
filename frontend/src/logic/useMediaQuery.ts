@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 
 function matchMediaSupported(): boolean {
     return typeof window !== 'undefined' && typeof window.matchMedia === 'function';
@@ -11,7 +11,7 @@ function matchMediaSupported(): boolean {
  * (SSR/jsdom ohne Polyfill), wird `false` zurückgegeben.
  */
 export function useMediaQuery(query: string): boolean {
-    const subscribe = useCallback((onStoreChange: () => void) => {
+    const subscribe = (onStoreChange: () => void) => {
         if (!matchMediaSupported()) {
             return () => {};
         }
@@ -20,14 +20,14 @@ export function useMediaQuery(query: string): boolean {
         return () => {
             mediaQueryList.removeEventListener('change', onStoreChange);
         };
-    }, [query]);
+    };
 
-    const getSnapshot = useCallback(() => {
+    const getSnapshot = () => {
         if (!matchMediaSupported()) {
             return false;
         }
         return window.matchMedia(query).matches;
-    }, [query]);
+    };
 
     return useSyncExternalStore(subscribe, getSnapshot);
 }

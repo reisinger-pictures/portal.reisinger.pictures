@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { t } from "@lingui/core/macro";
 import { useUI } from '../ui/components/UIContext';
 import { ExtractedData } from './usePdfExtraction';
@@ -8,7 +8,7 @@ export function useProjectPdfDrop(onExtracted: (data: ExtractedData) => void) {
     const [isDragging, setIsDragging] = useState(false);
     const [isExtracting, setIsExtracting] = useState(false);
 
-    const processFile = useCallback(async (file: File) => {
+    const processFile = async (file: File) => {
         const fd = new FormData();
         fd.append('pdf', file);
         setIsExtracting(true);
@@ -40,19 +40,19 @@ export function useProjectPdfDrop(onExtracted: (data: ExtractedData) => void) {
         } finally {
             setIsExtracting(false);
         }
-    }, [onExtracted, showToast]);
+    };
 
-    const handleDragOver = useCallback((e: React.DragEvent) => {
+    const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(true);
-    }, []);
+    };
 
-    const handleDragLeave = useCallback((e: React.DragEvent) => {
+    const handleDragLeave = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-    }, []);
+    };
 
-    const handleDrop = useCallback(async (e: React.DragEvent) => {
+    const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
         const file = e.dataTransfer.files?.[0];
@@ -61,7 +61,7 @@ export function useProjectPdfDrop(onExtracted: (data: ExtractedData) => void) {
         } else if (file) {
             showToast('error', t`Bitte lade eine gültige PDF-Datei hoch.`);
         }
-    }, [processFile, showToast]);
+    };
 
     return { isDragging, isExtracting, handleDragOver, handleDragLeave, handleDrop };
 }

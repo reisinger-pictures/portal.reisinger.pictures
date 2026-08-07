@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import { usePhoto, PhotoVersion } from '../../logic/usePhoto';
 import { useUI } from './UIContext';
 
@@ -25,16 +25,21 @@ export default function PhotoHistoryModal({ photoId, isOpen, onClose, onReverted
     const { getVersions, revertMetadata } = usePhoto();
     const { showToast, confirm } = useUI();
 
+    const getVersionsRef = useRef(getVersions);
+    useEffect(() => {
+        getVersionsRef.current = getVersions;
+    }, [getVersions]);
+
     useEffect(() => {
         let isMounted = true;
         if (isOpen && photoId) {
             dispatch({ type: 'LOAD' });
-            getVersions(photoId)
+            getVersionsRef.current(photoId)
                 .then(data => { if(isMounted) dispatch({ type: 'LOADED', versions: data }); })
                 .catch(() => { if(isMounted) { showToast('error', t`Historie konnte nicht geladen werden.`); dispatch({ type: 'LOADED', versions: [] }); } });
         }
         return () => { isMounted = false; };
-    }, [isOpen, photoId, getVersions, showToast]);
+    }, [isOpen, photoId, showToast]);
 
     const handleRevert = async (versionId: string) => {
         if (!(await confirm({ title: t`Version wiederherstellen?`, message: t`Möchtest du diese Metadaten-Version wirklich wiederherstellen? Dies überschreibt den aktuellen Stand.`, confirmText: t`Wiederherstellen`, confirmColor: 'warning' }))) return;

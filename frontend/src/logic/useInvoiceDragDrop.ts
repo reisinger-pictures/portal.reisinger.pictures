@@ -1,4 +1,4 @@
-import {useState, useCallback} from 'react';
+import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
 
@@ -6,17 +6,17 @@ export function useInvoiceDragDrop(isOffer: boolean, onFileDrop: (file: File) =>
     const {showToast} = useUI();
     const [isDragging, setIsDragging] = useState(false);
 
-    const handleDragOver = useCallback((e: React.DragEvent) => {
+    const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         if (!isOffer) setIsDragging(true);
-    }, [isOffer]);
+    };
 
-    const handleDragLeave = useCallback((e: React.DragEvent) => {
+    const handleDragLeave = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-    }, []);
+    };
 
-    const handleDrop = useCallback(async (e: React.DragEvent) => {
+    const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
         if (isOffer) return;
@@ -27,7 +27,7 @@ export function useInvoiceDragDrop(isOffer: boolean, onFileDrop: (file: File) =>
         } else if (file) {
             showToast('error', t`Bitte lade eine gültige PDF-Datei hoch.`);
         }
-    }, [isOffer, onFileDrop, showToast]);
+    };
 
     return {isDragging, handleDragOver, handleDragLeave, handleDrop};
 }

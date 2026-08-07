@@ -6,7 +6,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
 import { usePermissions } from '../../logic/usePermissions';
@@ -63,12 +63,12 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
         filteredSnippetsRef.current = filteredSnippets;
     });
 
-    const closeSlashMenu = useCallback(() => {
+    const closeSlashMenu = () => {
         setSlashState(s => ({ ...s, active: false }));
         setSelectedIndex(0);
-    }, []);
+    };
 
-    const applySnippet = useCallback((snippet: TextSnippet) => {
+    const applySnippet = (snippet: TextSnippet) => {
         const editorInstance = editorRef.current;
         if (!editorInstance) return;
         const range = slashStateRef.current.range;
@@ -85,9 +85,9 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
             .insertContent(content)
             .run();
         closeSlashMenu();
-    }, [closeSlashMenu]);
+    };
 
-    const updateSlashMenu = useCallback((editorInstance: Editor) => {
+    const updateSlashMenu = (editorInstance: Editor) => {
         const { selection } = editorInstance.state;
         const { $from, empty } = selection;
         if (!empty) {
@@ -114,7 +114,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
         } else {
             closeSlashMenu();
         }
-    }, [closeSlashMenu]);
+    };
 
     const editor = useEditor({
         extensions: [

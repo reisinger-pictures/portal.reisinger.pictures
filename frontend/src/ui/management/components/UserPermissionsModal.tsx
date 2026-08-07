@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import {useCallback, useState} from 'react';
+import {useState} from 'react';
 import {Role, UserDetailed, UserRole} from '../../../logic/useUsers';
 import {FlatGroup, Gallery} from '../../../logic/useGalleries';
 
@@ -39,7 +39,7 @@ export default function UserPermissionsModal({
     const effectiveBrand: string | null = isSuperAdmin ? null : brand;
 
     // When toggling roles, adjust brand for the super-admin transition.
-    const toggleItem = useCallback((arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
+    const toggleItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
         const newArr = arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id];
         setArr(newArr);
 
@@ -61,7 +61,7 @@ export default function UserPermissionsModal({
             // Switching FROM super-admin → reset to default brand.
             setBrand('rp');
         }
-    }, [roles]);
+    };
 
     const handleSave = () => {
         onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand, canPurchaseUpgrades);

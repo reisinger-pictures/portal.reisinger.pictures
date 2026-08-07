@@ -1,8 +1,8 @@
-import {useState, useEffect, useCallback, useMemo, useRef, ReactNode} from 'react';
+import {useState, useEffect, useRef, ReactNode} from 'react';
 import {CartItem, CartContext} from './CartContext';
 import {useAuth} from './useAuth';
 import {useUI} from '../ui/components/UIContext';
-import {addToCartPure, removeFromCartPure, calculateTotalAmount, loadCartItems} from './cartLogic';
+import {addToCartPure, removeFromCartPure, calculateTotalAmount, loadCartItems, persistCartItems} from './cartLogic';
 import {useVolumeLicensing} from './useVolumeLicensing';
 import {trackEvent, TRACKING_EVENTS} from './tracking';
 
@@ -37,35 +37,28 @@ export function CartProvider({children}: CartProviderProps) {
     // Speichern bei Änderungen
     useEffect(() => {
         if (loadingRef.current) return;
-        try {
-            if (items.length > 0 || localStorage.getItem(cartKey)) {
-                localStorage.setItem(cartKey, JSON.stringify(items));
-            }
-        } catch {
+        if (!persistCartItems(cartKey, items)) {
             showToast('error', 'Warenkorb konnte nicht gespeichert werden.');
         }
     }, [items, cartKey, showToast]);
 
-    const addToCart = useCallback((item: CartItem) => {
+    const addToCart = (item: CartItem) => {
         setItems(prev => addToCartPure(prev, item));
-    }, []);
+    };
 
-    const removeFromCart = useCallback((photoId: string) => {
+    const removeFromCart = (photoId: string) => {
         setItems(prev => removeFromCartPure(prev, photoId));
         trackEvent(TRACKING_EVENTS.remove_from_cart, { photo_id: photoId });
-    }, []);
+    };
 
-    const clearCart = useCallback(() => setItems([]), []);
+    const clearCart = () => setItems([]);
 
     // Derived values: volume licensing pricing + totalAmount (licensing-mode-aware)
     const volumeLicensing = useVolumeLicensing(items);
     const totalAmount = calculateTotalAmount(items, volumeLicensing.isVolumePricing);
     const itemCount = items.length;
 
-    const contextValue = useMemo(
-        () => ({items, addToCart, removeFromCart, clearCart, totalAmount, itemCount, volumeLicensing}),
-        [items, addToCart, removeFromCart, clearCart, totalAmount, itemCount, volumeLicensing],
-    );
+    const contextValue = {items, addToCart, removeFromCart, clearCart, totalAmount, itemCount, volumeLicensing};
 
     return (
         <CartContext.Provider value={contextValue}>

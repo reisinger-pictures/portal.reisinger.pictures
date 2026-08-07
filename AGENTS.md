@@ -39,31 +39,12 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
 * **New E2E tests MUST include at least one tag.** If the test is critical path, use `@smoke`. If it's feature-specific, use `@feature:<name>`. Deep edge cases can remain untagged but will only run in the full pre-deployment suite.
 
 ## 3. AI Operating Rules (STRICT)
-* **useEffect & Derived State Policy (STRICT):** Forbid the use of `useEffect` for side effects triggered by user events (e.g. creating object URLs). Handlers MUST perform these actions. Forbid the use of `useState` for values that can be derived during rendering.
-* **Tailwind JIT Policy (STRICT):** Dynamische String-Konkatenation für Tailwind-Klassen (z.B. `btn-${color}`) ist **strikt verboten**, da der JIT-Compiler diese beim Build-Prozess übersieht und restlos entfernt (Purge). Klassen müssen immer vollständig und statisch ausgeschrieben werden (z.B. per explizitem Mapping-Objekt oder Ternary-Operator).
-* **Tailwind-Only Policy (STRICT):** Das `style`-Attribut ist **strikt verboten** – mit Ausnahme von dynamischen Werten, die sich zur Laufzeit ändern (z. B. berechnete Breiten/Höhen aus Benutzereingaben, animierte Werte). Statische Layout-Werte (insb. vh/vw/dvh/dvw-basierte Größen) MÜSSEN via Tailwind-Klassen gelöst werden. Werte in eckigen Klammern (JIT-Bracket-Syntax wie `w-[30%]`, `text-[10px]`, `max-w-[200px]`) bleiben ebenfalls **strikt verboten** — außer bei Iconify-Icons. Tailwind 4 bietet native Fraktionen (`w-3/10`, `w-1/5`), Spacing-Werte (`max-w-xs`, `text-xs`, `h-80`) und `dvh`-Utilities (`h-dvh`, `max-h-dvh`). Reichen diese nicht aus, ist eine Erweiterung der Tailwind-Konfiguration (z. B. via `@utility` in `index.css`) dem Inline-Style vorzuziehen.
-* **Validation (Zod) Policy (STRICT):** * Alle `react-hook-form` Implementierungen MÜSSEN `@hookform/resolvers/zod` nutzen.
-  * Daten aus unsicheren, lokalen Quellen (wie `localStorage`) MÜSSEN via Zod geparst werden (`safeParse` oder `catch`), bevor sie in den State übernommen werden.
 * **ESLint Auto-Fix Policy (STRICT):** Always use `npm run lint:fix` (= `eslint . --fix`) instead of plain `npm run lint`. Auto-fix handles formatting and trivial rules — never fix those by hand. The plain `lint` script (without `--fix`) is reserved for CI/PR checks only.
-* **ESLint & TypeScript:** The use of `eslint-disable`, `@ts-ignore`, or `any` is **strictly forbidden**. All typing issues must be resolved structurally using exact interfaces, `unknown`, or generic type constraints.
-* **Semantic Locator Scoping:** Agenten MÜSSEN Playwright-Locators über Landmarks (`main`, `aside`, `footer`) scopen, um Eindeutigkeit sicherzustellen und Abhängigkeiten von rein visuellen CSS-Klassen zu minimieren.
-* **No `page.goto` for SPA Navigation (STRICT):** `page.goto()` ist ein Anti-Pattern und darf nicht für SPA-Navigation verwendet werden. Ausnahmen:   
-  * Externe Links (Invite, Magic-Link, Setup-Link)   
-  * Initialer Seitenaufruf bei Gästen (`/`)   
-  * Route-Guard-Tests (direkter URL-Zugriff testen)   
-  * Brand-Isolation-Tests (Cross-Domain-Navigation)   
-  * Stripe-Redirect-Simulation (return_url nach Zahlung)   
-  * Navigation MUSS via `sidebar.navigateTo()`, Klicks im UI oder API-Aufrufe erfolgen. localStorage-Injektion + page.goto('/cart') ist verboten — Cart-Items MÜSSEN via API hinzugefügt werden.
 * **Test Debugging Transparency:** When analyzing test failure reports, you must explicitly document your debugging progress and thought process in the "Planungsphase" before proposing a fix. Explain what failed, why it failed based on the logs/DOM snapshots, and how the fix addresses the root cause.
 * **Patching & File Modification (CRITICAL):**
   * Multi-line Regex for search-and-replace in code is STRICTLY FORBIDDEN. It is too brittle.
   * Base64 output for file content is STRICTLY FORBIDDEN.
   * **Safe Patching Policy (CRITICAL):** Alle `patch.mjs` Scripts MÜSSEN den Erfolg einer Ersetzung validieren. Prüfe zwingend mit `.includes()` oder `.indexOf()`, ob der Zielstring existiert, *bevor* du `.replace()` aufrufst. Prüfe danach, ob sich der `content` tatsächlich verändert hat. Brich mit einer klaren `console.error` ab, falls der Patch ins Leere läuft. Blinde `.replace()` Aufrufe sind untersagt!
-* **Field Label Policy (STRICT):** 
-  * Pflichtfelder MÜSSEN das `required`-HTML-Attribut tragen — der Star (`*`) wird automatisch via CSS angehängt (`.form-control:has(input[required]) .label-text::after`).
-  * `(Optional)` oder `(optional)` in Labels ist **strikt verboten**. Optionale Felder werden schlicht ohne Zusatz gekennzeichnet.
-  * Die CSS-Regel in `index.css` (`.form-control:has(input[required], select[required], textarea[required]) .label-text::after`) ist der zentrale Mechanismus und darf nicht umgangen werden.
-* **Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. **V027 ist die letzte (deploy-bereite) Migration** (V025–V026 wurden 2026-08-04 deployed; V027 verifiziert in `portal_test_db`). Neue Schema-Änderungen erfolgen daher als separate Migrationen ab V028. **`down()`-Methoden werden nie ausgeführt und können als Regel leer gelassen werden** (etabliert 2026-08-03).
 
 ## 4. AI Agent Roles & Responsibilities
 The system and workflow are managed via a Main/Secondary Model architecture to prevent context pollution:
@@ -82,86 +63,17 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
   * 2. Backend Unit/Integration-Tests schreiben (`php artisan test --filter`)
   * 3. Frontend Unit-Tests schreiben (`pnpm vitest run`)
   * 4. Erst danach: E2E-Tests fixen (`npx playwright test`)
-* **localStorage Injection (STRICT ANTI-PATTERN):** Daten via `page.evaluate()` oder `addInitScript` in `localStorage` zu injizieren ist verboten. localStorage ist ein Implementierungsdetail des Frontends. Tests MÜSSEN den User-Flow abbilden: Login → Navigation → Formular-Interaktion. Ausnahme: `E2ESessionHelper` für Test-Setup (API-basiert).
 * **Max 3 Fix-Versuche für Tests (STRICT):** Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agent an den Benutzer zurückgeben mit einer Analyse was schiefgeht. Keine Endlos-Fix-Loops.
 
-## 5. Test Commands
+## 5. Modules
 
-**Backend** (PHP via Herd — PATH muss das PHP-Binary enthalten):
+Module-specific instructions live in per-module `AGENTS.md` files:
 
-```bash
-export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
-cd backend && php artisan test
-```
+- **`frontend/AGENTS.md`** — React Vite SPA: React Compiler policy (`reactCompilerPreset`; `useMemo`/`useCallback`/`React.memo`/`forwardRef` are antipatterns), frontend test/lint/build + Playwright E2E commands, frontend STRICT rules (Tailwind JIT/Only, Zod validation, ESLint & TypeScript, semantic locator scoping, no `page.goto` SPA navigation, localStorage injection, field labels, useEffect & derived state).
+- **`backend/AGENTS.md`** — Laravel PHP: backend test command, Database Setup + Migration policy (seed after every migration; V027 is the latest deploy-ready migration), backend parallel testing/paratest rules and worker-DB concurrency.
+- **`admin.lrplugin/AGENTS.md`** — Lightroom Classic Lua plugin: scope, key files, and Lua conventions. This is a separate module with its own doc.
 
-**Frontend Unit** (pnpm, NICHT npm):
-
-```bash
-cd frontend && pnpm run test:run
-```
-
-**Frontend Lint + Build** (pnpm, NICHT npm):
-
-```bash
-cd frontend && pnpm lint:fix && pnpm build
-```
-
-**E2E (Playwright):**
-
-- Full suite, nur vor Deployment: `cd frontend && npx playwright test`
-- Nur @smoke, nach jedem Code-Change: `cd frontend && npx playwright test --grep @smoke`
-- Nur spezifisches Feature, z. B. checkout: `cd frontend && npx playwright test --grep @feature:checkout`
-- Nur fehlgeschlagene wiederholen: `cd frontend && npx playwright test --last-failed`
-
-**E2E Workflow:**
-
-1. Nach jedem Code-Change: `pnpm test:e2e:smoke`
-2. Feature-spezifisch: `npx playwright test --grep @feature:<name>`
-3. Nur vor Deployment: `npx playwright test` (full suite)
-4. Flaky Tests in AGENTS.todo.md dokumentieren mit:
-   - Datei + Testname
-   - Fehlerursache (wenn bekannt)
-   - `flaky` tag im Commit/PR
-
-Bug-Fixing: Bei fehlschlagenden E2E-Tests `npx playwright test --last-failed` wiederholt ausführen, bis alle grün sind.
-
-**E2E Timeout Policy (STRICT):**
-
-- Vor jeder Session die aktuelle Minimallaufzeit messen: `npx playwright test`
-- Timeout auf das Doppelte setzen (z. B. 7 min gemessen → 15 min Timeout)
-- Diese Regel und die Laufzeit in AGENTS.todo.md dokumentieren
-- Bei Änderungen an E2E-Tests neu messen und aktualisieren
-- Aktuelle Laufzeit (05.07.2026): ~7 min → Timeout: 15 min (900000 ms)
-
-**Backend Parallel Testing (PHP) — EINRICHTUNG AKTIV (2026-08-03):**
-
-`paratest` ist installiert (`brianium/paratest`). Die Test-Infra ist parallel-fähig:
-
-- Canonical Test-DB: `portal_test_db` (MariaDB :3307, aus `phpunit.xml`).
-- Worker-DBs: `php artisan test --parallel` legt pro Prozess automatisch `portal_test_db_test_<n>` an. `portal_user` hat die Wildcard-Grants `ON portal\_test\_db\_test\_%` + CREATE-Recht (verifiziert 2026-08-03).
-
-**KONKURRENZ-REGEL (STRICT, Subagenten):**
-
-- `RefreshDatabase` leert und re-migriert die DB bei jedem PHPUnit-Prozessstart. Mehrere gleichzeitige `php artisan test`-Läufe auf DERSELBEN DB kollidieren (Tabellen-Drop im Parallelbetrieb) → Kaskaden-Fehler.
-- Die volle Suite läuft IMMER NUR in EINEM Subagenten (einmal, canonical DB).
-- Subagenten, die Backend-Tests ausführen müssen, nutzen für Scoped-Runs (`--filter`) eine eigene Worker-DB, z. B.:
-
-```bash
-DB_DATABASE=portal_test_db_test_<task> php artisan test --filter <TestClass>
-```
-
-  (Anlegen der Worker-DB vorab via `docker exec portal_db_test mariadb ...`; der Name MUSS `portal_test_db_test_%` matchen, damit der Grant greift.)
-
-**PHP Group-Strategy (noch nicht implementiert):**
-
-1. Tests mit `@group=smoke` taggen für schnelle Regression
-2. Nur Feature-Tests bei Feature-Arbeit: `php artisan test --testsuite=Feature --parallel`
-
-## 6. Database Setup Policy (STRICT)
-
-Nach `php artisan migrate:fresh` MUSS `php artisan db:seed` (oder `--seed` Flag) ausgeführt werden. Ohne Seed existiert kein Admin-User — Login und Auth sind tot. Der `DatabaseSeeder` legt den Admin via `firstOrCreate` mit `ADMIN_EMAIL`/`ADMIN_PASSWORD` an.
-
-**Migration-Regel (STRICT):** Bei JEDER Migration gilt: **immer seeden**, nie nur migrieren. `php artisan migrate` (bzw. `migrate:fresh`) allein reicht nicht — anschließend IMMER `php artisan db:seed` (oder `--seed` Flag) ausführen, sonst funktioniert das Anmelden (Login/Auth) nicht, weil kein Admin-User existiert.
+The Security Risk Register (accepted risks, resolved C1–C7) is in §7 below and is repo-global.
 
 ## 7. Security Risk Register (Accepted Risks)
 

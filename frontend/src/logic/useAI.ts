@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { getCompressedBase64 } from './utils/ImageHelper';
 import { z } from 'zod';
 
@@ -89,7 +89,7 @@ export function useAI() {
         return () => { cancelled = true; };
     }, []);
 
-    const generateMetadata = useCallback(async (
+    const generateMetadata = async (
         photoId: string,
         globalContext: string,
         specificContext: string,
@@ -156,9 +156,9 @@ export function useAI() {
             throw new Error('AI output does not match expected format');
         }
         return validationResult.data;
-    }, [mode, modelId]);
+    };
 
-    const generateMetadataFromText = useCallback(async (
+    const generateMetadataFromText = async (
         textInput: string,
         globalContext: string = ''
     ): Promise<AIResponse> => {
@@ -178,16 +178,16 @@ export function useAI() {
             throw new Error('AI text response validation failed');
         }
         return validationResult.data;
-    }, []);
+    };
 
-    const updateBaseUrl = useCallback((url: string) => {
+    const updateBaseUrl = (url: string) => {
         const result = lmStudioUrlSchema.safeParse(url);
         if (result.success) {
             localStorage.setItem('lmstudio_url', url);
         } else {
             console.warn('Attempted to save invalid LM Studio URL', result.error);
         }
-    }, []);
+    };
 
     return { isAvailable, mode, modelId, generateMetadata, generateMetadataFromText, updateBaseUrl };
 }

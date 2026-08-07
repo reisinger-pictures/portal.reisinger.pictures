@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
@@ -38,7 +38,7 @@ export default function ContractSignView() {
             .catch(err => { setError(err.message); setLoading(false); });
     }, [token]);
 
-    const handleStale = useCallback(() => setIsStale(true), []);
+    const handleStale = () => setIsStale(true);
     useContractHeartbeat(token, contentVersion, signed, handleStale);
 
     useEffect(() => {

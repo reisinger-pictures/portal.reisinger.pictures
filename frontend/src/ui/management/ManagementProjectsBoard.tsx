@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useProjectsBoard, Project, ProjectInput } from '../../logic/useProjectsBoard';
 import { useIsDesktop } from '../../logic/useMediaQuery';
 import { usePermissions } from '../../logic/usePermissions';
@@ -48,7 +48,7 @@ export default function ManagementProjectsBoard({ embedded = false }: Management
     const [defaultStatus, setDefaultStatus] = useState(columns[0].status);
     const [prefill, setPrefill] = useState<{ client_name?: string; email?: string } | undefined>(undefined);
 
-    const handlePdfExtracted = useCallback((data: ExtractedData) => {
+    const handlePdfExtracted = (data: ExtractedData) => {
         setPrefill({
             client_name: data.customer_name || undefined,
             email: data.customer_email || undefined,
@@ -56,7 +56,7 @@ export default function ManagementProjectsBoard({ embedded = false }: Management
         setEditing(null);
         setDefaultStatus(columns[0].status);
         setModalOpen(true);
-    }, []);
+    };
 
     const { isDragging, isExtracting, handleDragOver, handleDragLeave, handleDrop } = useProjectPdfDrop(handlePdfExtracted);
 

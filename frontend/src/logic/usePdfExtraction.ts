@@ -1,4 +1,4 @@
-import {useState, useCallback} from 'react';
+import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
 import {InvoiceDiscount, InvoiceItem} from '../api';
@@ -21,7 +21,7 @@ export function usePdfExtraction(onDataExtracted: (data: ExtractedData) => void)
     const {showToast} = useUI();
     const [isExtracting, setIsExtracting] = useState(false);
 
-    const processPdfFile = useCallback(async (file: File) => {
+    const processPdfFile = async (file: File) => {
         const fd = new FormData();
         fd.append('pdf', file);
         setIsExtracting(true);
@@ -70,14 +70,14 @@ export function usePdfExtraction(onDataExtracted: (data: ExtractedData) => void)
         } finally {
             setIsExtracting(false);
         }
-    }, [onDataExtracted, showToast]);
+    };
 
-    const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         await processPdfFile(file);
         e.target.value = '';
-    }, [processPdfFile]);
+    };
 
     return {isExtracting, processPdfFile, handleFileUpload};
 }

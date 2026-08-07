@@ -2083,8 +2083,8 @@ msgid "Gutscheincode löschen?"
 msgstr "Gutscheincode löschen?"
 
 #: src/ui/management/ManagementCouponsView.tsx
-msgid "Gutscheincodes erfordern Volume-Licensing als Preisstrategie."
-msgstr "Gutscheincodes erfordern Volume-Licensing als Preisstrategie."
+#~ msgid "Gutscheincodes erfordern Volume-Licensing als Preisstrategie."
+#~ msgstr "Gutscheincodes erfordern Volume-Licensing als Preisstrategie."
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Gutscheincodes können eingelöst werden"

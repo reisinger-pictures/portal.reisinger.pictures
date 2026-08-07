@@ -1,4 +1,4 @@
-import {useState, useCallback} from 'react';
+import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
 import {DocumentFormData, InvoiceDiscount, InvoiceItem} from '../api';
@@ -57,14 +57,14 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
     const [discounts, setDiscounts] = useState<InvoiceDiscount[]>([]);
 
     const [isDirty, setIsDirty] = useState(false);
-    const markDirty = useCallback(() => {
+    const markDirty = () => {
         if (!isDirty) {
             setIsDirty(true);
             setUnsavedChanges(true);
         }
-    }, [isDirty, setUnsavedChanges]);
+    };
 
-    const handleUpdateField = useCallback((field: string, value: string) => {
+    const handleUpdateField = (field: string, value: string) => {
         markDirty();
         setFormData(p => {
             const next = {...p, [field]: value};
@@ -73,100 +73,100 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             }
             return next;
         });
-    }, [isOffer, serviceDateDirty, markDirty]);
+    };
 
-    const handleOptionChange = useCallback((opt: string) => {
+    const handleOptionChange = (opt: string) => {
         markDirty();
         setDueDateOption(opt);
         if (opt === '0') {
             handleUpdateField('due_date', isOffer ? getOfferValidUntil() : getInvoiceDefaultDue());
         }
-    }, [isOffer, handleUpdateField, markDirty]);
+    };
 
-    const handleServiceDateManualChange = useCallback((val: string) => {
+    const handleServiceDateManualChange = (val: string) => {
         markDirty();
         setServiceDateDirty(true);
         handleUpdateField('service_date', val);
-    }, [handleUpdateField, markDirty]);
+    };
 
-    const handleItemChange = useCallback((index: number, field: string, value: string | number) => {
+    const handleItemChange = (index: number, field: string, value: string | number) => {
         markDirty();
         setItems(prev => {
             const newArr = [...prev];
             newArr[index] = {...newArr[index], [field]: value};
             return newArr;
         });
-    }, [markDirty]);
+    };
 
-    const handleDiscountChange = useCallback((index: number, field: string, value: string | number) => {
+    const handleDiscountChange = (index: number, field: string, value: string | number) => {
         markDirty();
         setDiscounts(prev => {
             const newArr = [...prev];
             newArr[index] = {...newArr[index], [field]: value};
             return newArr;
         });
-    }, [markDirty]);
+    };
 
-    const addItem = useCallback(() => {
+    const addItem = () => {
         markDirty();
         setItems(prev => [...prev, {type: 'item', description: '', notes: '', qty: 1, price: 0}]);
-    }, [markDirty]);
+    };
 
-    const removeItem = useCallback((index: number) => {
+    const removeItem = (index: number) => {
         markDirty();
         setItems(prev => prev.filter((_, i) => i !== index));
-    }, [markDirty]);
+    };
 
-    const moveItemUp = useCallback((index: number) => {
+    const moveItemUp = (index: number) => {
         if (index === 0) return;
         markDirty();
         setItems(prev => moveArrayItemUp(prev, index));
-    }, [markDirty]);
+    };
 
-    const moveItemDown = useCallback((index: number) => {
+    const moveItemDown = (index: number) => {
         setItems(prev => {
             if (index === prev.length - 1) return prev;
             const result = moveArrayItemDown(prev, index);
             markDirty();
             return result;
         });
-    }, [markDirty]);
+    };
 
-    const addDiscount = useCallback(() => {
+    const addDiscount = () => {
         markDirty();
         setDiscounts(prev => [...prev, {type: 'discount_fixed', description: '', notes: '', price: 0}]);
-    }, [markDirty]);
+    };
 
-    const removeDiscount = useCallback((index: number) => {
+    const removeDiscount = (index: number) => {
         markDirty();
         setDiscounts(prev => prev.filter((_, i) => i !== index));
-    }, [markDirty]);
+    };
 
-    const moveDiscountUp = useCallback((index: number) => {
+    const moveDiscountUp = (index: number) => {
         if (index === 0) return;
         markDirty();
         setDiscounts(prev => moveArrayItemUp(prev, index));
-    }, [markDirty]);
+    };
 
-    const moveDiscountDown = useCallback((index: number) => {
+    const moveDiscountDown = (index: number) => {
         setDiscounts(prev => moveArrayItemDown(prev, index));
         markDirty();
-    }, [markDirty]);
+    };
 
-    const handleAddPackageFromCalculator = useCallback((newItem: InvoiceItem, newDiscount: InvoiceDiscount | null) => {
+    const handleAddPackageFromCalculator = (newItem: InvoiceItem, newDiscount: InvoiceDiscount | null) => {
         markDirty();
         setItems(prev => [newItem, ...prev.filter(i => !isEmptyRow(i))]);
         if (newDiscount) {
             setDiscounts(prev => [...prev, newDiscount]);
         }
-    }, [markDirty]);
+    };
 
-    const handleMultiUpdate = useCallback((updates: Record<string, string>) => {
+    const handleMultiUpdate = (updates: Record<string, string>) => {
         markDirty();
         setFormData(prev => ({...prev, ...updates}));
-    }, [markDirty]);
+    };
 
-    const loadExtractedData = useCallback((data: {
+    const loadExtractedData = (data: {
         customer_name?: string;
         customer_company?: string;
         customer_street?: string;
@@ -197,9 +197,9 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
         const filtered = data.items.filter(i => !isEmptyRow(i));
         setItems(filtered.length > 0 ? filtered : [{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
         setDiscounts(data.discounts);
-    }, [markDirty]);
+    };
 
-    const handleDownload = useCallback(async (e: React.FormEvent) => {
+    const handleDownload = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsGenerating(true);
         try {
@@ -240,7 +240,7 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             showToast('error', err instanceof Error ? err.message : t`Fehler`);
         }
         setIsGenerating(false);
-    }, [formData, items, discounts, isOffer, showToast, setUnsavedChanges]);
+    };
 
     const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
     const total = discounts.reduce(

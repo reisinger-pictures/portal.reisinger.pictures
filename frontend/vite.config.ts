@@ -1,5 +1,5 @@
 import {defineConfig} from 'vite'
-import react from '@vitejs/plugin-react'
+import react, {reactCompilerPreset} from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import babel from '@rolldown/plugin-babel'
 import lingui, {linguiTransformerBabelPreset} from '@lingui/vite-plugin'
@@ -13,7 +13,7 @@ export default defineConfig(() => {
             react(),
             tailwindcss(),
             lingui(),
-            babel({presets: [linguiTransformerBabelPreset()]}),
+            babel({presets: [reactCompilerPreset(), linguiTransformerBabelPreset()]}),
         ],
         optimizeDeps: {
             include: ['photoswipe', 'photoswipe/lightbox'],

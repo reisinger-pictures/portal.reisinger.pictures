@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 
 export interface Toast {
-    id: number;
+    id: string;
     type: 'success' | 'error' | 'info';
     text: string;
 }

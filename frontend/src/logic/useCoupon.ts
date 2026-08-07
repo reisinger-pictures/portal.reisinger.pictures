@@ -14,7 +14,7 @@
  * @see features/ecommerce/08-srp-coupon-system.md
  */
 
-import {useCallback, useState} from 'react';
+import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 
 // ---------------------------------------------------------------------------
@@ -76,6 +76,40 @@ const INITIAL_STATE = {
 };
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+interface CouponValidationRequest {
+    code: string;
+    galleryId?: number | string;
+    metaGalleryId?: number | string;
+}
+
+/**
+ * POSTs a coupon code to the backend, catching network errors so the hook body
+ * stays free of try/catch (React Compiler bails on value blocks in try/catch).
+ */
+async function requestCouponValidation(body: CouponValidationRequest): Promise<Response | null> {
+    try {
+        return await fetch('/api/coupons/validate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                code: body.code,
+                ...(body.galleryId !== undefined && {gallery_id: body.galleryId}),
+                ...(body.metaGalleryId !== undefined && {meta_gallery_id: body.metaGalleryId}),
+            }),
+        });
+    } catch {
+        return null;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -95,7 +129,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
     const [isLoading, setIsLoading] = useState<boolean>(INITIAL_STATE.isLoading);
     const [error, setError] = useState<string | null>(INITIAL_STATE.error);
 
-    const applyCoupon = useCallback(async (code: string): Promise<void> => {
+    const applyCoupon = async (code: string): Promise<void> => {
         const trimmed = code.trim();
         if (!trimmed) {
             setError(t`Bitte einen Rabattcode eingeben.`);
@@ -110,22 +144,8 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
         setIsValid(false);
         setDiscount(null);
 
-        let response: Response;
-        try {
-            response = await fetch('/api/coupons/validate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    code: trimmed,
-                    ...(galleryId !== undefined && {gallery_id: galleryId}),
-                    ...(metaGalleryId !== undefined && {meta_gallery_id: metaGalleryId}),
-                }),
-            });
-        } catch {
+        const response = await requestCouponValidation({code: trimmed, galleryId, metaGalleryId});
+        if (response === null) {
             setIsLoading(false);
             setError(t`Netzwerkfehler: Rabattcode konnte nicht geprüft werden.`);
             setCouponCode(null);
@@ -161,15 +181,15 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
             );
         }
         setIsLoading(false);
-    }, [galleryId, metaGalleryId]);
+    };
 
-    const removeCoupon = useCallback((): void => {
+    const removeCoupon = (): void => {
         setCouponCode(INITIAL_STATE.couponCode);
         setIsValid(INITIAL_STATE.isValid);
         setDiscount(INITIAL_STATE.discount);
         setIsLoading(INITIAL_STATE.isLoading);
         setError(INITIAL_STATE.error);
-    }, []);
+    };
 
     return {
         couponCode,
