@@ -11,6 +11,22 @@
 
 ---
 
+## 🔄 portal-base:8.5 — Spezialisiertes Image im Portal-Repo (2026-08-07)
+
+**Ziel:** Das Base-Image-Repo `reisi007/docker-base-images` (lokal `~/dev/php-apache-mod2rewrite`) wird **komplett entfernt** (lokal + Remote + GHCR-Packages), da das Portal der einzige Konsument ist. Das spezialisierte Image `ghcr.io/reisi007/portal-base:8.5` (PHP 8.5, mysql, Dockerfile 1:1 aus dem Base-Repo) wird künftig **per Cron (täglich 01:00)** aus **diesem** Repo gebaut.
+
+**Umsetzungsplan:**
+- [ ] `deployment/Dockerfile` anlegen (identischer Inhalt wie Base-Repo-Dockerfile)
+- [ ] `.github/workflows/base-image.yml`: cron `0 1 * * *` + `workflow_dispatch` + `push` (paths: Dockerfile + Workflow); baut **NUR** `portal-base:8.5`/`latest` (PHP 8.5, mysql)
+- [ ] Commit 1 pushen → CI bleibt auf `php-base:8.5` (grün), base-image-Run baut `portal-base:8.5`
+- [ ] **portal-base:8.5-Run grün abwarten** (Gate für Löschung)
+- [ ] Commit 2: Referenzen `php-base:8.5` → `portal-base:8.5` in `deployment/docker-compose.yml:56`, `.github/workflows/ci.yml` (55, 67, 95, 291, 305), `backend/.env.ci` (4–5), `features/infrastructure/01-deployment.md:25`
+- [ ] CI nach Commit 2 grün
+- [ ] Base-Repo löschen: lokaler Klon + `gh repo delete reisi007/docker-base-images`
+- [ ] GHCR-Packages aufräumen: `php-base` (30 Versionen), `php-mysql` (20), `php-postgres` (20), `portal-base`-Orphans (untagged)
+
+---
+
 ## ✅ GELÖST — CI-E2E-Run 31160185815: 4 rote Tests gefixt (2026-08-07)
 
 **Status: lokal grün; Commit + Push; CI beobachten.** Meine Änderung (nur `rclone-backend-filter.txt`) hatte 4 E2E-Failures aufgedeckt, die in Run `31032939108` (grün) noch nicht existierten → nach `93707b3` (React-Compiler, CI damals cancelled) entstanden.

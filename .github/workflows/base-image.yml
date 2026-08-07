@@ -1,0 +1,44 @@
+name: Build and Push portal-base Image
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'deployment/Dockerfile'
+      - '.github/workflows/base-image.yml'
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push portal-base Image
+        uses: docker/build-push-action@v6
+        with:
+          context: deployment
+          push: true
+          build-args: |
+            PHP_VERSION=8.5
+            DB_EXT=mysql
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-base:8.5
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-base:latest
