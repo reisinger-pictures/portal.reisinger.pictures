@@ -22,7 +22,7 @@ status: active
 - **CSP & X-Frame-Options** werden im Caddyfile gesetzt (Block `portal.reisinger.pictures`). Achtung: Der `Content-Security-Policy`-Header enthält einen `sha256`-Hash des Inline-Brand-Scripts aus `frontend/index.html`. Wird dieses Script geändert, muss der Hash im Caddyfile neu berechnet werden (`openssl dgst -sha256 -binary | base64`).
 
 ## 4. Caddy + PHP-FPM Architektur (Apache abgelöst)
-- **Basis-Image:** `ghcr.io/reisi007/php-base:8.5` (ersetzt `portal-base`)
+- **Basis-Image:** `ghcr.io/reisi007/portal-base:8.5` (Spezial-Image, gebaut per Cron aus diesem Repo — siehe `.github/workflows/base-image.yml`)
 - **Webserver:** PHP-FPM statt Apache – Caddy spricht via FastCGI-Protokoll mit dem Backend
 - **File Delivery:** `X-Accel-Redirect` statt `X-Sendfile` – Caddy fängt den Header via `handle_response` ab und serviert Dateien direkt von der Festplatte
 - **Pfad-Mapping:** Der `PROXY_DELIVERY_HEADER` ist fest auf `X-Accel-Redirect` gesetzt. Der Pfad `/var/www/photos/...` wird in Caddy via `handle_path` auf das gemountete Volume `/srv/photos` umgeschrieben

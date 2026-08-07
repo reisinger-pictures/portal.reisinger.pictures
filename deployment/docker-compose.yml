@@ -53,7 +53,7 @@ services:
     command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
 
   backend:
-    image: ghcr.io/reisi007/php-base:8.5
+    image: ghcr.io/reisi007/portal-base:8.5
     container_name: portal_backend
     restart: unless-stopped
     depends_on:

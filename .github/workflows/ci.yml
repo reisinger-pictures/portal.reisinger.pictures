@@ -52,7 +52,7 @@ jobs:
           - 8026:8025
     steps:
       - uses: actions/checkout@v4
-      # PHP-Tests laufen im Prod-Image ghcr.io/reisi007/php-base:8.5 (PHP 8.5 +
+      # PHP-Tests laufen im Prod-Image ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 +
       # exiftool + alle App-Extensions) - identisch zur Prod-Runtime. Composer
       # kommt wie in Prod ueber das offizielle composer:latest-Image. Die
       # CI-Env (DB/Meili/Mail/JWT/Admin) steht in backend/.env.ci und wird als
@@ -64,7 +64,7 @@ jobs:
             --network host \
             -v "${{ github.workspace }}:/app" \
             -w /app/backend \
-            ghcr.io/reisi007/php-base:8.5 \
+            ghcr.io/reisi007/portal-base:8.5 \
             sleep infinity
           until docker exec php php -v > /dev/null 2>&1; do sleep 1; done
       - name: Prepare environment
@@ -92,7 +92,7 @@ jobs:
         # DatabaseSeeder ruft am Ende app:import-locations auf (Geonames-Download).
         run: docker exec php php artisan db:seed --force
       - name: Run PHPUnit
-        # Parallele Worker via paratest (php-base:8.5 enthaelt seit dem
+        # Parallele Worker via paratest (portal-base:8.5 enthaelt seit dem
         # Rebuild ext-pcntl + posix). pipefail laesst den Step fehlschlagen,
         # wenn Tests rot sind (nicht das tee). Log fuer Summary-Step.
         run: |
@@ -288,7 +288,7 @@ jobs:
             exit 1
           fi
           echo "Stripe write (payment_intents create) OK"
-      # Backend laeuft im Prod-Image ghcr.io/reisi007/php-base:8.5 (PHP 8.5 +
+      # Backend laeuft im Prod-Image ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 +
       # exiftool) - identisch zur Prod-Runtime. Composer ueber composer:latest.
       # CI-Env steht in backend/.env.ci (-> .env); nur die Stripe-Test-Keys
       # kommen per Container-Env aus den GitHub Secrets. `--network host` ->
@@ -302,7 +302,7 @@ jobs:
             -e STRIPE_KEY="${{ secrets.STRIPE_KEY }}" \
             -e STRIPE_SECRET="${{ secrets.STRIPE_SECRET }}" \
             -e STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
-            ghcr.io/reisi007/php-base:8.5 \
+            ghcr.io/reisi007/portal-base:8.5 \
             sleep infinity
           until docker exec php php -v > /dev/null 2>&1; do sleep 1; done
       - name: Prepare backend environment
