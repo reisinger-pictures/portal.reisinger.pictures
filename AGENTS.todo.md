@@ -23,8 +23,8 @@
 - [x] Commit 2: Referenzen `php-base:8.5` → `portal-base:8.5` in `deployment/docker-compose.yml:56`, `.github/workflows/ci.yml` (55, 67, 95, 291, 305), `backend/.env.ci` (4–5), `features/infrastructure/01-deployment.md:25`
 - [x] CI nach Commit 2 grün (Run `31187394565` success)
 - [ ] **⚠️ Prod manuell updaten:** `docker-compose.yml` referenziert jetzt `portal-base:8.5` → Portainer Stack-Redeploy nötig (User-Notify erledigt)
-- [ ] Base-Repo löschen: lokaler Klon + `gh repo delete reisi007/docker-base-images`
-- [ ] GHCR-Packages aufräumen: `php-base` (30 Versionen), `php-mysql` (20), `php-postgres` (20), `portal-base`-Orphans (untagged)
+- [x] Base-Repo löschen: lokaler Klon (`~/dev/php-apache-mod2rewrite`) + `gh repo delete reisi007/docker-base-images` (2026-08-07, nach grünem portal-base-Run)
+- [x] GHCR-Packages aufräumen: `php-base` (30 Versionen), `php-mysql` (20), `php-postgres` (20) gelöscht; `portal-base` verbleibt (frisches Package, gehört dem Portal-Repo)
 
 ---
 
