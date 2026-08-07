@@ -29,6 +29,7 @@ const licenseSettingsSchema = z.object({
 type LicenseSettingsFormValues = z.infer<typeof licenseSettingsSchema>;
 
 export default function LicenseSettingsCard() {
+    "use no memo";
     const {terms, updateTerms, isLoading} = useLicenseTerms();
     const {showToast} = useUI();
 

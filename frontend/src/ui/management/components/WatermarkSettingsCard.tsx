@@ -17,6 +17,7 @@ const watermarkSchema = z.object({
 export type WatermarkFormValues = z.infer<typeof watermarkSchema>;
 
 export default function WatermarkSettingsCard() {
+    "use no memo";
     const {watermark, updateWatermark} = useSettings();
     const {isAdmin} = usePermissions();
     const {showToast} = useUI();

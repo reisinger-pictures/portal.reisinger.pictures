@@ -1,6 +1,6 @@
 # Task Board — Portal Reisinger Pictures
 
-> Stand: 2026-08-05. **Nur offene TODOs.** Analyse & Architektur-Entscheidungen sind ausgelagert:
+> Stand: 2026-08-07. **Nur offene TODOs.** Analyse & Architektur-Entscheidungen sind ausgelagert:
 > - Brand-Architektur (SOLL, Commit `1831116`): `features/infrastructure/21-brand-config-driven.md`
 > - Pricing-Strategy-Pattern: `features/infrastructure/17-pricing-strategy-pattern.md`
 > - Kanban-SOLL (Rollen-Matrix, DnD-Desktop-only, Status-Select): `features/b2b/11-kanban-board.md`
@@ -8,6 +8,21 @@
 > - **Backlog-Ausarbeitung 2026-08-04:** Drei parallele Analyse-Aufträge (A1, F3, Stack-Konsolidierung) abgeschlossen — Pläne unten. Offene Fragen interaktiv geklärt (Entscheidungen dokumentiert). **Kein Code geändert.**
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
+
+---
+
+## ✅ GELÖST — CI-E2E-Run 31160185815: 4 rote Tests gefixt (2026-08-07)
+
+**Status: lokal grün; Commit + Push; CI beobachten.** Meine Änderung (nur `rclone-backend-filter.txt`) hatte 4 E2E-Failures aufgedeckt, die in Run `31032939108` (grün) noch nicht existierten → nach `93707b3` (React-Compiler, CI damals cancelled) entstanden.
+
+**Befund & Fixes:**
+1. **`billing-details.spec.ts:20` + `:55`** — schreiben **globale brand-weite Bankdaten-Settings** (`/api/management/settings/billing-details`). Desktop- UND Mobile-Shard fuhren dieselben Tests parallel (2 Shards × 2 Worker) gegen dieselbe DB → gegenseitige Überschreibung (nach Reload anderer Inhaber/IBAN; IBAN-Validierung sah fremde Daten). **Fix:** `ci.yml` → billing-details in den seriellen Shard (`--grep "projects-board|production-board|billing-details" --workers=1`), aus Desktop/Mobile-grep-invert. Lokal simuliert (Desktop+Mobile parallel) grün, aber deterministisch nur durch Serialisierung gelöst.
+2. **`metadata.spec.ts:122` (Copyright)** + **`photographer.spec.ts:113` (FTP slug)** — Root Cause identisch: `ProfileSettingsCard.tsx` hatte einen `useEffect`-Reset ohne `!isDirty`-Guard (Muster `BillingDetailsCard.tsx:52`). SWR-Hydration von `/api/auth/me` konnte nach dem Füllen die getippten Werte (`metadata_copyright` / `ftp_slug`) überschreiben → leer persistiert → `artist` fiel auf `name`, FTP-Inbox zeigte User-ID statt Slug. **Fix:** `!isDirty`-Guard im `useEffect` (Deps `[user, profileForm, isDirty]`). Zeitbasiert → wirkte "flaky".
+3. **19× `"use no memo";`** in Formular-Komponenten (lokale React-Compiler-Opt-Outs, konsistent mit `BillingDetailsCard`) — mit in den Commit aufgenommen.
+
+**Verifikation lokal:** billing (2) + metadata + photographer-Files (10) + `@smoke` Desktop (28) + Vitest (591) + lint + build grün.
+
+**Hinweis für CI-Beobachtung:** Shard-Name geändert in `serial (kanban, billing)`. Erwartung: Desktop/Mobile grün, serial-Shard grün.
 
 ---
 

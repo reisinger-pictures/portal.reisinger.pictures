@@ -35,6 +35,7 @@ const EMPTY_DEFAULTS: BillingFormValues = {
  * instead of silently failing on every keystroke.
  */
 export default function BillingDetailsCard() {
+    "use no memo";
     const {billingDetails, updateBillingDetails, isLoading} = useBillingDetails();
     const {showToast} = useUI();
     const {isSuperAdmin} = usePermissions();

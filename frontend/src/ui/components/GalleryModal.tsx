@@ -44,6 +44,7 @@ interface Props {
 }
 
 export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
+    "use no memo";
     const { showToast, confirm } = useUI();
     const { data: orgs, isLoading } = useSWR<Org[]>('/api/management/orgs', fetcher);
 

@@ -23,6 +23,7 @@ interface Props {
 }
 
 export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSave }: Props) {
+    "use no memo";
     const { register, handleSubmit, reset, setValue, control, formState: { errors, isSubmitting } } = useForm<SnippetFormValues>({
         resolver: zodResolver(snippetSchema)
     });

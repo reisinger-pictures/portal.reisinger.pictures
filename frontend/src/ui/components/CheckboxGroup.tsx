@@ -12,6 +12,7 @@ interface CheckboxGroupProps<T extends FieldValues> {
 }
 
 export default function CheckboxGroup<T extends FieldValues>({ items, register }: CheckboxGroupProps<T>) {
+    "use no memo";
     return (
         <>
             {items.map((item, i) => (

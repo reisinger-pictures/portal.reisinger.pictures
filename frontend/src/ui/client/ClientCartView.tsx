@@ -39,6 +39,7 @@ const checkoutSchema = z.object({
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 export default function ClientCartView() {
+    "use no memo";
     const {items, removeFromCart, totalAmount, clearCart, addToCart, volumeLicensing} = useCart();
     const cartGalleryId = items.length > 0 && items.every(i => i.galleryId === items[0].galleryId)
         ? items[0].galleryId

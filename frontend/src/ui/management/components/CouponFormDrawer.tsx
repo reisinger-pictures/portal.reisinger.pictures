@@ -90,6 +90,7 @@ function emptyToUndefined(value: string | undefined): string | undefined {
 }
 
 export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSave }: Props) {
+    "use no memo";
     const { confirm } = useUI();
     const {
         register,

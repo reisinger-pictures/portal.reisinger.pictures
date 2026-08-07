@@ -48,6 +48,7 @@ const paymentOptions = [
 ];
 
 export default function ProjectModal({ isOpen, onClose, editing, onSave, initial, defaultStatus, statusOptions }: Props) {
+    "use no memo";
     const { register, control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<ProjectFormValues>({
         resolver: zodResolver(projectSchema),
         defaultValues: {

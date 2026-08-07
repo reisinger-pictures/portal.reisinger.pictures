@@ -18,6 +18,7 @@ interface Props {
 }
 
 export default function CreateUserModal({ isOpen, onClose, onCreate }: Props) {
+    "use no memo";
     const { showToast } = useUI();
     
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<UserFormValues>({

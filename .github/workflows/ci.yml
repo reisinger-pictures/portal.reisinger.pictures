@@ -188,13 +188,19 @@ jobs:
 
   e2e:
     # 2 Projekt-Shards (Desktop / Mobile, je --workers=2) + 1 dedizierter,
-    # strikt serieller Kanban-Shard (--workers=1). Kanban-Tests teilen sich das
-    # Board; unter voller Parallelitaet kollidieren Drag&Drop/Status-Select
-    # (Layout-Shift) und waitForResponse-Timeout (Slow-Response bei Backend-Last).
+    # strikt serieller Shard (--workers=1). Seriell laufen:
+    #  * Kanban-Tests: teilen sich das Board; unter voller Parallelitaet
+    #    kollidieren Drag&Drop/Status-Select (Layout-Shift) und
+    #    waitForResponse-Timeout (Slow-Response bei Backend-Last).
+    #  * billing-details.spec.ts: schreibt globale (brand-weite) Bankdaten-Settings
+    #    in /api/management/settings/billing-details. Desktop- UND Mobile-Shard
+    #    fuhren dieselben Tests parallel gegen dieselbe DB -> gegenzeitige
+    #    Ueberschreibung (nach Reload steht ein anderer Inhaber/IBAN da; die
+    #    IBAN-Validierung sieht fremde Daten). Im Serial-Shard (workers=1) gibt es
+    #    keinen parallelen Schreiber.
     # --project grenzt die Shards an Projektgrenzen ab (--shard splittet Dateien
     # global ueber BEIDE Projekte und ist dafuer ungeeignet). Serielle Dateien
-    # (aktuell nur Kanban, zukuenftig alle describe.configure({mode:'serial'})
-    # Dateien) werden grundsaetzlich einzeln im Serial-Shard isoliert.
+    # werden grundsaetzlich einzeln im Serial-Shard isoliert.
     name: E2E (Playwright) — ${{ matrix.name }}
     # Job-level `if` darf KEINEN secrets-Context lesen (offizielle Context
     # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Secrets
@@ -208,9 +214,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {name: 'Desktop', slug: 'desktop', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board" --workers=2'}
-          - {name: 'Mobile', slug: 'mobile', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board" --workers=2'}
-          - {name: 'serial (kanban)', slug: 'kanban', args: '--grep "projects-board|production-board" --workers=1'}
+          - {name: 'Desktop', slug: 'desktop', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2'}
+          - {name: 'Mobile', slug: 'mobile', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2'}
+          - {name: 'serial (kanban, billing)', slug: 'kanban', args: '--grep "projects-board|production-board|billing-details" --workers=1'}
     env:
       # Zuordnung spiegelt backend/.env (lokales, funktionierendes E2E-Setup):
       # STRIPE_KEY = pk_test (publishable), STRIPE_SECRET = sk_test (secret key).

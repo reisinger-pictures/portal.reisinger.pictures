@@ -13,6 +13,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function SidebarLoginForm() {
+    "use no memo";
     const { login } = useAuth();
     const [authError, setAuthError] = useState('');
     const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormValues>({

@@ -17,6 +17,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfileSettingsCard() {
+    "use no memo";
     const { user, mutate: mutateUser } = useAuth();
     const { isPhotographer } = usePermissions();
     const { showToast } = useUI();
@@ -26,15 +27,20 @@ export default function ProfileSettingsCard() {
         defaultValues: { name: '', metadata_copyright: '', ftp_slug: '' }
     });
 
+    const { formState: { isDirty } } = profileForm;
+
     useEffect(() => {
-        if (user) {
+        // Nur beim initialen Laden hydrieren — ein bereits "dirty" Formular (User
+        // hat getippt) darf der SWR-Hydration nicht den Wert überschreiben, sonst
+        // wird z.B. ftp_slug/metadata_copyright leer persistiert (E2E-Flake).
+        if (user && !isDirty) {
             profileForm.reset({
                 name: user.name || '',
                 metadata_copyright: user.metadata_copyright || '',
                 ftp_slug: user.ftp_slug || ''
             });
         }
-    }, [user, profileForm]);
+    }, [user, profileForm, isDirty]);
 
     const onSubmit = async (data: ProfileFormValues) => {
         try {

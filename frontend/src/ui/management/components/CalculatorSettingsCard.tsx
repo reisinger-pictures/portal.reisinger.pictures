@@ -57,6 +57,7 @@ function mapFormToApi(data: CalculatorSettingsFormValues): Record<string, number
 }
 
 export default function CalculatorSettingsCard() {
+    "use no memo";
     const {terms, updateTerms} = useLicenseTerms();
     const {showToast} = useUI();
 

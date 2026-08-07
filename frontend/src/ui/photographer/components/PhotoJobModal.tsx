@@ -52,6 +52,7 @@ interface Props {
 }
 
 export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaultStatus, statusOptions }: Props) {
+    "use no memo";
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PhotoJobFormValues>({
         resolver: zodResolver(photoJobSchema),
         defaultValues: {

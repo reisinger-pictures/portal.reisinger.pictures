@@ -23,6 +23,7 @@ interface Props {
 }
 
 export default function ProductModal({ isOpen, onClose, editingProduct, onSave }: Props) {
+    "use no memo";
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema)
     });

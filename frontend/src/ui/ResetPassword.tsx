@@ -20,6 +20,7 @@ const resetSchema = z.object({
 type ResetFormValues = z.infer<typeof resetSchema>;
 
 export default function ResetPassword() {
+    "use no memo";
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
     const email = searchParams.get('email');

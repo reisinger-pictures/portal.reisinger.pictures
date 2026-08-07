@@ -29,6 +29,7 @@ export interface MetadataDefaultsFormValues {
 }
 
 export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery, onUpdate }: Props) {
+    "use no memo";
     const { showToast } = useUI();
     const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
