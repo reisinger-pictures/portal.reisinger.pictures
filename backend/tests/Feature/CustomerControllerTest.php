@@ -8,13 +8,13 @@ use App\Models\Customer;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Meilisearch\Contracts\TasksQuery;
 use Tests\TestCase;
 
 class CustomerControllerTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     private User $superAdmin;
     private User $admin;

@@ -34,14 +34,34 @@ return new class extends Migration {
         });
 
         // 3. invoice_sequences: year zum PK
-        DB::statement('ALTER TABLE invoice_sequences MODIFY id BIGINT UNSIGNED NOT NULL');
-        
-        Schema::table('invoice_sequences', function (Blueprint $table) {
-            $table->dropPrimary();
-            $table->dropColumn('id');
-            $table->dropUnique(['year']); // Entferne alten Unique-Index aus V004
-            $table->primary('year');
-        });
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // No-op: MariaDB-only syntax. On SQLite the column is already BIGINT (AUTOINCREMENT).
+        } else {
+            DB::statement('ALTER TABLE invoice_sequences MODIFY id BIGINT UNSIGNED NOT NULL');
+        }
+
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // SQLite cannot DROP COLUMN on the AUTOINCREMENT (rowid) primary key, so
+            // rebuild the table manually to the identical end state:
+            // PK on year, no id column, current_value preserved.
+            Schema::create('invoice_sequences_sqlite_tmp', function (Blueprint $t) {
+                $t->integer('year')->primary();
+                $t->integer('current_value')->default(0);
+            });
+            DB::table('invoice_sequences_sqlite_tmp')->insertUsing(
+                ['year', 'current_value'],
+                DB::table('invoice_sequences')->select('year', 'current_value')
+            );
+            Schema::drop('invoice_sequences');
+            Schema::rename('invoice_sequences_sqlite_tmp', 'invoice_sequences');
+        } else {
+            Schema::table('invoice_sequences', function (Blueprint $table) {
+                $table->dropPrimary();
+                $table->dropColumn('id');
+                $table->dropUnique(['year']); // Entferne alten Unique-Index aus V004
+                $table->primary('year');
+            });
+        }
 
         // 4. photos & photo_metadata_versions: mime_type, headline
         Schema::table('photos', function (Blueprint $table) {

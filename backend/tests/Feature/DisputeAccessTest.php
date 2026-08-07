@@ -4,11 +4,11 @@ namespace Tests\Feature;
 use Tests\TestCase;
 use App\Models\Order;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class DisputeAccessTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     public function test_webhook_dispute_locks_order_status() {
         \Illuminate\Support\Facades\Mail::fake();

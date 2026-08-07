@@ -18,7 +18,7 @@ Das lokale Setup ist vollständig in VS Code / IntelliJ integriert. Öffne einfa
 
 ### 1. Der reguläre Start
 Wähle im Dropdown **`🚀 [Run] Start Alles (Docker + Frontend)`** und klicke auf Play.
-Das startet automatisch MariaDB, Meilisearch, Mailpit und deinen Vite-Dev-Server (Frontend auf **http://localhost:4321**).
+Das startet automatisch Meilisearch, Mailpit und deinen Vite-Dev-Server (Frontend auf **http://localhost:4321**). Die Datenbank läuft lokal als SQLite-Datei (`backend/database/database.sqlite`) — ein DB-Container wird nicht mehr benötigt.
 
 ### 2. Einmaliges Setup (beim ersten Mal oder nach Pulls)
 Falls du das Projekt neu eingerichtet hast oder sich die Datenbankstruktur geändert hat:
@@ -31,7 +31,7 @@ Falls du das Projekt neu eingerichtet hast oder sich die Datenbankstruktur geän
 ### 3. Wartung & Herunterfahren
 * **Index aktualisieren:** Wenn du Probleme mit der Suche hast, führe `🔍 [Wartung] Meilisearch Sync & Import` aus.
 * **Feierabend:** Nutze `🛑 [Core] Stop Docker (Graceful)` um die Services sauber herunterzufahren.
-* **Achtung:** `🧨 [Gefahr] DB Reset & Seed` löscht deine gesamte lokale Datenbank unwiderruflich und baut sie neu auf!
+* **Achtung:** `🧨 [Gefahr] DB Reset & Seed` löscht deine gesamte lokale SQLite-Datenbank (`backend/database/database.sqlite`) unwiderruflich und baut sie neu auf!
 
 ### macOS: exiftool & ImageMagick für Laravel Herd
 
@@ -51,7 +51,7 @@ Danach Laravel Herd einmal neu starten, damit PHP-FPM die Tools findet. Ohne die
 
 ### Login-Daten (Lokal)
 - **Dashboard:** `florian@reisinger.pictures` / `admin`
-- **Datenbank:** user: `portal_user` / pass: `admin`
+- **Datenbank:** SQLite-Datei `backend/database/database.sqlite` (kein DB-Container; Einrichtung via `php artisan migrate:fresh --seed`)
 
 ### Stripe Webhooks (Lokal Testen)
 Führe `stripe listen --forward-to localhost:8000/api/webhooks/stripe` aus und trage das ausgegebene `STRIPE_WEBHOOK_SECRET` in die `.env` Datei im Backend ein.

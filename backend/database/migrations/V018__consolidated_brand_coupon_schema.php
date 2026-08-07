@@ -4,6 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * Consolidated schema: Brand multitenancy + Coupon system (SRP-01).
@@ -34,16 +35,24 @@ return new class extends Migration {
         // ══════════════════════════════════════════════
 
         // 1a. Drop single-column PRIMARY KEY on settings.key
-        $hasSettingsPrimary = collect(DB::select("SHOW INDEX FROM `settings`"))
-            ->contains(fn ($i) => $i->Key_name === 'PRIMARY');
-        if ($hasSettingsPrimary) {
-            DB::statement("ALTER TABLE `settings` DROP PRIMARY KEY");
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('settings', fn (Blueprint $t) => $t->dropPrimary(['key']));
+        } else {
+            $hasSettingsPrimary = collect(DB::select("SHOW INDEX FROM `settings`"))
+                ->contains(fn ($i) => $i->Key_name === 'PRIMARY');
+            if ($hasSettingsPrimary) {
+                DB::statement("ALTER TABLE `settings` DROP PRIMARY KEY");
+            }
         }
 
         // 1b. Add brand column to all 12 tables
         foreach (self::BRAND_TABLES as $table) {
             if (!Schema::hasColumn($table, 'brand')) {
-                DB::statement("ALTER TABLE `{$table}` ADD COLUMN `brand` ENUM('rp','srp') NULL DEFAULT NULL");
+                if (DB::connection()->getDriverName() === 'sqlite') {
+                    Schema::table($table, fn (Blueprint $t) => $t->enum('brand', ['rp', 'srp'])->nullable());
+                } else {
+                    DB::statement("ALTER TABLE `{$table}` ADD COLUMN `brand` ENUM('rp','srp') NULL DEFAULT NULL");
+                }
             }
         }
 
@@ -67,10 +76,17 @@ return new class extends Migration {
                         ->delete();
 
                     while (DB::table($table)->where('key', $dupKey)->count() > 1) {
-                        DB::statement(
-                            "DELETE FROM `{$table}` WHERE `key` = ? AND `value` = ? LIMIT 1",
-                            [$dupKey, $survivorValue]
-                        );
+                        if (DB::connection()->getDriverName() === 'sqlite') {
+                            DB::delete(
+                                "DELETE FROM `{$table}` WHERE `key` = ? AND `value` = ? AND rowid = (SELECT rowid FROM `{$table}` WHERE `key` = ? AND `value` = ? LIMIT 1)",
+                                [$dupKey, $survivorValue, $dupKey, $survivorValue]
+                            );
+                        } else {
+                            DB::statement(
+                                "DELETE FROM `{$table}` WHERE `key` = ? AND `value` = ? LIMIT 1",
+                                [$dupKey, $survivorValue]
+                            );
+                        }
                     }
                 }
             }
@@ -82,17 +98,26 @@ return new class extends Migration {
         // 1e. Add brand indexes
         foreach (self::BRAND_TABLES as $table) {
             $indexName = "{$table}_brand_index";
-            if (!collect(DB::select("SHOW INDEX FROM `{$table}`"))->contains(fn ($i) => $i->Key_name === $indexName)) {
-                DB::statement("ALTER TABLE `{$table}` ADD INDEX `{$indexName}` (`brand`)");
+            if (DB::connection()->getDriverName() === 'sqlite') {
+                Schema::table($table, fn (Blueprint $t) => $t->index('brand', $indexName));
+            } else {
+                if (!collect(DB::select("SHOW INDEX FROM `{$table}`"))->contains(fn ($i) => $i->Key_name === $indexName)) {
+                    DB::statement("ALTER TABLE `{$table}` ADD INDEX `{$indexName}` (`brand`)");
+                }
             }
         }
 
         // 1f. Add settings.key index + composite unique (key, brand)
-        if (!collect(DB::select("SHOW INDEX FROM `settings`"))->contains(fn ($i) => $i->Key_name === 'settings_key_index')) {
-            DB::statement("ALTER TABLE `settings` ADD INDEX `settings_key_index` (`key`)");
-        }
-        if (!collect(DB::select("SHOW INDEX FROM `settings`"))->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique')) {
-            DB::statement("ALTER TABLE `settings` ADD UNIQUE INDEX `settings_key_brand_unique` (`key`, `brand`)");
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('settings', fn (Blueprint $t) => $t->index('key', 'settings_key_index'));
+            Schema::table('settings', fn (Blueprint $t) => $t->unique(['key', 'brand'], 'settings_key_brand_unique'));
+        } else {
+            if (!collect(DB::select("SHOW INDEX FROM `settings`"))->contains(fn ($i) => $i->Key_name === 'settings_key_index')) {
+                DB::statement("ALTER TABLE `settings` ADD INDEX `settings_key_index` (`key`)");
+            }
+            if (!collect(DB::select("SHOW INDEX FROM `settings`"))->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique')) {
+                DB::statement("ALTER TABLE `settings` ADD UNIQUE INDEX `settings_key_brand_unique` (`key`, `brand`)");
+            }
         }
 
         // ══════════════════════════════════════════════
@@ -190,26 +215,56 @@ return new class extends Migration {
         //  Part 7: Backfill photo_metadata_versions (was V019)
         // ══════════════════════════════════════════════
 
-        DB::statement("
-            INSERT INTO photo_metadata_versions (id, photo_id, user_id, title, headline, description, keywords, location, city, state, country, iso_country, created_at)
-            SELECT
-                UUID() AS id,
-                p.id AS photo_id,
-                p.user_id,
-                p.title,
-                p.headline,
-                p.description,
-                p.keywords,
-                p.location,
-                p.city,
-                p.state,
-                p.country,
-                p.iso_country,
-                p.created_at
-            FROM photos p
-            LEFT JOIN photo_metadata_versions v ON v.photo_id = p.id
-            WHERE v.id IS NULL
-        ");
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            $photosWithoutVersions = DB::table('photos')
+                ->select(
+                    'photos.id', 'photos.user_id', 'photos.title', 'photos.headline',
+                    'photos.description', 'photos.keywords', 'photos.location', 'photos.city',
+                    'photos.state', 'photos.country', 'photos.iso_country', 'photos.created_at'
+                )
+                ->leftJoin('photo_metadata_versions', 'photo_metadata_versions.photo_id', '=', 'photos.id')
+                ->whereNull('photo_metadata_versions.id')
+                ->get();
+
+            foreach ($photosWithoutVersions as $photo) {
+                DB::table('photo_metadata_versions')->insert([
+                    'id' => (string) Str::uuid(),
+                    'photo_id' => $photo->id,
+                    'user_id' => $photo->user_id,
+                    'title' => $photo->title,
+                    'headline' => $photo->headline,
+                    'description' => $photo->description,
+                    'keywords' => $photo->keywords,
+                    'location' => $photo->location,
+                    'city' => $photo->city,
+                    'state' => $photo->state,
+                    'country' => $photo->country,
+                    'iso_country' => $photo->iso_country,
+                    'created_at' => $photo->created_at,
+                ]);
+            }
+        } else {
+            DB::statement("
+                INSERT INTO photo_metadata_versions (id, photo_id, user_id, title, headline, description, keywords, location, city, state, country, iso_country, created_at)
+                SELECT
+                    UUID() AS id,
+                    p.id AS photo_id,
+                    p.user_id,
+                    p.title,
+                    p.headline,
+                    p.description,
+                    p.keywords,
+                    p.location,
+                    p.city,
+                    p.state,
+                    p.country,
+                    p.iso_country,
+                    p.created_at
+                FROM photos p
+                LEFT JOIN photo_metadata_versions v ON v.photo_id = p.id
+                WHERE v.id IS NULL
+            ");
+        }
     }
 
     public function down(): void

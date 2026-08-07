@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Restructures the photo job workflow: 'shooting' → 'importiert', 'export' →
@@ -17,11 +19,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE photo_jobs MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'importiert'");
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('photo_jobs', fn (Blueprint $t) => $t->string('status', 20)->default('importiert')->change());
+        } else {
+            DB::statement("ALTER TABLE photo_jobs MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'importiert'");
+        }
         DB::statement("UPDATE photo_jobs SET status = 'importiert' WHERE status = 'shooting'");
         DB::statement("UPDATE photo_jobs SET status = 'exportiert' WHERE status = 'export'");
         DB::statement("UPDATE photo_jobs SET status = 'exportiert' WHERE status = 'veroeffentlicht'");
-        DB::statement("ALTER TABLE photo_jobs MODIFY COLUMN status ENUM('importiert','culling','bearbeitung','exportiert','abgebrochen') NOT NULL DEFAULT 'importiert'");
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('photo_jobs', fn (Blueprint $t) => $t->enum('status', ['importiert', 'culling', 'bearbeitung', 'exportiert', 'abgebrochen'])->default('importiert')->change());
+        } else {
+            DB::statement("ALTER TABLE photo_jobs MODIFY COLUMN status ENUM('importiert','culling','bearbeitung','exportiert','abgebrochen') NOT NULL DEFAULT 'importiert'");
+        }
     }
 
     public function down(): void

@@ -31,7 +31,11 @@ return new class extends Migration {
         // ══════════════════════════════════════════════
 
         // 0a. Add 'photographer' to scope_type ENUM
-        DB::statement("ALTER TABLE `coupons` MODIFY COLUMN `scope_type` ENUM('global', 'gallery', 'meta_gallery', 'photographer', 'organisation') NOT NULL DEFAULT 'global'");
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // No-op: on a fresh SQLite DB the ENUM already includes 'photographer' (created by V018).
+        } else {
+            DB::statement("ALTER TABLE `coupons` MODIFY COLUMN `scope_type` ENUM('global', 'gallery', 'meta_gallery', 'photographer', 'organisation') NOT NULL DEFAULT 'global'");
+        }
 
         // 0b. Rename max_uses → max_uses_global (skip if already done by V018)
         if (Schema::hasColumn('coupons', 'max_uses')) {
@@ -40,12 +44,20 @@ return new class extends Migration {
 
         // 0c. Add max_uses_per_account
         if (!Schema::hasColumn('coupons', 'max_uses_per_account')) {
-            DB::statement("ALTER TABLE `coupons` ADD COLUMN `max_uses_per_account` INT UNSIGNED NULL AFTER `max_uses_global`");
+            if (DB::connection()->getDriverName() === 'sqlite') {
+                Schema::table('coupons', fn (Blueprint $t) => $t->unsignedInteger('max_uses_per_account')->nullable());
+            } else {
+                DB::statement("ALTER TABLE `coupons` ADD COLUMN `max_uses_per_account` INT UNSIGNED NULL AFTER `max_uses_global`");
+            }
         }
 
         // 0d. Add created_by (nullable FK to users — uuid, no DB constraint)
         if (!Schema::hasColumn('coupons', 'created_by')) {
-            DB::statement("ALTER TABLE `coupons` ADD COLUMN `created_by` CHAR(36) NULL AFTER `active`");
+            if (DB::connection()->getDriverName() === 'sqlite') {
+                Schema::table('coupons', fn (Blueprint $t) => $t->char('created_by', 36)->nullable());
+            } else {
+                DB::statement("ALTER TABLE `coupons` ADD COLUMN `created_by` CHAR(36) NULL AFTER `active`");
+            }
         }
 
         // 0e. Create coupon_user_usage table
@@ -65,14 +77,21 @@ return new class extends Migration {
         //  Part 1: Fix settings PK (was dropped in V018 without restore)
         // ══════════════════════════════════════════════
 
-        $hasCompositeUnique = collect(DB::select("SHOW INDEX FROM `settings`"))
-            ->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique');
-        $hasPrimary = collect(DB::select("SHOW INDEX FROM `settings`"))
-            ->contains(fn ($i) => $i->Key_name === 'PRIMARY');
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('settings', function (Blueprint $t) {
+                $t->dropUnique('settings_key_brand_unique');
+                $t->primary(['key', 'brand']);
+            });
+        } else {
+            $hasCompositeUnique = collect(DB::select("SHOW INDEX FROM `settings`"))
+                ->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique');
+            $hasPrimary = collect(DB::select("SHOW INDEX FROM `settings`"))
+                ->contains(fn ($i) => $i->Key_name === 'PRIMARY');
 
-        if ($hasCompositeUnique && !$hasPrimary) {
-            DB::statement("ALTER TABLE `settings` DROP INDEX `settings_key_brand_unique`");
-            DB::statement("ALTER TABLE `settings` ADD PRIMARY KEY (`key`, `brand`)");
+            if ($hasCompositeUnique && !$hasPrimary) {
+                DB::statement("ALTER TABLE `settings` DROP INDEX `settings_key_brand_unique`");
+                DB::statement("ALTER TABLE `settings` ADD PRIMARY KEY (`key`, `brand`)");
+            }
         }
 
         // ─── Part 2+3 SKIPPED ────────────────────────
@@ -154,7 +173,11 @@ return new class extends Migration {
         }
 
         // 7c. Update the type enum to remove free_items
-        DB::statement("ALTER TABLE `coupons` MODIFY COLUMN `type` ENUM('fixed', 'percentage') NOT NULL");
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('coupons', fn (Blueprint $t) => $t->enum('type', ['fixed', 'percentage'])->change());
+        } else {
+            DB::statement("ALTER TABLE `coupons` MODIFY COLUMN `type` ENUM('fixed', 'percentage') NOT NULL");
+        }
 
         // ══════════════════════════════════════════════
         //  Part 8: Add can_purchase_upgrades to users (per-user upgrade toggle)
@@ -180,20 +203,32 @@ return new class extends Migration {
         //  Part 10: Change galleries/gallery_groups FK from SET NULL to CASCADE
         // ══════════════════════════════════════════════
 
-        $galleriesFk = DB::select("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'galleries' AND CONSTRAINT_NAME = 'galleries_tenant_id_foreign'");
-        if (!empty($galleriesFk) && $galleriesFk[0]->DELETE_RULE === 'SET NULL') {
+        if (DB::connection()->getDriverName() === 'sqlite') {
             Schema::table('galleries', function (Blueprint $table) {
-                $table->dropForeign('galleries_tenant_id_foreign');
+                $table->dropForeign(['tenant_id']);
                 $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
             });
-        }
 
-        $groupsFk = DB::select("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'gallery_groups' AND CONSTRAINT_NAME = 'gallery_groups_tenant_id_foreign'");
-        if (!empty($groupsFk) && $groupsFk[0]->DELETE_RULE === 'SET NULL') {
             Schema::table('gallery_groups', function (Blueprint $table) {
-                $table->dropForeign('gallery_groups_tenant_id_foreign');
+                $table->dropForeign(['tenant_id']);
                 $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
             });
+        } else {
+            $galleriesFk = DB::select("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'galleries' AND CONSTRAINT_NAME = 'galleries_tenant_id_foreign'");
+            if (!empty($galleriesFk) && $galleriesFk[0]->DELETE_RULE === 'SET NULL') {
+                Schema::table('galleries', function (Blueprint $table) {
+                    $table->dropForeign('galleries_tenant_id_foreign');
+                    $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
+                });
+            }
+
+            $groupsFk = DB::select("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'gallery_groups' AND CONSTRAINT_NAME = 'gallery_groups_tenant_id_foreign'");
+            if (!empty($groupsFk) && $groupsFk[0]->DELETE_RULE === 'SET NULL') {
+                Schema::table('gallery_groups', function (Blueprint $table) {
+                    $table->dropForeign('gallery_groups_tenant_id_foreign');
+                    $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
+                });
+            }
         }
     }
 

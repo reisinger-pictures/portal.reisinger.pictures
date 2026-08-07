@@ -21,21 +21,6 @@ jobs:
       run:
         working-directory: backend
     services:
-      mariadb:
-        image: mariadb:11.4
-        ports:
-          - 3307:3306
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: portal_test_db
-          MYSQL_USER: portal_user
-          MYSQL_PASSWORD: admin
-        # Ports + Credentials matchen backend/phpunit.xml (DB_PORT=3307 ...)
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
       meilisearch:
         image: getmeili/meilisearch:v1.48.3
         ports:
@@ -55,9 +40,10 @@ jobs:
       # PHP-Tests laufen im Prod-Image ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 +
       # exiftool + alle App-Extensions) - identisch zur Prod-Runtime. Composer
       # kommt wie in Prod ueber das offizielle composer:latest-Image. Die
-      # CI-Env (DB/Meili/Mail/JWT/Admin) steht in backend/.env.ci und wird als
-      # `.env` eingespielt. `--network host` -> Dienste bleiben unter
-      # 127.0.0.1:3307/7701/1026 erreichbar (phpunit.xml + .env unveraendert).
+      # CI-Env (Meili/Mail/JWT/Admin) steht in backend/.env.ci und wird als
+      # `.env` eingespielt. Die Tests laufen via phpunit.xml auf SQLite
+      # `:memory:` (kein DB-Service noetig). `--network host` -> Dienste bleiben
+      # unter 127.0.0.1:7701/1026 erreichbar (phpunit.xml + .env unveraendert).
       - name: Start PHP container (prod image)
         run: |
           docker run -d --name php \
@@ -79,18 +65,6 @@ jobs:
             composer install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
         run: docker exec php php artisan key:generate
-      - name: Grant parallel test DB permissions
-        # paratest legt pro Worker `portal_test_db_test_<n>` an; der von
-        # mariadb:11.4 angelegte portal_user hat nur Rechte auf portal_test_db.
-        # Laravel erzeugt Worker-DBs via CREATE DATABASE -> globales CREATE noetig.
-        run: |
-          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -proot -e \
-            "GRANT ALL PRIVILEGES ON \`portal\_test\_db\_test\_%\`.* TO 'portal_user'@'%'; GRANT CREATE ON *.* TO 'portal_user'@'%'; FLUSH PRIVILEGES;"
-      - name: Run migrations
-        run: docker exec php php artisan migrate --force
-      - name: Seed database
-        # DatabaseSeeder ruft am Ende app:import-locations auf (Geonames-Download).
-        run: docker exec php php artisan db:seed --force
       - name: Run PHPUnit
         # Parallele Worker via paratest (portal-base:8.5 enthaelt seit dem
         # Rebuild ext-pcntl + posix). pipefail laesst den Step fehlschlagen,

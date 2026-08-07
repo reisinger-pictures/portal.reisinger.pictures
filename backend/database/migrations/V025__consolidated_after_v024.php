@@ -58,7 +58,11 @@ return new class extends Migration
         });
 
         // ── V026 (contract templates) ─────────────────────────────────
-        DB::statement("ALTER TABLE contracts ADD COLUMN type ENUM('contract', 'template') NOT NULL DEFAULT 'contract' AFTER closes_at");
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('contracts', fn (Blueprint $t) => $t->enum('type', ['contract', 'template'])->default('contract'));
+        } else {
+            DB::statement("ALTER TABLE contracts ADD COLUMN type ENUM('contract', 'template') NOT NULL DEFAULT 'contract' AFTER closes_at");
+        }
         Schema::table('contracts', function (Blueprint $table) {
             $table->uuid('template_id')->nullable()->after('type');
             $table->foreign('template_id')->references('id')->on('contracts')->nullOnDelete();
@@ -131,26 +135,49 @@ return new class extends Migration
         // ── V025 Step D ───────────────────────────────────────────────
 
         // D1. Drop ALL foreign keys referencing tenants/tenant_id before renaming
-        Schema::table('gallery_group_tenant', function (Blueprint $table) {
-            $table->dropForeign('gallery_group_tenant_tenant_id_foreign');
-        });
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('gallery_group_tenant', fn (Blueprint $table) => $table->dropForeign(['tenant_id']));
+        } else {
+            Schema::table('gallery_group_tenant', function (Blueprint $table) {
+                $table->dropForeign('gallery_group_tenant_tenant_id_foreign');
+            });
+        }
 
-        Schema::table('tenant_invites', function (Blueprint $table) {
-            $table->dropForeign('tenant_invites_tenant_id_foreign');
-        });
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('tenant_invites', fn (Blueprint $table) => $table->dropForeign(['tenant_id']));
+        } else {
+            Schema::table('tenant_invites', function (Blueprint $table) {
+                $table->dropForeign('tenant_invites_tenant_id_foreign');
+            });
+        }
 
-        Schema::table('galleries', function (Blueprint $table) {
-            $table->dropForeign('galleries_tenant_id_foreign');
-        });
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('galleries', fn (Blueprint $table) => $table->dropForeign(['tenant_id']));
+        } else {
+            Schema::table('galleries', function (Blueprint $table) {
+                $table->dropForeign('galleries_tenant_id_foreign');
+            });
+        }
 
-        Schema::table('gallery_groups', function (Blueprint $table) {
-            $table->dropForeign('gallery_groups_tenant_id_foreign');
-        });
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('gallery_groups', fn (Blueprint $table) => $table->dropForeign(['tenant_id']));
+        } else {
+            Schema::table('gallery_groups', function (Blueprint $table) {
+                $table->dropForeign('gallery_groups_tenant_id_foreign');
+            });
+        }
 
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign('users_tenant_id_foreign');
-            $table->dropIndex('users_tenant_id_index');
-        });
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropForeign(['tenant_id']);
+                $table->dropIndex('users_tenant_id_index');
+            });
+        } else {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropForeign('users_tenant_id_foreign');
+                $table->dropIndex('users_tenant_id_index');
+            });
+        }
 
         // D2. Rename tables
         Schema::rename('tenants', 'orgs');
@@ -234,7 +261,18 @@ return new class extends Migration
         foreach ($brandTables as $table => $config) {
             $nullable = $config['nullable'] ? 'NULL' : 'NOT NULL';
             $default = $config['default'] !== null ? " DEFAULT '{$config['default']}'" : '';
-            DB::statement("ALTER TABLE `{$table}` MODIFY COLUMN `brand` VARCHAR(20) {$nullable}{$default}");
+            if (DB::connection()->getDriverName() === 'sqlite') {
+                Schema::table($table, function (Blueprint $t) use ($config) {
+                    $brand = $t->string('brand', 20);
+                    $config['nullable'] ? $brand->nullable() : $brand->nullable(false);
+                    if ($config['default'] !== null) {
+                        $brand->default($config['default']);
+                    }
+                    $brand->change();
+                });
+            } else {
+                DB::statement("ALTER TABLE `{$table}` MODIFY COLUMN `brand` VARCHAR(20) {$nullable}{$default}");
+            }
         }
 
         // ── V030: contracts.brand → VARCHAR(20) (special case, NOT in V028) ─

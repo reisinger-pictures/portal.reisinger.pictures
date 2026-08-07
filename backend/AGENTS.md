@@ -17,28 +17,28 @@ cd backend && php artisan test
 
 Nach `php artisan migrate:fresh` MUSS `php artisan db:seed` (oder `--seed` Flag) ausgeführt werden. Ohne Seed existiert kein Admin-User — Login und Auth sind tot. Der `DatabaseSeeder` legt den Admin via `firstOrCreate` mit `ADMIN_EMAIL`/`ADMIN_PASSWORD` an.
 
+**Lokale Dev-DB:** SQLite-Datei `backend/database/database.sqlite` (gitignored, leer). Kein DB-Container nötig — `php artisan migrate:fresh --seed` erstellt das Schema direkt in dieser Datei.
+
 **Migration-Regel (STRICT):** Bei JEDER Migration gilt: **immer seeden**, nie nur migrieren. `php artisan migrate` (bzw. `migrate:fresh`) allein reicht nicht — anschließend IMMER `php artisan db:seed` (oder `--seed` Flag) ausführen, sonst funktioniert das Anmelden (Login/Auth) nicht, weil kein Admin-User existiert.
 
-**Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. **V027 ist die letzte (deploy-bereite) Migration** (V025–V026 wurden 2026-08-04 deployed; V027 verifiziert in `portal_test_db`). Neue Schema-Änderungen erfolgen daher als separate Migrationen ab V028. **`down()`-Methoden werden nie ausgeführt und können als Regel leer gelassen werden** (etabliert 2026-08-03).
+**Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. **V027 ist die letzte (deploy-bereite) Migration** (V025–V026 wurden 2026-08-04 deployed; V027 verifiziert). Neue Schema-Änderungen erfolgen daher als separate Migrationen ab V028. **`down()`-Methoden werden nie ausgeführt und können als Regel leer gelassen werden** (etabliert 2026-08-03).
 
-## Backend Parallel Testing (PHP) — EINRICHTUNG AKTIV (2026-08-03)
+## Backend Parallel Testing (PHP) — SQLite `:memory:` (2026-08-07)
 
-`paratest` ist installiert (`brianium/paratest`). Die Test-Infra ist parallel-fähig:
+`paratest` ist installiert (`brianium/paratest`). Die Tests laufen via `phpunit.xml` vollständig auf **SQLite `:memory:`** — kein DB-Container, keine MariaDB-Grants, keine Worker-DBs:
 
-- Canonical Test-DB: `portal_test_db` (MariaDB :3307, aus `phpunit.xml`).
-- Worker-DBs: `php artisan test --parallel` legt pro Prozess automatisch `portal_test_db_test_<n>` an. `portal_user` hat die Wildcard-Grants `ON portal\_test\_db\_test\_%` + CREATE-Recht (verifiziert 2026-08-03).
+- Canonical Test-DB: SQLite `:memory:` (aus `phpunit.xml`).
+- `php artisan test --parallel` funktioniert out-of-the-box: jeder paratest-Worker-Prozess startet eine eigene, isolierte In-Memory-DB. Es existiert keine geteilte Instanz, auf der sich parallele Läufe gegenseitig zerstören können.
 
 **KONKURRENZ-REGEL (STRICT, Subagenten):**
 
-- `RefreshDatabase` leert und re-migriert die DB bei jedem PHPUnit-Prozessstart. Mehrere gleichzeitige `php artisan test`-Läufe auf DERSELBEN DB kollidieren (Tabellen-Drop im Parallelbetrieb) → Kaskaden-Fehler.
-- Die volle Suite läuft IMMER NUR in EINEM Subagenten (einmal, canonical DB).
-- Subagenten, die Backend-Tests ausführen müssen, nutzen für Scoped-Runs (`--filter`) eine eigene Worker-DB, z. B.:
+- `RefreshDatabase` migriert die In-Memory-DB bei jedem PHPUnit-Prozessstart frisch. SQLite `:memory:` macht parallele Läufe von Natur aus isoliert — Kollisionen durch Tabellen-Drop auf einer geteilten DB sind ausgeschlossen.
+- Trotzdem: Die volle Suite läuft zur Reproduzierbarkeit IMMER NUR in EINEM Subagenten (einmal).
+- Scoped-Runs (`--filter`) sind ohne Worker-DB-Setup direkt möglich — kein `DB_DATABASE=`-Präfix und kein `docker exec ... mariadb` mehr nötig:
 
 ```bash
-DB_DATABASE=portal_test_db_test_<task> php artisan test --filter <TestClass>
+php artisan test --filter <TestClass>
 ```
-
-  (Anlegen der Worker-DB vorab via `docker exec portal_db_test mariadb ...`; der Name MUSS `portal_test_db_test_%` matchen, damit der Grant greift.)
 
 **PHP Group-Strategy (noch nicht implementiert):**
 

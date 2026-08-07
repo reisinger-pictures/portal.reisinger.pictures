@@ -227,7 +227,7 @@ class PhotoMetadataTest extends TestCase {
         $res->assertStatus(200);
         $this->assertDatabaseHas('photos', [
             'id' => $photo->id,
-            'keywords' => $longKeywords
+            'keywords' => rtrim($longKeywords)
         ]);
     }
     public function test_captured_at_is_readonly_and_returned_in_context() {

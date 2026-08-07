@@ -1,16 +1,4 @@
 services:
-  db:
-    image: mariadb:11.4
-    container_name: portal_db_local
-    restart: unless-stopped
-    ports: ["3306:3306"]
-    environment:
-      MYSQL_ROOT_PASSWORD: admin
-      MYSQL_DATABASE: portal_db
-      MYSQL_USER: portal_user
-      MYSQL_PASSWORD: admin
-    volumes: ["db_data_local:/var/lib/mysql"]
-
   search:
     image: getmeili/meilisearch:v1.48.3
     container_name: portal_search_local
@@ -30,5 +18,4 @@ services:
       - "1025:1025"
 
 volumes:
-  db_data_local:
   search_data_local:

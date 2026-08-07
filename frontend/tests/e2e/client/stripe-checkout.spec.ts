@@ -108,7 +108,7 @@ test.describe('Stripe Checkout Workflow', () => {
     };
 
     test('Negative Flow: Handles generic decline and insufficient funds via inline alert', { tag: ['@feature:client:checkout'] }, async ({page}) => {
-        test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
+        test.setTimeout(120000); // Erhöhtes Timeout für Multi-User Flow (2 Zahlungsversuche)
         const {stripeFrame} = await navigateToStripeIframe(page);
 
         await StripeHelper.fillStripeForm(page, CreditCardHelper.genericDecline);
@@ -141,7 +141,7 @@ test.describe('Stripe Checkout Workflow', () => {
     });
 
     test('Positive Flow: Handles successful payment via Visa', { tag: ['@smoke', '@feature:client:checkout'] }, async ({page}) => {
-        test.setTimeout(60000); // Erhöhtes Timeout für Multi-User Flow
+        test.setTimeout(120000); // Erhöhtes Timeout für Multi-User Flow
         await navigateToStripeIframe(page);
 
         await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa);

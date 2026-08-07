@@ -8,12 +8,12 @@ use App\Models\Role;
 use App\Models\TextSnippet;
 use App\Models\User;
 use App\Support\BrandRegistry;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class TextSnippetControllerTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     private User $superAdmin;
     private User $admin;

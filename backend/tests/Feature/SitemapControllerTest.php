@@ -8,12 +8,12 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SitemapControllerTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     public function test_sitemap_galleries_returns_xml()
     {

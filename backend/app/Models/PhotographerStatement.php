@@ -19,7 +19,7 @@ class PhotographerStatement extends Model
     protected $casts = [
         'month' => 'integer',
         'year' => 'integer',
-        'total_shares_earned' => 'string',
+        'total_shares_earned' => 'decimal:4',
         'pool_earnings_cents' => 'integer',
         'delta_surcharge_earnings_cents' => 'integer',
         'earned_amount_cents' => 'integer',

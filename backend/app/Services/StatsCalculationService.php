@@ -52,7 +52,7 @@ class StatsCalculationService
         $rawDomainStats = DB::table('download_logs')
             ->join('users', 'download_logs.user_id', '=', 'users.id')
             ->where($tierFilterDb)
-            ->selectRaw('SUBSTRING_INDEX(users.email, "@", -1) as domain, COUNT(*) as count')
+            ->selectRaw("substr(users.email, instr(users.email, '@') + 1) as domain, COUNT(*) as count")
             ->groupBy('domain')
             ->get();
 
@@ -104,7 +104,7 @@ class StatsCalculationService
             ->join('users', 'download_logs.user_id', '=', 'users.id')
             ->whereIn('download_logs.user_id', $orgUserIds)
             ->where($tierFilterDb)
-            ->selectRaw('SUBSTRING_INDEX(users.email, "@", -1) as domain, COUNT(*) as count')
+            ->selectRaw("substr(users.email, instr(users.email, '@') + 1) as domain, COUNT(*) as count")
             ->groupBy('domain')
             ->get();
 
@@ -165,7 +165,7 @@ class StatsCalculationService
             ->join('users', 'download_logs.user_id', '=', 'users.id')
             ->whereIn('download_logs.gallery_id', $galleryIds)
             ->where($tierFilterDb)
-            ->selectRaw('SUBSTRING_INDEX(users.email, "@", -1) as domain, COUNT(*) as count')
+            ->selectRaw("substr(users.email, instr(users.email, '@') + 1) as domain, COUNT(*) as count")
             ->groupBy('domain')
             ->get();
 

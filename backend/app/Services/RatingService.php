@@ -42,7 +42,7 @@ class RatingService
             ->join('photos', 'ratings.photo_id', '=', 'photos.id')
             ->where('photos.gallery_id', $gallery->id)
             ->whereNull('ratings.user_id')
-            ->select('ratings.guest_id', 'ratings.guest_name', DB::raw('COUNT(IF(ratings.rating > 0, 1, NULL)) as rated_count'))
+            ->select('ratings.guest_id', 'ratings.guest_name', DB::raw('COUNT(CASE WHEN ratings.rating > 0 THEN 1 END) as rated_count'))
             ->groupBy('ratings.guest_id', 'ratings.guest_name')
             ->get();
 
