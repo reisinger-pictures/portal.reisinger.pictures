@@ -20,4 +20,6 @@
 - storage/app/private/watermark*
 - out/**
 - bootstrap/cache/**
+- core
+- core/**
 + **
