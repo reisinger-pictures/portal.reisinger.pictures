@@ -16,12 +16,13 @@
 **Ziel:** Das Base-Image-Repo `reisi007/docker-base-images` (lokal `~/dev/php-apache-mod2rewrite`) wird **komplett entfernt** (lokal + Remote + GHCR-Packages), da das Portal der einzige Konsument ist. Das spezialisierte Image `ghcr.io/reisi007/portal-base:8.5` (PHP 8.5, mysql, Dockerfile 1:1 aus dem Base-Repo) wird künftig **per Cron (täglich 01:00)** aus **diesem** Repo gebaut.
 
 **Umsetzungsplan:**
-- [ ] `deployment/Dockerfile` anlegen (identischer Inhalt wie Base-Repo-Dockerfile)
-- [ ] `.github/workflows/base-image.yml`: cron `0 1 * * *` + `workflow_dispatch` + `push` (paths: Dockerfile + Workflow); baut **NUR** `portal-base:8.5`/`latest` (PHP 8.5, mysql)
-- [ ] Commit 1 pushen → CI bleibt auf `php-base:8.5` (grün), base-image-Run baut `portal-base:8.5`
-- [ ] **portal-base:8.5-Run grün abwarten** (Gate für Löschung)
-- [ ] Commit 2: Referenzen `php-base:8.5` → `portal-base:8.5` in `deployment/docker-compose.yml:56`, `.github/workflows/ci.yml` (55, 67, 95, 291, 305), `backend/.env.ci` (4–5), `features/infrastructure/01-deployment.md:25`
-- [ ] CI nach Commit 2 grün
+- [x] `deployment/Dockerfile` anlegen (identischer Inhalt wie Base-Repo-Dockerfile)
+- [x] `.github/workflows/base-image.yml`: cron `0 1 * * *` + `workflow_dispatch` + `push` (paths: Dockerfile + Workflow); baut **NUR** `portal-base:8.5`/`latest` (PHP 8.5, mysql)
+- [x] Commit 1 pushen → CI bleibt auf `php-base:8.5` (grün), base-image-Run baut `portal-base:8.5`
+- [x] **portal-base:8.5-Run grün abwarten** (Gate für Löschung) — inkl. Multi-Arch-Fix (amd64+arm64, Commit `1f37a82`); `exec: php-fpm: not found` war Emulations-Problem auf Apple Silicon, arm64-Variante läuft nativ
+- [x] Commit 2: Referenzen `php-base:8.5` → `portal-base:8.5` in `deployment/docker-compose.yml:56`, `.github/workflows/ci.yml` (55, 67, 95, 291, 305), `backend/.env.ci` (4–5), `features/infrastructure/01-deployment.md:25`
+- [x] CI nach Commit 2 grün (Run `31187394565` success)
+- [ ] **⚠️ Prod manuell updaten:** `docker-compose.yml` referenziert jetzt `portal-base:8.5` → Portainer Stack-Redeploy nötig (User-Notify erledigt)
 - [ ] Base-Repo löschen: lokaler Klon + `gh repo delete reisi007/docker-base-images`
 - [ ] GHCR-Packages aufräumen: `php-base` (30 Versionen), `php-mysql` (20), `php-postgres` (20), `portal-base`-Orphans (untagged)
 
