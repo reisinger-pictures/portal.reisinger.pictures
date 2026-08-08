@@ -9,13 +9,5 @@ services:
     ports: ["7701:7700"]
     volumes: ["search_data_test:/meili_data"]
 
-  mailpit:
-    image: axllent/mailpit
-    container_name: portal_mailpit_test
-    restart: unless-stopped
-    ports:
-      - "8026:8025"
-      - "1026:1025"
-
 volumes:
   search_data_test:

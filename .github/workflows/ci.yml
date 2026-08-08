@@ -29,12 +29,12 @@ jobs:
           MEILI_MASTER_KEY: test_meili_secret
           MEILI_ENV: development
       mailpit:
-        # phpunit.xml sendet via SMTP auf 127.0.0.1:1026; MailpitAssertions.php
-        # liest Mails ueber die HTTP-API auf 127.0.0.1:8026 (hardcodiert).
+        # phpunit.xml sendet via SMTP auf 127.0.0.1:1025; MailpitAssertions.php
+        # liest Mails ueber die HTTP-API auf 127.0.0.1:8025 (hardcodiert).
         image: axllent/mailpit
         ports:
-          - 1026:1025
-          - 8026:8025
+          - 1025:1025
+          - 8025:8025
     steps:
       - uses: actions/checkout@v4
       # PHP-Tests laufen im Prod-Image ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 +
@@ -43,7 +43,7 @@ jobs:
       # CI-Env (Meili/Mail/JWT/Admin) steht in backend/.env.ci und wird als
       # `.env` eingespielt. Die Tests laufen via phpunit.xml auf SQLite
       # `:memory:` (kein DB-Service noetig). `--network host` -> Dienste bleiben
-      # unter 127.0.0.1:7701/1026 erreichbar (phpunit.xml + .env unveraendert).
+      # unter 127.0.0.1:7701/1025 erreichbar (phpunit.xml + .env unveraendert).
       - name: Start PHP container (prod image)
         run: |
           docker run -d --name php \

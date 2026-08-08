@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Http;
 
 trait MailpitAssertions
 {
-    private const MAILPIT_API = 'http://127.0.0.1:8026/api/v1';
+    private const MAILPIT_API = 'http://127.0.0.1:8025/api/v1';
 
     protected function getMailpitMessages(): array
     {
