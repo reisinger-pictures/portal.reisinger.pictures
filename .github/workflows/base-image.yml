@@ -34,12 +34,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push portal-base Image (amd64 + arm64)
+      - name: Build and Push portal-base Image (amd64)
         uses: docker/build-push-action@v6
         with:
           context: deployment
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           build-args: |
             PHP_VERSION=8.5
             DB_EXT=mysql
