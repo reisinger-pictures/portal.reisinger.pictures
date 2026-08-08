@@ -55,3 +55,13 @@ Danach Laravel Herd einmal neu starten, damit PHP-FPM die Tools findet. Ohne die
 
 ### Stripe Webhooks (Lokal Testen)
 Führe `stripe listen --forward-to localhost:8000/api/webhooks/stripe` aus und trage das ausgegebene `STRIPE_WEBHOOK_SECRET` in die `.env` Datei im Backend ein.
+
+## Lokale E2E-Tests isoliert ausführen (eigene Backend-Instanz + SQLite-DB)
+
+Die Playwright-E2E-Suite nutzt lokal standardmäßig den laufenden Dev-Backend (`portal.test` / `backend/database/database.sqlite`) — Testdaten würden dort landen. Um die lokale Instanz unberührt zu lassen, gibt es einen **isolierten E2E-Backend** mit eigener SQLite-DB (`backend/database/database.e2e.sqlite`, gitignored) auf Port **8001**:
+
+1. **Backend starten:** Run-Config `🐘 [Run] Start E2E Backend (isoliert)` (oder `bash scripts/e2e-up.sh`) — startet Test-Docker-Services (Meili 7701, Mailpit 8026/1026), generiert `backend/.env.e2e` aus deinem `.env`, migriert + seedet die E2E-DB und served auf `http://127.0.0.1:8001`.
+2. **Frontend mit Proxy:** Run-Config `⚡ [Run] Frontend: Start Frontend (E2E Proxy)` (oder `VITE_API_PROXY=http://127.0.0.1:8001 pnpm dev`).
+3. **Tests:** Run-Config `🧪 [Test] Frontend: Playwright (E2E isoliert)` (oder `MAILPIT_API_URL=http://127.0.0.1:8026/api/v1 pnpm test:e2e`).
+
+*Hinweis: Die Dev-Instanz (`portal.test`) bleibt davon völlig unberührt — die E2E-Daten liegen ausschließlich in der e2e-SQLite-DB und den Test-Service-Containern.*

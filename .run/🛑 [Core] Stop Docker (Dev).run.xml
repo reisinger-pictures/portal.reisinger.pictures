@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="🛑 [Core] Stop Docker (Dev)" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="docker compose --project-name portal_test -f docker-compose.local.yml down" />
+    <option name="SCRIPT_TEXT" value="docker compose --project-name portal_local -f docker-compose.local.yml down" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

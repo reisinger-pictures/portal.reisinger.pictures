@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="🧪 [Test] Frontend: Playwright (E2E isoliert)" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/frontend/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="test:e2e" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs>
+      <env name="MAILPIT_API_URL" value="http://127.0.0.1:8026/api/v1" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

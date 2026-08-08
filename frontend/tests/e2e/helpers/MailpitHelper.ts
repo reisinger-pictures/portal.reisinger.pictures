@@ -2,7 +2,7 @@ import { APIRequestContext } from '@playwright/test';
 import { MailpitMessage } from '../../../src/api';
 
 export class MailpitHelper {
-    private baseUrl = 'http://localhost:8025/api/v1';
+    private baseUrl = process.env.MAILPIT_API_URL || 'http://localhost:8025/api/v1';
 
     constructor(private request: APIRequestContext) {}
 

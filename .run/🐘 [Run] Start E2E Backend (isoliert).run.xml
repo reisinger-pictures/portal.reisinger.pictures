@@ -1,11 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="⚙️ [Setup] Backend: DB Migration (Test)" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="php artisan migrate:fresh --seed" />
+  <configuration default="false" name="🐘 [Run] Start E2E Backend (isoliert)" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="bash scripts/e2e-up.sh" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />
     <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="false" />
-    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/backend" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
     <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
     <option name="INTERPRETER_PATH" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />

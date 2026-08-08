@@ -11,6 +11,40 @@
 
 ---
 
+## 🔄 Lokale E2E-Isolation: separater Backend + eigene SQLite-DB (2026-08-08)
+
+**Ausgangsfrage (User):** „Nutzen wir schon eine eigene Instanz des Backends / SQLite-DB-Kombi für E2E-Tests, damit die lokale Instanz unberührt bleibt?"
+
+**Ist-Analyse (verifiziert):**
+- **CI (GitHub Actions): JA, vollständig isoliert.** Der e2e-Job nutzt einen eigenen MariaDB-Container (`portal_test_db`), eigene Meili (7701), eigene Mailpit (8025/1025) und das Backend im Container mit `.env.ci`. Lokale Instanz wird nie berührt.
+- **Lokal: NEIN.** Lokale Playwright-Tests treffen `http://localhost:4321` (Vite), das `/api` an `VITE_API_PROXY || 'https://portal.test'` proxied → lokales Herd-Backend mit `.env` → **lokale SQLite `database/database.sqlite`**. E2E erzeugt/löscht Daten direkt in der lokalen Dev-DB.
+
+**Was fehlt (lokal):**
+1. Separater Backend-Prozess mit eigener `.env.e2e` → eigener SQLite `database/database.e2e.sqlite`.
+2. Isolierte Services: Meili 7701 (`test_meili_secret`) + `SCOUT_PREFIX=e2e_` (Index-Isolation), Mailpit 8026/1026 (aus `docker-compose.test.yml`).
+3. Frontend-Proxy auf den isolierten Backend: `VITE_API_PROXY=http://127.0.0.1:8001`.
+4. MailpitHelper: Basis-URL via `MAILPIT_API_URL` konfigurierbar (Default 8025 = CI unverändert; lokal E2E → 8026).
+
+**Entscheidungen:**
+1. **Backend NICHT im Docker-Image** (User: „isolierte DB via artisan serve reicht"): `php artisan --env=e2e serve --host=127.0.0.1 --port=8001 --no-reload`. Empirisch verifiziert: mit `--no-reload` erbt der Child-Prozess alle `.env.e2e`-Werte (Stripe-Keys überleben, DB zeigt auf e2e-Datei). `APP_ENV=local` in `.env.e2e` → `/api/test/cleanup-user` bleibt registriert (E2E-Teardown).
+2. **`scripts/e2e-up.sh`** (neu, idempotent): Test-Services `up -d` → `.env.e2e` aus `.env` generieren (Stripe/JWT/APP_KEY werden übernommen, E2E-Keys validiert überschrieben) → `touch` e2e-SQLite → `migrate:fresh --seed --env=e2e` → `serve` auf 8001.
+3. **`.env.e2e` ist gitignored** (Stripe-Test-Keys) — wird nur lokal generiert.
+4. **Run-Configs (IntelliJ):**
+   - Löschen: `⚙️ [Setup] Backend: Config & Cache Reset` (dup von Init (Cache)), `⚙️ [Setup] Backend: DB Migration (Test)` (dup von Gefahr DB Reset & Seed), `💳 [Run] Stripe: Webhook Tunnel (Node)` (dup), `🔧 [Wartung] Meilisearch Sync` (Command `scout:sync` existiert nicht → kaputt).
+   - Bugfix: `🛑 [Core] Stop Docker (Dev)` referenzierte `--project-name portal_test` statt `portal_local`.
+   - Konsistenz: `🐳/🛑 Docker (Test)` nutzten `--project-name portal_test`, die real laufenden Test-Container (fixe `container_name` in Compose) liegen aber unter dem Default-Projektnamen → beide auf Default umgestellt (kein Name-Conflict, `down` stoppt wirklich).
+   - Neu: `🐘 [Run] Start E2E Backend (isoliert)` → `scripts/e2e-up.sh`; `⚡ [Run] Frontend: Start Frontend (E2E Proxy)` (`VITE_API_PROXY=8001`); `🧪 [Test] Frontend: Playwright (E2E isoliert)` (`MAILPIT_API_URL=8026`).
+
+**TODO (Implementierung delegiert an Subagent):**
+- [x] `scripts/e2e-up.sh` anlegen (idempotent, Safe-Patching)
+- [x] `MailpitHelper.ts`: `process.env.MAILPIT_API_URL || 'http://localhost:8025/api/v1'`
+- [x] Run-Configs: 4 löschen, Stop-Docker(Dev)-Bug fixen, Docker(Test)-Projektname vereinheitlichen, 3 neue anlegen
+- [x] README: Abschnitt „Lokale E2E-Isolation" + Run-Config-Referenzen aktualisieren
+- [x] Verifikation durch separaten Subagenten (bash -n, env-Generierung, git diff) + Korrekturen eingearbeitet
+- [ ] Commit + Push; CI-Run beobachten
+
+---
+
 ## 🔄 portal-base:8.5 — Spezialisiertes Image im Portal-Repo (2026-08-07)
 
 **Ziel:** Das Base-Image-Repo `reisi007/docker-base-images` (lokal `~/dev/php-apache-mod2rewrite`) wird **komplett entfernt** (lokal + Remote + GHCR-Packages), da das Portal der einzige Konsument ist. Das spezialisierte Image `ghcr.io/reisi007/portal-base:8.5` (PHP 8.5, mysql, Dockerfile 1:1 aus dem Base-Repo) wird künftig **per Cron (täglich 01:00)** aus **diesem** Repo gebaut.

@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="⚡ [Run] Frontend: Start Frontend (E2E Proxy)" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/frontend/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="dev" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs>
+      <env name="VITE_API_PROXY" value="http://127.0.0.1:8001" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>
