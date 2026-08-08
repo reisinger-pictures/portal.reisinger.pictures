@@ -11,53 +11,6 @@
 
 ---
 
-## 🔄 SQLite statt MariaDB/Postgres lokal (2026-08-07)
-
-**Ziel:** Lokale Dev-Umgebung (Portal + Tracking) komplett ohne Datenbank-Container. Portal: MariaDB-Container (Dev + Test) fliegen raus. Tracking: Postgres-Container (Dev) fliegt raus. **Produktion unberührt** (Portal → MariaDB, Tracking → Postgres).
-
-**Entscheidungen (interaktiv geklärt 2026-08-07):**
-1. **Portal PHPUnit komplett auf SQLite `:memory:`** → `docker-compose.test.yml` verliert den `db`-Service; paratest-Worker-DB-Logik (MariaDB-Grants) entfällt.
-2. **Portal CI-E2E-Job bleibt auf MariaDB** (Produktionsparität, Fehler sollen dort gefunden werden). Nur der CI-`backend`-Job verliert den nun ungenutzten MariaDB-Service (Tests laufen via `phpunit.xml` auf SQLite). `.env.ci` bleibt unverändert (wird vom E2E-Job gebraucht).
-3. **Tracking lokal = SQLite, CI/E2E = Postgres** (unverändert: `docker-compose.test.yml` + Image mit `pdo_pgsql`). Tracking-PHPUnit läuft bereits auf SQLite `:memory:`.
-
-**Bestandsaufnahme (geprüft):**
-- Portal `.env` nutzt heute `DB_PORT=3307` = Test-MariaDB-Container; Local-Container (3306) faktisch ungenutzt (s. Stack-Konsolidierung).
-- Portal-Migrationen mit MariaDB-Raw-SQL (SQLite-Zweige nötig): **V018** (`SHOW INDEX`, `ALTER ... DROP PRIMARY KEY`, `ADD COLUMN ... ENUM`, `DELETE ... LIMIT 1`, `INSERT ... SELECT UUID()`), **V019** (`MODIFY/CHANGE ... ENUM`, `information_schema.REFERENTIAL_CONSTRAINTS`), **V023/V024** (`MODIFY ... ENUM`), **V025** (`ADD COLUMN type ENUM ... AFTER`, `MODIFY brand VARCHAR`), **V027** (`MODIFY status ENUM`). `enum()`/`json()`-Spalten sind auf SQLite ok (Laravel: TEXT+CHECK).
-- Portal-Services mit MySQL-Funktionen: `RatingService:45` (`IF()`), `StatsCalculationService:55/107/168` (`SUBSTRING_INDEX`).
-- Tracking: SQLite-kompatibel (Tests laufen schon auf sqlite), `database/database.sqlite` existiert; nur lokale Env + Compose umstellen.
-
-**Umsetzung (parallele Implementer-Subagenten, Build-Agent schreibt keinen Code):**
-- [x] **Imp-Portal-Migrations:** V008/V018/V019/V023/V024/V025/V027 driver-conditional (`DB::getDriverName() === 'sqlite'`), MariaDB-Pfad unverändert (byte-ident, git-diff-verifiziert); `RatingService`+`StatsCalculationService` portabel (`CASE WHEN` / `substr`+`instr`). V008: SQLite-Manual-Rebuild für `invoice_sequences` (AUTOINCREMENT-PK-`id`-Drop ist auf SQLite nicht erlaubt). Smoke: volle Kette `migrate:fresh` auf Scratch-SQLite ohne Stand-in.
-- [x] **Imp-Portal-Config:** `.env`/`.env.example`/`phpunit.xml` → sqlite; `database/database.sqlite` angelegt; `docker-compose.local.yml`+`.test.yml` ohne `db`-Service; `docker/test/init/01-grants.sql` gelöscht; `backend/AGENTS.md` Parallel-Testing-Abschnitt; README; `.run`-Config; `ci.yml` `backend`-Job: MariaDB-Service + Grant-Step + vestigiale `migrate`/`seed`-Steps entfernt (RefreshDatabase migriert selbst), `e2e`-Job + `.env.ci` unangetastet; alte MariaDB/Postgres-Container entfernt.
-- [x] **Imp-Tracking:** `.env`/`.env.example` → sqlite (Datei `database/database.sqlite`); `docker-compose.local.yml` ohne Postgres (nur Mailpit); README lokal-DB-Abschnitte; E2E-Compose/Deployment unangetastet.
-
-**Verifikation (parallele Verifizierer, NIE Implementer desselben Tasks):**
-- [x] **Ver-MariaDB-Parität:** volle Kette V001–V027 auf Throwaway-MariaDB 11.4 (`docker run --rm` :33306, danach entfernt) → End-Schema exakt (PKs, ENUMs, kein `invoice_sequences.id`). **Produktionsparität bestätigt.**
-- [x] **Ver-Portal-Tests:** volle Suite auf SQLite `:memory:` **1097 passed / 0 failed** (single + `--parallel`, 18 Worker, je eigene In-Memory-DB). Fixes: 2 Model-Casts `string`→`decimal:4` (PayoutPool/PhotographerStatement — SQLite-NUMERIC-Affinität liefert `'0'` statt `'0.0000'`), 4 Tests `DatabaseTransactions`→`RefreshDatabase` (SQLite `:memory:` migriert pro Prozess), 1 Assertion (`rtrim`-Trailing-Space, PAD-SPACE-Collation existiert auf SQLite nicht).
-- [x] **Ver-Portal-E2E:** lokal auf SQLite-Backend grün — `@smoke` 56/56, volle Suite **297 passed / 0 failed / 7 skipped** (intentional: 2× Desktop-only, 5× DnD Mobile-only). Fix: `stripe-checkout.spec.ts` `test.setTimeout` 60s→120s (SQLite-Single-Writer langsamer unter 8-Worker-Last). `stripe_tunnel.mjs` nicht nötig.
-- [x] **Ver-Tracking:** `php artisan test` **93 passed / 0 failed**, lokales `migrate:fresh --seed` auf SQLite grün, `docker compose config --quiet` ok, E2E-Compose unverändert (Postgres).
-
-**Container-Cleanup:** entfernt: `portal_db_local`, `portal_db_test` (MariaDB), `ci-repro`, `pipeline-repro`, Tracking-E2E-Stack (`analytics_*_test`, Postgres). Verbleiben: Meili + Mailpit (local + test), Tracking-Mailpit.
-
-**Akzeptierte SQLite-Fidelity-Gap (dokumentiert):** `contracts.type` (V025) hat auf SQLite keinen CHECK-Constraint (Laravel-Rebuild nach FK-Add verwirft ihn); MariaDB behält echtes ENUM. Funktional harmlos (App validiert Werte), Prod unberührt.
-
-**Risiken:** SQLite-Verhaltensdifferenzen (LIKE-Collation, Enums via CHECK, Boolean/Decimal-Casts) könnten Tests aufdecken → im Verifikations-Track fixen (Max-3-Regel). Prod-Migrationspfad bleibt durch Gating unverändert.
-
-### ✅ Verifikation E2E lokal auf SQLite (2026-08-08)
-
-**Stack:** Meili/Mailpit-Container (`docker-compose.local.yml`, `portal_search_local` :7700 / `portal_mailpit_local` :8025+1025); Backend `php artisan serve --host=127.0.0.1 --port=8000`; Frontend `VITE_API_PROXY=http://127.0.0.1:8000 VITE_STRIPE_PUBLIC_KEY=<pk_test aus backend/.env STRIPE_KEY> pnpm dev` :4321. DB: `migrate:fresh --seed --force` auf `database/database.sqlite` (Geonames-Import ok, Admin `admin@example.com`).
-
-**Resultate:**
-- `@smoke`: **56/56 passed** (Attempt 1, 1.9m)
-- Full suite: **297 passed, 0 failed, 7 skipped** (intentional: 2× Desktop-only, 5× DnD Mobile-only), ~8–10m
-- Stripe-Webhook nicht nötig (`stripe_tunnel.mjs` nicht gestartet; Checkout-Tests grün).
-
-**Gefixt (1 Datei):** `frontend/tests/e2e/client/stripe-checkout.spec.ts` — Negative-Flow-Test schlug unter 8-Worker-Voll-Last mit `Test timeout of 60000ms exceeded` fehl (`Target page, context or browser has been closed` = Playwright-Teardown bei Timeout). Ursache: SQLite (Single-Writer-Datei) ist unter paralleler Worker-Last langsamer als das frühere MariaDB → Multi-User-Flows (3 User-Anlagen + Galerie + Upload + Checkout + 2 Zahlungsversuche) überschritten die 60s-`test.setTimeout`. Isolation: 53.7s → unter Last >60s. **Fix:** `test.setTimeout` auf 120s (Positive + Negative Flow; entspricht globalem `timeout: 120000`). Nach Fix: 2× volle Suite grün (297 passed).
-
-**E2E-Laufzeit lokal (SQLite):** ~8–10 min volle Suite → Timeout-Policy 15 min (900000 ms) weiterhin gültig.
-
----
-
 ## 🔄 portal-base:8.5 — Spezialisiertes Image im Portal-Repo (2026-08-07)
 
 **Ziel:** Das Base-Image-Repo `reisi007/docker-base-images` (lokal `~/dev/php-apache-mod2rewrite`) wird **komplett entfernt** (lokal + Remote + GHCR-Packages), da das Portal der einzige Konsument ist. Das spezialisierte Image `ghcr.io/reisi007/portal-base:8.5` (PHP 8.5, mysql, Dockerfile 1:1 aus dem Base-Repo) wird künftig **per Cron (täglich 01:00)** aus **diesem** Repo gebaut.
