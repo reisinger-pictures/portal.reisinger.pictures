@@ -11,6 +11,24 @@
 
 ---
 
+## ✅ GELÖST — Produktions-Build blank: Lingui module-scope `t` + stale CSP-Hash (2026-08-12)
+
+**Symptom (nach Deploy):** `portal.reisinger.pictures` zeigte eine leere Seite. Konsole:
+1. `Lingui: Attempted to call a translation function without setting a locale` (pageerror) → App crasht, Body leer.
+2. CSP-Violation für das Inline-Brand-Favicon-Script in `frontend/index.html`.
+
+**Befund 1 (Lingui, Root Cause):** Im **Produktions-Bundle** (rolldown) evaluieren statisch importierte Shell-Chunks **vor** `i18n.activate("de")` in `I18nProvider.tsx`. Module-scope `t`-Schemas in Shell-Komponenten rufen daher `i18n._()` vor der Aktivierung auf → throw. **Dev-Server (native ESM) reproduziert das NICHT** — nur via `pnpm build` + `pnpm preview`. Betroffen: `SidebarLoginForm` (`loginSchema`), `GalleryModal` (`gallerySchema`), `GalleryGroupModal` (`groupSchema`) — alle statisch über `App`/`PageLayout`/`DashboardLayout` erreichbar.
+- **Fix:** Schemas als **Factory-Funktionen** (`createXSchema()`) → Aufruf im Component-Body. `main.tsx` importiert `I18nProvider` zusätzlich als ersten Import (Safety).
+- **Verifikation:** `pnpm build` → `pnpm preview` (4173) → Playwright-Console-Capture: kein pageerror, Body rendert. Dev (4321) war nie betroffen.
+- **Regel dokumentiert:** `frontend/AGENTS.md` → „Lingui / i18n — No Module-Scope `t` (STRICT)".
+- **Regressions-Guard (manuell):** Nach Shell-Komponenten-Änderungen `pnpm build` + `pnpm preview` laden und Console auf Lingui-pageerror prüfen. Ein automatisierter Guard (E2E gegen Preview statt Dev-Server) ist Backlog-Kandidat.
+
+**Befund 2 (CSP-Hash, vorbestehend seit 2026-08-04, Commit `f92fb05`):** Caddyfile-Whitelist hatte `sha256-eHle+…`, aktuelles Inline-Script ergibt `sha256-2JqhWWJ9opkxqNUVZFFDVhn9EDRVGV651m6NLGm9waI=`. **Fix:** Hash im Caddyfile korrigiert (lokal `/Users/florianreisinger/dev/caddyfile/Caddyfile`) — **Server-Reload nötig!** Weder Tracking (`stats.reisinger.pictures`) noch Stripe waren betroffen — beide sind im `script-src` explizit erlaubt.
+
+- [ ] **TODO (Automatisierung CSP):** Inline-Brand-Script aus `frontend/index.html` in statische Datei (`frontend/public/brand-favicon-rewrite.js`) externalisieren → `script-src 'self'` deckt es ab, Hash aus Caddyfile entfernen → kein stale-hash-Problem mehr. Doku: `features/infrastructure/01-deployment.md` (CSP-Hash-Absatz anpassen).
+
+---
+
 ## 🔄 OUTDOOR-WERT: calc_outdoor_multiplier → calc_outdoor_images_per_hour (2026-08-12)
 
 **Problem (User-Report):** „Ein Outdoor-Foto-Bonus von 1/3 ist nicht möglich." Der Outdoor-Faktor war ein Prozent-Multiplikator (`calc_outdoor_multiplier`, Default 0,5 = 50 % Bildpreis); via `step="5"`-Input nur in 5er-Schritten (10–100 %) eingebbar → 1/3 (= 33,33 %) nicht setzbar.

@@ -6,14 +6,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '../../logic/useAuth';
 
-const loginSchema = z.object({
+const createLoginSchema = () => z.object({
     email: z.string().email(t`Ungültige E-Mail-Adresse`),
     password: z.string().min(1, t`Passwort erforderlich`)
 });
-type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginFormValues = z.infer<ReturnType<typeof createLoginSchema>>;
 
 export default function SidebarLoginForm() {
     "use no memo";
+    const loginSchema = createLoginSchema();
     const { login } = useAuth();
     const [authError, setAuthError] = useState('');
     const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormValues>({

@@ -14,7 +14,7 @@ import { toSlug } from '../../logic/utils';
 import CheckboxGroup from '../components/CheckboxGroup';
 import ModalDialogShell from './ModalDialogShell';
 
-const gallerySchema = z.object({
+const createGallerySchema = () => z.object({
     name: z.string().min(1, t`Name ist erforderlich`),
     slug: z.string(),
     type: z.enum(['selection', 'delivery']),
@@ -29,7 +29,7 @@ const gallerySchema = z.object({
     is_hidden: z.boolean().optional(),
     licensing_mode: z.string().optional()
 });
-type GalleryFormValues = z.infer<typeof gallerySchema>;
+type GalleryFormValues = z.infer<ReturnType<typeof createGallerySchema>>;
 
 interface Props {
     isOpen: boolean;
@@ -45,6 +45,7 @@ interface Props {
 
 export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availableGroups, editingGallery, defaultGroupId, onCreate, onUpdate, onDelete }: Props) {
     "use no memo";
+    const gallerySchema = createGallerySchema();
     const { showToast, confirm } = useUI();
     const { data: orgs, isLoading } = useSWR<Org[]>('/api/management/orgs', fetcher);
 

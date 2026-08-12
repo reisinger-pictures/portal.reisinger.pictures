@@ -104,3 +104,17 @@ Daten via `page.evaluate()` oder `addInitScript` in `localStorage` zu injizieren
 * Pflichtfelder MÜSSEN das `required`-HTML-Attribut tragen — der Star (`*`) wird automatisch via CSS angehängt (`.form-control:has(input[required]) .label-text::after`).
 * `(Optional)` oder `(optional)` in Labels ist **strikt verboten**. Optionale Felder werden schlicht ohne Zusatz gekennzeichnet.
 * Die CSS-Regel in `index.css` (`.form-control:has(input[required], select[required], textarea[required]) .label-text::after`) ist der zentrale Mechanismus und darf nicht umgangen werden.
+
+### Lingui / i18n — No Module-Scope `t` (STRICT, Regression 2026-08-12)
+Das `t`-Makro MUSS innerhalb von Funktions- oder Render-Bodies aufgerufen werden. **Auf Modulebene ist es strikt verboten** (z. B. `const schema = z.object({ ... t\`...\` ... })`, `const msg = t\`...\``).
+
+Grund: Im **Produktions-Bundle** (rolldown) werden statisch importierte Shell-Chunks vor dem `i18n.activate("de")` in `I18nProvider.tsx` evaluiert. Ein module-scope `t` crasht dort mit `Lingui: Attempted to call a translation function without setting a locale` und die Seite bleibt leer (blank). Im Dev-Server (native ESM) tritt der Fehler NICHT auf — reproduzierbar nur via `pnpm build` + `pnpm preview`.
+
+Regel bei Schemas in Shell-Komponenten (statisch von `App`/`PageLayout`/`DashboardLayout` erreichbar):
+- Schema als **Factory-Funktion** anlegen und im Component-Body aufrufen:
+  ```tsx
+  const createLoginSchema = () => z.object({ email: z.string().email(t`...`), password: z.string().min(1, t`...`) });
+  type LoginFormValues = z.infer<ReturnType<typeof createLoginSchema>>;
+  // im Component: const loginSchema = createLoginSchema();
+  ```
+- Verifikation: `pnpm build` + `pnpm preview` (Port 4173) laden und im Konsole-Tab prüfen, dass kein Lingui-pageerror auftritt (siehe `AGENTS.todo.md`, Bug-Analyse 2026-08-12).
