@@ -22,4 +22,6 @@
 - bootstrap/cache/**
 - core
 - core/**
+# 🛑 Lokale SQLite-Datenbanken (Dev/E2E) nicht synchronisieren
+- **/*.sqlite*
 + **
