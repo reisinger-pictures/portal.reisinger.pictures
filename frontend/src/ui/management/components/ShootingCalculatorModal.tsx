@@ -3,7 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import {InvoiceDiscount, InvoiceItem} from '../../../api';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
-import {calculateB2CFlexPrice, calculateShootingPrice, ShootingDiscount} from '../../../logic/shootingCalculator';
+import {calculateB2CFlexPrice, calculateShootingPrice, ShootingDiscount, DEFAULT_OUTDOOR_IMAGES_PER_HOUR} from '../../../logic/shootingCalculator';
 
 interface ShootingCalculatorModalProps {
     isOpen: boolean;
@@ -56,7 +56,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
             calc_base_price: terms?.calc_base_price,
             calc_hourly_rate: terms?.calc_hourly_rate,
             calc_images_per_hour: terms?.calc_images_per_hour,
-            calc_outdoor_multiplier: terms?.calc_outdoor_multiplier,
+            calc_outdoor_images_per_hour: terms?.calc_outdoor_images_per_hour,
             calc_flatrate_multiplier: terms?.calc_flatrate_multiplier,
             duration: calcDuration,
             images: calcImages,
@@ -180,7 +180,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                                 <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                     <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                            checked={calcIsOutdoor} onChange={e => setCalcIsOutdoor(e.target.checked)}/>
-                                    <span className="label-text font-bold">Outdoor-Shooting (Bildpreis: {Math.round((parseFloat(terms?.calc_outdoor_multiplier || '0.5')) * 100)}%)</span>
+                                    <span className="label-text font-bold">Outdoor-Shooting (Bilder/Std.: {terms?.calc_outdoor_images_per_hour || DEFAULT_OUTDOOR_IMAGES_PER_HOUR})</span>
                                 </label>
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">

@@ -11,6 +11,28 @@
 
 ---
 
+## 🔄 OUTDOOR-WERT: calc_outdoor_multiplier → calc_outdoor_images_per_hour (2026-08-12)
+
+**Problem (User-Report):** „Ein Outdoor-Foto-Bonus von 1/3 ist nicht möglich." Der Outdoor-Faktor war ein Prozent-Multiplikator (`calc_outdoor_multiplier`, Default 0,5 = 50 % Bildpreis); via `step="5"`-Input nur in 5er-Schritten (10–100 %) eingebbar → 1/3 (= 33,33 %) nicht setzbar.
+
+**Entscheidungen (interaktiv geklärt 2026-08-12):**
+1. Outdoor-Wert wird eine **Anzahl Bilder pro Stunde** (immer ganze Bilder): Basis Indoor `calc_images_per_hour` = 6 / Outdoor `calc_outdoor_images_per_hour` = 8.
+2. Berechnung: `imagesPrice = (hourlyRate / outdoorImagesPerHour) * images` (statt Multiplikator auf den Bildpreis).
+3. Migration **preiserhaltend konvertieren**: `new = round(calc_images_per_hour / calc_outdoor_multiplier)` (Default 6/0,5 = 12). Seeder-Default: 8 (frische Installs).
+4. Neuer Key `calc_outdoor_images_per_hour`; alter Key `calc_outdoor_multiplier` wird per Migration gelöscht.
+
+**Umsetzung delegiert (Implementer + Verifikator, AGENTS.md §4):**
+- [x] Backend: `V028__calc_outdoor_images_per_hour.php` (idempotente Daten-Migration, pro Brand)
+- [x] Backend: `SettingsController` GET-Feld + PUT-Validierung (`nullable|integer|min:1`)
+- [x] Backend: `DatabaseSeeder` 0.5 → 8
+- [x] Backend-Tests: `ShootingCalculatorSettingsTest` (GET-Feld, Persistenz, 422-Fälle, Migrations-Konvertierung 0.5→12 + custom)
+- [x] Frontend: `shootingCalculator.ts` (neues Feld, Formel), `useLicenseTerms.ts`, `CalculatorSettingsCard.tsx` (Label „Outdoor-Bilder/Std.", Integer-Validation), `ShootingCalculatorModal.tsx` (Label „Bilder/Std.: X")
+- [x] Frontend-Tests: `shootingCalculator.test.ts` (neue Erwartungswerte, mit Testlauf verifiziert)
+- [x] E2E: `package-calculator-config.spec.ts` (Label, Wert 20 → erwartete 229.00 € bleibt)
+- [x] Verifikation: `php artisan test` (1103 passed), `pnpm test:run` (591 passed), `pnpm lint:fix && pnpm build` (0 Fehler), E2E `@feature:admin:calculator` (4/4) + `@smoke` (56/56)
+
+---
+
 ## 🔄 portal-base:8.5 — Spezialisiertes Image im Portal-Repo (2026-08-07)
 
 **Ziel:** Das Base-Image-Repo `reisi007/docker-base-images` (lokal `~/dev/php-apache-mod2rewrite`) wird **komplett entfernt** (lokal + Remote + GHCR-Packages), da das Portal der einzige Konsument ist. Das spezialisierte Image `ghcr.io/reisi007/portal-base:8.5` (PHP 8.5, mysql, Dockerfile 1:1 aus dem Base-Repo) wird künftig **per Cron (täglich 01:00)** aus **diesem** Repo gebaut.

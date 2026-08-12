@@ -7,7 +7,7 @@ import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {
     DEFAULT_BASE_PRICE, DEFAULT_HOURLY_RATE, DEFAULT_IMAGES_PER_HOUR,
-    DEFAULT_OUTDOOR_MULTIPLIER, DEFAULT_FLATRATE_MULTIPLIER,
+    DEFAULT_OUTDOOR_IMAGES_PER_HOUR, DEFAULT_FLATRATE_MULTIPLIER,
     DEFAULT_SRP_BASE_PRICE, DEFAULT_SRP_SETUP_FEE,
     DEFAULT_SRP_PRIVACY_FEE, DEFAULT_SRP_EXTRA_IMAGE_FEE,
     safeParseFloat, safeParseInt
@@ -17,7 +17,7 @@ const calculatorSettingsSchema = z.object({
     calc_base_price: z.number().min(0, t`Muss positiv sein`),
     calc_hourly_rate: z.number().min(0, t`Muss positiv sein`),
     calc_images_per_hour: z.number().int(t`Muss eine ganze Zahl sein`).min(1, t`Mindestens 1 Bild`),
-    calc_outdoor_multiplier: z.number().min(10, t`Mindestens 10%`).max(100, t`Maximal 100%`),
+    calc_outdoor_images_per_hour: z.number().int(t`Muss eine ganze Zahl sein`).min(1, t`Mindestens 1 Bild`),
     calc_flatrate_surcharge: z.number().min(0, t`Muss positiv sein`).max(900, t`Maximal 900%`),
     srp_base_price: z.number().min(0, t`Muss positiv sein`),
     srp_setup_fee: z.number().min(0, t`Muss positiv sein`),
@@ -33,7 +33,7 @@ function mapApiToForm(terms: { [key: string]: string | undefined }): CalculatorS
         calc_base_price: safeParseFloat(terms.calc_base_price, DEFAULT_BASE_PRICE),
         calc_hourly_rate: safeParseFloat(terms.calc_hourly_rate, DEFAULT_HOURLY_RATE),
         calc_images_per_hour: safeParseInt(terms.calc_images_per_hour, DEFAULT_IMAGES_PER_HOUR),
-        calc_outdoor_multiplier: safeParseFloat(terms.calc_outdoor_multiplier, parseFloat(DEFAULT_OUTDOOR_MULTIPLIER)) * 100,
+        calc_outdoor_images_per_hour: safeParseInt(terms.calc_outdoor_images_per_hour, parseFloat(DEFAULT_OUTDOOR_IMAGES_PER_HOUR)),
         calc_flatrate_surcharge: Math.round((flatrateMultiplier - 1) * 100),
         srp_base_price: safeParseFloat(terms.srp_base_price, DEFAULT_SRP_BASE_PRICE) / 100,
         srp_setup_fee: safeParseFloat(terms.srp_setup_fee, DEFAULT_SRP_SETUP_FEE) / 100,
@@ -47,7 +47,7 @@ function mapFormToApi(data: CalculatorSettingsFormValues): Record<string, number
         calc_base_price: data.calc_base_price,
         calc_hourly_rate: data.calc_hourly_rate,
         calc_images_per_hour: data.calc_images_per_hour,
-        calc_outdoor_multiplier: data.calc_outdoor_multiplier / 100,
+        calc_outdoor_images_per_hour: data.calc_outdoor_images_per_hour,
         calc_flatrate_multiplier: 1 + (data.calc_flatrate_surcharge / 100),
         srp_base_price: Math.round(data.srp_base_price * 100),
         srp_setup_fee: Math.round(data.srp_setup_fee * 100),
@@ -66,7 +66,7 @@ export default function CalculatorSettingsCard() {
         defaultValues: {
             calc_base_price: DEFAULT_BASE_PRICE, calc_hourly_rate: DEFAULT_HOURLY_RATE,
             calc_images_per_hour: DEFAULT_IMAGES_PER_HOUR,
-            calc_outdoor_multiplier: 50, calc_flatrate_surcharge: 20,
+            calc_outdoor_images_per_hour: parseFloat(DEFAULT_OUTDOOR_IMAGES_PER_HOUR), calc_flatrate_surcharge: 20,
             srp_base_price: DEFAULT_SRP_BASE_PRICE, srp_setup_fee: DEFAULT_SRP_SETUP_FEE,
             srp_privacy_fee: DEFAULT_SRP_PRIVACY_FEE, srp_extra_image_fee: DEFAULT_SRP_EXTRA_IMAGE_FEE
         }
@@ -130,10 +130,10 @@ export default function CalculatorSettingsCard() {
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Outdoor-Faktor</span></label>
+                                className="label-text font-bold">Outdoor-Bilder/Std.</span></label>
                             <div className="join w-full">
-                                <input type="number" step="5" min="10" max="100" className="input input-bordered join-item w-full" {...register('calc_outdoor_multiplier', {valueAsNumber: true})} />
-                                <span className="join-badge">%</span>
+                                <input type="number" step="1" min="1" className="input input-bordered join-item w-full" {...register('calc_outdoor_images_per_hour', {valueAsNumber: true})} />
+                                <span className="join-badge">Stk</span>
                             </div>
                         </div>
                         <div className="form-control">

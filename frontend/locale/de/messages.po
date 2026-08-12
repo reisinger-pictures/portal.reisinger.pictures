@@ -2857,8 +2857,8 @@ msgid "Max. Verwendungen pro Account"
 msgstr "Max. Verwendungen pro Account"
 
 #: src/ui/management/components/CalculatorSettingsCard.tsx
-msgid "Maximal 100%"
-msgstr "Maximal 100%"
+#~ msgid "Maximal 100%"
+#~ msgstr "Maximal 100%"
 
 #: src/ui/management/components/CalculatorSettingsCard.tsx
 msgid "Maximal 900%"
@@ -2971,8 +2971,8 @@ msgid "Mindestens 1 Bild"
 msgstr "Mindestens 1 Bild"
 
 #: src/ui/management/components/CalculatorSettingsCard.tsx
-msgid "Mindestens 10%"
-msgstr "Mindestens 10%"
+#~ msgid "Mindestens 10%"
+#~ msgstr "Mindestens 10%"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Mindestens 2 Zeichen"

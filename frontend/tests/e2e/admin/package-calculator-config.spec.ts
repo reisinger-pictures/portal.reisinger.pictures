@@ -33,8 +33,8 @@ test.describe('Package Calculator Configuration (G2)', () => {
         const hourlyRateInput = cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]');
         await hourlyRateInput.fill('95');
 
-        const outdoorFactorInput = cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Faktor' }).locator('input[type="number"]');
-        await outdoorFactorInput.fill('65');
+        const outdoorFactorInput = cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Bilder' }).locator('input[type="number"]');
+        await outdoorFactorInput.fill('12');
 
         const flatrateSurchargeInput = cardBody.locator('.form-control').filter({ hasText: 'Reportage-Aufschlag' }).locator('input[type="number"]');
         await flatrateSurchargeInput.fill('25');
@@ -60,7 +60,7 @@ test.describe('Package Calculator Configuration (G2)', () => {
 
         await cardBody.locator('.form-control').filter({ hasText: 'Grundpreis' }).locator('input[type="number"]').fill('50');
         await cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]').fill('80');
-        await cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Faktor' }).locator('input[type="number"]').fill('30');
+        await cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Bilder' }).locator('input[type="number"]').fill('20');
         await cardBody.locator('.form-control').filter({ hasText: 'Bilder pro Stunde' }).locator('input[type="number"]').fill('6');
 
         await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
@@ -88,7 +88,7 @@ test.describe('Package Calculator Configuration (G2)', () => {
         await expect(calcModal).toBeHidden();
 
         // Verify result:
-        // Base 50 + Time 120 + (Images 200 * 0.3 = 60) = 230 → psych 229
+        // Base 50 + Time 120 + (Images (80/20)*15 = 60) = 230 → psych 229
         const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
         await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });
 

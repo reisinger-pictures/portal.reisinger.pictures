@@ -4,7 +4,7 @@
 export const DEFAULT_BASE_PRICE = 50;
 export const DEFAULT_HOURLY_RATE = 80;
 export const DEFAULT_IMAGES_PER_HOUR = 6;
-export const DEFAULT_OUTDOOR_MULTIPLIER = '0.5';
+export const DEFAULT_OUTDOOR_IMAGES_PER_HOUR = '8';
 export const DEFAULT_FLATRATE_MULTIPLIER = '1.2';
 export const DEFAULT_SRP_BASE_PRICE = 149;
 export const DEFAULT_SRP_SETUP_FEE = 50;
@@ -27,7 +27,7 @@ export interface ShootingPriceInput {
     calc_base_price?: string;
     calc_hourly_rate?: string;
     calc_images_per_hour?: string;
-    calc_outdoor_multiplier?: string;
+    calc_outdoor_images_per_hour?: string;
     calc_flatrate_multiplier?: string;
     duration: number; // Minuten
     images: number;
@@ -66,20 +66,22 @@ export function calculateCustomStudioPrice(input: ShootingPriceInput): ShootingP
     const hourlyRate = safeParseFloat(input.calc_hourly_rate, DEFAULT_HOURLY_RATE);
     
     const parsedImagesPerHour = parseInt(input.calc_images_per_hour || String(DEFAULT_IMAGES_PER_HOUR), 10);
-    const imagesPerHourPackage =
+    let imagesPerHourPackage =
         Number.isFinite(parsedImagesPerHour) && parsedImagesPerHour >= 1
             ? parsedImagesPerHour
             : DEFAULT_IMAGES_PER_HOUR;
-            
+
+    if (input.isOutdoor) {
+        const parsedOutdoorImagesPerHour = parseInt(input.calc_outdoor_images_per_hour || String(DEFAULT_OUTDOOR_IMAGES_PER_HOUR), 10);
+        imagesPerHourPackage =
+            Number.isFinite(parsedOutdoorImagesPerHour) && parsedOutdoorImagesPerHour >= 1
+                ? parsedOutdoorImagesPerHour
+                : parseFloat(DEFAULT_OUTDOOR_IMAGES_PER_HOUR);
+    }
+
     const durationHours = input.duration / 60;
     const timePrice = durationHours * hourlyRate;
-    
-    let imagesPrice = (hourlyRate / imagesPerHourPackage) * input.images;
-    
-    if (input.isOutdoor) {
-        const outdoorMultiplier = safeParseFloat(input.calc_outdoor_multiplier, parseFloat(DEFAULT_OUTDOOR_MULTIPLIER));
-        imagesPrice = imagesPrice * outdoorMultiplier;
-    }
+    const imagesPrice = (hourlyRate / imagesPerHourPackage) * input.images;
 
     const multiplier = input.flatrate ? safeParseFloat(input.calc_flatrate_multiplier, parseFloat(DEFAULT_FLATRATE_MULTIPLIER)) : 1;
     const rawTotal = (basePrice + timePrice + imagesPrice) * multiplier;

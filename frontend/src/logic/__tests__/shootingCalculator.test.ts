@@ -5,7 +5,7 @@ const defaults = (overrides: Partial<ShootingPriceInput> = {}): ShootingPriceInp
     calc_base_price: '50',
     calc_hourly_rate: '80',
     calc_images_per_hour: '6',
-    calc_outdoor_multiplier: '0.5',
+    calc_outdoor_images_per_hour: '8',
     duration: 90,
     images: 15,
     isOutdoor: false,
@@ -47,9 +47,9 @@ describe('calculateShootingPrice', () => {
         expect(calculateShootingPrice(defaults())).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
     });
 
-    it('halves the images price component when isOutdoor is true', () => {
-        // Base 50 + Time 120 + (Images 200 * 0.5 = 100) = 270 -> gerundet auf 269
-        expect(calculateShootingPrice(defaults({isOutdoor: true}))).toEqual({packagePrice: 269, finalPrice: 269, discountAbsolute: 0});
+    it('uses more images per hour (default 8) when isOutdoor is true', () => {
+        // Base 50 + Time 120 + (Images (80/8)*15 = 150) = 320 -> gerundet auf 319
+        expect(calculateShootingPrice(defaults({isOutdoor: true}))).toEqual({packagePrice: 319, finalPrice: 319, discountAbsolute: 0});
     });
 
     it('flatrate (+20%) → {445,445,0}', () => {
@@ -64,14 +64,14 @@ describe('calculateShootingPrice', () => {
         expect(calculateShootingPrice(defaults({discount: '50'}))).toEqual({packagePrice: 369, finalPrice: 185, discountAbsolute: 184});
     });
 
-    it('honours a custom outdoor multiplier (0.3 = 30%)', () => {
-        // Base 50 + Time 120 + (Images 200 * 0.3 = 60) = 230 -> gerundet auf 229
-        expect(calculateShootingPrice(defaults({isOutdoor: true, calc_outdoor_multiplier: '0.3'}))).toEqual({packagePrice: 229, finalPrice: 229, discountAbsolute: 0});
+    it('honours a custom outdoor images-per-hour (20)', () => {
+        // Base 50 + Time 120 + (Images (80/20)*15 = 60) = 230 -> gerundet auf 229
+        expect(calculateShootingPrice(defaults({isOutdoor: true, calc_outdoor_images_per_hour: '20'}))).toEqual({packagePrice: 229, finalPrice: 229, discountAbsolute: 0});
     });
 
-    it('outdoor multiplier 1.0 means no reduction (100%)', () => {
-        // Base 50 + Time 120 + (Images 200 * 1.0 = 200) = 370 -> gerundet auf 369
-        expect(calculateShootingPrice(defaults({isOutdoor: true, calc_outdoor_multiplier: '1.0'}))).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
+    it('outdoor images-per-hour 6 equals the indoor default (6)', () => {
+        // Base 50 + Time 120 + (Images (80/6)*15 = 200) = 370 -> gerundet auf 369
+        expect(calculateShootingPrice(defaults({isOutdoor: true, calc_outdoor_images_per_hour: '6'}))).toEqual({packagePrice: 369, finalPrice: 369, discountAbsolute: 0});
     });
 
     it('honours a custom base price', () => {
@@ -94,9 +94,9 @@ describe('calculateShootingPrice', () => {
     });
 
     it('combines flatrate, outdoor and discount correctly', () => {
-        // (Base 50 + Time 120 + (Images 200 * 0.5 = 100)) * 1.2 = 270 * 1.2 = 324 -> gerundet auf 325
-        // 325 - 50% = 162.5 -> gerundet auf 165
-        expect(calculateShootingPrice(defaults({flatrate: true, isOutdoor: true, discount: '50'}))).toEqual({packagePrice: 325, finalPrice: 165, discountAbsolute: 160});
+        // (Base 50 + Time 120 + (Images (80/8)*15 = 150)) * 1.2 = 320 * 1.2 = 384 -> gerundet auf 385
+        // 385 - 50% = 192.5 -> gerundet auf 195
+        expect(calculateShootingPrice(defaults({flatrate: true, isOutdoor: true, discount: '50'}))).toEqual({packagePrice: 385, finalPrice: 195, discountAbsolute: 190});
     });
 
     it('honours a custom hourly rate', () => {
@@ -126,9 +126,9 @@ describe('calculateShootingPrice', () => {
         expect(calculateShootingPrice(defaults({isReorder: true}))).toEqual({packagePrice: 319, finalPrice: 319, discountAbsolute: 0});
     });
 
-    it('reorder + outdoor applies outdoor multiplier on images', () => {
-        // basePrice=0, time=120, images=200*0.5=100 → 220 → psych 219
-        expect(calculateShootingPrice(defaults({isReorder: true, isOutdoor: true}))).toEqual({packagePrice: 219, finalPrice: 219, discountAbsolute: 0});
+    it('reorder + outdoor uses outdoor images-per-hour on images', () => {
+        // basePrice=0, time=120, images=(80/8)*15=150 → 270 → psych 269
+        expect(calculateShootingPrice(defaults({isReorder: true, isOutdoor: true}))).toEqual({packagePrice: 269, finalPrice: 269, discountAbsolute: 0});
     });
 
     it('reorder + flatrate applies +20% on (time + images)', () => {

@@ -5,7 +5,7 @@ export interface LicenseTerms {
     calc_base_price?: string;
     calc_hourly_rate?: string;
     calc_images_per_hour?: string;
-    calc_outdoor_multiplier?: string;
+    calc_outdoor_images_per_hour?: string;
     calc_flatrate_multiplier?: string;
     srp_base_price?: string;
     srp_setup_fee?: string;
@@ -20,7 +20,7 @@ export interface LicenseTermsPayload {
     calc_base_price?: string | number;
     calc_hourly_rate?: string | number;
     calc_images_per_hour?: string | number;
-    calc_outdoor_multiplier?: string | number;
+    calc_outdoor_images_per_hour?: string | number;
     calc_flatrate_multiplier?: string | number;
     srp_base_price?: string | number;
     srp_setup_fee?: string | number;

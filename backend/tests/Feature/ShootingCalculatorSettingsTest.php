@@ -66,7 +66,8 @@ class ShootingCalculatorSettingsTest extends TestCase
             ->assertJsonPath('base_price', '35.00')
             ->assertJsonPath('calc_base_price', '50')
             ->assertJsonPath('calc_hourly_rate', '80')
-            ->assertJsonPath('calc_images_per_hour', '6');
+            ->assertJsonPath('calc_images_per_hour', '6')
+            ->assertJsonPath('calc_outdoor_images_per_hour', null);
     }
 
     public function test_get_license_terms_returns_persisted_values_after_put(): void
@@ -208,6 +209,40 @@ class ShootingCalculatorSettingsTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_update_persists_outdoor_images_per_hour(): void
+    {
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validCalcPayload([
+                'calc_outdoor_images_per_hour' => '10',
+            ]))
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertSame('10', Setting::where('key', 'calc_outdoor_images_per_hour')->value('value'));
+    }
+
+    public function test_migration_converts_outdoor_multiplier_preserving_price(): void
+    {
+        $migration = require database_path('migrations/V028__calc_outdoor_images_per_hour.php');
+
+        Setting::updateOrCreate(['key' => 'calc_outdoor_multiplier', 'brand' => 'rp'], ['value' => '0.5']);
+        Setting::updateOrCreate(['key' => 'calc_images_per_hour', 'brand' => 'rp'], ['value' => '6']);
+
+        $migration->up();
+
+        $this->assertSame('12', Setting::where('key', 'calc_outdoor_images_per_hour')->where('brand', 'rp')->value('value'));
+        $this->assertNull(Setting::where('key', 'calc_outdoor_multiplier')->where('brand', 'rp')->value('value'));
+
+        // custom value: preiserhaltend
+        Setting::updateOrCreate(['key' => 'calc_outdoor_multiplier', 'brand' => 'rp'], ['value' => '0.25']);
+
+        $migration->up();
+
+        $this->assertSame('24', Setting::where('key', 'calc_outdoor_images_per_hour')->where('brand', 'rp')->value('value'));
+    }
+
     // ------------------------------------------------------------------
     // PUT — Validierungsfehler (422)
     // ------------------------------------------------------------------
@@ -234,6 +269,10 @@ class ShootingCalculatorSettingsTest extends TestCase
             'calc_images_per_hour dezimal (integer-rule)' => [['calc_images_per_hour' => '1.5'], 'calc_images_per_hour'],
             'calc_images_per_hour negativ' => [['calc_images_per_hour' => -3], 'calc_images_per_hour'],
             'calc_images_per_hour nicht-numerisch' => [['calc_images_per_hour' => 'many'], 'calc_images_per_hour'],
+            'calc_outdoor_images_per_hour null (min:1)' => [['calc_outdoor_images_per_hour' => 0], 'calc_outdoor_images_per_hour'],
+            'calc_outdoor_images_per_hour dezimal (integer-rule)' => [['calc_outdoor_images_per_hour' => '4.5'], 'calc_outdoor_images_per_hour'],
+            'calc_outdoor_images_per_hour negativ' => [['calc_outdoor_images_per_hour' => -2], 'calc_outdoor_images_per_hour'],
+            'calc_outdoor_images_per_hour nicht-numerisch' => [['calc_outdoor_images_per_hour' => 'many'], 'calc_outdoor_images_per_hour'],
         ];
     }
 
