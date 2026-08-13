@@ -20,8 +20,6 @@ import LicenseSelectorCard from './client/components/LicenseSelectorCard';
 import VolumeLicensingCard from './client/components/VolumeLicensingCard';
 import {useLicensingMode} from '../logic/useLicensingMode';
 import { BreadcrumbItem } from '../api';
-import { useEffect } from 'react';
-import { trackEvent, TRACKING_EVENTS } from '../logic/tracking';
 
 interface PhotoContextData {
     photo: Photo;
@@ -65,15 +63,6 @@ export default function PhotoDetailView() {
             effective_is_editorial_only: data.photo.effective_is_editorial_only || false
         });
     }
-
-    useEffect(() => {
-        if (photoId) {
-            trackEvent(TRACKING_EVENTS.photo_view, {
-                photo_id: photoId,
-                gallery_id: data?.photo?.gallery_id,
-            });
-        }
-    }, [photoId, data?.photo?.gallery_id]);
 
     if (isLoading) return <PageLayout><div className="flex h-full items-center justify-center"><span className="loading loading-spinner loading-lg"></span></div></PageLayout>;
     if (error || !data) return <PageLayout><div className="p-8"><ErrorMessage message={t`Foto konnte nicht geladen werden oder keine Berechtigung.`} /></div></PageLayout>;

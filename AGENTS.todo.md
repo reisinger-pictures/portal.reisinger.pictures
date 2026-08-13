@@ -23,7 +23,7 @@
 - **Regel dokumentiert:** `frontend/AGENTS.md` → „Lingui / i18n — No Module-Scope `t` (STRICT)".
 - **Regressions-Guard (manuell):** Nach Shell-Komponenten-Änderungen `pnpm build` + `pnpm preview` laden und Console auf Lingui-pageerror prüfen. Ein automatisierter Guard (E2E gegen Preview statt Dev-Server) ist Backlog-Kandidat.
 
-**Befund 2 (CSP-Hash, vorbestehend seit 2026-08-04, Commit `f92fb05`):** Caddyfile-Whitelist hatte `sha256-eHle+…`, aktuelles Inline-Script ergibt `sha256-2JqhWWJ9opkxqNUVZFFDVhn9EDRVGV651m6NLGm9waI=`. **Fix:** Hash im Caddyfile korrigiert (lokal `/Users/florianreisinger/dev/caddyfile/Caddyfile`) — **Server-Reload nötig!** Weder Tracking (`stats.reisinger.pictures`) noch Stripe waren betroffen — beide sind im `script-src` explizit erlaubt.
+**Befund 2 (CSP-Hash, vorbestehend seit 2026-08-04, Commit `f92fb05`):** Caddyfile-Whitelist hatte `sha256-eHle+…`, aktuelles Inline-Script ergibt `sha256-2JqhWWJ9opkxqNUVZFFDVhn9EDRVGV651m6NLGm9waI=`. **Fix:** Hash im Caddyfile korrigiert (lokal `/Users/florianreisinger/dev/caddyfile/Caddyfile`) — **Server-Reload nötig!** Stripe war nicht betroffen — es ist im `script-src` explizit erlaubt.
 
 - [ ] **TODO (Automatisierung CSP):** Inline-Brand-Script aus `frontend/index.html` in statische Datei (`frontend/public/brand-favicon-rewrite.js`) externalisieren → `script-src 'self'` deckt es ab, Hash aus Caddyfile entfernen → kein stale-hash-Problem mehr. Doku: `features/infrastructure/01-deployment.md` (CSP-Hash-Absatz anpassen).
 

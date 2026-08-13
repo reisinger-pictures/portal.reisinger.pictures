@@ -13,7 +13,6 @@ import { useGallery } from '../../logic/useGallery';
 import { isCovered, ResolutionTier } from '../../logic/pricingLogic';
 import EmptyState from '../components/EmptyState';
 import NotificationsOptIn from '../components/NotificationsOptIn';
-import { trackEvent, TRACKING_EVENTS } from '../../logic/tracking';
 export interface DeliveryViewProps {
     galleryData: ReturnType<typeof useGallery>;
 }
@@ -61,7 +60,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                             if (allowedTiers.length === 1) {
                                 return (
                                     <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + allowedTiers[0].id} target="_blank"
-                                       onClick={() => trackEvent(TRACKING_EVENTS.photo_download, { gallery_id: gallery.id, tier: allowedTiers[0].id, scope: 'gallery' })} className="btn btn-primary">
+                                       className="btn btn-primary">
                                         <span className="iconify mdi--zip-box text-xl hidden sm:inline-block mr-1"></span> <Trans>Alle herunterladen (.zip)</Trans>
                                     </a>
                                 );
@@ -77,7 +76,7 @@ export default function DeliveryView({ galleryData }: DeliveryViewProps) {
                                         {allowedTiers.map(t => (
                                             <li key={t.id}>
                                                 <a href={'/api/galleries/' + gallery.id + '/download-zip?tier=' + t.id} target="_blank"
-                                                   onClick={() => trackEvent(TRACKING_EVENTS.photo_download, { gallery_id: gallery.id, tier: t.id, scope: 'gallery' })} className="font-bold">
+                                                   className="font-bold">
                                                     <span className="uppercase">{t.id}</span> <Trans>Format</Trans>
                                                 </a>
                                             </li>

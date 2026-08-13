@@ -20,7 +20,6 @@ import PageLayout from '../components/PageLayout';
 import {StripeCheckoutForm} from './components/StripeCheckoutForm';
 import {CartItemList} from './components/CartItemList';
 import CouponInput from './components/CouponInput';
-import {trackEvent, TRACKING_EVENTS} from '../../logic/tracking';
 
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 const stripePromise = loadStripe(stripePublicKey);
@@ -61,11 +60,6 @@ export default function ClientCartView() {
     useEffect(() => {
         if (!redirectStatus) return;
         if (redirectStatus === 'succeeded') {
-            trackEvent(TRACKING_EVENTS.checkout_succeeded, {
-                item_count: items.length,
-                total_cents: totalAmount,
-                payment_method: paymentMethod,
-            });
             clearCart();
             removeCoupon();
             mutateUser().then(() => {
@@ -73,16 +67,10 @@ export default function ClientCartView() {
                 navigate('/orders', {replace: true});
             });
         } else {
-            trackEvent(TRACKING_EVENTS.checkout_failed, {
-                item_count: items.length,
-                total_cents: totalAmount,
-                payment_method: paymentMethod,
-                redirect_status: redirectStatus,
-            });
             showToast('error', t`Zahlung fehlgeschlagen — bitte versuche es erneut.`);
             navigate('/cart', {replace: true});
         }
-    }, [redirectStatus, clearCart, removeCoupon, mutateUser, showToast, navigate, items.length, totalAmount, paymentMethod]);
+    }, [redirectStatus, clearCart, removeCoupon, mutateUser, showToast, navigate]);
 
     const hasQuotes = items.some(i => i.isQuote);
 
@@ -168,14 +156,6 @@ export default function ClientCartView() {
                 withdrawal_waived: !!data.withdrawal_waived,
                 coupon_code: isCouponValid && couponCode ? couponCode : null
             };
-
-            trackEvent(TRACKING_EVENTS.checkout_started, {
-                item_count: items.length,
-                total_cents: totalAmount,
-                payment_method: paymentMethod,
-                has_quotes: hasQuotes,
-                coupon_applied: isCouponValid && couponCode ? true : false,
-            });
 
             const response = await apiMutate<CheckoutResponse>('/api/orders/checkout', 'POST', payload);
 

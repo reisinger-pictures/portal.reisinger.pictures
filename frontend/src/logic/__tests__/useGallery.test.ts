@@ -1,7 +1,6 @@
 ﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useGallery } from '../useGallery';
-import { TRACKING_EVENTS } from '../tracking';
 
 vi.mock('swr/infinite', () => ({
     default: vi.fn(),
@@ -112,44 +111,6 @@ describe('useGallery', () => {
         await result.current.ratePhoto('p1', 5, 'Great!');
 
         expect(mockMutate).toHaveBeenCalled();
-    });
-
-    it('tracks a photo_rated event when rating a photo', async () => {
-        const originalTrackEvent = window.trackEvent;
-        const trackSpy = vi.fn();
-        window.trackEvent = trackSpy;
-
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
-
-        const { result } = renderHook(() => useGallery('test-gallery'));
-        await result.current.ratePhoto('p1', 5, 'Great!');
-
-        expect(trackSpy).toHaveBeenCalledWith(TRACKING_EVENTS.photo_rated, {
-            photo_id: 'p1',
-            rating: 5,
-            has_comment: true,
-        });
-
-        window.trackEvent = originalTrackEvent;
-    });
-
-    it('tracks photo_rated without comment flag when comment is empty', async () => {
-        const originalTrackEvent = window.trackEvent;
-        const trackSpy = vi.fn();
-        window.trackEvent = trackSpy;
-
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
-
-        const { result } = renderHook(() => useGallery('test-gallery'));
-        await result.current.ratePhoto('p1', 3, '');
-
-        expect(trackSpy).toHaveBeenCalledWith(TRACKING_EVENTS.photo_rated, {
-            photo_id: 'p1',
-            rating: 3,
-            has_comment: false,
-        });
-
-        window.trackEvent = originalTrackEvent;
     });
 
     afterEach(() => {

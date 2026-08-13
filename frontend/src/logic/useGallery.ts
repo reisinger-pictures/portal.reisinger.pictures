@@ -2,7 +2,6 @@ import useSWRInfinite from 'swr/infinite';
 import {fetcher} from '../api';
 import {Gallery} from './useGalleries';
 import {IptcData} from './usePhoto';
-import {trackEvent, TRACKING_EVENTS} from './tracking';
 
 export interface Photo extends IptcData {
     id: string;
@@ -67,12 +66,6 @@ export function useGallery(slug: string | undefined) {
 
     const ratePhoto = async (photoId: string, rating: number, comment: string = '') => {
         const oldData = data;
-
-        trackEvent(TRACKING_EVENTS.photo_rated, {
-            photo_id: photoId,
-            rating,
-            has_comment: comment.trim().length > 0,
-        });
 
         if (data) {
             const newData = data.map(page => ({

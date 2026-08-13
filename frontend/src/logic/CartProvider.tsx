@@ -4,7 +4,6 @@ import {useAuth} from './useAuth';
 import {useUI} from '../ui/components/UIContext';
 import {addToCartPure, removeFromCartPure, calculateTotalAmount, loadCartItems, persistCartItems} from './cartLogic';
 import {useVolumeLicensing} from './useVolumeLicensing';
-import {trackEvent, TRACKING_EVENTS} from './tracking';
 
 export interface CartProviderProps {
     children: ReactNode;
@@ -48,7 +47,6 @@ export function CartProvider({children}: CartProviderProps) {
 
     const removeFromCart = (photoId: string) => {
         setItems(prev => removeFromCartPure(prev, photoId));
-        trackEvent(TRACKING_EVENTS.remove_from_cart, { photo_id: photoId });
     };
 
     const clearCart = () => setItems([]);
