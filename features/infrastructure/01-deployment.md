@@ -19,13 +19,14 @@ status: active
 - Caddy (zentraler Reverse Proxy) handles the routing:
   - `/api/*` -> `portal_backend` (PHP-FPM via FastCGI auf Port 9000)
   - `/*` -> statische `dist/` via `spa`-Snippet (Root: `/srv/websites/web-portal.reisinger.pictures/dist`, Symlink auf `/home/webadmin/websites/web-portal.reisinger.pictures`)
-- **CSP & X-Frame-Options** werden im Caddyfile gesetzt (Block `portal.reisinger.pictures`). Achtung: Der `Content-Security-Policy`-Header enthält einen `sha256`-Hash des Inline-Brand-Scripts aus `frontend/index.html`. Wird dieses Script geändert, muss der Hash im Caddyfile neu berechnet werden (`openssl dgst -sha256 -binary | base64`).
+- **CSP & X-Frame-Options** werden im Caddyfile gesetzt (Block `portal.reisinger.pictures`). Das Brand-Favicon-Script ist eine statische Datei unter `/brand-favicon-rewrite.js` (siehe `frontend/public/brand-favicon-rewrite.js`), die über `script-src 'self'` abgedeckt ist — der früher nötige `sha256`-Hash des Inline-Scripts kann aus dem Caddyfile entfernt werden. Der Header wird nur noch geändert, wenn sich die übrige CSP-Policy ändert.
 
 ## 4. Caddy + PHP-FPM Architektur (Apache abgelöst)
 - **Basis-Image:** `ghcr.io/reisi007/portal-base:8.5` (Spezial-Image, gebaut per Cron aus diesem Repo — siehe `.github/workflows/base-image.yml`)
 - **Webserver:** PHP-FPM statt Apache – Caddy spricht via FastCGI-Protokoll mit dem Backend
 - **File Delivery:** `X-Accel-Redirect` statt `X-Sendfile` – Caddy fängt den Header via `handle_response` ab und serviert Dateien direkt von der Festplatte
 - **Pfad-Mapping:** Der `PROXY_DELIVERY_HEADER` ist fest auf `X-Accel-Redirect` gesetzt. Der Pfad `/var/www/photos/...` wird in Caddy via `handle_path` auf das gemountete Volume `/srv/photos` umgeschrieben
+- **Sicherheitshinweis (akzeptiert, 2026-08-13):** Der `X-Accel-Redirect`-Header trägt den absoluten Server-Pfad, wird aber ausschließlich von Caddy (`handle_response @accel_header`) konsumiert und erreicht den Client nie — das Backend ist nur intern via Caddy erreichbar (same-origin `/api/*`). Reine interne Optimierung, kein Härtungsbedarf (Review S4).
 - **Vorteil:** Kein Apache mehr – einheitliche PHP-FPM-Images für alle Projekte (form2email + portal)
 
 ## 5. Deployment-Pfade (Server-Dateisystem)

@@ -50,7 +50,7 @@ sudo ln -s /opt/homebrew/bin/convert /usr/local/bin/convert
 Danach Laravel Herd einmal neu starten, damit PHP-FPM die Tools findet. Ohne diesen Schritt schlagen Bild-Uploads mit `422 "Die hochgeladene Datei ist kein gültiges oder lesbares Bild."` fehl (der serverseitige `exiftool`-MIME-Check läuft ins Leere).
 
 ### Login-Daten (Lokal)
-- **Dashboard:** `florian@reisinger.pictures` / `admin`
+- **Dashboard:** `admin@example.com` / `admin` (bzw. lokale `ADMIN_EMAIL`/`ADMIN_PASSWORD` aus der `.env`)
 - **Datenbank:** SQLite-Datei `backend/database/database.sqlite` (kein DB-Container; Einrichtung via `php artisan migrate:fresh --seed`)
 
 ### Stripe Webhooks (Lokal Testen)

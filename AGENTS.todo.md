@@ -11,6 +11,55 @@
 
 ---
 
+## 🔍 REVIEW 2026-08-13 — Architektur / UX / Sicherheit
+
+**Gesamturteil:** Überdurchschnittlich solide. Sicherheits-Basis (Stripe-Webhook-Verifikation + Underpayment-Guard, JWT-httpOnly-Cookie + SameSite=Lax, Money-Pattern mit bcmath, Brand-Isolation, Offer-Token) vorbildlich. Baustellen: Autorisierungs-Scatter, God-Entities, CSP-Favicon (bekannt).
+
+**Befunde (Detail in Session-Review):**
+
+| # | Befund | Ort |
+|---|---|---|
+| A1 | User.php God-Entity; ~170 `is_*`-Prüfungen verstreut; N+1 via Accessoren | `User.php:24–167` |
+| A2 | CheckoutService 410 Z. (Validierung+Pricing+Order+Stripe gemischt) | `CheckoutService.php` |
+| A3 | Autorisierungs-Scatter: Middleware-Prefix + Inline-Checks + Policies (inkonsistent) | `ManagementMiddleware.php:28–45` |
+| A4 | Bool-Komposit `is_admin\|\|(is_photographer&&canPhotographerAccessGallery)` 5× kopiert | Policies + Download-Controller |
+| A5 | Raw-SQL-CTE (legitim, parametrisiert) bricht Eloquent-Regel | `AccessControlService.php:105` |
+| S1 | Photographer-Fläche in ManagementMiddleware breit (`orgs*`, `coupons*`, `lightroom-catalogs*`) | `ManagementMiddleware.php:29` |
+| S2 | Kein `Permissions-Policy`-Header; CSP nur an Caddy (stale Hash → bekannter Prod-Crash) | `SetSecurityHeaders.php` |
+| S3 | Rolling Refresh unbegrenzt (`refresh_iat=true`, `refresh_ttl=20160`) | `config/jwt.php:120–121` |
+| S4 | `proxy_delivery_header` leakt FS-Pfad falls Proxy Header nicht konsumiert | `FileDeliveryController.php:153` |
+| S5 | `/test/flush-queue` immer registriert; Admin-Email-Default hartcodiert | `api.php:79`, `AuthController.php:106` |
+| U1 | God-Components: ManagementContractView 654 Z., OrgDetail 379, ClientCart 361 | `frontend/src/ui/**` |
+| U2 | Dupliziertes Form-Muster (Load→Reset→disabled) | `BillingDetailsCard` u. a. |
+| U3 | CSP-Favicon-Script → leerer Prod-Screen (stale Hash) | `AGENTS.todo.md:54` |
+
+**Priorisiert:** (1) A1 durchziehen (reduziert A3/A4/S1), (2) A2 split, (3) S1 Policies, (4) U3/S2 CSP externalisieren, (5) S3/S4/S5 dokumentieren.
+
+**Entscheidungen (interaktiv geklärt 2026-08-13):**
+- [x] **S3 (gehärtet):** `JWT_REFRESH_TTL` von 20160 → **10080 (7 Tage)**. Rolling bleibt (`refresh_iat=true`), aber hartes Re-Auth-Fenster. → Task T4.
+- [x] **S4 (akzeptiert):** `X-Accel-Redirect` ist interne Optimierung, Caddy konsumiert ihn (`handle_response @accel_header`, `root /srv/photos`) — Header erreicht den Client nie. Zusätzlich: stale `sha256`-Hash aus dem Caddyfile entfernen (Script ist seit T1 extern). → Task T6 (Caddyfile extern) + Doku.
+- [x] **S5b (env-driven):** Super-Admin via ENV (`ADMIN_EMAIL`), kein hartcodierter Name im Source. Generischer Fallback `admin@example.com` (statt `florian@reisinger.pictures`). → Task T5. **Folge-Fund:** Die E-Mail dient als magische Super-Admin-Identität (Brand `brand=null`) in `V004:145`, `V018:129/133/293`, `DatabaseSeeder:17`, `E2ETestUserSeeder:21/31`, `DatabaseSeeder:123` (`company_email`) — wird in T5 mit bereinigt. Historische `features/*.md`-Notizen + `README.md` werden separat dokumentarisch angepasst.
+
+### Umsetzung 2026-08-13 (2. Batch, delegiert + verifiziert)
+
+- [x] **T4 (S3)** `config/jwt.php` Default `refresh_ttl` → 10080 + `backend/.env.example` + `backend/.env.ci` auf `JWT_REFRESH_TTL=10080`. **Verifikation approved** (Diff exakt, `git grep JWT_REFRESH_TTL=20160` leer, AuthControllerTest grün). **Manuell (Prod):** `JWT_REFRESH_TTL` in Portainer auf 10080 ziehen; lokale gitignored `.env` optional angleichen.
+- [x] **T5 (S5b)** Admin-Email env-driven: `config/admin.php` Fallback `admin@example.com`; `AuthController::resetPassword` nutzt `config('admin.email')`; `DatabaseSeeder` + `E2ETestUserSeeder` + `V004` + `V018` auf `env('ADMIN_EMAIL', 'admin@example.com')`; Regressionstest (403-Guard). **Verifikation approved:** V018-Semantik (Super-Admin `brand=null` exklusiv via Admin-E-Mail) intakt, `env()` nicht in Query-Closures, Grep sauber (nur GmailRestTransportTest-`from()`-Fixtures), **volle Suite 1168 passed / 0 failed**. Doku: `features/security/env-hardening.md` §Admin-Identität, `README.md` Login-Daten.
+- [x] **T6 (S4/CSP)** Caddyfile: `sha256`-Hash aus `script-src` entfernt + Kommentar bereinigt (`script-src 'self' https://js.stripe.com`). **Verifikation approved** (kein `sha256` mehr, X-Accel-Redirect-Handling unverändert). **Manuell (Prod):** `caddy reload` auf dem Server.
+
+**⚠️ Environment-Lücke (erledigt):** Meilisearch (127.0.0.1:7701) läuft wieder (health 200) — die volle `php artisan test`-Suite ist **grün (1168 passed / 0 failed)**, die zuvor dokumentierte Meilisearch-Lücke ist damit geschlossen.
+
+**Doku (Main Model):** S3 → `features/auth/01-roles-and-access.md` §Session Lifetime; S4 → `features/infrastructure/01-deployment.md` §4 Sicherheitshinweis; S5b → `features/security/env-hardening.md` §Admin-Identität + `README.md` Login-Daten.
+
+### Umsetzung 2026-08-13 (delegiert, je eigener Implementer + separater Verifikator)
+
+- [x] **T1 (Frontend)** CSP-Favicon externalisiert: Inline-Script → `frontend/public/brand-favicon-rewrite.js`, `<script src>` in `index.html`, Doku `01-deployment.md` §3 angepasst. **Verifikation approved:** `pnpm build` + `eslint` + `lint` grün; Script-Reihenfolge im `<head>` funktional unverändert. **Offen (manuell, extern):** `sha256`-Hash aus dem Caddyfile entfernen + Server-Reload.
+- [x] **T2 (Backend)** `/test/flush-queue` nur noch in `local|testing` registriert. **Verifikation approved:** `route:list` in production ohne `/test/*`; Sanity-Test grün.
+- [x] **T3 (Backend)** `AccessControlService` → `AuthorizationService` (A1 Schritt 1, additiv): 11 Prädikate + Rekursions-Guard; keine Caller-Migration. **Verifikation approved:** kein `AccessControlService`-Rest, kein `$user->is_` im Service, Prädikate semantisch identisch zu den Accessoren/`GalleryPolicy::manage`; 150 Scoped-Tests grün (`AuthorizationServiceTest` 55, `UserPermissionLogicTest` 74, `GalleryTreeServiceTest` 17, `AuthorizationTest` 4).
+
+**⚠️ Environment-Lücke (RESOLVED):** Meilisearch war zu Sessionbeginn aus (Docker/Rancher Desktop aus). Nach Docker-Start (health 200) läuft die volle `php artisan test`-Suite **grün (1168 passed / 0 failed)** — siehe 2. Batch (T5-Verifikation).
+
+---
+
 ## ✅ ERLEDIGT — Volume-Licensing-Presets: konfigurierbare Staffeln pro Brand + pro Gallerie (2026-08-13)
 
 **Ergebnis (SOLL-Doku):** `features/infrastructure/27-volume-licensing-presets.md`.
@@ -51,7 +100,7 @@
 
 **Befund 2 (CSP-Hash, vorbestehend seit 2026-08-04, Commit `f92fb05`):** Caddyfile-Whitelist hatte `sha256-eHle+…`, aktuelles Inline-Script ergibt `sha256-2JqhWWJ9opkxqNUVZFFDVhn9EDRVGV651m6NLGm9waI=`. **Fix:** Hash im Caddyfile korrigiert (lokal `/Users/florianreisinger/dev/caddyfile/Caddyfile`) — **Server-Reload nötig!** Stripe war nicht betroffen — es ist im `script-src` explizit erlaubt.
 
-- [ ] **TODO (Automatisierung CSP):** Inline-Brand-Script aus `frontend/index.html` in statische Datei (`frontend/public/brand-favicon-rewrite.js`) externalisieren → `script-src 'self'` deckt es ab, Hash aus Caddyfile entfernen → kein stale-hash-Problem mehr. Doku: `features/infrastructure/01-deployment.md` (CSP-Hash-Absatz anpassen).
+- [x] **TODO (Automatisierung CSP):** Inline-Brand-Script aus `frontend/index.html` in statische Datei (`frontend/public/brand-favicon-rewrite.js`) externalisiert (2026-08-13, Task T1) → `script-src 'self'` deckt es ab. **Rest (manuell):** Hash aus dem Caddyfile entfernen + Server-Reload (Caddyfile liegt extern unter `/Users/florianreisinger/dev/caddyfile/Caddyfile`).
 
 ---
 

@@ -10,6 +10,7 @@ status: active
 - **Stateless JWT:** The API uses JSON Web Tokens (JWT) via `php-open-source-saver/jwt-auth`. There are no PHP sessions (the `web` guard is deactivated).
 - **Storage & XSS Prevention:** Tokens are NEVER sent in the JSON body or stored in `localStorage`. They are attached as secure, `HttpOnly`, `SameSite=Lax` cookies (`rp_jwt`).
 - **Silent Refresh:** The frontend Axios/Fetch layer intercepts `401 Unauthorized` errors, calls `/api/auth/refresh` to get a new cookie, and retries the original request seamlessly.
+- **Session Lifetime (SOLL, 2026-08-13):** Access-Token TTL 240 min (`JWT_TTL`); Refresh-Fenster **7 Tage** (`JWT_REFRESH_TTL=10080`), rolling via `refresh_iat=true`. Nach 7 Tagen InaktivitÃ¤t ist ein Re-Login erforderlich (hÃ¤rtet den Rolling-Refresh ab â€” vorher 14 Tage). Prod-Steuerung Ã¼ber Portainer-Env `JWT_REFRESH_TTL`.
 
 ## 2. Role System
 Roles are strictly separated.
@@ -34,7 +35,7 @@ Roles are strictly separated.
 - Every controller method accessing a specific resource (e.g., a photo or a gallery) MUST verify that the authenticated user's ID (or transient claim) is linked to that resource via the `getAllowedGalleryIds()` logic.
 
 ## Related
-- [Magic Links & Invites](../auth/02-magic-links.md) — transient access for guests overriding role model
-- [Roles & Access Management (Single Org)](../auth/03-roles-and-rbac.md) — enterprise RBAC evolution of the role system
-- [Audit Logs & GDPR](../delivery/02-audit-logs.md) — access logging and data minimization
-- [Frontend Brand & Org Isolation](../infrastructure/10-frontend-brand-Org-isolation.md) — Super Admin Org-unrestricted access
+- [Magic Links & Invites](../auth/02-magic-links.md) ï¿½ transient access for guests overriding role model
+- [Roles & Access Management (Single Org)](../auth/03-roles-and-rbac.md) ï¿½ enterprise RBAC evolution of the role system
+- [Audit Logs & GDPR](../delivery/02-audit-logs.md) ï¿½ access logging and data minimization
+- [Frontend Brand & Org Isolation](../infrastructure/10-frontend-brand-Org-isolation.md) ï¿½ Super Admin Org-unrestricted access

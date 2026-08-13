@@ -21,6 +21,10 @@ zu tracken und damit das korrekte Ignore-Pattern im Root-`.gitignore`
 
 ## SOLL-Zustand
 
+### Admin-Identität (S5b, 2026-08-13)
+
+Die Super-Admin-Identität ist **vollständig env-getrieben** (`ADMIN_EMAIL`), mit generischem Fallback `admin@example.com`. Es gibt **keine hartcodierte persönliche E-Mail** mehr im Quellcode (vorher `florian@reisinger.pictures` als magische `brand=null`-Identität in `AuthController`, `DatabaseSeeder`, `E2ETestUserSeeder`, `V004`, `V018` und `company_email`-Setting). Prod setzt die reale Admin-E-Mail ausschließlich über Portainer/`.env`.
+
 ### Getrackte Dateien (committed)
 
 Nur noch Template-Dateien mit Platzhaltern sind committed:
