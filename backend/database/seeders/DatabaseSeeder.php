@@ -14,7 +14,7 @@ class DatabaseSeeder extends Seeder
 
         // Admin-User seeden, um Race-Conditions in parallelen E2E-Tests zu vermeiden
         $adminUser = \App\Models\User::firstOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'florian@reisinger.pictures')],
+            ['email' => env('ADMIN_EMAIL', 'admin@example.com')],
             ['name' => 'Florian Reisinger', 'password' => \Illuminate\Support\Facades\Hash::make(env('ADMIN_PASSWORD', 'admin'))]
         );
         $roles = [\App\Enums\UserRole::SUPER_ADMIN->value, \App\Enums\UserRole::ADMIN->value, \App\Enums\UserRole::PHOTOGRAPHER->value, \App\Enums\UserRole::CLIENT->value, \App\Enums\UserRole::ORG_ADMIN->value, \App\Enums\UserRole::POWER_USER->value];
@@ -120,7 +120,7 @@ class DatabaseSeeder extends Seeder
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_zip', 'brand' => $brandCode], ['value' => '4020']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_city', 'brand' => $brandCode], ['value' => 'Linz']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_country', 'brand' => $brandCode], ['value' => 'Österreich']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_email', 'brand' => $brandCode], ['value' => 'florian@reisinger.pictures']);
+        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_email', 'brand' => $brandCode], ['value' => 'admin@example.com']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_iban', 'brand' => $brandCode], ['value' => 'DE96100110012179986174']);
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_bic', 'brand' => $brandCode], ['value' => 'NTSBDEB1XXX']);
 

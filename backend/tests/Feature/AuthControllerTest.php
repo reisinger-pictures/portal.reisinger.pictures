@@ -4,6 +4,7 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\Support\MailpitAssertions;
@@ -92,5 +93,21 @@ class AuthControllerTest extends TestCase {
 
         $user->refresh();
         $this->assertNull($user->password, 'Password must remain unchanged on brand mismatch');
+    }
+
+    public function test_password_reset_for_super_admin_is_blocked_before_token_validation() {
+        // T5/S5b: The system admin identity comes from config('admin.email')
+        // (env ADMIN_EMAIL, generic fallback). The guard fires BEFORE any
+        // token validation, so an arbitrary token value must not matter.
+        Config::set('admin.email', 'admin@example.com');
+
+        $response = $this->postJson('/api/auth/reset-password', [
+            'email' => 'admin@example.com',
+            'token' => 'any-token-value',
+            'password' => 'newPassword123',
+        ]);
+
+        $response->assertStatus(403);
+        $response->assertJson(['error' => 'Passwort-Reset für den System-Admin ist deaktiviert.']);
     }
 }

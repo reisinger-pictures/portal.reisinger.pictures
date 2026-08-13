@@ -142,7 +142,7 @@ return new class extends Migration {
         ]);
 
         // God Mode an unseren initialen Admin vergeben
-        $adminUser = \Illuminate\Support\Facades\DB::table('users')->where('email', env('ADMIN_EMAIL', 'florian@reisinger.pictures'))->first();
+        $adminUser = \Illuminate\Support\Facades\DB::table('users')->where('email', env('ADMIN_EMAIL', 'admin@example.com'))->first();
         if ($adminUser) {
             \Illuminate\Support\Facades\DB::table('user_roles')->insert([
                 'user_id' => $adminUser->id,

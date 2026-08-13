@@ -18,7 +18,7 @@ class E2ETestUserSeeder extends Seeder
         }
 
         $adminUser = User::firstOrCreate(
-            ['email' => 'florian@reisinger.pictures'],
+            ['email' => 'admin@example.com'],
             [
                 'name' => 'Florian Reisinger',
                 'password' => Hash::make('admin'),
@@ -28,6 +28,6 @@ class E2ETestUserSeeder extends Seeder
 
         $adminUser->roles()->sync(array_values($roles));
 
-        $this->command->info('E2E admin user created: florian@reisinger.pictures / admin');
+        $this->command->info('E2E admin user created: admin@example.com / admin');
     }
 }

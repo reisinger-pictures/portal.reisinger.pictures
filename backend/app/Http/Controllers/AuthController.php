@@ -103,7 +103,7 @@ class AuthController extends Controller
 
     public function resetPassword(Request $request) 
     {
-        if ($request->email === config('admin.email', 'florian@reisinger.pictures')) {
+        if ($request->email === config('admin.email')) {
             return response()->json(['error' => 'Passwort-Reset für den System-Admin ist deaktiviert.'], 403);
         }
 

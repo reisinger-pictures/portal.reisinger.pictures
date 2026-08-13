@@ -30,6 +30,8 @@ return new class extends Migration {
 
     public function up(): void
     {
+        $adminEmail = env('ADMIN_EMAIL', 'admin@example.com');
+
         // ══════════════════════════════════════════════
         //  Part 1: Brand multitenancy (was V018)
         // ══════════════════════════════════════════════
@@ -126,11 +128,11 @@ return new class extends Migration {
 
         DB::table('users')
             ->whereNull('brand')
-            ->where('email', '!=', 'florian@reisinger.pictures')
+            ->where('email', '!=', $adminEmail)
             ->update(['brand' => 'rp']);
 
         DB::table('users')
-            ->where('email', 'florian@reisinger.pictures')
+            ->where('email', $adminEmail)
             ->whereNotNull('brand')
             ->update(['brand' => null]);
 
@@ -269,6 +271,8 @@ return new class extends Migration {
 
     public function down(): void
     {
+        $adminEmail = env('ADMIN_EMAIL', 'admin@example.com');
+
         Schema::dropIfExists('coupon_user_usage');
 
         if (Schema::hasColumn('orders', 'coupon_id')) {
@@ -290,7 +294,7 @@ return new class extends Migration {
 
         // Revert user brand isolation
         DB::table('users')
-            ->where('email', 'florian@reisinger.pictures')
+            ->where('email', $adminEmail)
             ->whereNull('brand')
             ->update(['brand' => 'rp']);
 
