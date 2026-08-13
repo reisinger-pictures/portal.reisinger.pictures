@@ -78,7 +78,7 @@ class GalleryTreeService
         }
         
         if (!empty($explicitGroupIds)) {
-            $explicitGroupIds = array_unique(array_merge($explicitGroupIds, app(\App\Services\AccessControlService::class)->getSubGroupIds($explicitGroupIds)));
+            $explicitGroupIds = array_unique(array_merge($explicitGroupIds, app(\App\Services\AuthorizationService::class)->getSubGroupIds($explicitGroupIds)));
         }
 
         $galleryPredicate = fn(array $g): bool => in_array($g['id'], $allowedGalleryIds);

@@ -2,13 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
-class AccessControlService
+class AuthorizationService
 {
     /**
      * Get all gallery IDs a user is allowed to access.
@@ -54,7 +55,7 @@ class AccessControlService
             $galleryIds = array_unique(array_merge($galleryIds, $user->transient_galleries));
         }
 
-        if ($user->is_photographer) {
+        if ($this->isPhotographer($user)) {
             $buildUnrestricted = function () {
                 $allGalleries = Gallery::with('galleryGroup')->get();
                 return $allGalleries->filter(fn($g) => !$g->effective_restricted_photographers)->pluck('id')->toArray();
@@ -114,5 +115,124 @@ class AccessControlService
 
         $result = DB::select($query, $parentIds);
         return array_values(array_unique(array_column($result, 'id')));
+    }
+
+    /**
+     * Check whether a user holds any of the given role names.
+     */
+    public function hasRole(User $user, string ...$roles): bool
+    {
+        return $user->roles()->whereIn('name', $roles)->exists();
+    }
+
+    /**
+     * Get the role names of a user.
+     *
+     * @return array<string>
+     */
+    public function roleNames(User $user): array
+    {
+        return $user->roles->pluck('name')->all();
+    }
+
+    public function isSuperAdmin(User $user): bool
+    {
+        return $user->roles()->where('name', UserRole::SUPER_ADMIN->value)->exists();
+    }
+
+    public function isAdmin(User $user): bool
+    {
+        return $user->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists();
+    }
+
+    public function isPhotographer(User $user): bool
+    {
+        return $user->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists();
+    }
+
+    public function isPowerUser(User $user): bool
+    {
+        return $user->roles()->where('name', UserRole::POWER_USER->value)->exists();
+    }
+
+    public function isOrgAdmin(User $user): bool
+    {
+        return $user->roles()->where('name', UserRole::ORG_ADMIN->value)->exists() && $user->org_id !== null;
+    }
+
+    /**
+     * Mirrors User::getIsPendingAttribute(): a user without guest context and
+     * without any role, gallery-group, or gallery assignment is pending.
+     */
+    public function isPending(User $user): bool
+    {
+        if ($user->guest_id) {
+            return false;
+        }
+        return $user->roles()->count() === 0
+            && $user->galleryGroups()->count() === 0
+            && $user->galleries()->count() === 0;
+    }
+
+    /**
+     * Mirrors User::canPhotographerAccessGallery().
+     */
+    public function canPhotographerAccessGallery(User $user, string $galleryId): bool
+    {
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+        if (!$this->isPhotographer($user)) {
+            return false;
+        }
+
+        $gallery = Gallery::find($galleryId);
+        if (!$gallery) {
+            return false;
+        }
+
+        if (!$gallery->effective_restricted_photographers) {
+            return true;
+        }
+
+        if ($user->photographerGalleries()->where('galleries.id', $galleryId)->exists()) {
+            return true;
+        }
+
+        $groupIds = $user->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
+        if (!empty($groupIds)) {
+            $allGroupIds = $this->getSubGroupIds($groupIds);
+            if (in_array($gallery->gallery_group_id, $allGroupIds)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Mirrors User::canAccessGallery().
+     */
+    public function canAccessGallery(User $user, string $galleryId): bool
+    {
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        if ($this->isPhotographer($user) && $this->canPhotographerAccessGallery($user, $galleryId)) {
+            return true;
+        }
+
+        return in_array($galleryId, $this->getAllowedGalleryIds($user));
+    }
+
+    /**
+     * Mirrors GalleryPolicy::manage().
+     */
+    public function canManageGallery(User $user, string $galleryId): bool
+    {
+        return $this->isSuperAdmin($user)
+            || $this->isAdmin($user)
+            || ($this->isPhotographer($user) && $this->canPhotographerAccessGallery($user, $galleryId));
     }
 }

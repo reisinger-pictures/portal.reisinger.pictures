@@ -318,12 +318,12 @@ class UserPermissionLogicTest extends TestCase
 
     // =====================================================================
     // 2. getSubGroupIds() — direkt (via Reflection, private Methode)
-    //    Die Methode lebt jetzt im AccessControlService.
+    //    Die Methode lebt jetzt im AuthorizationService.
     // =====================================================================
 
     public function test_get_sub_group_ids_empty_input_returns_empty_array(): void
     {
-        $service = new \App\Services\AccessControlService();
+        $service = new \App\Services\AuthorizationService();
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
@@ -332,7 +332,7 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_get_sub_group_ids_single_id_returns_self(): void
     {
-        $service = new \App\Services\AccessControlService();
+        $service = new \App\Services\AuthorizationService();
         $group = GalleryGroup::factory()->create();
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
@@ -344,7 +344,7 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_get_sub_group_ids_with_nonexistent_id_returns_empty(): void
     {
-        $service = new \App\Services\AccessControlService();
+        $service = new \App\Services\AuthorizationService();
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
@@ -355,7 +355,7 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_get_sub_group_ids_recursive_deep_chain(): void
     {
-        $service = new \App\Services\AccessControlService();
+        $service = new \App\Services\AuthorizationService();
         $g1 = GalleryGroup::factory()->create();
         $g2 = GalleryGroup::factory()->create(['parent_id' => $g1->id]);
         $g3 = GalleryGroup::factory()->create(['parent_id' => $g2->id]);
@@ -375,7 +375,7 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_handles_large_uuid_list(): void
     {
-        $service = new \App\Services\AccessControlService();
+        $service = new \App\Services\AuthorizationService();
         // 50 separate Gruppen testen.
         $root1 = GalleryGroup::factory()->create();
         $root2 = GalleryGroup::factory()->create();
@@ -404,7 +404,7 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_with_quote_in_id_uses_bound_parameters(): void
     {
-        $service = new \App\Services\AccessControlService();
+        $service = new \App\Services\AuthorizationService();
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
@@ -419,7 +419,7 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_empty_after_filter_returns_empty_array(): void
     {
-        $service = new \App\Services\AccessControlService();
+        $service = new \App\Services\AuthorizationService();
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
