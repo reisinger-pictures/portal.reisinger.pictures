@@ -20,3 +20,4 @@
 * [JWT offer tokens](18-jwt-offer-tokens.md)
 * [SettingResolver](20-setting-resolver.md)
 * [Per-User Settings Pattern](26-per-user-settings.md)
+* [Volume-Licensing-Presets](27-volume-licensing-presets.md)

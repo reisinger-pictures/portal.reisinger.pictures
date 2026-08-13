@@ -17,7 +17,7 @@ export interface CartItemListProps {
 export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes, totalAmount, volumeLicensing}: CartItemListProps) => {
     const isVolumeLicensingMode = volumeLicensing?.isVolumePricing;
     const pricePerItemStr = isVolumeLicensingMode ? formatMoney(volumeLicensing!.pricePerItemCents) : '';
-    const tierNum = volumeLicensing?.tier ?? 0;
+    const tierNum = volumeLicensing?.tierIndex ?? 0;
     const nextCount = volumeLicensing?.nextTierCount ?? 0;
     const nextLabel = volumeLicensing?.nextTierLabel ?? '';
     const itemCount = items.length;
@@ -43,7 +43,7 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                             <Trans><Plural value={nextCount} one="Noch # Bild" other="Noch # Bilder" /> bis {nextLabel}</Trans>
                         </span>
                     )}
-                    {volumeLicensing.tier === 3 && (
+                    {volumeLicensing.isMaxTier && (
                         <span className="text-xs text-success font-bold"><Trans>Bester Rabatt aktiv</Trans></span>
                     )}
                 </div>

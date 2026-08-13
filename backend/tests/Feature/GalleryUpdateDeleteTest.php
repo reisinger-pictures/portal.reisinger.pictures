@@ -40,7 +40,6 @@ class GalleryUpdateDeleteTest extends TestCase {
     public function test_photographer_cannot_update_or_delete_other_photographers_gallery() {
         $photog1 = User::factory()->create();
         $photog1->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
-
         $photog2 = User::factory()->create();
         $photog2->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
 
@@ -58,6 +57,43 @@ class GalleryUpdateDeleteTest extends TestCase {
         $this->withHeaders(['Authorization' => "Bearer $token2"])
              ->deleteJson("/api/management/galleries/{$gallery->id}")
              ->assertStatus(403);
+    }
+
+    public function test_gallery_update_rejects_volume_preset_from_other_brand() {
+        \App\Support\BrandRegistry::set(\App\Enums\Brand::B2B);
+
+        // Preset einer "fremden" Brand — Host-Brand ist rp.
+        $foreignPreset = \App\Models\VolumePreset::create(['brand' => 'other', 'name' => 'Fremd', 'is_default' => false]);
+
+        $photog = User::factory()->create();
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $token = auth('api')->login($photog);
+
+        $gallery = Gallery::factory()->create();
+        $photog->galleries()->attach($gallery);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->putJson("/api/management/galleries/{$gallery->id}", ['volume_preset_id' => $foreignPreset->id])
+             ->assertStatus(422);
+    }
+
+    public function test_gallery_update_accepts_volume_preset_from_current_brand() {
+        \App\Support\BrandRegistry::set(\App\Enums\Brand::B2B);
+
+        $preset = \App\Models\VolumePreset::create(['brand' => 'rp', 'name' => 'Eigen', 'is_default' => false]);
+
+        $photog = User::factory()->create();
+        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $token = auth('api')->login($photog);
+
+        $gallery = Gallery::factory()->create();
+        $photog->galleries()->attach($gallery);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+             ->putJson("/api/management/galleries/{$gallery->id}", ['volume_preset_id' => $preset->id])
+             ->assertStatus(200);
+
+        $this->assertDatabaseHas('galleries', ['id' => $gallery->id, 'volume_preset_id' => $preset->id]);
     }
 
     public function test_deleting_group_moves_galleries_to_root() {

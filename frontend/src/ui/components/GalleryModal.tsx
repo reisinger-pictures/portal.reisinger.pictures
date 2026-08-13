@@ -27,7 +27,8 @@ const createGallerySchema = () => z.object({
     is_free_download: z.boolean().optional(),
     is_editorial_only: z.boolean().optional(),
     is_hidden: z.boolean().optional(),
-    licensing_mode: z.string().optional()
+    licensing_mode: z.string().optional(),
+    volume_preset_id: z.string().optional()
 });
 type GalleryFormValues = z.infer<ReturnType<typeof createGallerySchema>>;
 
@@ -52,7 +53,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
         defaultValues: {
-            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', org_ids: [], is_free_download: false, is_editorial_only: false, is_hidden: false, licensing_mode: ''
+            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', org_ids: [], is_free_download: false, is_editorial_only: false, is_hidden: false, licensing_mode: '', volume_preset_id: ''
         }
     });
 
@@ -71,7 +72,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 is_free_download: !!editingGallery?.is_free_download,
                 is_editorial_only: !!editingGallery?.is_editorial_only,
                 is_hidden: !!editingGallery?.is_hidden,
-                licensing_mode: editingGallery?.licensing_mode || ''
+                licensing_mode: editingGallery?.licensing_mode || '',
+                volume_preset_id: editingGallery?.volume_preset_id || ''
             });
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);
@@ -80,6 +82,10 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     const watchGroupId = useWatch({ control, name: 'gallery_group_id' });
     const watchIsPublic = useWatch({ control, name: 'is_public' });
     const watchOrgIds = useWatch({ control, name: 'org_ids' });
+    const watchLicensingMode = useWatch({ control, name: 'licensing_mode' });
+
+    const { data: presets } = useSWR<{ presets: Array<{ id: string; name: string; is_default: boolean }> }>('/api/management/settings/volume-presets', fetcher);
+    const volumePresets = watchLicensingMode === 'volume_licensing' ? presets?.presets : undefined;
 
     const selectedParent = availableGroups.find(g => g.id === (watchGroupId === '' ? null : watchGroupId));
     let isVisibilityForced = selectedParent?.is_public !== undefined && selectedParent?.is_public !== null;
@@ -96,7 +102,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
             is_free_download: data.is_free_download,
             is_editorial_only: data.is_editorial_only,
             is_hidden: data.is_hidden,
-            licensing_mode: data.licensing_mode || null
+            licensing_mode: data.licensing_mode || null,
+            volume_preset_id: data.volume_preset_id || null
         };
 
         try {
@@ -242,6 +249,25 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                     <option value="volume_licensing"><Trans>Volume-Lizenzierung</Trans></option>
                 </select>
             </div>
+
+            {watchLicensingMode === 'volume_licensing' && (
+                <div className="form-control w-full mb-4">
+                    <label className="label"><span className="label-text font-bold"><Trans>Volume-Preset</Trans></span></label>
+                    <select {...register('volume_preset_id')} className="select select-bordered w-full">
+                        <option value=""><Trans>Brand-Standard</Trans></option>
+                        {volumePresets?.map(p => (
+                            <option key={p.id} value={p.id}>
+                                {p.name}{p.is_default ? ' (Standard)' : ''}
+                            </option>
+                        ))}
+                    </select>
+                    <label className="label pt-1 pb-0">
+                        <span className="label-text-alt opacity-70 leading-tight whitespace-normal break-words">
+                            <Trans>Definiert die Mengenrabatt-Staffeln für diese Galerie. Ohne Auswahl gilt das Standard-Preset der Brand.</Trans>
+                        </span>
+                    </label>
+                </div>
+            )}
 
             {watchType === 'delivery' && (
                 <div className="space-y-3 mb-4">

@@ -133,11 +133,13 @@ describe('CartItemList', () => {
             items: mockItems,
             totalAmount: 4000,
             volumeLicensing: {
-                tier: 2 as const,
+                tierIndex: 2 as const,
+                isMaxTier: false,
                 pricePerItemCents: 2500,
                 totalCents: 5000,
                 nextTierCount: 10,
                 nextTierLabel: '20 Bilder (20 €)',
+                tiers: [],
                 isVolumePricing: true,
             },
         });
@@ -146,16 +148,18 @@ describe('CartItemList', () => {
         expect(screen.getByText(/Noch 10.*er.*bis 20 Bilder \(20 €\)/)).toBeInTheDocument();
     });
 
-    it('shows "Bester Rabatt aktiv" at tier 3', () => {
+    it('shows "Bester Rabatt aktiv" when max tier is active', () => {
         renderList({
             items: mockItems,
             totalAmount: 4000,
             volumeLicensing: {
-                tier: 3 as const,
+                tierIndex: 2 as const,
+                isMaxTier: true,
                 pricePerItemCents: 2000,
                 totalCents: 4000,
                 nextTierCount: 0,
                 nextTierLabel: '',
+                tiers: [],
                 isVolumePricing: true,
             },
         });
@@ -168,11 +172,13 @@ describe('CartItemList', () => {
             items: mockItems,
             totalAmount: 4000,
             volumeLicensing: {
-                tier: 1 as const,
+                tierIndex: 1 as const,
+                isMaxTier: false,
                 pricePerItemCents: 3000,
                 totalCents: 6000,
                 nextTierCount: 8,
                 nextTierLabel: '10 Bilder (25 €)',
+                tiers: [],
                 isVolumePricing: true,
             },
         });
@@ -188,11 +194,13 @@ describe('CartItemList', () => {
             items: mockItems,
             totalAmount: 6000,
             volumeLicensing: {
-                tier: 1 as const,
+                tierIndex: 1 as const,
+                isMaxTier: false,
                 pricePerItemCents: 3000,
                 totalCents: 6000,
                 nextTierCount: 8,
                 nextTierLabel: '10 Bilder (25 €)',
+                tiers: [],
                 isVolumePricing: true,
             },
         });

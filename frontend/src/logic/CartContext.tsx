@@ -16,13 +16,25 @@ export interface CartItem {
     price: number;
 }
 
+export interface VolumeTierConfig {
+    /** From this many items (inclusive) the tier applies. */
+    minQuantity: number;
+    /** Unit price in cents for the tier. */
+    priceCents: number;
+}
+
 /** Volume licensing pricing summary derived from cart items. */
 export interface VolumeLicensingResult {
-    tier: 1 | 2 | 3;
+    /** 0-based index of the currently qualifying tier. */
+    tierIndex: number;
+    /** True when the last tier is active (best discount). */
+    isMaxTier: boolean;
     pricePerItemCents: number;
     totalCents: number;
     nextTierCount: number;
     nextTierLabel: string;
+    /** Effective tier structure (configurable per brand/gallery). */
+    tiers: VolumeTierConfig[];
     isVolumePricing: boolean;
 }
 

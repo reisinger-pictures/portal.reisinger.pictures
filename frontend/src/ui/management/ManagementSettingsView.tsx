@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import WatermarkSettingsCard from './components/WatermarkSettingsCard';
-import LicenseCatalogSettings from './components/LicenseCatalogSettings';
+import PricingSettingsTabs from './components/PricingSettingsTabs';
 import BillingDetailsCard from './components/BillingDetailsCard';
 import useSWR from 'swr';
 import {fetcher, SystemInfo} from '../../api';
@@ -60,7 +60,7 @@ export default function ManagementSettingsView() {
                 </div>
             )}
 
-            <LicenseCatalogSettings/>
+            <PricingSettingsTabs/>
 
             <BillingDetailsCard/>
             <WatermarkSettingsCard/>

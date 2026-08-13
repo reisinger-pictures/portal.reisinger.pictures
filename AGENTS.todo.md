@@ -11,6 +11,32 @@
 
 ---
 
+## ✅ ERLEDIGT — Volume-Licensing-Presets: konfigurierbare Staffeln pro Brand + pro Gallerie (2026-08-13)
+
+**Ergebnis (SOLL-Doku):** `features/infrastructure/27-volume-licensing-presets.md`.
+
+**Entscheidungen (interaktiv geklärt 2026-08-13):**
+1. **Rabatt-Semantik:** RETROAKTIV beibehalten (Gesamtmenge → Einheitspreis für alle Bilder), nur variable Staffelzahl.
+2. **Gallery:** Lizenzmodus-Select (existierte schon) + neuer **Volume-Preset-Dropdown** (nur bei volume_licensing).
+3. **Alt-Settings `srp_*`:** werden beim ersten Zugriff in ein auto-erzeugtes „Standard"-Preset pro Brand migriert.
+
+**Umgesetzt:**
+- Migration **V029** (`volume_presets`, `volume_preset_tiers`, `galleries.volume_preset_id`) + Seeder.
+- `VolumePreset`/`VolumePresetTier`-Modelle, `VolumePresetService` (Default-Erzwingung, srp-*-Migration, CRUD, Delete-Constraints).
+- `VolumeLicensingStrategy` auf `(VolumePreset, ?CouponService)` umgestellt (variable Staffeln, retroaktive `tier_breakdown`-Step-Diffs); Caller (`AppServiceProvider`, `CheckoutService`) aktualisiert.
+- `CheckoutService` gruppiert nach `(mode, preset)`; Volume-Gruppen immer via Multi-Strategy (Gallery-Preset schlägt Brand-Default).
+- `VolumePresetController` + Routen (GET für Management-Rollen, Schreiben super_admin); `SettingsController::getLicenseTerms` liefert `volume_pricing.tiers`.
+- `GalleryRequest`-Validierung + `GalleryService::assertPresetForBrand` (Cross-Brand 422).
+- Frontend: `PricingSettingsTabs` (Lizenz-Katalog + Volume-Pricing als 2 Tabs, responsive), `VolumePresetSettingsCard` (Staffel-Editor), `GalleryModal`-Preset-Dropdown, `useVolumeLicensing`/`VolumeLicensingCard`/`CartItemList` ohne Hardcodes (tierIndex/isMaxTier, Konfig aus API).
+
+**Tests:**
+- PHPUnit: `VolumePresetServiceTest` (10), `VolumePresetControllerTest` (7), `VolumeLicensingStrategyTest` (9, variabel), `MixedCartPricingTest` +2 (Gallery-Preset-Override), `SettingsControllerTest` +3 (volume_pricing), `GalleryUpdateDeleteTest` +2 (Cross-Brand-Guard). Gesamt: **1129 passed**.
+- Vitest: `useVolumePresets.test` (5), `useVolumeLicensing.test` (18, variabel), `CartItemList.test` angepasst. Gesamt: **580 passed**.
+- Playwright: `volume-presets.spec.ts` (CRUD + Gallery-Zuordnung, `@feature:admin:volume-pricing`, 1× `@smoke`); **58 @smoke + Spezifische Specs grün**.
+- Per E2E entdeckte Bugs: Formular-Submit ohne `preventDefault` (Reload) + Cross-Brand-Enum-Vergleich — beide gefixt + Regressionstests.
+
+---
+
 ## ✅ GELÖST — Produktions-Build blank: Lingui module-scope `t` + stale CSP-Hash (2026-08-12)
 
 **Symptom (nach Deploy):** `portal.reisinger.pictures` zeigte eine leere Seite. Konsole:
@@ -233,7 +259,7 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 2. **Ein Meilisearch auf 7700** (`search-test`-Service + Port 7701 entfallen). Tests via `SCOUT_PREFIX=test_` (getrennte Indizes `test_photos`, `test_galleries`, …). `phpunit.xml`: `MEILISEARCH_HOST=http://127.0.0.1:7700`, einheitlicher Key (`local_meili_secret`), `SCOUT_PREFIX=test_` ergänzen. Dev nutzt unpräfixte Indizes. Scout-Re-Import (`scout:sync-index-settings` + `scout:import`) nach Setup.
 3. **Geteilte Mailpit-Instanz 8025/1025** für Dev + PHPUnit. `backend/tests/Support/MailpitAssertions.php:9` → 8025; E2E-`MailpitHelper` (8025) unverändert. Filterung per Empfänger.
 4. **.run-Configs: „Start/Stop Docker (Test)" löschen**; „Start/Stop Docker (Dev)" → `docker compose up -d`/`down`; §9-Namenskonvention anwenden. „DB Migration (Test)" um `--seed` ergänzen.
-5. **Generische Container-Namen** (`mysql`, `mailpit`, `meili`?) + Standard-Ports (3306/7700/8025+1025) für lokale Konsistenz und Duplizierbarkeit in anderen Projekten. **Keine separate globale Infra-Compose** — andere Projekte duplizieren die Compose (User-Präferenz: „lieber duplizieren, globale Infra-Compose potenziell nervig"). Konkrete Namen/Volumes bei der Umsetzung in der Planungsphase festlegen.
+5. **Generische Container-Namen** (`mysql`, `mailpit`, `meili`?) + Standard-Ports (3306/7700/8025+1025) für lokale Konsistenz und Duplizierbarkeit in anderen Projekten. **Keine separate globale Infra-Compose** — andere Projekte duplizieren die Compose (User-Präferenz: „lieber duplizieren, globale Infra-Compose potenziell nervig"). Konkrete Namen/Volumes bei der Umsetzung festlegen.
 
 **Korrigierter Umsetzungsplan (angepasst an Entscheidungen):**
 0. Beide alten Stacks down (`--project-name portal_local` + `portal_test`).

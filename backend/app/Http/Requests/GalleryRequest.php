@@ -34,6 +34,7 @@ abstract class GalleryRequest extends FormRequest
             'default_country' => 'nullable|string',
             'default_iso_country' => 'nullable|string|max:2',
             'licensing_mode' => 'nullable|in:scope_licensing,volume_licensing',
+            'volume_preset_id' => 'nullable|numeric|exists:volume_presets,id',
         ];
     }
 }

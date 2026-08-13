@@ -10,6 +10,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Services\CheckoutService;
+use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -145,5 +146,71 @@ class MixedCartPricingTest extends TestCase
         $response = $this->service->processCheckout($request, $user, 'invoice');
 
         $this->assertEquals(200, $response->status());
+    }
+
+    public function test_single_volume_gallery_with_custom_preset_uses_gallery_preset(): void
+    {
+        $presetService = app(VolumePresetService::class);
+        $presetService->ensureDefaultPresetForBrand(Brand::B2B);
+        $custom = $presetService->create('Custom', [
+            ['min_quantity' => 0, 'price_cents' => 9000],
+            ['min_quantity' => 2, 'price_cents' => 5000],
+        ]);
+
+        $gallery = Gallery::factory()->create([
+            'is_public' => true,
+            'licensing_mode' => 'volume_licensing',
+            'volume_preset_id' => $custom->id,
+        ]);
+
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $user = User::factory()->create();
+
+        $request = Request::create('/', 'POST', [
+            'items' => [
+                ['photoId' => $photo->id, 'tier' => 'web'],
+            ],
+            'billing_name' => 'Tester',
+            'billing_street' => 'Street',
+            'billing_zip' => '1234',
+            'billing_city' => 'City',
+        ]);
+
+        $response = $this->service->processCheckout($request, $user, 'invoice');
+        $this->assertEquals(200, $response->status());
+
+        // Single non-quote item → tier 1 of the gallery preset (9000).
+        $this->assertDatabaseHas('orders', ['total_amount' => 9000]);
+    }
+
+    public function test_volume_gallery_without_preset_uses_brand_default(): void
+    {
+        $presetService = app(VolumePresetService::class);
+        $default = $presetService->ensureDefaultPresetForBrand(Brand::B2B);
+
+        $gallery = Gallery::factory()->create([
+            'is_public' => true,
+            'licensing_mode' => 'volume_licensing',
+            'volume_preset_id' => null,
+        ]);
+
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $user = User::factory()->create();
+
+        $request = Request::create('/', 'POST', [
+            'items' => [
+                ['photoId' => $photo->id, 'tier' => 'web'],
+            ],
+            'billing_name' => 'Tester',
+            'billing_street' => 'Street',
+            'billing_zip' => '1234',
+            'billing_city' => 'City',
+        ]);
+
+        $response = $this->service->processCheckout($request, $user, 'invoice');
+        $this->assertEquals(200, $response->status());
+
+        // Single non-quote item → tier 1 of the brand default (3000).
+        $this->assertDatabaseHas('orders', ['total_amount' => 3000]);
     }
 }

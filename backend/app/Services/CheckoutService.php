@@ -9,7 +9,6 @@ use App\Models\Photo;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CouponService;
-use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -59,9 +58,9 @@ class CheckoutService {
 
                 $groups = $this->groupItemsByLicensingMode($strategyItems);
 
-                $hasVolumeGroup = isset($groups['volume_licensing']);
+                $hasVolumeGroup = collect(array_keys($groups))->contains(fn ($key) => str_starts_with($key, 'volume_licensing'));
 
-                if (count($groups) > 1) {
+                if ($hasVolumeGroup || count($groups) > 1) {
                     if ($hasVolumeGroup && $couponCode !== null) {
                         $appliedCoupon = $this->resolveCoupon($couponCode, $request->items, $user);
                     }
@@ -165,7 +164,10 @@ class CheckoutService {
         foreach ($strategyItems as $item) {
             $gallery = Gallery::find($item['gallery_id']);
             $mode = $gallery ? $gallery->effective_licensing_mode : 'scope_licensing';
-            $groups[$mode][] = $item;
+            $presetKey = $mode === 'volume_licensing'
+                ? ($gallery?->volume_preset_id ?: 'default')
+                : 'default';
+            $groups[$mode . '|' . $presetKey][] = $item;
         }
         return $groups;
     }
@@ -178,14 +180,18 @@ class CheckoutService {
         $couponId = null;
         $allTierBreakdown = [];
 
-        foreach ($groups as $mode => $groupItems) {
-            $strategy = match ($mode) {
-                'volume_licensing' => new VolumeLicensingStrategy(
-                    app(SettingResolver::class),
-                    $this->couponService
-                ),
-                default => new ScopeLicensingStrategy(),
-            };
+        foreach ($groups as $groupKey => $groupItems) {
+            [$mode, $presetKey] = explode('|', $groupKey, 2);
+
+            if ($mode === 'volume_licensing') {
+                $presetService = app(VolumePresetService::class);
+                $preset = $presetKey === 'default'
+                    ? $presetService->resolveDefaultForBrand(\App\Support\BrandRegistry::currentOrDefault())
+                    : \App\Models\VolumePreset::findOrFail($presetKey);
+                $strategy = new VolumeLicensingStrategy($preset, $this->couponService);
+            } else {
+                $strategy = new ScopeLicensingStrategy();
+            }
 
             $groupCouponCode = $strategy->supportsCoupons() ? $couponCode : null;
             $result = $strategy->calculateCart($groupItems, $user, $groupCouponCode);

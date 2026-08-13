@@ -11,6 +11,7 @@ export class E2ESessionHelper {
     private createdProductIds: string[] = [];
     private createdContractIds: string[] = [];
     private createdCouponIds: string[] = [];
+    private createdPresetIds: string[] = [];
     private adminToken: string | null = null;
 
     constructor(private request: APIRequestContext) {}
@@ -107,6 +108,15 @@ export class E2ESessionHelper {
     trackProduct(id: string) { if (id) this.createdProductIds.push(id); }
     trackContract(id: string) { if (id) this.createdContractIds.push(id); }
     trackCoupon(id: string) { if (id) this.createdCouponIds.push(id); }
+    trackPreset(id: string) { if (id) this.createdPresetIds.push(id); }
+
+    async createVolumePreset(data: { name: string; tiers: Array<{ min_quantity: number; price_cents: number }> }) {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const res = await this.request.post('/api/management/settings/volume-presets', { data, headers });
+        if (!res.ok()) throw new Error(`Volume preset creation failed: ${await res.text()}`);
+        return res.json();
+    }
 
     async createCoupon(data: {
         code: string;
@@ -163,5 +173,6 @@ export class E2ESessionHelper {
         await this.deleteResources(this.createdSnippetIds, '/api/management/text-snippets', 'text-snippet');
         await this.deleteResources(this.createdProductIds, '/api/management/products', 'product');
         await this.deleteResources(this.createdCouponIds, '/api/management/coupons', 'coupon');
+        await this.deleteResources(this.createdPresetIds, '/api/management/settings/volume-presets', 'volume-preset');
     }
 }

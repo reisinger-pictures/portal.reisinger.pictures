@@ -36,6 +36,7 @@ use App\Http\Controllers\OrgController;
 use App\Http\Controllers\OrgInviteController;
 use App\Http\Controllers\TextSnippetController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VolumePresetController;
 use App\Http\Controllers\WebhookController;
 use App\Models\DownloadLog;
 use App\Models\User;
@@ -177,6 +178,8 @@ Route::middleware(['auth:api', 'management'])->group(function () {
 
     Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark'])->name('api.management.settings.watermark.update');
     Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms'])->name('api.management.settings.license-terms');
+    // Volume-Presets lesen ist für alle Management-Rollen (Gallery-Zuordnung); Schreiben nur Super-Admin (unten).
+    Route::get('/management/settings/volume-presets', [VolumePresetController::class, 'index'])->name('api.management.settings.volume-presets.index');
     // R-01: Billing-/Impressum-Konfiguration ist ein Super-Admin-Anliegen (s. isImpressumMissing-
     // Gate im Frontend) → zusätzlich super_admin-gesichert. Lesen (GET /settings/billing-details)
     // bleibt auth:api, da Klienten die Bankdaten für "Kauf auf Rechnung" brauchen.
@@ -189,6 +192,11 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::post('/management/settings/license-modifiers', [LicenseCatalogController::class, 'storeModifier'])->name('api.management.settings.license-modifiers.store');
         Route::put('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'updateModifier'])->name('api.management.settings.license-modifiers.update');
         Route::delete('/management/settings/license-modifiers/{id}', [LicenseCatalogController::class, 'destroyModifier'])->name('api.management.settings.license-modifiers.destroy');
+
+        Route::post('/management/settings/volume-presets', [VolumePresetController::class, 'store'])->name('api.management.settings.volume-presets.store');
+        Route::put('/management/settings/volume-presets/{id}', [VolumePresetController::class, 'update'])->name('api.management.settings.volume-presets.update');
+        Route::delete('/management/settings/volume-presets/{id}', [VolumePresetController::class, 'destroy'])->name('api.management.settings.volume-presets.destroy');
+        Route::post('/management/settings/volume-presets/{id}/default', [VolumePresetController::class, 'setDefault'])->name('api.management.settings.volume-presets.default');
 
         Route::get('/management/payouts', [\App\Http\Controllers\PayoutController::class, 'adminIndex'])->name('api.management.payouts');
         Route::post('/management/payouts/calculate', [\App\Http\Controllers\PayoutController::class, 'calculate'])->name('api.management.payouts.calculate');

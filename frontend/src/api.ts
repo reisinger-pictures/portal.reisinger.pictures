@@ -186,6 +186,20 @@ export interface Gallery {
     brand?: string | null;
     licensing_mode?: string | null;
     effective_licensing_mode?: string;
+    volume_preset_id?: string | null;
+}
+
+export interface VolumePresetTier {
+    position: number;
+    min_quantity: number;
+    price_cents: number;
+}
+
+export interface VolumePreset {
+    id: string;
+    name: string;
+    is_default: boolean;
+    tiers: VolumePresetTier[];
 }
 
 // Canonical auth-context user (`/api/auth/me`). `roles` is the role-name list.

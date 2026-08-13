@@ -5,45 +5,44 @@ namespace App\Pricing;
 use App\Contracts\PricingStrategy;
 use App\Models\Photo;
 use App\Models\User;
+use App\Models\VolumePreset;
+use App\Models\VolumePresetTier;
 use App\Services\CouponService;
-use App\Services\SettingResolver;
 
+/**
+ * Retroactive volume pricing using a configurable volume preset.
+ *
+ * The preset holds an arbitrary number of tiers (position, min_quantity,
+ * price_cents). All non-quote items are priced at the base tier price (the
+ * tier with the smallest min_quantity); the tier that applies is determined by
+ * the total count of non-quote items, and the volume discount is itemized as
+ * `tier_breakdown` discount_fixed lines (one per step below the qualifying tier).
+ *
+ * Quote items are 0 cents and do not count toward the volume tier.
+ */
 class VolumeLicensingStrategy implements PricingStrategy
 {
-    /** Default prices per tier in cents (fallback when settings are not configured). */
-    private const DEFAULT_TIER1_PRICE = 3000;
-    private const DEFAULT_TIER2_PRICE = 2500;
-    private const DEFAULT_TIER3_PRICE = 2000;
+    /** @var VolumePresetTier[] sorted by min_quantity ascending. */
+    private array $tiers;
 
-    /** Default thresholds (fallback when settings are not configured). */
-    private const DEFAULT_THRESHOLD1 = 10;
-    private const DEFAULT_THRESHOLD2 = 20;
-
-    private SettingResolver $settings;
     private ?CouponService $couponService;
 
-    public function __construct(SettingResolver $settings, ?CouponService $couponService = null)
+    public function __construct(VolumePreset $preset, ?CouponService $couponService = null)
     {
-        $this->settings = $settings;
+        $this->tiers = $preset->tiers->sortBy('min_quantity')->values()->all();
         $this->couponService = $couponService;
     }
 
     /**
-     * Calculate prices using the SRP volume-based model.
+     * Calculate prices using the volume-based model.
      *
-     * All non-quote items are charged at the tier-1 base price. Volume discounts
-     * are itemized as separate tier_breakdown discount_fixed lines so the invoice
-     * shows the progressive discount structure.
-     *
-     * Quote items are 0 cents and do not count toward the volume tier.
-     *
-     * If a $couponCode is provided and a CouponService is available, the coupon is applied
-     * after the volume pricing calculation. Only one coupon is valid at a time, alongside
-     * the always-active volume discount.
+     * All non-quote items are charged at the tier price determined by the total
+     * item count (retroactive). Volume discounts are itemized as separate
+     * tier_breakdown discount_fixed lines so the invoice shows the progressive
+     * discount structure.
      */
     public function calculateCart(array $items, User $user, ?string $couponCode = null): array
     {
-        // Count non-quote items
         $nonQuoteCount = 0;
         foreach ($items as $item) {
             if (empty($item['is_quote'])) {
@@ -51,16 +50,8 @@ class VolumeLicensingStrategy implements PricingStrategy
             }
         }
 
-        // Read tier prices and thresholds
-        $tier1Cents = (int) ($this->settings->get('srp_price_per_image_tier1', self::DEFAULT_TIER1_PRICE));
-        $tier2Cents = (int) ($this->settings->get('srp_price_per_image_tier2', self::DEFAULT_TIER2_PRICE));
-        $tier3Cents = (int) ($this->settings->get('srp_price_per_image_tier3', self::DEFAULT_TIER3_PRICE));
-        $threshold1 = (int) ($this->settings->get('srp_tier_threshold1', self::DEFAULT_THRESHOLD1));
-        $threshold2 = (int) ($this->settings->get('srp_tier_threshold2', self::DEFAULT_THRESHOLD2));
-
-        // All non-quote items use the tier-1 base price; volume discounts are
-        // itemized separately via tier_breakdown.
-        $perImagePriceCents = $tier1Cents;
+        [$qualifyingIndex] = $this->resolveTierIndex($nonQuoteCount);
+        $perImagePriceCents = $this->basePriceCents();
 
         $pricedItems = [];
         $totalCents = 0;
@@ -75,8 +66,8 @@ class VolumeLicensingStrategy implements PricingStrategy
                 $pricedItems[] = [
                     'itemId' => $itemId,
                     'priceCents' => 0,
-'tier' => 'volume',
-                'useCaseName' => 'Anfrage',
+                    'tier' => 'volume',
+                    'useCaseName' => 'Anfrage',
                     'modifierNames' => [],
                     'galleryId' => $galleryId,
                 ];
@@ -94,39 +85,7 @@ class VolumeLicensingStrategy implements PricingStrategy
             $totalCents += $perImagePriceCents;
         }
 
-        // Build tier breakdown discount lines
-        $tierBreakdown = [];
-
-        if ($nonQuoteCount >= $threshold2) {
-            $diff12 = $tier1Cents - $tier2Cents;
-            $diff23 = $tier2Cents - $tier3Cents;
-            $tierBreakdown[] = [
-                'type' => 'discount_fixed',
-                'filename' => 'Mengenrabatt ab ' . $threshold1 . ' Bildern',
-                'notes' => sprintf('%d × -%s €', $nonQuoteCount, number_format($diff12 / 100, 2, ',', '.')),
-                'price' => -$diff12,
-                'qty' => $nonQuoteCount,
-                'row_total' => -($nonQuoteCount * $diff12),
-            ];
-            $tierBreakdown[] = [
-                'type' => 'discount_fixed',
-                'filename' => 'Mengenrabatt ab ' . $threshold2 . ' Bildern',
-                'notes' => sprintf('%d × -%s €', $nonQuoteCount, number_format($diff23 / 100, 2, ',', '.')),
-                'price' => -$diff23,
-                'qty' => $nonQuoteCount,
-                'row_total' => -($nonQuoteCount * $diff23),
-            ];
-        } elseif ($nonQuoteCount >= $threshold1) {
-            $diff12 = $tier1Cents - $tier2Cents;
-            $tierBreakdown[] = [
-                'type' => 'discount_fixed',
-                'filename' => 'Mengenrabatt ab ' . $threshold1 . ' Bildern',
-                'notes' => sprintf('%d × -%s €', $nonQuoteCount, number_format($diff12 / 100, 2, ',', '.')),
-                'price' => -$diff12,
-                'qty' => $nonQuoteCount,
-                'row_total' => -($nonQuoteCount * $diff12),
-            ];
-        }
+        $tierBreakdown = $this->buildTierBreakdown($qualifyingIndex, $nonQuoteCount);
 
         // Subtract tier discounts from the item total
         foreach ($tierBreakdown as $bd) {
@@ -145,7 +104,6 @@ class VolumeLicensingStrategy implements PricingStrategy
         if ($couponCode !== null && $this->couponService !== null) {
             $brand = \App\Support\BrandRegistry::current();
             if ($brand !== null) {
-                // Extract gallery/meta-gallery context from items (first non-quote item's gallery)
                 $galleryId = null;
                 $metaGalleryId = null;
                 foreach ($items as $item) {
@@ -183,33 +141,78 @@ class VolumeLicensingStrategy implements PricingStrategy
         return $result;
     }
 
-    /**
-     * Determine the per-image price in cents based on the total number of non-quote items.
-     *
-     * Reads thresholds and prices from SettingResolver, falling back to hardcoded defaults.
-     */
     public function supportsCoupons(): bool
     {
         return true;
     }
 
-    private function resolveTierPrice(int $count): int
+    /**
+     * Determine the qualifying tier index for a given item count.
+     *
+     * The qualifying tier is the one with the highest min_quantity that is still
+     * <= count. All items are priced at the base tier price; the retroactive
+     * discount to the qualifying tier is itemized via `buildTierBreakdown`.
+     *
+     * @return array{0: int} [qualifying index]
+     */
+    private function resolveTierIndex(int $count): array
     {
+        if (count($this->tiers) === 0) {
+            return [0];
+        }
+
         if ($count <= 0) {
-            return 0;
+            return [0];
         }
 
-        $threshold1 = (int) ($this->settings->get('srp_tier_threshold1', self::DEFAULT_THRESHOLD1));
-        $threshold2 = (int) ($this->settings->get('srp_tier_threshold2', self::DEFAULT_THRESHOLD2));
-
-        if ($count >= $threshold2) {
-            return (int) ($this->settings->get('srp_price_per_image_tier3', self::DEFAULT_TIER3_PRICE));
+        $qualifyingIndex = 0;
+        foreach ($this->tiers as $index => $tier) {
+            if ($count >= $tier->min_quantity) {
+                $qualifyingIndex = $index;
+            } else {
+                break;
+            }
         }
 
-        if ($count >= $threshold1) {
-            return (int) ($this->settings->get('srp_price_per_image_tier2', self::DEFAULT_TIER2_PRICE));
+        return [$qualifyingIndex];
+    }
+
+    private function basePriceCents(): int
+    {
+        return count($this->tiers) > 0 ? $this->tiers[0]->price_cents : 0;
+    }
+
+    /**
+     * Build the retroactive discount lines: one step per tier below the
+     * qualifying tier, priced as the difference to the next tier.
+     */
+    private function buildTierBreakdown(int $qualifyingIndex, int $nonQuoteCount): array
+    {
+        $breakdown = [];
+
+        if ($nonQuoteCount <= 0 || $qualifyingIndex <= 0) {
+            return $breakdown;
         }
 
-        return (int) ($this->settings->get('srp_price_per_image_tier1', self::DEFAULT_TIER1_PRICE));
+        for ($i = 1; $i <= $qualifyingIndex; $i++) {
+            $upperPrice = $this->tiers[$i - 1]->price_cents;
+            $lowerPrice = $this->tiers[$i]->price_cents;
+            $diff = $upperPrice - $lowerPrice;
+
+            if ($diff <= 0) {
+                continue;
+            }
+
+            $breakdown[] = [
+                'type' => 'discount_fixed',
+                'filename' => 'Mengenrabatt ab ' . $this->tiers[$i]->min_quantity . ' Bildern',
+                'notes' => sprintf('%d × -%s €', $nonQuoteCount, number_format($diff / 100, 2, ',', '.')),
+                'price' => -$diff,
+                'qty' => $nonQuoteCount,
+                'row_total' => -($nonQuoteCount * $diff),
+            ];
+        }
+
+        return $breakdown;
     }
 }

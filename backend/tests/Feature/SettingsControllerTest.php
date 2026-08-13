@@ -48,6 +48,48 @@ class SettingsControllerTest extends TestCase
             ]);
     }
 
+    public function test_get_license_terms_volume_pricing_uses_brand_default_preset(): void
+    {
+        Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
+
+        $this->getJson('/api/settings/license-terms')
+            ->assertStatus(200)
+            ->assertJsonPath('pricing_strategy', 'volume_licensing')
+            ->assertJsonPath('volume_pricing.preset_name', 'Standard')
+            ->assertJsonCount(3, 'volume_pricing.tiers')
+            ->assertJsonPath('volume_pricing.tiers.1.min_quantity', 10);
+    }
+
+    public function test_get_license_terms_volume_pricing_resolves_gallery_preset(): void
+    {
+        Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
+
+        $presetService = app(\App\Services\VolumePresetService::class);
+        $custom = $presetService->create('Custom', [
+            ['min_quantity' => 0, 'price_cents' => 7000],
+        ]);
+        $gallery = \App\Models\Gallery::factory()->create([
+            'is_public' => true,
+            'licensing_mode' => 'volume_licensing',
+            'volume_preset_id' => $custom->id,
+        ]);
+
+        $this->getJson('/api/settings/license-terms?gallery_id=' . $gallery->id)
+            ->assertStatus(200)
+            ->assertJsonPath('volume_pricing.preset_id', $custom->id)
+            ->assertJsonPath('volume_pricing.tiers.0.price_cents', 7000);
+    }
+
+    public function test_get_license_terms_volume_pricing_null_for_scope(): void
+    {
+        Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'scope_licensing']);
+
+        $this->getJson('/api/settings/license-terms')
+            ->assertStatus(200)
+            ->assertJsonPath('pricing_strategy', 'scope_licensing')
+            ->assertJsonPath('volume_pricing', null);
+    }
+
     public function test_get_billing_details_requires_auth(): void
     {
         $this->getJson('/api/settings/billing-details')

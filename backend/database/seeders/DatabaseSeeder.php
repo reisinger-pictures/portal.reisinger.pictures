@@ -72,6 +72,9 @@ class DatabaseSeeder extends Seeder
         // --- Per-brand catalog, settings, CRM seed ---
         $this->seedCatalogForBrand(Brand::B2B);
 
+        // --- Volume-Licensing-Presets (Standard-Preset je Brand) ---
+        app(\App\Services\VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B);
+
         // Neu: Trigger den Location Import direkt im Seed
         $this->command->info('Starte Smart Assistance Import...');
         \Illuminate\Support\Facades\Artisan::call('app:import-locations', [], $this->command->getOutput());

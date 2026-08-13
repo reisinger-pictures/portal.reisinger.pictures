@@ -49,6 +49,7 @@ export interface GalleryMetadataOpts {
     is_editorial_only?: boolean;
     is_hidden?: boolean;
     licensing_mode?: string | null;
+    volume_preset_id?: string | null;
     restricted_photographers?: boolean;
     allow_client_metadata_edit?: boolean;
     apply_metadata_to_photos?: boolean;

@@ -135,6 +135,7 @@ class SettingsController extends Controller
         $galleryId = $request->query('gallery_id');
 
         $pricingStrategy = $resolver->get('pricing_strategy') ?? 'scope_licensing';
+        $gallery = null;
 
         if ($galleryId !== null) {
             $gallery = Gallery::find($galleryId);
@@ -142,6 +143,11 @@ class SettingsController extends Controller
                 $pricingStrategy = $gallery->effective_licensing_mode;
             }
         }
+
+        $presetService = app(\App\Services\VolumePresetService::class);
+        $preset = $pricingStrategy === 'volume_licensing'
+            ? $presetService->resolveForGallery($gallery)
+            : null;
 
         return response()->json([
             'editorial' => $resolver->get('term_editorial'),
@@ -167,6 +173,14 @@ class SettingsController extends Controller
                 'srp_privacy_fee' => $resolver->get('privacy_fee'),
                 'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
                 'pricing_strategy' => $pricingStrategy,
+                'volume_pricing' => $preset !== null ? [
+                    'preset_id' => $preset->id,
+                    'preset_name' => $preset->name,
+                    'tiers' => $preset->tiers->map(fn ($tier) => [
+                        'min_quantity' => $tier->min_quantity,
+                        'price_cents' => $tier->price_cents,
+                    ])->values(),
+                ] : null,
         ]);
     }
 

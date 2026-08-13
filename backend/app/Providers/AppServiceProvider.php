@@ -56,7 +56,8 @@ class AppServiceProvider extends ServiceProvider
 
             return match ($strategy) {
                 'volume_licensing' => new VolumeLicensingStrategy(
-                    $app->make(SettingResolver::class),
+                    $app->make(\App\Services\VolumePresetService::class)
+                        ->resolveDefaultForBrand(BrandRegistry::currentOrDefault()),
                     $app->make(CouponService::class)
                 ),
                 default => new ScopeLicensingStrategy(),

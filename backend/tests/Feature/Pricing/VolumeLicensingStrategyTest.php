@@ -4,11 +4,11 @@ namespace Tests\Feature\Pricing;
 
 use App\Enums\Brand;
 use App\Models\Coupon;
-use App\Models\Setting;
 use App\Models\User;
+use App\Models\VolumePreset;
+use App\Models\VolumePresetTier;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CouponService;
-use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -23,7 +23,7 @@ class VolumeLicensingStrategyTest extends TestCase
     {
         parent::setUp();
         BrandRegistry::set(Brand::B2B);
-        $this->strategy = new VolumeLicensingStrategy(new SettingResolver());
+        $this->strategy = $this->makeStrategy([[0, 3000], [5, 2500], [10, 2000]]);
     }
 
     protected function tearDown(): void
@@ -34,15 +34,6 @@ class VolumeLicensingStrategyTest extends TestCase
 
     public function test_calculate_cart_applies_volume_discount_at_threshold(): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
-            ['value' => '5']
-        );
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
-            ['value' => '10']
-        );
-
         $user = User::factory()->create();
         $items = $this->buildItems(5, false);
         $result = $this->strategy->calculateCart($items, $user);
@@ -54,15 +45,6 @@ class VolumeLicensingStrategyTest extends TestCase
 
     public function test_calculate_cart_applies_higher_discount_at_higher_threshold(): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
-            ['value' => '5']
-        );
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
-            ['value' => '10']
-        );
-
         $user = User::factory()->create();
         $items = $this->buildItems(10, false);
         $result = $this->strategy->calculateCart($items, $user);
@@ -74,15 +56,6 @@ class VolumeLicensingStrategyTest extends TestCase
 
     public function test_calculate_cart_below_lowest_threshold_no_discount(): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
-            ['value' => '5']
-        );
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
-            ['value' => '10']
-        );
-
         $user = User::factory()->create();
         $items = $this->buildItems(3, false);
         $result = $this->strategy->calculateCart($items, $user);
@@ -93,15 +66,6 @@ class VolumeLicensingStrategyTest extends TestCase
 
     public function test_tier_breakdown_is_generated_correctly(): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
-            ['value' => '5']
-        );
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
-            ['value' => '10']
-        );
-
         $user = User::factory()->create();
         $items = $this->buildItems(10, false);
         $result = $this->strategy->calculateCart($items, $user);
@@ -125,15 +89,6 @@ class VolumeLicensingStrategyTest extends TestCase
 
     public function test_quote_items_are_excluded_from_count(): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
-            ['value' => '5']
-        );
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
-            ['value' => '10']
-        );
-
         $user = User::factory()->create();
         // 3 non-quote + 2 quote = 5 total, but only 3 non-quote → below threshold(5)
         $items = [
@@ -146,23 +101,46 @@ class VolumeLicensingStrategyTest extends TestCase
         $this->assertEmpty($result['tier_breakdown']);
     }
 
+    public function test_single_tier_preset_has_flat_pricing(): void
+    {
+        $strategy = $this->makeStrategy([[0, 5000]]);
+
+        $user = User::factory()->create();
+        $result = $strategy->calculateCart($this->buildItems(50, false), $user);
+
+        // No tier below the base → flat price, no breakdown lines.
+        $this->assertSame(50 * 5000, $result['totalCents']);
+        $this->assertEmpty($result['tier_breakdown']);
+    }
+
+    public function test_variable_tier_count_three_steps(): void
+    {
+        $strategy = $this->makeStrategy([[0, 4000], [3, 3000], [7, 2000], [12, 1000]]);
+
+        $user = User::factory()->create();
+
+        // 5 items → tier 2 (3000)
+        $result = $strategy->calculateCart($this->buildItems(5, false), $user);
+        $this->assertSame(5 * 3000, $result['totalCents']);
+        $this->assertCount(1, $result['tier_breakdown']);
+
+        // 12 items → tier 4 (1000)
+        $result = $strategy->calculateCart($this->buildItems(12, false), $user);
+        $this->assertSame(12 * 1000, $result['totalCents']);
+        $this->assertCount(3, $result['tier_breakdown']);
+    }
+
     public function test_coupon_integration_with_fixed_discount(): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold1', 'brand' => 'rp'],
-            ['value' => '5']
-        );
-        Setting::updateOrCreate(
-            ['key' => 'srp_tier_threshold2', 'brand' => 'rp'],
-            ['value' => '10']
-        );
-
         $coupon = Coupon::factory()->fixed(10.00)->create([
             'brand' => 'rp',
             'active' => true,
         ]);
 
-        $strategy = new VolumeLicensingStrategy(new SettingResolver(), new CouponService());
+        $strategy = new VolumeLicensingStrategy(
+            VolumePreset::first(),
+            new CouponService()
+        );
         $user = User::factory()->create();
         $items = $this->buildItems(5, false);
         $result = $strategy->calculateCart($items, $user, $coupon->code);
@@ -183,6 +161,23 @@ class VolumeLicensingStrategyTest extends TestCase
         $this->assertSame(0, $result['totalCents']);
         $this->assertEmpty($result['items']);
         $this->assertEmpty($result['tier_breakdown']);
+    }
+
+    /**
+     * @param array<array{0: int, 1: int}> $tiers [min_quantity, price_cents]
+     */
+    private function makeStrategy(array $tiers): VolumeLicensingStrategy
+    {
+        $preset = VolumePreset::create(['brand' => 'rp', 'name' => 'Test', 'is_default' => true]);
+        foreach ($tiers as $position => [$minQuantity, $priceCents]) {
+            VolumePresetTier::create([
+                'volume_preset_id' => $preset->id,
+                'position' => $position,
+                'min_quantity' => $minQuantity,
+                'price_cents' => $priceCents,
+            ]);
+        }
+        return new VolumeLicensingStrategy($preset);
     }
 
     private function buildItems(int $count, bool $isQuote): array

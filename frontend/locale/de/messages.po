@@ -111,6 +111,10 @@ msgstr "{nextCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {nextLa
 msgid "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
 msgstr "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
 
+#: src/logic/useVolumeLicensing.ts
+msgid "{price}€ pro Bild"
+msgstr "{price}€ pro Bild"
+
 #: src/ui/client/components/CartItemList.tsx
 msgid "{pricePerItemStr} pro Bild (Tier {tierNum})"
 msgstr "{pricePerItemStr} pro Bild (Tier {tierNum})"
@@ -137,8 +141,8 @@ msgid "{successCount} Bild(er) hochgeladen"
 msgstr "{successCount} Bild(er) hochgeladen"
 
 #: src/logic/useVolumeLicensing.ts
-msgid "{t1Price}€ pro Bild"
-msgstr "{t1Price}€ pro Bild"
+#~ msgid "{t1Price}€ pro Bild"
+#~ msgstr "{t1Price}€ pro Bild"
 
 #. placeholder {0}: total === 1 ? '' : 's'
 #: src/ui/management/ManagementCouponsView.tsx
@@ -191,8 +195,8 @@ msgid "1 Jahr:"
 msgstr "1 Jahr:"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
-msgid "1–9 Bilder"
-msgstr "1–9 Bilder"
+#~ msgid "1–9 Bilder"
+#~ msgstr "1–9 Bilder"
 
 #: src/ui/Privacy.tsx
 msgid "1. Automatische Datenerfassung und IP-Adressen"
@@ -226,6 +230,10 @@ msgstr "3. Download-Tracking und Urheberrechtsschutz"
 msgid "4. Ihre Rechte"
 msgstr "4. Ihre Rechte"
 
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Ab"
+msgstr "Ab"
+
 #. placeholder {0}: config.tier2Threshold
 #. placeholder {0}: config.tier3Threshold
 #. placeholder {1}: (config.tier2PriceCents / 100).toFixed(0)
@@ -235,28 +243,36 @@ msgstr "4. Ihre Rechte"
 #~ msgstr "Ab {0} Bildern {1}€ pro Bild"
 
 #: src/logic/useVolumeLicensing.ts
-msgid "Ab {nt2Threshold} Bildern {nt2Price}€ pro Bild"
-msgstr "Ab {nt2Threshold} Bildern {nt2Price}€ pro Bild"
+msgid "Ab {minQuantity} Bildern {price}€ pro Bild"
+msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
 
 #: src/logic/useVolumeLicensing.ts
-msgid "Ab {nt3Threshold} Bildern {nt3Price}€ pro Bild"
-msgstr "Ab {nt3Threshold} Bildern {nt3Price}€ pro Bild"
+#~ msgid "Ab {nt2Threshold} Bildern {nt2Price}€ pro Bild"
+#~ msgstr "Ab {nt2Threshold} Bildern {nt2Price}€ pro Bild"
 
 #: src/logic/useVolumeLicensing.ts
-msgid "Ab {t2Threshold} Bildern {t2Price}€ pro Bild"
-msgstr "Ab {t2Threshold} Bildern {t2Price}€ pro Bild"
+#~ msgid "Ab {nt3Threshold} Bildern {nt3Price}€ pro Bild"
+#~ msgstr "Ab {nt3Threshold} Bildern {nt3Price}€ pro Bild"
 
 #: src/logic/useVolumeLicensing.ts
-msgid "Ab {t3Threshold} Bildern {t3Price}€ pro Bild"
-msgstr "Ab {t3Threshold} Bildern {t3Price}€ pro Bild"
+#~ msgid "Ab {t2Threshold} Bildern {t2Price}€ pro Bild"
+#~ msgstr "Ab {t2Threshold} Bildern {t2Price}€ pro Bild"
+
+#: src/logic/useVolumeLicensing.ts
+#~ msgid "Ab {t3Threshold} Bildern {t3Price}€ pro Bild"
+#~ msgstr "Ab {t3Threshold} Bildern {t3Price}€ pro Bild"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
-msgid "Ab 10 Bilder"
-msgstr "Ab 10 Bilder"
+#~ msgid "Ab 10 Bilder"
+#~ msgstr "Ab 10 Bilder"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
-msgid "Ab 20 Bilder"
-msgstr "Ab 20 Bilder"
+#~ msgid "Ab 20 Bilder"
+#~ msgstr "Ab 20 Bilder"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+#~ msgid "Ab dieser Anzahl Bilder gilt der Einheitspreis für alle Bilder der Bestellung. Die erste Staffel beginnt bei 0 Bildern."
+#~ msgstr "Ab dieser Anzahl Bilder gilt der Einheitspreis für alle Bilder der Bestellung. Die erste Staffel beginnt bei 0 Bildern."
 
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
@@ -398,6 +414,10 @@ msgstr "Alle Auflösungen"
 msgid "Alle ausklappen"
 msgstr "Alle ausklappen"
 
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Alle Bilder einer Bestellung werden zum Einheitspreis der erreichten Staffel abgerechnet (retroaktiv)."
+msgstr "Alle Bilder einer Bestellung werden zum Einheitspreis der erreichten Staffel abgerechnet (retroaktiv)."
+
 #: src/ui/management/ManagementStructureView.tsx
 msgid "Alle einklappen"
 msgstr "Alle einklappen"
@@ -433,6 +453,14 @@ msgstr "Als Angebot anfragen"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Als Bezahlt markieren"
 msgstr "Als Bezahlt markieren"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Als Standard"
+msgstr "Als Standard"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Als Standard gesetzt"
+msgstr "Als Standard gesetzt"
 
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Änderungshistorie (Vor-Zustände)"
@@ -648,6 +676,10 @@ msgstr "Automatischer Refresh für Besucher alle 10 Sekunden."
 msgid "Backend:"
 msgstr "Backend:"
 
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Basispreis"
+msgstr "Basispreis"
+
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Batch-Generierung abgeschlossen."
 msgstr "Batch-Generierung abgeschlossen."
@@ -669,6 +701,7 @@ msgid "Baustein..."
 msgstr "Baustein..."
 
 #: src/ui/management/components/UserTable.tsx
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
 #: src/ui/management/ManagementStructureView.tsx
@@ -908,6 +941,10 @@ msgstr "Bilder selektiert"
 msgid "Bilder ZIP"
 msgstr "Bilder ZIP"
 
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Bildern"
+msgstr "Bildern"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Bildinformationen"
 msgstr "Bildinformationen"
@@ -1065,6 +1102,10 @@ msgstr "Darf maximal 999 sein"
 msgid "Das Passwort muss mindestens 8 Zeichen lang sein."
 msgstr "Das Passwort muss mindestens 8 Zeichen lang sein."
 
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Das Preset \"{name}\" wirklich löschen? Galerien mit diesem Preset fallen auf den Brand-Standard zurück."
+msgstr "Das Preset \"{name}\" wirklich löschen? Galerien mit diesem Preset fallen auf den Brand-Standard zurück."
+
 #: src/ui/ContractSignView.tsx
 msgid "Das unterschriebene Vertragsdokument wird dir nach Vertragsschluss per E-Mail zugesendet."
 msgstr "Das unterschriebene Vertragsdokument wird dir nach Vertragsschluss per E-Mail zugesendet."
@@ -1118,6 +1159,18 @@ msgstr "Deaktiviert"
 #: src/ui/components/GalleryModal.tsx
 msgid "Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste."
 msgstr "Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste."
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Definiere den Basispreis und Mengenrabatt-Staffeln pro Preset. Der Brand-Standard gilt für alle Galerien ohne eigenes Preset; Galerien können im Galerie-Dialog ein anderes Preset zugewiesen bekommen."
+msgstr "Definiere den Basispreis und Mengenrabatt-Staffeln pro Preset. Der Brand-Standard gilt für alle Galerien ohne eigenes Preset; Galerien können im Galerie-Dialog ein anderes Preset zugewiesen bekommen."
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+#~ msgid "Definiere Mengenrabatt-Staffeln pro Preset. Der Brand-Standard gilt für alle Galerien ohne eigenes Preset; Galerien können im Galerie-Dialog ein anderes Preset zugewiesen bekommen."
+#~ msgstr "Definiere Mengenrabatt-Staffeln pro Preset. Der Brand-Standard gilt für alle Galerien ohne eigenes Preset; Galerien können im Galerie-Dialog ein anderes Preset zugewiesen bekommen."
+
+#: src/ui/components/GalleryModal.tsx
+msgid "Definiert die Mengenrabatt-Staffeln für diese Galerie. Ohne Auswahl gilt das Standard-Preset der Brand."
+msgstr "Definiert die Mengenrabatt-Staffeln für diese Galerie. Ohne Auswahl gilt das Standard-Preset der Brand."
 
 #: src/ui/components/Sidebar.tsx
 msgid "Dein Account"
@@ -1246,6 +1299,10 @@ msgstr "Details & Metadaten"
 #: src/ui/management/components/invoice/InvoiceDragDropZone.tsx
 msgid "Die Daten werden automatisch in die Rechnung übernommen."
 msgstr "Die Daten werden automatisch in die Rechnung übernommen."
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+#~ msgid "Die erste Staffel muss ab 0 Bildern gelten"
+#~ msgstr "Die erste Staffel muss ab 0 Bildern gelten"
 
 #: src/ui/Impressum.tsx
 msgid "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter"
@@ -1677,6 +1734,7 @@ msgstr "Fehler beim Laden."
 #: src/ui/components/GalleryModal.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
 #: src/ui/management/ManagementProductsView.tsx
@@ -1709,6 +1767,10 @@ msgstr "Fehler beim Senden: {mailError}"
 msgid "Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen."
 msgstr "Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen."
 
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Fehler beim Setzen des Standards"
+msgstr "Fehler beim Setzen des Standards"
+
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
@@ -1718,6 +1780,7 @@ msgstr "Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen."
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
 #: src/ui/management/components/ProfileSettingsCard.tsx
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
 #: src/ui/management/components/WatermarkSettingsCard.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
@@ -2770,6 +2833,10 @@ msgstr "Lizenz (Auflösung)"
 msgid "Lizenz wählen"
 msgstr "Lizenz wählen"
 
+#: src/ui/management/components/PricingSettingsTabs.tsx
+msgid "Lizenz-Katalog"
+msgstr "Lizenz-Katalog"
+
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Lizenzierte Bilder als ZIP herunterladen"
 msgstr "Lizenzierte Bilder als ZIP herunterladen"
@@ -2926,6 +2993,10 @@ msgstr "Mengenrabatt"
 msgid "Mengenrabatt Staffel"
 msgstr "Mengenrabatt Staffel"
 
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Mengenrabatt-Staffeln"
+msgstr "Mengenrabatt-Staffeln"
+
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Meta-Galerie"
 msgstr "Meta-Galerie"
@@ -2985,6 +3056,10 @@ msgstr "Mindestens 3 Zeichen"
 #: src/ui/OrgInviteView.tsx
 msgid "Mindestens 8 Zeichen"
 msgstr "Mindestens 8 Zeichen"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Mindestens eine Preisstaffel erforderlich"
+msgstr "Mindestens eine Preisstaffel erforderlich"
 
 #: src/ui/ContractSignView.tsx
 msgid "Mit deiner Unterschrift bestätigst du, den Vertrag gelesen zu haben und akzeptierst alle Bedingungen. Deine IP-Adresse und der Zeitpunkt werden im Audit-Trail protokolliert."
@@ -3123,6 +3198,7 @@ msgstr "Nachricht Senden"
 #: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/components/RatingStatusModal.tsx
 #: src/ui/management/components/UserTable.tsx
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Name"
 msgstr "Name"
@@ -3150,6 +3226,7 @@ msgstr "Name der Galerie"
 #: src/ui/management/components/CreateUserModal.tsx
 #: src/ui/management/components/ProductModal.tsx
 #: src/ui/management/components/ProfileSettingsCard.tsx
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Name ist erforderlich"
 msgstr "Name ist erforderlich"
 
@@ -3271,6 +3348,10 @@ msgstr "Neuer Vertrag"
 msgid "Neues Passwort"
 msgstr "Neues Passwort"
 
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Neues Preset"
+msgstr "Neues Preset"
+
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Neues Projekt"
 msgstr "Neues Projekt"
@@ -3278,6 +3359,10 @@ msgstr "Neues Projekt"
 #: src/ui/management/components/ProjectModal.tsx
 msgid "Neues Projekt anlegen"
 msgstr "Neues Projekt anlegen"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Neues Volume-Preset"
+msgstr "Neues Volume-Preset"
 
 #: src/ui/SearchView.tsx
 msgid "Neueste Entdeckungen"
@@ -3339,6 +3424,10 @@ msgstr "Noch keine Lightroom-Kataloge angelegt."
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Noch keine Pools berechnet."
 msgstr "Noch keine Pools berechnet."
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Noch keine Presets angelegt."
+msgstr "Noch keine Presets angelegt."
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Noch keine Verträge vorhanden."
@@ -3669,9 +3758,37 @@ msgstr "Preis (€)"
 msgid "Preis / Stück"
 msgstr "Preis / Stück"
 
+#: src/ui/management/components/PricingSettingsTabs.tsx
+msgid "Preise & Lizenzen"
+msgstr "Preise & Lizenzen"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+#~ msgid "Preisstaffeln (retroaktiv)"
+#~ msgstr "Preisstaffeln (retroaktiv)"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Preisstruktur (retroaktiv)"
+msgstr "Preisstruktur (retroaktiv)"
+
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #~ msgid "Premium Tarif"
 #~ msgstr "Premium Tarif"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Preset bearbeiten"
+msgstr "Preset bearbeiten"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Preset gelöscht"
+msgstr "Preset gelöscht"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Preset gespeichert"
+msgstr "Preset gespeichert"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Preset löschen?"
+msgstr "Preset löschen?"
 
 #: src/ui/client/DeliveryView.tsx
 msgid "Print (A4)"
@@ -3701,6 +3818,10 @@ msgstr "Privat erzwingen (Nur mit Link / Passwort)"
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "pro Bild"
 msgstr "pro Bild"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "pro Bild (ab 0 Bildern)"
+msgstr "pro Bild (ab 0 Bildern)"
 
 #: src/ui/components/Sidebar.tsx
 msgid "Produkte & Leistungen"
@@ -4062,6 +4183,14 @@ msgstr "Stadt \"{detectedCity}\" wurde nicht in der Datenbank gefunden."
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Stadt / Ort"
 msgstr "Stadt / Ort"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Staffel entfernen"
+msgstr "Staffel entfernen"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "Staffel hinzufügen"
+msgstr "Staffel hinzufügen"
 
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Standard"
@@ -4628,6 +4757,14 @@ msgstr "Vielen Dank, {signerName}."
 msgid "Volume-Lizenzierung"
 msgstr "Volume-Lizenzierung"
 
+#: src/ui/components/GalleryModal.tsx
+msgid "Volume-Preset"
+msgstr "Volume-Preset"
+
+#: src/ui/management/components/PricingSettingsTabs.tsx
+msgid "Volume-Pricing"
+msgstr "Volume-Pricing"
+
 #. placeholder {0}: volumeLicensing.tier
 #: src/ui/client/components/CartItemList.tsx
 #~ msgid "Volumenpreis (Tier {0})"
@@ -4842,6 +4979,10 @@ msgstr "z.B. Sommerfest der Firma XYZ in Wien, 2026"
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 msgid "z.B. Stammkundenrabatt"
 msgstr "z.B. Stammkundenrabatt"
+
+#: src/ui/management/components/VolumePresetSettingsCard.tsx
+msgid "z.B. Werbung, Standard, Event"
+msgstr "z.B. Werbung, Standard, Event"
 
 #: src/logic/useInvoiceDraft.ts
 msgid "Zahlbar sofort nach Erhalt der Rechnung."

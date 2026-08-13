@@ -180,17 +180,18 @@ export default function LicenseCatalogSettings() {
     if (isLoading) return <div className="p-8 text-center"><span className="loading loading-spinner text-primary"></span></div>;
 
     return (
-        <div className="card bg-base-100 border border-base-300 mt-8 shadow-sm">
-            <div className="card-body p-6 md:p-8">
-                <h2 className="card-title text-2xl mb-2 flex items-center gap-2">
+        <div className="flex flex-col gap-8">
+            <div>
+                <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
                     <span className="iconify mdi--format-list-checks text-primary text-3xl"></span> Lizenz-Katalog (RSV Modell)
                 </h2>
-                <p className="text-sm opacity-70 mb-8 max-w-3xl">
+                <p className="text-sm opacity-70 max-w-3xl">
                     Definiere die Grundhonorare und die modularen Aufschläge (Zuschläge), die deine Kunden im Checkout auswählen können.
                     Alle Einträge werden den Kunden zur Auswahl angeboten.
                 </p>
+            </div>
 
-                <div className="flex flex-col gap-12">
+            <div className="flex flex-col gap-10">
                     
                     {/* Sektion 1: USE CASES */}
                     <div className="bg-base-100">
@@ -330,6 +331,5 @@ export default function LicenseCatalogSettings() {
 
                 </div>
             </div>
-        </div>
     );
 }

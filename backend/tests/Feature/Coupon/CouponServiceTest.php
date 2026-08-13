@@ -12,7 +12,7 @@ use App\Models\Org;
 use App\Models\User;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CouponService;
-use App\Services\SettingResolver;
+use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Carbon\Carbon;
@@ -310,7 +310,10 @@ class CouponServiceTest extends TestCase
             'active' => true,
         ]);
 
-        $strategy = new VolumeLicensingStrategy(new SettingResolver(), new CouponService());
+        $strategy = new VolumeLicensingStrategy(
+            app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B),
+            new CouponService()
+        );
         $user = User::factory()->create();
 
         $items = $this->buildStrategyItems(10, false);
@@ -324,7 +327,10 @@ class CouponServiceTest extends TestCase
 
     public function test_strategy_without_coupon_no_discount(): void
     {
-        $strategy = new VolumeLicensingStrategy(new SettingResolver(), new CouponService());
+        $strategy = new VolumeLicensingStrategy(
+            app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B),
+            new CouponService()
+        );
         $user = User::factory()->create();
 
         $items = $this->buildStrategyItems(10, false);
@@ -340,7 +346,10 @@ class CouponServiceTest extends TestCase
     {
         BrandRegistry::set(Brand::B2B);
 
-        $strategy = new VolumeLicensingStrategy(new SettingResolver(), new CouponService());
+        $strategy = new VolumeLicensingStrategy(
+            app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B),
+            new CouponService()
+        );
         $user = User::factory()->create();
 
         $items = $this->buildStrategyItems(10, false);

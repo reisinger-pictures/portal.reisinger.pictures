@@ -14,7 +14,7 @@ export interface VolumeLicensingCardProps {
 export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensingCardProps) {
     const {items, addToCart} = useCart();
     const {showToast} = useUI();
-    const {pricePerItemCents, tier, nextTierCount, nextTierLabel, isVolumePricing} = useVolumeLicensing(items);
+    const {pricePerItemCents, tierIndex, isMaxTier, nextTierCount, nextTierLabel, isVolumePricing, tiers} = useVolumeLicensing(items);
 
     const isInCart = items.some(i => i.photoId === photo.id);
 
@@ -35,7 +35,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
         onAddToCart();
     };
 
-    const bestPrice = formatMoney(2000);
+    const bestPrice = formatMoney(tiers[tiers.length - 1]?.priceCents ?? 0);
     return (
         <div className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
             <h4 className="font-bold text-xl flex items-center gap-2">
@@ -54,28 +54,23 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             <div className="space-y-2 bg-base-200 p-4 rounded-box border border-base-300">
                 <p className="text-sm font-bold opacity-70 uppercase tracking-wide"><Trans>Mengenrabatt Staffel</Trans></p>
                 <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                        <span><Trans>1–9 Bilder</Trans></span>
-                        <span className="font-mono font-bold">{formatMoney(3000)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="flex items-center gap-1">
-                            <Trans>Ab 10 Bilder</Trans>
-                            {tier === 2 && (
-                                <span className="badge badge-success badge-xs text-xs"><Trans>Aktiv</Trans></span>
-                            )}
-                        </span>
-                        <span className="font-mono font-bold">{formatMoney(2500)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="flex items-center gap-1">
-                            <Trans>Ab 20 Bilder</Trans>
-                            {tier === 3 && (
-                                <span className="badge badge-success badge-xs text-xs"><Trans>Aktiv</Trans></span>
-                            )}
-                        </span>
-                        <span className="font-mono font-bold">{formatMoney(2000)}</span>
-                    </div>
+                    {tiers.map((tier, index) => {
+                        const nextMin = tiers[index + 1]?.minQuantity;
+                        const rangeLabel = tier.minQuantity === 0
+                            ? `${tier.minQuantity + 1}–${nextMin ? nextMin - 1 : ''} Bilder`
+                            : `Ab ${tier.minQuantity} Bilder`;
+                        return (
+                            <div key={index} className="flex justify-between text-sm">
+                                <span className="flex items-center gap-1">
+                                    <span>{rangeLabel}</span>
+                                    {tierIndex === index && (
+                                        <span className="badge badge-success badge-xs text-xs"><Trans>Aktiv</Trans></span>
+                                    )}
+                                </span>
+                                <span className="font-mono font-bold">{formatMoney(tier.priceCents)}</span>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -87,7 +82,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
                 </div>
             )}
 
-            {isVolumePricing && tier === 3 && (
+            {isVolumePricing && isMaxTier && (
                 <div className="text-sm text-center text-success font-semibold bg-success/5 p-3 rounded-box border border-success/20">
                     <span className="iconify mdi--check-circle inline-block mr-1"></span>
                     <Trans>Bester Rabatt aktiv — {bestPrice} pro Bild</Trans>

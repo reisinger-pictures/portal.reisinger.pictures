@@ -96,6 +96,8 @@ class GalleryService
 
         $expiresAt = $this->parseExpiresAt($data['expires_at'] ?? null);
 
+        $this->assertPresetForBrand($data['volume_preset_id'] ?? null);
+
         return DB::transaction(function () use ($data, $slug, $isPublic, $user, $expiresAt) {
             $gallery = Gallery::create([
                 'name' => $data['name'],
@@ -122,6 +124,7 @@ class GalleryService
                 'default_country' => $data['default_country'] ?? null,
                 'default_iso_country' => $data['default_iso_country'] ?? null,
                 'licensing_mode' => $data['licensing_mode'] ?? null,
+                'volume_preset_id' => $data['volume_preset_id'] ?? null,
             ]);
 
             if ($user && $user->is_photographer) {
@@ -139,6 +142,10 @@ class GalleryService
      */
     public function updateGallery(Gallery $gallery, array $data): Gallery
     {
+        if (array_key_exists('volume_preset_id', $data)) {
+            $this->assertPresetForBrand($data['volume_preset_id']);
+        }
+
         if (array_key_exists('slug', $data) && $data['slug'] !== $gallery->slug) {
             $data['slug'] = $this->slugService->makeUnique($data['slug'], 'galleries');
         }
@@ -230,6 +237,26 @@ class GalleryService
             return Carbon::parse($value)->endOfDay();
         } catch (\Exception $e) {
             throw ValidationException::withMessages(['expires_at' => 'Ungültiges Datumsformat.']);
+        }
+    }
+
+    /**
+     * Guard against cross-brand preset assignment: a gallery may only reference
+     * a preset belonging to the same brand as the current host.
+     */
+    private function assertPresetForBrand(mixed $presetId): void
+    {
+        if ($presetId === null || $presetId === '') {
+            return;
+        }
+
+        $preset = \App\Models\VolumePreset::find($presetId);
+        $currentBrand = BrandRegistry::currentOrDefault()->value;
+        $presetBrand = $preset?->brand instanceof \App\Enums\Brand ? $preset->brand->value : $preset?->brand;
+        if ($preset === null || $presetBrand !== $currentBrand) {
+            throw ValidationException::withMessages([
+                'volume_preset_id' => 'Das gewählte Volume-Preset gehört nicht zur aktuellen Brand.',
+            ]);
         }
     }
 }

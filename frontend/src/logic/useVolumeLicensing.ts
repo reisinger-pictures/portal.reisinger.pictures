@@ -4,39 +4,41 @@
  * Provides pure functions for volume tier calculation and a React hook
  * that derives the current volume licensing state from cart items.
  *
- * The default configuration (30/25/20 €, thresholds 10/20) is hardcoded
- * here but is designed to be replaceable with a future settings/API source.
+ * Pricing is retroactive: all items of a cart are charged at the tier price
+ * determined by the *total* count of non-quote items. The tier structure is
+ * fully configurable (arbitrary number of tiers) and comes from the backend
+ * `/api/settings/license-terms` response (`volume_pricing.tiers`). While the
+ * terms are loading, `DEFAULT_VOLUME_PRICING` is used as a stable fallback.
  */
 import {t} from "@lingui/core/macro";
-import {CartItem, VolumeLicensingResult} from './CartContext';
+import useSWR from 'swr';
+import {fetcher} from '../api';
+import {CartItem, VolumeLicensingResult, VolumeTierConfig} from './CartContext';
 import {useLicensingMode} from './useLicensingMode';
+import {useLicenseTerms, LicenseTerms} from './useLicenseTerms';
 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
 
 export interface VolumePricingConfig {
-    /** Items < tier2Threshold → tier 1 price (default: 0–9 items). */
-    tier1Threshold: number;
-    /** Items >= tier2Threshold but < tier3Threshold → tier 2 price (default: 10–19). */
-    tier2Threshold: number;
-    /** Items >= tier3Threshold → tier 3 price (default: 20+). */
-    tier3Threshold: number;
-    /** Tier 1 price in cents (default: 3000 = 30 €). */
-    tier1PriceCents: number;
-    /** Tier 2 price in cents (default: 2500 = 25 €). */
-    tier2PriceCents: number;
-    /** Tier 3 price in cents (default: 2000 = 20 €). */
-    tier3PriceCents: number;
+    /** Tiers ordered by `minQuantity` ascending. First tier must start at 0. */
+    tiers: VolumeTierConfig[];
+}
+
+/** Backend shape of `volume_pricing` inside `/api/settings/license-terms`. */
+export interface VolumePricingPayload {
+    preset_id?: string;
+    preset_name?: string;
+    tiers: Array<{min_quantity: number; price_cents: number}>;
 }
 
 export const DEFAULT_VOLUME_PRICING: VolumePricingConfig = {
-    tier1Threshold: 0,
-    tier2Threshold: 10,
-    tier3Threshold: 20,
-    tier1PriceCents: 3000,
-    tier2PriceCents: 2500,
-    tier3PriceCents: 2000,
+    tiers: [
+        {minQuantity: 0, priceCents: 3000},
+        {minQuantity: 10, priceCents: 2500},
+        {minQuantity: 20, priceCents: 2000},
+    ],
 };
 
 // ---------------------------------------------------------------------------
@@ -45,7 +47,10 @@ export const DEFAULT_VOLUME_PRICING: VolumePricingConfig = {
 
 export interface VolumeTierResult {
     priceCents: number;
-    tier: 1 | 2 | 3;
+    /** 0-based index of the qualifying tier within the config. */
+    tierIndex: number;
+    /** The qualifying tier is the last (cheapest) one → no further discount. */
+    isMaxTier: boolean;
     label: string;
 }
 
@@ -59,18 +64,28 @@ export function calculateVolumeTier(
     count: number,
     config: VolumePricingConfig = DEFAULT_VOLUME_PRICING,
 ): VolumeTierResult {
-    if (count >= config.tier3Threshold) {
-        const t3Threshold = config.tier3Threshold;
-        const t3Price = (config.tier3PriceCents / 100).toFixed(0);
-        return {priceCents: config.tier3PriceCents, tier: 3, label: t`Ab ${t3Threshold} Bildern ${t3Price}€ pro Bild`};
+    let qualifyingIndex = 0;
+    for (let i = 0; i < config.tiers.length; i++) {
+        if (count >= config.tiers[i].minQuantity) {
+            qualifyingIndex = i;
+        } else {
+            break;
+        }
     }
-    if (count >= config.tier2Threshold) {
-        const t2Threshold = config.tier2Threshold;
-        const t2Price = (config.tier2PriceCents / 100).toFixed(0);
-        return {priceCents: config.tier2PriceCents, tier: 2, label: t`Ab ${t2Threshold} Bildern ${t2Price}€ pro Bild`};
-    }
-    const t1Price = (config.tier1PriceCents / 100).toFixed(0);
-    return {priceCents: config.tier1PriceCents, tier: 1, label: t`${t1Price}€ pro Bild`};
+
+    const tier = config.tiers[qualifyingIndex];
+    const price = (tier.priceCents / 100).toFixed(0);
+    const minQuantity = tier.minQuantity;
+    const label = minQuantity === 0
+        ? t`${price}€ pro Bild`
+        : t`Ab ${minQuantity} Bildern ${price}€ pro Bild`;
+
+    return {
+        priceCents: tier.priceCents,
+        tierIndex: qualifyingIndex,
+        isMaxTier: qualifyingIndex === config.tiers.length - 1,
+        label,
+    };
 }
 
 /**
@@ -96,53 +111,72 @@ export function calculateVolumeTotal(
 // Hook
 // ---------------------------------------------------------------------------
 
+/** Map the backend `volume_pricing.tiers` payload into the config shape. */
+export function tiersFromApi(tiers?: Array<{min_quantity: number; price_cents: number}>): VolumeTierConfig[] {
+    if (!tiers || tiers.length === 0) {
+        return DEFAULT_VOLUME_PRICING.tiers;
+    }
+    return [...tiers]
+        .sort((a, b) => a.min_quantity - b.min_quantity)
+        .map(t => ({minQuantity: t.min_quantity, priceCents: t.price_cents}));
+}
+
 /**
  * React hook that derives volume licensing pricing from cart items.
  *
- * Returns `isVolumePricing: false` when the current licensing mode is not volume licensing,
- * so consumers can branch on this flag.
+ * Returns `isVolumePricing: false` when the effective licensing mode is not
+ * volume licensing, so consumers can branch on this flag.
  */
 export function useVolumeLicensing(items: CartItem[]): VolumeLicensingResult {
-    const licensingMode = useLicensingMode();
-    const config = DEFAULT_VOLUME_PRICING;
+    const galleryId = items.find(i => !i.isQuote && i.galleryId)?.galleryId;
+    const licensingMode = useLicensingMode(galleryId);
+
+    const { terms } = useLicenseTerms();
+    const galleryKey = galleryId ? `/api/settings/license-terms?gallery_id=${galleryId}` : null;
+    const { data: galleryTerms } = useSWR<LicenseTerms>(galleryKey, fetcher, {revalidateOnFocus: false});
+
+    const effectiveTerms = galleryId && galleryTerms ? galleryTerms : terms;
+    interface TermsWithVolumePricing { volume_pricing?: VolumePricingPayload | null }
+    const volumePricing = (effectiveTerms as unknown as TermsWithVolumePricing | undefined)?.volume_pricing;
+    const config: VolumePricingConfig = {
+        tiers: tiersFromApi(volumePricing?.tiers),
+    };
 
     if (licensingMode !== 'volume_licensing') {
         return {
-            tier: 1,
-            pricePerItemCents: config.tier1PriceCents,
+            tierIndex: 0,
+            isMaxTier: config.tiers.length === 1,
+            pricePerItemCents: config.tiers[0].priceCents,
             totalCents: 0,
             nextTierCount: 0,
             nextTierLabel: '',
+            tiers: config.tiers,
             isVolumePricing: false,
         };
     }
 
     const nonQuoteItems = items.filter(i => !i.isQuote);
     const count = nonQuoteItems.length;
-    const {priceCents, tier} = calculateVolumeTier(count, config);
+    const {priceCents, tierIndex, isMaxTier} = calculateVolumeTier(count, config);
     const totalCents = count * priceCents;
 
     // Determine items needed for the next tier
     let nextTierCount = 0;
     let nextTierLabel = '';
-    if (tier === 1) {
-        nextTierCount = config.tier2Threshold - count;
-        const nt2Threshold = config.tier2Threshold;
-        const nt2Price = (config.tier2PriceCents / 100).toFixed(0);
-        nextTierLabel = t`Ab ${nt2Threshold} Bildern ${nt2Price}€ pro Bild`;
-    } else if (tier === 2) {
-        nextTierCount = config.tier3Threshold - count;
-        const nt3Threshold = config.tier3Threshold;
-        const nt3Price = (config.tier3PriceCents / 100).toFixed(0);
-        nextTierLabel = t`Ab ${nt3Threshold} Bildern ${nt3Price}€ pro Bild`;
+    if (!isMaxTier) {
+        const nextTier = config.tiers[tierIndex + 1];
+        nextTierCount = nextTier.minQuantity - count;
+        nextTierLabel = calculateVolumeTier(nextTier.minQuantity, config).label;
     }
 
     return {
-        tier,
+        tierIndex,
+        isMaxTier,
         pricePerItemCents: priceCents,
         totalCents,
         nextTierCount,
         nextTierLabel,
+        tiers: config.tiers,
         isVolumePricing: true,
     };
 }

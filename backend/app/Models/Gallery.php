@@ -21,6 +21,7 @@ class Gallery extends Model
         'default_title', 'default_description', 'default_keywords',
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
         'org_ids', 'brand', 'licensing_mode', 'effective_licensing_mode',
+        'volume_preset_id',
         'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers'
     ];
 
@@ -49,6 +50,7 @@ class Gallery extends Model
         'default_iso_country',
         'brand',
         'licensing_mode',
+        'volume_preset_id',
         'expires_at'
     ];
 
@@ -151,6 +153,11 @@ class Gallery extends Model
     public function galleryGroup()
     {
         return $this->belongsTo(GalleryGroup::class);
+    }
+
+    public function volumePreset()
+    {
+        return $this->belongsTo(VolumePreset::class, 'volume_preset_id');
     }
 
     public function orgs()

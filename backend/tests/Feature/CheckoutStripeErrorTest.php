@@ -9,7 +9,6 @@ use App\Models\Photo;
 use App\Models\User;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CheckoutService;
-use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use App\Enums\Brand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +28,9 @@ class CheckoutStripeErrorTest extends TestCase
     {
         parent::setUp();
         BrandRegistry::set(Brand::B2B);
-        $this->service = new CheckoutService(new VolumeLicensingStrategy(new SettingResolver()));
+        $this->service = new CheckoutService(new VolumeLicensingStrategy(
+            app(\App\Services\VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B)
+        ));
         Mail::fake();
     }
 
