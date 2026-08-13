@@ -74,14 +74,12 @@ if (app()->environment('local', 'testing')) {
         return response()->json(['success' => true]);
     })->name('api.test.cleanup-user');
 
-}
-
-Route::post('/test/flush-queue', function () {
-    if (app()->environment('local', 'testing')) {
+    Route::post('/test/flush-queue', function () {
         Artisan::call('queue:work', ['--stop-when-empty' => true]);
-    }
-    return response()->json(['success' => true]);
-})->name('api.test.flush-queue');
+        return response()->json(['success' => true]);
+    })->name('api.test.flush-queue');
+
+}
 
 Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('api.webhooks.stripe')->middleware('throttle:10,1');
 
