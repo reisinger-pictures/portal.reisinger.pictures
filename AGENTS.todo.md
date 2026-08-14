@@ -25,6 +25,10 @@
 
 **Verifikation (separater Subagent):** `composer audit` = 0 Advisories; volle `php artisan test`-Suite **1168 passed / 0 failed** (Meilisearch 7701 OK). Alerts schließen sich nach Push automatisch (Lockfile auf default Branch gepatcht).
 
+**Nachfolger-Alert #115 (nanoid, high, npm):** Nach dem Push waren alle Composer-Alerts geschlossen, aber ein 18. Alert blieb offen: `nanoid < 3.3.18` (Transitive von `postcss`). Fix: `pnpm.overrides` in `frontend/package.json` 3.3.17 → **3.3.18** + `pnpm install`. `pnpm audit` = 0. Verifikation: lint:fix + build + Vitest (580 passed) grün; E2E-@smoke nicht gelaufen (App-Stack nicht gestartet, Environment-Lücke).
+
+**⚠️ Lektion (Overrides/Workspace):** `pnpm.overrides` in `package.json` wird vom effektiven pnpm (packageManager-Pin `pnpm@9.15.4` im Frontend) weiterhin gelesen und angewendet — die Deprecation-Warnung („keys were ignored") ist in 9.15.x nur eine Warnung, kein Ignore. `overrides` in `pnpm-workspace.yaml` wird von 9.15.4 NICHT gelesen (Versuch führte zu react-router 7.18.1 → audit high; zurückgerollt). `frontend/pnpm-workspace.yaml` ist getrackt und darf NICHT überschrieben werden — es steuert `allowBuilds`/`onlyBuiltDependencies` (esbuild).
+
 — keine Regression.
 
 ---
