@@ -11,6 +11,24 @@
 
 ---
 
+## ✅ ERLEDIGT — Dependabot-Vulnerabilities (2026-08-14): 17 Composer-Alerts gefixt
+
+**Symptom:** 17 offene Dependabot-Alerts im Backend (5 high / 10 medium / 2 low) — ausschließlich Composer-Transitives:
+
+| Package | Version (vor) | Version (nach) | Alerts | Betroffen |
+|---|---|---|---|---|
+| `league/commonmark` | 2.8.2 | 2.10.0 | 6 (4 high, 2 medium) | via `laravel/framework` `^2.8.1` |
+| `guzzlehttp/guzzle` | 7.13.1 | 7.15.3 | 6 (1 high, 5 medium) | via `laravel/framework` `^7.8.2` |
+| `dompdf/dompdf` | v3.1.5 | v3.1.6 | 6 (4 medium, 2 low) | via `barryvdh/laravel-dompdf` `^3.0` |
+
+**Umsetzung:** `composer update league/commonmark guzzlehttp/guzzle dompdf/dompdf --with-all-dependencies` (nur `backend/composer.lock` geändert, `composer.json` unverändert — Constraints erlaubten die Patches bereits). Nebeneffekt-Updates: `guzzlehttp/promises` 2.5.0→2.5.2, `guzzlehttp/psr7` 2.12.3→2.13.0, `nette/utils` v4.1.4→v4.1.5.
+
+**Verifikation (separater Subagent):** `composer audit` = 0 Advisories; volle `php artisan test`-Suite **1168 passed / 0 failed** (Meilisearch 7701 OK). Alerts schließen sich nach Push automatisch (Lockfile auf default Branch gepatcht).
+
+— keine Regression.
+
+---
+
 ## 🔍 REVIEW 2026-08-13 — Architektur / UX / Sicherheit
 
 **Gesamturteil:** Überdurchschnittlich solide. Sicherheits-Basis (Stripe-Webhook-Verifikation + Underpayment-Guard, JWT-httpOnly-Cookie + SameSite=Lax, Money-Pattern mit bcmath, Brand-Isolation, Offer-Token) vorbildlich. Baustellen: Autorisierungs-Scatter, God-Entities, CSP-Favicon (bekannt).
