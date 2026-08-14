@@ -144,7 +144,7 @@ jobs:
           echo "stripe_key_placeholder: $(echo "$STRIPE_KEY" | grep -c 'ci_placeholder' || true)"
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.15.4
+          version: 11.21.0
       - uses: actions/setup-node@v4
         with:
           node-version: 26
@@ -315,7 +315,7 @@ jobs:
           timeout 60s bash -c 'until curl -sf http://127.0.0.1:8000/api/ping > /dev/null; do sleep 1; done'
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.15.4
+          version: 11.21.0
       - uses: actions/setup-node@v4
         with:
           node-version: 26
