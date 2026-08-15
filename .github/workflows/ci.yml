@@ -36,7 +36,7 @@ jobs:
           - 1025:1025
           - 8025:8025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # PHP-Tests laufen im Prod-Image ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 +
       # exiftool + alle App-Extensions) - identisch zur Prod-Runtime. Composer
       # kommt wie in Prod ueber das offizielle composer:latest-Image. Die
@@ -128,7 +128,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Fingerprint Stripe publishable key (debug)
         env:
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
@@ -142,10 +142,10 @@ jobs:
           echo "stripe_key_len: ${#STRIPE_KEY}"
           echo "stripe_key_prefix: ${STRIPE_KEY:0:12}"
           echo "stripe_key_placeholder: $(echo "$STRIPE_KEY" | grep -c 'ci_placeholder' || true)"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.21.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: pnpm
@@ -229,7 +229,7 @@ jobs:
           - 8025:8025
           - 1025:1025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Ensure Stripe test keys are configured
         env:
           STRIPE_SECRET_SET: ${{ secrets.STRIPE_SECRET != '' }}
@@ -313,10 +313,10 @@ jobs:
         run: |
           docker exec php php artisan serve --host=127.0.0.1 --port=8000 --no-reload > /tmp/php-serve.log 2>&1 &
           timeout 60s bash -c 'until curl -sf http://127.0.0.1:8000/api/ping > /dev/null; do sleep 1; done'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.21.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: pnpm
@@ -398,14 +398,14 @@ jobs:
       - name: Upload Playwright report
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-report-${{ matrix.slug }}
           path: frontend/playwright-report
           retention-days: 7
       - name: Upload Playwright test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-test-results-${{ matrix.slug }}
           path: frontend/test-results
