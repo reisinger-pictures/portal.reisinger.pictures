@@ -398,14 +398,14 @@ jobs:
       - name: Upload Playwright report
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.slug }}
           path: frontend/playwright-report
           retention-days: 7
       - name: Upload Playwright test results
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-test-results-${{ matrix.slug }}
           path: frontend/test-results

@@ -4,3 +4,8 @@
 
 # Vitest v8 coverage report (pnpm test:coverage)
 coverage/
+
+# UI-review screenshot harness (playwright.screenshots.config.ts).
+# Already covered globally by the root .gitignore; kept here for explicitness.
+test-results/
+playwright-report/
