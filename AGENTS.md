@@ -155,3 +155,7 @@ Alle Run-Configs in `.run/*.run.xml` folgen einem einheitlichen Schema (etablier
 - **macOS-Regel:** `:` ist in Dateinamen verboten → im Dateinamen wird `: ` als `_ ` geschrieben (`Backend_ Import Locations.run.xml` ↔ intern `name="⚙️ [Setup] Backend: Import Locations"`). Das interne `name`-Attribut trägt immer `: `.
 - **Konsistenz:** Dateiname und internes `name` müssen synchron sein (Name ohne `.run.xml`-Endung). Neue Configs MÜSSEN diesem Schema folgen.
 - **Sprache:** gemischt erlaubt (deutsche Kategorien `[Wartung]`, `[Gefahr]` und Task-Namen wie „generieren" bleiben).
+
+## TODO (UI-Review)
+
+UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).
