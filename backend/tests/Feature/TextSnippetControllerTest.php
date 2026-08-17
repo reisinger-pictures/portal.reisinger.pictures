@@ -69,6 +69,36 @@ class TextSnippetControllerTest extends TestCase
         $this->assertDatabaseHas('text_snippets', ['shortcut' => 'impressum']);
     }
 
+    public function test_snippet_sanitizer_preserves_supported_headings_and_ordered_lists(): void
+    {
+        $response = $this->actingAs($this->superAdmin, 'api')->postJson('/api/management/text-snippets', [
+            'title' => 'Formatierung',
+            'content_html' => '<h1>Head</h1><h2>Sub</h2><h3>Sub3</h3><h4>Sub4</h4><ol><li>Eins</li></ol><p>Text</p>',
+        ]);
+
+        $response->assertOk();
+        $content = TextSnippet::query()->latest('id')->value('content_html');
+        $this->assertStringContainsString('<h1>Head</h1>', $content);
+        $this->assertStringContainsString('<h2>Sub</h2>', $content);
+        $this->assertStringContainsString('<h3>Sub3</h3>', $content);
+        $this->assertStringContainsString('<h4>Sub4</h4>', $content);
+        $this->assertStringContainsString('<ol><li>Eins</li></ol>', $content);
+    }
+
+    public function test_snippet_sanitizer_removes_unsupported_headings_and_scripts(): void
+    {
+        $response = $this->actingAs($this->superAdmin, 'api')->postJson('/api/management/text-snippets', [
+            'title' => 'Unsicher',
+            'content_html' => '<h5>Gone</h5><script>alert(1)</script><p>Safe</p>',
+        ]);
+
+        $response->assertOk();
+        $content = TextSnippet::query()->latest('id')->value('content_html');
+        $this->assertStringNotContainsString('<h5', $content);
+        $this->assertStringNotContainsString('<script', $content);
+        $this->assertStringContainsString('<p>Safe</p>', $content);
+    }
+
     public function test_snippet_create_validates_required_fields()
     {
         $response = $this->actingAs($this->superAdmin, 'api')

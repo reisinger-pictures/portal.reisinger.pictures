@@ -145,6 +145,7 @@ services:
       fi;
       if [ -z \"$APP_KEY\" ]; then php artisan key:generate --force; fi;
       if [ -z \"$JWT_SECRET\" ]; then php artisan jwt:secret --force; fi;
+      php artisan cache:clear;
       php artisan optimize;
       php artisan migrate --force;
       php artisan scout:sync-index-settings;

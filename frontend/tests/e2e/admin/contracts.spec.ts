@@ -365,6 +365,37 @@ test.describe('Digital Contracts Workflow', () => {
         expect(expiredCheck.status()).toBe(410);
     });
 
+    test('WysiwygEditor survives a hard page reload without crashing', { tag: ['@regression', '@feature:admin:contracts'] }, async ({ page }) => {
+        // Regression for "Cannot read properties of null (reading 'cached')":
+        // the Tiptap editor was created during render and destroyed/recreated by
+        // React 19 StrictMode + the React Compiler, leaving a nulled schema when
+        // getHTML() ran on a hard reload. The editor now defers creation to a
+        // post-mount effect (immediatelyRender: false) and guards destroyed instances.
+        const pageErrors: string[] = [];
+        page.on('pageerror', (err) => pageErrors.push(err.message));
+
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await auth.login(testUser.email, testUser.password);
+
+        // Navigate to Verträge — the contract form (with the Tiptap editor) renders by default.
+        await sidebar.navigateTo('Verträge');
+        await expect(page).toHaveURL(/.*\/admin-contracts/);
+
+        // The editor must mount and its content area become visible.
+        const editor = page.locator('.ProseMirror').first();
+        await expect(editor).toBeVisible({ timeout: 10000 });
+
+        // Hard reload — this is exactly what triggered the null-schema crash.
+        await page.reload();
+
+        await expect(page).toHaveURL(/.*\/admin-contracts/);
+        await expect(editor).toBeVisible({ timeout: 10000 });
+
+        expect(pageErrors, `Uncaught page errors after reload: ${pageErrors.join(' | ')}`).toHaveLength(0);
+    });
+
     test('Multiple clients signing same template creates multiple instances', { tag: ['@feature:admin:contracts'] }, async ({ request, page }) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);

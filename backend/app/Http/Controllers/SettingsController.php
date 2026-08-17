@@ -5,23 +5,32 @@ use Illuminate\Http\Request;
 use App\Models\Gallery;
 use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Cache;
+use Symfony\Component\Finder\Finder;
 
 class SettingsController extends Controller
 {
     public function getSystemInfo()
     {
+        // Build time = newest modification time of ANY PHP file in the backend
+        // (the deployed source). Runtime-generated directories (vendor, storage,
+        // node_modules, bootstrap/cache) are excluded so log writes, cache
+        // flushes or composer installs never masquerade as a code deploy.
+        // Cached forever for performance, but the cache is cleared on every
+        // container start (php artisan cache:clear in the backend command block
+        // of docker-compose.yml) — a deploy + restart therefore always shows the
+        // fresh timestamp. Without that reset the value froze at the first
+        // request and survived rclone syncs (2026-08-17 regression).
         $timestamp = Cache::rememberForever('laravel_build_time', function () {
-            $directories = [app_path(), base_path('routes'), base_path('config'), base_path('resources/views')];
+            $finder = Finder::create()
+                ->files()
+                ->in(base_path())
+                ->name('*.php')
+                ->exclude(['vendor', 'storage', 'node_modules', 'bootstrap/cache', 'out']);
             $maxTime = 0;
-            foreach ($directories as $dir) {
-                if (!is_dir($dir)) continue;
-                $files = File::allFiles($dir);
-                foreach ($files as $file) {
-                    $time = $file->getMTime();
-                    if ($time > $maxTime) $maxTime = $time;
-                }
+            foreach ($finder as $file) {
+                $time = $file->getMTime();
+                if ($time > $maxTime) $maxTime = $time;
             }
             return $maxTime ?: time();
         });

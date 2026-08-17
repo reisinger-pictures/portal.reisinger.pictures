@@ -35,6 +35,27 @@ describe('sanitizeHtml', () => {
         expect(result).toContain('<em>!</em>');
     });
 
+    it('preserves headings and ordered lists', () => {
+        const result = sanitizeHtml('<h1>One</h1><h2>Two</h2><h3>Three</h3><h4>Four</h4><ol><li>Item</li></ol>');
+        expect(result).toContain('<h1>One</h1>');
+        expect(result).toContain('<h2>Two</h2>');
+        expect(result).toContain('<h3>Three</h3>');
+        expect(result).toContain('<h4>Four</h4>');
+        expect(result).toContain('<ol><li>Item</li></ol>');
+    });
+
+    it('preserves safe link attributes and strips unsupported attributes', () => {
+        const result = sanitizeHtml('<h2 id="heading" class="x" style="color:red">Title</h2><a href="https://example.com" target="_blank" rel="noopener" title="Example" class="x" style="color:red">Link</a>');
+        expect(result).toContain('<h2>Title</h2>');
+        expect(result).toContain('href="https://example.com"');
+        expect(result).toContain('target="_blank"');
+        expect(result).toContain('rel="noopener"');
+        expect(result).toContain('title="Example"');
+        expect(result).not.toContain('class=');
+        expect(result).not.toContain('style=');
+        expect(result).not.toContain('id=');
+    });
+
     it('preserves table structure', () => {
         const input = '<table><thead><tr><th>H</th></tr></thead><tbody><tr><td>D</td></tr></tbody></table>';
         const result = sanitizeHtml(input);

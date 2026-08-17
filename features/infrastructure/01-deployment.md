@@ -92,3 +92,4 @@ Das `app:search-rebuild`-Command flushed alle 5 Indizes (Photo, Gallery, Locatio
 - **Der Grund:** In Produktionsumgebungen ist der PHP OPcache aus Performancegründen scharf geschaltet (meist `opcache.validate_timestamps=0`). PHP liest geänderte Dateien nicht neu von der Festplatte ein, sondern nutzt den alten Bytecode aus dem RAM.
 - **Die Lösung:** Nach einem Rclone-Sync von Backend-Dateien muss der PHP-Container (PHP-FPM) zwingend neu gestartet werden, um den Cache zu leeren:
   `docker restart portal_backend`
+- **App-Cache (2026-08-17):** Das `command`-Block des Backend-Containers führt bei jedem Start `php artisan cache:clear` aus. Damit werden forever-gecachte Werte wie `laravel_build_time` (System-Info-Seite) bei jedem Deploy/Neustart frisch berechnet — der Timestamp ist die neueste mtime **aller** PHP-Dateien (exkl. `vendor/`, `storage/`, `bootstrap/cache/`), nicht nur einzelner Verzeichnisse.

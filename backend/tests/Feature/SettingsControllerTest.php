@@ -6,6 +6,7 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class SettingsControllerTest extends TestCase
@@ -159,6 +160,34 @@ class SettingsControllerTest extends TestCase
             ->assertJsonStructure([
                 'laravel_build_time', 'php_version', 'laravel_version', 'db_version',
             ]);
+    }
+
+    public function test_system_info_build_time_refreshes_after_cache_clear(): void
+    {
+        // Regression (2026-08-17): the build time was cached with
+        // rememberForever and had NO invalidation path — the value froze at the
+        // first request and survived rclone syncs and container restarts.
+        // The reset now happens via `php artisan cache:clear` in the backend
+        // command block (every container start).
+        Cache::put('laravel_build_time', now()->subDays(30)->getTimestamp());
+        $token = $this->adminToken();
+
+        // Cache hit: the stale value is served while the key exists.
+        $cached = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->getJson('/api/management/settings/system')
+            ->assertStatus(200)
+            ->json('laravel_build_time');
+        $this->assertSame(now()->subDays(30)->getTimestamp(), strtotime($cached));
+
+        // Container start runs `php artisan cache:clear` — same effect here.
+        Cache::forget('laravel_build_time');
+
+        // Recomputed from the newest PHP file mtime — no longer frozen.
+        $fresh = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->getJson('/api/management/settings/system')
+            ->assertStatus(200)
+            ->json('laravel_build_time');
+        $this->assertGreaterThan(now()->subDays(30)->getTimestamp(), strtotime($fresh));
     }
 
     public function test_update_license_terms_requires_mult_fields(): void

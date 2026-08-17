@@ -5,6 +5,7 @@ import WysiwygEditor from '../components/WysiwygEditor';
 
 vi.mock('@tiptap/react', () => ({
     useEditor: vi.fn(),
+    useEditorState: vi.fn(),
     EditorContent: () => <div data-testid="editor-content" />,
 }));
 
@@ -40,7 +41,7 @@ vi.mock('../../logic/usePermissions', () => ({
     usePermissions: vi.fn(),
 }));
 
-import { useEditor } from '@tiptap/react';
+import { useEditor, useEditorState } from '@tiptap/react';
 import { usePermissions } from '../../logic/usePermissions';
 import useSWR from 'swr';
 
@@ -98,6 +99,17 @@ describe('WysiwygEditor', () => {
             off: vi.fn(),
             destroy: vi.fn(),
         } as never);
+
+        vi.mocked(useEditorState).mockReturnValue({
+            bold: false,
+            italic: false,
+            underline: false,
+            link: false,
+            bulletList: false,
+            orderedList: false,
+            table: false,
+            heading: 0,
+        });
     });
 
     it('shows loading spinner when snippets are loading for super admin', () => {

@@ -275,6 +275,7 @@ msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
 #~ msgstr "Ab dieser Anzahl Bilder gilt der Einheitspreis für alle Bilder der Bestellung. Die erste Staffel beginnt bei 0 Bildern."
 
 #: src/ui/components/ModalDialogShell.tsx
+#: src/ui/components/WysiwygEditor.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/CreateUserModal.tsx
 #: src/ui/management/components/EditableTableRow.tsx
@@ -332,6 +333,10 @@ msgstr "Abrechnungen (Payouts)"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Abrechnungslauf starten?"
 msgstr "Abrechnungslauf starten?"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Absatz"
+msgstr "Absatz"
 
 #: src/ui/client/SelectionView.tsx
 msgid "Abschließen"
@@ -562,6 +567,7 @@ msgid "Ansehen"
 msgstr "Ansehen"
 
 #: src/ui/client/components/CouponInput.tsx
+#: src/ui/components/WysiwygEditor.tsx
 msgid "Anwenden"
 msgstr "Anwenden"
 
@@ -1532,6 +1538,7 @@ msgstr "Empfänger:"
 
 #: src/ui/client/components/CartItemList.tsx
 #: src/ui/client/components/CouponInput.tsx
+#: src/ui/components/WysiwygEditor.tsx
 #: src/ui/management/components/GalleryAccessModal.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
 msgid "Entfernen"
@@ -1841,6 +1848,10 @@ msgstr "Fehler: {emailError}"
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Festbetrag"
 msgstr "Festbetrag"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Fett"
+msgstr "Fett"
 
 #: src/ui/Impressum.tsx
 msgid "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
@@ -2703,6 +2714,10 @@ msgstr "Kundenname"
 msgid "Kundenname ist erforderlich"
 msgstr "Kundenname ist erforderlich"
 
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Kursiv"
+msgstr "Kursiv"
+
 #: src/ui/management/components/TextSnippetModal.tsx
 msgid "Kürzel ist erforderlich"
 msgstr "Kürzel ist erforderlich"
@@ -2808,6 +2823,10 @@ msgstr "Lightroom-Katalog"
 #~ msgid "Lightroom-Kataloge"
 #~ msgstr "Lightroom-Kataloge"
 
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Link einfügen"
+msgstr "Link einfügen"
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "Link kopieren"
 msgstr "Link kopieren"
@@ -2815,6 +2834,10 @@ msgstr "Link kopieren"
 #: src/ui/management/ManagementContractView.tsx
 msgid "Link wurde kopiert."
 msgstr "Link wurde kopiert."
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Link-Adresse"
+msgstr "Link-Adresse"
 
 #: src/ui/components/GalleryModal.tsx
 msgid "LIVE Galerie"
@@ -3437,6 +3460,10 @@ msgstr "Noch keine Verträge vorhanden."
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Notiz"
 msgstr "Notiz"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Nummerierte Liste"
+msgstr "Nummerierte Liste"
 
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
@@ -4122,6 +4149,18 @@ msgstr "Sofort Download"
 msgid "Sonderanfrage (Angebot)"
 msgstr "Sonderanfrage (Angebot)"
 
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Spalte danach hinzufügen"
+msgstr "Spalte danach hinzufügen"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Spalte davor hinzufügen"
+msgstr "Spalte davor hinzufügen"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Spalte löschen"
+msgstr "Spalte löschen"
+
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
@@ -4336,6 +4375,14 @@ msgstr "System Info"
 msgid "System-Einstellungen"
 msgstr "System-Einstellungen"
 
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Tabelle einfügen"
+msgstr "Tabelle einfügen"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Tabelle löschen"
+msgstr "Tabelle löschen"
+
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Teilbezahlt"
@@ -4457,6 +4504,26 @@ msgstr "Übernommen"
 msgid "Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten."
 msgstr "Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten."
 
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Überschrift"
+msgstr "Überschrift"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Überschrift 1"
+msgstr "Überschrift 1"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Überschrift 2"
+msgstr "Überschrift 2"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Überschrift 3"
+msgstr "Überschrift 3"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Überschrift 4"
+msgstr "Überschrift 4"
+
 #: src/ui/components/Sidebar.tsx
 msgid "Übersicht"
 msgstr "Übersicht"
@@ -4553,6 +4620,10 @@ msgstr "Unterschrieben"
 msgid "Unterschrieben am"
 msgstr "Unterschrieben am"
 
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Unterstrichen"
+msgstr "Unterstrichen"
+
 #: src/ui/ContractSignView.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Unterzeichner"
@@ -4585,6 +4656,10 @@ msgstr "Urheber / Copyright"
 #: src/ui/Impressum.tsx
 msgid "Urheberrecht"
 msgstr "Urheberrecht"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "URL"
+msgstr "URL"
 
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
@@ -5039,6 +5114,18 @@ msgstr "Zahlungsstatus"
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Zahlungsziel / Fälligkeitstext"
 msgstr "Zahlungsziel / Fälligkeitstext"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Zeile danach hinzufügen"
+msgstr "Zeile danach hinzufügen"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Zeile davor hinzufügen"
+msgstr "Zeile davor hinzufügen"
+
+#: src/ui/components/WysiwygEditor.tsx
+msgid "Zeile löschen"
+msgstr "Zeile löschen"
 
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Zeitpunkt"

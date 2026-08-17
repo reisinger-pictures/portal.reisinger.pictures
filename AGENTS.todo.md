@@ -11,6 +11,85 @@
 
 ---
 
+## 🔄 WYSIWYG-Editor: Überschriften (H1–H4) + nummerierte Liste + Links + Underline + Tabellen-Fix (2026-08-17, User-Request)
+
+**Symptom (User-Report):** Der WysiwygEditor (Tiptap, `frontend/src/ui/components/WysiwygEditor.tsx`) unterstützt keine Überschriften, keine nummerierte Liste, keine Links, kein Underline. Tabellen zeigen **nur Zeilen, keine Spalten** (fehlende vertikale Borders) und haben **keine Spalten-/Zeilen-Add/Remove-Buttons**; es sollen **alle Borders gerendert** werden.
+
+**Analyse (Bestandsaufnahme):**
+- **Editor:** `StarterKit` 3.27.1 liefert `Heading`/`OrderedList`-Commands — es fehlen UI-Controls (kein Heading-Select, kein `toggleOrderedList`-Button). `ul`-Button existiert ✓.
+- **WICHTIG (geprüft 2026-08-17):** `@tiptap/starter-kit` 3.27.1 enthält **kein** `Link` und **kein** `Underline`; `@tiptap/extension-link` und `@tiptap/extension-underline` sind **nicht installiert** → beide Pakete (^3.27.1, wie Rest) per `pnpm add` installieren.
+- **Tabellen-Bug (Root Cause):** Tailwind-Typography-`prose` zeichnet für `table` nur **horizontale** Linien (thead oben/unten, tbody-tr unten) — keine vertikalen; Tiptap-Table-CSS wird nicht importiert. Fix: scoped CSS für `.ProseMirror table` (border-collapse + Zell-Borders, `index.css`). Toolbar fehlen `addColumnBefore`, `deleteColumn`, `addRowBefore`, `deleteRow` (vorhanden: `addColumnAfter`, `addRowAfter`, `deleteTable`).
+- **Backend-Sanitizer (`AppServiceProvider.php:31–47`, Symfony HtmlSanitizer):** erlaubt `p, strong, em, u, s, ul, ol, li, br, a, table, thead, tbody, tr, th, td` — **KEINE h1–h4**; `u`, `a[href,title,target,rel]`, `ol` sind bereits ✓.
+- **Frontend-Sanitizer (`sanitizeHtml.ts:14–17`, DOMPurify):** identische Allowlist (mirror-Policy, Kommentar in der Datei) — **KEINE h1–h4**; `u`, `a` (href/target/rel/title), `ol` bereits ✓.
+- **Konsequenz:** Headings würden selbst mit Toolbar-Buttons beim Persistieren (Backend) und beim Rendern (DOMPurify) gestrippt → Sanitizer MÜSSEN im selben Change mitgehen (Mirror-Policy).
+- **Render-Seite OK:** `prose`-Klassen (Tailwind Typography) in `ContractSignView`, Snippet-Preview, Editor-Content stylen h1–h4/ol/links; PDF-Blade-Templates (`manual_offer`, `invoice`, `contract_signatures`) haben bereits h1–h6-CSS. Borders-Regel optional auch für Read-Only-Render-Sites (`.editor-content`, Snippet-Preview) konsistent anwenden.
+- **Scope:** h1–h4 (laut User-Request), kein h5/h6. StarterKit-`Heading` auf `levels: [1,2,3,4]` konfigurieren, damit kein nicht-whitelisteter Level erzeugt wird.
+
+**Umsetzungsplan (delegiert):**
+1. [ ] `pnpm add @tiptap/extension-link @tiptap/extension-underline` (^3.27.1).
+2. [ ] `WysiwygEditor.tsx`: Heading-Select (Absatz + Überschrift 1–4, Lingui-`<Trans>`-Labels, testbares `title`/`aria-label`), `toggleOrderedList()`-Button (`mdi--format-list-numbered`), Underline-Button (`mdi--format-underline`), Link-Button (`mdi--link-variant`) mit Popover (Label = aktuelle Selektion, Href = Eingabe; `setLink({href, target:'_blank', rel:'noopener noreferrer'})` / `unsetLink()`, Link-Button-State via `editor.isActive('link')`). StarterKit `heading: { levels: [1,2,3,4] }`. Tabellen-Buttons ergänzen: `addColumnBefore` (`mdi--table-column-plus-before`), `deleteColumn` (`mdi--table-column-remove`), `addRowBefore` (`mdi--table-row-plus-before`), `deleteRow` (`mdi--table-row-remove`).
+3. [ ] `index.css`: scoped Table-CSS — `.ProseMirror table { border-collapse: collapse; width: 100%; }` + `th, td { border: 1px solid <base-300>; padding; vertical-align }`; konsistent für Read-Only-Rich-Text-Sites.
+4. [ ] `sanitizeHtml.ts`: `'h1','h2','h3','h4'` in `ALLOWED_TAGS` (Mirror-Policy-Kommentar beachten).
+5. [ ] `AppServiceProvider.php`: `->allowElement('h1') … ->allowElement('h4')` beim HtmlSanitizer-Singleton.
+6. [ ] **Vitest** `sanitizeHtml.test.ts`: h1–h4 & ol bleiben erhalten; `a[href]` mit erlaubten Attributen bleibt, unerlaubte Attribute (`style`/`id`/`class`) werden gestrippt.
+7. [ ] **PHPUnit** `TextSnippetControllerTest`: Snippet via API mit `<h1>–<h4>` + `<ol><li>` + `<a href>` → persistiertes `content_html` unverändert; Negativfall: `<h5>`/`<script>` entfernt (exaktes Strip-Verhalten bei der Implementierung am tatsächlichen Verhalten festmachen).
+8. [ ] **Playwright** (neue Spec `wysiwyg-editor.spec.ts`, Tag `@feature:admin:documents`): Heading-Select „Überschrift 2" → `.ProseMirror h2`; ol → `.ProseMirror ol li` (Enter für 2. Punkt); Underline → `.ProseMirror u`; Text selektieren → Link-Button → URL eingeben → `.ProseMirror a[href]` mit Label; Tabelle einfügen → `tr`/`th`/`td` zählen → `deleteColumn`/`addColumnAfter`/`deleteRow` verändern Zählung. Locator-Scoping via `title`/`aria-label` (mehrere Selects/Buttons in der Toolbar).
+9. [ ] Verifikation (separater Subagent): `pnpm vitest run` (sanitizeHtml), `php artisan test --filter TextSnippetControllerTest`, `pnpm lint:fix && pnpm build`, E2E `--grep @feature:admin:documents`.
+
+**Workflow (User-Vorgabe 2026-08-17):** Dev-Server im Hintergrund starten → Implementierung delegieren → Verifikation → **erst nach manuellem Test durch den User committen + pushen** (kein automatischer Commit/Push vorher).
+
+**Stand 2026-08-17: 🟡 IN ARBEIT — noch NICHT gelöst (kein Commit vor User-Freigabe):**
+
+**✅ Abgeschlossen:**
+- [x] Implementierung lokal grün: Pakete (link/underline ^3.27.1), Toolbar (Heading-Select, ol, Underline, Link-Popover v1, Tabellen-Buttons), Tabellen-Border-CSS, Sanitizer ×2 (h1–h4), Vitest `sanitizeHtml` (12), PHPUnit `TextSnippetControllerTest` (12/31), `lint:fix && build`, Lingui-Extract
+- [x] Paralleler Bugfix (wird mit-committet): Tiptap-Crash `reading 'cached'` bei Hard-Reload → `immediatelyRender: false` + `isDestroyed`-Guard + Regressionstest `contracts.spec.ts` + `vite.config.ts`-Preview-Proxy + AGENTS.md-Policy (Delegation an `general`)
+
+**🔄 Umsetzung — neuer Stand (Implementer-Task 2 abgeschlossen, 2026-08-17):**
+- [x] **Link-Fix verifiziert GRÜN**: `lastTextSelectionRef`/`setTextSelection`-Restore + Keyboard-Selektion im E2E — der Link-Step der Spec läuft durch. **User-Test Runde 3: „link works fine" ✓**
+- [x] **Tabellen-Buttons GEFIXT — Root Cause endgültig (React Compiler):** `editor` hat über Renders hinweg stabile Identität, `editor.state` mutiert; der Compiler memoisiert das JSX-Subtree `{isInsideTable(editor) && …}` mit `editor` als einziger Dependency → der beim ersten Render berechnete Wert `false` wird bei jedem Re-Render aus dem Cache restauriert. **ALLE Render-Zeit-Lesezugriffe auf `editor.state`/`editor.isActive(...)` sind damit permanent eingefroren** (deshalb versagten `isActive('table')` UND der Ancestor-Scan identisch, während `headingLevel` als State korrekt lief). Fix: `isTableActive`-State + `isInsideTable()`-Ancestor-Scan, berechnet im Event-Handler `updateSlashMenu` VOR dem Early-Return (Zeile 117–121); Toolbar-Condition auf `isTableActive` umgestellt. E2E: Listen-Exit vor Table-Insert (Guard `ol table` count 0), th 3→2→3, tr 3→2 kalibriert. **Alle Tests grün: Vitest 582/582, E2E 20/20 (wysiwyg-editor 2/2, manual-documents, contracts), lint+build 0 Fehler.**
+- [ ] **🆕 SYSTEMISCHER REST-FIX (vor User-Test Runde 4 nötig):** Aus derselben Compiler-Ursache sind die Active-Styles von Fett/Kursiv/Unterstrichen/Link/bulletList/orderedList (`btn-neutral` vs `btn-ghost`) und die Link-Popover-Logik (`editor.isActive('link')` → „Entfernen"-Button, Link-Button-disabled) eingefroren → **Link-Bearbeitung/-Entfernung funktioniert aktuell nicht** (Button bleibt disabled beim Klick in bestehenden Link). Sanierung: Tiptap-v3-`useEditorState({ editor, selector })` für alle Toolbar-Active-States (ein State-Objekt) + E2E-Assertions (Active-Style nach Klick; Link-Entfernen-Flow).
+
+**🆕 Offen — Link-Flow-Umbau (User-Manual-Test Runde 2, 2026-08-17):**
+- [x] **„Link disabled" behoben** — Diagnose: Tiptap v3 räumt beim Blur (Toolbar-Klick) die Selektion auf → Disabled-Logik griff zu früh. Fix greift: `lastTextSelectionRef` + `setTextSelection`-Restore vor `setLink` + Keyboard-Selektion im E2E. **User-Test Runde 3: „link works fine" ✓**
+- [x] **Link mit Label + Href-Input: VERWORFEN (User-Entscheid 2026-08-17)** — selektionsbasierter Link (Label = selektierter Text) bleibt; kein zusätzliches Label-Feld. „not as specified, but lets keep it this way"
+- [ ] E2E-Erweiterung (optional, entfällt mangels Feature): ~~toBeEnabled-Regression + No-Selection-Flow~~
+- [x] **E2E `wysiwyg-editor.spec.ts` gesamt grün (2026-08-17, beide Browser 2/2):** Root Cause der Rest-Flakiness = **Toolbar-Blur direkt vor der Maus-Drag-Selektion**. Tiptap v3 feuert beim Blur (Toolbar-Klick „Unterstrichen") asynchron ein Leer-Selection-Update, das auf Desktop NACH dem Drag-Update eintraf (Last-write-wins → `hasTextSelection=false` → Button disabled). Fix: **Reihenfolge umgestellt** — Link-Insert/-Remove läuft jetzt VOR dem Underline-Step (Drag ohne vorherigen Toolbar-Blur, per Probe auf beiden Browsern verifiziert: Selektion „Punkt zwei", Button enabled). Zusätzlich: Drag-Auswahl statt Tastatur (Home/End/Shift+Arrow sind in dieser Tiptap-v3-Setup dokument- statt textblock-skopiert), `exact: true` für „Entfernen" (Substring-Kollision mit „Formatierung entfernen"), Listen-Exit via Klick auf Trailing-Paragraph.
+- [x] Regression `manual-documents.spec.ts` + `contracts.spec.ts` grün (18/18) — zwischenzeitlicher Rot-Fail war **Umgebung** (Meilisearch-Container `portal_search_test` down → CRM-Autocomplete ohne Treffer); nach Docker-Start (`open -a "Rancher Desktop"` + `docker compose -f docker-compose.test.yml up -d`) wieder grün.
+- [x] Voll-Verifikation abgeschlossen: `pnpm vitest run` (582), `pnpm lint:fix && pnpm build` (0 Fehler), E2E wisywig 2/2 + Regression 18/18 + `@smoke` 44/44, `php artisan test` (1171).
+- [x] **AGENTS.todo.md final aufgeräumt** + Commit + Push (2026-08-17, nach grünem E2E-Fix).
+- [x] **🔄 SYNC NACH PROD ERFOLGT (2026-08-17):** `pnpm build` + `./sync.sh` (Backend + Frontend-`dist` via rclone) + Backend-Nachsync (System-Info-Fix). **Manuell (Prod):** `docker restart portal_backend` nach Backend-Syncs (OPcache + App-Cache-Reset) und **Portainer-Stack-Update** (Compose-Änderung `cache:clear` im Init-Block ist nicht rclone-synchronisiert).
+
+**🆕 System-Info „Laravel Update"-Timestamp (2026-08-17, User-Report):**
+- [x] **Bug:** `laravel_build_time` in `SettingsController::getSystemInfo` war `Cache::rememberForever` **ohne Invalidierung** → Wert eingefroren seit 16.7. (überlebte Sync + Restart). Zusätzlich scannte es nur 4 Verzeichnisse (`app/`, `routes/`, `config/`, `resources/views`), nicht alle PHP-Dateien.
+- [x] **Fix:** Scan jetzt über **alle PHP-Dateien** (`Finder`, `base_path()` exkl. `vendor/`, `storage/`, `node_modules/`, `bootstrap/cache/`, `out/` — die laufzeit-generierten, nicht synchronisierten Pfade); Cache bleibt `rememberForever`, aber **`php artisan cache:clear` im Backend-`command`-Block** (`deployment/docker-compose.yml`, vor `optimize`) → jeder Container-Start setzt den Cache zurück. Doku: `01-deployment.md` §11.
+- [x] **Audit andere Forever-Caches (kein weiterer Freeze-Bug):** `gallery_tree_admin` (`GalleryTreeService`) = write-invalidiert (`Cache::forget` bei jeder Gallery-Mutation) ✓; `unrestricted_photographer_gallery_ids` = 5-Min-TTL + forget bei Mutation ✓.
+- [x] **PHPUnit-Regressionstest** `test_system_info_build_time_refreshes_after_cache_clear` (SettingsControllerTest 13/13 grün): stale Wert wird gecacht serviert → `Cache::forget` (simuliert Container-Start) → frischer Wert > stale. Volle Suite läuft.
+
+**Kein Migration-Bedarf** (reine Write-Zeit-Filterung, bestehende Daten unberührt). **Doku:** Kein neuer SOLL-Zustand → nur TODO-Eintrag.
+
+---
+
+## 🔴 GELÖST — Produktions-Reload-Crash WysiwygEditor: „Cannot read properties of null (reading 'cached')" (2026-08-17)
+
+**Symptom (User-Report):** Neuladen von `portal.reisinger.pictures/admin-contracts` (und allen anderen Seiten mit Tiptap-Editor) in **Produktion** wirft `TypeError: Cannot read properties of null (reading 'cached')`. Reproduziert via `pnpm build` + `pnpm preview` (4173) + Playwright-Console-Capture — Dev-Server (4321) zeigte es ebenfalls (StrictMode), Prod war der primäre Trigger.
+
+**Befund (Root Cause):** `WysiwygEditor.tsx` nutzt `useEditor({...})` mit dem Tiptap-Default **`immediatelyRender: true`** → der Editor wird bereits **während des React-Renders** (im `useState`-Initializer des internen `EditorInstanceManager`) erzeugt. Unter **React 19 StrictMode** (Dev-Double-Invoke) und dem **React Compiler** (Prod-Bundle) wird die Instanz in dieser Phase erstellt, danach zerstört und neu aufgebaut — es bleibt ein Fenster, in dem `editor.getHTML()` (→ `DOMSerializer.fromSchema(this.schema)` bzw. `Editor.getHTML` → `getHTMLFromFragment`) auf einem Editor läuft, dessen `schema` durch `Editor.destroy()` (`@tiptap/core`) bereits auf `null` gesetzt wurde. `DOMSerializer.fromSchema(null)` → `null.cached` → Crash.
+- Stack (gekürzt): `DOMSerializer.fromSchema` → `getHTMLFromFragment` → `Editor.getHTML` → `WysiwygEditor` (in `useEffect`/`getHTML()`-Char-Count). Stack-Trace endete im `ErrorBoundary`.
+- Betroffen: **alle** Editor-Nutzungen, da sie über die eine `WysiwygEditor`-Komponente laufen (`ManagementContractView`, `ManagementManualInvoiceView`, `ManagementOrdersView`, `EmailComposerModal`, `TextSnippetModal`).
+
+**Fix (`frontend/src/ui/components/WysiwygEditor.tsx`):**
+1. `immediatelyRender: false` an `useEditor` → Editor-Erzeugung wandert in einen **Post-Mount-Effect** statt in den Render (die dokumentierte Tiptap-Lösung für React 19). Eliminiert das Destroy/Recreate-Fenster beim Reload.
+2. Defensive Guards gegen zerstörte Instanzen (Defense-in-Depth): `useEffect` Sync nur bei `editor && !editor.isDestroyed`; Render-Char-Count via `safeHtmlLength = editor.isDestroyed ? 0 : editor.getHTML().length`.
+
+**Verifikation:**
+- Repro-E2E gegen Preview (4173): **vor Fix rot** (`.ProseMirror` erscheint nach Reload nie → pageerror), **nach Fix grün**.
+- Regressionstest (permanent): `tests/e2e/admin/contracts.spec.ts` → `WysiwygEditor survives a hard page reload without crashing` (`@regression @feature:admin:contracts`) — navigiert zu Verträge, **`page.reload()`**, assertet dass Editor wieder sichtbar + **keine `pageerror`** (fängt genau den null-schema-Crash). Test reproduziert den Bug (gegen ungefixte Build-Variante verifiziert: rot).
+- `pnpm lint:fix` + `pnpm build` grün; Vitest `WysiwygEditor.test.tsx` (5) grün.
+
+**Lehrstelle:** Tiptap-`useEditor` ist nicht React-Compiler/StrictMode-kompatibel im Default-Render-Modus → immer `immediatelyRender: false` in dieser App. Gilt auch für künftige Editor-Einbindungen (alle über `WysiwygEditor` → dort zentral konfiguriert).
+
+---
+
 ## ✅ ERLEDIGT — Dependabot-Vulnerabilities (2026-08-14): 17 Composer-Alerts gefixt
 
 **Symptom:** 17 offene Dependabot-Alerts im Backend (5 high / 10 medium / 2 low) — ausschließlich Composer-Transitives:

@@ -52,6 +52,17 @@ export default defineConfig(() => {
                     cookieDomainRewrite: '.localhost',
                 }
             }
+        },
+        preview: {
+            port: 4173,
+            proxy: {
+                '/api': {
+                    target: process.env.VITE_API_PROXY || 'https://portal.test',
+                    changeOrigin: true,
+                    secure: false,
+                    cookieDomainRewrite: '.localhost',
+                }
+            }
         }
     }
 })

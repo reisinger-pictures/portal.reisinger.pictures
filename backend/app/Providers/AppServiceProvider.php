@@ -30,6 +30,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(HtmlSanitizer::class, function ($app) {
             $config = (new HtmlSanitizerConfig())
                 ->allowElement('p')
+                ->allowElement('h1')
+                ->allowElement('h2')
+                ->allowElement('h3')
+                ->allowElement('h4')
                 ->allowElement('strong')
                 ->allowElement('em')
                 ->allowElement('u')
