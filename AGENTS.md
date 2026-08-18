@@ -156,6 +156,15 @@ Alle Run-Configs in `.run/*.run.xml` folgen einem einheitlichen Schema (etablier
 - **Konsistenz:** Dateiname und internes `name` müssen synchron sein (Name ohne `.run.xml`-Endung). Neue Configs MÜSSEN diesem Schema folgen.
 - **Sprache:** gemischt erlaubt (deutsche Kategorien `[Wartung]`, `[Gefahr]` und Task-Namen wie „generieren" bleiben).
 
+## 11. CodeGraph — Index & Git Sync Hook
+
+- **Init/Index:** `.codegraph/` ist versioniert-ausgenommen via `.codegraph/.gitignore` (zeigt nur dieses eine File). The index (`codegraph.db`, daemon logs) bleibt lokal. Status: `codegraph status`, Rebuild: `codegraph index`, Manueller Sync: `codegraph sync`.
+- **Auto-Sync:** Der CodeGraph-Daemon (MCP) watchet die Working Tree und synct laufend (`daemon.log`). Der index ist damit fast immer fresh.
+- **Git Sync Hook (etabliert 2026-08-18):** `.githooks/pre-commit` (versioniert) läuft `codegraph sync -q` vor jedem Commit → Index ist zum Commit-Zeitpunkt garantiert aktuell, auch wenn der Daemon nicht läuft. Aktiviert via `git config core.hooksPath .githooks` (lokal, pro Clone einmal setzen).
+  - **Fails open:** Fehlender `codegraph` auf PATH oder Sync-Fehler → Warnung, aber exit 0. Index-Freshness ist kein Commit-Gate (Design-Intent von codegraph selbst: Hooks „never block git").
+  - Test: `git hook run pre-commit` (git ≥ 2.36) oder direkt `.githooks/pre-commit` ausführen.
+  - codegraph bietet zusätzlich optionale **post**-Hooks (`post-commit`/`post-merge`/`post-checkout`, API `installGitSyncHook()` — für WSL2-Szenarien ohne File-Watcher). Bei uns nicht nötig (Daemon läuft); falls je gebraucht: als versionierte Files nach `.githooks/` legen (nicht den built-in Installer nutzen, er schreibt nach `.git/hooks/` — das wird bei gesetztem `core.hooksPath` ignoriert).
+
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).

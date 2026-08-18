@@ -1,305 +1,192 @@
 # Task Board — Portal Reisinger Pictures
 
-> Stand: 2026-08-07. **Nur offene TODOs.** Analyse & Architektur-Entscheidungen sind ausgelagert:
+> Stand: 2026-08-18. **Nur offene TODOs.** Analyse & Architektur-Entscheidungen sind ausgelagert:
 > - Brand-Architektur (SOLL, Commit `1831116`): `features/infrastructure/21-brand-config-driven.md`
 > - Pricing-Strategy-Pattern: `features/infrastructure/17-pricing-strategy-pattern.md`
 > - Kanban-SOLL (Rollen-Matrix, DnD-Desktop-only, Status-Select): `features/b2b/11-kanban-board.md`
 > - Security-Risiken (C1–C4) & Stärken: `AGENTS.md` §7 / §8
-> - **Backlog-Ausarbeitung 2026-08-04:** Drei parallele Analyse-Aufträge (A1, F3, Stack-Konsolidierung) abgeschlossen — Pläne unten. Offene Fragen interaktiv geklärt (Entscheidungen dokumentiert). **Kein Code geändert.**
+> - Backlog-Ausarbeitung 2026-08-04: A1 (Schritt 1 erledigt, Commit `e44f6dd`), F3 (offen), Stack-Konsolidierung (obsolet → SQLite-Richtung, s. u.).
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 
 ---
 
-## 🔄 WYSIWYG-Editor: Überschriften (H1–H4) + nummerierte Liste + Links + Underline + Tabellen-Fix (2026-08-17, User-Request)
+## ✅ Erledigt (2026-08-18, Tooling) — CodeGraph Sync Pre-Commit-Hook
 
-**Symptom (User-Report):** Der WysiwygEditor (Tiptap, `frontend/src/ui/components/WysiwygEditor.tsx`) unterstützt keine Überschriften, keine nummerierte Liste, keine Links, kein Underline. Tabellen zeigen **nur Zeilen, keine Spalten** (fehlende vertikale Borders) und haben **keine Spalten-/Zeilen-Add/Remove-Buttons**; es sollen **alle Borders gerendert** werden.
-
-**Analyse (Bestandsaufnahme):**
-- **Editor:** `StarterKit` 3.27.1 liefert `Heading`/`OrderedList`-Commands — es fehlen UI-Controls (kein Heading-Select, kein `toggleOrderedList`-Button). `ul`-Button existiert ✓.
-- **WICHTIG (geprüft 2026-08-17):** `@tiptap/starter-kit` 3.27.1 enthält **kein** `Link` und **kein** `Underline`; `@tiptap/extension-link` und `@tiptap/extension-underline` sind **nicht installiert** → beide Pakete (^3.27.1, wie Rest) per `pnpm add` installieren.
-- **Tabellen-Bug (Root Cause):** Tailwind-Typography-`prose` zeichnet für `table` nur **horizontale** Linien (thead oben/unten, tbody-tr unten) — keine vertikalen; Tiptap-Table-CSS wird nicht importiert. Fix: scoped CSS für `.ProseMirror table` (border-collapse + Zell-Borders, `index.css`). Toolbar fehlen `addColumnBefore`, `deleteColumn`, `addRowBefore`, `deleteRow` (vorhanden: `addColumnAfter`, `addRowAfter`, `deleteTable`).
-- **Backend-Sanitizer (`AppServiceProvider.php:31–47`, Symfony HtmlSanitizer):** erlaubt `p, strong, em, u, s, ul, ol, li, br, a, table, thead, tbody, tr, th, td` — **KEINE h1–h4**; `u`, `a[href,title,target,rel]`, `ol` sind bereits ✓.
-- **Frontend-Sanitizer (`sanitizeHtml.ts:14–17`, DOMPurify):** identische Allowlist (mirror-Policy, Kommentar in der Datei) — **KEINE h1–h4**; `u`, `a` (href/target/rel/title), `ol` bereits ✓.
-- **Konsequenz:** Headings würden selbst mit Toolbar-Buttons beim Persistieren (Backend) und beim Rendern (DOMPurify) gestrippt → Sanitizer MÜSSEN im selben Change mitgehen (Mirror-Policy).
-- **Render-Seite OK:** `prose`-Klassen (Tailwind Typography) in `ContractSignView`, Snippet-Preview, Editor-Content stylen h1–h4/ol/links; PDF-Blade-Templates (`manual_offer`, `invoice`, `contract_signatures`) haben bereits h1–h6-CSS. Borders-Regel optional auch für Read-Only-Render-Sites (`.editor-content`, Snippet-Preview) konsistent anwenden.
-- **Scope:** h1–h4 (laut User-Request), kein h5/h6. StarterKit-`Heading` auf `levels: [1,2,3,4]` konfigurieren, damit kein nicht-whitelisteter Level erzeugt wird.
-
-**Umsetzungsplan (delegiert):**
-1. [ ] `pnpm add @tiptap/extension-link @tiptap/extension-underline` (^3.27.1).
-2. [ ] `WysiwygEditor.tsx`: Heading-Select (Absatz + Überschrift 1–4, Lingui-`<Trans>`-Labels, testbares `title`/`aria-label`), `toggleOrderedList()`-Button (`mdi--format-list-numbered`), Underline-Button (`mdi--format-underline`), Link-Button (`mdi--link-variant`) mit Popover (Label = aktuelle Selektion, Href = Eingabe; `setLink({href, target:'_blank', rel:'noopener noreferrer'})` / `unsetLink()`, Link-Button-State via `editor.isActive('link')`). StarterKit `heading: { levels: [1,2,3,4] }`. Tabellen-Buttons ergänzen: `addColumnBefore` (`mdi--table-column-plus-before`), `deleteColumn` (`mdi--table-column-remove`), `addRowBefore` (`mdi--table-row-plus-before`), `deleteRow` (`mdi--table-row-remove`).
-3. [ ] `index.css`: scoped Table-CSS — `.ProseMirror table { border-collapse: collapse; width: 100%; }` + `th, td { border: 1px solid <base-300>; padding; vertical-align }`; konsistent für Read-Only-Rich-Text-Sites.
-4. [ ] `sanitizeHtml.ts`: `'h1','h2','h3','h4'` in `ALLOWED_TAGS` (Mirror-Policy-Kommentar beachten).
-5. [ ] `AppServiceProvider.php`: `->allowElement('h1') … ->allowElement('h4')` beim HtmlSanitizer-Singleton.
-6. [ ] **Vitest** `sanitizeHtml.test.ts`: h1–h4 & ol bleiben erhalten; `a[href]` mit erlaubten Attributen bleibt, unerlaubte Attribute (`style`/`id`/`class`) werden gestrippt.
-7. [ ] **PHPUnit** `TextSnippetControllerTest`: Snippet via API mit `<h1>–<h4>` + `<ol><li>` + `<a href>` → persistiertes `content_html` unverändert; Negativfall: `<h5>`/`<script>` entfernt (exaktes Strip-Verhalten bei der Implementierung am tatsächlichen Verhalten festmachen).
-8. [ ] **Playwright** (neue Spec `wysiwyg-editor.spec.ts`, Tag `@feature:admin:documents`): Heading-Select „Überschrift 2" → `.ProseMirror h2`; ol → `.ProseMirror ol li` (Enter für 2. Punkt); Underline → `.ProseMirror u`; Text selektieren → Link-Button → URL eingeben → `.ProseMirror a[href]` mit Label; Tabelle einfügen → `tr`/`th`/`td` zählen → `deleteColumn`/`addColumnAfter`/`deleteRow` verändern Zählung. Locator-Scoping via `title`/`aria-label` (mehrere Selects/Buttons in der Toolbar).
-9. [ ] Verifikation (separater Subagent): `pnpm vitest run` (sanitizeHtml), `php artisan test --filter TextSnippetControllerTest`, `pnpm lint:fix && pnpm build`, E2E `--grep @feature:admin:documents`.
-
-**Workflow (User-Vorgabe 2026-08-17):** Dev-Server im Hintergrund starten → Implementierung delegieren → Verifikation → **erst nach manuellem Test durch den User committen + pushen** (kein automatischer Commit/Push vorher).
-
-**Stand 2026-08-17: 🟡 IN ARBEIT — noch NICHT gelöst (kein Commit vor User-Freigabe):**
-
-**✅ Abgeschlossen:**
-- [x] Implementierung lokal grün: Pakete (link/underline ^3.27.1), Toolbar (Heading-Select, ol, Underline, Link-Popover v1, Tabellen-Buttons), Tabellen-Border-CSS, Sanitizer ×2 (h1–h4), Vitest `sanitizeHtml` (12), PHPUnit `TextSnippetControllerTest` (12/31), `lint:fix && build`, Lingui-Extract
-- [x] Paralleler Bugfix (wird mit-committet): Tiptap-Crash `reading 'cached'` bei Hard-Reload → `immediatelyRender: false` + `isDestroyed`-Guard + Regressionstest `contracts.spec.ts` + `vite.config.ts`-Preview-Proxy + AGENTS.md-Policy (Delegation an `general`)
-
-**🔄 Umsetzung — neuer Stand (Implementer-Task 2 abgeschlossen, 2026-08-17):**
-- [x] **Link-Fix verifiziert GRÜN**: `lastTextSelectionRef`/`setTextSelection`-Restore + Keyboard-Selektion im E2E — der Link-Step der Spec läuft durch. **User-Test Runde 3: „link works fine" ✓**
-- [x] **Tabellen-Buttons GEFIXT — Root Cause endgültig (React Compiler):** `editor` hat über Renders hinweg stabile Identität, `editor.state` mutiert; der Compiler memoisiert das JSX-Subtree `{isInsideTable(editor) && …}` mit `editor` als einziger Dependency → der beim ersten Render berechnete Wert `false` wird bei jedem Re-Render aus dem Cache restauriert. **ALLE Render-Zeit-Lesezugriffe auf `editor.state`/`editor.isActive(...)` sind damit permanent eingefroren** (deshalb versagten `isActive('table')` UND der Ancestor-Scan identisch, während `headingLevel` als State korrekt lief). Fix: `isTableActive`-State + `isInsideTable()`-Ancestor-Scan, berechnet im Event-Handler `updateSlashMenu` VOR dem Early-Return (Zeile 117–121); Toolbar-Condition auf `isTableActive` umgestellt. E2E: Listen-Exit vor Table-Insert (Guard `ol table` count 0), th 3→2→3, tr 3→2 kalibriert. **Alle Tests grün: Vitest 582/582, E2E 20/20 (wysiwyg-editor 2/2, manual-documents, contracts), lint+build 0 Fehler.**
-- [ ] **🆕 SYSTEMISCHER REST-FIX (vor User-Test Runde 4 nötig):** Aus derselben Compiler-Ursache sind die Active-Styles von Fett/Kursiv/Unterstrichen/Link/bulletList/orderedList (`btn-neutral` vs `btn-ghost`) und die Link-Popover-Logik (`editor.isActive('link')` → „Entfernen"-Button, Link-Button-disabled) eingefroren → **Link-Bearbeitung/-Entfernung funktioniert aktuell nicht** (Button bleibt disabled beim Klick in bestehenden Link). Sanierung: Tiptap-v3-`useEditorState({ editor, selector })` für alle Toolbar-Active-States (ein State-Objekt) + E2E-Assertions (Active-Style nach Klick; Link-Entfernen-Flow).
-
-**🆕 Offen — Link-Flow-Umbau (User-Manual-Test Runde 2, 2026-08-17):**
-- [x] **„Link disabled" behoben** — Diagnose: Tiptap v3 räumt beim Blur (Toolbar-Klick) die Selektion auf → Disabled-Logik griff zu früh. Fix greift: `lastTextSelectionRef` + `setTextSelection`-Restore vor `setLink` + Keyboard-Selektion im E2E. **User-Test Runde 3: „link works fine" ✓**
-- [x] **Link mit Label + Href-Input: VERWORFEN (User-Entscheid 2026-08-17)** — selektionsbasierter Link (Label = selektierter Text) bleibt; kein zusätzliches Label-Feld. „not as specified, but lets keep it this way"
-- [ ] E2E-Erweiterung (optional, entfällt mangels Feature): ~~toBeEnabled-Regression + No-Selection-Flow~~
-- [x] **E2E `wysiwyg-editor.spec.ts` gesamt grün (2026-08-17, beide Browser 2/2):** Root Cause der Rest-Flakiness = **Toolbar-Blur direkt vor der Maus-Drag-Selektion**. Tiptap v3 feuert beim Blur (Toolbar-Klick „Unterstrichen") asynchron ein Leer-Selection-Update, das auf Desktop NACH dem Drag-Update eintraf (Last-write-wins → `hasTextSelection=false` → Button disabled). Fix: **Reihenfolge umgestellt** — Link-Insert/-Remove läuft jetzt VOR dem Underline-Step (Drag ohne vorherigen Toolbar-Blur, per Probe auf beiden Browsern verifiziert: Selektion „Punkt zwei", Button enabled). Zusätzlich: Drag-Auswahl statt Tastatur (Home/End/Shift+Arrow sind in dieser Tiptap-v3-Setup dokument- statt textblock-skopiert), `exact: true` für „Entfernen" (Substring-Kollision mit „Formatierung entfernen"), Listen-Exit via Klick auf Trailing-Paragraph.
-- [x] Regression `manual-documents.spec.ts` + `contracts.spec.ts` grün (18/18) — zwischenzeitlicher Rot-Fail war **Umgebung** (Meilisearch-Container `portal_search_test` down → CRM-Autocomplete ohne Treffer); nach Docker-Start (`open -a "Rancher Desktop"` + `docker compose -f docker-compose.test.yml up -d`) wieder grün.
-- [x] Voll-Verifikation abgeschlossen: `pnpm vitest run` (582), `pnpm lint:fix && pnpm build` (0 Fehler), E2E wisywig 2/2 + Regression 18/18 + `@smoke` 44/44, `php artisan test` (1171).
-- [x] **AGENTS.todo.md final aufgeräumt** + Commit + Push (2026-08-17, nach grünem E2E-Fix).
-- [x] **🔄 SYNC NACH PROD ERFOLGT (2026-08-17):** `pnpm build` + `./sync.sh` (Backend + Frontend-`dist` via rclone) + Backend-Nachsync (System-Info-Fix). **Manuell (Prod):** `docker restart portal_backend` nach Backend-Syncs (OPcache + App-Cache-Reset) und **Portainer-Stack-Update** (Compose-Änderung `cache:clear` im Init-Block ist nicht rclone-synchronisiert).
-
-**🆕 System-Info „Laravel Update"-Timestamp (2026-08-17, User-Report):**
-- [x] **Bug:** `laravel_build_time` in `SettingsController::getSystemInfo` war `Cache::rememberForever` **ohne Invalidierung** → Wert eingefroren seit 16.7. (überlebte Sync + Restart). Zusätzlich scannte es nur 4 Verzeichnisse (`app/`, `routes/`, `config/`, `resources/views`), nicht alle PHP-Dateien.
-- [x] **Fix:** Scan jetzt über **alle PHP-Dateien** (`Finder`, `base_path()` exkl. `vendor/`, `storage/`, `node_modules/`, `bootstrap/cache/`, `out/` — die laufzeit-generierten, nicht synchronisierten Pfade); Cache bleibt `rememberForever`, aber **`php artisan cache:clear` im Backend-`command`-Block** (`deployment/docker-compose.yml`, vor `optimize`) → jeder Container-Start setzt den Cache zurück. Doku: `01-deployment.md` §11.
-- [x] **Audit andere Forever-Caches (kein weiterer Freeze-Bug):** `gallery_tree_admin` (`GalleryTreeService`) = write-invalidiert (`Cache::forget` bei jeder Gallery-Mutation) ✓; `unrestricted_photographer_gallery_ids` = 5-Min-TTL + forget bei Mutation ✓.
-- [x] **PHPUnit-Regressionstest** `test_system_info_build_time_refreshes_after_cache_clear` (SettingsControllerTest 13/13 grün): stale Wert wird gecacht serviert → `Cache::forget` (simuliert Container-Start) → frischer Wert > stale. Volle Suite läuft.
-
-**Kein Migration-Bedarf** (reine Write-Zeit-Filterung, bestehende Daten unberührt). **Doku:** Kein neuer SOLL-Zustand → nur TODO-Eintrag.
+- `.githooks/pre-commit` (versioniert) → `codegraph sync -q` vor jedem Commit; **fails open** (kein Commit-Gate). Aktiviert: `git config core.hooksPath .githooks` (lokal gesetzt, pro Clone einmal nötig). Test: `git hook run pre-commit` ✅ (beide Pfade verifiziert: sync ok / codegraph fehlt → exit 0, Warnung).
+- `codegraph init` war bereits abgeschlossen (`.codegraph/` indexiert: 783 files / 8.665 nodes, Daemon läuft, Auto-Sync aktiv) — kein Rebuild nötig; `codegraph sync` → „Already up to date".
+- Doku: `AGENTS.md` §11.
 
 ---
 
-## 🔴 GELÖST — Produktions-Reload-Crash WysiwygEditor: „Cannot read properties of null (reading 'cached')" (2026-08-17)
+## ✅ UMGESETZT & VERIFIZIERT (2026-08-18) — WYSIWYG-Resize + PDF-Konsistenz + Kalkulation-oben/Dedup + Typografie
 
-**Symptom (User-Report):** Neuladen von `portal.reisinger.pictures/admin-contracts` (und allen anderen Seiten mit Tiptap-Editor) in **Produktion** wirft `TypeError: Cannot read properties of null (reading 'cached')`. Reproduziert via `pnpm build` + `pnpm preview` (4173) + Playwright-Console-Capture — Dev-Server (4321) zeigte es ebenfalls (StrictMode), Prod war der primäre Trigger.
+> **Status: ✅ Implementierung abgeschlossen + verifiziert am 2026-08-18 — wartet auf manuellen User-Test vor Commit/Push** (etablierter Workflow 2026-08-17: kein Commit/Push vor User-Freigabe; danach Sync nach Prod wie gehabt: Backend-Sync + `docker restart portal_backend` + ggf. Portainer-Stack-Update).
+>
+> **Verifikations-Ergebnis (separate Agenten, 2026-08-18):** Backend volle Suite **1176 passed / 0 failed** (inkl. neuem `PdfTypographyTest` 5 Tests / 44 Assertions; Regression `ManualDocumentTest|ContractPdfServiceTest` 8/38; Pint PASS). Frontend **vitest 585 passed**, `pnpm lint:fix && pnpm build` 0 Fehler; E2E `@feature:admin:documents` **8/8**, `contracts.spec.ts` **14/14**, `@smoke` **58/58**.
+>
+> **Dokumentierte Abweichungen/Erkenntnisse:** (1) E2E-Resize-Test nach Verifikator-Befund kalibriert: Container startet bei 80 Absätzen am `max-h-160` → Drag **nach oben** (Verkleinern); Diagnose wasserdicht (Ziehen nach unten ist per CSS-`max-height` wirkungslos). (2) Resize-Drag-Substep **Desktop-only** (Mobile-Touch-Emulation unterstützt CSS-`resize` nicht; Präzedenzfall `projects-board.spec.ts`); Scroll-/Toolbar-Assertions laufen auf Mobile weiter voll. (3) **UX-Note:** CSS-`resize` ist Mouse-only → auf echten Touch-Geräten nicht resize-bar; falls gewünscht, Custom-Pointer-Events-Lösung in `WysiwygEditor` (separater Task). (4) `features/documents/` (neue Kategorie) ist inzwischen in `features/README.md` indexiert (Abschnitt „📄 Documents & PDF").
 
-**Befund (Root Cause):** `WysiwygEditor.tsx` nutzt `useEditor({...})` mit dem Tiptap-Default **`immediatelyRender: true`** → der Editor wird bereits **während des React-Renders** (im `useState`-Initializer des internen `EditorInstanceManager`) erzeugt. Unter **React 19 StrictMode** (Dev-Double-Invoke) und dem **React Compiler** (Prod-Bundle) wird die Instanz in dieser Phase erstellt, danach zerstört und neu aufgebaut — es bleibt ein Fenster, in dem `editor.getHTML()` (→ `DOMSerializer.fromSchema(this.schema)` bzw. `Editor.getHTML` → `getHTMLFromFragment`) auf einem Editor läuft, dessen `schema` durch `Editor.destroy()` (`@tiptap/core`) bereits auf `null` gesetzt wurde. `DOMSerializer.fromSchema(null)` → `null.cached` → Crash.
-- Stack (gekürzt): `DOMSerializer.fromSchema` → `getHTMLFromFragment` → `Editor.getHTML` → `WysiwygEditor` (in `useEffect`/`getHTML()`-Char-Count). Stack-Trace endete im `ErrorBoundary`.
-- Betroffen: **alle** Editor-Nutzungen, da sie über die eine `WysiwygEditor`-Komponente laufen (`ManagementContractView`, `ManagementManualInvoiceView`, `ManagementOrdersView`, `EmailComposerModal`, `TextSnippetModal`).
+**User-Requests (2026-08-18, vier zusammenhängende Punkte):**
+1. **WYSIWYG-Editor** soll per Drag am rechten unteren Eck wie eine Textbox in der Größe veränderbar sein; bei zu langem Inhalt scrollt **nur der Text** im Editor, nicht der Editor inkl. Toolbar.
+2. **Generiertes PDF:** Der WYSIWYG-Bereich (`terms_html`) wird hervorgehoben (Rand + Hintergrund) und passt nicht zum Brand-Farbschema → soll „aus einem Guss" wirken.
+3. **Rechnung & Angebot:** Kalkulation (Leistungen/Positionen + Summe) im Formular **nach oben**; **Duplizierung entfernen** (interaktiv geklärt 2026-08-18: = (a) Positionen-Block im Formular über den Text-Editor, (b) PDF-Templates entduplizieren).
+4. **Typografie:** Schusterjungen (widows) & Hurenkinder (orphans) in der automatisierten PDF-Erstellung; **bevorzugt PHPUnit-Test** („Farben und Absätze").
 
-**Fix (`frontend/src/ui/components/WysiwygEditor.tsx`):**
-1. `immediatelyRender: false` an `useEditor` → Editor-Erzeugung wandert in einen **Post-Mount-Effect** statt in den Render (die dokumentierte Tiptap-Lösung für React 19). Eliminiert das Destroy/Recreate-Fenster beim Reload.
-2. Defensive Guards gegen zerstörte Instanzen (Defense-in-Depth): `useEffect` Sync nur bei `editor && !editor.isDestroyed`; Render-Char-Count via `safeHtmlLength = editor.isDestroyed ? 0 : editor.getHTML().length`.
+**Engine-Entscheidung (interaktiv geklärt 2026-08-18, verifiziert per Web-Recherche):** **Bei dompdf bleiben — kein Umbau.** Begründung: mPDF hat **keine** widows/orphans-Unterstützung (offizielles Manual + GitHub-Issue #48, seit 2015 offen) → Seitwärtswechsel. `dragonofmercy/phppdf` (2026-08-18 geprüft) ist kein HTML→CSS-Renderer (imperative API), hat ebenfalls keine orphan/widow-Logik und nur ~109 Installs → verworfen. Einziger echter Upgrade-Pfad wäre Headless-Chromium (Browsershot; caniuse: widows/orphans ab Chrome 25) — Deployment-Kosten (Binary im Docker-Image, RAM) rechtfertigen die eine CSS-Eigenschaft nicht, die per `page-break-inside: avoid` kompensierbar ist. dompdf-Fakt (Vendor-Source verifiziert): `orphans` wird enforced (`FrameDecorator/Page.php:420`, Default 2), `widows` **nicht** (`Page.php:426–427`: `// FIXME: Checking widows is tricky … Just ignore it for now`). → Siehe Task E + Doku `features/`.
 
-**Verifikation:**
-- Repro-E2E gegen Preview (4173): **vor Fix rot** (`.ProseMirror` erscheint nach Reload nie → pageerror), **nach Fix grün**.
-- Regressionstest (permanent): `tests/e2e/admin/contracts.spec.ts` → `WysiwygEditor survives a hard page reload without crashing` (`@regression @feature:admin:contracts`) — navigiert zu Verträge, **`page.reload()`**, assertet dass Editor wieder sichtbar + **keine `pageerror`** (fängt genau den null-schema-Crash). Test reproduziert den Bug (gegen ungefixte Build-Variante verifiziert: rot).
-- `pnpm lint:fix` + `pnpm build` grün; Vitest `WysiwygEditor.test.tsx` (5) grün.
+### Task A — WysiwygEditor: Resize-Griff + scrollbarer Textbereich
 
-**Lehrstelle:** Tiptap-`useEditor` ist nicht React-Compiler/StrictMode-kompatibel im Default-Render-Modus → immer `immediatelyRender: false` in dieser App. Gilt auch für künftige Editor-Einbindungen (alle über `WysiwygEditor` → dort zentral konfiguriert).
+**Datei:** `frontend/src/ui/components/WysiwygEditor.tsx` (aktuell: Wrapper Z. 258 `overflow-visible flex flex-col`; `EditorContent` Z. 340 wächst unbegrenzt; kein Scroll-Container, kein Resize; `min-h-48` liegt derzeit auf den ProseMirror-Attributen Z. 181).
 
----
-
-## ✅ ERLEDIGT — Dependabot-Vulnerabilities (2026-08-14): 17 Composer-Alerts gefixt
-
-**Symptom:** 17 offene Dependabot-Alerts im Backend (5 high / 10 medium / 2 low) — ausschließlich Composer-Transitives:
-
-| Package | Version (vor) | Version (nach) | Alerts | Betroffen |
-|---|---|---|---|---|
-| `league/commonmark` | 2.8.2 | 2.10.0 | 6 (4 high, 2 medium) | via `laravel/framework` `^2.8.1` |
-| `guzzlehttp/guzzle` | 7.13.1 | 7.15.3 | 6 (1 high, 5 medium) | via `laravel/framework` `^7.8.2` |
-| `dompdf/dompdf` | v3.1.5 | v3.1.6 | 6 (4 medium, 2 low) | via `barryvdh/laravel-dompdf` `^3.0` |
-
-**Umsetzung:** `composer update league/commonmark guzzlehttp/guzzle dompdf/dompdf --with-all-dependencies` (nur `backend/composer.lock` geändert, `composer.json` unverändert — Constraints erlaubten die Patches bereits). Nebeneffekt-Updates: `guzzlehttp/promises` 2.5.0→2.5.2, `guzzlehttp/psr7` 2.12.3→2.13.0, `nette/utils` v4.1.4→v4.1.5.
-
-**Verifikation (separater Subagent):** `composer audit` = 0 Advisories; volle `php artisan test`-Suite **1168 passed / 0 failed** (Meilisearch 7701 OK). Alerts schließen sich nach Push automatisch (Lockfile auf default Branch gepatcht).
-
-**Nachfolger-Alert #115 (nanoid, high, npm):** Nach dem Push waren alle Composer-Alerts geschlossen, aber ein 18. Alert blieb offen: `nanoid < 3.3.18` (Transitive von `postcss`). Fix: `pnpm.overrides` in `frontend/package.json` 3.3.17 → **3.3.18** + `pnpm install`. `pnpm audit` = 0. Verifikation: lint:fix + build + Vitest (580 passed) grün; E2E-@smoke nicht gelaufen (App-Stack nicht gestartet, Environment-Lücke).
-
-**⚠️ Lektion (Overrides/Workspace, gelöst 2026-08-14):** `pnpm.overrides` in `package.json` wurde vom gepinnten pnpm 9.15.4 gelesen (Deprecation-Warnung war nur eine Warnung). Da pnpm 10/11 `package.json`-Overrides ignoriert, wurden die Overrides nach `frontend/pnpm-workspace.yaml` **migriert** und pnpm auf **11.21.0** angehoben (`packageManager` + `ci.yml` `pnpm/action-setup`). Der Lockfile bleibt byte-identisch (9.15.4+package.json-Overrides == 11.21.0+workspace-Overrides, lockfileVersion 9.0). `frontend/pnpm-workspace.yaml` ist getrackt und steuert zusätzlich `allowBuilds`/`onlyBuiltDependencies` (esbuild).
-
-— keine Regression.
-
----
-
-## 🔍 REVIEW 2026-08-13 — Architektur / UX / Sicherheit
-
-**Gesamturteil:** Überdurchschnittlich solide. Sicherheits-Basis (Stripe-Webhook-Verifikation + Underpayment-Guard, JWT-httpOnly-Cookie + SameSite=Lax, Money-Pattern mit bcmath, Brand-Isolation, Offer-Token) vorbildlich. Baustellen: Autorisierungs-Scatter, God-Entities, CSP-Favicon (bekannt).
-
-**Befunde (Detail in Session-Review):**
-
-| # | Befund | Ort |
-|---|---|---|
-| A1 | User.php God-Entity; ~170 `is_*`-Prüfungen verstreut; N+1 via Accessoren | `User.php:24–167` |
-| A2 | CheckoutService 410 Z. (Validierung+Pricing+Order+Stripe gemischt) | `CheckoutService.php` |
-| A3 | Autorisierungs-Scatter: Middleware-Prefix + Inline-Checks + Policies (inkonsistent) | `ManagementMiddleware.php:28–45` |
-| A4 | Bool-Komposit `is_admin\|\|(is_photographer&&canPhotographerAccessGallery)` 5× kopiert | Policies + Download-Controller |
-| A5 | Raw-SQL-CTE (legitim, parametrisiert) bricht Eloquent-Regel | `AccessControlService.php:105` |
-| S1 | Photographer-Fläche in ManagementMiddleware breit (`orgs*`, `coupons*`, `lightroom-catalogs*`) | `ManagementMiddleware.php:29` |
-| S2 | Kein `Permissions-Policy`-Header; CSP nur an Caddy (stale Hash → bekannter Prod-Crash) | `SetSecurityHeaders.php` |
-| S3 | Rolling Refresh unbegrenzt (`refresh_iat=true`, `refresh_ttl=20160`) | `config/jwt.php:120–121` |
-| S4 | `proxy_delivery_header` leakt FS-Pfad falls Proxy Header nicht konsumiert | `FileDeliveryController.php:153` |
-| S5 | `/test/flush-queue` immer registriert; Admin-Email-Default hartcodiert | `api.php:79`, `AuthController.php:106` |
-| U1 | God-Components: ManagementContractView 654 Z., OrgDetail 379, ClientCart 361 | `frontend/src/ui/**` |
-| U2 | Dupliziertes Form-Muster (Load→Reset→disabled) | `BillingDetailsCard` u. a. |
-| U3 | CSP-Favicon-Script → leerer Prod-Screen (stale Hash) | `AGENTS.todo.md:54` |
-
-**Priorisiert:** (1) A1 durchziehen (reduziert A3/A4/S1), (2) A2 split, (3) S1 Policies, (4) U3/S2 CSP externalisieren, (5) S3/S4/S5 dokumentieren.
-
-**Entscheidungen (interaktiv geklärt 2026-08-13):**
-- [x] **S3 (gehärtet):** `JWT_REFRESH_TTL` von 20160 → **10080 (7 Tage)**. Rolling bleibt (`refresh_iat=true`), aber hartes Re-Auth-Fenster. → Task T4.
-- [x] **S4 (akzeptiert):** `X-Accel-Redirect` ist interne Optimierung, Caddy konsumiert ihn (`handle_response @accel_header`, `root /srv/photos`) — Header erreicht den Client nie. Zusätzlich: stale `sha256`-Hash aus dem Caddyfile entfernen (Script ist seit T1 extern). → Task T6 (Caddyfile extern) + Doku.
-- [x] **S5b (env-driven):** Super-Admin via ENV (`ADMIN_EMAIL`), kein hartcodierter Name im Source. Generischer Fallback `admin@example.com` (statt `florian@reisinger.pictures`). → Task T5. **Folge-Fund:** Die E-Mail dient als magische Super-Admin-Identität (Brand `brand=null`) in `V004:145`, `V018:129/133/293`, `DatabaseSeeder:17`, `E2ETestUserSeeder:21/31`, `DatabaseSeeder:123` (`company_email`) — wird in T5 mit bereinigt. Historische `features/*.md`-Notizen + `README.md` werden separat dokumentarisch angepasst.
-
-### Umsetzung 2026-08-13 (2. Batch, delegiert + verifiziert)
-
-- [x] **T4 (S3)** `config/jwt.php` Default `refresh_ttl` → 10080 + `backend/.env.example` + `backend/.env.ci` auf `JWT_REFRESH_TTL=10080`. **Verifikation approved** (Diff exakt, `git grep JWT_REFRESH_TTL=20160` leer, AuthControllerTest grün). **Manuell (Prod):** `JWT_REFRESH_TTL` in Portainer auf 10080 ziehen; lokale gitignored `.env` optional angleichen.
-- [x] **T5 (S5b)** Admin-Email env-driven: `config/admin.php` Fallback `admin@example.com`; `AuthController::resetPassword` nutzt `config('admin.email')`; `DatabaseSeeder` + `E2ETestUserSeeder` + `V004` + `V018` auf `env('ADMIN_EMAIL', 'admin@example.com')`; Regressionstest (403-Guard). **Verifikation approved:** V018-Semantik (Super-Admin `brand=null` exklusiv via Admin-E-Mail) intakt, `env()` nicht in Query-Closures, Grep sauber (nur GmailRestTransportTest-`from()`-Fixtures), **volle Suite 1168 passed / 0 failed**. Doku: `features/security/env-hardening.md` §Admin-Identität, `README.md` Login-Daten.
-- [x] **T6 (S4/CSP)** Caddyfile: `sha256`-Hash aus `script-src` entfernt + Kommentar bereinigt (`script-src 'self' https://js.stripe.com`). **Verifikation approved** (kein `sha256` mehr, X-Accel-Redirect-Handling unverändert). **Manuell (Prod):** `caddy reload` auf dem Server.
-
-**⚠️ Environment-Lücke (erledigt):** Meilisearch (127.0.0.1:7701) läuft wieder (health 200) — die volle `php artisan test`-Suite ist **grün (1168 passed / 0 failed)**, die zuvor dokumentierte Meilisearch-Lücke ist damit geschlossen.
-
-**Doku (Main Model):** S3 → `features/auth/01-roles-and-access.md` §Session Lifetime; S4 → `features/infrastructure/01-deployment.md` §4 Sicherheitshinweis; S5b → `features/security/env-hardening.md` §Admin-Identität + `README.md` Login-Daten.
-
-### Umsetzung 2026-08-13 (delegiert, je eigener Implementer + separater Verifikator)
-
-- [x] **T1 (Frontend)** CSP-Favicon externalisiert: Inline-Script → `frontend/public/brand-favicon-rewrite.js`, `<script src>` in `index.html`, Doku `01-deployment.md` §3 angepasst. **Verifikation approved:** `pnpm build` + `eslint` + `lint` grün; Script-Reihenfolge im `<head>` funktional unverändert. **Offen (manuell, extern):** `sha256`-Hash aus dem Caddyfile entfernen + Server-Reload.
-- [x] **T2 (Backend)** `/test/flush-queue` nur noch in `local|testing` registriert. **Verifikation approved:** `route:list` in production ohne `/test/*`; Sanity-Test grün.
-- [x] **T3 (Backend)** `AccessControlService` → `AuthorizationService` (A1 Schritt 1, additiv): 11 Prädikate + Rekursions-Guard; keine Caller-Migration. **Verifikation approved:** kein `AccessControlService`-Rest, kein `$user->is_` im Service, Prädikate semantisch identisch zu den Accessoren/`GalleryPolicy::manage`; 150 Scoped-Tests grün (`AuthorizationServiceTest` 55, `UserPermissionLogicTest` 74, `GalleryTreeServiceTest` 17, `AuthorizationTest` 4).
-
-**⚠️ Environment-Lücke (RESOLVED):** Meilisearch war zu Sessionbeginn aus (Docker/Rancher Desktop aus). Nach Docker-Start (health 200) läuft die volle `php artisan test`-Suite **grün (1168 passed / 0 failed)** — siehe 2. Batch (T5-Verifikation).
-
----
-
-## ✅ ERLEDIGT — Volume-Licensing-Presets: konfigurierbare Staffeln pro Brand + pro Gallerie (2026-08-13)
-
-**Ergebnis (SOLL-Doku):** `features/infrastructure/27-volume-licensing-presets.md`.
-
-**Entscheidungen (interaktiv geklärt 2026-08-13):**
-1. **Rabatt-Semantik:** RETROAKTIV beibehalten (Gesamtmenge → Einheitspreis für alle Bilder), nur variable Staffelzahl.
-2. **Gallery:** Lizenzmodus-Select (existierte schon) + neuer **Volume-Preset-Dropdown** (nur bei volume_licensing).
-3. **Alt-Settings `srp_*`:** werden beim ersten Zugriff in ein auto-erzeugtes „Standard"-Preset pro Brand migriert.
-
-**Umgesetzt:**
-- Migration **V029** (`volume_presets`, `volume_preset_tiers`, `galleries.volume_preset_id`) + Seeder.
-- `VolumePreset`/`VolumePresetTier`-Modelle, `VolumePresetService` (Default-Erzwingung, srp-*-Migration, CRUD, Delete-Constraints).
-- `VolumeLicensingStrategy` auf `(VolumePreset, ?CouponService)` umgestellt (variable Staffeln, retroaktive `tier_breakdown`-Step-Diffs); Caller (`AppServiceProvider`, `CheckoutService`) aktualisiert.
-- `CheckoutService` gruppiert nach `(mode, preset)`; Volume-Gruppen immer via Multi-Strategy (Gallery-Preset schlägt Brand-Default).
-- `VolumePresetController` + Routen (GET für Management-Rollen, Schreiben super_admin); `SettingsController::getLicenseTerms` liefert `volume_pricing.tiers`.
-- `GalleryRequest`-Validierung + `GalleryService::assertPresetForBrand` (Cross-Brand 422).
-- Frontend: `PricingSettingsTabs` (Lizenz-Katalog + Volume-Pricing als 2 Tabs, responsive), `VolumePresetSettingsCard` (Staffel-Editor), `GalleryModal`-Preset-Dropdown, `useVolumeLicensing`/`VolumeLicensingCard`/`CartItemList` ohne Hardcodes (tierIndex/isMaxTier, Konfig aus API).
+1. [x] Neuer Scroll-Container um `<EditorContent/>` (zwischen Toolbar und Zeichenzähler-Footer), Klassen: `min-h-48 max-h-160 overflow-y-auto resize-y` + `data-testid="editor-scroll"` — Startgröße 12rem wie bisheriges ProseMirror-`min-h-48`, max. 40rem (Tailwind-v4-Spacing-Skala, **keine** JIT-Bracket-Syntax, kein `style`-Attribut → Tailwind-Only-Policy). `resize-y` = nativer Textbox-Griff unten rechts (CSS-`resize` erfordert `overflow` ≠ `visible` → passt zu `overflow-y-auto`). `min-h-48` von den ProseMirror-Attributen (Z. 181) in den Scroll-Container verschieben (Attribut-Klassen: `prose prose-sm max-w-none focus:outline-none p-4 text-base-content/90`).
+2. [x] Äußerer Wrapper bleibt `overflow-visible` (Link-Popover, Slash-Menü `position:fixed` → unbeschnitten); Toolbar + Footer liegen **außerhalb** des Scroll-Containers (Geschwister) → langer Text scrollt nur im Content-Bereich.
+3. [x] Keine Änderung an Tiptap-Extensions/`immediatelyRender: false` (bestehende Crash-Fix-Regel bleibt).
 
 **Tests:**
-- PHPUnit: `VolumePresetServiceTest` (10), `VolumePresetControllerTest` (7), `VolumeLicensingStrategyTest` (9, variabel), `MixedCartPricingTest` +2 (Gallery-Preset-Override), `SettingsControllerTest` +3 (volume_pricing), `GalleryUpdateDeleteTest` +2 (Cross-Brand-Guard). Gesamt: **1129 passed**.
-- Vitest: `useVolumePresets.test` (5), `useVolumeLicensing.test` (18, variabel), `CartItemList.test` angepasst. Gesamt: **580 passed**.
-- Playwright: `volume-presets.spec.ts` (CRUD + Gallery-Zuordnung, `@feature:admin:volume-pricing`, 1× `@smoke`); **58 @smoke + Spezifische Specs grün**.
-- Per E2E entdeckte Bugs: Formular-Submit ohne `preventDefault` (Reload) + Cross-Brand-Enum-Vergleich — beide gefixt + Regressionstests.
+4. [x] **Vitest** `frontend/src/ui/__tests__/WysiwygEditor.test.tsx` (existiert): neuer Test — `getByTestId('editor-scroll')` hat Klassen `resize-y`, `overflow-y-auto`, `min-h-48`, `max-h-160`; Toolbar (Heading-Select) und Zeichenzähler-Footer sind **Geschwister** des Containers (nicht Nachfahren).
+5. [x] **Playwright** `frontend/tests/e2e/admin/wysiwyg-editor.spec.ts` (Tag `@feature:admin:documents`): Manuelles Angebot → viele Absätze in Editor tippen → `evaluate(el => el.scrollHeight > el.clientHeight)` auf `[data-testid="editor-scroll"]` = true; Heading-Select (Toolbar) bleibt sichtbar; dann Resize-Griff (Bounding-Box unten rechts) per `page.mouse` ziehen → Höhe des Containers hat sich geändert.
+
+### Task B — PDF: hervorgehobene Box entfernen („aus einem Guss")
+
+**Befund:** `manual_offer.blade.php:31,86` und `contract_signatures.blade.php:61` rendern `terms_html`/`custom_conditions` in `background:#fcfcfc; border:1px solid #eee; border-radius:5px`. `invoice.blade.php` (Z. 128/134) nutzt keine Box → inkonsistent.
+
+1. [x] Box-Stil (`#fcfcfc`/`#eee`) aus allen drei Vorkommen **entfernen**; `.editor-content`-Regeln wandern in das gemeinsame Styles-Fragment (Task D) — einheitlich: keine Box, konsistenter Textfluss, `h1–h6` in `$secondaryColor` (Invoice erhält die Heading-Farbe zur Angleichung — bewusste Änderung), Tabellen-Borders dezent auf `$secondaryColor` getönt statt `#ccc`.
+2. [x] `contract_signatures.blade.php`: hartcodierte `#4A5568` (Headings, `.section-title`, `.signature-section th`, `.audit-section`) → Brand-Farben `$primaryColor`/`$secondaryColor` (Service übergibt sie bereits, `ContractPdfService.php:60–61`). Bewusste Farbangleichung, wird im Commit begründet.
+
+### Task C — Formular: Kalkulation nach oben (interaktiv bestätigt)
+
+**Datei:** `frontend/src/ui/management/ManagementManualInvoiceView.tsx` (aktuelle Reihenfolge verifiziert: Header → RecipientFormSection → **isOffer: „Angebotstext (Einleitung)"+Editor** → „Leistungen / Positionen" → **!isOffer: „Zusatztexte / Sonderkonditionen"+Editor** → Submit)
+
+1. [x] JSX-Reihenfolge ändern: `ManualDocumentHeader` → `RecipientFormSection` → **`Leistungen / Positionen`-Block** (inkl. Paket-Kalkulator-Button, `InvoiceItemsTable`, `InvoiceDiscountsSection`, `InvoiceTotalSummary`) → danach Offer-`Angebotstext (Einleitung)` bzw. Invoice-`Zusatztexte / Sonderkonditionen` (jeweils mit `WysiwygEditor`) → Submit.
+2. [x] Bestehende Tests (`ManagementManualInvoiceView.test.tsx`) prüfen nur Präsenz, keine DOM-Reihenfolge → bleiben grün. E2E `manual-documents.spec.ts` nutzt `.ProseMirror` `.first()` (nur ein Editor pro Typ) → unabhängig von der Reihenfolge.
+
+**Tests:**
+3. [x] **Vitest** `ManagementManualInvoiceView.test.tsx`: neuer Test — `invoice-items-table` steht **vor** `wysiwyg-editor` im DOM (via `compareDocumentPosition`), für beide Typen (invoice + offer). (Mocks mit den Testids existieren bereits in der Datei.)
+
+### Task D — PDF-Templates entduplizieren (interaktiv bestätigt)
+
+**Befund:** Items-/Totals-Markup („Kalkulation") 3× dupliziert (`invoice`, `manual_offer`, `contract_signatures`); `pdf/fragments/items_table.blade.php` existiert als **totes** Fragment (nirgends includiert); CSS-Blöcke der drei Templates duplizieren sich ebenfalls.
+
+1. [x] **Neu `backend/resources/views/pdf/fragments/styles.blade.php`:** gemeinsamer `<style>`-Block (Body, `.invoice-details`, `h1–h6` inkl. `page-break-after: avoid`, `table.items`, `.editor-content` inkl. Tabellen-Regeln, `.footer`, Typografie-Regeln aus Task E); Parameter `$primaryColor`/`$secondaryColor`; von allen drei Templates im `<head>` includiert (`@include('pdf.fragments.styles', [...])`).
+2. [x] **`backend/resources/views/pdf/fragments/items_table.blade.php` (tot → Single-Source-of-Truth):** rendert Items-`<tbody>` + Zwischensumme + `discount_rows` + Gesamtbetrag. Parameter: `$totalLabel` („Rechnungsbetrag" / „Voraussichtlicher Gesamtbetrag" / „Gesamtbetrag"), `$invoiceMode` (bool → Tier-Rows mit „Auflösung" + Header „Preis / Stück"), `$showSubtotal` (nur wenn Rabatte). Invoice-Totals-Box (`page-break-inside: avoid`) bleibt als dünner Wrapper im Invoice-Template (Paginierungsschutz der Totals).
+3. [x] `invoice.blade.php`, `manual_offer.blade.php`, `contract_signatures.blade.php` auf Fragment-Includes umstellen (kein `@php $subtotal …`-Block mehr in den Templates).
+4. [x] **Regression:** bestehende `ManualDocumentTest` (echte dompdf-Generierung, Real-PDF) und `ContractPdfServiceTest` (loadView-Mock) bleiben unverändert grün.
+
+### Task E — Typografie (Schusterjungen/Hurenkinder) + PHPUnit-Test
+
+**Fakten (verifiziert):** dompdf 3.0 enforced `orphans` (Default 2), **nicht** `widows` (Vendor-FIXME `Page.php:426–427`). → Zwei Maßnahmen:
+
+1. [x] Im Styles-Fragment (Task D): explizit `body { orphans: 2; widows: 2; }` (orphans greift sofort, dokumentiert Intention) **und** `.editor-content p, .editor-content li { page-break-inside: avoid; }` → WYSIWYG-Absätze werden nie über Seitengrenzen gerissen → Schusterjungen im Nutzerinhalt ausgeschlossen (kompensiert widows-FIXME vollständig). `h1–h6 { page-break-after: avoid; }` in allen Templates (Invoice ergänzen). **Kein** `page-break-inside: avoid` auf großen Blöcken (Paginierungslücken vermeiden).
+
+**Test (PHPUnit, bevorzugt — „Farben und Absätze"):**
+2. [x] **Neu `backend/tests/Feature/PdfTypographyTest.php`:** Data-Provider über alle 3 Templates; `InvoiceSnapshot` per `new InvoiceSnapshot([...])` (wie `InvoiceController::generateManualInvoice`, Array-Cast `customer_details`, kein DB-Save), Settings für Header/Footer seeden (Muster `ManualDocumentTest::setUp`); `view('pdf.invoice'|'pdf.manual_offer'|'pdf.contract_signatures', $data)->render()`.
+   - **Absätze:** HTML enthält `orphans: 2`, `widows: 2`, `.editor-content p` mit `page-break-inside: avoid`; übergebene `<p>`-Inhalte erscheinen im `.editor-content`-Bereich.
+   - **Farben:** `primaryColor`/`secondaryColor` aus `BrandRegistry::configOrDefault()` sind im gerenderten HTML enthalten; **kein** `#fcfcfc`, **kein** `border: 1px solid #eee`.
+   - **Regression Dedup:** Gesamtbetrag-Label (je Template) + formatierter Betrag erscheinen genau einmal.
+3. [x] **Ergänzung Feature-Test** (in `PdfTypographyTest` oder `ManualDocumentTest`): `/api/management/invoices/manual` für invoice + offer → Stream-Content beginnt mit `%PDF-1.`, Offer enthält `%OFFER_JWT:` (Muster `test_offer_jwt_can_be_generated_and_extracted`).
+
+### Doku (features/, SOLL-Zustand)
+
+4. [x] **`features/documents/pdf-typography.md`** (neu): dompdf-Engine-Entscheidung dokumentieren (orphans enforced / widows FIXME, Engine-Vergleich dompdf vs. mPDF vs. phppdf vs. Chromium, Entscheidung „bei dompdf bleiben" + Kriterien für einen späteren Wechsel); CSS-Typografie-Vertrag (orphans/widows/page-break-inside) als SOLL; der `page-break-inside`-Workaround darf nicht ohne Kenntnis des widows-FIXME entfernt werden (analog Security Risk Register).
+
+### Verifikation & DoD (Freigabe erteilt)
+
+- [x] Backend: `php artisan test` (alle grün, inkl. neuem `PdfTypographyTest`).
+- [x] Frontend: `pnpm test:run` → `pnpm lint:fix && pnpm build` (0 Fehler; keine `any`/`@ts-ignore`/`eslint-disable`; Tailwind-Only + daisyUI-Skill beachten).
+- [x] E2E: `npx playwright test --grep @feature:admin:documents` nach jedem Code-Change + `@smoke`-Suite.
+- [x] Workflow eingehalten: Delegation an `general`-Subagenten (Implementierung) + separater Verifikations-Subagent; Tests explizit als TODOs mitgeführt (siehe oben); kein Commit/Push vor manueller User-Freigabe.
 
 ---
 
-## ✅ GELÖST — Produktions-Build blank: Lingui module-scope `t` + stale CSP-Hash (2026-08-12)
+## 🔄 IN ARBEIT (2026-08-18) — Follow-ups aus dem User-Manual-Test
 
-**Symptom (nach Deploy):** `portal.reisinger.pictures` zeigte eine leere Seite. Konsole:
-1. `Lingui: Attempted to call a translation function without setting a locale` (pageerror) → App crasht, Body leer.
-2. CSP-Violation für das Inline-Brand-Favicon-Script in `frontend/index.html`.
+Zwei neue User-Requests nach dem manuellen Test der Task-A–E-Umsetzung. Implementierung delegiert an `general`-Subagenten (parallel), Verifikation durch separaten Subagenten inkl. `vision`-Check (AGENTS.md §5.5). Kein Commit/Push vor manueller User-Freigabe.
 
-**Befund 1 (Lingui, Root Cause):** Im **Produktions-Bundle** (rolldown) evaluieren statisch importierte Shell-Chunks **vor** `i18n.activate("de")` in `I18nProvider.tsx`. Module-scope `t`-Schemas in Shell-Komponenten rufen daher `i18n._()` vor der Aktivierung auf → throw. **Dev-Server (native ESM) reproduziert das NICHT** — nur via `pnpm build` + `pnpm preview`. Betroffen: `SidebarLoginForm` (`loginSchema`), `GalleryModal` (`gallerySchema`), `GalleryGroupModal` (`groupSchema`) — alle statisch über `App`/`PageLayout`/`DashboardLayout` erreichbar.
-- **Fix:** Schemas als **Factory-Funktionen** (`createXSchema()`) → Aufruf im Component-Body. `main.tsx` importiert `I18nProvider` zusätzlich als ersten Import (Safety).
-- **Verifikation:** `pnpm build` → `pnpm preview` (4173) → Playwright-Console-Capture: kein pageerror, Body rendert. Dev (4321) war nie betroffen.
-- **Regel dokumentiert:** `frontend/AGENTS.md` → „Lingui / i18n — No Module-Scope `t` (STRICT)".
-- **Regressions-Guard (manuell):** Nach Shell-Komponenten-Änderungen `pnpm build` + `pnpm preview` laden und Console auf Lingui-pageerror prüfen. Ein automatisierter Guard (E2E gegen Preview statt Dev-Server) ist Backlog-Kandidat.
+### Task F — „Baustein"-Select in der WysiwygEditor-Toolbar ersatzlos entfernen
 
-**Befund 2 (CSP-Hash, vorbestehend seit 2026-08-04, Commit `f92fb05`):** Caddyfile-Whitelist hatte `sha256-eHle+…`, aktuelles Inline-Script ergibt `sha256-2JqhWWJ9opkxqNUVZFFDVhn9EDRVGV651m6NLGm9waI=`. **Fix:** Hash im Caddyfile korrigiert (lokal `/Users/florianreisinger/dev/caddyfile/Caddyfile`) — **Server-Reload nötig!** Stripe war nicht betroffen — es ist im `script-src` explizit erlaubt.
+**User-Request (2026-08-18):** „'Baustein' selekt ersatzlos entfernen bitte" — der Snippet-Select in der Toolbar von `frontend/src/ui/components/WysiwygEditor.tsx` (Z. 260–272: `{isSuperAdmin && !hideSnippets && (<select …>Baustein...</select>)}`) soll komplett weg. Snippets bleiben ausschließlich über das **Slash-Menü** („/") nutzbar.
 
-- [x] **TODO (Automatisierung CSP):** Inline-Brand-Script aus `frontend/index.html` in statische Datei (`frontend/public/brand-favicon-rewrite.js`) externalisiert (2026-08-13, Task T1) → `script-src 'self'` deckt es ab. **Rest (manuell):** Hash aus dem Caddyfile entfernen + Server-Reload (Caddyfile liegt extern unter `/Users/florianreisinger/dev/caddyfile/Caddyfile`).
+**Analyse (verifiziert):**
+- Snippet-Daten kommen **nicht** per Prop, sondern intern via `useSWR('/api/management/text-snippets')` (Z. 66) — kein Caller betroffen.
+- `useSWR`, `filteredSnippets`, `filteredSnippetsRef`, `applySnippet`, Slash-Menü (Z. 186–201, 357–369) werden **weiterhin** vom Slash-Menü gebraucht → bleiben.
+- `hideSnippets` (Props-Interface Z. 22, Destructure Z. 64) wird NUR vom Select benutzt → nach Entfernen ungenutzt: Prop + Interface-Eintrag + `hideSnippets={true}` in `TextSnippetModal.tsx:80` entfernen.
+- Tests: kein `Baustein`-Bezug in Vitest/E2E; `WysiwygEditor.test.tsx:115` (Spinner bei Snippet-Loading) bleibt gültig (SWR bleibt).
+- i18n: `<Trans>Baustein...</Trans>` verschwindet → `pnpm lingui:extract && pnpm lingui:compile` für Catalog-Sync; check-i18n läuft im Build.
 
----
+1. [x] Select-Block entfernen; `hideSnippets`-Prop (Interface + Destructure) + `TextSnippetModal.tsx`-Aufruf bereinigen; Slash-Menü unangetastet.
+2. [x] Vitest `WysiwygEditor.test.tsx` grün; `pnpm lint:fix && pnpm build` (inkl. i18n-Extract/Compile); E2E `wysiwyg-editor.spec.ts` + `manual-documents.spec.ts` (Slash-Menü-Flow) grün.
 
-## 🔄 OUTDOOR-WERT: calc_outdoor_multiplier → calc_outdoor_images_per_hour (2026-08-12)
+**✅ VERIFIZIERT (2026-08-18, separater Verifikations-Agent):** Grep 0× `hideSnippets`/`Baustein...`, Slash-Menü intakt (`isSuperAdmin`, `filteredSnippets`, `applySnippet`), 585 vitest, lint/build 0, E2E 8/8 (wysiwyg-editor + manual-documents), `messages.po` `#~`-obsolet i18n-konform. Verbliebene 6× „Baustein"-Treffer sind bewusst erhaltene Funktionalität (Snippet-CRUD-Seite + Slash-Menü-Empty-State). Commit-Begründung (DoD §2): Select redundant zum Slash-Menü.
 
-**Problem (User-Report):** „Ein Outdoor-Foto-Bonus von 1/3 ist nicht möglich." Der Outdoor-Faktor war ein Prozent-Multiplikator (`calc_outdoor_multiplier`, Default 0,5 = 50 % Bildpreis); via `step="5"`-Input nur in 5er-Schritten (10–100 %) eingebbar → 1/3 (= 33,33 %) nicht setzbar.
+### Task G — Item-Zeile „Leistungen / Positionen": gequetschte/überlaufende Spalten (admin-manual-offer)
 
-**Entscheidungen (interaktiv geklärt 2026-08-12):**
-1. Outdoor-Wert wird eine **Anzahl Bilder pro Stunde** (immer ganze Bilder): Basis Indoor `calc_images_per_hour` = 6 / Outdoor `calc_outdoor_images_per_hour` = 8.
-2. Berechnung: `imagesPrice = (hourlyRate / outdoorImagesPerHour) * images` (statt Multiplikator auf den Bildpreis).
-3. Migration **preiserhaltend konvertieren**: `new = round(calc_images_per_hour / calc_outdoor_multiplier)` (Default 6/0,5 = 12). Seeder-Default: 8 (frische Installs).
-4. Neuer Key `calc_outdoor_images_per_hour`; alter Key `calc_outdoor_multiplier` wird per Migration gelöscht.
+**User-Request (2026-08-18):** „Die einzelne Leistung / Position overflowt sehr stark, ist so unbenutzbar" — auf `http://localhost:4321/admin-manual-offer` (E2E-Stack).
 
-**Umsetzung delegiert (Implementer + Verifikator, AGENTS.md §4):**
-- [x] Backend: `V028__calc_outdoor_images_per_hour.php` (idempotente Daten-Migration, pro Brand)
-- [x] Backend: `SettingsController` GET-Feld + PUT-Validierung (`nullable|integer|min:1`)
-- [x] Backend: `DatabaseSeeder` 0.5 → 8
-- [x] Backend-Tests: `ShootingCalculatorSettingsTest` (GET-Feld, Persistenz, 422-Fälle, Migrations-Konvertierung 0.5→12 + custom)
-- [x] Frontend: `shootingCalculator.ts` (neues Feld, Formel), `useLicenseTerms.ts`, `CalculatorSettingsCard.tsx` (Label „Outdoor-Bilder/Std.", Integer-Validation), `ShootingCalculatorModal.tsx` (Label „Bilder/Std.: X")
-- [x] Frontend-Tests: `shootingCalculator.test.ts` (neue Erwartungswerte, mit Testlauf verifiziert)
-- [x] E2E: `package-calculator-config.spec.ts` (Label, Wert 20 → erwartete 229.00 € bleibt)
-- [x] Verifikation: `php artisan test` (1103 passed), `pnpm test:run` (591 passed), `pnpm lint:fix && pnpm build` (0 Fehler), E2E `@feature:admin:calculator` (4/4) + `@smoke` (56/56)
+**Analyse (diagnostiziert per Playwright + `vision`-Befund, 2026-08-18):**
+- Datei: `frontend/src/ui/management/components/invoice/InvoiceItemsTable.tsx` (Z. 34: Row = `flex flex-col md:flex-row gap-3 items-start p-3 …`, 7 Spalten).
+- Kein Page-Level-Horizontal-Scroll bei 820–1440px (scrollWidth == clientWidth), Row passt rechnerisch in die Card (overflowIntoCard = 0 bei 1100/960px).
+- **Root Cause (per Vision bestätigt):** Die zwei Text-Spalten (`form-control flex-1 w-full`) teilen den Restplatz 50:50, kollabieren aber per Min-Content unterschiedlich: „Titel / Name" (AutocompleteInput) bei ≤1152px auf **82px** (bei 1440px: 245px), „Zusatz" 158px. Produktname „Alle Fotos (unbearbeitbare JPEG)" wird bei 1100px auf **„Alle Fo"** gekürzt (960px: „Alle ") → unbenutzbar. Autocomplete-Dropdown (`w-full` am 82px-Feld) wrappt den Namen auf **4 Zeilen** (auch der Preis steht einzeln darunter).
+- **Fix-Plan (Vision-Empfehlung, Tailwind-v4-konform ohne Bracket-Klassen):**
+  1. Row: `md:` → **`lg:`-Breakpoint** + `flex-wrap` (unter 1024px stapeln → volle Feldbreite; auf lg wrappen statt kollabieren): `flex flex-col lg:flex-row flex-wrap gap-3 items-start …`
+  2. „Titel / Name": `flex-1` → **`flex-3 min-w-50`** (v4-dynamische Spacing-Skala, 200px Mindestbreite)
+  3. „Zusatz": `flex-1` → **`flex-2 min-w-30`** (120px)
+  4. Autocomplete-Dropdown (`AutocompleteInput.tsx`, Z. 129): **`min-w-72`** (288px) zusätzlich zu `w-full` → Produktname + Preis in einer Zeile lesbar; Regression checken (CRM-Autocomplete via E2E `manual-documents.spec.ts` „CRM autocomplete"-Test, da Shared Component).
+  5. Feste Spalten behalten `shrink-0`; Label/Input-Struktur je Feld unverändert (E2E-Locators `.form-control` mit Label-Text bleiben gültig); kein `overflow-hidden` auf der Row.
+3. [x] Row-Layout in `InvoiceItemsTable.tsx` robust umbauen (Mindestbreiten + Wrap); bestehende Props/Logik unverändert.
+4. [x] Bestehende Tests grün (Vitest-Suite; E2E `manual-documents.spec.ts` — befüllt Item-Zeilen); `pnpm lint:fix && pnpm build`; visuelle Verifikation per `vision`-Subagent (Screenshots vorher/nachher, 960/1100/1440px).
 
----
+**✅ VERIFIZIERT (2026-08-18, 3 Iterationen mit je separater Verifikation):**
+- **Finaler Stand:** Row = `xl:flex-row flex-wrap` (unter 1280px gestapelt), „Titel / Name" `flex-3 min-w-50`, „Zusatz" `flex-2 min-w-30` + Label `whitespace-normal`, Dropdown `min-w-72` (288px).
+- **Finale Messungen:** 960/1100px gestapelt (Titel-Feld 466–606px, voller Text), 1280px einzeilig (Label-Abstand `Menge`−`Zusatz`: **+12px**, vorher −16px Kollision), 1440px einzeilig ausgewogen; Dropdown einzeilig ohne Überstand.
+- **Unabhängige Verifikationen:** 585 vitest, lint/build 0, E2E manual-documents 4/4 + wysiwyg-editor 4/4 + `@smoke` 58/58; CSS-Klassen (`.flex-3`/`.flex-2`/`.min-w-*`) im generierten CSS bestätigt; kein `any`/`@ts-ignore`/`eslint-disable`, keine Bracket-Klassen.
+- **Backlog (cosmetic, optional, keine Aktion):** bei 1280px/1440px schneiden lange Texte im `<input>` intern ab (Standard-Verhalten, voller Text bei Fokus) — ggf. später `min-w`-Feinjustierung; „Gesamt"/Löschen-Button leichte Vertikal-Offsets (beabsichtigt durch `mt-7`/`self-center`).
 
-## 🔄 portal-base:8.5 — Spezialisiertes Image im Portal-Repo (2026-08-07)
+### Task H — „Absatz"-Dropdown in der Editor-Toolbar schmaler
 
-**Ziel:** Das Base-Image-Repo `reisi007/docker-base-images` (lokal `~/dev/php-apache-mod2rewrite`) wird **komplett entfernt** (lokal + Remote + GHCR-Packages), da das Portal der einzige Konsument ist. Das spezialisierte Image `ghcr.io/reisi007/portal-base:8.5` (PHP 8.5, mysql, Dockerfile 1:1 aus dem Base-Repo) wird künftig **per Cron (täglich 01:00)** aus **diesem** Repo gebaut.
+**User-Request (2026-08-18):** „Absatz Dropdown weniger breit machen wenn möglich" — der Heading-Select in `WysiwygEditor.tsx` (ca. Z. 260: `className="select select-sm select-bordered"`, `aria-label="Überschrift"`, Optionen `Absatz` / `Überschrift 1–4`) hat Auto-Breite.
 
-**Umsetzungsplan:**
-- [x] `deployment/Dockerfile` anlegen (identischer Inhalt wie Base-Repo-Dockerfile)
-- [x] `.github/workflows/base-image.yml`: cron `0 1 * * *` + `workflow_dispatch` + `push` (paths: Dockerfile + Workflow); baut **NUR** `portal-base:8.5`/`latest` (PHP 8.5, mysql)
-- [x] Commit 1 pushen → CI bleibt auf `php-base:8.5` (grün), base-image-Run baut `portal-base:8.5`
-- [x] **portal-base:8.5-Run grün abwarten** (Gate für Löschung) — inkl. Multi-Arch-Fix (amd64+arm64, Commit `1f37a82`); `exec: php-fpm: not found` war Emulations-Problem auf Apple Silicon, arm64-Variante läuft nativ
-  - [x] 2026-08-08: **arm64-Variante wieder gestrichen** (Cron-Build grün, aber arm64 nicht benötigt) → `platforms: linux/amd64` in `base-image.yml`
-- [x] Commit 2: Referenzen `php-base:8.5` → `portal-base:8.5` in `deployment/docker-compose.yml:56`, `.github/workflows/ci.yml` (55, 67, 95, 291, 305), `backend/.env.ci` (4–5), `features/infrastructure/01-deployment.md:25`
-- [x] CI nach Commit 2 grün (Run `31187394565` success)
-- [ ] **⚠️ Prod manuell updaten:** `docker-compose.yml` referenziert jetzt `portal-base:8.5` → Portainer Stack-Redeploy nötig (User-Notify erledigt)
-- [x] Base-Repo löschen: lokaler Klon (`~/dev/php-apache-mod2rewrite`) + `gh repo delete reisi007/docker-base-images` (2026-08-07, nach grünem portal-base-Run)
-- [x] GHCR-Packages aufräumen: `php-base` (30 Versionen), `php-mysql` (20), `php-postgres` (20) gelöscht; `portal-base` verbleibt (frisches Package, gehört dem Portal-Repo)
+**Root Cause (gemessen + in `node_modules/daisyui/components/select.css` verifiziert):** daisyUI 5.6.13 setzt auf `.select` `width: clamp(3rem, 20rem, 100%)` → ohne Breiten-Klasse immer **320px**, obwohl „Absatz" nur ~45px Text braucht.
 
----
+**Fix (verifiziert):** `w-32` (128px) → längste Option „Überschrift 4" (85px Text + 40px Padding = 125px) passt ohne Clip; gemessen 320px → **128px** (−60 %), `scrollWidth` = `clientWidth` auch mit „Überschrift 4" selektiert.
 
-## ✅ GELÖST — CI-E2E-Run 31160185815: 4 rote Tests gefixt (2026-08-07)
+5. [x] Select-Breite anpassen; `pnpm lint:fix && pnpm build`; kurzer E2E-Smoke (wysiwyg-editor.spec.ts) + Vision-Check geöffnetes Dropdown.
 
-**Status: lokal grün; Commit + Push; CI beobachten.** Meine Änderung (nur `rclone-backend-filter.txt`) hatte 4 E2E-Failures aufgedeckt, die in Run `31032939108` (grün) noch nicht existierten → nach `93707b3` (React-Compiler, CI damals cancelled) entstanden.
+**✅ VERIFIZIERT (2026-08-18):** 585 vitest, lint/build 0, E2E wysiwyg-editor 4/4 + `@smoke` 58/58; Vision-Befund: Select ~128px, „Absatz" vollständig lesbar, fügt sich harmonisch in die Toolbar ein. Kein Commit/Push vor User-Freigabe.
 
-**Befund & Fixes:**
-1. **`billing-details.spec.ts:20` + `:55`** — schreiben **globale brand-weite Bankdaten-Settings** (`/api/management/settings/billing-details`). Desktop- UND Mobile-Shard fuhren dieselben Tests parallel (2 Shards × 2 Worker) gegen dieselbe DB → gegenseitige Überschreibung (nach Reload anderer Inhaber/IBAN; IBAN-Validierung sah fremde Daten). **Fix:** `ci.yml` → billing-details in den seriellen Shard (`--grep "projects-board|production-board|billing-details" --workers=1`), aus Desktop/Mobile-grep-invert. Lokal simuliert (Desktop+Mobile parallel) grün, aber deterministisch nur durch Serialisierung gelöst.
-2. **`metadata.spec.ts:122` (Copyright)** + **`photographer.spec.ts:113` (FTP slug)** — Root Cause identisch: `ProfileSettingsCard.tsx` hatte einen `useEffect`-Reset ohne `!isDirty`-Guard (Muster `BillingDetailsCard.tsx:52`). SWR-Hydration von `/api/auth/me` konnte nach dem Füllen die getippten Werte (`metadata_copyright` / `ftp_slug`) überschreiben → leer persistiert → `artist` fiel auf `name`, FTP-Inbox zeigte User-ID statt Slug. **Fix:** `!isDirty`-Guard im `useEffect` (Deps `[user, profileForm, isDirty]`). Zeitbasiert → wirkte "flaky".
-3. **19× `"use no memo";`** in Formular-Komponenten (lokale React-Compiler-Opt-Outs, konsistent mit `BillingDetailsCard`) — mit in den Commit aufgenommen.
+### Task I — Item-Zeile: „Menge" + „Preis / Stück" in eine Zeile (ein Zeilen-Slot)
 
-**Verifikation lokal:** billing (2) + metadata + photographer-Files (10) + `@smoke` Desktop (28) + Vitest (591) + lint + build grün.
+**User-Request (2026-08-18):** „Menge und Preis pro Stück kann in eine Zeile" — die zwei kleinen Zahlenfelder der Leistungs-Zeile sollen eine Einheit bilden (sichtbar gruppiert, ein Flex-Slot statt zwei, spart einen Spalten-Gap und verhindert getrenntes Wrappen).
 
-**Hinweis für CI-Beobachtung:** Shard-Name geändert in `serial (kanban, billing)`. Erwartung: Desktop/Mobile grün, serial-Shard grün.
+**E2E-kritische Randbedingung (geprüft):** `manual-documents.spec.ts` (Z. 90/91/136/137) + `contracts.spec.ts` (Z. 50) filtern `.form-control` mit `hasText: 'Menge'` bzw. `'Preis / Stück'` und nehmen `input .first()`. → **KEINE Verschmelzung zu EINEM `.form-control`** (Filter griffe aufs falsche Input). Lösung: beide `.form-control`s (Labels „Menge" / „Preis / Stück" unverändert) in einen gemeinsamen Flex-Wrapper (`flex flex-row gap-2 shrink-0`) — Locators bleiben exakt gültig.
 
----
+### Task J — „Rabatte & Abzüge": gleiches Kollaps-Problem wie die Item-Zeile
 
-## ✅ GELÖST — CI-Stripe-Failures (401 + "Postleitzahl ist ungültig") — 2 Root-Causes (2026-08-05)
+**User-Request (2026-08-18):** „Gleiches Problem bei den Rabatten und abzügen" — `InvoiceDiscountsSection.tsx` hat exakt das alte, bereits verifiziert gefixte Muster: Row `flex flex-col md:flex-row` (Z. 40) + „Titel / Beschreibung" `flex-1 w-full` (Z. 74) → kollabiert bei schmalem Content auf Min-Content (Autocomplete-Input ~82–100px, Dropdown schmal). Fix spiegelt Task G: `md:` → `xl:` + `flex-wrap`; Titel `flex-3 min-w-50`. „Art" (`md:w-1/4`) / „Wert" (`md:w-32`) bleiben — gleiche bewährte Fixed-Breiten-in-Stack-Modus-Semantik wie die Item-Fixed-Spalten (`md:w-28`).
 
-**Finaler Run `30995040128` grün:** Backend + Frontend + alle 4 E2E-Jobs (3 Shards à 88 + Kanban 33) = 297 passed, 0 failed, 0 flaky, ~9 min E2E-Wall-Time.
+Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wirkt dort automatisch (contracts.spec.ts deckt `Preis / Stück`-Locator ab, bleibt gültig).
 
-1. **CI-401 `Invalid API Key provided: sk_test_************der>`** → `php artisan serve --no-reload`:
-   - Laravel `ServeCommand` filtert Env-Vars raus, die nicht in `$passthroughVariables` stehen (nur `APP_ENV`/`PATH`/XDEBUG/…), **sobald `.env` existiert** (kein `--no-reload`). Das per Container-`-e` injizierte `STRIPE_SECRET` fehlt in der Liste → Serverprozess fällt auf den `.env.ci`-Platzhalter `sk_test_<ci_placeholder>` zurück → Stripe 401. `der>` = last4 von `<ci_placeholder>` (Stripe maskiert den Key: `sk_test_` + Sterne + last4).
-   - **Beweis:** Pipeline-Nachstellung im arm64-Build des php-base-Images (QEMU-SIGSEGV durch nativem arm64-Build umgangen): ohne `--no-reload` wird `STRIPE_SECRET` im ServeCommand-Child auf `false` gesetzt (gefiltert), mit `--no-reload` überlebt es (len 107). Fingerprint/Dump (`php -r`) zeigt den echten Key, der serve-Prozess nicht — daher die scheinbare Contradiction.
-   - Fix in `ci.yml` "Start backend server": `--no-reload` (mit Kommentar als Regressionsschutz).
-2. **"Postleitzahl ist ungültig" / "Your ZIP is invalid" (nach 401-Fix)** → Billing-Adresse an Stripe übergeben:
-   - Stripe PaymentElement sammelt eine PLZ mit **US-Default-Country**; österreichische PLZ `1010` (4-stellig) ist dafür invalide. Nur in CI reproduzierbar (Pipeline-Replica lokal 6/6 in beiden Locales/Workern).
-   - Fix: `ClientCartView` speichert die Checkout-Billing-Adresse (`setCheckoutBilling`) → `StripeCheckoutForm` übergibt `billingDetails.address` (line1, postal_code, city, `country: 'AT'`) an das PaymentElement. Unit-Test ergänzt (`StripeCheckoutForm.test.tsx`).
+6. [x] Task I: Menge+Preis-Wrapper in `InvoiceItemsTable.tsx`; Task J: Discount-Row `xl:flex-row flex-wrap` + Titel `flex-3 min-w-50` in `InvoiceDiscountsSection.tsx`; Locators/Labels unangetastet.
+7. [ ] Vitest + `pnpm lint:fix && pnpm build` + E2E `manual-documents.spec.ts` + `contracts.spec.ts` (+ `@smoke`); Vision-Check Screenshots (Item-Zeile 1280px, Rabatt-Zeile 1100/1280px).
 
-**Nebenfunde/-Fixes (im selben Zuge):**
-- **Kanban-Flakes deterministisch gefixt:** dedizierter serieller Kanban-Shard (`--grep 'projects-board|production-board' --workers=1`) + `production-board.spec.ts` `mode: 'serial'` (projects-board hatte es schon) + `waitForDelete`-**Race** (Promise VOR "Löschen"-Klick registrieren, analog `94c3fd6`). Die Flakes kamen von `fullyParallel` auf derselben DB im Shard.
-- **Sharding (behalten):** 3 parallele Shards (`--workers=2`, `--grep-invert` kanban) + 1 Kanban-Shard. Nicht weiter aufteilen (Setup-Dominanz); nicht weniger (längere Wall-Time); Kanban nicht in parallele Shards integrieren (DB-Interferenz zwischen den beiden Board-Dateien).
-- **de-AT-Locale-Experiment (`b77d532`) brachte NICHTS** (ZIP-Fehler blieb, nur Meldung deutsch) → **zurückgerollt** (`a1af17e`). Deutsche Decline-Regex in `stripe-checkout.spec.ts` blieb (harmlos, robust für beide Locales).
-- **Keys verifiziert unverändert:** GitHub-Secrets == lokal (pk `pk_test_51TJ…JRJ8` md5 `869894885b…`, sk `sk_test_51TJ…vPQD` md5 `4f1bf871…`). Kein Restricted-Key.
-- **Nicht gelöst/offen:** `metadata.spec.ts:31` + `metadata-defaults.spec.ts:38` (Location-Autocomplete "Salzburg"/"Graz") flaky in CI, lokal grün → separate Beobachtung.
+**Zwischenstand I+J (2026-08-18, Implementierer-Bericht):** Diff wie spezifiziert (Wrapper ohne `form-control`-Klasse, Labels unverändert; Discount-Row `xl:flex-row flex-wrap` + `flex-3 min-w-50`). 585 vitest, lint/build 0, E2E manual-documents + contracts **18/18** (2 Projects × 8 Tests). Messungen: Menge/Preis gleiche y=434 (eine Zeile); Discount-Titel 1280px=371px, 1100px=656px gestapelt. Screenshots im Temp-Ordner. **Ausstehend:** separate Verifikation (Verifikator ≠ Implementierer) + Vision-Check (§5.4/§5.5).
 
----
+### Task K — Löschen-Buttons rechtsbündig statt linksbündig
 
-## 🟡 OFFEN — CI-E2E-Run 30954666385: Flakes analysiert (2026-08-05)
+**User-Request (2026-08-18):** „löschen rechtsbündig statt linksbündig" — im **gestapelten Modus** (< 1280px Viewport) hängen die Trash-Buttons der Item- und Rabatt-Zeilen linksbündig unter den Feldern. Fix: `ml-auto` auf beide Buttons (`InvoiceItemsTable.tsx` Z. ~132, `InvoiceDiscountsSection.tsx` Z. ~119: `btn btn-sm btn-ghost text-error shrink-0 mt-7` → `+ ml-auto`). In Column-Mode schiebt der Auto-Margin den Button rechts (rechtsbündig); in Row-Mode ist er bereits letztes Element → kein visueller Unterschied. E2E-locator-sicher (Buttons werden per `getByRole`-Name bzw. Icon adressiert — nur Klassen ändern).
 
-**Run:** 286 passed, **9 failed, 2 flaky**. Lokal reproduziert (Herd, Vite :4321):
-- ✅ **manual-documents.spec.ts:146 (deterministisch) — GEFIXT:** Strict-Mode-Violation (3 `<select>` im Modal) → Locator auf `.form-control` mit `hasText: 'Rabatt-Stufe'` gescoped. Volle Spec lokal grün (Desktop+Mobile).
-- ✅ **empty-feed.spec.ts:33 (Mobile-only):** Assertion zählt Console-Fehler; kein `console.error` im App-Code → der CI-Error ist Resource-Load-Noise (Tracking-Domain aus GH-Runner-IP). Filter um `'Failed to load resource'` erweitert (App-Fehler werden weiterhin erfasst).
-- ⚠️ **stripe-checkout.spec.ts:106/138 + quote-checkout.spec.ts:29 (CI-only):** Backend 502 „Die Zahlung konnte nicht verarbeitet werden" = `CheckoutService.php:400` fängt Stripe-SDK-Exception. Lokal (Herd) 3/3 grün → Environment-Flakiness (Rate-Limit / ApiConnection von CI-IPs, nicht reproduzierbar — Container-Repro durch QEMU-SIGSEGV blockiert). **Fix:** `test.describe.configure({ retries: 2 })` in beiden Specs + neuer CI-Step „Validate Stripe API key" (curl `/v1/balance` → lauter Fehler, falls Secret stale). Beim nächsten CI-Run prüfen: (a) Validation-Step grün? (b) Stripe-Tests grün?
-- ⚠️ **projects-board.spec.ts:69 (flaky):** retry grün, lokal 3× grün — beobachten.
-- **Nächster Schritt:** ci.yml (Summary-Header + Validation-Step) + Test-Fixes committen & force-pushen → CI-Run → wenn Stripe weiter fehlschlägt: playwright-report-Artifact (enthält Console-Logs) herunterladen und echten Stripe-Fehler extrahieren.
+8. [x] Task K: `ml-auto` auf beide Löschen-Buttons; Regression: vitest/lint/build + E2E manual-documents/contracts; Screenshot gestapelter Modus (1100px) für Vision-Check. **Verifiziert (2026-08-18):** 585 vitest, lint/build 0, E2E 18/18; Trash-Button-End x=997/1022 vs. Row-Ende 1010/1035 (Δ13px = Innenrand, rechtsbündig) @ 1100px.
 
----
+### Task L — Rabatt-Zeile: „Art w-full", Preis/Stück ≥ 0, „Gesamt"-Spalte (= Wert der Zeile)
 
-## 🟡 OFFEN — CI-E2E-Run 30979963995: Stripe weiter rot, projects-board-Race gefixt (2026-08-05)
+**User-Requests (2026-08-18):**
+- „bei rabatten art w-full" → Art-Select im Stack-Modus volle Breite (aktuell `md:w-1/4` = 25% auch bei 768–1279px Viewport).
+- „positiver preis / stück also ≥0 wäre wichtig" → Item-Zeile „Preis / Stück"-Input hat kein `min="0"` (Rabatt-Wert hat es) → ergänzen.
+- „Mit Gesamt meine ich den Wert der Zeile. Den haben wir bei Leistungen, aber nicht bei Rabatten" → Rabatt-Zeile bekommt eine **„Gesamt"-Spalte** (wie Items): effektiver €-Wert der Zeile. Fixer €-Rabatt: `price` direkt; %-Rabatt: `subtotal × price/100` (Dokumentation: Sequenz-Ketten mehrerer Rabatte werden bewusst NICHT nachgebildet — die TotalBox bleibt autoritativ; subtotal = Σ items price×qty, kommt als neue Prop aus beiden Views, die es bereits berechnen: `useInvoiceDraft`-return Z. 283, `ManagementContractView` Z. 260).
 
-**Run:** 287 passed, **7 failed, 1 flaky, 2 did not run.**
-- ✅ **manual-documents + empty-feed-Filter waren grün** (deterministische Fixes halten).
-- ✅ **projects-board:69/173 (Race) — GEFIXT:** CI-Snapshot zeigte leeres Board → DELETE lief bereits, aber `waitForResponse` war erst NACH dem „Löschen"-Klick registriert und verpasste die Response. Fix: Promise **vor** Klick registrieren (beide Delete-Tests). Volle Spec lokal 11/11 grün.
-- ❌ **Stripe weiter rot (6×, Desktop+Mobile):** `stripe-checkout:110/142` + `quote-checkout:33`; jetzt **3 Attempts** (describe-retries: 2) je Test, alle failed → deterministisch. **Neuer Validate-Step (read+write) war grün** (balance=200), aber `paymentIntents->create` (write) schlägt im eigentlichen Flow fehl → Verdacht **Restricted-Key** (Read ja / Write nein) oder Rate-Limit. Nächster Run: Validate-Step testet jetzt explizit `payment_intents create` (write) + „Dump backend log" (60 Zeilen `storage/logs/laravel.log` mit echter Stripe-Exception aus `CheckoutService::respondBasedOnPayment` catch).
-- Lokale Repro im php-base-Container (QEMU, Apple Silicon): curl `api.stripe.com/v1/balance` = 200, Stripe-SDK `paymentIntents->create` (Dev-Key aus `backend/.env`) = **OK** → Container-Netz/SSL/SDK sind nicht die Ursache; Diff ist der CI-Secret.
-- **Falls Validate-Step (write) rot:** CI-Secret `STRIPE_SECRET` prüfen — muss die **volle sk_test** aus `backend/.env` sein, nicht ein Restricted-Key (Restricted Keys: `/v1/balance` liest ok, aber `payment_intents`-Write fehlt → exakt das Symptom).
+**Dateien:** `InvoiceDiscountsSection.tsx` (Art `w-full xl:w-1/4 shrink-0`, Wert `w-full xl:w-32 shrink-0`, neue Gesamt-Spalte `w-full xl:w-28 shrink-0` mit Label „Gesamt" + Display `text-right font-mono font-bold mt-1 text-base-content`, neue Prop `subtotal: number`), `InvoiceItemsTable.tsx` (`min="0"` am Preis-Input, `ml-auto` am Trash), `InvoiceDiscountsSection.tsx` (`ml-auto` am Trash), `ManagementManualInvoiceView.tsx` + `ManagementContractView.tsx` (`subtotal={subtotal}` verdrahten). E2E-Locators unberührt (kein Spec nutzt „Gesamt"-Filter; `Titel / Beschreibung` via `.last()` gültig).
+
+9. [x] Task L: Klassen/Prop/Gesamt-Spalte wie oben; vitest/lint/build + E2E manual-documents/contracts; Messung (%-Rabatt zeigt berechneten €-Wert, fixer €-Rabatt zeigt price) + Screenshots für Vision. **Verifiziert (2026-08-18):** 585 vitest, lint/build 0, E2E 18/18; Rabatt-Gesamt: fix €100 → „100.00 €", 10 % von 3198,00 → „319.80 €"; Art/Wert/Gesamt @ 1100px w-full (656px = Innenbreite). **Zusatzfix (direkt, ohne Delegation nach User-Anweisung):** Menge/Preis-Wrapper füllt im Stack die ganze Zeile (`w-full xl:w-auto` + `flex-1 xl:flex-none`) — gemessen 1100px: 606px (299/299), 1440px: 200px (80/112); E2E manual-documents 4/4.
 
 ---
 
@@ -320,13 +207,21 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 
 ---
 
+## 🟡 OFFEN (manuell) — Prod-Infra-Nacharbeiten
+
+- **portal-base:8.5 (2026-08-07):** `docker-compose.yml` referenziert jetzt `portal-base:8.5` → **Portainer Stack-Redeploy nötig** (User-Notify erledigt). Rest des Plans (Dockerfile, base-image.yml, CI-Referenzen, Base-Repo-Löschung, GHCR-Cleanup) erledigt.
+
+---
+
 ## 📋 AUSGEARBEITETE BACKLOG-PLÄNE (2026-08-04)
 
-> Nur Ausarbeitung (Planung) — noch **kein Code** geändert. Umsetzung erfolgt in separaten Sessions durch Implementer-Subagenten + Review durch Verifikator (AGENTS.md §4). **Offene Fragen wurden interaktiv geklärt (2026-08-04) und sind in den Plänen als Entscheidungen dokumentiert.**
+> Nur Ausarbeitung (Planung). Umsetzung erfolgt in separaten Sessions durch Implementer-Subagenten + Review durch Verifikator (AGENTS.md §4). Offene Fragen wurden interaktiv geklärt (2026-08-04) und sind in den Plänen als Entscheidungen dokumentiert. **A1 Schritt 1 wurde umgesetzt (Commit `e44f6dd`, 2026-08-13).**
 
 ---
 
 ### 🔙 A1 — User-God-Entity entschärfen + Role-Prüfungen konsolidieren
+
+**Status:** Schritt 1 erledigt (Commit `e44f6dd`, 2026-08-13: `AccessControlService` → `AuthorizationService`, additiv, 150 Scoped-Tests grün). **Offen: Schritte 2–7.**
 
 **Ziel:** Rollen-/Autorisierungslogik aus `backend/app/Models/User.php` in einen **konsolidierten `AuthorizationService`** (Umbenennung von `AccessControlService`, Entscheidung 2026-08-04) überführen; Scatter (~170 direkte `is_*`-Prüfungen in 20+ Dateien) beseitigen; N+1 Role-Queries beheben. Serialisierung (`$visible`, `AuthController::me()`, `UserResource`) bleibt unverändert → kein API-Break.
 
@@ -334,13 +229,13 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 - God-Entity: `User.php:24–128` — `getIsSuperAdminAttribute` (24–27), `getIsPendingAttribute` (80–84), `getIsPhotographerAttribute` (86), `getIsAdminAttribute` (87), `getIsOrgAdminAttribute` (88), `getIsPowerUserAttribute` (91), `getAllowedGalleryIds` (93–96), `canPhotographerAccessGallery` (98–117), `canAccessGallery` (119–128).
 - `hasPurchasedPhoto` (130–162) = Kauf-/Bestelllogik, **kein Rollen-Thema** → bewusst NICHT Teil von A1.
 - Scatter gruppiert: `is_admin` 53× (Controllers, Policies, Requests, Provider), `is_super_admin` 34×, `is_photographer` 41×, `is_org_admin` 18×, `canAccessGallery` 16×, `canPhotographerAccessGallery` 7×, `getAllowedGalleryIds` 8×.
-- **Rekursions-Falle:** `AccessControlService.php:57` ruft `$user->is_photographer` (Model-Accessor!) → sobald Accessor → Service delegiert, rekursiv. MUSS mitfixiert werden.
+- **Rekursions-Falle:** `AuthorizationService` (vormals `AccessControlService.php:57`) ruft `$user->is_photographer` (Model-Accessor!) → sobald Accessor → Service delegiert, rekursiv. MUSS mitfixiert werden.
 - Gates in `AppServiceProvider.php:72–97` (`manage-catalog`, `manage-users`, `purchase-upgrades`) nutzen rohe `pluck('name')`-Blocklisten.
 
 **SOLL-Architektur:** Konsolidierter **`AuthorizationService`** (vorher `AccessControlService`) mit `hasRole(User, ...roles)`, `roleNames(User)`, `isSuperAdmin/isAdmin/isPhotographer/isPowerUser/isOrgAdmin/isPending/isClient/isPrivileged(User)`, `canAccessGallery(User, id)`, `canPhotographerAccessGallery(User, id)`, `canManageGallery(User, id)` (Komposit). **Regel: Service referenziert NIE `$user->is_*`-Accessor** (Rekursionsschutz); alle Prädikate via `$user->loadMissing('roles')`. Model wird dünne Delegation (1-Zeilen-Delegates), Relations bleiben.
 
 **Priorisierte Migrationsschritte (jeder einzeln grün testbar):**
-1. Service erweitern + umbenennen in `AuthorizationService` (rein additiv, keine Caller-Umbauten) — `AuthorizationServiceTest` (umbenannt aus `AccessControlServiceTest`).
+1. ~~Service erweitern + umbenennen in `AuthorizationService` (rein additiv, keine Caller-Umbauten) — `AuthorizationServiceTest`~~ ✅ **erledigt (e44f6dd)**
 2. Model auf Delegation umstellen — Guard: `AuthorizationTest`, `UserPermissionLogicTest`, `GalleryTreeServiceTest:304`.
 3. Gates konsolidieren + Semantik verfeinern (`AppServiceProvider`) — Guard-Tests der Ist-Bool-Ergebnisse + neue `isClient`/`isPrivileged`.
 4. Middleware (`SuperAdminMiddleware:14`, `ManagementMiddleware:21,28,37`) — Guard: `RoleAbortTest`.
@@ -354,7 +249,7 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 
 **Entscheidungen (interaktiv geklärt 2026-08-04):**
 1. **Accessor bleiben dauerhaft** als dünne 1-Zeilen-Delegates im Model (kein API-Break, kein Frontend-PR). `$visible`/`me()`/`UserResource` unverändert. KEINE 2. Phase.
-2. **Umbenennen in `AuthorizationService`** (statt `AccessControlService`) — inkl. Test-Datei (`AccessControlServiceTest.php` → `AuthorizationServiceTest.php`) und allen Referenzen.
+2. **Umbenennen in `AuthorizationService`** (statt `AccessControlService`) — inkl. Test-Datei (`AccessControlServiceTest.php` → `AuthorizationServiceTest.php`) und allen Referenzen. ✅ erledigt
 3. **`ManagementMiddleware`: Path-Prefix-Logik bleibt in der Middleware**; nur die Rollen-Prädikate werden über den Service aufgelöst.
 4. **Controller-Migration (Schritt 6): eigene Commits je Fachgebiet (6a–6f), direkter Push nach master wenn Tests grün**; wo fachlich unabhängig, parallel an Subagenten delegieren, aber Commits sauber splitten.
 5. **Gates: Semantik verfeinern** (nicht 1:1) — `isClient`/`isPrivileged` und die Gate-Definitionen (`AppServiceProvider:79–97`) werden logisch neu modelliert; bestehende Bool-Ergebnisse je Gate vor der Umsetzung als Guard-Test einfrieren.
@@ -394,61 +289,6 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 
 ---
 
-### 🔙 Stack-Konsolidierung — Ein Compose statt zwei
+### 🔙 Stack-Konsolidierung — ❌ OBSOLET / SUPERSEDED (2026-08-18)
 
-**Ziel:** Ein `docker-compose.yml` im Root (Default-Name); `docker-compose.local.yml` + `docker-compose.test.yml` + `docker/test/` löschen; Configs/`.run`/Doku auf einen Port-Satz; `scripts/e2e-up.sh` (existiert NICHT → neu, idempotent).
-
-**Zielbild (SOLL, angepasst an Entscheidungen 2026-08-04):** Ein `docker-compose.yml` im Root mit **generischen Container-Namen** (mysql, mailpit, meili), Standard-Ports, `SCOUT_PREFIX=test_` für Test-Meili-Indizes. **Kein `search-test`-Service.** Grants via `docker/init/01-init.sql` (Portal-Test-DB + Wildcard). Details in den Entscheidungen unten.
-
-**Wichtig (Ist-Zustand):** `backend/.env:27` nutzt `DB_PORT=3307` bei `DB_DATABASE=portal_dev_db` → Dev-Backend läuft heute gegen den **Test-Container**; Local-Container (3306) faktisch ungenutzt. Dev-Daten liegen in Volume `portalreisingerpictures_db_data_test`.
-
-**Risiken:** Dev-Datenverlust (Entscheidung: Option B akzeptiert → Dev-Daten werden verworfen), Parallelbetrieb bricht ohne Wildcard-Grant (Init + e2e-up), Meili-Prefix-Trennung (SCOUT_PREFIX=test_ — Indexnamen `test_photos` etc. sauber getrennt), Port-Kollisionen (erst beide Stacks stoppen), `.run`-Stop-Bug.
-
-**Entscheidungen (interaktiv geklärt 2026-08-04):**
-1. **Option B: frischer Start** — Dev-Daten (alte Volume `portalreisingerpictures_db_data_test`) werden **verworfen**. Danach zwingend `migrate:fresh --seed` (AGENTS.md §6). Kein Volume-Kopierschritt. Schritt 3 (Datenmigration) entfällt.
-2. **Ein Meilisearch auf 7700** (`search-test`-Service + Port 7701 entfallen). Tests via `SCOUT_PREFIX=test_` (getrennte Indizes `test_photos`, `test_galleries`, …). `phpunit.xml`: `MEILISEARCH_HOST=http://127.0.0.1:7700`, einheitlicher Key (`local_meili_secret`), `SCOUT_PREFIX=test_` ergänzen. Dev nutzt unpräfixte Indizes. Scout-Re-Import (`scout:sync-index-settings` + `scout:import`) nach Setup.
-3. **Geteilte Mailpit-Instanz 8025/1025** für Dev + PHPUnit. `backend/tests/Support/MailpitAssertions.php:9` → 8025; E2E-`MailpitHelper` (8025) unverändert. Filterung per Empfänger.
-4. **.run-Configs: „Start/Stop Docker (Test)" löschen**; „Start/Stop Docker (Dev)" → `docker compose up -d`/`down`; §9-Namenskonvention anwenden. „DB Migration (Test)" um `--seed` ergänzen.
-5. **Generische Container-Namen** (`mysql`, `mailpit`, `meili`?) + Standard-Ports (3306/7700/8025+1025) für lokale Konsistenz und Duplizierbarkeit in anderen Projekten. **Keine separate globale Infra-Compose** — andere Projekte duplizieren die Compose (User-Präferenz: „lieber duplizieren, globale Infra-Compose potenziell nervig"). Konkrete Namen/Volumes bei der Umsetzung festlegen.
-
-**Korrigierter Umsetzungsplan (angepasst an Entscheidungen):**
-0. Beide alten Stacks down (`--project-name portal_local` + `portal_test`).
-1. Neues `docker-compose.yml` (ein Meili-Service, generische Namen, `docker/init/01-init.sql` mit `CREATE DATABASE IF NOT EXISTS portal_test_db` + `GRANT ALL ON portal_test_db.*` + Wildcard `portal_test_db\_test\_%`); alte Compose-Dateien + `docker/test/` löschen — `docker compose config --quiet`.
-2. `docker compose up -d` (frisches Volume → Init-Script läuft) + Grant-Check (`SHOW GRANTS FOR 'portal_user'@'%'`).
-3. `migrate:fresh --seed` (Dev-DB aufbauen) — Login mit `florian@reisinger.pictures` verifizieren.
-4. Configs: `backend/.env` + `.env.example` DB_PORT 3306; `phpunit.xml` DB_PORT 3306, MAIL_PORT 1025, MEILISEARCH_HOST 7700, MEILISEARCH_KEY `local_meili_secret`, `SCOUT_PREFIX=test_`; `tests/Support/MailpitAssertions.php:9` 8025.
-5. `scripts/e2e-up.sh` neu (idempotent: `up -d` → DB-Ready-Wait → Grants → optional `--fresh`+Seed).
-6. `.run`-Configs (s. Entscheidung 4).
-7. Doku: `README.md:15–34`, `CLAUDE.md:82–85,175,304`, `AGENTS.md:140–153`, `features/security/env-hardening.md:45–46`, `features/search/01-search-and-discovery.md:15–17` → neue Ports/Compose. Grep-Check: keine `3307|8026|1026|docker-compose.test.yml|docker-compose.local.yml`-Treffer mehr.
-8. Gesamtverifikation: `php artisan test` (ein Prozess), `php artisan test --parallel` (Worker-DBs auf 3306), `DB_DATABASE=portal_test_db_test_<x>`-Scoped-Run, `pnpm test:e2e:smoke`, `pnpm lint:fix && pnpm build`, Scout-Sync/Import (Meili-Indizes inkl. `test_`-Prefix).
-
----
-
-## 🔄 DEPENDABOT + CI-Pipeline (2026-08-04, Entscheidungen interaktiv geklärt)
-
-**Ziel:** Dependabot wieder aktivieren (war aktiv bis PR #8, Config wurde entfernt) + CI-Build-Pipeline (lint/test/e2e) + Auto-Merge für grüne patch/minor-PRs. **Kein Branch Protection** (Entscheidung User).
-
-**Entscheidungen (2026-08-04):**
-1. **Gruppen nach Risiko:** `minor`+`patch` pro Ecosystem gebündelt in je einem PR; **Major-Updates einzeln** (eigener PR, manueller Review).
-2. **Ecosystems:** npm (`/frontend` + `/`), composer (`/backend`), docker (`/deployment` + `/` für local/test-compose). Schedule: **npm+composer täglich, docker wöchentlich**.
-3. **Auto-Merge:** ja für patch+minor **nur wenn CI grün** — da kein Branch Protection, via Workflow-Gate (`pull_request_target` + `dependabot/fetch-metadata` → update-type ≠ major → wait-on-check → `gh pr merge --squash`). Docker-Gruppen nie auto-mergen.
-4. **CI (`.github/workflows/ci.yml`):** 3 Jobs:
-   - `backend`: PHP 8.4, Service-Container **mariadb:11.4 (Port 3307)**, **meilisearch:v1.48.3 (7701)** → `composer install` → `php artisan test` (serial, kein Seed nötig — RefreshDatabase). Ports passen zu `phpunit.xml` (3307/7701/1026).
-   - `frontend`: Node 22 + pnpm 9.15.4 → `pnpm install --frozen-lockfile` → `pnpm lint` → `pnpm build` (inkl. tsc+check-i18n) → `pnpm test:run`.
-    - `e2e` (nur wenn `secrets.STRIPE_KEY` gesetzt): Services mariadb(3307)/meili(7701)/**mailpit(8025+1025)**; Backend `.env` generieren (APP_KEY/JWT_SECRET via `key:generate`, MAIL_PORT=1025, MEILI auf 7701, STRIPE_KEY=pk_test, STRIPE_SECRET=sk_test, STRIPE_WEBHOOK_SECRET); `migrate --force` + `db:seed` mit `ADMIN_EMAIL=admin@example.com` (E2E nutzt überall `admin@example.com/admin`, s. AuthHelper/E2ESessionHelper); `php artisan serve` auf 8000; Frontend `pnpm dev` auf 4321 mit `VITE_API_PROXY=http://127.0.0.1:8000` + `VITE_STRIPE_PUBLIC_KEY`; `npx playwright install --with-deps chromium`; `CI=1 pnpm test:e2e`.
-   - **Dependabot-PRs bekommen KEINE Secrets bei `pull_request`** (Fork-Treat) → CI auf `on: push` (alle Branches, dependabot-Branches sind in-repo) + `on: pull_request`; E2E-Job nur bei gesetzten Secrets. Stripe-Test-Keys als GitHub Secrets hinterlegen (Namen unten).
-   - **Seed-Risiko:** `DatabaseSeeder` ruft `app:import-locations` (GeoNames-Download, Netz) — im CI akzeptiert (Runner haben Internet), bei Flakiness Retry/log.
-5. **`.github/dependabot.yml`:** npm×2 + composer×2-Update (jeweils groups `update-types: [minor, patch]`; Major ungruppiert) + docker×2 (weekly, eine Gruppe). `open-pull-requests-limit: 8`, `labels: [dependencies]`, `versioning-strategy: auto`.
-6. **Repo-Settings (via gh API, nach Files-Merge):** Automated Security Fixes + Vulnerability Alerts aktivieren.
-
-**Stripe-Test-Keys als GitHub Secrets** (User legt an; Quelle `frontend/.env.local` pk_test + `backend/.env` sk_test/whsec_test): `STRIPE_KEY` (pk_test, publishable), `STRIPE_SECRET` (sk_test, secret API-Key — `StripePaymentService` liest `config('services.stripe.secret')` als API-Key), `STRIPE_WEBHOOK_SECRET` (whsec_test), `VITE_STRIPE_PUBLIC_KEY` (pk_test, redundant zu STRIPE_KEY). Konsistente Projekt-Konvention (`.env.example` + App): `STRIPE_KEY`=pk, `STRIPE_SECRET`=sk. `.env.production` wurde am 2026-08-04 an diese Konvention angeglichen (war invertiert, nur lokal genutzt).
-
-**Hinweis:** `.env.production`/`frontend/.env` sind **korrekt gitignored** (`.gitignore:50`) — kein Exposure (User-Frage geklärt 2026-08-04). Repo ist **public** → CI-Security: `pull_request_target` nur für actor==dependabot, kein Checkout untrusted Code.
-
-**TODO (Implementierung delegiert an Subagent):**
-- [ ] `.github/dependabot.yml` (Ecosystems, Groups, Schedule)
-- [ ] `.github/workflows/ci.yml` (backend/frontend/e2e)
-- [ ] `.github/workflows/automerge.yml` (Gate ohne Branch Protection)
-- [ ] Verification: actionlint/lint der YAMLs, Push auf Feature-Branch, CI-Runs beobachten, E2E-Job iterieren (Max-3-Regel)
-- [ ] Repo-Settings via gh API (automated-security-fixes, vulnerability-alerts)
-- [ ] Doku-Follow-up: `features/` SOLL-Notiz optional
+**Nicht mehr gültig:** Die 2026-08-04 ausgearbeitete Richtung (ein MariaDB-Compose mit generischen Namen, 3306/7700/8025+1025) wurde durch die **SQLite-Richtung** abgelöst: Backend läuft lokal/test auf **SQLite** (`DB_CONNECTION=sqlite`, Tests `:memory:`, Commits `3144fb9` „local + test backend on SQLite", `3e2d823` „E2E-Isolation via separatem Backend + eigener SQLite-DB"), Mailpit nativ via Homebrew (`0a897a6`, `MAIL_PORT=1025`), `docker-compose.test.yml` betreibt nur noch Meilisearch. `scripts/e2e-up.sh` existiert und ist idempotent. Details der alten Planung sind nicht mehr heranzuziehen; bei künftiger Infra-Arbeit gilt der Ist-Zustand (SQLite + Homebrew-Mailpit + Meili-Container).

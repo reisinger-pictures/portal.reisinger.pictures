@@ -1,0 +1,27 @@
+#!/bin/sh
+# CodeGraph index sync — refresh the knowledge-graph index before committing.
+#
+# Design (fails open, never blocks git):
+#   - Missing CLI or failed sync => warn, but exit 0. Index freshness is a
+#     convenience for the AI tooling, not a commit gate.
+#   - cwd of a git hook is the working-tree root; we still resolve it via
+#     git rev-parse so the hook stays correct if invoked differently.
+#
+# Matches codegraph's own intent for hooks: `codegraph sync -q` is documented
+# as "Suppress output (for git hooks)".
+
+set -u
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+if command -v codegraph >/dev/null 2>&1; then
+  if codegraph sync -q "$repo_root" >/dev/null 2>&1; then
+    echo "codegraph: index synced"
+  else
+    echo "codegraph: warning - sync failed (index may be stale); run 'codegraph sync' manually" >&2
+  fi
+else
+  echo "codegraph: not found on PATH - skipping index sync" >&2
+fi
+
+exit 0
