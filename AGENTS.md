@@ -160,10 +160,18 @@ Alle Run-Configs in `.run/*.run.xml` folgen einem einheitlichen Schema (etablier
 
 - **Init/Index:** `.codegraph/` ist versioniert-ausgenommen via `.codegraph/.gitignore` (zeigt nur dieses eine File). The index (`codegraph.db`, daemon logs) bleibt lokal. Status: `codegraph status`, Rebuild: `codegraph index`, Manueller Sync: `codegraph sync`.
 - **Auto-Sync:** Der CodeGraph-Daemon (MCP) watchet die Working Tree und synct laufend (`daemon.log`). Der index ist damit fast immer fresh.
-- **Git Sync Hook (etabliert 2026-08-18):** `.githooks/pre-commit` (versioniert) läuft `codegraph sync -q` vor jedem Commit → Index ist zum Commit-Zeitpunkt garantiert aktuell, auch wenn der Daemon nicht läuft. Aktiviert via `git config core.hooksPath .githooks` (lokal, pro Clone einmal setzen).
-  - **Fails open:** Fehlender `codegraph` auf PATH oder Sync-Fehler → Warnung, aber exit 0. Index-Freshness ist kein Commit-Gate (Design-Intent von codegraph selbst: Hooks „never block git").
+- **Git Sync Hook (etabliert 2026-08-18):** `.githooks/pre-commit` (versioniert) läuft `codegraph sync -q` vor jedem Commit → Index ist zum Commit-Zeitpunkt garantiert aktuell, auch wenn der Daemon nicht läuft. Aktiviert via `git config core.hooksPath .githooks` (lokal, pro Clone einmal setzen). **Kanonische Kopie + Template:** `agents-skills/.agents/skills/codegraph-project-setup/templates/pre-commit.sh` (GitHub `reisi007/agents-skills`).
+  - **Fails open:** Fehlender `codegraph` auf PATH oder Sync-Fehler → Warnung, aber exit 0. Index-Freshness ist kein Commit-Gate (Design-Intent von codegraph selbst: Hooks „never block git"). Repos ohne `.codegraph/`-Index skippen still (Guard `[ -d .codegraph ]`).
   - Test: `git hook run pre-commit` (git ≥ 2.36) oder direkt `.githooks/pre-commit` ausführen.
   - codegraph bietet zusätzlich optionale **post**-Hooks (`post-commit`/`post-merge`/`post-checkout`, API `installGitSyncHook()` — für WSL2-Szenarien ohne File-Watcher). Bei uns nicht nötig (Daemon läuft); falls je gebraucht: als versionierte Files nach `.githooks/` legen (nicht den built-in Installer nutzen, er schreibt nach `.git/hooks/` — das wird bei gesetztem `core.hooksPath` ignoriert).
+
+## 12. Zentrale Skills-Repo (agents-skills) — etabliert 2026-08-18
+
+- **Alle eigenen Skills** leben versioniert in `~/dev/agents-skills/` (GitHub `reisi007/agents-skills`, privat), Struktur `.agents/skills/<id>/SKILL.md` (portable Agent-Skills-Spec). Registriert global via `skills`-Array in `~/.config/opencode/opencode.jsonc` → in **jedem** Projekt verfügbar.
+- **Keine eigenen Skills in Projekten** (diese Regel): Projekt-Kopien sind entfernt (`portal/.opencode/skills/`, `open-accreditation/.opencode/skills/`).
+- **Skills im Repo (Stand 2026-08-18):** `codegraph-project-setup` (Bootstrap-Runbook, §11), `ui-review` (Playwright-Screenshot-Loop), `agent-config` (globales Setup — opencode.jsonc, MCP, Skills-Registrierung).
+- **Ownership:** Offizielle/Third-Party-Packs (daisyui, find-skills, stripe-*, …) bleiben dort, wo der Installer sie ablegt (`~/.agents/skills/`, Projekt-`.agents/skills/`, …); projekt-spezifische Skills (nx-*, blog-beitrag, testimonial) bleiben im Projekt.
+- **Erweitern:** neuer Skill als `.agents/skills/<id>/SKILL.md` (Frontmatter `name`+`description`, kebab-case-ID = Ordnername) → Commit+Push; keine Config-Änderung nötig. Details: Skill `agent-config`.
 
 ## TODO (UI-Review)
 

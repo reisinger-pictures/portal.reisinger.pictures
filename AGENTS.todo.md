@@ -19,6 +19,21 @@
 
 ---
 
+## ✅ Erledigt (2026-08-18, Tooling) — CodeGraph Sync Pre-Commit-Hook + zentrales Skills-Repo
+
+**CodeGraph Pre-Commit-Hook (12 Kopien, alle identisch via sha256):**
+- `.githooks/pre-commit` → `codegraph sync -q` vor jedem Commit; **fails open** (kein Commit-Gate), Guard `[ -d .codegraph ]` → stiller Skip ohne Index. Aktiviert: `git config core.hooksPath .githooks` (portal + 9 Projekte + agents-skills).
+- Kanonische Kopie: `agents-skills/.agents/skills/codegraph-project-setup/templates/pre-commit.sh`.
+
+**Zentrales Skills-Repo `agents-skills` (GitHub `reisi007/agents-skills`, privat):**
+- Eigene Skills jetzt NUR dort: `ui-review`, `codegraph-project-setup`, `agent-config` (neu, dokumentiert globales Setup). Struktur `.agents/skills/<id>/` (portable Agent-Skills-Spec).
+- Global registriert via `~/.config/opencode/opencode.jsonc` `skills`-Array (Backup: `opencode.jsonc.bak-20260818`) → in jeder Session/Projekt verfügbar (verifiziert: Skill-Listing dieser Session zeigt `codegraph-project-setup` + `agent-config`).
+- Projekt-Kopien entfernt: `portal/.opencode/skills/`, `open-accreditation/.opencode/skills/`.
+- **Nicht verschoben** (per User-Entscheid): daisyui, find-skills, blog-beitrag, testimonial, stripe-* (Portal), nx-* (angular-material-extended). Ownership-Regeln: `AGENTS.md` §12.
+- GitHub-Repo-Description gesetzt (deutsch, siehe §12/Doku).
+
+---
+
 ## ✅ UMGESETZT & VERIFIZIERT (2026-08-18) — WYSIWYG-Resize + PDF-Konsistenz + Kalkulation-oben/Dedup + Typografie
 
 > **Status: ✅ Implementierung abgeschlossen + verifiziert am 2026-08-18 — wartet auf manuellen User-Test vor Commit/Push** (etablierter Workflow 2026-08-17: kein Commit/Push vor User-Freigabe; danach Sync nach Prod wie gehabt: Backend-Sync + `docker restart portal_backend` + ggf. Portainer-Stack-Update).
