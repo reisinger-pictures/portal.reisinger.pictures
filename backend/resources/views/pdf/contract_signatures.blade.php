@@ -3,30 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <title>Vertrag {{ $contract->id }}</title>
+    @include('pdf.fragments.styles', [
+        'primaryColor' => $primaryColor ?? '#1E5631',
+        'secondaryColor' => $secondaryColor ?? '#A4B494',
+        'footerAbsolute' => false,
+    ])
     <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; font-size: 13px; line-height: 1.5; }
-        .invoice-details { margin-bottom: 30px; width: 100%; }
-        .invoice-details td { vertical-align: top; padding: 0; border: none; }
-        h1, h2, h3, h4, h5, h6 { page-break-after: avoid; color: #4A5568; }
-        table.items { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        table.items th, table.items td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
-        table.items th { background-color: #f8f9fa; font-weight: bold; }
-        .text-right { text-align: right !important; }
-        .total-row td { font-size: 16px; font-weight: bold; border-top: 2px solid #4A5568; padding-top: 15px; }
-        .editor-content table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .editor-content table td, .editor-content table th { border: 1px solid #ccc; padding: 8px; }
-        .editor-content table th { background-color: #f2f2f2; font-weight: bold; }
         .signature-section { margin-top: 40px; }
         .signature-section table { width: 100%; border-collapse: collapse; }
         .signature-section th, .signature-section td { padding: 10px; border: 1px solid #ddd; text-align: left; }
-        .signature-section th { background-color: #4A5568; color: #fff; font-weight: bold; }
+        .signature-section th { background-color: {{ $primaryColor }}; color: #fff; font-weight: bold; }
         .audit-section { margin-top: 30px; page-break-inside: avoid; }
-        .audit-section h4 { color: #4A5568; margin-bottom: 5px; }
+        .audit-section h4 { color: {{ $secondaryColor }}; margin-bottom: 5px; }
         .audit-section table { width: 100%; border-collapse: collapse; font-size: 11px; }
         .audit-section th, .audit-section td { padding: 8px; border: 1px solid #ddd; text-align: left; }
-        .audit-section th { background-color: #f8f9fa; font-weight: bold; color: #4A5568; }
-        .footer { position: relative; bottom: 0; width: 100%; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; margin-top: 50px; text-align: center; }
-        .section-title { font-size: 18px; font-weight: bold; color: #4A5568; border-bottom: 2px solid #4A5568; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; }
+        .audit-section th { background-color: #f8f9fa; font-weight: bold; color: {{ $secondaryColor }}; }
+        .section-title { font-size: 18px; font-weight: bold; color: {{ $secondaryColor }}; border-bottom: 2px solid {{ $secondaryColor }}; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -58,61 +50,21 @@
 
     @if(!empty($contract->terms_html))
         <div class="section-title">Vertragstext</div>
-        <div class="editor-content" style="margin-top: 20px; padding: 15px; background: #fcfcfc; border: 1px solid #eee; border-radius: 5px;">
+        <div class="editor-content" style="margin-top: 20px;">
             {!! $contract->terms_html !!}
         </div>
     @endif
 
     <div class="section-title">Leistungen und Vergütung</div>
 
-    <table class="items">
-        <thead>
-            <tr>
-                <th>Position</th>
-                <th class="text-right">Menge</th>
-                <th class="text-right">Preis</th>
-                <th class="text-right">Gesamt</th>
-            </tr>
-        </thead>
-        <tbody>
-            @php $subtotal = 0; $hasDiscounts = false; @endphp
-            @foreach($items as $item)
-                @if(!isset($item['type']) || $item['type'] === 'item')
-                    @php $subtotal += $item['row_total']; @endphp
-                    <tr>
-                        <td>
-                            <strong>{{ $item['filename'] }}</strong>
-                            @if(!empty($item['notes']))<br><small style="color: #666;">{{ $item['notes'] }}</small>@endif
-                        </td>
-                        <td class="text-right" style="white-space: nowrap;">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
-                        <td class="text-right" style="white-space: nowrap;">
-                            @if(isset($item['type']) && $item['type'] === 'discount_percent')
-                                {{ rtrim(rtrim(number_format($item['price'] / 100, 4, ',', '.'), '0'), ',') }} %
-                            @else
-                                {{ number_format($item['price'] / 100, 2, ',', '.') }} €
-                            @endif
-                        </td>
-                        <td class="text-right" style="white-space: nowrap;">{{ number_format($item['row_total'] / 100, 2, ',', '.') }} €</td>
-                    </tr>
-                @else
-                    @php $hasDiscounts = true; @endphp
-                @endif
-            @endforeach
-
-            @if($hasDiscounts)
-                <tr>
-                    <td colspan="3" class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>Zwischensumme</strong></td>
-                    <td class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>{{ number_format($subtotal / 100, 2, ',', '.') }} €</strong></td>
-                </tr>
-                @include('pdf.fragments.discount_rows', ['items' => $items])
-            @endif
-
-            <tr class="total-row">
-                <td colspan="3" class="text-right">Gesamtbetrag</td>
-                <td class="text-right">{{ number_format($total / 100, 2, ',', '.') }} €</td>
-            </tr>
-        </tbody>
-    </table>
+    <div style="margin-top: 20px;">
+        @include('pdf.fragments.items_table', [
+            'items' => $items,
+            'totalLabel' => 'Gesamtbetrag',
+            'totalGross' => $total,
+            'invoiceMode' => false,
+        ])
+    </div>
 
     <div class="signature-section">
         <div class="section-title">Unterschriften</div>

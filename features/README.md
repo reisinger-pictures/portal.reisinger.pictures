@@ -67,6 +67,9 @@ This directory serves as the single source of truth for all technical concepts, 
 * [02-smart-assistance.md](search/02-smart-assistance.md) - GeoNames autocomplete.
 * [03-meilisearch-typo-tolerance.md](search/03-meilisearch-typo-tolerance.md) - Typo-tolerance configuration and sync.
 
+### 📄 Documents & PDF
+* [01-pdf-typography.md](documents/pdf-typography.md) - dompdf engine decision (orphans enforced / widows FIXME, Engine-Vergleich dompdf vs. mPDF vs. phppdf vs. Chromium) + CSS-Typografie-Vertrag (orphans/widows/page-break-inside).
+
 ### 💻 Tech & Architecture
 * [01-database-schema.md](tech/01-database-schema.md) - UUIDs and migration strategy.
 * [02-backend-architecture.md](tech/02-backend-architecture.md) - Stateless API and ZIP streaming.
