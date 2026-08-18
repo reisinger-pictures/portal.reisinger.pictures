@@ -54,6 +54,7 @@ This directory serves as the single source of truth for all technical concepts, 
 * [16-srp-volume-pricing.md](infrastructure/16-srp-volume-pricing.md) - Volume pricing model for SRP (retroactive tiered pricing).
 * [17-pricing-strategy-pattern.md](infrastructure/17-pricing-strategy-pattern.md) - Strategy pattern for pricing (ScopeLicensing / VolumeLicensing).
 * [18-jwt-offer-tokens.md](infrastructure/18-jwt-offer-tokens.md) - JWT-based machine-readable offer tokens.
+* [28-ci-test-image.md](infrastructure/28-ci-test-image.md) - **E2E-Test-Image `portal-e2e`:** portal-base + Node/pnpm/Composer + Playwright-Chromium vorinstalliert; CI-E2E läuft komplett im Container.
 
 ### 📷 Photos & Metadata
 * [01-upload-and-processing.md](photos/01-upload-and-processing.md) - Lightroom UUIDs and ImageProcessor.

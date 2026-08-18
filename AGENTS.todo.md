@@ -11,6 +11,32 @@
 
 ---
 
+## 🔄 Open (2026-08-18) — E2E-Test-Image `portal-e2e` (CI-Beschleunigung)
+
+**Ziel (User-Request):** Docker-Image (Derivat) mit vorinstalliertem Playwright/Chromium + Node/pnpm/Composer, regelmäßig gebaut und in Tests/E2E genutzt → kein Browser-Download, kein apt-Deps-Setup pro CI-Run.
+
+**SOLL-Doku (dauerhaft):** `features/infrastructure/28-ci-test-image.md` (+ Index in `features/README.md`).
+
+**Änderungen:**
+- [x] `deployment/Dockerfile.e2e` (neu) — Derivat von `ghcr.io/reisi007/portal-base:8.5`; Composer (`composer:2`-Dist), Node v26 (nodejs.org-Tarball), pnpm `11.21.0` (packageManager), `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`, `npx playwright@<build-arg> install --with-deps chromium` (Debian trixie — lokal unter amd64-Emulation verifiziert).
+- [x] `.github/workflows/e2e-image.yml` (neu) — Trigger: push/main bei `Dockerfile.e2e`+Workflow+`frontend/pnpm-lock.yaml`, weekly Mo 02:00 UTC, dispatch. Build-Args aus Repo extrahiert (Playwright `^`-bereinigt aus package.json, pnpm aus packageManager). Tags `:latest` + `:<playwright-version>`.
+- [x] `.github/workflows/ci.yml` — `e2e`-Job: `container: ghcr.io/reisi007/portal-e2e:latest`; Backend direkt im Container (`composer install`/`key:generate`/`migrate`/`seed`/`serve --no-reload` — kein DinD); `.env`-Overrides auf Service-Namen (`DB_HOST=mariadb`, `DB_PORT=3306`, `MEILISEARCH_HOST=http://meilisearch:7700`, `MAIL_HOST=mailpit`); `MAILPIT_API_URL` im Job-Env; Playwright-Step = No-Op-Fallback (`npx playwright install chromium`).
+- [x] **Kein Frontend-/Backend-Code-Change nötig:** `MailpitHelper.ts` liest `MAILPIT_API_URL` seit jeher (Default bleibt `localhost:8025` für lokale E2E via `e2e-up.sh`).
+
+**Invarianten (nicht regredieren):**
+- Nur Umgebung einbacken — NIE App-Code, `node_modules/`, `vendor/` (Tests laufen gegen den aktuellen Commit; Dependencies pro Commit installiert).
+- Browser-Version == `@playwright/test`; Dependabot-Bump → `pnpm-lock.yaml`-Trigger im e2e-image-Workflow erzwingt Rebuild.
+- Container-Modus: Dienste per Service-Namen (kein `127.0.0.1`).
+
+**Verifikation:**
+- [x] Lokaler Image-Build (amd64-Emulation) grün — Node 26.7.0 / pnpm 11.21.0 / Composer / Chromium in `/ms-playwright` verifiziert.
+- [x] CI: `e2e-image`-Build-Workflow grün (GHCR `portal-e2e:latest` + `:1.62.1` gepusht).
+- [x] CI: E2E-Jobs (3 Shards: Desktop/Mobile/serial) grün; Backend- und Frontend-Jobs unverändert grün (Zero-Pre-existing-Failures).
+
+**Fallback (falls Container-Modus-Probleme):** Runner-Hosted + Browser via `docker cp` aus dem Image extrahieren (`PLAYWRIGHT_BROWSERS_PATH`), siehe SOLL-Doku §Fallback.
+
+---
+
 ## ✅ Erledigt (2026-08-18, Tooling) — CodeGraph Sync Pre-Commit-Hook
 
 - `.githooks/pre-commit` (versioniert) → `codegraph sync -q` vor jedem Commit; **fails open** (kein Commit-Gate). Aktiviert: `git config core.hooksPath .githooks` (lokal gesetzt, pro Clone einmal nötig). Test: `git hook run pre-commit` ✅ (beide Pfade verifiziert: sync ok / codegraph fehlt → exit 0, Warnung).

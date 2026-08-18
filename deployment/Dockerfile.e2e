@@ -1,0 +1,61 @@
+# ==========================================================================
+# portal-e2e — E2E-/Test-Image (aus portal-base abgeleitet)
+# --------------------------------------------------------------------------
+# Basis: ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 Prod-Runtime, exiftool,
+# ImageMagick, alle App-Extensions; Debian trixie) — identische Runtime wie
+# Produktion. Zusätzlich für die E2E-CI (ci.yml, Job `e2e`) vorinstalliert:
+#   * Composer (Dist-Binary, wie Prod via composer:latest)
+#   * Node.js (aktuelle v26, offizielles Linux-Binary)
+#   * pnpm (exakt frontend/package.json#packageManager)
+#   * Playwright-Chromium inkl. apt-System-Deps (Version == @playwright/test)
+#
+# INVARIANTE: Es wird NUR die Umgebung eingebacken — niemals App-Code,
+# node_modules/ oder vendor/. Die CI mountet den Workspace und installiert
+# Dependencies pro Commit. Browser sind an die Playwright-Version gebunden
+# -> Rebuild-Trigger siehe .github/workflows/e2e-image.yml
+# (features/infrastructure/28-ci-test-image.md).
+# ==========================================================================
+FROM ghcr.io/reisi007/portal-base:8.5
+
+# --- Build-Args (Workflow e2e-image.yml extrahiert Repo-Werte) -------------
+ARG PLAYWRIGHT_VERSION=1.62.1
+ARG NODE_MAJOR=26
+ARG PNPM_VERSION=11.21.0
+
+# Playwright-Browser liegen global unter /ms-playwright
+# (Pfad-Konvention der offiziellen Playwright-Images).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# Composer — statisches Dist-Binary (portabel über Debian-Varianten)
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# System-Utils: git (actions/checkout), curl (Downloads), xz-utils (Node-Tarball),
+# unzip/zip (composer dist-Extraktion)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        curl \
+        xz-utils \
+        unzip \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js — aktuelles v${NODE_MAJOR}-Binary direkt von nodejs.org
+# (distro-agnostisch; latest-v<major>.x-Verzeichnis auflösen, kein
+# nodesource-Repo nötig)
+RUN NODE_VERSION="$(curl -fsSL "https://nodejs.org/dist/latest-v${NODE_MAJOR}.x/" \
+        | grep -o 'node-v[0-9.]*-linux-x64\.tar\.xz' | head -n1 \
+        | sed -E 's/^node-(v[0-9.]+)-linux-x64\.tar\.xz$/\1/')" \
+    && [ -n "$NODE_VERSION" ] \
+    && curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz \
+    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+    && rm -f /tmp/node.tar.xz \
+    && node --version && npm --version
+
+# pnpm — exakt die Version aus frontend/package.json (packageManager)
+RUN npm install -g "pnpm@${PNPM_VERSION}" && pnpm --version
+
+# Playwright-Chromium inkl. apt-System-Deps — Version == @playwright/test.
+# DEBIAN_FRONTEND=noninteractive, da playwright apt intern aufruft.
+ENV DEBIAN_FRONTEND=noninteractive
+RUN npx --yes "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium \
+    && ls -1 /ms-playwright

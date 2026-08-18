@@ -1,0 +1,72 @@
+name: Build and Push portal-e2e Image
+
+# portal-e2e = E2E-/Test-Image (portal-base + Node/pnpm/Composer +
+# Playwright-Chromium vorinstalliert). Die E2E-CI (ci.yml, Job `e2e`)
+# laeuft komplett in diesem Image -> kein Browser-Download und kein
+# apt-Deps-Setup pro Run (Details: features/infrastructure/28-ci-test-image.md).
+#
+# Rebuild-Trigger (Playwright-Browser sind an die @playwright/test-Version
+# gebunden!):
+#   * Push auf main bei Aenderung von Dockerfile.e2e, Workflow oder
+#     frontend/pnpm-lock.yaml (Dependabot-Bumps -> Image muss nachziehen)
+#   * Weekly (Mo 02:00 UTC) als Frische-Untergrenze
+#   * workflow_dispatch manuell
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'deployment/Dockerfile.e2e'
+      - '.github/workflows/e2e-image.yml'
+      - 'frontend/pnpm-lock.yaml'
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Extract build args from repository
+        id: versions
+        run: |
+          PLAYWRIGHT_VERSION="$(sed -n 's/.*"@playwright\/test"[[:space:]]*:[[:space:]]*"\^\{0,1\}\([0-9][0-9.]*\)".*/\1/p' frontend/package.json | head -n1)"
+          PNPM_VERSION="$(sed -n 's/.*"packageManager"[[:space:]]*:[[:space:]]*"pnpm@\([0-9][0-9.]*\)".*/\1/p' frontend/package.json | head -n1)"
+          [ -n "$PLAYWRIGHT_VERSION" ] || { echo "::error::@playwright/test Version nicht in frontend/package.json gefunden"; exit 1; }
+          [ -n "$PNPM_VERSION" ] || { echo "::error::packageManager (pnpm) nicht in frontend/package.json gefunden"; exit 1; }
+          echo "playwright_version=${PLAYWRIGHT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "pnpm_version=${PNPM_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and Push portal-e2e Image (amd64)
+        uses: docker/build-push-action@v7
+        with:
+          context: deployment
+          file: deployment/Dockerfile.e2e
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            PLAYWRIGHT_VERSION=${{ steps.versions.outputs.playwright_version }}
+            PNPM_VERSION=${{ steps.versions.outputs.pnpm_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-e2e:latest
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-e2e:${{ steps.versions.outputs.playwright_version }}
