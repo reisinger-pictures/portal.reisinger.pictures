@@ -77,7 +77,7 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
                         <label className="label shrink-0"><span className="label-text font-bold">Inhalt (HTML)</span></label>
                         <input type="hidden" required />
                         <div className="flex-1 overflow-y-auto">
-                            <WysiwygEditor value={watchContentHtml || ''} onChange={val => setValue('content_html', val)} hideSnippets={true} />
+                            <WysiwygEditor value={watchContentHtml || ''} onChange={val => setValue('content_html', val)} />
                         </div>
                         {errors.content_html && <span className="text-error text-xs mt-1">{errors.content_html.message}</span>}
                     </div>

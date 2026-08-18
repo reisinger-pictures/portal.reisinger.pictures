@@ -103,4 +103,47 @@ test.describe('WYSIWYG-Editor', () => {
         await page.getByTitle('Zeile löschen').click();
         await expect(table.locator('tr')).toHaveCount(2);
     });
+
+    test('scrolls long editor content inside a resizable text area while toolbar stays visible', { tag: ['@feature:admin:documents'] }, async ({ page }) => {
+        await new AuthHelper(page).login(user.email, user.password);
+        await new SidebarHelper(page).navigateTo('Manuelles Angebot');
+
+        const editor = page.locator('.ProseMirror').first();
+        const scroll = page.getByTestId('editor-scroll');
+        const heading = page.getByRole('combobox', { name: 'Überschrift' });
+
+        await editor.click();
+        // Long content: only the text area must scroll, not the whole page.
+        for (let i = 0; i < 80; i++) {
+            await editor.pressSequentially(`Absatz ${i}`);
+            await editor.press('Enter');
+        }
+
+        await expect.poll(() => scroll.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+        await expect(heading).toBeVisible();
+
+        // The native CSS `resize-y` handle is a mouse-only browser feature. Under
+        // the touch emulation of the Mobile Chrome project (hover: none) it does
+        // not respond to mouse drags at all — same platform limitation as
+        // drag & drop (cf. projects-board.spec.ts) — so the resize sub-step runs
+        // on Desktop only. The scroll/toolbar assertions above stay cross-platform.
+        if (test.info().project.name !== 'Mobile Chrome') {
+            // Native resize handle sits at the bottom-right corner: shrink by
+            // dragging UP ~80px. With 80 paragraphs the container already sits at
+            // max-h-160 (640px) and CSS max-height would block any grow —
+            // shrinking is deterministic and stays well above min-h-48 (192px).
+            await scroll.scrollIntoViewIfNeeded();
+            const before = await scroll.boundingBox();
+            if (!before) throw new Error('editor scroll container has no bounding box');
+            await page.mouse.move(before.x + before.width - 5, before.y + before.height - 5);
+            await page.mouse.down();
+            await page.mouse.move(before.x + before.width - 5, before.y + before.height - 80, { steps: 5 });
+            await page.mouse.up();
+
+            await expect.poll(async () => {
+                const after = await scroll.boundingBox();
+                return after !== null && after.height !== before.height;
+            }).toBe(true);
+        }
+    });
 });

@@ -174,4 +174,21 @@ describe('WysiwygEditor', () => {
         renderWithProviders(<WysiwygEditor value="" onChange={mockOnChange} />);
         expect(screen.getByTestId('editor-content')).toBeInTheDocument();
     });
+
+    it('renders a resizable scroll container with toolbar and footer as siblings', () => {
+        renderWithProviders(<WysiwygEditor value="" onChange={vi.fn()} />);
+
+        const scroll = screen.getByTestId('editor-scroll');
+        expect(scroll).toHaveClass('min-h-48', 'max-h-160', 'overflow-y-auto', 'resize-y');
+
+        const headingSelect = screen.getByRole('combobox', { name: 'Überschrift' });
+        const charCount = screen.getByText(/Zeichen \(HTML\)/);
+
+        // Toolbar and character-count footer are siblings of the scroll
+        // container (same parent wrapper), not descendants of it.
+        expect(scroll.parentElement).toBe(headingSelect.parentElement?.parentElement ?? null);
+        expect(scroll.parentElement).toBe(charCount.parentElement?.parentElement ?? null);
+        expect(scroll.contains(headingSelect)).toBe(false);
+        expect(scroll.contains(charCount)).toBe(false);
+    });
 });

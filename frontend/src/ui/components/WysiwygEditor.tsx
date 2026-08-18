@@ -19,7 +19,6 @@ import { TextSnippet } from '../../api';
 interface Props {
     value: string;
     onChange: (val: string) => void;
-    hideSnippets?: boolean;
 }
 
 export interface SlashStateRect {
@@ -61,7 +60,7 @@ const EMPTY_TOOLBAR_UI: ToolbarUiState = {
     heading: 0,
 };
 
-export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) {
+export default function WysiwygEditor({ value, onChange }: Props) {
     const {isSuperAdmin} = usePermissions();
     const { data: snippets, isLoading } = useSWR<TextSnippet[]>(isSuperAdmin ? '/api/management/text-snippets' : null, fetcher);
     const snippetsRef = useRef<TextSnippet[]>([]);
@@ -178,7 +177,7 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
             updateSlashMenu(editor);
         },
         editorProps: { 
-            attributes: { class: 'prose prose-sm max-w-none focus:outline-none min-h-48 p-4 text-base-content/90' },
+            attributes: { class: 'prose prose-sm max-w-none focus:outline-none p-4 text-base-content/90' },
             // 🔥 WICHTIG: Tastatur-Events HIER abfangen, bevor Tiptap sie schluckt
             handleKeyDown: (_view, event) => {
                 if (!slashStateRef.current.active) return false;
@@ -257,22 +256,8 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
     return (
         <div className="border border-base-300 rounded-box overflow-visible bg-base-100 flex flex-col focus-within:border-primary transition-colors shadow-inner relative z-10">
             <div className="bg-base-200 border-b border-base-300 p-2 flex flex-wrap gap-2 items-center rounded-t-box">
-                {isSuperAdmin && !hideSnippets && (
-                    <select 
-                        className="select select-sm select-bordered bg-primary/10 text-primary font-bold border-primary/30 mr-1" 
-                        onChange={(e) => {
-                            editor.chain().focus().insertContent(e.target.value).insertContent(' ').run();
-                            e.target.value = '';
-                        }}
-                        defaultValue=""
-                    >
-                        <option value="" disabled className="bg-base-100 text-base-content"><Trans>Baustein...</Trans></option>
-                        {snippets?.map(s => <option key={s.id} value={s.content_html} className="bg-base-100 text-base-content">{s.title}{s.shortcut ? ` (/${s.shortcut})` : ''}</option>)}
-                    </select>
-                )}
-
                 <select
-                    className="select select-sm select-bordered"
+                    className="select select-sm select-bordered w-32"
                     aria-label={t`Überschrift`}
                     title={t`Überschrift`}
                     value={toolbarUi.heading}
@@ -338,7 +323,9 @@ export default function WysiwygEditor({ value, onChange, hideSnippets }: Props) 
                 </button>
             </div>
             
-            <EditorContent editor={editor} />
+            <div data-testid="editor-scroll" className="min-h-48 max-h-160 overflow-y-auto resize-y">
+                <EditorContent editor={editor} />
+            </div>
             
             <div className="bg-base-200 border-t border-base-300 p-1 flex justify-end items-center rounded-b-box text-sm opacity-60">
                      <span className={safeHtmlLength > 90000 ? 'text-error font-bold' : ''}>

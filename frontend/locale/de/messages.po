@@ -703,8 +703,8 @@ msgid "Baustein gelöscht"
 msgstr "Baustein gelöscht"
 
 #: src/ui/components/WysiwygEditor.tsx
-msgid "Baustein..."
-msgstr "Baustein..."
+#~ msgid "Baustein..."
+#~ msgstr "Baustein..."
 
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
@@ -2059,6 +2059,7 @@ msgid "Generieren"
 msgstr "Generieren"
 
 #: src/ui/ContractSignView.tsx
+#: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 #: src/ui/management/components/invoice/InvoiceItemsTable.tsx
 msgid "Gesamt"
 msgstr "Gesamt"
