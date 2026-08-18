@@ -5,6 +5,7 @@ import AutocompleteInput from '../../../components/AutocompleteInput';
 
 interface InvoiceDiscountsSectionProps {
     discounts: InvoiceDiscount[];
+    subtotal: number;
     onDiscountChange: (index: number, field: string, value: string | number) => void;
     onAddDiscount: () => void;
     onRemoveDiscount: (index: number) => void;
@@ -14,6 +15,7 @@ interface InvoiceDiscountsSectionProps {
 
 export default function InvoiceDiscountsSection({
     discounts,
+    subtotal,
     onDiscountChange,
     onAddDiscount,
     onRemoveDiscount,
@@ -37,7 +39,7 @@ export default function InvoiceDiscountsSection({
                 {discounts.map((discount, idx) => (
                     <div
                         key={idx}
-                        className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300"
+                        className="flex flex-col xl:flex-row flex-wrap gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300"
                     >
                         <div className="flex flex-col gap-1 self-center shrink-0 mr-2">
                             <button
@@ -57,7 +59,7 @@ export default function InvoiceDiscountsSection({
                                 <span className="iconify mdi--arrow-down text-lg opacity-50"></span>
                             </button>
                         </div>
-                        <div className="form-control w-full md:w-1/4 shrink-0">
+                        <div className="form-control w-full xl:w-1/4 shrink-0">
                             <label className="label py-1">
                                 <span className="label-text text-sm font-bold"><Trans>Art</Trans></span>
                             </label>
@@ -71,7 +73,7 @@ export default function InvoiceDiscountsSection({
                             </select>
                         </div>
 
-                        <div className="form-control flex-1 w-full">
+                        <div className="form-control flex-3 min-w-50 w-full">
                             <label className="label py-1">
                                 <span className="label-text text-sm font-bold"><Trans>Titel / Beschreibung</Trans></span>
                             </label>
@@ -96,7 +98,7 @@ export default function InvoiceDiscountsSection({
                             />
                         </div>
 
-                        <div className="form-control w-full md:w-32 shrink-0">
+                        <div className="form-control w-full xl:w-32 shrink-0">
                             <label className="label py-1">
                                 <span className="label-text text-sm font-bold"><Trans>Wert</Trans></span>
                             </label>
@@ -116,10 +118,19 @@ export default function InvoiceDiscountsSection({
                             </div>
                         </div>
 
+                        <div className="form-control w-full xl:w-28 shrink-0">
+                            <label className="label py-1">
+                                <span className="label-text text-sm font-bold"><Trans>Gesamt</Trans></span>
+                            </label>
+                            <div className="text-right font-mono font-bold mt-1 text-base-content">
+                                {(discount.type === 'discount_percent' ? subtotal * discount.price / 100 : discount.price).toFixed(2)} €
+                            </div>
+                        </div>
+
                         <button
                             type="button"
                             onClick={() => onRemoveDiscount(idx)}
-                            className="btn btn-sm btn-ghost text-error shrink-0 mt-7"
+                            className="btn btn-sm btn-ghost text-error shrink-0 mt-7 ml-auto"
                         >
                             <span className="iconify mdi--trash-can text-lg"></span>
                         </button>

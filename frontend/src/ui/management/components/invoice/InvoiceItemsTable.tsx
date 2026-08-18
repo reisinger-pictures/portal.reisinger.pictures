@@ -31,7 +31,7 @@ export default function InvoiceItemsTable({
 
             <div className="space-y-4">
                 {items.map((item, idx) => (
-                    <div key={idx} className="flex flex-col md:flex-row gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
+                    <div key={idx} className="flex flex-col xl:flex-row flex-wrap gap-3 items-start p-3 bg-base-200 rounded-box border border-base-300">
                         <div className="flex flex-col gap-1 self-center shrink-0 mr-2">
                             <button
                                 type="button"
@@ -51,7 +51,7 @@ export default function InvoiceItemsTable({
                             </button>
                         </div>
 
-                        <div className="form-control flex-1 w-full">
+                        <div className="form-control flex-3 min-w-50 w-full">
                             <label className="label py-1">
                                 <span className="label-text text-sm font-bold"><Trans>Titel / Name</Trans></span>
                             </label>
@@ -75,9 +75,9 @@ export default function InvoiceItemsTable({
                             />
                         </div>
 
-                        <div className="form-control flex-1 w-full">
+                        <div className="form-control flex-2 min-w-30 w-full">
                             <label className="label py-1">
-                                <span className="label-text text-sm font-bold"><Trans>Zusatz (kleingedruckt)</Trans></span>
+                                <span className="label-text text-sm font-bold whitespace-normal"><Trans>Zusatz (kleingedruckt)</Trans></span>
                             </label>
                             <input
                                 type="text"
@@ -88,35 +88,37 @@ export default function InvoiceItemsTable({
                             />
                         </div>
 
-                        <div className="form-control w-20 shrink-0">
-                            <label className="label py-1">
-                                <span className="label-text text-sm font-bold"><Trans>Menge</Trans></span>
-                            </label>
-                            <input
-                                required
-                                type="number"
-                                step="0.25"
-                                min="0.25"
-                                value={item.qty}
-                                onChange={(e) => onItemChange(idx, 'qty', parseFloat(e.target.value) || 0)}
-                                className="input input-sm input-bordered w-full font-mono text-center"
-                            />
-                        </div>
-
-                        <div className="form-control w-full md:w-28 shrink-0">
-                            <label className="label py-1">
-                                <span className="label-text text-sm font-bold"><Trans>Preis / Stück</Trans></span>
-                            </label>
-                            <div className="join w-full">
+                        <div className="flex flex-row gap-2 w-full xl:w-auto shrink-0">
+                            <div className="form-control w-20 flex-1 xl:flex-none">
+                                <label className="label py-1">
+                                    <span className="label-text text-sm font-bold"><Trans>Menge</Trans></span>
+                                </label>
                                 <input
                                     required
                                     type="number"
-                                    step="0.01"
-                                    value={item.price}
-                                    onChange={(e) => onItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                                    className="input input-sm input-bordered join-item w-full font-mono text-right"
+                                    step="0.25"
+                                    min="0.25"
+                                    value={item.qty}
+                                    onChange={(e) => onItemChange(idx, 'qty', parseFloat(e.target.value) || 0)}
+                                    className="input input-sm input-bordered w-full font-mono text-center"
                                 />
-                                <span className="join-badge">€</span>
+                            </div>
+                            <div className="form-control w-28 flex-1 xl:flex-none">
+                                <label className="label py-1">
+                                    <span className="label-text text-sm font-bold"><Trans>Preis / Stück</Trans></span>
+                                </label>
+                                <div className="join w-full">
+                                    <input
+                                        required
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={item.price}
+                                        onChange={(e) => onItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                        className="input input-sm input-bordered join-item w-full font-mono text-right"
+                                    />
+                                    <span className="join-badge">€</span>
+                                </div>
                             </div>
                         </div>
 
@@ -132,7 +134,7 @@ export default function InvoiceItemsTable({
                         <button
                             type="button"
                             onClick={() => onRemoveItem(idx)}
-                            className="btn btn-sm btn-ghost text-error shrink-0 mt-7"
+                            className="btn btn-sm btn-ghost text-error shrink-0 mt-7 ml-auto"
                         >
                             <span className="iconify mdi--trash-can text-lg"></span>
                         </button>

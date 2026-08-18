@@ -49,6 +49,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
         handleMultiUpdate,
         loadExtractedData,
         handleDownload,
+        subtotal,
         total,
         isFormValid,
     } = draft;
@@ -96,13 +97,6 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
                 <RecipientFormSection formData={formData} onUpdate={handleUpdateField}
                                       onMultiUpdate={handleMultiUpdate}/>
 
-                {isOffer && (
-                    <div className="bg-base-100 p-6 rounded-box border border-primary/30 shadow-md">
-                        <h2 className="font-bold text-xl mb-4 text-primary"><Trans>Angebotstext (Einleitung)</Trans></h2>
-                        <WysiwygEditor value={formData.terms_html} onChange={v => handleUpdateField('terms_html', v)}/>
-                    </div>
-                )}
-
                 <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                     <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
                         <h2 className="font-bold text-xl text-primary"><Trans>Leistungen / Positionen</Trans></h2>
@@ -125,6 +119,7 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
 
                     <InvoiceDiscountsSection
                         discounts={discounts}
+                        subtotal={subtotal}
                         onDiscountChange={handleDiscountChange}
                         onAddDiscount={addDiscount}
                         onRemoveDiscount={removeDiscount}
@@ -134,6 +129,13 @@ export default function ManagementManualInvoiceView({type = 'invoice'}: Manageme
 
                     <InvoiceTotalSummary total={total}/>
                 </div>
+
+                {isOffer && (
+                    <div className="bg-base-100 p-6 rounded-box border border-primary/30 shadow-md">
+                        <h2 className="font-bold text-xl mb-4 text-primary"><Trans>Angebotstext (Einleitung)</Trans></h2>
+                        <WysiwygEditor value={formData.terms_html} onChange={v => handleUpdateField('terms_html', v)}/>
+                    </div>
+                )}
 
                 {!isOffer && (
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">

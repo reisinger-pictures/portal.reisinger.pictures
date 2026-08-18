@@ -215,4 +215,23 @@ describe('ManagementManualInvoiceView', () => {
         expect(submitButton!.querySelector('.loading')).toBeInTheDocument();
         expect(submitButton).toBeDisabled();
     });
+
+    it('renders invoice items table before the Wysiwyg editor (invoice)', () => {
+        renderView({ type: 'invoice' });
+        const itemsTable = screen.getByTestId('invoice-items-table');
+        const wysiwygEditor = screen.getByTestId('wysiwyg-editor');
+        expect(itemsTable.compareDocumentPosition(wysiwygEditor)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
+    it('renders invoice items table before the Wysiwyg editor (offer)', () => {
+        vi.mocked(useInvoiceDraft).mockReturnValue({
+            ...baseDraft,
+            isOffer: true,
+        });
+
+        renderView({ type: 'offer' });
+        const itemsTable = screen.getByTestId('invoice-items-table');
+        const wysiwygEditor = screen.getByTestId('wysiwyg-editor');
+        expect(itemsTable.compareDocumentPosition(wysiwygEditor)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
 });

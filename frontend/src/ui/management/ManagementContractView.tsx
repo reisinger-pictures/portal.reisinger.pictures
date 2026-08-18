@@ -522,6 +522,7 @@ export default function ManagementContractView() {
                     <div className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm">
                         <InvoiceDiscountsSection
                             discounts={discounts}
+                            subtotal={subtotal}
                             onDiscountChange={handleDiscountChange}
                             onAddDiscount={addDiscount}
                             onRemoveDiscount={removeDiscount}

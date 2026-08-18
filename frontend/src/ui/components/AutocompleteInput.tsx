@@ -126,7 +126,7 @@ export default function AutocompleteInput<T>({
                 )}
             </div>
             {isOpen && !disabled && options.length > 0 && (
-                <ul id="autocomplete-listbox" role="listbox" className="absolute z-50 top-full left-0 w-full mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
+                <ul id="autocomplete-listbox" role="listbox" className="absolute z-50 top-full left-0 w-full min-w-72 mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
                     {options.map((opt, idx) => (
                         <li
                             key={opt.id}
