@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
 use App\Services\ImageProcessor;
+use App\Services\PurchaseService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -166,7 +167,7 @@ class PhotoDownloadController extends Controller
 
         $hasFullAccess = $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
         $isCoveredByFlatrate = $userRank >= $reqRank;
-        $hasPurchased = $user && $user->hasPurchasedPhoto($photo->id, $tier);
+        $hasPurchased = $user && app(PurchaseService::class)->hasPurchasedPhoto($user, $photo->id, $tier);
 
         if (! $hasFullAccess && ! $isCoveredByFlatrate && ! $hasPurchased && ! $gallery->effective_is_free_download) {
             abort(403, 'Sie besitzen keine gültige Lizenz für diese Bildauflösung ('.$tier.').');
