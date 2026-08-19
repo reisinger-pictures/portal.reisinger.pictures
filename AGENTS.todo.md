@@ -29,9 +29,11 @@
 - Container-Modus: Dienste per Service-Namen (kein `127.0.0.1`).
 
 **Verifikation:**
-- [x] Lokaler Image-Build (amd64-Emulation) grün — Node 26.7.0 / pnpm 11.21.0 / Composer / Chromium in `/ms-playwright` verifiziert.
+- [x] Lokaler Image-Build (amd64-Emulation) grün — Node 26.7.0 / pnpm 11.21.0 / Composer 2.10.2 / Chromium 151.0.7922.34 (v1234) in `/ms-playwright` verifiziert.
 - [x] CI: `e2e-image`-Build-Workflow grün (GHCR `portal-e2e:latest` + `:1.62.1` gepusht).
-- [x] CI: E2E-Jobs (3 Shards: Desktop/Mobile/serial) grün; Backend- und Frontend-Jobs unverändert grün (Zero-Pre-existing-Failures).
+- [x] CI: **alle 5 Jobs grün** (Commit `037473e`, 2026-08-19): Backend (PHPUnit), Frontend (Lint/Build/Vitest), E2E Desktop/Mobile/serial (3 Shards, Container-Modus).
+- [x] **Gemessener Speedup** (Desktop-Shard, Step-Level): Setup-Overhead 47s → 5s (Browser-Step 28s → 1s No-Op; Backend-Deps 10s → 4s; kein DinD mehr). E2E-Job gesamt 12m22s → 11m57s; CI-Gesamtdurchlauf 12m37s → 11m57s (Testausführung selbst ~10,5 min dominiert weiterhin).
+- [x] **Stripe-Idempotency-Race gefixt** (`037473e`): Alle 3 Shards teilten `GITHUB_RUN_ID` als Idempotency-Key → parallele Requests → 409. Key jetzt `pi_ci_validate_<run>_<slug>` (latenter Pre-Bug, beim Container-Umstieg erstmals reproduziert).
 
 **Fallback (falls Container-Modus-Probleme):** Runner-Hosted + Browser via `docker cp` aus dem Image extrahieren (`PLAYWRIGHT_BROWSERS_PATH`), siehe SOLL-Doku §Fallback.
 
