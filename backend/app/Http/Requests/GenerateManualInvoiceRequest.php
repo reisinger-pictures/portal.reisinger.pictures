@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\AuthorizationService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 class GenerateManualInvoiceRequest extends FormRequest
@@ -10,6 +11,7 @@ class GenerateManualInvoiceRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
+
         return $user && app(AuthorizationService::class)->isSuperAdmin($user);
     }
 
@@ -36,12 +38,12 @@ class GenerateManualInvoiceRequest extends FormRequest
             'items.*.notes' => 'nullable|string',
             'items.*.price' => 'required|numeric',
             'items.*.qty' => 'required|numeric|min:0.01',
-            'terms_html' => 'nullable|string'
+            'terms_html' => 'nullable|string',
         ];
     }
 
     protected function failedAuthorization()
     {
-        throw new \Illuminate\Auth\Access\AuthorizationException('Keine Berechtigung');
+        throw new AuthorizationException('Keine Berechtigung');
     }
 }

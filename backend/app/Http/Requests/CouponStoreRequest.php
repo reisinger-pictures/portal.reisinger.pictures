@@ -9,7 +9,6 @@ use App\Support\BrandRegistry;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Http\JsonResponse;
 
 class CouponStoreRequest extends FormRequest
 {
@@ -29,7 +28,7 @@ class CouponStoreRequest extends FormRequest
     {
         $user = $this->user();
         $svc = app(AuthorizationService::class);
-        $isPhotographer = $user && $svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user);
+        $isPhotographer = $user && $svc->isPhotographer($user) && ! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user);
 
         $scopeTypes = $isPhotographer
             ? 'in:gallery,meta_gallery,photographer'
@@ -42,7 +41,7 @@ class CouponStoreRequest extends FormRequest
             'max_items' => 'nullable|integer|min:1|max:999',
             'package_quantity' => 'nullable|integer',
             'package_price_cents' => 'nullable|numeric',
-            'scope_type' => 'required|string|' . $scopeTypes,
+            'scope_type' => 'required|string|'.$scopeTypes,
             'scope_id' => 'nullable|string|required_if:scope_type,gallery,meta_gallery',
             'max_uses_global' => 'nullable|integer|min:1',
             'max_uses_per_account' => 'nullable|integer|min:1',
@@ -61,7 +60,9 @@ class CouponStoreRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $route = $this->route();
-        if (!$route) return;
+        if (! $route) {
+            return;
+        }
 
         $action = $route->getActionName();
 
@@ -90,16 +91,16 @@ class CouponStoreRequest extends FormRequest
 
             // `value` is required for fixed/percentage coupons; it is unused for photo_package.
             if (in_array($data['type'] ?? null, ['fixed', 'percentage'], true)
-                && (!isset($data['value']) || $data['value'] === '')) {
+                && (! isset($data['value']) || $data['value'] === '')) {
                 $validator->errors()->add('value', 'Value is required for fixed and percentage coupons.');
             }
 
             // photo_package requires package_quantity (≥1) and package_price_cents (≥0).
             if (($data['type'] ?? null) === 'photo_package') {
-                if (!isset($data['package_quantity']) || $data['package_quantity'] === '' || (int) ($data['package_quantity'] ?? 0) < 1) {
+                if (! isset($data['package_quantity']) || $data['package_quantity'] === '' || (int) ($data['package_quantity'] ?? 0) < 1) {
                     $validator->errors()->add('package_quantity', 'Package quantity must be at least 1.');
                 }
-                if (!isset($data['package_price_cents']) || $data['package_price_cents'] === '' || (float) ($data['package_price_cents'] ?? -1) < 0) {
+                if (! isset($data['package_price_cents']) || $data['package_price_cents'] === '' || (float) ($data['package_price_cents'] ?? -1) < 0) {
                     $validator->errors()->add('package_price_cents', 'Package price must not be negative.');
                 }
             }
@@ -112,7 +113,7 @@ class CouponStoreRequest extends FormRequest
 
             if (($data['scope_type'] ?? null) === 'organisation') {
                 $orgExists = Org::where('id', $data['scope_id'] ?? '')->where('brand', BrandRegistry::currentId())->exists();
-                if (!$orgExists) {
+                if (! $orgExists) {
                     $validator->errors()->add('scope_id', 'Org not found for this brand.');
                 }
             }

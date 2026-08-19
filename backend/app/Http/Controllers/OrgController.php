@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\UserRole;
+use App\Models\Order;
 use App\Models\Org;
+use App\Models\User;
 use App\Services\AuthorizationService;
+use App\Services\InvoiceService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,12 +25,13 @@ class OrgController extends Controller
             $query->where('id', $user->org_id);
         }
 
-        $query->when($user->brand !== null, fn($q) => $q->where('brand', $user->brand));
+        $query->when($user->brand !== null, fn ($q) => $q->where('brand', $user->brand));
 
         if ($svc->isAdmin($user) || $svc->isPhotographer($user)) {
             return response()->json($query->get());
         } elseif ($svc->isOrgAdmin($user)) {
             $org = $query->first();
+
             return response()->json($org ? [$org] : []);
         }
 
@@ -39,7 +44,7 @@ class OrgController extends Controller
         $user = auth('api')->user();
         $org = Org::with(['users:id,name,email,org_id', 'galleryGroups:id,name,parent_id'])->findOrFail($id);
 
-        if (!$svc->isAdmin($user) && $user->org_id !== $id) {
+        if (! $svc->isAdmin($user) && $user->org_id !== $id) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -47,7 +52,7 @@ class OrgController extends Controller
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $openDeliveryNotesCount = \App\Models\Order::whereIn('user_id', $org->users()->pluck('id'))
+        $openDeliveryNotesCount = Order::whereIn('user_id', $org->users()->pluck('id'))
             ->where('status', 'delivery_note')
             ->count();
         $org->setAttribute('open_delivery_notes_count', $openDeliveryNotesCount);
@@ -58,7 +63,7 @@ class OrgController extends Controller
     public function store(Request $request)
     {
         $svc = app(AuthorizationService::class);
-        if (!$svc->isAdmin(auth('api')->user())) {
+        if (! $svc->isAdmin(auth('api')->user())) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -75,6 +80,7 @@ class OrgController extends Controller
         $data = $request->only(['name', 'domain', 'invoice_frequency', 'default_flatrate_level', 'shared_flatrate_cents', 'can_purchase_upgrades', 'auto_join_policy']);
         $data['brand'] = BrandRegistry::currentOrDefault();
         $org = Org::create($data);
+
         return response()->json(['success' => true, 'org' => $org]);
     }
 
@@ -82,7 +88,7 @@ class OrgController extends Controller
     {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $id)) {
+        if (! $svc->isAdmin($user) && ! ($svc->isOrgAdmin($user) && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -90,7 +96,7 @@ class OrgController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'domain' => 'nullable|string|max:255|unique:orgs,domain,' . $id,
+            'domain' => 'nullable|string|max:255|unique:orgs,domain,'.$id,
             'invoice_frequency' => 'required|in:immediate,monthly,quarterly',
             'default_flatrate_level' => 'nullable|in:none,web,print,original',
             'shared_flatrate_cents' => 'nullable|integer|min:0',
@@ -99,13 +105,14 @@ class OrgController extends Controller
         ]);
 
         $org->update($request->only(['name', 'domain', 'invoice_frequency', 'default_flatrate_level', 'shared_flatrate_cents', 'can_purchase_upgrades', 'auto_join_policy']));
+
         return response()->json(['success' => true, 'org' => $org]);
     }
 
     public function destroy($id)
     {
         $svc = app(AuthorizationService::class);
-        if (!$svc->isAdmin(auth('api')->user())) {
+        if (! $svc->isAdmin(auth('api')->user())) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -114,7 +121,7 @@ class OrgController extends Controller
         DB::transaction(function () use ($org) {
             $userIds = $org->users()->pluck('users.id');
 
-            $users = \App\Models\User::whereIn('id', $userIds)->get();
+            $users = User::whereIn('id', $userIds)->get();
             foreach ($users as $user) {
                 if ($org->default_role_id && $user->roles->contains($org->default_role_id)) {
                     $user->roles()->detach($org->default_role_id);
@@ -139,17 +146,19 @@ class OrgController extends Controller
     {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $id)) {
+        if (! $svc->isAdmin($user) && ! ($svc->isOrgAdmin($user) && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
         $request->validate([
             'user_ids' => 'array',
-            'user_ids.*' => 'exists:users,id'
+            'user_ids.*' => 'exists:users,id',
         ]);
 
-        $superAdmins = \App\Models\User::whereIn('id', $request->user_ids ?? [])
-            ->whereHas('roles', function($q) { $q->where('name', \App\Enums\UserRole::SUPER_ADMIN->value); })
+        $superAdmins = User::whereIn('id', $request->user_ids ?? [])
+            ->whereHas('roles', function ($q) {
+                $q->where('name', UserRole::SUPER_ADMIN->value);
+            })
             ->exists();
 
         if ($superAdmins) {
@@ -159,7 +168,7 @@ class OrgController extends Controller
         $org = Org::findOrFail($id);
 
         if ($org->brand !== null) {
-            $conflictingUsers = \App\Models\User::whereIn('id', $request->user_ids ?? [])
+            $conflictingUsers = User::whereIn('id', $request->user_ids ?? [])
                 ->whereNotNull('brand')
                 ->where('brand', '!=', $org->brand)
                 ->exists();
@@ -174,11 +183,11 @@ class OrgController extends Controller
         $removedUserIds = array_diff($oldUserIds, $newUserIds);
 
         // Set org_id on newly assigned users
-        \App\Models\User::whereIn('id', $newUserIds)->update(['org_id' => $id]);
+        User::whereIn('id', $newUserIds)->update(['org_id' => $id]);
 
         // Revoke organization-derived role + flatrate from removed users
-        if (!empty($removedUserIds)) {
-            $removedUsers = \App\Models\User::whereIn('id', $removedUserIds)->get();
+        if (! empty($removedUserIds)) {
+            $removedUsers = User::whereIn('id', $removedUserIds)->get();
             foreach ($removedUsers as $removedUser) {
                 // Only revoke if the user's role matches the org's default role
                 if ($org->default_role_id && $removedUser->roles->contains($org->default_role_id)) {
@@ -204,7 +213,7 @@ class OrgController extends Controller
     {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $id)) {
+        if (! $svc->isAdmin($user) && ! ($svc->isOrgAdmin($user) && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -215,19 +224,18 @@ class OrgController extends Controller
         return response()->json(['success' => true]);
     }
 
-
-    public function generateCollectiveInvoice($id, \App\Services\InvoiceService $invoiceService)
+    public function generateCollectiveInvoice($id, InvoiceService $invoiceService)
     {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $id)) {
+        if (! $svc->isAdmin($user) && ! ($svc->isOrgAdmin($user) && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
         $org = Org::findOrFail($id);
         $result = $invoiceService->generateForOrg($org, $user);
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             return response()->json(['error' => $result['error']], 400);
         }
 

@@ -2,17 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\SendQuoteRequest;
+use App\Mail\CustomMail;
 use App\Models\Order;
 use App\Services\AuthorizationService;
+use App\Services\ManualInvoiceService;
 use App\Services\QuoteLinkService;
-use App\Http\Requests\SendQuoteRequest;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 
 class QuoteController extends Controller
 {
     public function __construct(
         private QuoteLinkService $quoteLinkService,
-        private \App\Services\ManualInvoiceService $manualInvoiceService
+        private ManualInvoiceService $manualInvoiceService
     ) {}
 
     public function sendQuote(SendQuoteRequest $request, $id)
@@ -29,10 +32,10 @@ class QuoteController extends Controller
 
         $link = $this->quoteLinkService->generateQuoteLink($photoIds, $request->custom_price, rightsText: $request->rights_text);
 
-        $subject = "Individuelles Angebot";
-        $body = "<p>" . nl2br(htmlspecialchars($request->message)) . "</p><br><p><a href=\"{$link}\">Hier geht es zum Angebot und Checkout</a></p>";
+        $subject = 'Individuelles Angebot';
+        $body = '<p>'.nl2br(htmlspecialchars($request->message))."</p><br><p><a href=\"{$link}\">Hier geht es zum Angebot und Checkout</a></p>";
 
-        \Illuminate\Support\Facades\Mail::to($order->user->email)->send(new \App\Mail\CustomMail($subject, $body));
+        Mail::to($order->user->email)->send(new CustomMail($subject, $body));
 
         return response()->json(['success' => true]);
     }
@@ -41,7 +44,7 @@ class QuoteController extends Controller
     {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$svc->isAdmin($user) && !$svc->isPhotographer($user)) {
+        if (! $svc->isAdmin($user) && ! $svc->isPhotographer($user)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
         $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer', 'rights_text' => 'nullable|string|max:2000']);
@@ -54,10 +57,14 @@ class QuoteController extends Controller
     public function decodeQuoteLink(Request $request)
     {
         $token = $request->query('token');
-        if (!$token) return response()->json(['error' => 'Ungültiges Token-Format.'], 400);
+        if (! $token) {
+            return response()->json(['error' => 'Ungültiges Token-Format.'], 400);
+        }
 
         $data = $this->quoteLinkService->decode($token);
-        if (!$data) return response()->json(['error' => 'Angebot abgelaufen oder ungültig.'], 410);
+        if (! $data) {
+            return response()->json(['error' => 'Angebot abgelaufen oder ungültig.'], 410);
+        }
 
         return response()->json($data);
     }
@@ -66,20 +73,20 @@ class QuoteController extends Controller
     {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user || !$svc->isSuperAdmin($user)) {
+        if (! $user || ! $svc->isSuperAdmin($user)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
         $request->validate(['pdf' => 'required|file|mimes:pdf|max:10240']);
         $content = file_get_contents($request->file('pdf')->getPathname());
 
-        if (!preg_match('/OFFER_JWT:([A-Za-z0-9_\.\-]+)/', $content)) {
+        if (! preg_match('/OFFER_JWT:([A-Za-z0-9_\.\-]+)/', $content)) {
             return response()->json(['error' => 'Kein eingebettetes Angebot in diesem PDF gefunden.'], 404);
         }
 
         $data = $this->manualInvoiceService->extractOfferFromPdf($content);
 
-        if (!$data) {
+        if (! $data) {
             return response()->json(['error' => 'Angebot nicht auslesbar oder abgelaufen.'], 400);
         }
 

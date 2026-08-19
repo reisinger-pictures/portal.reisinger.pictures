@@ -3,16 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Brand;
-use App\Services\AuthorizationService;
-use Illuminate\Http\Request;
+use App\Enums\UserRole;
+use App\Mail\OrgInviteMail;
 use App\Models\Org;
 use App\Models\OrgInvite;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\OrgInviteMail;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\AuthorizationService;
+use App\Support\BrandRegistry;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use App\Support\BrandRegistry;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class OrgInviteController extends Controller
 {
@@ -23,12 +27,12 @@ class OrgInviteController extends Controller
 
         // Scoped Policy: Nur Admins oder Org-Admin DES Org dürfen einladen
         $svc = app(AuthorizationService::class);
-        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $orgId)) {
+        if (! $svc->isAdmin($user) && ! ($svc->isOrgAdmin($user) && $user->org_id === $orgId)) {
             return response()->json(['error' => 'Keine Berechtigung, Nutzer in diese Organisation einzuladen.'], 403);
         }
 
         $request->validate([
-            'email' => 'required|email'
+            'email' => 'required|email',
         ]);
 
         $token = Str::random(64);
@@ -37,11 +41,11 @@ class OrgInviteController extends Controller
             'email' => $request->email,
             'org_id' => $org->id,
             'token' => $token,
-            'expires_at' => now()->addDays(7)
+            'expires_at' => now()->addDays(7),
         ]);
 
         $orgBrand = $org->brand instanceof Brand ? $org->brand : BrandRegistry::currentOrDefault();
-        $link = BrandRegistry::frontendUrl($orgBrand) . '/org-invite/' . $token;
+        $link = BrandRegistry::frontendUrl($orgBrand).'/org-invite/'.$token;
         Mail::to($request->email)->queue(new OrgInviteMail($org->name, $link));
 
         return response()->json(['success' => true]);
@@ -56,7 +60,7 @@ class OrgInviteController extends Controller
 
         return response()->json([
             'org_name' => $invite->org->name,
-            'email' => $invite->email
+            'email' => $invite->email,
         ]);
     }
 
@@ -67,14 +71,14 @@ class OrgInviteController extends Controller
         if ($user) {
             $request->validate([
                 'token' => 'required|string',
-                'accept_privacy' => 'required|accepted'
+                'accept_privacy' => 'required|accepted',
             ]);
         } else {
             $request->validate([
                 'token' => 'required|string',
                 'name' => 'required|string|max:255',
                 'password' => 'required|string|min:8',
-                'accept_privacy' => 'required|accepted'
+                'accept_privacy' => 'required|accepted',
             ]);
         }
 
@@ -84,9 +88,9 @@ class OrgInviteController extends Controller
             ->firstOrFail();
 
         return DB::transaction(function () use ($request, $invite, $user) {
-            if (!$user) {
+            if (! $user) {
                 // Neuen User erstellen
-                $user = \App\Models\User::firstOrCreate(
+                $user = User::firstOrCreate(
                     ['email' => $invite->email],
                     ['name' => $request->name, 'password' => Hash::make($request->password)]
                 );
@@ -103,8 +107,8 @@ class OrgInviteController extends Controller
             $user->save();
 
             // Client-Rolle vergeben falls noch keine
-            $clientRole = \App\Models\Role::where('name', \App\Enums\UserRole::CLIENT->value)->first();
-            if ($clientRole && !$user->roles->contains($clientRole->id)) {
+            $clientRole = Role::where('name', UserRole::CLIENT->value)->first();
+            if ($clientRole && ! $user->roles->contains($clientRole->id)) {
                 $user->roles()->syncWithoutDetaching([$clientRole->id]);
             }
 
@@ -117,10 +121,11 @@ class OrgInviteController extends Controller
             }
 
             // Neuen User einloggen
-            \Illuminate\Support\Facades\Auth::guard('api')->logout();
-            $token = \Illuminate\Support\Facades\Auth::guard('api')->login($user);
-            $ttl = \Illuminate\Support\Facades\Auth::guard('api')->factory()->getTTL();
-            $cookie = cookie('rp_jwt', $token, $ttl, '/', null, !app()->environment('local'), true, false, 'Lax');
+            Auth::guard('api')->logout();
+            $token = Auth::guard('api')->login($user);
+            $ttl = Auth::guard('api')->factory()->getTTL();
+            $cookie = cookie('rp_jwt', $token, $ttl, '/', null, ! app()->environment('local'), true, false, 'Lax');
+
             return response()->json(['success' => true])->withCookie($cookie);
         });
     }

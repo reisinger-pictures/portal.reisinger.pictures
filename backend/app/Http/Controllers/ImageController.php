@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Gallery;
 use App\Models\Photo;
-use Illuminate\Support\Str;
 use App\Services\AuthorizationService;
 use App\Services\PhotoProcessingService;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 
 class ImageController extends Controller
 {
@@ -26,16 +28,18 @@ class ImageController extends Controller
         ]);
 
         $gallery = Gallery::find($request->gallery_id);
-        if (!$gallery) return response()->json(['error' => 'Galerie nicht gefunden'], 404);
+        if (! $gallery) {
+            return response()->json(['error' => 'Galerie nicht gefunden'], 404);
+        }
 
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 
-        if (!$svc->isPhotographer($user)) {
+        if (! $svc->isPhotographer($user)) {
             return response()->json(['error' => 'Nur Fotografen dürfen Bilder hochladen.'], 403);
         }
 
-        if (!$svc->isSuperAdmin($user) && !$svc->isAdmin($user) && !($svc->isPhotographer($user) && $svc->canPhotographerAccessGallery($user, $gallery->id))) {
+        if (! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user) && ! ($svc->isPhotographer($user) && $svc->canPhotographerAccessGallery($user, $gallery->id))) {
             return response()->json(['error' => 'Keine Berechtigung für diese Galerie.'], 403);
         }
 
@@ -43,24 +47,26 @@ class ImageController extends Controller
 
         // Exiftool on Windows can't always read PHP temp files directly (file locking).
         // Copy to a stable path before invoking exiftool.
-        $mimeCheckPath = tempnam(sys_get_temp_dir(), 'mimecheck_') . '.' . $file->getClientOriginalExtension();
+        $mimeCheckPath = tempnam(sys_get_temp_dir(), 'mimecheck_').'.'.$file->getClientOriginalExtension();
         copy($file->getRealPath() ?: $file->getPathname(), $mimeCheckPath);
-        $process = new \Symfony\Component\Process\Process(['exiftool', '-MIMEType', '-S', $mimeCheckPath]);
+        $process = new Process(['exiftool', '-MIMEType', '-S', $mimeCheckPath]);
         $process->run();
         unlink($mimeCheckPath);
-        if (!$process->isSuccessful() || !str_contains($process->getOutput(), 'image/')) {
+        if (! $process->isSuccessful() || ! str_contains($process->getOutput(), 'image/')) {
             return response()->json(['error' => 'Die hochgeladene Datei ist kein gültiges oder lesbares Bild.'], 422);
         }
 
         // Originalnamen merken für IPTC Title Fallback
         $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $extension = strtolower($file->extension());
-        if ($extension === 'jpeg') $extension = 'jpg';
+        if ($extension === 'jpeg') {
+            $extension = 'jpg';
+        }
         $mimeType = $file->getClientMimeType();
-        
+
         $targetDir = (string) $gallery->id;
-        $thumbsDir = $targetDir . '/_thumbs';
-        $isLrUpload = $request->lr_uuid && !Str::startsWith($request->lr_uuid, ['web-', 'ftp-']);
+        $thumbsDir = $targetDir.'/_thumbs';
+        $isLrUpload = $request->lr_uuid && ! Str::startsWith($request->lr_uuid, ['web-', 'ftp-']);
         $lrUuid = $request->lr_uuid ?? Str::uuid()->toString();
 
         // Heavy Lifting (ExifTool CLI) VOR der DB-Transaktion ausführen, um Deadlocks zu vermeiden!
@@ -71,7 +77,7 @@ class ImageController extends Controller
         }
 
         return DB::transaction(function () use ($file, $gallery, $user, $extension, $targetDir, $thumbsDir, $isLrUpload, $lrUuid, $request, $meta) {
-            
+
             $query = Photo::where('gallery_id', $gallery->id);
             if ($isLrUpload) {
                 $query->where('lr_uuid', $lrUuid);
@@ -83,7 +89,7 @@ class ImageController extends Controller
             }
             try {
                 $existingPhoto = $query->lockForUpdate()->first();
-            } catch (\Illuminate\Database\QueryException $e) {
+            } catch (QueryException $e) {
                 if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
                     return response()->json(['error' => 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'], 503);
                 }
@@ -92,34 +98,34 @@ class ImageController extends Controller
 
             // Dateinamen IMMER aus UUID generieren!
             $photoId = $existingPhoto ? $existingPhoto->id : (string) Str::uuid();
-            $filename = $photoId . '.' . $extension;
+            $filename = $photoId.'.'.$extension;
 
             Storage::disk('photos')->makeDirectory($targetDir);
             Storage::disk('photos')->makeDirectory($thumbsDir);
 
-            if (!$file->storeAs($targetDir, $filename, ['disk' => 'photos'])) {
+            if (! $file->storeAs($targetDir, $filename, ['disk' => 'photos'])) {
                 throw new \Exception('Datei konnte nicht gespeichert werden.');
             }
 
-            $targetPath = Storage::disk('photos')->path($targetDir . '/' . $filename);
-            $thumbPath = Storage::disk('photos')->path($thumbsDir . '/' . md5($filename . '1024') . '.webp');
+            $targetPath = Storage::disk('photos')->path($targetDir.'/'.$filename);
+            $thumbPath = Storage::disk('photos')->path($thumbsDir.'/'.md5($filename.'1024').'.webp');
 
-            $photoModel = new Photo();
+            $photoModel = new Photo;
             $filteredMeta = array_intersect_key($meta, array_flip($photoModel->getFillable()));
 
             if ($existingPhoto) {
                 $existingPhoto->fill(array_merge([
                     'user_id' => $user->id,
-                    'lr_uuid' => $lrUuid
+                    'lr_uuid' => $lrUuid,
                 ], $filteredMeta))->save();
                 $photo = $existingPhoto;
             } else {
-                $photo = new Photo();
+                $photo = new Photo;
                 $photo->fill(array_merge([
                     'id' => $photoId,
-                    'gallery_id' => $gallery->id, 
-                    'lr_uuid' => $lrUuid, 
-                    'user_id' => $user->id
+                    'gallery_id' => $gallery->id,
+                    'lr_uuid' => $lrUuid,
+                    'user_id' => $user->id,
                 ], $filteredMeta))->save();
             }
 

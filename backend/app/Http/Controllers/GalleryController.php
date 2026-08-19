@@ -2,23 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use App\Models\GalleryGroup;
-use App\Models\Gallery;
-use App\Models\Photo;
-use App\Http\Requests\StoreGroupRequest;
-use App\Http\Requests\UpdateGroupRequest;
 use App\Http\Requests\StoreGalleryRequest;
-use App\Http\Requests\UpdateGalleryRequest;
+use App\Http\Requests\StoreGroupRequest;
 use App\Http\Requests\SyncGalleryAccessRequest;
-use App\Http\Resources\GalleryResource;
+use App\Http\Requests\UpdateGalleryRequest;
+use App\Http\Requests\UpdateGroupRequest;
 use App\Http\Resources\GalleryGroupResource;
+use App\Http\Resources\GalleryResource;
 use App\Http\Resources\PhotoResource;
+use App\Jobs\DeleteGalleryFolderJob;
+use App\Models\DownloadLog;
+use App\Models\Gallery;
+use App\Models\GalleryGroup;
+use App\Models\Photo;
+use App\Models\User;
 use App\Services\AuthorizationService;
 use App\Services\GalleryService;
 use App\Services\GalleryTreeService;
 use App\Services\RatingService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class GalleryController extends Controller
@@ -109,9 +112,10 @@ class GalleryController extends Controller
         }
 
         // Dispatch Job to delete files asynchronously
-        \App\Jobs\DeleteGalleryFolderJob::dispatch((string) $gallery->id);
+        DeleteGalleryFolderJob::dispatch((string) $gallery->id);
 
         $gallery->delete();
+
         return response()->json(['success' => true]);
     }
 
@@ -155,7 +159,7 @@ class GalleryController extends Controller
 
         $galleryIds = Gallery::whereIn('gallery_group_id', $groupIds)->pluck('id')->toArray();
 
-        if (!$svc->isAdmin($user)) {
+        if (! $svc->isAdmin($user)) {
             $allowedGalleryIds = $user->getAllowedGalleryIds();
             $galleryIds = array_intersect($galleryIds, $allowedGalleryIds);
         }
@@ -164,23 +168,24 @@ class GalleryController extends Controller
 
         return response()->json([
             'group' => new GalleryGroupResource($group),
-            'downloads_count' => \App\Models\DownloadLog::whereIn('gallery_id', $galleryIds)->count(),
-            'photos' => $photos->items() ? collect($photos->items())->map(fn($p) => new PhotoResource($p))->values() : [],
+            'downloads_count' => DownloadLog::whereIn('gallery_id', $galleryIds)->count(),
+            'photos' => $photos->items() ? collect($photos->items())->map(fn ($p) => new PhotoResource($p))->values() : [],
             'current_page' => $photos->currentPage(),
             'last_page' => $photos->lastPage(),
-            'total' => $photos->total()
+            'total' => $photos->total(),
         ]);
     }
 
-    public function syncAccess(SyncGalleryAccessRequest $request, $id): JsonResponse {
+    public function syncAccess(SyncGalleryAccessRequest $request, $id): JsonResponse
+    {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$svc->isAdmin($user)) {
+        if (! $svc->isAdmin($user)) {
             return response()->json(['error' => 'Nur Admins können Zugriffe direkt verwalten'], 403);
         }
 
         $validated = $request->validated();
-        $targetUser = \App\Models\User::findOrFail($validated['user_id']);
+        $targetUser = User::findOrFail($validated['user_id']);
 
         $gallery = Gallery::findOrFail($id);
         if (Gate::denies('manage', $gallery)) {
@@ -192,17 +197,19 @@ class GalleryController extends Controller
         } else {
             $targetUser->galleries()->detach($id);
         }
+
         return response()->json(['success' => true]);
     }
 
-    public function syncPhotographers(SyncGalleryAccessRequest $request, $id): JsonResponse {
+    public function syncPhotographers(SyncGalleryAccessRequest $request, $id): JsonResponse
+    {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$svc->isAdmin($user) && !$svc->isPhotographer($user)) {
+        if (! $svc->isAdmin($user) && ! $svc->isPhotographer($user)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
         $validated = $request->validated();
-        $targetUser = \App\Models\User::findOrFail($validated['user_id']);
+        $targetUser = User::findOrFail($validated['user_id']);
 
         $gallery = Gallery::findOrFail($id);
         if (Gate::denies('manage', $gallery)) {
@@ -214,20 +221,22 @@ class GalleryController extends Controller
         } else {
             $targetUser->photographerGalleries()->detach($id);
         }
+
         return response()->json(['success' => true]);
     }
 
-    public function syncGroupPhotographers(SyncGalleryAccessRequest $request, $id): JsonResponse {
+    public function syncGroupPhotographers(SyncGalleryAccessRequest $request, $id): JsonResponse
+    {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$svc->isAdmin($user) && !$svc->isPhotographer($user)) {
+        if (! $svc->isAdmin($user) && ! $svc->isPhotographer($user)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
         $validated = $request->validated();
-        $targetUser = \App\Models\User::findOrFail($validated['user_id']);
+        $targetUser = User::findOrFail($validated['user_id']);
 
-        $group = \App\Models\GalleryGroup::findOrFail($id);
-        if (!$svc->isSuperAdmin($user) && !$svc->isAdmin($user) && !($svc->isPhotographer($user) && $user->photographerGalleryGroups()->where('gallery_groups.id', $group->id)->exists())) {
+        $group = GalleryGroup::findOrFail($id);
+        if (! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user) && ! ($svc->isPhotographer($user) && $user->photographerGalleryGroups()->where('gallery_groups.id', $group->id)->exists())) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
@@ -236,6 +245,7 @@ class GalleryController extends Controller
         } else {
             $targetUser->photographerGalleryGroups()->detach($id);
         }
+
         return response()->json(['success' => true]);
     }
 }

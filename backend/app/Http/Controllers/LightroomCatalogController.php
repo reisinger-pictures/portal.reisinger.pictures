@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LightroomCatalog;
 use App\Models\User;
 use App\Services\AuthorizationService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -15,12 +16,12 @@ class LightroomCatalogController extends Controller
     private function authorizeView(User $user): void
     {
         $svc = app(AuthorizationService::class);
-        if (!$svc->isSuperAdmin($user) && !$svc->isPhotographer($user)) {
+        if (! $svc->isSuperAdmin($user) && ! $svc->isPhotographer($user)) {
             abort(403, 'Forbidden');
         }
     }
 
-    private function scopedQuery(User $user): \Illuminate\Database\Eloquent\Builder
+    private function scopedQuery(User $user): Builder
     {
         return LightroomCatalog::ownedBy($user);
     }

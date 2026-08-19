@@ -2,15 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Gallery;
-use App\Models\DownloadLog;
-use App\Models\User;
 use App\Http\Requests\StatsIndexRequest;
 use App\Http\Resources\DownloadLogResource;
+use App\Models\DownloadLog;
+use App\Models\User;
 use App\Services\AuthorizationService;
 use App\Services\StatsCalculationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class StatsController extends Controller
 {
@@ -39,10 +37,10 @@ class StatsController extends Controller
             $query->where('resolution_tier', $tier);
         }
 
-        if ($svc->isOrgAdmin($user) && !$svc->isAdmin($user)) {
-            $orgUserIds = \App\Models\User::where('org_id', $user->org_id)->pluck('id');
+        if ($svc->isOrgAdmin($user) && ! $svc->isAdmin($user)) {
+            $orgUserIds = User::where('org_id', $user->org_id)->pluck('id');
             $query->whereIn('user_id', $orgUserIds);
-        } elseif (!$svc->isAdmin($user)) {
+        } elseif (! $svc->isAdmin($user)) {
             $galleryIds = array_unique(array_merge(
                 $user->galleries()->pluck('galleries.id')->toArray(),
                 $user->photographerGalleries()->pluck('galleries.id')->toArray()
@@ -56,10 +54,12 @@ class StatsController extends Controller
             if ($log->gallery && $log->gallery->latestPhoto) {
                 $log->thumb_url = $log->gallery->latestPhoto->thumb_url;
             }
+
             return $log;
         });
 
-        $paginated->getCollection()->transform(fn($log) => new DownloadLogResource($log));
+        $paginated->getCollection()->transform(fn ($log) => new DownloadLogResource($log));
+
         return response()->json($paginated);
     }
 }
