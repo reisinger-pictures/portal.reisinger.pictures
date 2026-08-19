@@ -7,6 +7,7 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Http\Resources\GalleryResource;
 use App\Http\Resources\PhotoResource;
+use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\DB;
 
@@ -20,13 +21,14 @@ class GalleryFrontendController extends Controller
             return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
         }
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
 
         $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
         $canManage = false;
         if ($user) {
-            if ($user->is_super_admin || $user->is_admin) {
+            if ($svc->isSuperAdmin($user) || $svc->isAdmin($user)) {
                 $canManage = true;
-            } elseif ($user->is_photographer && $user->canPhotographerAccessGallery($gallery->id)) {
+            } elseif ($svc->isPhotographer($user) && $svc->canPhotographerAccessGallery($user, $gallery->id)) {
                 $canManage = true;
             }
         }
@@ -37,7 +39,7 @@ class GalleryFrontendController extends Controller
 
         if (!$gallery->is_public) {
             if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
-            if (!$user->canAccessGallery($gallery->id)) {
+            if (!$svc->canAccessGallery($user, $gallery->id)) {
                 return response()->json(['error' => 'Kein Zugriff auf diese Galerie.'], 403);
             }
         }
@@ -106,6 +108,7 @@ class GalleryFrontendController extends Controller
 
         $photo = Photo::with('gallery')->findOrFail($photoId);
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
 
 
         if ($photo->gallery->type !== 'selection') {
@@ -114,14 +117,14 @@ class GalleryFrontendController extends Controller
         if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
 
         $isExpired = $photo->gallery->expires_at && \Carbon\Carbon::parse($photo->gallery->expires_at)->isPast();
-        $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($photo->gallery_id)));
+        $canManage = $user && ($svc->isAdmin($user) || ($svc->isPhotographer($user) && $svc->canAccessGallery($user, $photo->gallery_id)));
 
         if ($isExpired && !$canManage) {
             return response()->json(['error' => 'Galerie abgelaufen.'], 403);
         }
 
         if (!$photo->gallery->is_public) {
-            if (!$user->canAccessGallery($photo->gallery_id)) {
+            if (!$svc->canAccessGallery($user, $photo->gallery_id)) {
                 return response()->json(['error' => 'Kein Zugriff auf dieses Foto.'], 403);
             }
         }

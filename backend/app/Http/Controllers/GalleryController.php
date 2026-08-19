@@ -15,6 +15,7 @@ use App\Http\Requests\SyncGalleryAccessRequest;
 use App\Http\Resources\GalleryResource;
 use App\Http\Resources\GalleryGroupResource;
 use App\Http\Resources\PhotoResource;
+use App\Services\AuthorizationService;
 use App\Services\GalleryService;
 use App\Services\GalleryTreeService;
 use App\Services\RatingService;
@@ -147,13 +148,14 @@ class GalleryController extends Controller
     {
         $group = GalleryGroup::with('children')->findOrFail($id);
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
 
         $groupIds = $this->galleryTreeService->getAllSubgroupIds($group);
         $groupIds[] = $group->id;
 
         $galleryIds = Gallery::whereIn('gallery_group_id', $groupIds)->pluck('id')->toArray();
 
-        if (!$user->is_admin) {
+        if (!$svc->isAdmin($user)) {
             $allowedGalleryIds = $user->getAllowedGalleryIds();
             $galleryIds = array_intersect($galleryIds, $allowedGalleryIds);
         }
@@ -171,8 +173,11 @@ class GalleryController extends Controller
     }
 
     public function syncAccess(SyncGalleryAccessRequest $request, $id): JsonResponse {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user->is_admin) return response()->json(['error' => 'Nur Admins können Zugriffe direkt verwalten'], 403);
+        if (!$svc->isAdmin($user)) {
+            return response()->json(['error' => 'Nur Admins können Zugriffe direkt verwalten'], 403);
+        }
 
         $validated = $request->validated();
         $targetUser = \App\Models\User::findOrFail($validated['user_id']);
@@ -191,8 +196,11 @@ class GalleryController extends Controller
     }
 
     public function syncPhotographers(SyncGalleryAccessRequest $request, $id): JsonResponse {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$svc->isAdmin($user) && !$svc->isPhotographer($user)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
         $validated = $request->validated();
         $targetUser = \App\Models\User::findOrFail($validated['user_id']);
 
@@ -210,13 +218,16 @@ class GalleryController extends Controller
     }
 
     public function syncGroupPhotographers(SyncGalleryAccessRequest $request, $id): JsonResponse {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$svc->isAdmin($user) && !$svc->isPhotographer($user)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
         $validated = $request->validated();
         $targetUser = \App\Models\User::findOrFail($validated['user_id']);
 
         $group = \App\Models\GalleryGroup::findOrFail($id);
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->photographerGalleryGroups()->where('gallery_groups.id', $group->id)->exists())) {
+        if (!$svc->isSuperAdmin($user) && !$svc->isAdmin($user) && !($svc->isPhotographer($user) && $user->photographerGalleryGroups()->where('gallery_groups.id', $group->id)->exists())) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 
