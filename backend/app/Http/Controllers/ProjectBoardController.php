@@ -8,6 +8,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\PhotoJobStatus;
 use App\Models\PhotoJob;
 use App\Models\Project;
+use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -19,7 +20,8 @@ class ProjectBoardController extends Controller
     /** Gate: nur Admin / Super-Admin. */
     private function authorizeUser(User $user): void
     {
-        if (!$user->is_super_admin && !$user->is_admin) {
+        $svc = app(AuthorizationService::class);
+        if (!$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
             abort(403, 'Forbidden');
         }
     }
@@ -29,7 +31,7 @@ class ProjectBoardController extends Controller
         $query = Project::query()
             ->where('brand', BrandRegistry::currentOrDefault());
 
-        if (!$user->is_super_admin) {
+        if (!app(AuthorizationService::class)->isSuperAdmin($user)) {
             $query->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
                     ->orWhere('assignee_id', $user->id);
@@ -211,7 +213,7 @@ class ProjectBoardController extends Controller
     public function handoff(Request $request, $id)
     {
         $user = Auth::guard('api')->user();
-        if (!$user->is_super_admin) {
+        if (!app(AuthorizationService::class)->isSuperAdmin($user)) {
             abort(403, 'Forbidden');
         }
 

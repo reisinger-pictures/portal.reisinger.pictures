@@ -6,9 +6,10 @@ use Illuminate\Http\Request;
 use App\Models\Gallery;
 use App\Models\Photo;
 use App\Http\Resources\GalleryResource;
+use App\Services\AuthorizationService;
+use App\Services\PhotoProcessingService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Services\PhotoProcessingService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 
@@ -42,8 +43,9 @@ class FtpController extends Controller
     {
         $request->validate(['gallery_id' => 'nullable|string|exists:galleries,id']);
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
 
-        if ($request->gallery_id && !$user->is_photographer) {
+        if ($request->gallery_id && !$svc->isPhotographer($user)) {
             return response()->json(['error' => 'Keine Rechte für diese Aktion.'], 403);
         }
 
@@ -59,7 +61,8 @@ class FtpController extends Controller
     public function process(Request $request)
     {
         $user = auth('api')->user();
-        if (!$user->is_photographer) {
+        $svc = app(AuthorizationService::class);
+        if (!$svc->isPhotographer($user)) {
             return response()->json(['error' => 'Nur Fotografen dürfen den FTP-Import anstoßen.'], 403);
         }
         if (!$user->current_ftp_gallery_id) {

@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Role;
 use App\Services\AIService;
+use App\Services\AuthorizationService;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
 
@@ -198,12 +199,13 @@ class AuthController extends Controller
     public function me()
     {
         $user = Auth::guard('api')->user();
-        
+        $svc = app(AuthorizationService::class);
+
         // Immer Galerien laden, da auch Admins und Fotografen spezifische Zuweisungen haben können
         $user->load(['galleries', 'roles', 'galleryGroups', 'photographerGalleries', 'photographerGalleryGroups']);
 
         $missingWatermark = false;
-        if ($user->is_super_admin) {
+        if ($svc->isSuperAdmin($user)) {
             $disk = \Illuminate\Support\Facades\Storage::disk('photos');
             if (!$disk->exists('_watermarks/master_500.png') || !$disk->exists('_watermarks/watermark.svg')) {
                 $missingWatermark = true;
@@ -222,13 +224,13 @@ class AuthController extends Controller
             'brand' => $user->brand instanceof Brand ? $user->brand->value : $user->brand,
             'is_cross_brand' => $user->brand === null,
 
-            'is_super_admin' => $user->is_super_admin,
-            'is_admin' => $user->is_admin,
-            'is_photographer' => $user->is_photographer,
+            'is_super_admin' => $svc->isSuperAdmin($user),
+            'is_admin' => $svc->isAdmin($user),
+            'is_photographer' => $svc->isPhotographer($user),
 
-            'is_org_admin' => $user->is_org_admin,
-            'is_power_user' => $user->is_power_user,
-            'is_pending' => $user->is_pending,
+            'is_org_admin' => $svc->isOrgAdmin($user),
+            'is_power_user' => $svc->isPowerUser($user),
+            'is_pending' => $svc->isPending($user),
             'roles' => $user->roles->pluck('name'),
             'missing_watermark' => $missingWatermark,
             'ai_is_unconfigured' => app(AIService::class)->isUnconfigured(),
