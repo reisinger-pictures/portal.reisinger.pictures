@@ -40,6 +40,20 @@ Dieser Download/Install war pro Run reiner Overhead (3 E2E-Shards, ~10–20 min 
      bei Versionsdrift zwischen Dependabot-Bump und Image-Rebuild; ohne `--with-deps`,
      da apt-Deps im Image gebacken sind)
 
+## Shard-Strategie (2026-08-19, gemessen)
+
+Matrix `strategy.matrix.include` in `ci.yml` (5 Shards, Jobs laufen parallel):
+
+| Shard | Projekt | Filter | workers |
+|---|---|---|---|
+| Desktop (1/2) / (2/2) | Desktop Chrome | `--grep-invert "projects-board\|production-board\|billing-details" --shard=1/2 \| 2/2` | 2 |
+| Mobile (1/2) / (2/2) | Mobile Chrome | dito (identische Dateien, anderer Viewport) | 2 |
+| serial (kanban, billing) | beide | `--grep "projects-board\|production-board\|billing-details"` | 1 |
+
+**Gemessener Critical Path:** vorher 12m05s (Desktop/Mobile je 1 Shard) → **8m05s** (Mobile 2/2; Desktop 2/2: 7m58s; 1/2-Shards ≈ 6m; serial 5m28s). **−33 %.**
+
+**Bekannte deterministische Schieflage (akzeptiert):** Playwright shardet nach Test-**Anzahl** (60 vs 64 ≈ fair), nicht nach Laufzeit → die 2/2-Shards tragen 751s serielle Laufzeit vs 491s im 1/2-Shard (schwere Dateien: `stripe-checkout` 96s, `photo-management` 75s, `downloads` 55s, `metadata` 47s… clustern in 2/2). Perfekte Balance (130s seriell rüber) brächte nur ~1 min (→ ~7m Makespan), kostet aber fragile Titel-Greps bei jeder Umbenennung. `workers` > 2 wurde bewusst NICHT erhöht (Login-Rate-Limiter-Flake-Klasse, analog P2b-F9 in open-accreditation). **Korrekturweg bei Bedarf (nicht empfohlen):** schwere Specs per stabilem Titel-Grep von Shard 2 nach Shard 1 ziehen oder nach Laufzeit messen und Datei-Gruppen per CLI-Pfaden (statt `--shard`) aufteilen — dann aber Coverage-Guard für neue Dateien einplanen.
+
 ## Invarianten (nicht regredieren)
 
 - **Nur die Umgebung einbacken** — nie App-Code, `node_modules/`, `vendor/`.
