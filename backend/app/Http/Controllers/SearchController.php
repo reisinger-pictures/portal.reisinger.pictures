@@ -9,6 +9,7 @@ use App\Models\Location;
 use App\Models\GalleryGroup;
 use App\Http\Resources\GalleryResource;
 use App\Http\Resources\PhotoResource;
+use App\Services\AuthorizationService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use App\Support\BrandRegistry;
@@ -19,8 +20,9 @@ class SearchController extends Controller
     {
         $q = $request->input('q', '');
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
 
-        $canSeeExpired = $user && ($user->is_admin || $user->is_photographer);
+        $canSeeExpired = $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
 
         if ($request->boolean('personal') && $user) {
             $allowedGalleryIds = $user->getAllowedGalleryIds();
@@ -57,7 +59,7 @@ class SearchController extends Controller
             }
             $publicGalleryIds = $publicQuery->pluck('id')->toArray();
 
-            if ($user && !$user->is_admin) {
+            if ($user && !$svc->isAdmin($user)) {
                 $allowed = $user->getAllowedGalleryIds();
                 if (!$canSeeExpired && !empty($allowed)) {
                     $allowed = Gallery::whereIn('id', $allowed)->where(function($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); })->pluck('id')->toArray();
@@ -141,9 +143,10 @@ class SearchController extends Controller
     {
         $photo = Photo::with('gallery')->findOrFail($id);
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
 
         if (!$photo->gallery->is_public) {
-            if (!$user || !$user->canAccessGallery($photo->gallery_id)) {
+            if (!$user || !$svc->canAccessGallery($user, $photo->gallery_id)) {
                 abort(403);
             }
         }
