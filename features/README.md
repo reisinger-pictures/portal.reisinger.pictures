@@ -47,6 +47,7 @@ This directory serves as the single source of truth for all technical concepts, 
   * [09-brand-context-queue-cli.md](infrastructure/09-brand-context-queue-cli.md) - Brand-Kontext in Queue-Jobs und CLI-Commands.
   * [20-setting-resolver.md](infrastructure/20-setting-resolver.md) - Brand-gescopte Settings (Fallback-Chain).
   * [21-brand-config-driven.md](infrastructure/21-brand-config-driven.md) - **SOLL:** Statisches `config/brands.php` statt DB-Tabelle, SRP entfernt (Commit `1831116`).
+  * [22-brand-settings-overlay.md](infrastructure/22-brand-settings-overlay.md) - **SOLL:** F3 Brand-Settings-Overlay (DB-Overlay auf `settings`, Whitelist, Merge-Precedence, API-Vertrag).
 * [07-lightroom-multi-Org-gap.md](infrastructure/07-lightroom-multi-Org-gap.md) - Lightroom plugin single-Org gap analysis.
 * [11-brand-settings-separation.md](infrastructure/11-brand-settings-separation.md) - Symmetric brand-prefixed settings resolver.
 * [13-ftp-brand-isolation.md](infrastructure/13-ftp-brand-isolation.md) - FTP upload brand isolation and defense-in-depth.

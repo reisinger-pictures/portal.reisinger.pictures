@@ -58,5 +58,33 @@ The `VolumeLicensingStrategy` (formerly "SRP" volume pricing) is now a **generic
 | Task | Status | Description |
 |------|--------|-------------|
 | **F2** | ✅ Implemented (2026-07-14) | Per-gallery licensing override (`licensing_mode` on `galleries`, Mixed-Cart via `CheckoutService::groupItemsByLicensingMode()`). |
-| **F3** | 🔙 Backlog | Admin-UI for brand settings (NOT full CRUD — only settings for existing brands). Requires config-write-layer or DB revert; not planned for near future. |
+| **F3** | ✅ Implemented (2026-08-19) | Admin-UI for brand settings overlay (DB-Overlay, "Option B"). Per-brand overrides of a fixed config whitelist via `BrandSettingsService`, exposed in `ManagementSettingsView` (super_admin only). No new migration — reuses the V019 `settings` table. See `22-brand-settings-overlay.md`. |
 | **F4** | ✅ Implemented (2026-07-14) | Theme-override per brand (PDF colors from `BrandConfig` already dynamic; daisyUI themes renamed `rp-light`/`rp-dark`). |
+
+## F3 — Brand Settings Admin-UI (Implemented 2026-08-19)
+
+F3 adds an **admin-UI for per-brand settings overrides** — deliberately **not** full CRUD on brands. It follows the **DB-Overlay ("Option B")** pattern (see `22-brand-settings-overlay.md`): `config/brands.php` remains the static default/fallback; a small whitelist of per-brand values can be overridden and persisted in the existing `settings` table.
+
+### What was actually built
+
+| Component | Detail |
+|-----------|--------|
+| Backend service | `app/Services/BrandSettingsService.php` — `OVERRIDABLE` whitelist, `apply()` (persist/reset) and `overridesFor()` (read). Writes via `Setting::updateOrCreate`/`delete` using the `brand_config.<key>` namespace; clears `BrandRegistry` memoized cache after a write. |
+| Controller | `SettingsController::getBrandSettings()` (read) + `updateBrandSettings()` (write) — both in `app/Http/Controllers/SettingsController.php`. |
+| Request | `app/Http/Requests/StoreBrandSettingsRequest.php` — partial payload, per-field type validation, `{brand}` whitelisted against `config('brands')`, `isAdmin`/`isSuperAdmin` authorization. |
+| Routes | `backend/routes/api.php:192-193` — `GET /api/management/brand-settings` (auth:api, all management roles) and `PUT /api/management/brand-settings/{brand}` (`super_admin` middleware). |
+| Merge | `BrandRegistry::buildFromArray()` overlays DB overrides onto the config default before constructing `BrandConfig`. Merge precedence: **DB override > config default**; config-only keys (theme, logos, hostnames, `is_active`) are never touched. |
+| Frontend hook | `frontend/src/logic/useBrandSettings.ts` — SWR `GET`, `updateBrandSettings(brand, payload)` → `PUT`. Zod schema + partial-nullable `BrandSettingsPayload`. |
+| Frontend UI | `frontend/src/ui/management/components/BrandSettingsCard.tsx` — per-brand editor (RHF + zod, explicit "Speichern" button, "Auf Standard zurücksetzen" → `null` overrides), rendered **only for super_admins** inside `ManagementSettingsView.tsx` (`{isSuperAdmin && <BrandSettingsCard/>}`). |
+| Tests | `backend/tests/Feature/BrandSettingsControllerTest.php` (auth 401/403/200, 422 validation, null-reset, merge-precedence, no cross-brand leak), `frontend/src/ui/__tests__/useBrandSettings.test.ts`, `frontend/tests/e2e/admin/brand-settings.spec.ts` (`@feature:admin:brand-settings`). |
+
+### Migration note
+
+**No new migration was needed for F3.** Overrides reuse the existing `settings` table, whose composite primary key `(key, brand)` was established by **V019** (`V019__consolidated_fixes.php`, Part 1). F3 only introduces a new `brand_config.*` key namespace on that table.
+
+### API endpoints
+
+- `GET /api/management/brand-settings` → `{ brands: [{ id, editable_fields, defaults, overrides, effective }] }` for every configured brand.
+- `PUT /api/management/brand-settings/{brand}` → partial payload (`{ field: value | null }`); `null` resets that field to its config default. Returns `{ success, effective }`. Super-admin only.
+
+See `22-brand-settings-overlay.md` for the full SOLL contract (overridable whitelist, merge precedence, API shape, components).
