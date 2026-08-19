@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\UserRole;
 use App\Models\Gallery;
-use App\Models\GalleryGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -31,34 +30,35 @@ class AuthorizationService
         $groupIds = $user->galleryGroups()->pluck('gallery_groups.id')->toArray();
         $allGroupIds = $this->getSubGroupIds($groupIds);
 
-        if (!empty($allGroupIds)) {
+        if (! empty($allGroupIds)) {
             $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allGroupIds)->pluck('id')->toArray();
             $galleryIds = array_unique(array_merge($galleryIds, $groupGalleryIds));
         }
 
         // 3. Org Integration (pivot group assignments)
         if ($user->org_id) {
-            $orgGalleryIds = Gallery::whereHas('orgs', fn($q) => $q->where('orgs.id', $user->org_id))->where('type', 'delivery')->pluck('id')->toArray();
+            $orgGalleryIds = Gallery::whereHas('orgs', fn ($q) => $q->where('orgs.id', $user->org_id))->where('type', 'delivery')->pluck('id')->toArray();
             $pivotGroupIds = DB::table('gallery_group_org')->where('org_id', $user->org_id)->pluck('gallery_group_id')->toArray();
 
             $combinedGroupIds = $pivotGroupIds;
             $allOrgGroupIds = $this->getSubGroupIds($combinedGroupIds);
 
-            if (!empty($allOrgGroupIds)) {
+            if (! empty($allOrgGroupIds)) {
                 $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allOrgGroupIds)->where('type', 'delivery')->pluck('id')->toArray();
                 $orgGalleryIds = array_unique(array_merge($orgGalleryIds, $groupGalleryIds));
             }
             $galleryIds = array_unique(array_merge($galleryIds, $orgGalleryIds));
         }
 
-        if (!empty($user->transient_galleries)) {
+        if (! empty($user->transient_galleries)) {
             $galleryIds = array_unique(array_merge($galleryIds, $user->transient_galleries));
         }
 
         if ($this->isPhotographer($user)) {
             $buildUnrestricted = function () {
                 $allGalleries = Gallery::with('galleryGroup')->get();
-                return $allGalleries->filter(fn($g) => !$g->effective_restricted_photographers)->pluck('id')->toArray();
+
+                return $allGalleries->filter(fn ($g) => ! $g->effective_restricted_photographers)->pluck('id')->toArray();
             };
             $unrestrictedIds = Cache::remember('unrestricted_photographer_gallery_ids', now()->addMinutes(5), $buildUnrestricted);
             $galleryIds = array_merge($galleryIds, $unrestrictedIds);
@@ -114,6 +114,7 @@ class AuthorizationService
         ";
 
         $result = DB::select($query, $parentIds);
+
         return array_values(array_unique(array_column($result, 'id')));
     }
 
@@ -160,6 +161,16 @@ class AuthorizationService
         return $user->roles()->where('name', UserRole::ORG_ADMIN->value)->exists() && $user->org_id !== null;
     }
 
+    public function isClient(User $user): bool
+    {
+        return $this->hasRole($user, UserRole::CLIENT->value);
+    }
+
+    public function isPrivileged(User $user): bool
+    {
+        return $this->hasRole($user, UserRole::POWER_USER->value, UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value, UserRole::PHOTOGRAPHER->value);
+    }
+
     /**
      * Mirrors User::getIsPendingAttribute(): a user without guest context and
      * without any role, gallery-group, or gallery assignment is pending.
@@ -169,6 +180,7 @@ class AuthorizationService
         if ($user->guest_id) {
             return false;
         }
+
         return $user->roles()->count() === 0
             && $user->galleryGroups()->count() === 0
             && $user->galleries()->count() === 0;
@@ -182,16 +194,16 @@ class AuthorizationService
         if ($this->isSuperAdmin($user)) {
             return true;
         }
-        if (!$this->isPhotographer($user)) {
+        if (! $this->isPhotographer($user)) {
             return false;
         }
 
         $gallery = Gallery::find($galleryId);
-        if (!$gallery) {
+        if (! $gallery) {
             return false;
         }
 
-        if (!$gallery->effective_restricted_photographers) {
+        if (! $gallery->effective_restricted_photographers) {
             return true;
         }
 
@@ -200,7 +212,7 @@ class AuthorizationService
         }
 
         $groupIds = $user->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
-        if (!empty($groupIds)) {
+        if (! empty($groupIds)) {
             $allGroupIds = $this->getSubGroupIds($groupIds);
             if (in_array($gallery->gallery_group_id, $allGroupIds)) {
                 return true;

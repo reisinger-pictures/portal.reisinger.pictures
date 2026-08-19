@@ -9,6 +9,7 @@ use App\Mail\Transports\GmailRestTransport;
 use App\Models\Setting;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
+use App\Services\AuthorizationService;
 use App\Services\CouponService;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
@@ -77,22 +78,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::define('manage-catalog', function ($user) {
-            return $user->is_super_admin;
+        Gate::define('manage-catalog', fn ($user) => app(AuthorizationService::class)->isSuperAdmin($user));
+
+        Gate::define('manage-users', function ($user) {
+            $svc = app(AuthorizationService::class);
+
+            return $svc->isAdmin($user) || $svc->isOrgAdmin($user);
         });
 
-        Gate::define('manage-users', fn ($user) => $user->is_admin || $user->is_org_admin);
-
         Gate::define('purchase-upgrades', function ($user) {
-            $user->loadMissing('roles');
-            $roleNames = $user->roles->pluck('name')->all();
-            $isClient = in_array(UserRole::CLIENT->value, $roleNames);
-            $isPrivileged = in_array(UserRole::POWER_USER->value, $roleNames)
-                || in_array(UserRole::ADMIN->value, $roleNames)
-                || in_array(UserRole::SUPER_ADMIN->value, $roleNames)
-                || in_array(UserRole::PHOTOGRAPHER->value, $roleNames);
+            $svc = app(AuthorizationService::class);
 
-            return ! $isClient || $isPrivileged;
+            return ! $svc->isClient($user) || $svc->isPrivileged($user);
         });
 
         Gate::define('purchase-on-invoice', function ($user) {
