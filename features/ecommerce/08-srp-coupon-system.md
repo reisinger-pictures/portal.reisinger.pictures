@@ -8,12 +8,13 @@
 
 ### 1. Coupon Types
 
-Two atomic discount types, defined by the `type` column:
+Three coupon types, defined by the `type` column:
 
 | Type | `value` meaning | Example |
 |---|---|---|
 | `fixed` | Fixed discount in Euro (stored as DECIMAL, converted to cents) | `value=5` → −5,00 € |
 | `percentage` | Percentage discount (0–100). When `max_items` is set, applies only to the X cheapest items. | `value=10` → −10 % (entire cart) or `value=50, max_items=3` → 50% off the 3 cheapest items |
+| `photo_package` | **Until N photos for a flat price Y €** (Foto-Paket / Volume-Licensing-Gutschein). N = `package_quantity`, Y = `package_price_cents`. Semantics, calculation & data model: **§3a**. | `package_quantity=10`, `package_price_cents=4000` → „10 Fotos für 40 €" |
 
 ### 2. Scope
 
@@ -79,6 +80,82 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 - **Coupon invalidation (active toggle):** Admins and photographers can deactivate coupons via `active = false`. A deactivated coupon is permanently invalid until reactivated.
 - **Coupon deletion:** Super Admin and Admin (brand-bound) can delete any coupon unconditionally. Photographers may only delete their own coupons where `used_count = 0` (invoice integrity). The `used_count > 0` guard is skipped for any user with `is_admin` or `is_super_admin`.
 
+### 3a. Photo Package Type (`photo_package`) — Foto-Paket-Gutschein
+
+**Status:** ✅ Implementiert (Backend `V030__add_photo_package_to_coupons.php` + `CouponService::applyCoupon` `case 'photo_package'`; Frontend `CouponFormDrawer`, `useCoupon`, `CouponInput`, Listen `GalleryCouponsTab` / `GalleryGroupCouponsTab` / `ManagementCouponsView`). SOLL = Ist.
+
+**Herkunft:** User-Request (2026-08-19): „Gutscheine für Volume Licensing à 10 Fotos für 40 €".
+Bestehende Typen decken das nicht ab — `fixed`/`percentage` sind reine Rabatt-Codes, die automatische
+Volume-Staffel kennt keinen einlösbaren Paket-Preis. `photo_package` ist ein dritter Coupon-Typ, der
+**N Fotos zum Festpreis Y €** gewährt. Tracking: `AGENTS.todo.md` → Plan **P1**.
+
+**Semantik (Einlöse-Regeln):**
+
+Parameter: **N** = `package_quantity` (Anzahl Fotos im Paket), **Y** = `package_price_cents` (Festpreis in Cent).
+
+- **M** = Anzahl zahlbarer Warenkorb-Items (`priceCents > 0`; Quote-Items mit `priceCents = 0` werden **nicht** gezählt — siehe Annahme unten).
+- **M ≤ N** → Gesamtpreis der Paket-Fotos = **Y €** (alle M Fotos im Paket enthalten).
+- **M > N** → die ersten **N** Fotos kosten gesamt **Y €**; die verbleibenden **(M − N)** Fotos werden zum
+  **regulären Volume-Preis** berechnet (kein weiterer Rabatt).
+- **Übercharge-Guard:** Falls Y € höher wäre als der reguläre Preis der abgedeckten Fotos, zahlt der Kunde
+  **nie mehr** als den regulären Preis. Effektiver Paketpreis = `min(Y, Summe(priceCents der abgedeckten Items))`.
+
+**Beispiel „10 Fotos für 40 €" (Volume-Einzelpreis 5 €/Foto):**
+- 7 Fotos → **40,00 €** (statt 35 € regulär → Guard greift: effektiv 35 €, kein Aufschlag).
+- 10 Fotos → **40,00 €** (statt 50 € regulär).
+- 13 Fotos → **40,00 € + 3 × 5,00 € = 55,00 €** (10 im Paket, 3 zum Normalpreis).
+
+**Berechnung (`CouponService::applyCoupon`):** neuer `case 'photo_package'` im bestehenden `switch`:
+
+```
+M             = count(items where priceCents > 0)                 // zahlbare Items
+covered       = min(M, coupon.package_quantity)
+prices        = sort(items.priceCents where priceCents > 0 ascending)
+normalCovered = sum(prices[0 .. covered-1])                       // regulärer Preis der abgedeckten Fotos
+effPackage    = min(coupon.package_price_cents, normalCovered)    // Übercharge-Guard
+discountCents = normalCovered - effPackage
+totalCents    = currentTotalCents - discountCents                 // Rest-Items (M - covered) unverändert
+```
+
+Integriert sich nahtlos in `VolumeLicensingStrategy::calculateCart()`, das `applyCoupon` bereits aufruft
+(Konsistenz mit `fixed`/`percentage`). Coupon wird **nach** der Volume-Preisberechnung angewendet.
+
+**Data Model (Migration V030):** neue, **separate** Migration (`V030__add_photo_package_to_coupons.php`; V027 war die letzte deploy-bereite — V028/V029 kamen danach hinzu).
+Tabelle `coupons` erweitern um `package_quantity INT UNSIGNED NOT NULL` (N) und
+`package_price_cents INT NOT NULL` (Y, Stripe-konform). `Coupon::$fillable` + `$casts` ergänzen.
+Für `photo_package` sind `value` und `max_items` **ungenutzt** (bleiben NULL/0). `down()` darf leer bleiben.
+
+**Validation (`CouponStoreRequest` / `CouponUpdateRequest`):** `type → in:fixed,percentage,photo_package`;
+bei `photo_package` (conditional via `withValidator`): `package_quantity → required|integer|min:1`,
+`package_price_cents → required|integer|min:0`. Frontend sendet den Preis zweckmäßig in **Euro**;
+`CouponAdminController::store()`/`update()` mappt `package_price` (float) → `package_price_cents` (int)
+vor `Coupon::create()`/`update()` (Cent-Konvention wie `value`→`*_cents` andernorts).
+
+**Frontend:**
+- **Admin-Formular** `CouponFormDrawer.tsx`: Typ-Option **„Foto-Paket"**; bei `type === 'photo_package'`
+  statt `value`/`max_items` zwei Felder: *„Anzahl Fotos (N)"* (`package_quantity`) + *„Festpreis in € (Y)"* (`package_price`).
+  `couponSchema` (Zod, `type: z.enum([... , 'photo_package'])`), lokales `Coupon`-Interface, `TYPE_VALUE_LABEL`,
+  `toFormValues`, `onSubmit`-Payload anpassen.
+- **Einlösen/Anzeige**: `useCoupon.ts` (`CouponSummary.type` um `'photo_package'`), `CouponInput.tsx`,
+  `ClientCartView.tsx` → Label *„10 Fotos für 40 €"* + Rabatt-Vorschau (`discount_cents` aus Backend).
+- **Listen** `GalleryCouponsTab.tsx` / `GalleryGroupCouponsTab.tsx` / `ManagementCouponsView.tsx`
+  (`formatValue`/`formatUsage`) → *„10 Fotos / 40 €"* für Paket-Typ.
+
+**Security / Brand Isolation:** Coupon ist bereits brand-isoliert (`forCurrentBrand`/`byBrand`;
+`CouponAdminController` setzt `brand`). `photo_package` erbt Scope/Limits/Expiry/Usage-Count automatisch —
+**kein neuer Guard nötig**; bestehende IDOR-Guards (H2/H3) greifen weiter. Wie alle Coupons ist
+`photo_package` **SRP/Volume-exklusiv** (siehe §3 oben: nur `VolumeLicensingStrategy` wendet Coupons an).
+
+**Annahme „zahlbar" = `priceCents > 0`:** Quote-Items sind 0 und werden nicht gezählt. Edge-Case: ein
+reguläres Item mit `priceCents = 0` würde fälschlich nicht gezählt — im Volume-Pfad unrealistisch; bei
+Bedarf `is_quote`-Flag in `pricedItems` durchreichen statt der `> 0`-Heuristik.
+
+**Tests (DoD):** Backend PHPUnit (`CouponServiceTest` erweitern): `photo_package` mit M ≤ N, M > N,
+Übercharge-Guard, sowie `CouponStoreRequest`-Validierung (conditional required). Frontend Vitest
+(`CouponFormDrawer.test.tsx`: Paket-Option rendert N + Y-Felder + Validation). E2E Playwright
+`@feature:coupon` (bzw. `@smoke`): Paket-Gutschein anlegen → im Cart einlösen → Assert Gesamtpreis = Y bei
+≤ N und Y + Rest bei > N.
+
 ### 4. Validation Flow (Frontend → Backend)
 
 1. User enters coupon code in checkout.
@@ -117,7 +194,7 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 |---|---|
 | `VolumeLicensingStrategy` | After `$result` is produced, apply coupon if present and valid. If coupon is requested but invalid, throw exception. |
 | `CheckoutService` | Pass coupon code from request → validate before strategy call → reject if invalid. Store `coupon_id` and `coupon_discount_cents` on order. |
-| `CouponService` | New service: find valid coupon (incl. organisation scope), apply discount calculation (incl. percentage+max_items), increment usage. |
+| `CouponService` | New service: find valid coupon (incl. organisation scope), apply discount calculation (`fixed` / `percentage`+`max_items` / `photo_package` bundle, see §3a), increment usage. |
 | `Order` model | Add `coupon_id` (nullable FK) and `coupon_discount_cents` (integer, default 0). |
 
 ### 6. API Endpoints
@@ -143,9 +220,11 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 | `id` | BIGINT UNSIGNED AUTO_INCREMENT | Primary key |
 | `brand` | ENUM('rp','srp') NOT NULL | Brand isolation |
 | `code` | VARCHAR(50) NOT NULL | Human-readable code |
-| `type` | ENUM('fixed','percentage') NOT NULL | Discount type |
-| `value` | DECIMAL(10,2) NOT NULL | Amount / percent |
+| `type` | ENUM('fixed','percentage','photo_package') NOT NULL | Discount type (see §1 / §3a) |
+| `value` | DECIMAL(10,2) NOT NULL | Amount / percent (unused for `photo_package`) |
 | `max_items` | INT UNSIGNED NULL | When type=percentage: limit discount to X cheapest items (NULL = entire cart) |
+| `package_quantity` | INT UNSIGNED NULL | When type=photo_package: N (number of photos included in the bundle) |
+| `package_price_cents` | INT NULL | When type=photo_package: flat price Y € in cents (Stripe-conform) |
 | `scope_type` | ENUM('global','gallery','meta_gallery','photographer','organisation') NOT NULL DEFAULT 'global' | Scope type |
 | `scope_id` | CHAR(36) NULL | Target ID (galleries / gallery_groups / tenants) |
 | `max_uses_global` | INT UNSIGNED NULL | Global usage limit (NULL = unlimited) |
@@ -186,6 +265,7 @@ Unique: `(coupon_id, user_id)`
 | `scope_type` | alle (inkl. `organisation`) | alle (inkl. `organisation`) | `gallery`, `meta_gallery`, `photographer` (nur eigene) |
 | `scope_id` | jede ID | jede ID der Brand | nur eigene Galleries/Groups |
 | `max_items` | ✓ | ✓ | ✓ |
+| `package_quantity` / `package_price_cents` | ✓ | ✓ | ✓ |
 | `max_uses_global` | ✓ | ✓ | versteckt / null |
 | `max_uses_per_account` | ✓ | ✓ | ✓ |
 | `active` | ✓ | ✓ | versteckt (aktiv via expires_at + used_count) |

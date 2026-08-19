@@ -23,8 +23,12 @@ import {t} from "@lingui/core/macro";
 
 export interface CouponSummary {
     code: string;
-    type: 'fixed' | 'percentage';
+    type: 'fixed' | 'percentage' | 'photo_package';
     value: number;
+    /** Photo-package: number of photos (N). */
+    package_quantity?: number;
+    /** Photo-package: flat price Y in cents. */
+    package_price_cents?: number;
 }
 
 interface ValidateSuccessResponse {
@@ -49,6 +53,8 @@ export interface UseCouponOptions {
 export interface UseCouponResult {
     /** Currently applied coupon code, or null if none. */
     couponCode: string | null;
+    /** Fully resolved coupon summary (type + params), or null if none. */
+    coupon: CouponSummary | null;
     /** True iff a coupon has been successfully validated and applied. */
     isValid: boolean;
     /** Computed/returned discount in cents, or null when no coupon is active. */
@@ -69,6 +75,7 @@ export interface UseCouponResult {
 
 const INITIAL_STATE = {
     couponCode: null as string | null,
+    coupon: null as CouponSummary | null,
     isValid: false,
     discount: null as number | null,
     isLoading: false,
@@ -124,6 +131,7 @@ async function requestCouponValidation(body: CouponValidationRequest): Promise<R
 export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
     const {galleryId, metaGalleryId} = options ?? {};
     const [couponCode, setCouponCode] = useState<string | null>(INITIAL_STATE.couponCode);
+    const [coupon, setCoupon] = useState<CouponSummary | null>(INITIAL_STATE.coupon);
     const [isValid, setIsValid] = useState<boolean>(INITIAL_STATE.isValid);
     const [discount, setDiscount] = useState<number | null>(INITIAL_STATE.discount);
     const [isLoading, setIsLoading] = useState<boolean>(INITIAL_STATE.isLoading);
@@ -136,6 +144,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
             setIsValid(false);
             setDiscount(null);
             setCouponCode(null);
+            setCoupon(null);
             return;
         }
 
@@ -151,6 +160,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
             setCouponCode(null);
             setIsValid(false);
             setDiscount(null);
+            setCoupon(null);
             return;
         }
 
@@ -165,6 +175,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
         if (response.ok && payload.valid === true) {
             const successPayload = payload as ValidateSuccessResponse;
             setCouponCode(successPayload.coupon.code);
+            setCoupon(successPayload.coupon);
             setIsValid(true);
             setDiscount(typeof successPayload.discount_cents === 'number'
                 ? successPayload.discount_cents
@@ -173,6 +184,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
         } else {
             const failurePayload = payload as ValidateFailureResponse;
             setCouponCode(null);
+            setCoupon(null);
             setIsValid(false);
             setDiscount(null);
             setError(
@@ -185,6 +197,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
 
     const removeCoupon = (): void => {
         setCouponCode(INITIAL_STATE.couponCode);
+        setCoupon(INITIAL_STATE.coupon);
         setIsValid(INITIAL_STATE.isValid);
         setDiscount(INITIAL_STATE.discount);
         setIsLoading(INITIAL_STATE.isLoading);
@@ -193,6 +206,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
 
     return {
         couponCode,
+        coupon,
         isValid,
         discount,
         isLoading,

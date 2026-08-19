@@ -349,7 +349,7 @@ Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wi
 
 ### 🔙 P1 — Coupon-Typ `photo_package` (Foto-Paket-Gutschein)
 
-**Status:** Ausgearbeitet (2026-08-19) — **noch nicht umgesetzt.** SOLL-Doku: `features/ecommerce/08-srp-coupon-system.md` §3a.
+**Status:** ✅ **Implementiert** (2026-08-19). SOLL-Doku: `features/ecommerce/08-srp-coupon-system.md` §3a (Status = Ist). Migration real ist **V030** (V028/V029 waren zum Umsetzungszeitpunkt bereits belegt).
 
 **Ziel (User-Request 2026-08-19):** „Gutscheine für Volume Licensing à 10 Fotos für 40 €" — ein neuer Coupon-Typ, der **bis zu N Fotos zum Festpreis Y €** gewährt (Foto-Paket / Bundle). Aktuell nicht möglich: `Coupon`-Model kennt nur `type ∈ {fixed, percentage}` (`app/Models/Coupon.php:24`); die automatische Volume-Staffel (`VolumeLicensingStrategy`) kennt keinen einlösbaren Paket-Preis.
 
@@ -364,12 +364,12 @@ Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wi
 - `CouponService::applyCoupon` erhält `case 'photo_package'`; reiht sich nach der Volume-Berechnung ein.
 
 **Umsetzungsplan (jeder Schritt einzeln grün testbar):**
-1. [ ] Migration V028 (`package_quantity`, `package_price_cents`); `Coupon::$fillable` + `$casts`; `CouponResource` exponiert Felder. `down()` leer.
-2. [ ] `CouponStoreRequest`/`CouponUpdateRequest`: `type` → `in:fixed,percentage,photo_package`; conditional (via `withValidator`): `package_quantity` required ≥1, `package_price_cents` required ≥0 bei `photo_package`. `CouponAdminController` mappt Euro→Cent vor `create()`/`update()`.
-3. [ ] `CouponService::applyCoupon` — `case 'photo_package'` (Berechnung §3a).
-4. [ ] Frontend `CouponFormDrawer.tsx`: Typ-Option „Foto-Paket", N+Y-Felder, `couponSchema`/`Coupon`-Interface/`onSubmit` angepasst. `useCoupon.ts` (`CouponSummary.type`), `CouponInput.tsx`, `ClientCartView.tsx` (Label „10 Fotos für 40 €" + Rabatt-Vorschau). Listen (`*CouponsTab.tsx`, `ManagementCouponsView`) zeigen „10 Fotos / 40 €".
-5. [ ] Doku: `08-srp-coupon-system.md` §3a ist SOLL (erledigt); ggf. Typ-Liste in §1/§7 synchron (erledigt).
-6. [ ] **Tests (DoD — explizit als TODO):** ⬜ Backend PHPUnit `CouponServiceTest`: M≤N, M>N, Übercharge-Guard, `CouponStoreRequest`-Validierung (conditional required). ⬜ Frontend Vitest `CouponFormDrawer.test.tsx`: Paket-Option rendert N+Y + Validation. ⬜ E2E Playwright `@feature:coupon` (bzw. `@smoke`): Paket-Gutschein anlegen → im Cart einlösen → Assert Gesamtpreis = Y bei ≤N und Y+Rest bei >N.
+1. [x] Migration V030 (`package_quantity`, `package_price_cents`); `Coupon::$fillable` + `$casts`; `CouponResource` exponiert Felder. `down()` leer.
+2. [x] `CouponStoreRequest`/`CouponUpdateRequest`: `type` → `in:fixed,percentage,photo_package`; conditional (via `withValidator`): `package_quantity` required ≥1, `package_price_cents` required ≥0 bei `photo_package`. `CouponAdminController` mappt Euro→Cent vor `create()`/`update()`.
+3. [x] `CouponService::applyCoupon` — `case 'photo_package'` (Berechnung §3a).
+4. [x] Frontend `CouponFormDrawer.tsx`: Typ-Option „Foto-Paket", N+Y-Felder, `couponSchema`/`Coupon`-Interface/`onSubmit` angepasst. `useCoupon.ts` (`CouponSummary.type`), `CouponInput.tsx`, `ClientCartView.tsx` (Label „10 Fotos für 40 €" + Rabatt-Vorschau). Listen (`*CouponsTab.tsx`, `ManagementCouponsView`) zeigen „10 Fotos / 40 €".
+5. [x] Doku: `08-srp-coupon-system.md` §3a ist SOLL (= Ist); Typ-Liste in §1/§7 synchron (enthalten).
+6. [x] **Tests (DoD):** ✅ Backend PHPUnit `CouponServiceTest` (M≤N, M>N, Übercharge-Guard, M=N) + `CouponAdminControllerTest` (Validierung conditional required + Euro→Cent-Mapping). ✅ Frontend Vitest `CouponFormDrawer.test.tsx`: Paket-Option rendert N+Y + Validation + Submit. ⬜ E2E Playwright `@feature:coupon`: Paket-Gutschein anlegen → im Cart einlösen → Assert Gesamtpreis = Y bei ≤N und Y+Rest bei >N (noch offen — separater E2E-Task).
 
 **Test-Strategie:** PHPUnit (applyCoupon-Kombinationen + Request-Validierung), Vitest (Form-Rendering/Validation), Playwright (`@feature:coupon`). Nach jedem Code-Change `@smoke`.
 

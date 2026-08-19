@@ -16,8 +16,11 @@ interface CouponInputProps {
 }
 
 export default function CouponInput({galleryId}: CouponInputProps) {
-    const {couponCode, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon({galleryId});
+    const {couponCode, coupon, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon({galleryId});
     const [inputValue, setInputValue] = useState<string>('');
+
+    const packageQuantity = coupon?.package_quantity ?? null;
+    const packagePriceText = coupon != null ? formatMoney(coupon.package_price_cents ?? 0) : null;
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -48,6 +51,11 @@ export default function CouponInput({galleryId}: CouponInputProps) {
                         {typeof discount === 'number' && discount > 0 && (
                             <span className="text-success font-semibold whitespace-nowrap">
                                 −{formatMoney(discount)}
+                            </span>
+                        )}
+                        {coupon?.type === 'photo_package' && packageQuantity != null && packagePriceText != null && (
+                            <span className="text-sm opacity-80 whitespace-nowrap">
+                                <Trans>{packageQuantity} Fotos für {packagePriceText}</Trans>
                             </span>
                         )}
                     </div>

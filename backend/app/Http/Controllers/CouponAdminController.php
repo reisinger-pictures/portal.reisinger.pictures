@@ -80,10 +80,34 @@ class CouponAdminController extends Controller
     //  Admin: Create (role-aware field restrictions)
     // ──────────────────────────────────────────────
 
+    /**
+     * Normalize coupon input before persistence.
+     *
+     * - For `photo_package` coupons, `value` / `max_items` are unused (the
+     *   `value` column is NOT NULL, so default it to 0) and the Euro-based
+     *   `package_price_cents` field (sent by the frontend as a flat price in €)
+     *   is mapped to its integer cents representation (Stripe-conform).
+     */
+    private function normalizePackagePrice(array $validated): array
+    {
+        if (($validated['type'] ?? null) === 'photo_package') {
+            if (!isset($validated['value']) || $validated['value'] === '') {
+                $validated['value'] = 0;
+            }
+            $validated['max_items'] = null;
+
+            if (array_key_exists('package_price_cents', $validated) && $validated['package_price_cents'] !== null) {
+                $validated['package_price_cents'] = (int) round((float) $validated['package_price_cents'] * 100);
+            }
+        }
+
+        return $validated;
+    }
+
     public function store(CouponStoreRequest $request): JsonResponse
     {
         $user = auth()->user();
-        $validated = $request->validated();
+        $validated = $this->normalizePackagePrice($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
 
@@ -108,7 +132,7 @@ class CouponAdminController extends Controller
         $this->authorizeCoupon($coupon);
 
         $user = auth()->user();
-        $validated = $request->validated();
+        $validated = $this->normalizePackagePrice($request->validated());
 
         if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
             unset($validated['max_uses_global']);
@@ -186,7 +210,7 @@ class CouponAdminController extends Controller
         $gallery = $this->findAndVerifyGallery($galleryId);
 
         $user = auth()->user();
-        $validated = $request->validated();
+        $validated = $this->normalizePackagePrice($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
         $validated['scope_type'] = 'gallery';
@@ -260,7 +284,7 @@ class CouponAdminController extends Controller
         }
 
         $user = auth()->user();
-        $validated = $request->validated();
+        $validated = $this->normalizePackagePrice($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
         $validated['scope_type'] = 'meta_gallery';
