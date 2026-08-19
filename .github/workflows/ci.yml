@@ -196,8 +196,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {name: 'Desktop', slug: 'desktop', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2'}
-          - {name: 'Mobile', slug: 'mobile', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2'}
+          # Desktop/Mobile je in 2 Sub-Shards geteilt (--shard=x/2), damit der
+          # Critical Path (~12 min Testausfuehrung je Projekt-Shard, gemessen
+          # 2026-08-19) auf ~6 min halbiert wird. Playwright shardet nach
+          # Datei-REIHENFOLGE, nicht Laufzeit -> nach dem ersten Lauf die
+          # Shard-Dauern vergleichen und bei Schieflage per Untergruppen
+          # (grep) nachbalancieren.
+          - {name: 'Desktop (1/2)', slug: 'desktop-1', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=1/2'}
+          - {name: 'Desktop (2/2)', slug: 'desktop-2', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=2/2'}
+          - {name: 'Mobile (1/2)', slug: 'mobile-1', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=1/2'}
+          - {name: 'Mobile (2/2)', slug: 'mobile-2', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=2/2'}
           - {name: 'serial (kanban, billing)', slug: 'kanban', args: '--grep "projects-board|production-board|billing-details" --workers=1'}
     env:
       # Zuordnung spiegelt backend/.env (lokales, funktionierendes E2E-Setup):
@@ -253,7 +261,7 @@ jobs:
       - name: Validate Stripe API key (read + write)
         env:
           STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
-          # Eindeutiger Idempotency-Key pro Shard: alle 3 E2E-Shards desselben
+          # Eindeutiger Idempotency-Key pro Shard: alle 5 E2E-Shards desselben
           # Runs teilen sich GITHUB_RUN_ID -> parallele Requests mit identischem
           # Key -> Stripe 409 (idempotency_key_in_use). Fix: 2026-08-19.
           IDEMPOTENCY_KEY: pi_ci_validate_${GITHUB_RUN_ID}_${{ matrix.slug }}
