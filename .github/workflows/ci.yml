@@ -253,6 +253,10 @@ jobs:
       - name: Validate Stripe API key (read + write)
         env:
           STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
+          # Eindeutiger Idempotency-Key pro Shard: alle 3 E2E-Shards desselben
+          # Runs teilen sich GITHUB_RUN_ID -> parallele Requests mit identischem
+          # Key -> Stripe 409 (idempotency_key_in_use). Fix: 2026-08-19.
+          IDEMPOTENCY_KEY: pi_ci_validate_${GITHUB_RUN_ID}_${{ matrix.slug }}
         run: |
           HTTP_CODE=$(curl -sS -o /tmp/stripe-balance.json -w '%{http_code}' \
             -H "Authorization: Bearer ${STRIPE_SECRET}" \
@@ -264,7 +268,7 @@ jobs:
           echo "Stripe read (balance) OK"
           HTTP_CODE=$(curl -sS -o /tmp/stripe-pi.json -w '%{http_code}' \
             -H "Authorization: Bearer ${STRIPE_SECRET}" \
-            -H "Idempotency-Key: pi_ci_validate_${GITHUB_RUN_ID}" \
+            -H "Idempotency-Key: ${IDEMPOTENCY_KEY}" \
             https://api.stripe.com/v1/payment_intents \
             -d "amount=150000" -d "currency=eur" \
             -d "receipt_email=e2e-ci-validate@example.com" \
