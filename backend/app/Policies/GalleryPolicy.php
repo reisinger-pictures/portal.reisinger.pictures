@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\User;
 use App\Models\Gallery;
+use App\Services\AuthorizationService;
 
 class GalleryPolicy
 {
@@ -12,11 +13,13 @@ class GalleryPolicy
      */
     public function manage(User $user, Gallery $gallery): bool
     {
-        return $user->is_super_admin || $user->is_admin || ($user->is_photographer && $user->canPhotographerAccessGallery($gallery->id));
+        return app(AuthorizationService::class)->canManageGallery($user, $gallery->id);
     }
 
     public function create(User $user): bool
     {
-        return $user->is_super_admin || $user->is_photographer;
+        $svc = app(AuthorizationService::class);
+
+        return $svc->isSuperAdmin($user) || $svc->isPhotographer($user);
     }
 }
