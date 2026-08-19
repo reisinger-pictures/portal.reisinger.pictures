@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Enums\Brand;
 use App\Models\Contract;
 use App\Models\Order;
+use App\Services\BrandSettingsService;
 use App\Values\BrandConfig;
 
 class BrandRegistry
@@ -28,12 +29,13 @@ class BrandRegistry
                 }
             }
         }
+
         return Brand::B2B;
     }
 
     public static function config(): ?BrandConfig
     {
-        if (!app()->bound(self::CONTAINER_KEY)) {
+        if (! app()->bound(self::CONTAINER_KEY)) {
             return null;
         }
         $value = app(self::CONTAINER_KEY);
@@ -43,6 +45,7 @@ class BrandRegistry
         if ($value instanceof Brand) {
             return self::configForBrand($value->value);
         }
+
         return null;
     }
 
@@ -54,6 +57,7 @@ class BrandRegistry
     public static function current(): ?Brand
     {
         $config = self::config();
+
         return $config ? Brand::tryFrom($config->id) : null;
     }
 
@@ -87,12 +91,14 @@ class BrandRegistry
     public static function resolveFromOrder(Order $order): Brand
     {
         $brand = $order->brand;
+
         return $brand instanceof Brand ? $brand : Brand::B2B;
     }
 
     public static function resolveFromContract(Contract $contract): Brand
     {
         $brand = $contract->brand;
+
         return $brand instanceof Brand ? $brand : Brand::B2B;
     }
 
@@ -110,6 +116,7 @@ class BrandRegistry
         if ($config && isset($config->hostnames[0])) {
             return "https://{$config->hostnames[0]}";
         }
+
         return rtrim(config('app.url'), '/');
     }
 
@@ -121,6 +128,7 @@ class BrandRegistry
     public static function configForBrand(string $brandId): ?BrandConfig
     {
         $configs = self::loadAllConfigs();
+
         return $configs[$brandId] ?? null;
     }
 
@@ -144,7 +152,7 @@ class BrandRegistry
 
         $brands = config('brands', []);
         foreach ($brands as $id => $data) {
-            if (!($data['is_active'] ?? true)) {
+            if (! ($data['is_active'] ?? true)) {
                 continue;
             }
             self::$brandConfigs[$id] = self::buildFromArray($id, $data);
@@ -155,24 +163,39 @@ class BrandRegistry
 
     private static function buildFromArray(string $id, array $data): BrandConfig
     {
+        // Overlay DB overrides over the config default (F3 — DB-Overlay, Option B).
+        // Only whitelisted keys are honored; config-only keys (theme, logos,
+        // hostnames, is_active) are never touched.
+        $merged = $data;
+        $overrides = app(BrandSettingsService::class)->overridesFor($id);
+        foreach ($overrides as $configKey => $value) {
+            if (str_contains($configKey, '.')) {
+                [$section, $sub] = explode('.', $configKey, 2);
+                $merged[$section] = $merged[$section] ?? [];
+                $merged[$section][$sub] = $value;
+            } else {
+                $merged[$configKey] = $value;
+            }
+        }
+
         return new BrandConfig(
             id: $id,
-            name: $data['name'] ?? $id,
-            theme: $data['theme'] ?? 'rp',
-            portalName: $data['portal_name'] ?? $id,
-            impressumUrl: $data['impressum_url'] ?? null,
-            logoPath: $data['logo_path'] ?? null,
-            logoEmailPath: $data['logo_email_path'] ?? null,
-            logoEmailPath2x: $data['logo_email_path_2x'] ?? null,
-            features: $data['features'] ?? [],
-            hostnames: $data['hostnames'] ?? [],
-            isActive: $data['is_active'] ?? true,
-            frontendUrl: $data['frontend_url'] ?? null,
-            fromAddress: $data['from_address'] ?? null,
-            fromName: $data['from_name'] ?? null,
-            accountingEmail: $data['accounting_email'] ?? null,
-            primaryColor: $data['primary_color'] ?? '#1E5631',
-            secondaryColor: $data['secondary_color'] ?? '#A4B494',
+            name: $merged['name'] ?? $id,
+            theme: $merged['theme'] ?? 'rp',
+            portalName: $merged['portal_name'] ?? $id,
+            impressumUrl: $merged['impressum_url'] ?? null,
+            logoPath: $merged['logo_path'] ?? null,
+            logoEmailPath: $merged['logo_email_path'] ?? null,
+            logoEmailPath2x: $merged['logo_email_path_2x'] ?? null,
+            features: $merged['features'] ?? [],
+            hostnames: $merged['hostnames'] ?? [],
+            isActive: $merged['is_active'] ?? true,
+            frontendUrl: $merged['frontend_url'] ?? null,
+            fromAddress: $merged['from_address'] ?? null,
+            fromName: $merged['from_name'] ?? null,
+            accountingEmail: $merged['accounting_email'] ?? null,
+            primaryColor: $merged['primary_color'] ?? '#1E5631',
+            secondaryColor: $merged['secondary_color'] ?? '#A4B494',
         );
     }
 
@@ -185,7 +208,7 @@ class BrandRegistry
         $subdomain = null;
 
         foreach ($configs as $config) {
-            if (!$config->isActive) {
+            if (! $config->isActive) {
                 continue;
             }
             foreach ($config->hostnames as $brandHost) {
@@ -194,7 +217,7 @@ class BrandRegistry
                     $exact = $config;
                     break 2;
                 }
-                if (str_ends_with($host, '.' . $brandHost)) {
+                if (str_ends_with($host, '.'.$brandHost)) {
                     $subdomain = $config;
                 }
             }
@@ -211,7 +234,7 @@ class BrandRegistry
         if (str_starts_with($host, 'www.')) {
             $withoutWww = substr($host, 4);
             foreach ($configs as $config) {
-                if (!$config->isActive) {
+                if (! $config->isActive) {
                     continue;
                 }
                 foreach ($config->hostnames as $brandHost) {
@@ -219,7 +242,7 @@ class BrandRegistry
                     if ($withoutWww === $brandHost) {
                         return $config;
                     }
-                    if (str_ends_with($withoutWww, '.' . $brandHost)) {
+                    if (str_ends_with($withoutWww, '.'.$brandHost)) {
                         $subdomain = $config;
                     }
                 }

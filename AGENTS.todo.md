@@ -11,7 +11,7 @@
 
 ---
 
-## 🔄 Open (2026-08-18) — E2E-Test-Image `portal-e2e` (CI-Beschleunigung)
+## ✅ Erledigt (2026-08-18) — E2E-Test-Image `portal-e2e` (CI-Beschleunigung)
 
 **Ziel (User-Request):** Docker-Image (Derivat) mit vorinstalliertem Playwright/Chromium + Node/pnpm/Composer, regelmäßig gebaut und in Tests/E2E genutzt → kein Browser-Download, kein apt-Deps-Setup pro CI-Run.
 
@@ -211,9 +211,9 @@ Zwei neue User-Requests nach dem manuellen Test der Task-A–E-Umsetzung. Implem
 Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wirkt dort automatisch (contracts.spec.ts deckt `Preis / Stück`-Locator ab, bleibt gültig).
 
 6. [x] Task I: Menge+Preis-Wrapper in `InvoiceItemsTable.tsx`; Task J: Discount-Row `xl:flex-row flex-wrap` + Titel `flex-3 min-w-50` in `InvoiceDiscountsSection.tsx`; Locators/Labels unangetastet.
-7. [ ] Vitest + `pnpm lint:fix && pnpm build` + E2E `manual-documents.spec.ts` + `contracts.spec.ts` (+ `@smoke`); Vision-Check Screenshots (Item-Zeile 1280px, Rabatt-Zeile 1100/1280px).
+7. [x] Vitest + `pnpm lint:fix && pnpm build` + E2E `manual-documents.spec.ts` + `contracts.spec.ts` (+ `@smoke`); Vision-Check Screenshots (Item-Zeile 1280px, Rabatt-Zeile 1100/1280px). **✅ VERIFIZIERT (2026-08-19, separater Verifikations-Subagent + Vision-Subagent):** vitest **585/0**, lint/build **0**, E2E manual-documents+contracts **18/18**, `@smoke` **58/58**; Source (Tasks I+J+K/L) verifiziert; Vision PASS (Menge/Preis eine Zeile, Discount-Row responsiv nicht kollabiert, Trash rechtsbündig, Gesamt-€-Spalte da). Screenshots `/tmp/ij-review/*.png`. Minor: `contracts_1100_discounts` hat Discount-Felder nicht mitgefangen — nicht blockierend (Shared-Component mit manual-offer).
 
-**Zwischenstand I+J (2026-08-18, Implementierer-Bericht):** Diff wie spezifiziert (Wrapper ohne `form-control`-Klasse, Labels unverändert; Discount-Row `xl:flex-row flex-wrap` + `flex-3 min-w-50`). 585 vitest, lint/build 0, E2E manual-documents + contracts **18/18** (2 Projects × 8 Tests). Messungen: Menge/Preis gleiche y=434 (eine Zeile); Discount-Titel 1280px=371px, 1100px=656px gestapelt. Screenshots im Temp-Ordner. **Ausstehend:** separate Verifikation (Verifikator ≠ Implementierer) + Vision-Check (§5.4/§5.5).
+**Zwischenstand I+J (2026-08-18, Implementierer-Bericht):** Diff wie spezifiziert (Wrapper ohne `form-control`-Klasse, Labels unverändert; Discount-Row `xl:flex-row flex-wrap` + `flex-3 min-w-50`). 585 vitest, lint/build 0, E2E manual-documents + contracts **18/18** (2 Projects × 8 Tests). Messungen: Menge/Preis gleiche y=434 (eine Zeile); Discount-Titel 1280px=371px, 1100px=656px gestapelt. Screenshots im Temp-Ordner. **✅ VERIFIZIERT 2026-08-19:** separate Verifikation (Verifikator ≠ Implementierer) + Vision-Check (§5.4/§5.5) — alle Gates grün (vitest 585/0, E2E 18/18 + `@smoke` 58/58, lint/build 0), Source + Vision PASS (siehe Item 7).
 
 ### Task K — Löschen-Buttons rechtsbündig statt linksbündig
 
@@ -234,9 +234,23 @@ Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wi
 
 ---
 
-## 🟡 OFFEN — Kanban: PDF-Drop auf Projekte-Seite — E2E-Test fehlt
+## ✅ UMGESETZT & VERIFIZIERT (2026-08-19) — Kanban: PDF-Drop auf Projekte-Seite — E2E-Test
 
-Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email/amount/package, verdrahtet in `ManagementProjectsBoard.tsx`). **Offen: E2E-Verifikation** — kein Test in `frontend/tests/e2e/admin/projects-board.spec.ts`.
+**Funktionalität:** `useProjectPdfDrop` (in `frontend/src/logic/useProjectPdfDrop.ts`, verdrahtet in `ManagementProjectsBoard.tsx` via `<div onDrop>`). Beim Drop wird die PDF an `/api/management/invoices/extract-offer` (Browser-Session-Cookie) gesendet; der Handler (`handlePdfExtracted`) öffnet `ProjectModal` mit `initial={client_name, email}` — **es werden bewusst NUR `client_name` + `email` vorbefüllt** (nicht amount/package; die alte Aufgaben-Formulierung war ungenau). Beide Routen (`/admin-projects` „Projekte" für Admin, `/boards?tab=projects` „Workflow" für Super-Admin) rendern dieselbe Board-Komponente.
+
+**E2E-Test:** `frontend/tests/e2e/admin/projects-board.spec.ts` — `Super-Admin dropt ein Angebot-PDF auf das Board und das Projekt-Formular wird mit Kundenname & E-Mail vorbefüllt`, Tag `@feature:admin:projects`. Erzeugt ein echtes Angebot-PDF (super_admin-Cookie) und simuliert den Drop.
+
+**Verifikation (2026-08-19, orchestrator-delegiert + eigener Lauf):**
+- `@feature:admin:projects`: **2 passed** (Desktop + Mobile Chrome).
+- Ganze Datei `projects-board.spec.ts`: **20 passed / 4 skipped** (mobile DnD).
+- `pnpm lint:fix`: exit 0.
+- Eigener Re-Run (Ground Truth): **2 passed / EXIT 0**.
+
+**Gefundene/behobene Fallstricke (für künftige E2E-Hooks relevant):**
+1. **Playwright 1.62.1 unterstützt KEIN `dataTransfer` in `page.dispatchEvent`** → `DragEvent`-Konstruktion wirft. Fix: echtes `DragEvent` + `DataTransfer` via `page.evaluate` (Bytes als base64 reichen), auf `main .kanban-grid` dispatchen (bubbelt zum `onDrop`-Div).
+2. **`OFFER_JWT`-Expiry:** `extract-offer` lieferte 400 „Angebot nicht auslesbar oder abgelaufen", weil `exp` = Mitternacht von `due_date`. Im Test `due_date` auf eine Zukunftsdatum setzen (sonst heute bereits abgelaufen).
+3. **super_admin sieht den Board-Eintrag als „Workflow", nicht „Projekte"** (Sidebar.tsx:79 vs :82) → Navigation via `setup(page, superAdmin, 'Workflow', 'Projekte')`.
+4. **`/management/invoices/manual` + `/extract-offer` erfordern `is_super_admin`** (FormRequest-`authorize()` bzw. Management-Gruppe) → Test-User muss super_admin sein.
 
 ---
 
@@ -317,7 +331,7 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 - Write via `BrandSettingsService` (neuer Service) mit `Setting::updateOrCreate(['key','brand'])` — NICHT `SettingResolver::set()` (der hängt am Host-Kontext).
 
 **Umsetzungsplan (priorisiert):**
-1. `BrandSettingsService` + Merge in `buildFromArray()` + Queue-Cache-Clear — `BrandSettingsServiceTest`, `BrandRegistryTest`.
+1. [x] `BrandSettingsService` + Merge in `buildFromArray()` + Queue-Cache-Clear — `BrandSettingsServiceTest` (8/28), `BrandRegistryTest` (18/28); **✅ VERIFIZIERT** (2026-08-19, separater Verifikator: Whitelist exakt 10 Keys, config-only unberührt, features.orgs bool-cast, Queue::before `clearCache`; Suite 1188/0, Pint clean).
 2. Endpoint: `StoreBrandSettingsRequest`, `SettingsController::getBrandSettings/updateBrandSettings`, 2 Routen — `BrandSettingsControllerTest`.
 3. Frontend: `useBrandSettings.ts` + Vitest.
 4. `BrandSettingsCard.tsx` + Einbau in `ManagementSettingsView.tsx` — `pnpm lint:fix && pnpm build`.
@@ -330,6 +344,39 @@ Funktionalität vorhanden via `useProjectPdfDrop` (vorbefüllt client_name/email
 1. **features.orgs wird DB-overridable** (Whitelist erhält `features.orgs`; Sidebar-Gating `Sidebar.tsx:110` wird darüber gesteuert). **Dead-Flags `features.coupons` + `features.volume_licensing` werden aus `config/brands.php` entfernt** (real schaltet das DB-Setting `pricing_strategy` — `ManagementCouponsView.tsx:85`). `theme` bleibt config-only (Frontend-Theme-Abhängigkeit).
 2. **Logos (`logo_path*`) bleiben config-only** (Upload = eigener Scope, nicht F3).
 3. **Audit: Ja — einfacher Laravel-Log-Eintrag** bei jedem Brand-Settings-Write (User, Brand, geänderte Felder), da `Setting::$timestamps = false`.
+
+---
+
+### 🔙 P1 — Coupon-Typ `photo_package` (Foto-Paket-Gutschein)
+
+**Status:** Ausgearbeitet (2026-08-19) — **noch nicht umgesetzt.** SOLL-Doku: `features/ecommerce/08-srp-coupon-system.md` §3a.
+
+**Ziel (User-Request 2026-08-19):** „Gutscheine für Volume Licensing à 10 Fotos für 40 €" — ein neuer Coupon-Typ, der **bis zu N Fotos zum Festpreis Y €** gewährt (Foto-Paket / Bundle). Aktuell nicht möglich: `Coupon`-Model kennt nur `type ∈ {fixed, percentage}` (`app/Models/Coupon.php:24`); die automatische Volume-Staffel (`VolumeLicensingStrategy`) kennt keinen einlösbaren Paket-Preis.
+
+**Bestandsaufnahme:**
+- Coupon-Infrastruktur ist vorhanden und wiederverwendbar: `CouponService` (find/apply/increment), `CouponAdminController` (CRUD), `CouponStoreRequest`/`CouponUpdateRequest` (Validierung), `VolumeLicensingStrategy::calculateCart()` ruft bereits `applyCoupon` auf (Z. 131).
+- Admin-Formular `frontend/.../CouponFormDrawer.tsx` (Zod-Schema, Typ-Select, `TYPE_VALUE_LABEL`), Einlöse-UI `useCoupon.ts` / `CouponInput.tsx` / `ClientCartView.tsx`, Listen `GalleryCouponsTab.tsx` / `GalleryGroupCouponsTab.tsx` / `ManagementCouponsView.tsx`.
+- Coupons sind **SRP/Volume-exklusiv** (`ScopeLicensingStrategy` überspringt Coupon-Auflösung) — `photo_package` folgt derselben Regel.
+
+**SOLL-Architektur (§3a):**
+- Neuer `type = 'photo_package'`; Spalten `package_quantity` (N, INT UNSIGNED NOT NULL) + `package_price_cents` (Y, INT NOT NULL) via **separate Migration V028** (V027 = letzte deploy-bereit). `value`/`max_items` für diesen Typ ungenutzt.
+- Semantik: M = zahlbare Items (`priceCents > 0`); M ≤ N → Y €; M > N → Y € für erste N + Rest zum Volume-Preis; **Übercharge-Guard** `effPackage = min(Y, Summe abgedeckte)` (Kunde zahlt nie mehr als Normalpreis).
+- `CouponService::applyCoupon` erhält `case 'photo_package'`; reiht sich nach der Volume-Berechnung ein.
+
+**Umsetzungsplan (jeder Schritt einzeln grün testbar):**
+1. [ ] Migration V028 (`package_quantity`, `package_price_cents`); `Coupon::$fillable` + `$casts`; `CouponResource` exponiert Felder. `down()` leer.
+2. [ ] `CouponStoreRequest`/`CouponUpdateRequest`: `type` → `in:fixed,percentage,photo_package`; conditional (via `withValidator`): `package_quantity` required ≥1, `package_price_cents` required ≥0 bei `photo_package`. `CouponAdminController` mappt Euro→Cent vor `create()`/`update()`.
+3. [ ] `CouponService::applyCoupon` — `case 'photo_package'` (Berechnung §3a).
+4. [ ] Frontend `CouponFormDrawer.tsx`: Typ-Option „Foto-Paket", N+Y-Felder, `couponSchema`/`Coupon`-Interface/`onSubmit` angepasst. `useCoupon.ts` (`CouponSummary.type`), `CouponInput.tsx`, `ClientCartView.tsx` (Label „10 Fotos für 40 €" + Rabatt-Vorschau). Listen (`*CouponsTab.tsx`, `ManagementCouponsView`) zeigen „10 Fotos / 40 €".
+5. [ ] Doku: `08-srp-coupon-system.md` §3a ist SOLL (erledigt); ggf. Typ-Liste in §1/§7 synchron (erledigt).
+6. [ ] **Tests (DoD — explizit als TODO):** ⬜ Backend PHPUnit `CouponServiceTest`: M≤N, M>N, Übercharge-Guard, `CouponStoreRequest`-Validierung (conditional required). ⬜ Frontend Vitest `CouponFormDrawer.test.tsx`: Paket-Option rendert N+Y + Validation. ⬜ E2E Playwright `@feature:coupon` (bzw. `@smoke`): Paket-Gutschein anlegen → im Cart einlösen → Assert Gesamtpreis = Y bei ≤N und Y+Rest bei >N.
+
+**Test-Strategie:** PHPUnit (applyCoupon-Kombinationen + Request-Validierung), Vitest (Form-Rendering/Validation), Playwright (`@feature:coupon`). Nach jedem Code-Change `@smoke`.
+
+**Entscheidungen (interaktiv geklärt 2026-08-19):**
+1. **Foto-Paket (Bundle), nicht Stückpreis-Cap** — Kunde wählt bis zu N Fotos frei aus, Festpreis Y €.
+2. **„Bis zu N, Rest Normalpreis"** — bei > N Fotos zahlen die übrigen den regulären Volume-Preis (kein „exakt N erforderlich").
+3. **SOLL in `08` eingefaltet** (nicht eigene Nummer) — `photo_package` ist ein Coupon-Typ desselben Systems.
 
 ---
 
