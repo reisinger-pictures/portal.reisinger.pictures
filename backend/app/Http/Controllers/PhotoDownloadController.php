@@ -6,6 +6,7 @@ use App\Constants\TierRanks;
 use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Services\AuthorizationService;
 use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -21,8 +22,9 @@ class PhotoDownloadController extends Controller
     private function authorizeGalleryAccess($gallery)
     {
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
         $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
-        $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($gallery->id)));
+        $canManage = $user && ($svc->isAdmin($user) || ($svc->isPhotographer($user) && $svc->canAccessGallery($user, $gallery->id)));
 
         if ($isExpired && !$canManage) {
             abort(403, 'Galerie abgelaufen.');
@@ -31,7 +33,7 @@ class PhotoDownloadController extends Controller
         if (!$gallery->is_public) {
             if (!$user)
                 abort(401, 'Unauthorized access to this gallery.');
-            if (!$user->canAccessGallery($gallery->id)) {
+            if (!$svc->canAccessGallery($user, $gallery->id)) {
                 abort(403, 'Unauthorized access to this gallery.');
             }
         }
@@ -148,12 +150,13 @@ class PhotoDownloadController extends Controller
         $photo = Photo::with('gallery')->findOrFail($id);
         $gallery = $photo->gallery;
         $user = $this->authorizeGalleryAccess($gallery);
+        $svc = app(AuthorizationService::class);
 
         $tier = $request->query('tier', 'original');
         $userRank = $user && $user->flatrate_level ? (TierRanks::RANKS[$user->flatrate_level] ?? 0) : 0;
         $reqRank = TierRanks::RANKS[$tier] ?? 3;
 
-        $hasFullAccess = $user && ($user->is_admin || $user->is_photographer);
+        $hasFullAccess = $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
         $isCoveredByFlatrate = $userRank >= $reqRank;
         $hasPurchased = $user && $user->hasPurchasedPhoto($photo->id, $tier);
 
@@ -212,12 +215,13 @@ class PhotoDownloadController extends Controller
     {
         $gallery = Gallery::with('photos')->findOrFail($galleryId);
         $user = $this->authorizeGalleryAccess($gallery);
+        $svc = app(AuthorizationService::class);
 
         $tier = $request->query('tier', 'original');
         $userRank = $user && $user->flatrate_level ? (TierRanks::RANKS[$user->flatrate_level] ?? 0) : 0;
         $reqRank = TierRanks::RANKS[$tier] ?? 3;
 
-        $hasFullAccess = $user && ($user->is_admin || $user->is_photographer);
+        $hasFullAccess = $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
         $isCoveredByFlatrate = $userRank >= $reqRank;
 
         if (!$hasFullAccess && !$isCoveredByFlatrate && !$gallery->effective_is_free_download) {
