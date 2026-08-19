@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Casts\AsBrand;
-use App\Constants\TierRanks;
 use App\Services\AuthorizationService;
+use App\Services\PurchaseService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -160,39 +160,6 @@ class User extends Authenticatable implements JWTSubject
 
     public function hasPurchasedPhoto($photoId, $requestedTier): bool
     {
-        $cacheKey = "user.{$this->id}.purchased.{$photoId}.{$requestedTier}";
-        $cached = cache()->get($cacheKey);
-        if ($cached !== null) {
-            return $cached;
-        }
-
-        $orders = Order::where('user_id', $this->id)
-            ->whereNotIn('status', ['disputed', 'refunded', 'cancelled'])
-            ->where(function ($q) {
-                $q->where('is_quote_request', false)
-                    ->orWhere('status', '!=', 'pending');
-            })->with('invoiceSnapshot')->get();
-        $reqRank = TierRanks::RANKS[$requestedTier] ?? 3;
-
-        foreach ($orders as $order) {
-            $snapshot = $order->invoiceSnapshot;
-            if (! $snapshot) {
-                continue;
-            }
-
-            $items = $snapshot->customer_details['items'] ?? [];
-            foreach ($items as $item) {
-                if (($item['photoId'] ?? '') === $photoId) {
-                    $itemRank = TierRanks::RANKS[$item['tier'] ?? 'none'] ?? 0;
-                    if ($itemRank >= $reqRank) {
-                        cache()->put($cacheKey, true, 3600);
-
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
+        return app(PurchaseService::class)->hasPurchasedPhoto($this, $photoId, $requestedTier);
     }
 }
