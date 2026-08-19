@@ -2,22 +2,26 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\Photo;
+use App\Models\User;
 use App\Services\AuthorizationService;
 
 class PhotoPolicy
 {
     public function view(?User $user, Photo $photo): bool
     {
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
 
         return app(AuthorizationService::class)->canAccessGallery($user, $photo->gallery_id);
     }
 
     public function updateMetadata(?User $user, Photo $photo): bool
     {
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
 
         $svc = app(AuthorizationService::class);
 
@@ -37,21 +41,27 @@ class PhotoPolicy
 
     public function viewVersions(?User $user, Photo $photo): bool
     {
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
 
         return app(AuthorizationService::class)->canManageGallery($user, $photo->gallery_id);
     }
 
     public function revertMetadata(?User $user, Photo $photo): bool
     {
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
 
         return app(AuthorizationService::class)->canManageGallery($user, $photo->gallery_id);
     }
 
     public function delete(?User $user, Photo $photo): bool
     {
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
 
         return app(AuthorizationService::class)->canManageGallery($user, $photo->gallery_id);
     }

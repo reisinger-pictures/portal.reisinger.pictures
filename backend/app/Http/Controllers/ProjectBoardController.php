@@ -4,13 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Enums\Brand;
 use App\Enums\PaymentStatus;
-use App\Enums\ProjectStatus;
 use App\Enums\PhotoJobStatus;
+use App\Enums\ProjectStatus;
 use App\Models\PhotoJob;
 use App\Models\Project;
+use App\Models\User;
+use App\Models\WorkflowLog;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
-use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -21,17 +23,17 @@ class ProjectBoardController extends Controller
     private function authorizeUser(User $user): void
     {
         $svc = app(AuthorizationService::class);
-        if (!$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
+        if (! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user)) {
             abort(403, 'Forbidden');
         }
     }
 
-    private function scopedQuery(User $user): \Illuminate\Database\Eloquent\Builder
+    private function scopedQuery(User $user): Builder
     {
         $query = Project::query()
             ->where('brand', BrandRegistry::currentOrDefault());
 
-        if (!app(AuthorizationService::class)->isSuperAdmin($user)) {
+        if (! app(AuthorizationService::class)->isSuperAdmin($user)) {
             $query->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
                     ->orWhere('assignee_id', $user->id);
@@ -69,8 +71,8 @@ class ProjectBoardController extends Controller
             'assignee_id' => 'nullable|exists:users,id',
             'linked_photo_job_id' => 'nullable|exists:photo_jobs,id',
             'notes' => 'nullable|string',
-            'status' => 'nullable|string|in:' . implode(',', array_column(ProjectStatus::cases(), 'value')),
-            'payment_status' => 'string|in:' . implode(',', array_column(PaymentStatus::cases(), 'value')),
+            'status' => 'nullable|string|in:'.implode(',', array_column(ProjectStatus::cases(), 'value')),
+            'payment_status' => 'string|in:'.implode(',', array_column(PaymentStatus::cases(), 'value')),
         ]);
 
         $status = $validated['status'] ?? ProjectStatus::initial()->value;
@@ -103,8 +105,8 @@ class ProjectBoardController extends Controller
             'assignee_id' => 'nullable|exists:users,id',
             'linked_photo_job_id' => 'nullable|exists:photo_jobs,id',
             'notes' => 'nullable|string',
-            'status' => 'sometimes|string|in:' . implode(',', array_column(ProjectStatus::cases(), 'value')),
-            'payment_status' => 'sometimes|string|in:' . implode(',', array_column(PaymentStatus::cases(), 'value')),
+            'status' => 'sometimes|string|in:'.implode(',', array_column(ProjectStatus::cases(), 'value')),
+            'payment_status' => 'sometimes|string|in:'.implode(',', array_column(PaymentStatus::cases(), 'value')),
         ]);
 
         $oldStatus = $project->status;
@@ -165,7 +167,7 @@ class ProjectBoardController extends Controller
             $this->reindexColumn($user, $newStatus, $project->id, $effectivePosition);
 
             if ($oldStatus !== $newStatus) {
-                \App\Models\WorkflowLog::create([
+                WorkflowLog::create([
                     'item_type' => 'project',
                     'item_id' => $project->id,
                     'from_status' => $oldStatus,
@@ -213,7 +215,7 @@ class ProjectBoardController extends Controller
     public function handoff(Request $request, $id)
     {
         $user = Auth::guard('api')->user();
-        if (!app(AuthorizationService::class)->isSuperAdmin($user)) {
+        if (! app(AuthorizationService::class)->isSuperAdmin($user)) {
             abort(403, 'Forbidden');
         }
 

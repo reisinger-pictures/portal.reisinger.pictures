@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\AuthorizationService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SendQuoteRequest extends FormRequest
@@ -11,6 +12,7 @@ class SendQuoteRequest extends FormRequest
     {
         $svc = app(AuthorizationService::class);
         $user = $this->user();
+
         return $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
     }
 
@@ -19,12 +21,12 @@ class SendQuoteRequest extends FormRequest
         return [
             'custom_price' => 'required|integer',
             'message' => 'required|string',
-            'rights_text' => 'nullable|string|max:2000'
+            'rights_text' => 'nullable|string|max:2000',
         ];
     }
 
     protected function failedAuthorization()
     {
-        throw new \Illuminate\Auth\Access\AuthorizationException('Keine Berechtigung');
+        throw new AuthorizationException('Keine Berechtigung');
     }
 }

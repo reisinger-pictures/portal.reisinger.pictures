@@ -44,6 +44,7 @@ class CouponAdminController extends Controller
             if ($couponBrandValue !== BrandRegistry::currentId()) {
                 abort(403, 'Forbidden');
             }
+
             return;
         }
 
@@ -51,6 +52,7 @@ class CouponAdminController extends Controller
             if ($coupon->created_by !== $user->id) {
                 abort(403, 'Forbidden');
             }
+
             return;
         }
 
@@ -70,7 +72,7 @@ class CouponAdminController extends Controller
         $query = Coupon::forCurrentBrand()
             ->orderBy('created_at', 'desc');
 
-        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
+        if ($svc->isPhotographer($user) && ! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user)) {
             $query->where('coupons.created_by', $user->getKey());
         }
 
@@ -94,7 +96,7 @@ class CouponAdminController extends Controller
     private function normalizePackagePrice(array $validated): array
     {
         if (($validated['type'] ?? null) === 'photo_package') {
-            if (!isset($validated['value']) || $validated['value'] === '') {
+            if (! isset($validated['value']) || $validated['value'] === '') {
                 $validated['value'] = 0;
             }
             $validated['max_items'] = null;
@@ -115,7 +117,7 @@ class CouponAdminController extends Controller
 
         $validated['brand'] = BrandRegistry::currentId();
 
-        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
+        if ($svc->isPhotographer($user) && ! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user)) {
             $validated['created_by'] = $user->id;
             unset($validated['max_uses_global']);
             $validated['active'] = true;
@@ -139,7 +141,7 @@ class CouponAdminController extends Controller
         $svc = app(AuthorizationService::class);
         $validated = $this->normalizePackagePrice($request->validated());
 
-        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
+        if ($svc->isPhotographer($user) && ! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user)) {
             unset($validated['max_uses_global']);
             $validated['active'] = true;
         }
@@ -161,7 +163,7 @@ class CouponAdminController extends Controller
         $user = auth()->user();
         $svc = app(AuthorizationService::class);
 
-        if (!$svc->isSuperAdmin($user) && !$svc->isAdmin($user) && $coupon->used_count > 0) {
+        if (! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user) && $coupon->used_count > 0) {
             return response()->json([
                 'success' => false,
                 'error' => 'Cannot delete a coupon that has already been used.',
@@ -192,21 +194,21 @@ class CouponAdminController extends Controller
             ->where(function ($q) use ($galleryId, $photographerIds) {
                 $q->where(function ($sq) use ($galleryId) {
                     $sq->where('scope_type', 'gallery')
-                       ->where('scope_id', $galleryId);
+                        ->where('scope_id', $galleryId);
                 })->orWhere(function ($sq) use ($galleryId) {
                     $sq->where('scope_type', 'meta_gallery')
-                       ->where('scope_id', $galleryId);
+                        ->where('scope_id', $galleryId);
                 })->orWhere(function ($sq) use ($photographerIds) {
-                    if (!empty($photographerIds)) {
+                    if (! empty($photographerIds)) {
                         $sq->where('scope_type', 'photographer')
-                           ->whereIn('created_by', $photographerIds);
+                            ->whereIn('created_by', $photographerIds);
                     }
                 });
             })
             ->orderBy('created_at', 'desc');
 
         $coupons = $query->paginate($perPage);
-        $coupons->getCollection()->transform(fn($c) => new CouponResource($c));
+        $coupons->getCollection()->transform(fn ($c) => new CouponResource($c));
 
         return response()->json($coupons);
     }
@@ -223,7 +225,7 @@ class CouponAdminController extends Controller
         $validated['scope_type'] = 'gallery';
         $validated['scope_id'] = $galleryId;
 
-        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
+        if ($svc->isPhotographer($user) && ! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user)) {
             $validated['created_by'] = $user->id;
             unset($validated['max_uses_global']);
             $validated['active'] = true;
@@ -259,23 +261,23 @@ class CouponAdminController extends Controller
             ->where(function ($q) use ($groupId, $galleryIds, $photographerIds) {
                 $q->where(function ($sq) use ($groupId) {
                     $sq->where('scope_type', 'meta_gallery')
-                       ->where('scope_id', $groupId);
+                        ->where('scope_id', $groupId);
                 })->orWhere(function ($sq) use ($galleryIds) {
-                    if (!empty($galleryIds)) {
+                    if (! empty($galleryIds)) {
                         $sq->where('scope_type', 'gallery')
-                           ->whereIn('scope_id', $galleryIds);
+                            ->whereIn('scope_id', $galleryIds);
                     }
                 })->orWhere(function ($sq) use ($photographerIds) {
-                    if (!empty($photographerIds)) {
+                    if (! empty($photographerIds)) {
                         $sq->where('scope_type', 'photographer')
-                           ->whereIn('created_by', $photographerIds);
+                            ->whereIn('created_by', $photographerIds);
                     }
                 });
             })
             ->orderBy('created_at', 'desc');
 
         $coupons = $query->paginate($perPage);
-        $coupons->getCollection()->transform(fn($c) => new CouponResource($c));
+        $coupons->getCollection()->transform(fn ($c) => new CouponResource($c));
 
         return response()->json($coupons);
     }
@@ -298,7 +300,7 @@ class CouponAdminController extends Controller
         $validated['scope_type'] = 'meta_gallery';
         $validated['scope_id'] = $groupId;
 
-        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
+        if ($svc->isPhotographer($user) && ! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user)) {
             $validated['created_by'] = $user->id;
             unset($validated['max_uses_global']);
             $validated['active'] = true;

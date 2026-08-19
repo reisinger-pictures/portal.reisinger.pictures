@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Enums\PhotoJobStatus;
 use App\Models\LightroomCatalog;
 use App\Models\PhotoJob;
+use App\Models\User;
+use App\Models\WorkflowLog;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
-use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -19,7 +21,7 @@ class PhotoJobBoardController extends Controller
     private function authorizeUser(User $user): void
     {
         $svc = app(AuthorizationService::class);
-        if (!$svc->isSuperAdmin($user) && !$svc->isPhotographer($user)) {
+        if (! $svc->isSuperAdmin($user) && ! $svc->isPhotographer($user)) {
             abort(403, 'Forbidden');
         }
     }
@@ -50,12 +52,12 @@ class PhotoJobBoardController extends Controller
         return $isSingle ? $items->first() : $items;
     }
 
-    private function scopedQuery(User $user): \Illuminate\Database\Eloquent\Builder
+    private function scopedQuery(User $user): Builder
     {
         $query = PhotoJob::query()
             ->where('brand', BrandRegistry::currentOrDefault());
 
-        if (!app(AuthorizationService::class)->isSuperAdmin($user)) {
+        if (! app(AuthorizationService::class)->isSuperAdmin($user)) {
             $query->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
                     ->orWhere('assignee_id', $user->id);
@@ -92,7 +94,7 @@ class PhotoJobBoardController extends Controller
             'target_gallery_id' => 'nullable|exists:galleries,id',
             'assignee_id' => 'nullable|exists:users,id',
             'notes' => 'nullable|string',
-            'status' => 'nullable|string|in:' . implode(',', array_column(PhotoJobStatus::cases(), 'value')),
+            'status' => 'nullable|string|in:'.implode(',', array_column(PhotoJobStatus::cases(), 'value')),
         ]);
 
         $status = $validated['status'] ?? PhotoJobStatus::initial()->value;
@@ -123,7 +125,7 @@ class PhotoJobBoardController extends Controller
             'target_gallery_id' => 'nullable|exists:galleries,id',
             'assignee_id' => 'nullable|exists:users,id',
             'notes' => 'nullable|string',
-            'status' => 'sometimes|string|in:' . implode(',', array_column(PhotoJobStatus::cases(), 'value')),
+            'status' => 'sometimes|string|in:'.implode(',', array_column(PhotoJobStatus::cases(), 'value')),
         ]);
 
         $oldStatus = $photoJob->status;
@@ -158,7 +160,7 @@ class PhotoJobBoardController extends Controller
         $photoJob = $this->scopedQuery($user)->findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:' . implode(',', array_column(PhotoJobStatus::cases(), 'value')),
+            'status' => 'required|string|in:'.implode(',', array_column(PhotoJobStatus::cases(), 'value')),
             'position' => 'required|integer|min:0',
         ]);
 
@@ -184,7 +186,7 @@ class PhotoJobBoardController extends Controller
             $this->reindexColumn($user, $newStatus, $photoJob->id, $effectivePosition);
 
             if ($oldStatus !== $newStatus) {
-                \App\Models\WorkflowLog::create([
+                WorkflowLog::create([
                     'item_type' => 'photo_job',
                     'item_id' => $photoJob->id,
                     'from_status' => $oldStatus,

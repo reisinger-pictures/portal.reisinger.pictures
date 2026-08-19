@@ -7,9 +7,12 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
 use App\Services\ImageProcessor;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class FileDeliveryController extends Controller
 {
@@ -19,31 +22,43 @@ class FileDeliveryController extends Controller
 
     public function serve(Request $request, $slug, $identifier)
     {
-        $gallery = \Illuminate\Support\Str::isUuid($slug) 
-            ? Gallery::where('id', $slug)->first() 
+        $gallery = Str::isUuid($slug)
+            ? Gallery::where('id', $slug)->first()
             : Gallery::where('slug', $slug)->first();
-        if (!$gallery) return response()->json(['error' => 'Galerie nicht gefunden'], 404);
+        if (! $gallery) {
+            return response()->json(['error' => 'Galerie nicht gefunden'], 404);
+        }
 
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
-        $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
+        $isExpired = $gallery->expires_at && Carbon::parse($gallery->expires_at)->isPast();
         $canManage = $user && ($svc->isAdmin($user) || ($svc->isPhotographer($user) && $svc->canAccessGallery($user, $gallery->id)));
 
-        if ($isExpired && !$canManage) return response()->json(['error' => 'Galerie abgelaufen'], 403);
-
-        if (!$gallery->is_public) {
-            if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
-            if (!$svc->canAccessGallery($user, $gallery->id)) return response()->json(['error' => 'Forbidden'], 403);
+        if ($isExpired && ! $canManage) {
+            return response()->json(['error' => 'Galerie abgelaufen'], 403);
         }
 
-        $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/\\');
+        if (! $gallery->is_public) {
+            if (! $user) {
+                return response()->json(['error' => 'Unauthenticated'], 401);
+            }
+            if (! $svc->canAccessGallery($user, $gallery->id)) {
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
+        }
+
+        $baseStoragePath = rtrim(Storage::disk('photos')->path(''), '/\\');
 
         // 1. Konzeptueller Check: Hat der User das Recht auf die cleane Originaldatei?
         $logicalNeedsWatermark = true;
-        if ($gallery->effective_is_free_download) $logicalNeedsWatermark = false;
-        elseif ($user && ($svc->isAdmin($user) || $svc->isPhotographer($user))) $logicalNeedsWatermark = false;
-        elseif ($user && $svc->canAccessGallery($user, $gallery->id)) {
-            if ((TierRanks::RANKS[$user->flatrate_level ?? 'none'] ?? 0) >= 1) $logicalNeedsWatermark = false;
+        if ($gallery->effective_is_free_download) {
+            $logicalNeedsWatermark = false;
+        } elseif ($user && ($svc->isAdmin($user) || $svc->isPhotographer($user))) {
+            $logicalNeedsWatermark = false;
+        } elseif ($user && $svc->canAccessGallery($user, $gallery->id)) {
+            if ((TierRanks::RANKS[$user->flatrate_level ?? 'none'] ?? 0) >= 1) {
+                $logicalNeedsWatermark = false;
+            }
         }
 
         // 2. Pfad-Prüfung und HTTP 403 Schutz
@@ -57,7 +72,7 @@ class FileDeliveryController extends Controller
         }
 
         // 3. Physischer Check: Wasserzeichen generieren, wenn angefordert UND global konfiguriert
-        $globalWatermarkExists = \Illuminate\Support\Facades\Storage::disk('photos')->exists('_watermarks/master_500.png');
+        $globalWatermarkExists = Storage::disk('photos')->exists('_watermarks/master_500.png');
         $generateWatermark = $isWatermarkedRequest && $globalWatermarkExists;
         $path = null;
 
@@ -67,19 +82,23 @@ class FileDeliveryController extends Controller
             $photoId = $matches[2];
 
             $photo = Photo::where('id', $photoId)->where('gallery_id', $gallery->id)->first();
-            if (!$photo) return response()->json(['error' => 'Foto nicht gefunden'], 404);
+            if (! $photo) {
+                return response()->json(['error' => 'Foto nicht gefunden'], 404);
+            }
 
-            $originalPath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
-            if (!file_exists($originalPath)) return response()->json(['error' => 'Original fehlt auf der Festplatte'], 404);
+            $originalPath = $baseStoragePath.'/'.$gallery->id.'/'.$photo->filename;
+            if (! file_exists($originalPath)) {
+                return response()->json(['error' => 'Original fehlt auf der Festplatte'], 404);
+            }
 
-            $thumbPath = $baseStoragePath . '/' . $gallery->id . '/_thumbs/' . $size . '/' . $photo->id . '.webp';
-            
-            $thumbLockKey = 'thumb_generation_' . $photo->id . '_' . $size;
+            $thumbPath = $baseStoragePath.'/'.$gallery->id.'/_thumbs/'.$size.'/'.$photo->id.'.webp';
+
+            $thumbLockKey = 'thumb_generation_'.$photo->id.'_'.$size;
             Cache::lock($thumbLockKey, 30)->block(10, function () use ($thumbPath, $originalPath, $size) {
                 if (file_exists($thumbPath)) {
                     return;
                 }
-                if (!is_dir(dirname($thumbPath))) {
+                if (! is_dir(dirname($thumbPath))) {
                     @mkdir(dirname($thumbPath), 0755, true);
                 }
                 try {
@@ -94,46 +113,60 @@ class FileDeliveryController extends Controller
                 }
             });
 
-            if (!file_exists($thumbPath)) return response()->json(['error' => 'Thumbnail fehlt'], 500);
+            if (! file_exists($thumbPath)) {
+                return response()->json(['error' => 'Thumbnail fehlt'], 500);
+            }
 
             $path = $thumbPath;
 
             if ($generateWatermark) {
-                $wmPath = $baseStoragePath . '/' . $gallery->id . '/_thumbs/_watermarked/' . $size . '/' . $photo->id . '.webp';
-                if (!file_exists($wmPath)) {
-                    if (!is_dir(dirname($wmPath))) @mkdir(dirname($wmPath), 0755, true);
+                $wmPath = $baseStoragePath.'/'.$gallery->id.'/_thumbs/_watermarked/'.$size.'/'.$photo->id.'.webp';
+                if (! file_exists($wmPath)) {
+                    if (! is_dir(dirname($wmPath))) {
+                        @mkdir(dirname($wmPath), 0755, true);
+                    }
                     try {
                         $this->imageProcessor->applyCenteredWatermark($path, $wmPath, null, $gallery->type);
-                        if (!file_exists($wmPath)) throw new \Exception("Watermark file missing.");
+                        if (! file_exists($wmPath)) {
+                            throw new \Exception('Watermark file missing.');
+                        }
                     } catch (\Exception $e) {
                         return response()->json(['error' => 'SECURITY: Watermark-Fail.'], 500);
                     }
                 }
-                $path = $wmPath; 
+                $path = $wmPath;
             }
-        } 
+        }
         // --- ORIGINAL BILDER ---
         else {
             if (preg_match('#^([a-f0-9\-]+)\.[a-z0-9]+$#i', $identifier, $matches)) {
                 $photoId = $matches[1];
                 $photo = Photo::where('id', $photoId)->where('gallery_id', $gallery->id)->first();
-                if (!$photo) return response()->json(['error' => 'Foto nicht gefunden'], 404);
+                if (! $photo) {
+                    return response()->json(['error' => 'Foto nicht gefunden'], 404);
+                }
             } else {
                 return response()->json(['error' => 'Ungültiges URL-Format'], 400);
             }
 
-            $originalPath = $baseStoragePath . '/' . $gallery->id . '/' . $photo->filename;
-            if (!file_exists($originalPath)) return response()->json(['error' => 'Original fehlt auf der Festplatte'], 404);
-            
+            $originalPath = $baseStoragePath.'/'.$gallery->id.'/'.$photo->filename;
+            if (! file_exists($originalPath)) {
+                return response()->json(['error' => 'Original fehlt auf der Festplatte'], 404);
+            }
+
             $path = $originalPath;
 
             if ($generateWatermark) {
-                $wmPath = $baseStoragePath . '/' . $gallery->id . '/_watermarked/' . $photo->filename;
-                if (!file_exists($wmPath)) {
-                    if (!is_dir(dirname($wmPath))) @mkdir(dirname($wmPath), 0755, true);
+                $wmPath = $baseStoragePath.'/'.$gallery->id.'/_watermarked/'.$photo->filename;
+                if (! file_exists($wmPath)) {
+                    if (! is_dir(dirname($wmPath))) {
+                        @mkdir(dirname($wmPath), 0755, true);
+                    }
                     try {
                         $this->imageProcessor->applyCenteredWatermark($path, $wmPath, 2000, $gallery->type);
-                        if (!file_exists($wmPath)) throw new \Exception("Watermark file missing.");
+                        if (! file_exists($wmPath)) {
+                            throw new \Exception('Watermark file missing.');
+                        }
                     } catch (\Exception $e) {
                         return response()->json(['error' => 'SECURITY: Watermark-Fail.'], 500);
                     }
@@ -142,10 +175,12 @@ class FileDeliveryController extends Controller
             }
         }
 
-        if (!file_exists($path)) return response()->json(['error' => 'Datei nicht gefunden'], 404);
+        if (! file_exists($path)) {
+            return response()->json(['error' => 'Datei nicht gefunden'], 404);
+        }
 
-        $cacheKey = 'photo_hit_' . $photo->id;
-        if (!Cache::has($cacheKey)) {
+        $cacheKey = 'photo_hit_'.$photo->id;
+        if (! Cache::has($cacheKey)) {
             $photo->update(['last_accessed_at' => now()]);
             Cache::put($cacheKey, true, now()->addHours(24));
         }
@@ -154,6 +189,7 @@ class FileDeliveryController extends Controller
 
         if ($proxyHeader = config('services.proxy_delivery_header')) {
             $headers[$proxyHeader] = $path;
+
             return response()->make('', 200, $headers);
         }
 

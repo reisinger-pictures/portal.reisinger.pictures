@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\Gallery;
+use App\Models\User;
 use App\Services\AuthorizationService;
 
 class GalleryPolicy

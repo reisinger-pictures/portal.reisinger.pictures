@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\Role;
 use App\Enums\UserRole;
-use App\Services\AuthorizationService;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Http\Resources\UserResource;
+use App\Mail\ActivateAccountMail;
+use App\Models\Org;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +26,8 @@ class UserController extends Controller
         $user = auth('api')->user();
         $query = User::with(['roles', 'galleryGroups', 'galleries', 'photographerGalleries', 'photographerGalleryGroups']);
 
-        if (!$svc->isAdmin($user)) {
-            if (!$svc->isOrgAdmin($user)) {
+        if (! $svc->isAdmin($user)) {
+            if (! $svc->isOrgAdmin($user)) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
             if ($user->org_id === null) {
@@ -33,7 +36,7 @@ class UserController extends Controller
             $query->where('org_id', $user->org_id);
         }
 
-        return \App\Http\Resources\UserResource::collection($query->get());
+        return UserResource::collection($query->get());
     }
 
     public function roles()
@@ -41,9 +44,10 @@ class UserController extends Controller
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
         $query = Role::query();
-        if (!$user || !$svc->isSuperAdmin($user)) {
+        if (! $user || ! $svc->isSuperAdmin($user)) {
             $query->where('name', '!=', UserRole::SUPER_ADMIN->value);
         }
+
         return $query->get();
     }
 
@@ -55,13 +59,13 @@ class UserController extends Controller
         // Org Admin: scope to their org
         $managerOrg = null;
         if ($currentUser && $svc->isOrgAdmin($currentUser)) {
-            $managerOrg = \App\Models\Org::find($currentUser->org_id);
-            if (!$managerOrg) {
+            $managerOrg = Org::find($currentUser->org_id);
+            if (! $managerOrg) {
                 return response()->json(['error' => 'Customer Manager hat keine Organisation.'], 422);
             }
         }
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $managerOrg) {
+        return DB::transaction(function () use ($request, $managerOrg) {
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -75,7 +79,7 @@ class UserController extends Controller
 
                 // Inherit role from org's default_role_id
                 $roleId = $managerOrg->default_role_id;
-                if (!$roleId) {
+                if (! $roleId) {
                     $clientRole = Role::where('name', UserRole::CLIENT->value)->first();
                     $roleId = $clientRole?->id;
                 }
@@ -94,15 +98,15 @@ class UserController extends Controller
             }
 
             $token = Str::random(64);
-            \Illuminate\Support\Facades\DB::table('password_reset_tokens')->updateOrInsert(
+            DB::table('password_reset_tokens')->updateOrInsert(
                 ['email' => $user->email],
                 ['token' => Hash::make($token), 'created_at' => now()]
             );
 
-            $link = BrandRegistry::frontendUrl() . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+            $link = BrandRegistry::frontendUrl().'/reset-password?token='.$token.'&email='.urlencode($user->email);
 
-            \Illuminate\Support\Facades\Mail::to($user->email)->send(
-                new \App\Mail\ActivateAccountMail(
+            Mail::to($user->email)->send(
+                new ActivateAccountMail(
                     $user->name,
                     'Es wurde ein Account für dich angelegt. Klicke hier, um ein Passwort zu vergeben:',
                     $link,
@@ -111,7 +115,7 @@ class UserController extends Controller
                 )
             );
 
-            return response()->json(['success' => true, 'user' => new \App\Http\Resources\UserResource($user)]);
+            return response()->json(['success' => true, 'user' => new UserResource($user)]);
         });
     }
 
@@ -121,8 +125,8 @@ class UserController extends Controller
         $currentUser = auth('api')->user();
         $user = User::findOrFail($id);
 
-        if (!$svc->isAdmin($currentUser)) {
-            if (!$svc->isOrgAdmin($currentUser)) {
+        if (! $svc->isAdmin($currentUser)) {
+            if (! $svc->isOrgAdmin($currentUser)) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
             if ($user->org_id !== $currentUser->org_id) {
@@ -133,7 +137,7 @@ class UserController extends Controller
         $superAdminRole = Role::where('name', UserRole::SUPER_ADMIN->value)->first();
         $wantsSuperAdmin = $superAdminRole && in_array($superAdminRole->id, $request->role_ids ?? []);
 
-        if ($wantsSuperAdmin !== $svc->isSuperAdmin($user) && !$svc->isSuperAdmin($currentUser)) {
+        if ($wantsSuperAdmin !== $svc->isSuperAdmin($user) && ! $svc->isSuperAdmin($currentUser)) {
             return response()->json(['error' => 'Nur Super Admins können die Super Admin Rolle verwalten.'], 403);
         }
 
@@ -167,7 +171,7 @@ class UserController extends Controller
             $selectedRoleNames = $request->has('role_ids')
                 ? Role::whereIn('id', $request->role_ids ?? [])->pluck('name')->all()
                 : $user->roles()->pluck('name')->all();
-            $isSuperAdmin = in_array(\App\Enums\UserRole::SUPER_ADMIN->value, $selectedRoleNames, true);
+            $isSuperAdmin = in_array(UserRole::SUPER_ADMIN->value, $selectedRoleNames, true);
 
             $user->update(['brand' => $isSuperAdmin ? null : $request->brand]);
         }
@@ -181,8 +185,8 @@ class UserController extends Controller
         $currentUser = auth('api')->user();
         $user = User::findOrFail($id);
 
-        if (!$svc->isAdmin($currentUser)) {
-            if (!$svc->isOrgAdmin($currentUser)) {
+        if (! $svc->isAdmin($currentUser)) {
+            if (! $svc->isOrgAdmin($currentUser)) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
             if ($user->org_id !== $currentUser->org_id) {
