@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Constants\TierRanks;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Services\AuthorizationService;
 use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -24,23 +25,24 @@ class FileDeliveryController extends Controller
         if (!$gallery) return response()->json(['error' => 'Galerie nicht gefunden'], 404);
 
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
         $isExpired = $gallery->expires_at && \Carbon\Carbon::parse($gallery->expires_at)->isPast();
-        $canManage = $user && ($user->is_admin || ($user->is_photographer && $user->canAccessGallery($gallery->id)));
+        $canManage = $user && ($svc->isAdmin($user) || ($svc->isPhotographer($user) && $svc->canAccessGallery($user, $gallery->id)));
 
         if ($isExpired && !$canManage) return response()->json(['error' => 'Galerie abgelaufen'], 403);
-        
+
         if (!$gallery->is_public) {
             if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
-            if (!$user->canAccessGallery($gallery->id)) return response()->json(['error' => 'Forbidden'], 403);
+            if (!$svc->canAccessGallery($user, $gallery->id)) return response()->json(['error' => 'Forbidden'], 403);
         }
 
         $baseStoragePath = rtrim(\Illuminate\Support\Facades\Storage::disk('photos')->path(''), '/\\');
-        
+
         // 1. Konzeptueller Check: Hat der User das Recht auf die cleane Originaldatei?
         $logicalNeedsWatermark = true;
         if ($gallery->effective_is_free_download) $logicalNeedsWatermark = false;
-        elseif ($user && ($user->is_admin || $user->is_photographer)) $logicalNeedsWatermark = false;
-        elseif ($user && $user->canAccessGallery($gallery->id)) {
+        elseif ($user && ($svc->isAdmin($user) || $svc->isPhotographer($user))) $logicalNeedsWatermark = false;
+        elseif ($user && $svc->canAccessGallery($user, $gallery->id)) {
             if ((TierRanks::RANKS[$user->flatrate_level ?? 'none'] ?? 0) >= 1) $logicalNeedsWatermark = false;
         }
 
