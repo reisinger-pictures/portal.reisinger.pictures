@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Coupon;
 use App\Models\Org;
+use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -27,7 +28,8 @@ class CouponUpdateRequest extends FormRequest
     public function rules(): array
     {
         $user = $this->user();
-        $isPhotographer = $user && $user->is_photographer && !$user->is_super_admin && !$user->is_admin;
+        $svc = app(AuthorizationService::class);
+        $isPhotographer = $user && $svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user);
 
         $scopeTypes = $isPhotographer
             ? 'in:gallery,meta_gallery,photographer'
