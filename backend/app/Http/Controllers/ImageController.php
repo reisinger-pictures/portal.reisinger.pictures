@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Gallery;
 use App\Models\Photo;
 use Illuminate\Support\Str;
+use App\Services\AuthorizationService;
 use App\Services\PhotoProcessingService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -28,12 +29,13 @@ class ImageController extends Controller
         if (!$gallery) return response()->json(['error' => 'Galerie nicht gefunden'], 404);
 
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
 
-        if (!$user->is_photographer) {
+        if (!$svc->isPhotographer($user)) {
             return response()->json(['error' => 'Nur Fotografen dürfen Bilder hochladen.'], 403);
         }
-        
-        if (!$user->is_super_admin && !$user->is_admin && !($user->is_photographer && $user->canPhotographerAccessGallery($gallery->id))) {
+
+        if (!$svc->isSuperAdmin($user) && !$svc->isAdmin($user) && !($svc->isPhotographer($user) && $svc->canPhotographerAccessGallery($user, $gallery->id))) {
             return response()->json(['error' => 'Keine Berechtigung für diese Galerie.'], 403);
         }
 
