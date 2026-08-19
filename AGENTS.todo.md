@@ -299,7 +299,7 @@ Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wi
 4. ✅ Middleware (SuperAdmin + Management) nutzt Service (8ca262d) — RoleAbortTest 4/4.
 5. ✅ Policies: GalleryPolicy + PhotoPolicy → `canManageGallery` (5de1937) — Zero `$user->is_*` in Policies.
 6. ✅ Controller 6a–6f (108e1bf–1b5dc3d) + Pint (79204d5) — Zero `$user->is_*` in Controllers.
-7. `hasPurchasedPhoto` Extrahierung — eigener Backlog-Item (kein Rollen-Thema).
+7. ✅ `hasPurchasedPhoto` → `PurchaseService` (b734013) — Model-Delegate, 1192/0 grün.
 
 **Test-Strategie:** `AuthorizationServiceTest` (alle Prädikate, Prezedenz, Guest), neuer N+1-Regressionstest, bestehende Suiten als Guard (s. Schritt 2), E2E-@smoke nach jedem Schritt.
 
@@ -336,7 +336,7 @@ Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wi
 3. [x] Frontend: `useBrandSettings.ts` + Vitest (4 Tests, 589/0 grün).
 4. [x] `BrandSettingsCard.tsx` + Einbau in `ManagementSettingsView.tsx` — `pnpm lint:fix && pnpm build` 0 Fehler.
 5. [x] Playwright `brand-settings.spec.ts` (`@feature:admin:brand-settings`).
-6. [ ] Doku: `21-brand-config-driven.md` (§Follow-up F3 → Implementiert), `features/infrastructure/22-brand-settings-overlay.md` (SOLL, nach Implementierung).
+6. [x] Doku: `21-brand-config-driven.md` (§Follow-up F3 → Implementiert), `features/infrastructure/22-brand-settings-overlay.md` (SOLL, erstellt).
 
 **Test-Strategie:** PHPUnit (401/403/200-Matrix, Persistenz mit brand='rp' + `brand_config.*`-Key, 422-Fälle, null-Reset, Merge-Precedence, public `brand-config` reflektiert Override, kein Cross-Brand-Leak); Vitest (Hook, Zod-Schema); Playwright (Super-Admin ändern→persistiert, ungültige Hex→Client-Validierung, Reset, Plain-Admin read-only).
 
@@ -369,7 +369,7 @@ Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wi
 3. [x] `CouponService::applyCoupon` — `case 'photo_package'` (Berechnung §3a).
 4. [x] Frontend `CouponFormDrawer.tsx`: Typ-Option „Foto-Paket", N+Y-Felder, `couponSchema`/`Coupon`-Interface/`onSubmit` angepasst. `useCoupon.ts` (`CouponSummary.type`), `CouponInput.tsx`, `ClientCartView.tsx` (Label „10 Fotos für 40 €" + Rabatt-Vorschau). Listen (`*CouponsTab.tsx`, `ManagementCouponsView`) zeigen „10 Fotos / 40 €".
 5. [x] Doku: `08-srp-coupon-system.md` §3a ist SOLL (= Ist); Typ-Liste in §1/§7 synchron (enthalten).
-6. [x] **Tests (DoD):** ✅ Backend PHPUnit `CouponServiceTest` (M≤N, M>N, Übercharge-Guard, M=N) + `CouponAdminControllerTest` (Validierung conditional required + Euro→Cent-Mapping). ✅ Frontend Vitest `CouponFormDrawer.test.tsx`: Paket-Option rendert N+Y + Validation + Submit. ⬜ E2E Playwright `@feature:coupon`: Paket-Gutschein anlegen → im Cart einlösen → Assert Gesamtpreis = Y bei ≤N und Y+Rest bei >N (noch offen — separater E2E-Task).
+6. [x] **Tests (DoD):** ✅ Backend PHPUnit `CouponServiceTest` (M≤N, M>N, Übercharge-Guard, M=N) + `CouponAdminControllerTest` (Validierung conditional required + Euro→Cent-Mapping). ✅ Frontend Vitest `CouponFormDrawer.test.tsx`: Paket-Option rendert N+Y + Validation + Submit. ✅ E2E Playwright `coupon-photo-package.spec.ts` (`@feature:coupon`, 2 Tests × Desktop/Mobile = 4).
 
 **Test-Strategie:** PHPUnit (applyCoupon-Kombinationen + Request-Validierung), Vitest (Form-Rendering/Validation), Playwright (`@feature:coupon`). Nach jedem Code-Change `@smoke`.
 
