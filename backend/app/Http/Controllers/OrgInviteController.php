@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Brand;
+use App\Services\AuthorizationService;
 use Illuminate\Http\Request;
 use App\Models\Org;
 use App\Models\OrgInvite;
@@ -21,7 +22,8 @@ class OrgInviteController extends Controller
         $org = Org::findOrFail($orgId);
 
         // Scoped Policy: Nur Admins oder Org-Admin DES Org dürfen einladen
-        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $orgId)) {
+        $svc = app(AuthorizationService::class);
+        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $orgId)) {
             return response()->json(['error' => 'Keine Berechtigung, Nutzer in diese Organisation einzuladen.'], 403);
         }
 
