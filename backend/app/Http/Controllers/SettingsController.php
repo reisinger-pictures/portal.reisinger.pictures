@@ -1,11 +1,20 @@
 <?php
+
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreBrandSettingsRequest;
 use App\Models\Gallery;
+use App\Services\BrandSettingsService;
 use App\Services\SettingResolver;
+use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
+use App\Values\BrandConfig;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\Finder\Finder;
 
 class SettingsController extends Controller
@@ -30,42 +39,49 @@ class SettingsController extends Controller
             $maxTime = 0;
             foreach ($finder as $file) {
                 $time = $file->getMTime();
-                if ($time > $maxTime) $maxTime = $time;
+                if ($time > $maxTime) {
+                    $maxTime = $time;
+                }
             }
+
             return $maxTime ?: time();
         });
 
-        $latestMigration = \Illuminate\Support\Facades\DB::table('migrations')->orderBy('id', 'desc')->value('migration');
-        $dbVersion = \Illuminate\Support\Facades\DB::table('migrations')->count();
+        $latestMigration = DB::table('migrations')->orderBy('id', 'desc')->value('migration');
+        $dbVersion = DB::table('migrations')->count();
         if ($latestMigration && preg_match('/V(\d+)__/', $latestMigration, $matches)) {
-            $dbVersion = (int)$matches[1];
+            $dbVersion = (int) $matches[1];
         }
 
         return response()->json([
             'laravel_build_time' => date('c', $timestamp),
             'php_version' => phpversion(),
             'laravel_version' => app()->version(),
-            'db_version' => $dbVersion
+            'db_version' => $dbVersion,
         ]);
     }
 
     public function getWatermarkSvg()
     {
         $pfx = BrandRegistry::prefix();
-        $path = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/' . $pfx . 'watermark.svg');
-        if (!file_exists($path)) {
-            $path = \Illuminate\Support\Facades\Storage::disk('photos')->path('_watermarks/watermark.svg');
+        $path = Storage::disk('photos')->path('_watermarks/'.$pfx.'watermark.svg');
+        if (! file_exists($path)) {
+            $path = Storage::disk('photos')->path('_watermarks/watermark.svg');
         }
-        if (!file_exists($path)) abort(404);
+        if (! file_exists($path)) {
+            abort(404);
+        }
+
         return response()->file($path, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'no-cache, no-store, must-revalidate']);
     }
 
     public function getWatermark(SettingResolver $resolver)
     {
         $pfx = BrandRegistry::prefix();
-        $disk = \Illuminate\Support\Facades\Storage::disk('photos');
+        $disk = Storage::disk('photos');
+
         return response()->json([
-            'has_svg' => $disk->exists('_watermarks/' . $pfx . 'watermark.svg'),
+            'has_svg' => $disk->exists('_watermarks/'.$pfx.'watermark.svg'),
             'opacity' => (float) $resolver->get('watermark_opacity', 0.15),
         ]);
     }
@@ -83,30 +99,48 @@ class SettingsController extends Controller
             'bucket_2000_sel' => 'nullable|file',
         ]);
 
-        if ($request->has('opacity')) $resolver->set('watermark_opacity', $request->opacity);
-        
-        $disk = \Illuminate\Support\Facades\Storage::disk('photos');
+        if ($request->has('opacity')) {
+            $resolver->set('watermark_opacity', $request->opacity);
+        }
+
+        $disk = Storage::disk('photos');
         $dir = '_watermarks';
-        if (!$disk->exists($dir)) $disk->makeDirectory($dir);
+        if (! $disk->exists($dir)) {
+            $disk->makeDirectory($dir);
+        }
 
         $pfx = BrandRegistry::prefix();
-        if ($request->hasFile('svg')) $disk->putFileAs($dir, $request->file('svg'), $pfx . 'watermark.svg');
-        if ($request->hasFile('bucket_500')) $disk->putFileAs($dir, $request->file('bucket_500'), $pfx . 'master_500.png');
-        if ($request->hasFile('bucket_1000')) $disk->putFileAs($dir, $request->file('bucket_1000'), $pfx . 'master_1000.png');
-        if ($request->hasFile('bucket_2000')) $disk->putFileAs($dir, $request->file('bucket_2000'), $pfx . 'master_2000.png');
-        if ($request->hasFile('bucket_500_sel')) $disk->putFileAs($dir, $request->file('bucket_500_sel'), $pfx . 'master_selection_500.png');
-        if ($request->hasFile('bucket_1000_sel')) $disk->putFileAs($dir, $request->file('bucket_1000_sel'), $pfx . 'master_selection_1000.png');
-        if ($request->hasFile('bucket_2000_sel')) $disk->putFileAs($dir, $request->file('bucket_2000_sel'), $pfx . 'master_selection_2000.png');
+        if ($request->hasFile('svg')) {
+            $disk->putFileAs($dir, $request->file('svg'), $pfx.'watermark.svg');
+        }
+        if ($request->hasFile('bucket_500')) {
+            $disk->putFileAs($dir, $request->file('bucket_500'), $pfx.'master_500.png');
+        }
+        if ($request->hasFile('bucket_1000')) {
+            $disk->putFileAs($dir, $request->file('bucket_1000'), $pfx.'master_1000.png');
+        }
+        if ($request->hasFile('bucket_2000')) {
+            $disk->putFileAs($dir, $request->file('bucket_2000'), $pfx.'master_2000.png');
+        }
+        if ($request->hasFile('bucket_500_sel')) {
+            $disk->putFileAs($dir, $request->file('bucket_500_sel'), $pfx.'master_selection_500.png');
+        }
+        if ($request->hasFile('bucket_1000_sel')) {
+            $disk->putFileAs($dir, $request->file('bucket_1000_sel'), $pfx.'master_selection_1000.png');
+        }
+        if ($request->hasFile('bucket_2000_sel')) {
+            $disk->putFileAs($dir, $request->file('bucket_2000_sel'), $pfx.'master_selection_2000.png');
+        }
 
         // Cache-Busting: Lösche alle generierten Wasserzeichen-Bilder asynchron im Hintergrund
         dispatch(function () {
-            $disk = \Illuminate\Support\Facades\Storage::disk('photos');
+            $disk = Storage::disk('photos');
             $directories = $disk->directories();
             foreach ($directories as $dir) {
                 // Nur Galerie-Ordner (UUIDs) durchsuchen
-                if (\Illuminate\Support\Str::isUuid($dir)) {
-                    $disk->deleteDirectory($dir . '/_watermarked');
-                    $disk->deleteDirectory($dir . '/_thumbs/_watermarked');
+                if (Str::isUuid($dir)) {
+                    $disk->deleteDirectory($dir.'/_watermarked');
+                    $disk->deleteDirectory($dir.'/_thumbs/_watermarked');
                 }
             }
         });
@@ -121,6 +155,7 @@ class SettingsController extends Controller
     public function getBrandConfig()
     {
         $config = BrandRegistry::configOrDefault();
+
         return response()->json([
             'id' => $config->id,
             'name' => $config->name,
@@ -153,7 +188,7 @@ class SettingsController extends Controller
             }
         }
 
-        $presetService = app(\App\Services\VolumePresetService::class);
+        $presetService = app(VolumePresetService::class);
         $preset = $pricingStrategy === 'volume_licensing'
             ? $presetService->resolveForGallery($gallery)
             : null;
@@ -177,19 +212,19 @@ class SettingsController extends Controller
             'calc_images_per_hour' => $resolver->get('calc_images_per_hour'),
             'calc_outdoor_images_per_hour' => $resolver->get('calc_outdoor_images_per_hour'),
             'calc_flatrate_multiplier' => $resolver->get('calc_flatrate_multiplier'),
-                'srp_base_price' => $resolver->get('base_price'),
-                'srp_setup_fee' => $resolver->get('setup_fee'),
-                'srp_privacy_fee' => $resolver->get('privacy_fee'),
-                'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
-                'pricing_strategy' => $pricingStrategy,
-                'volume_pricing' => $preset !== null ? [
-                    'preset_id' => $preset->id,
-                    'preset_name' => $preset->name,
-                    'tiers' => $preset->tiers->map(fn ($tier) => [
-                        'min_quantity' => $tier->min_quantity,
-                        'price_cents' => $tier->price_cents,
-                    ])->values(),
-                ] : null,
+            'srp_base_price' => $resolver->get('base_price'),
+            'srp_setup_fee' => $resolver->get('setup_fee'),
+            'srp_privacy_fee' => $resolver->get('privacy_fee'),
+            'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
+            'pricing_strategy' => $pricingStrategy,
+            'volume_pricing' => $preset !== null ? [
+                'preset_id' => $preset->id,
+                'preset_name' => $preset->name,
+                'tiers' => $preset->tiers->map(fn ($tier) => [
+                    'min_quantity' => $tier->min_quantity,
+                    'price_cents' => $tier->price_cents,
+                ])->values(),
+            ] : null,
         ]);
     }
 
@@ -258,6 +293,7 @@ class SettingsController extends Controller
             $settingsKey = $srpKeyMap[$key] ?? $key;
             $resolver->set($settingsKey, $value);
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -282,6 +318,114 @@ class SettingsController extends Controller
                 $resolver->set($key, $value);
             }
         }
+
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * F3 (Step 2): read all configurable brand settings for every brand.
+     *
+     * Returns, per brand, the whitelist of editable fields, the config defaults,
+     * the persisted DB overrides and the effective (merged) values.
+     */
+    public function getBrandSettings()
+    {
+        $service = app(BrandSettingsService::class);
+        $brandIds = array_keys(config('brands', []));
+
+        $brands = [];
+        foreach ($brandIds as $id) {
+            $brands[] = [
+                'id' => $id,
+                'editable_fields' => BrandSettingsService::OVERRIDABLE,
+                'defaults' => $this->defaultFieldsForBrand($id),
+                'overrides' => $service->overridesFor($id),
+                'effective' => $this->effectiveFieldsForBrand($id),
+            ];
+        }
+
+        return response()->json(['brands' => $brands]);
+    }
+
+    /**
+     * F3 (Step 2): persist (or reset) a partial set of brand overrides.
+     *
+     * Only whitelisted keys sent in the payload are honored; a `null` value
+     * resets that key back to the config default. Writes require the
+     * `super_admin` middleware (defense-in-depth via the request too).
+     */
+    public function updateBrandSettings(string $brand, StoreBrandSettingsRequest $request)
+    {
+        $payload = [];
+        foreach (BrandSettingsService::OVERRIDABLE as $key) {
+            if ($request->has($key)) {
+                $payload[$key] = $request->input($key);
+            }
+        }
+
+        $service = app(BrandSettingsService::class);
+        // Pass audit=false: we emit a single, user-attributed audit line below
+        // and clear the brand-config cache manually (the service gates its own
+        // cache-clear on the audit flag).
+        $changed = $service->apply($brand, $payload, false);
+
+        if ($changed !== []) {
+            BrandRegistry::clearCache();
+            Log::info('Brand settings updated', [
+                'user' => $request->user()?->id,
+                'brand' => $brand,
+                'changed' => $changed,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'effective' => $this->effectiveFieldsForBrand($brand),
+        ]);
+    }
+
+    /**
+     * Project the whitelisted fields from a BrandConfig (the effective result).
+     */
+    private function effectiveFieldsForBrand(string $brandId): array
+    {
+        $config = BrandRegistry::configForBrand($brandId);
+        if (! $config instanceof BrandConfig) {
+            return [];
+        }
+
+        return [
+            'name' => $config->name,
+            'portal_name' => $config->portalName,
+            'impressum_url' => $config->impressumUrl,
+            'primary_color' => $config->primaryColor,
+            'secondary_color' => $config->secondaryColor,
+            'frontend_url' => $config->frontendUrl,
+            'from_address' => $config->fromAddress,
+            'from_name' => $config->fromName,
+            'accounting_email' => $config->accountingEmail,
+            'features' => $config->features,
+        ];
+    }
+
+    /**
+     * Project the whitelisted fields from the raw config default (no DB overlay).
+     */
+    private function defaultFieldsForBrand(string $brandId): array
+    {
+        $data = config("brands.$brandId", []);
+
+        return [
+            'name' => $data['name'] ?? $brandId,
+            'portal_name' => $data['portal_name'] ?? $brandId,
+            'impressum_url' => $data['impressum_url'] ?? null,
+            'primary_color' => $data['primary_color'] ?? '#1E5631',
+            'secondary_color' => $data['secondary_color'] ?? '#A4B494',
+            'frontend_url' => $data['frontend_url'] ?? null,
+            'from_address' => $data['from_address'] ?? null,
+            'from_name' => $data['from_name'] ?? null,
+            'accounting_email' => $data['accounting_email'] ?? null,
+            'features' => $data['features'] ?? [],
+        ];
     }
 }

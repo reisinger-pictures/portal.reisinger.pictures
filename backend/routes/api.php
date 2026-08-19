@@ -2,43 +2,47 @@
 
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContractController;
+use App\Http\Controllers\ContractDownloadController;
 use App\Http\Controllers\ContractJoinController;
 use App\Http\Controllers\CouponAdminController;
 use App\Http\Controllers\CouponCheckoutController;
-use App\Http\Controllers\ContractDownloadController;
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\InvoiceDownloadController;
-use App\Http\Controllers\PhotoDownloadController;
 use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\GalleryFrontendController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\InviteController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoiceDownloadController;
 use App\Http\Controllers\LicenseCatalogController;
 use App\Http\Controllers\LightroomCatalogController;
 use App\Http\Controllers\MailController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
-use App\Http\Controllers\CheckoutController;
-use App\Http\Controllers\InvoiceController;
-use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\OrgController;
+use App\Http\Controllers\OrgInviteController;
+use App\Http\Controllers\PayoutController;
 use App\Http\Controllers\PhotoController;
+use App\Http\Controllers\PhotoDownloadController;
 use App\Http\Controllers\PhotoJobBoardController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProjectBoardController;
+use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StatsController;
-use App\Http\Controllers\OrgController;
-use App\Http\Controllers\OrgInviteController;
 use App\Http\Controllers\TextSnippetController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VolumePresetController;
 use App\Http\Controllers\WebhookController;
 use App\Models\DownloadLog;
+use App\Models\InvoiceSnapshot;
+use App\Models\Order;
+use App\Models\PhotographerStatement;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
@@ -62,20 +66,22 @@ if (app()->environment('local', 'testing')) {
     Route::delete('/test/cleanup-user/{id}', function ($id) {
         $user = User::find($id);
         if ($user) {
-            \App\Models\PhotographerStatement::where('user_id', $id)->delete();
-            $orderIds = \App\Models\Order::where('user_id', $id)->pluck('id');
+            PhotographerStatement::where('user_id', $id)->delete();
+            $orderIds = Order::where('user_id', $id)->pluck('id');
             if ($orderIds->isNotEmpty()) {
-                \App\Models\InvoiceSnapshot::whereIn('order_id', $orderIds)->delete();
-                \App\Models\Order::whereIn('id', $orderIds)->delete();
+                InvoiceSnapshot::whereIn('order_id', $orderIds)->delete();
+                Order::whereIn('id', $orderIds)->delete();
             }
             DownloadLog::where('user_id', $id)->delete();
             $user->delete();
         }
+
         return response()->json(['success' => true]);
     })->name('api.test.cleanup-user');
 
     Route::post('/test/flush-queue', function () {
         Artisan::call('queue:work', ['--stop-when-empty' => true]);
+
         return response()->json(['success' => true]);
     })->name('api.test.flush-queue');
 
@@ -106,7 +112,7 @@ Route::get('/media/{slug}/{filename}', [FileDeliveryController::class, 'serve'])
 $downloadThrottle = config('app.throttle_download', 60);
 Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', [PhotoDownloadController::class, 'downloadSingle'])->name('api.photos.download');
 Route::get('/orders/quote-decode', [QuoteController::class, 'decodeQuoteLink'])->name('api.orders.quote-decode');
-Route::middleware('throttle:' . config('app.throttle_zip_download', 3) . ',1')->get('/galleries/{galleryId}/download-zip', [PhotoDownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
+Route::middleware('throttle:'.config('app.throttle_zip_download', 3).',1')->get('/galleries/{galleryId}/download-zip', [PhotoDownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
 
 Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
@@ -127,9 +133,9 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');
     Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
     Route::get('/orders/{id}/invoice', [InvoiceDownloadController::class, 'downloadInvoice'])->name('api.orders.invoice');
-    Route::middleware('throttle:' . config('app.throttle_zip_download', 3) . ',1')->get('/orders/{id}/download-zip', [PhotoDownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
+    Route::middleware('throttle:'.config('app.throttle_zip_download', 3).',1')->get('/orders/{id}/download-zip', [PhotoDownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
     Route::delete('/photos/{id}', [PhotoController::class, 'destroy'])->name('api.photos.destroy');
-    Route::get('/payouts/my-statements', [\App\Http\Controllers\PayoutController::class, 'myStatements'])->name('api.payouts.my-statements');
+    Route::get('/payouts/my-statements', [PayoutController::class, 'myStatements'])->name('api.payouts.my-statements');
 
     // AI Metadata Generation
     Route::get('/ai/status', [AIController::class, 'status'])->name('api.ai.status');
@@ -169,10 +175,8 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::put('/management/users/{id}', [UserController::class, 'update'])->name('api.management.users.update');
     Route::delete('/management/users/{id}', [UserController::class, 'destroy'])->name('api.management.users.destroy');
 
-
     Route::get('/management/settings/watermark', [SettingsController::class, 'getWatermark'])->name('api.management.settings.watermark');
     Route::get('/management/settings/watermark/svg', [SettingsController::class, 'getWatermarkSvg'])->name('api.management.settings.watermark-svg');
-
 
     Route::post('/management/settings/watermark', [SettingsController::class, 'updateWatermark'])->name('api.management.settings.watermark.update');
     Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms'])->name('api.management.settings.license-terms');
@@ -182,6 +186,11 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     // Gate im Frontend) → zusätzlich super_admin-gesichert. Lesen (GET /settings/billing-details)
     // bleibt auth:api, da Klienten die Bankdaten für "Kauf auf Rechnung" brauchen.
     Route::put('/management/settings/billing-details', [SettingsController::class, 'updateBillingDetails'])->name('api.management.settings.billing-details')->middleware('super_admin');
+
+    // F3 (Step 2): brand settings overlay — read for all management roles,
+    // write (partial, super_admin only).
+    Route::get('/management/brand-settings', [SettingsController::class, 'getBrandSettings'])->name('api.management.brand-settings.index');
+    Route::put('/management/brand-settings/{brand}', [SettingsController::class, 'updateBrandSettings'])->name('api.management.brand-settings.update')->middleware('super_admin');
 
     Route::middleware(['super_admin'])->group(function () {
         Route::post('/management/settings/license-use-cases', [LicenseCatalogController::class, 'storeUseCase'])->name('api.management.settings.license-use-cases.store');
@@ -196,10 +205,10 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::delete('/management/settings/volume-presets/{id}', [VolumePresetController::class, 'destroy'])->name('api.management.settings.volume-presets.destroy');
         Route::post('/management/settings/volume-presets/{id}/default', [VolumePresetController::class, 'setDefault'])->name('api.management.settings.volume-presets.default');
 
-        Route::get('/management/payouts', [\App\Http\Controllers\PayoutController::class, 'adminIndex'])->name('api.management.payouts');
-        Route::post('/management/payouts/calculate', [\App\Http\Controllers\PayoutController::class, 'calculate'])->name('api.management.payouts.calculate');
-        Route::post('/management/payouts/{id}/approve', [\App\Http\Controllers\PayoutController::class, 'approveStatement'])->name('api.management.payouts.approve');
-        Route::post('/management/payouts/{id}/pay', [\App\Http\Controllers\PayoutController::class, 'markAsPaid'])->name('api.management.payouts.pay');
+        Route::get('/management/payouts', [PayoutController::class, 'adminIndex'])->name('api.management.payouts');
+        Route::post('/management/payouts/calculate', [PayoutController::class, 'calculate'])->name('api.management.payouts.calculate');
+        Route::post('/management/payouts/{id}/approve', [PayoutController::class, 'approveStatement'])->name('api.management.payouts.approve');
+        Route::post('/management/payouts/{id}/pay', [PayoutController::class, 'markAsPaid'])->name('api.management.payouts.pay');
 
         Route::get('/management/contracts', [ContractController::class, 'index'])->name('api.management.contracts.index');
         Route::post('/management/contracts', [ContractController::class, 'store'])->name('api.management.contracts.store');
@@ -220,7 +229,6 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/ftp/target', [FtpController::class, 'setTarget'])->name('api.management.ftp.target');
     Route::post('/management/ftp/process', [FtpController::class, 'process'])->name('api.management.ftp.process');
 
-
     Route::get('/management/orgs', [OrgController::class, 'index'])->name('api.management.orgs.index');
     Route::post('/management/orgs', [OrgController::class, 'store'])->name('api.management.orgs.store');
     Route::get('/management/orgs/{id}', [OrgController::class, 'show'])->name('api.management.orgs.show');
@@ -237,7 +245,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/orders/{id}/send-quote', [QuoteController::class, 'sendQuote'])->name('api.management.orders.send-quote');
     Route::post('/management/invoices/manual', [InvoiceController::class, 'generateManualInvoice'])->name('api.management.invoices.manual');
     Route::post('/management/invoices/extract-offer', [QuoteController::class, 'extractOffer'])->name('api.management.invoices.extract-offer');
-        Route::middleware(['super_admin'])->group(function () {
+    Route::middleware(['super_admin'])->group(function () {
         Route::get('/management/products', [ProductController::class, 'index'])->name('api.management.products.index');
         Route::post('/management/products', [ProductController::class, 'store'])->name('api.management.products.store');
         Route::put('/management/products/{id}', [ProductController::class, 'update'])->name('api.management.products.update');

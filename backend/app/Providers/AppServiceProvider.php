@@ -2,21 +2,24 @@
 
 namespace App\Providers;
 
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Queue;
-use App\Mail\Transports\GmailRestTransport;
+use App\Auth\TransientUserProvider;
 use App\Contracts\PricingStrategy;
+use App\Enums\UserRole;
+use App\Mail\Transports\GmailRestTransport;
 use App\Models\Setting;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CouponService;
-use App\Services\SettingResolver;
+use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\ServiceProvider;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
@@ -28,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(HtmlSanitizer::class, function ($app) {
-            $config = (new HtmlSanitizerConfig())
+            $config = (new HtmlSanitizerConfig)
                 ->allowElement('p')
                 ->allowElement('h1')
                 ->allowElement('h2')
@@ -49,7 +52,7 @@ class AppServiceProvider extends ServiceProvider
                 ->allowElement('tr')
                 ->allowElement('th')
                 ->allowElement('td');
-            
+
             return new HtmlSanitizer($config);
         });
 
@@ -60,11 +63,11 @@ class AppServiceProvider extends ServiceProvider
 
             return match ($strategy) {
                 'volume_licensing' => new VolumeLicensingStrategy(
-                    $app->make(\App\Services\VolumePresetService::class)
+                    $app->make(VolumePresetService::class)
                         ->resolveDefaultForBrand(BrandRegistry::currentOrDefault()),
                     $app->make(CouponService::class)
                 ),
-                default => new ScopeLicensingStrategy(),
+                default => new ScopeLicensingStrategy,
             };
         });
     }
@@ -83,26 +86,28 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('purchase-upgrades', function ($user) {
             $user->loadMissing('roles');
             $roleNames = $user->roles->pluck('name')->all();
-            $isClient = in_array(\App\Enums\UserRole::CLIENT->value, $roleNames);
-            $isPrivileged = in_array(\App\Enums\UserRole::POWER_USER->value, $roleNames)
-                || in_array(\App\Enums\UserRole::ADMIN->value, $roleNames)
-                || in_array(\App\Enums\UserRole::SUPER_ADMIN->value, $roleNames)
-                || in_array(\App\Enums\UserRole::PHOTOGRAPHER->value, $roleNames);
-            return !$isClient || $isPrivileged;
+            $isClient = in_array(UserRole::CLIENT->value, $roleNames);
+            $isPrivileged = in_array(UserRole::POWER_USER->value, $roleNames)
+                || in_array(UserRole::ADMIN->value, $roleNames)
+                || in_array(UserRole::SUPER_ADMIN->value, $roleNames)
+                || in_array(UserRole::PHOTOGRAPHER->value, $roleNames);
+
+            return ! $isClient || $isPrivileged;
         });
 
         Gate::define('purchase-on-invoice', function ($user) {
             $user->loadMissing('roles');
             $roleNames = $user->roles->pluck('name')->all();
-            $isClient = in_array(\App\Enums\UserRole::CLIENT->value, $roleNames);
-            $isPrivileged = in_array(\App\Enums\UserRole::POWER_USER->value, $roleNames)
-                || in_array(\App\Enums\UserRole::ADMIN->value, $roleNames)
-                || in_array(\App\Enums\UserRole::SUPER_ADMIN->value, $roleNames);
+            $isClient = in_array(UserRole::CLIENT->value, $roleNames);
+            $isPrivileged = in_array(UserRole::POWER_USER->value, $roleNames)
+                || in_array(UserRole::ADMIN->value, $roleNames)
+                || in_array(UserRole::SUPER_ADMIN->value, $roleNames);
+
             return $isClient || $isPrivileged;
         });
 
-        \Illuminate\Support\Facades\Auth::provider('transient_eloquent', function ($app, array $config) {
-            return new \App\Auth\TransientUserProvider($app['hash'], $config['model']);
+        Auth::provider('transient_eloquent', function ($app, array $config) {
+            return new TransientUserProvider($app['hash'], $config['model']);
         });
         // Den neuen Custom Transport in Laravel's Mail-Manager integrieren
         Mail::extend('gmail_rest', function (array $config) {
@@ -113,12 +118,10 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        RateLimiter::for('api', fn (Request $request) =>
-            Limit::perMinute(config('app.throttle_api', 120))->by($request->user('api')?->getKey() ?? $request->ip())
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('app.throttle_api', 120))->by($request->user('api')?->getKey() ?? $request->ip())
         );
 
-        RateLimiter::for('coupon-validate', fn (Request $request) =>
-            Limit::perMinute(10)->by($request->user('api')?->getKey() ?? $request->ip())
+        RateLimiter::for('coupon-validate', fn (Request $request) => Limit::perMinute(10)->by($request->user('api')?->getKey() ?? $request->ip())
         );
 
         // Reset brand state before each queue job to prevent stale config carrying over
@@ -127,6 +130,10 @@ class AppServiceProvider extends ServiceProvider
         // remain unaffected.
         Queue::before(function () {
             BrandRegistry::reset();
+            // Also drop the memoized brand-config cache so a brand-settings write
+            // (DB overlay) performed in a previous job is picked up fresh by the
+            // next job. clearCache() is idempotent (no-op when nothing cached).
+            BrandRegistry::clearCache();
         });
     }
 }
