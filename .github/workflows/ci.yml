@@ -184,6 +184,14 @@ jobs:
     # im ersten Step geprüft (dort ist der secrets-Context erlaubt).
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
+    # Gesamter E2E-Job laeuft im Test-Image portal-e2e (portal-base + Node/
+    # pnpm/Composer + Playwright-Chromium vorinstalliert) -> kein Browser-
+    # Download und kein apt-Deps-Setup pro Run. Backend & Vite laufen als
+    # Hintergrundprozesse im selben Container; die Daten-Dienste (mariadb/
+    # meili/mailpit) sind per Service-Name erreichbar. Details: features/
+    # infrastructure/28-ci-test-image.md.
+    container:
+      image: ghcr.io/reisi007/portal-e2e:latest
     strategy:
       fail-fast: false
       matrix:
@@ -201,6 +209,10 @@ jobs:
       JWT_SECRET: 2d093d84542d70f133a1689afb5866bed31edd1b520ce8c02ea9d25559fb0834
       ADMIN_EMAIL: admin@example.com
       ADMIN_PASSWORD: admin
+      # Mailpit-API fuer die E2E-Helper (MailpitHelper.ts liest MAILPIT_API_URL;
+      # Default waere localhost:8025). Container-Modus: Dienste sind nur per
+      # Service-Name erreichbar, nicht via 127.0.0.1.
+      MAILPIT_API_URL: http://mailpit:8025/api/v1
     services:
       mariadb:
         image: mariadb:11.4
@@ -262,56 +274,54 @@ jobs:
             exit 1
           fi
           echo "Stripe write (payment_intents create) OK"
-      # Backend laeuft im Prod-Image ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 +
-      # exiftool) - identisch zur Prod-Runtime. Composer ueber composer:latest.
-      # CI-Env steht in backend/.env.ci (-> .env); nur die Stripe-Test-Keys
-      # kommen per Container-Env aus den GitHub Secrets. `--network host` ->
-      # Frontend (Runner) und Backend teilen 127.0.0.1.
-      - name: Start PHP container (prod image)
-        run: |
-          docker run -d --name php \
-            --network host \
-            -v "${{ github.workspace }}:/app" \
-            -w /app/backend \
-            -e STRIPE_KEY="${{ secrets.STRIPE_KEY }}" \
-            -e STRIPE_SECRET="${{ secrets.STRIPE_SECRET }}" \
-            -e STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
-            ghcr.io/reisi007/portal-base:8.5 \
-            sleep infinity
-          until docker exec php php -v > /dev/null 2>&1; do sleep 1; done
+      # Der komplette Job laeuft im Test-Image ghcr.io/reisi007/portal-e2e:latest
+      # (portal-base + Node/pnpm/Composer + Playwright-Chromium vorinstalliert) ->
+      # kein Browser-Download, kein apt-Deps-Setup pro Run. App-Code wird vom
+      # Runner gemountet; Dependencies werden pro Commit frisch installiert
+      # (Invariante: nie node_modules/vendor einbacken).
+      # Container-Modus: Daten-Dienste sind per Service-Name erreichbar
+      # (nicht via 127.0.0.1) -> .env-Overrides unten; `.env.ci` selbst bleibt
+      # fuer den Backend-/PHPUnit-Job unveraendert.
       - name: Prepare backend environment
         working-directory: backend
-        run: cp .env.ci .env
+        run: |
+          cp .env.ci .env
+          sed -i.bak -E \
+            -e 's|^DB_HOST=.*|DB_HOST=mariadb|' \
+            -e 's|^DB_PORT=.*|DB_PORT=3306|' \
+            -e 's|^MEILISEARCH_HOST=.*|MEILISEARCH_HOST=http://meilisearch:7700|' \
+            -e 's|^MAIL_HOST=.*|MAIL_HOST=mailpit|' \
+            .env && rm -f .env.bak
+          grep -q '^DB_HOST=mariadb$' .env
+          grep -q '^DB_PORT=3306$' .env
+          grep -q '^MEILISEARCH_HOST=http://meilisearch:7700$' .env
+          grep -q '^MAIL_HOST=mailpit$' .env
       - name: Install backend dependencies
         working-directory: backend
-        run: |
-          docker run --rm \
-            --network host \
-            -v "${{ github.workspace }}:/app" \
-            -w /app/backend \
-            composer install --ignore-platform-reqs --no-interaction --optimize-autoloader
+        # Composer ist im Image (COPY --from=composer:2); kein separater
+        # composer:-Container mehr noetig.
+        run: composer install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
         working-directory: backend
-        run: docker exec php php artisan key:generate
+        run: php artisan key:generate
       - name: Run migrations
         working-directory: backend
-        run: docker exec php php artisan migrate --force
+        run: php artisan migrate --force
       - name: Seed database
         working-directory: backend
         # Full Seed: erzeugt den von den E2E-Specs erwarteten
         # admin@example.com mit allen Rollen + Katalog. DatabaseSeeder ruft
         # am Ende app:import-locations auf (Geonames-Download via HTTP).
-        run: docker exec php php artisan db:seed --force
+        run: php artisan db:seed --force
       - name: Start backend server
         working-directory: backend
         # WICHTIG: `--no-reload` NICHT entfernen! Laravels ServeCommand filtert
         # sonst alle Env-Vars heraus, die nicht in `$passthroughVariables`
-        # stehen (APP_ENV, PATH, XDEBUG, ...). STRIPE_SECRET wird per
-        # Container-Env (-e) injiziert und fehlt in dieser Liste -> ohne
-        # --no-reload bekommt der Serverprozess den `.env.ci`-Platzhalter
-        # `sk_test_<ci_placeholder>` -> Stripe 401. Fix: 2026-08-05.
+        # stehen (APP_ENV, PATH, XDEBUG, ...). STRIPE_SECRET kommt aus den
+        # Job-Secrets (immutable Dotenv -> gewinnt gegen den .env-Platzhalter),
+        # fehlt aber in der ServeCommand-Passliste -> ohne --no-reload Stripe 401.
         run: |
-          docker exec php php artisan serve --host=127.0.0.1 --port=8000 --no-reload > /tmp/php-serve.log 2>&1 &
+          php artisan serve --host=127.0.0.1 --port=8000 --no-reload > /tmp/php-serve.log 2>&1 &
           timeout 60s bash -c 'until curl -sf http://127.0.0.1:8000/api/ping > /dev/null; do sleep 1; done'
       - uses: pnpm/action-setup@v6
         with:
@@ -324,9 +334,14 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile
-      - name: Install Playwright browsers
+      - name: Verify Playwright browsers (fallback install)
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        # Browser sind im Image unter /ms-playwright vorinstalliert (Version ==
+        # @playwright/test). Dieser Schritt ist ein No-Op, wenn die Version
+        # passt; bei Versionsdrift (Dependabot-Bump vor Image-Rebuild) laedt er
+        # nur die fehlende Browser-Version nach. `--with-deps` bewusst NICHT:
+        # apt-System-Deps sind im Image gebacken.
+        run: npx playwright install chromium
       - name: Start frontend dev server
         working-directory: frontend
         run: |
