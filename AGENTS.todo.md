@@ -277,9 +277,9 @@ Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wi
 
 ---
 
-### 🔙 A1 — User-God-Entity entschärfen + Role-Prüfungen konsolidieren
+### ✅ A1 — User-God-Entity entschärfen + Role-Prüfungen konsolidieren — VERIFIZIERT (2026-08-19)
 
-**Status:** Schritt 1 erledigt (Commit `e44f6dd`, 2026-08-13: `AccessControlService` → `AuthorizationService`, additiv, 150 Scoped-Tests grün). **Offen: Schritte 2–7.**
+**Status:** Alle Schritte 1–6 erledigt. Step 7 (`hasPurchasedPhoto` Extrahierung) bewusst NICHT in A1 (kein Rollen-Thema, eigener Backlog-Item).
 
 **Ziel:** Rollen-/Autorisierungslogik aus `backend/app/Models/User.php` in einen **konsolidierten `AuthorizationService`** (Umbenennung von `AccessControlService`, Entscheidung 2026-08-04) überführen; Scatter (~170 direkte `is_*`-Prüfungen in 20+ Dateien) beseitigen; N+1 Role-Queries beheben. Serialisierung (`$visible`, `AuthController::me()`, `UserResource`) bleibt unverändert → kein API-Break.
 
@@ -293,13 +293,13 @@ Beide Komponenten werden auch in `ManagementContractView.tsx` genutzt → Fix wi
 **SOLL-Architektur:** Konsolidierter **`AuthorizationService`** (vorher `AccessControlService`) mit `hasRole(User, ...roles)`, `roleNames(User)`, `isSuperAdmin/isAdmin/isPhotographer/isPowerUser/isOrgAdmin/isPending/isClient/isPrivileged(User)`, `canAccessGallery(User, id)`, `canPhotographerAccessGallery(User, id)`, `canManageGallery(User, id)` (Komposit). **Regel: Service referenziert NIE `$user->is_*`-Accessor** (Rekursionsschutz); alle Prädikate via `$user->loadMissing('roles')`. Model wird dünne Delegation (1-Zeilen-Delegates), Relations bleiben.
 
 **Priorisierte Migrationsschritte (jeder einzeln grün testbar):**
-1. ~~Service erweitern + umbenennen in `AuthorizationService` (rein additiv, keine Caller-Umbauten) — `AuthorizationServiceTest`~~ ✅ **erledigt (e44f6dd)**
-2. Model auf Delegation umstellen — Guard: `AuthorizationTest`, `UserPermissionLogicTest`, `GalleryTreeServiceTest:304`.
-3. Gates konsolidieren + Semantik verfeinern (`AppServiceProvider`) — Guard-Tests der Ist-Bool-Ergebnisse + neue `isClient`/`isPrivileged`.
-4. Middleware (`SuperAdminMiddleware:14`, `ManagementMiddleware:21,28,37`) — Guard: `RoleAbortTest`.
-5. Policies (`GalleryPolicy:15,20`, `PhotoPolicy:13,20,27,38,44,50` — 5×-Komposit `is_super_admin||is_admin||(is_photographer&&canPhotographerAccessGallery)` → `canManageGallery`).
-6. Controller nach Fachgebiet (6a–6f, je eigener Commit): User/Org → Gallery/Frontend/Image → PhotoDownload/FileDelivery → Search/Mail/Notification/CheckoutService → Requests → Rest.
-7. (Optional) `hasPurchasedPhoto` als eigener Backlog-Item extrahieren — NICHT in A1.
+1. ✅ Service erweitern + umbenennen in `AuthorizationService` (e44f6dd)
+2. ✅ Model auf Delegation umstellen (13e8c09) — 63 Authorization-Tests grün.
+3. ✅ Gates konsolidiert + `isClient`/`isPrivileged` (ba8c7ea) — `purchase-on-invoice` bewusst unverändert (PHOTOGRAPHER ausgeschlossen).
+4. ✅ Middleware (SuperAdmin + Management) nutzt Service (8ca262d) — RoleAbortTest 4/4.
+5. ✅ Policies: GalleryPolicy + PhotoPolicy → `canManageGallery` (5de1937) — Zero `$user->is_*` in Policies.
+6. ✅ Controller 6a–6f (108e1bf–1b5dc3d) + Pint (79204d5) — Zero `$user->is_*` in Controllers.
+7. `hasPurchasedPhoto` Extrahierung — eigener Backlog-Item (kein Rollen-Thema).
 
 **Test-Strategie:** `AuthorizationServiceTest` (alle Prädikate, Prezedenz, Guest), neuer N+1-Regressionstest, bestehende Suiten als Guard (s. Schritt 2), E2E-@smoke nach jedem Schritt.
 
