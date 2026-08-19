@@ -1,66 +1,82 @@
-// UI-review route manifest — single source of truth for which pages get
+// UI-review route manifest — the single source of truth for which pages get
 // screenshotted and in which states. Edit this file to add/remove routes; the
 // generic spec picks the changes up automatically.
 //
-// Auth-Hinweis: fast alle Routen dieses Portals liegen hinter `ProtectedRoute`
-// (App.tsx) und erfordern Login (B2B-Dashboard, Warenkorb, Profile, …). Nur
-// öffentliche Routen werden hier erfasst. Token-Routen (`/invite/:token`,
-// `/contracts/join/:token`, `/reset-password?token=…`) sind ohne gültigen Link
-// nicht sinnvoll erreichbar und/oder rendern kein `<main>` (die Spec wartet auf
-// `main`), daher ausgenommen. Die Gast-Home `/` rendert `SearchView`
-// (ProtectedDashboard-Fallback), ist also ohne Login erreichbar.
+// This harness intentionally has NO fixture-tenant logic: the app has a single
+// primary tenant and we capture the "filled" (real production data) state only.
 
-export type UiReviewState = "filled" | "empty";
-export type UiReviewViewport = "desktop" | "mobile";
+export type UiReviewState = 'filled' | 'empty';
+export type UiReviewViewport = 'desktop' | 'mobile';
+export type UiReviewAuth = 'guest' | 'admin' | 'user' | 'none';
 
 export interface UiReviewRoute {
-  name: string;
-  path: string;
-  states: UiReviewState[];
-  viewports?: UiReviewViewport[];
-  note?: string;
-  /** Static <title> of the app — guards against capturing a foreign server on the port. */
-  expectedTitle: string;
+    name: string;
+    /** Route pattern; `:param` tokens are resolved from the seed result where used. */
+    path: string;
+    states: UiReviewState[];
+    auth?: UiReviewAuth;
+    viewports?: UiReviewViewport[];
+    /** Static <title> of the app — the spec asserts it so a foreign dev-server
+     *  on the port can never be silently screenshotted. Required when the app
+     *  has a stable title. */
+    expectedTitle?: string;
+    note?: string;
 }
 
 export interface UiReviewConfig {
-  /** Must mirror `outputDir` in playwright.screenshots.config.ts. */
-  outputDir: string;
-  routes: UiReviewRoute[];
+    /** Mirrors `outputDir` in playwright.screenshots.config.ts. */
+    outputDir: string;
+    routes: UiReviewRoute[];
 }
 
 export const uiReviewConfig: UiReviewConfig = {
-  outputDir: "test-results/ui-screenshots",
-  routes: [
-    {
-      name: "home",
-      path: "/",
-      states: ["filled"],
-      note: "Gast-Home = SearchView („Neueste Entdeckungen“); Login + Dashboard liegen hinter Auth. Ohne erreichbares Backend (Vite-Proxy → https://portal.test) zeigen die API-gestützten Sektionen Fehlerzustände (HTTP 502) — Layout, Header und Navigation sind trotzdem vollständig erfassbar.",
-      expectedTitle: "Reisinger Foto Portal",
-    },
-    {
-      name: "search",
-      path: "/search",
-      states: ["filled"],
-      note: "Dedizierte Suchseite (dieselbe Suchmaske wie die Gast-Home); leerer Query rendert die identische Ansicht. Ergebnislisten benötigen ein erreichbares Backend.",
-      expectedTitle: "Reisinger Foto Portal",
-    },
-    {
-      name: "privacy",
-      path: "/privacy",
-      states: ["filled"],
-      note: "Statische Datenschutzerklärung — vollständig ohne Backend/Auth erreichbar.",
-      expectedTitle: "Reisinger Foto Portal",
-    },
-    {
-      name: "impressum",
-      path: "/impressum",
-      states: ["filled"],
-      note: "Statisches Impressum — vollständig ohne Backend/Auth erreichbar.",
-      expectedTitle: "Reisinger Foto Portal",
-    },
-  ],
+    outputDir: 'test-results/ui-screenshots',
+    routes: [
+        {
+            name: 'login',
+            path: '/login',
+            states: ['filled'],
+            auth: 'guest',
+            note: 'Guest login page (filled = the form as shown to anonymous visitors).',
+        },
+        {
+            name: 'dashboard',
+            path: '/',
+            states: ['filled'],
+            auth: 'admin',
+            note: 'Admin lands on the dashboard ("Übersicht") after login.',
+        },
+        {
+            name: 'projects-board',
+            path: '/admin-projects',
+            states: ['filled'],
+            auth: 'admin',
+        },
+        {
+            name: 'settings',
+            path: '/settings',
+            states: ['filled'],
+            auth: 'admin',
+            note: 'ManagementSettingsView route (Einstellungen).',
+        },
+        {
+            name: 'manual-offer',
+            path: '/admin-manual-offer',
+            states: ['filled'],
+            auth: 'admin',
+        },
+        {
+            name: 'contracts',
+            path: '/admin-contracts',
+            states: ['filled'],
+            auth: 'admin',
+        },
+    ],
+    // DEFERRED (documented, not captured):
+    // - empty-tenant fixture: skipped — the app uses a single primary tenant,
+    //   no data-less tenant exists to screenshot an "empty" state against.
+    // - public gallery: skipped — requires a live public gallery slug + its
+    //   anonymous deep link; out of scope for the admin UI-review pass.
 };
 
 export const routes = uiReviewConfig.routes;
