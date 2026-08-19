@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import WatermarkSettingsCard from './components/WatermarkSettingsCard';
 import PricingSettingsTabs from './components/PricingSettingsTabs';
 import BillingDetailsCard from './components/BillingDetailsCard';
+import BrandSettingsCard from './components/BrandSettingsCard';
 import useSWR from 'swr';
 import {fetcher, SystemInfo} from '../../api';
 import {useState} from 'react';
@@ -63,6 +64,7 @@ export default function ManagementSettingsView() {
             <PricingSettingsTabs/>
 
             <BillingDetailsCard/>
+            {isSuperAdmin && <BrandSettingsCard/>}
             <WatermarkSettingsCard/>
 
             <CalculatorSettingsCard/>
