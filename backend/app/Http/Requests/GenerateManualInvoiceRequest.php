@@ -2,13 +2,15 @@
 
 namespace App\Http\Requests;
 
+use App\Services\AuthorizationService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class GenerateManualInvoiceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->is_super_admin ?? false;
+        $user = $this->user();
+        return $user && app(AuthorizationService::class)->isSuperAdmin($user);
     }
 
     public function rules(): array

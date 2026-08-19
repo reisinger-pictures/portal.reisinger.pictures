@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\AuthorizationService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,7 +27,7 @@ class StoreBrandSettingsRequest extends FormRequest
             return false;
         }
 
-        return $user->is_admin || $user->is_super_admin;
+        return app(AuthorizationService::class)->isAdmin($user) || app(AuthorizationService::class)->isSuperAdmin($user);
     }
 
     /**

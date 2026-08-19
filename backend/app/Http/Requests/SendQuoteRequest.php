@@ -2,14 +2,16 @@
 
 namespace App\Http\Requests;
 
+use App\Services\AuthorizationService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SendQuoteRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        $svc = app(AuthorizationService::class);
         $user = $this->user();
-        return $user && ($user->is_admin || $user->is_photographer);
+        return $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
     }
 
     public function rules(): array
