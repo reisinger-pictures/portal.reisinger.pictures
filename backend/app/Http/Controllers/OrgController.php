@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Org;
+use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,19 +12,20 @@ class OrgController extends Controller
 {
     public function index()
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
 
         $query = Org::withCount(['users', 'galleryGroups'])->orderBy('name');
 
-        if ($user->is_org_admin) {
+        if ($svc->isOrgAdmin($user)) {
             $query->where('id', $user->org_id);
         }
 
         $query->when($user->brand !== null, fn($q) => $q->where('brand', $user->brand));
 
-        if ($user->is_admin || $user->is_photographer) {
+        if ($svc->isAdmin($user) || $svc->isPhotographer($user)) {
             return response()->json($query->get());
-        } elseif ($user->is_org_admin) {
+        } elseif ($svc->isOrgAdmin($user)) {
             $org = $query->first();
             return response()->json($org ? [$org] : []);
         }
@@ -33,10 +35,11 @@ class OrgController extends Controller
 
     public function show($id)
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
         $org = Org::with(['users:id,name,email,org_id', 'galleryGroups:id,name,parent_id'])->findOrFail($id);
 
-        if (!$user->is_admin && $user->org_id !== $id) {
+        if (!$svc->isAdmin($user) && $user->org_id !== $id) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -54,7 +57,10 @@ class OrgController extends Controller
 
     public function store(Request $request)
     {
-        if (!auth('api')->user()->is_admin) return response()->json(['error' => 'Forbidden'], 403);
+        $svc = app(AuthorizationService::class);
+        if (!$svc->isAdmin(auth('api')->user())) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -74,8 +80,9 @@ class OrgController extends Controller
 
     public function update(Request $request, $id)
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $id)) {
+        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -97,7 +104,10 @@ class OrgController extends Controller
 
     public function destroy($id)
     {
-        if (!auth('api')->user()->is_admin) return response()->json(['error' => 'Forbidden'], 403);
+        $svc = app(AuthorizationService::class);
+        if (!$svc->isAdmin(auth('api')->user())) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
 
         $org = Org::findOrFail($id);
 
@@ -127,8 +137,9 @@ class OrgController extends Controller
 
     public function syncUsers(Request $request, $id)
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $id)) {
+        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -191,8 +202,9 @@ class OrgController extends Controller
 
     public function syncGroups(Request $request, $id)
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $id)) {
+        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
@@ -206,8 +218,9 @@ class OrgController extends Controller
 
     public function generateCollectiveInvoice($id, \App\Services\InvoiceService $invoiceService)
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user->is_admin && !($user->is_org_admin && $user->org_id === $id)) {
+        if (!$svc->isAdmin($user) && !($svc->isOrgAdmin($user) && $user->org_id === $id)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 

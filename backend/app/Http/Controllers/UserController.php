@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Role;
 use App\Enums\UserRole;
+use App\Services\AuthorizationService;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Support\BrandRegistry;
@@ -18,11 +19,12 @@ class UserController extends Controller
 {
     public function index()
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
         $query = User::with(['roles', 'galleryGroups', 'galleries', 'photographerGalleries', 'photographerGalleryGroups']);
 
-        if (!$user->is_admin) {
-            if (!$user->is_org_admin) {
+        if (!$svc->isAdmin($user)) {
+            if (!$svc->isOrgAdmin($user)) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
             if ($user->org_id === null) {
@@ -36,9 +38,10 @@ class UserController extends Controller
 
     public function roles()
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
         $query = Role::query();
-        if (!$user || !$user->is_super_admin) {
+        if (!$user || !$svc->isSuperAdmin($user)) {
             $query->where('name', '!=', UserRole::SUPER_ADMIN->value);
         }
         return $query->get();
@@ -46,11 +49,12 @@ class UserController extends Controller
 
     public function store(StoreUserRequest $request)
     {
+        $svc = app(AuthorizationService::class);
         $currentUser = auth('api')->user();
 
         // Org Admin: scope to their org
         $managerOrg = null;
-        if ($currentUser && $currentUser->is_org_admin) {
+        if ($currentUser && $svc->isOrgAdmin($currentUser)) {
             $managerOrg = \App\Models\Org::find($currentUser->org_id);
             if (!$managerOrg) {
                 return response()->json(['error' => 'Customer Manager hat keine Organisation.'], 422);
@@ -113,11 +117,12 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, $id)
     {
+        $svc = app(AuthorizationService::class);
         $currentUser = auth('api')->user();
         $user = User::findOrFail($id);
 
-        if (!$currentUser->is_admin) {
-            if (!$currentUser->is_org_admin) {
+        if (!$svc->isAdmin($currentUser)) {
+            if (!$svc->isOrgAdmin($currentUser)) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
             if ($user->org_id !== $currentUser->org_id) {
@@ -128,7 +133,7 @@ class UserController extends Controller
         $superAdminRole = Role::where('name', UserRole::SUPER_ADMIN->value)->first();
         $wantsSuperAdmin = $superAdminRole && in_array($superAdminRole->id, $request->role_ids ?? []);
 
-        if ($wantsSuperAdmin !== $user->is_super_admin && !$currentUser->is_super_admin) {
+        if ($wantsSuperAdmin !== $svc->isSuperAdmin($user) && !$svc->isSuperAdmin($currentUser)) {
             return response()->json(['error' => 'Nur Super Admins können die Super Admin Rolle verwalten.'], 403);
         }
 
@@ -172,11 +177,12 @@ class UserController extends Controller
 
     public function destroy($id)
     {
+        $svc = app(AuthorizationService::class);
         $currentUser = auth('api')->user();
         $user = User::findOrFail($id);
 
-        if (!$currentUser->is_admin) {
-            if (!$currentUser->is_org_admin) {
+        if (!$svc->isAdmin($currentUser)) {
+            if (!$svc->isOrgAdmin($currentUser)) {
                 return response()->json(['error' => 'Forbidden'], 403);
             }
             if ($user->org_id !== $currentUser->org_id) {
