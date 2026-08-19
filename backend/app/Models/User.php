@@ -2,52 +2,55 @@
 
 namespace App\Models;
 
+use App\Casts\AsBrand;
 use App\Constants\TierRanks;
-use App\Enums\Brand;
-use App\Enums\UserRole;
+use App\Services\AuthorizationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
 {
-    use HasFactory, Notifiable, HasUuids;
+    use HasFactory, HasUuids, Notifiable;
 
     public $guest_id = null;
+
     public $transient_galleries = [];
+
     public $transient_meta_galleries = [];
 
     public function getIsSuperAdminAttribute(): bool
     {
-        return $this->roles()->where('name', UserRole::SUPER_ADMIN->value)->exists();
+        return app(AuthorizationService::class)->isSuperAdmin($this);
     }
 
     protected $visible = [
         'id', 'name', 'email', 'brand', 'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
         'current_ftp_gallery_id', 'ftp_slug',
         'created_at', 'is_admin', 'is_photographer',
-        'is_pending', 'is_org_admin', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery'
+        'is_pending', 'is_org_admin', 'is_power_user', 'is_super_admin', 'roles', 'galleryGroups', 'galleries', 'currentFtpGallery',
     ];
 
     protected $fillable = [
         'name', 'email', 'password', 'brand', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
         'can_purchase_upgrades', 'current_ftp_gallery_id', 'ftp_slug', 'org_id',
-        'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city'
+        'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city',
     ];
 
     protected static function booted()
     {
         static::creating(function ($user) {
-            if (empty($user->ftp_slug) && !empty($user->email)) {
-                $baseSlug = \Illuminate\Support\Str::slug(explode('@', $user->email)[0]);
+            if (empty($user->ftp_slug) && ! empty($user->email)) {
+                $baseSlug = Str::slug(explode('@', $user->email)[0]);
                 $ftpSlug = $baseSlug;
                 $counter = 1;
                 while (static::where('ftp_slug', $ftpSlug)->exists()) {
-                    $ftpSlug = $baseSlug . $counter;
+                    $ftpSlug = $baseSlug.$counter;
                     $counter++;
                 }
                 $user->ftp_slug = $ftpSlug;
@@ -57,20 +60,58 @@ class User extends Authenticatable implements JWTSubject
 
     protected $casts = [
         'can_edit_metadata' => 'boolean',
-        'brand' => \App\Casts\AsBrand::class,
+        'brand' => AsBrand::class,
     ];
 
-    public function getJWTIdentifier() { return $this->getKey(); }
-    public function getJWTCustomClaims() { return []; }
+    public function getJWTIdentifier()
+    {
+        return $this->getKey();
+    }
 
-    public function roles() { return $this->belongsToMany(Role::class, 'user_roles'); }
-    public function galleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups')->withPivot('wants_notifications'); }
-    public function galleries() { return $this->belongsToMany(Gallery::class, 'user_galleries')->withPivot('wants_notifications'); }
-    public function photographerGalleries() { return $this->belongsToMany(Gallery::class, 'photographer_galleries'); }
-    public function photographerGalleryGroups() { return $this->belongsToMany(GalleryGroup::class, 'photographer_gallery_groups'); }
-    public function currentFtpGallery() { return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id'); }
-    public function photos() { return $this->hasMany(Photo::class); }
-    public function org(): BelongsTo { return $this->belongsTo(Org::class); }
+    public function getJWTCustomClaims()
+    {
+        return [];
+    }
+
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
+    public function galleryGroups()
+    {
+        return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups')->withPivot('wants_notifications');
+    }
+
+    public function galleries()
+    {
+        return $this->belongsToMany(Gallery::class, 'user_galleries')->withPivot('wants_notifications');
+    }
+
+    public function photographerGalleries()
+    {
+        return $this->belongsToMany(Gallery::class, 'photographer_galleries');
+    }
+
+    public function photographerGalleryGroups()
+    {
+        return $this->belongsToMany(GalleryGroup::class, 'photographer_gallery_groups');
+    }
+
+    public function currentFtpGallery()
+    {
+        return $this->belongsTo(Gallery::class, 'current_ftp_gallery_id');
+    }
+
+    public function photos()
+    {
+        return $this->hasMany(Photo::class);
+    }
+
+    public function org(): BelongsTo
+    {
+        return $this->belongsTo(Org::class);
+    }
 
     public function scopeByOrg(Builder $query, string $orgId): Builder
     {
@@ -79,52 +120,42 @@ class User extends Authenticatable implements JWTSubject
 
     public function getIsPendingAttribute(): bool
     {
-        if ($this->guest_id) return false;
-        return $this->roles()->count() === 0 && $this->galleryGroups()->count() === 0 && $this->galleries()->count() === 0;
+        return app(AuthorizationService::class)->isPending($this);
     }
 
-    public function getIsPhotographerAttribute(): bool { return $this->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists(); }
-    public function getIsAdminAttribute(): bool { return $this->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists(); }
-    public function getIsOrgAdminAttribute(): bool { return $this->roles()->where('name', UserRole::ORG_ADMIN->value)->exists() && $this->org_id !== null; }
+    public function getIsPhotographerAttribute(): bool
+    {
+        return app(AuthorizationService::class)->isPhotographer($this);
+    }
 
+    public function getIsAdminAttribute(): bool
+    {
+        return app(AuthorizationService::class)->isAdmin($this);
+    }
 
-    public function getIsPowerUserAttribute(): bool { return $this->roles()->where('name', UserRole::POWER_USER->value)->exists(); }
+    public function getIsOrgAdminAttribute(): bool
+    {
+        return app(AuthorizationService::class)->isOrgAdmin($this);
+    }
+
+    public function getIsPowerUserAttribute(): bool
+    {
+        return app(AuthorizationService::class)->isPowerUser($this);
+    }
 
     public function getAllowedGalleryIds(): array
     {
-        return $this->authorizationService()->getAllowedGalleryIds($this);
+        return app(AuthorizationService::class)->getAllowedGalleryIds($this);
     }
 
-    public function canPhotographerAccessGallery($galleryId): bool
+    public function canPhotographerAccessGallery(string $galleryId): bool
     {
-        if ($this->is_super_admin) return true;
-        if (!$this->is_photographer) return false;
-
-        $gallery = Gallery::find($galleryId);
-        if (!$gallery) return false;
-
-        if (!$gallery->effective_restricted_photographers) return true;
-
-        if ($this->photographerGalleries()->where('galleries.id', $galleryId)->exists()) return true;
-
-        $groupIds = $this->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
-        if (!empty($groupIds)) {
-            $allGroupIds = $this->authorizationService()->getSubGroupIds($groupIds);
-            if (in_array($gallery->gallery_group_id, $allGroupIds)) return true;
-        }
-
-        return false;
+        return app(AuthorizationService::class)->canPhotographerAccessGallery($this, $galleryId);
     }
 
-    public function canAccessGallery($galleryId): bool
+    public function canAccessGallery(string $galleryId): bool
     {
-        if ($this->is_super_admin) return true;
-
-        if ($this->is_photographer && $this->canPhotographerAccessGallery($galleryId)) {
-            return true;
-        }
-
-        return in_array($galleryId, $this->getAllowedGalleryIds());
+        return app(AuthorizationService::class)->canAccessGallery($this, $galleryId);
     }
 
     public function hasPurchasedPhoto($photoId, $requestedTier): bool
@@ -135,7 +166,7 @@ class User extends Authenticatable implements JWTSubject
             return $cached;
         }
 
-        $orders = \App\Models\Order::where('user_id', $this->id)
+        $orders = Order::where('user_id', $this->id)
             ->whereNotIn('status', ['disputed', 'refunded', 'cancelled'])
             ->where(function ($q) {
                 $q->where('is_quote_request', false)
@@ -145,7 +176,9 @@ class User extends Authenticatable implements JWTSubject
 
         foreach ($orders as $order) {
             $snapshot = $order->invoiceSnapshot;
-            if (!$snapshot) continue;
+            if (! $snapshot) {
+                continue;
+            }
 
             $items = $snapshot->customer_details['items'] ?? [];
             foreach ($items as $item) {
@@ -153,16 +186,13 @@ class User extends Authenticatable implements JWTSubject
                     $itemRank = TierRanks::RANKS[$item['tier'] ?? 'none'] ?? 0;
                     if ($itemRank >= $reqRank) {
                         cache()->put($cacheKey, true, 3600);
+
                         return true;
                     }
                 }
             }
         }
-        return false;
-    }
 
-    private function authorizationService(): \App\Services\AuthorizationService
-    {
-        return app(\App\Services\AuthorizationService::class);
+        return false;
     }
 }
