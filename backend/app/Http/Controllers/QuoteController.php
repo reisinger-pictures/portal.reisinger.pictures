@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Order;
+use App\Services\AuthorizationService;
 use App\Services\QuoteLinkService;
 use App\Http\Requests\SendQuoteRequest;
 
@@ -38,8 +39,11 @@ class QuoteController extends Controller
 
     public function generateQuoteLink(Request $request)
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user->is_admin && !$user->is_photographer) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (!$svc->isAdmin($user) && !$svc->isPhotographer($user)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
         $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer', 'rights_text' => 'nullable|string|max:2000']);
 
         $link = $this->quoteLinkService->generateQuoteLink($request->photo_ids, $request->custom_price, rightsText: $request->rights_text);
@@ -60,8 +64,9 @@ class QuoteController extends Controller
 
     public function extractOffer(Request $request)
     {
+        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (!$user || !$user->is_super_admin) {
+        if (!$user || !$svc->isSuperAdmin($user)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 

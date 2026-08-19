@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LightroomCatalog;
 use App\Models\User;
+use App\Services\AuthorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -13,7 +14,8 @@ class LightroomCatalogController extends Controller
     /** Gate: Super-Admin und Fotografen dürfen eigene Kataloge lesen und verwalten. */
     private function authorizeView(User $user): void
     {
-        if (!$user->is_super_admin && !$user->is_photographer) {
+        $svc = app(AuthorizationService::class);
+        if (!$svc->isSuperAdmin($user) && !$svc->isPhotographer($user)) {
             abort(403, 'Forbidden');
         }
     }

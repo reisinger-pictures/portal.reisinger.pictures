@@ -10,6 +10,7 @@ use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
+use App\Services\AuthorizationService;
 use App\Services\CouponService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
@@ -31,13 +32,14 @@ class CouponAdminController extends Controller
 
     private function authorizeCoupon(Coupon $coupon): void
     {
+        $svc = app(AuthorizationService::class);
         $user = auth()->user();
 
-        if ($user->is_super_admin) {
+        if ($svc->isSuperAdmin($user)) {
             return;
         }
 
-        if ($user->is_admin) {
+        if ($svc->isAdmin($user)) {
             $couponBrandValue = $coupon->brand instanceof Brand ? $coupon->brand->value : $coupon->brand;
             if ($couponBrandValue !== BrandRegistry::currentId()) {
                 abort(403, 'Forbidden');
@@ -45,7 +47,7 @@ class CouponAdminController extends Controller
             return;
         }
 
-        if ($user->is_photographer) {
+        if ($svc->isPhotographer($user)) {
             if ($coupon->created_by !== $user->id) {
                 abort(403, 'Forbidden');
             }
@@ -62,12 +64,13 @@ class CouponAdminController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
+        $svc = app(AuthorizationService::class);
         $perPage = min((int) $request->query('per_page', 20), 100);
 
         $query = Coupon::forCurrentBrand()
             ->orderBy('created_at', 'desc');
 
-        if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
+        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
             $query->where('coupons.created_by', $user->getKey());
         }
 
@@ -107,11 +110,12 @@ class CouponAdminController extends Controller
     public function store(CouponStoreRequest $request): JsonResponse
     {
         $user = auth()->user();
+        $svc = app(AuthorizationService::class);
         $validated = $this->normalizePackagePrice($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
 
-        if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
+        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
             $validated['created_by'] = $user->id;
             unset($validated['max_uses_global']);
             $validated['active'] = true;
@@ -132,9 +136,10 @@ class CouponAdminController extends Controller
         $this->authorizeCoupon($coupon);
 
         $user = auth()->user();
+        $svc = app(AuthorizationService::class);
         $validated = $this->normalizePackagePrice($request->validated());
 
-        if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
+        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
             unset($validated['max_uses_global']);
             $validated['active'] = true;
         }
@@ -154,8 +159,9 @@ class CouponAdminController extends Controller
         $this->authorizeCoupon($coupon);
 
         $user = auth()->user();
+        $svc = app(AuthorizationService::class);
 
-        if (!$user->is_super_admin && !$user->is_admin && $coupon->used_count > 0) {
+        if (!$svc->isSuperAdmin($user) && !$svc->isAdmin($user) && $coupon->used_count > 0) {
             return response()->json([
                 'success' => false,
                 'error' => 'Cannot delete a coupon that has already been used.',
@@ -210,13 +216,14 @@ class CouponAdminController extends Controller
         $gallery = $this->findAndVerifyGallery($galleryId);
 
         $user = auth()->user();
+        $svc = app(AuthorizationService::class);
         $validated = $this->normalizePackagePrice($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
         $validated['scope_type'] = 'gallery';
         $validated['scope_id'] = $galleryId;
 
-        if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
+        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
             $validated['created_by'] = $user->id;
             unset($validated['max_uses_global']);
             $validated['active'] = true;
@@ -284,13 +291,14 @@ class CouponAdminController extends Controller
         }
 
         $user = auth()->user();
+        $svc = app(AuthorizationService::class);
         $validated = $this->normalizePackagePrice($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
         $validated['scope_type'] = 'meta_gallery';
         $validated['scope_id'] = $groupId;
 
-        if ($user->is_photographer && !$user->is_super_admin && !$user->is_admin) {
+        if ($svc->isPhotographer($user) && !$svc->isSuperAdmin($user) && !$svc->isAdmin($user)) {
             $validated['created_by'] = $user->id;
             unset($validated['max_uses_global']);
             $validated['active'] = true;

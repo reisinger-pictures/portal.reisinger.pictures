@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PhotoJobStatus;
 use App\Models\LightroomCatalog;
 use App\Models\PhotoJob;
+use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
@@ -17,7 +18,8 @@ class PhotoJobBoardController extends Controller
 {
     private function authorizeUser(User $user): void
     {
-        if (!$user->is_super_admin && !$user->is_photographer) {
+        $svc = app(AuthorizationService::class);
+        if (!$svc->isSuperAdmin($user) && !$svc->isPhotographer($user)) {
             abort(403, 'Forbidden');
         }
     }
@@ -53,7 +55,7 @@ class PhotoJobBoardController extends Controller
         $query = PhotoJob::query()
             ->where('brand', BrandRegistry::currentOrDefault());
 
-        if (!$user->is_super_admin) {
+        if (!app(AuthorizationService::class)->isSuperAdmin($user)) {
             $query->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
                     ->orWhere('assignee_id', $user->id);
