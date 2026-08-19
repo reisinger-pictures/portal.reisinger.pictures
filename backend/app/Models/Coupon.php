@@ -21,9 +21,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $brand
  * @property string $code
- * @property string $type fixed|percentage
+ * @property string $type fixed|percentage|photo_package
  * @property float $value
  * @property int|null $max_items
+ * @property int|null $package_quantity  Photo-package: number of photos (N)
+ * @property int|null $package_price_cents  Photo-package: flat price Y in cents
  * @property string $scope_type global|gallery|meta_gallery|photographer|organisation
  * @property int|null $scope_id
  * @property int|null $max_uses_global
@@ -47,6 +49,8 @@ class Coupon extends Model
         'type',
         'value',
         'max_items',
+        'package_quantity',
+        'package_price_cents',
         'scope_type',
         'scope_id',
         'max_uses_global',
@@ -60,6 +64,8 @@ class Coupon extends Model
     protected $casts = [
         'value' => 'float',
         'max_items' => 'integer',
+        'package_quantity' => 'integer',
+        'package_price_cents' => 'integer',
         'scope_id' => 'string',
         'max_uses_global' => 'integer',
         'max_uses_per_account' => 'integer',

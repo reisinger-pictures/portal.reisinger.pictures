@@ -78,6 +78,20 @@ class CouponFactory extends Factory
     }
 
     /**
+     * Set the coupon type to a photo package (N photos for a flat price Y € in cents).
+     */
+    public function photoPackage(int $quantity, int $priceCents): static
+    {
+        return $this->state(fn (array $_) => [
+            'type' => 'photo_package',
+            'value' => 0,
+            'max_items' => null,
+            'package_quantity' => $quantity,
+            'package_price_cents' => $priceCents,
+        ]);
+    }
+
+    /**
      * Scope the coupon to a specific meta-gallery (gallery group).
      */
     public function scopedToMetaGallery(int $metaGalleryId): static

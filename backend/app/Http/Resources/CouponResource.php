@@ -16,6 +16,8 @@ class CouponResource extends JsonResource
             'type' => $this->type,
             'value' => $this->value,
             'max_items' => $this->max_items,
+            'package_quantity' => $this->package_quantity,
+            'package_price_cents' => $this->package_price_cents,
             'scope_type' => $this->scope_type,
             'scope_id' => $this->scope_id,
             'max_uses_global' => $this->max_uses_global,

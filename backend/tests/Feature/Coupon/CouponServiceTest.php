@@ -279,6 +279,69 @@ class CouponServiceTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
+    //  applyCoupon — photo_package (§3a)
+    // ──────────────────────────────────────────────
+
+    public function test_apply_photo_package_when_m_leq_n_charges_flat_price(): void
+    {
+        // N=10, Y=4000 (40 €). 5 payable items @ 1000 → M ≤ N.
+        $coupon = Coupon::factory()->photoPackage(10, 4000)->create(['brand' => 'rp', 'active' => true]);
+        $items = $this->makePricedItems(5, 1000); // 5 × 1000 = 5000
+        $total = 5000;
+
+        $result = $this->service->applyCoupon($coupon, $items, $total);
+
+        // normalCovered = 5000, effPackage = min(4000, 5000) = 4000, discount = 1000.
+        $this->assertSame(1000, $result['discountCents']);
+        $this->assertSame(4000, $result['totalCents']);
+    }
+
+    public function test_apply_photo_package_when_m_equals_n(): void
+    {
+        // N=10, Y=4000 (40 €). 10 payable items @ 1000 → exactly N.
+        $coupon = Coupon::factory()->photoPackage(10, 4000)->create(['brand' => 'rp', 'active' => true]);
+        $items = $this->makePricedItems(10, 1000); // 10 × 1000 = 10000
+        $total = 10000;
+
+        $result = $this->service->applyCoupon($coupon, $items, $total);
+
+        // normalCovered = 10000, effPackage = min(4000, 10000) = 4000, discount = 6000.
+        $this->assertSame(6000, $result['discountCents']);
+        $this->assertSame(4000, $result['totalCents']);
+    }
+
+    public function test_apply_photo_package_when_m_gt_n_charges_flat_plus_rest(): void
+    {
+        // N=10, Y=4000 (40 €). 15 payable items @ 1000 → first 10 in package, 5 at normal price.
+        $coupon = Coupon::factory()->photoPackage(10, 4000)->create(['brand' => 'rp', 'active' => true]);
+        $items = $this->makePricedItems(15, 1000); // 15 × 1000 = 15000
+        $total = 15000;
+
+        $result = $this->service->applyCoupon($coupon, $items, $total);
+
+        // covered = 10, normalCovered = 10000, effPackage = min(4000, 10000) = 4000, discount = 6000.
+        // remaining 5 × 1000 = 5000 unchanged → total = 15000 - 6000 = 9000.
+        $this->assertSame(6000, $result['discountCents']);
+        $this->assertSame(9000, $result['totalCents']);
+    }
+
+    public function test_apply_photo_package_overcharge_guard_uses_normal_price(): void
+    {
+        // N=10, Y=4000 (40 €). 7 payable items @ 500 → normalCovered = 3500 < Y.
+        // Guard caps the package at the normal price: customer pays 3500, never 4000.
+        $coupon = Coupon::factory()->photoPackage(10, 4000)->create(['brand' => 'rp', 'active' => true]);
+        $items = $this->makePricedItems(7, 500); // 7 × 500 = 3500
+        $total = 3500;
+
+        $result = $this->service->applyCoupon($coupon, $items, $total);
+
+        // normalCovered = 3500, effPackage = min(4000, 3500) = 3500, discount = 0.
+        // Without the guard the customer would pay 4000 (overcharge) — they pay 3500 instead.
+        $this->assertSame(0, $result['discountCents']);
+        $this->assertSame(3500, $result['totalCents']);
+    }
+
+    // ──────────────────────────────────────────────
     //  incrementUsage
     // ──────────────────────────────────────────────
 

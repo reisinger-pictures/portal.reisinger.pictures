@@ -54,6 +54,8 @@ class CouponCheckoutController extends Controller
                 'code' => $coupon->code,
                 'type' => $coupon->type,
                 'value' => $coupon->value,
+                'package_quantity' => $coupon->package_quantity,
+                'package_price_cents' => $coupon->package_price_cents,
             ],
             'discount_cents' => $result['discountCents'],
         ]);

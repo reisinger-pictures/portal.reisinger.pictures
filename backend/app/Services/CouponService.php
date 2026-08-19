@@ -195,6 +195,27 @@ class CouponService
                     $discountCents = (int) round($currentTotalCents * $percent / 100);
                 }
                 break;
+
+            case 'photo_package':
+                // N photos for a flat price Y € (bundle). See features/ecommerce/08-srp-coupon-system.md §3a.
+                $n = (int) $coupon->package_quantity;
+                $y = (int) $coupon->package_price_cents;
+
+                // M = payable items (priceCents > 0); quote items (0) are excluded.
+                $payablePrices = array_map(
+                    fn ($item) => (int) ($item['priceCents'] ?? 0),
+                    array_filter($items, fn ($item) => (int) ($item['priceCents'] ?? 0) > 0),
+                );
+                sort($payablePrices); // ascending → cheapest first (best for the customer)
+
+                $m = count($payablePrices);
+                $covered = min($m, $n);
+                $normalCovered = (int) array_sum(array_slice($payablePrices, 0, $covered));
+
+                // Overcharge guard: customer never pays more than the normal price.
+                $effectivePackage = min($y, $normalCovered);
+                $discountCents = max($normalCovered - $effectivePackage, 0);
+                break;
         }
 
         $totalCents = max($currentTotalCents - $discountCents, 0);

@@ -111,6 +111,10 @@ msgstr "{nextCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {nextLa
 msgid "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
 msgstr "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
 
+#: src/ui/client/components/CouponInput.tsx
+msgid "{packageQuantity} Fotos für {packagePriceText}"
+msgstr "{packageQuantity} Fotos für {packagePriceText}"
+
 #: src/logic/useVolumeLicensing.ts
 msgid "{price}€ pro Bild"
 msgstr "{price}€ pro Bild"
@@ -570,6 +574,14 @@ msgstr "Ansehen"
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Anwenden"
 msgstr "Anwenden"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Anzahl Fotos (N)"
+msgstr "Anzahl Fotos (N)"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Anzahl Fotos muss mindestens 1 sein"
+msgstr "Anzahl Fotos muss mindestens 1 sein"
 
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 msgid "Art"
@@ -1103,6 +1115,10 @@ msgstr "Culling"
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Darf maximal 999 sein"
 msgstr "Darf maximal 999 sein"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Darf nicht negativ sein"
+msgstr "Darf nicht negativ sein"
 
 #: src/ui/ResetPassword.tsx
 msgid "Das Passwort muss mindestens 8 Zeichen lang sein."
@@ -1849,6 +1865,14 @@ msgstr "Fehler: {emailError}"
 msgid "Festbetrag"
 msgstr "Festbetrag"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Festpreis darf nicht negativ sein"
+msgstr "Festpreis darf nicht negativ sein"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "Festpreis in € (Y)"
+msgstr "Festpreis in € (Y)"
+
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Fett"
 msgstr "Fett"
@@ -1903,6 +1927,13 @@ msgstr "Foto"
 #: src/ui/PhotoDetailView.tsx
 msgid "Foto konnte nicht geladen werden oder keine Berechtigung."
 msgstr "Foto konnte nicht geladen werden oder keine Berechtigung."
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+#: src/ui/management/components/GalleryCouponsTab.tsx
+#: src/ui/management/components/GalleryGroupCouponsTab.tsx
+#: src/ui/management/ManagementCouponsView.tsx
+msgid "Foto-Paket"
+msgstr "Foto-Paket"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/UserTable.tsx
@@ -5006,6 +5037,10 @@ msgstr "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben
 msgid "Workflow"
 msgstr "Workflow"
 
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "z.B. 10"
+msgstr "z.B. 10"
+
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
 msgid "z.B. 2026-08"
 msgstr "z.B. 2026-08"
@@ -5013,6 +5048,10 @@ msgstr "z.B. 2026-08"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "z.B. 2500.00"
 msgstr "z.B. 2500.00"
+
+#: src/ui/management/components/CouponFormDrawer.tsx
+msgid "z.B. 40"
+msgstr "z.B. 40"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "z.B. 450.00"

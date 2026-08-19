@@ -7,8 +7,8 @@ import useSWRMutation from 'swr/mutation';
 import { fetcher, apiMutate } from '../../api';
 import { useUI } from '../components/UIContext';
 import { useAuth } from '../../logic/useAuth';
-import ErrorMessage from '../components/ErrorMessage';
 import { formatMoney } from '../../logic/utils';
+import ErrorMessage from '../components/ErrorMessage';
 import CouponFormDrawer, { type Coupon } from './components/CouponFormDrawer';
 import Pagination from '../components/Pagination';
 
@@ -20,9 +20,17 @@ interface PaginatedCoupons {
     total: number;
 }
 
-const TYPE_LABELS: Record<Coupon['type'], string> = {
-    fixed: t`Festbetrag`,
-    percentage: t`Prozent`,
+const couponTypeLabel = (type: Coupon['type']): string => {
+    switch (type) {
+        case 'fixed':
+            return t`Festbetrag`;
+        case 'percentage':
+            return t`Prozent`;
+        case 'photo_package':
+            return t`Foto-Paket`;
+        default:
+            return type;
+    }
 };
 
 const SCOPE_LABELS: Record<Coupon['scope_type'], string> = {
@@ -41,6 +49,8 @@ const formatValue = (coupon: Coupon): string => {
             return formatMoney(Math.round(numeric * 100));
         case 'percentage':
             return `${numeric} %`;
+        case 'photo_package':
+            return `${coupon.package_quantity} Fotos / ${formatMoney(coupon.package_price_cents ?? 0)}`;
         default:
             return String(coupon.value);
     }
@@ -233,7 +243,7 @@ export default function ManagementCouponsView() {
                                     <td className="font-mono font-bold">{coupon.code}</td>
                                     <td>
                                         <span className="badge badge-outline whitespace-nowrap">
-                                            {TYPE_LABELS[coupon.type]}
+                                            {couponTypeLabel(coupon.type)}
                                         </span>
                                     </td>
                                     <td className="font-mono">{formatValue(coupon)}</td>

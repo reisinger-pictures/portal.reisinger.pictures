@@ -35,9 +35,11 @@ class CouponStoreRequest extends FormRequest
 
         $rules = [
             'code' => 'required|string|max:50',
-            'type' => 'required|string|in:fixed,percentage',
-            'value' => 'required|numeric|min:0|max:9999999.99',
+            'type' => 'required|string|in:fixed,percentage,photo_package',
+            'value' => 'nullable|numeric|min:0|max:9999999.99',
             'max_items' => 'nullable|integer|min:1|max:999',
+            'package_quantity' => 'nullable|integer',
+            'package_price_cents' => 'nullable|numeric',
             'scope_type' => 'required|string|' . $scopeTypes,
             'scope_id' => 'nullable|string|required_if:scope_type,gallery,meta_gallery',
             'max_uses_global' => 'nullable|integer|min:1',
@@ -82,6 +84,22 @@ class CouponStoreRequest extends FormRequest
 
             if (($data['type'] ?? null) === 'percentage' && ($data['value'] ?? 0) > 100) {
                 $validator->errors()->add('value', 'Percentage value must not exceed 100.');
+            }
+
+            // `value` is required for fixed/percentage coupons; it is unused for photo_package.
+            if (in_array($data['type'] ?? null, ['fixed', 'percentage'], true)
+                && (!isset($data['value']) || $data['value'] === '')) {
+                $validator->errors()->add('value', 'Value is required for fixed and percentage coupons.');
+            }
+
+            // photo_package requires package_quantity (≥1) and package_price_cents (≥0).
+            if (($data['type'] ?? null) === 'photo_package') {
+                if (!isset($data['package_quantity']) || $data['package_quantity'] === '' || (int) ($data['package_quantity'] ?? 0) < 1) {
+                    $validator->errors()->add('package_quantity', 'Package quantity must be at least 1.');
+                }
+                if (!isset($data['package_price_cents']) || $data['package_price_cents'] === '' || (float) ($data['package_price_cents'] ?? -1) < 0) {
+                    $validator->errors()->add('package_price_cents', 'Package price must not be negative.');
+                }
             }
 
             $brandValue = BrandRegistry::currentId();

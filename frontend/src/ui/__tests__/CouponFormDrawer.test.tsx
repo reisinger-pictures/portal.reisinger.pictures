@@ -137,4 +137,80 @@ describe('CouponFormDrawer', () => {
 
         expect(onClose).toHaveBeenCalledTimes(1);
     });
+
+    it('shows package fields when type=photo_package', async () => {
+        renderDrawer();
+
+        const selects = screen.getAllByRole('combobox');
+        const typeSelect = selects[0];
+
+        await userEvent.selectOptions(typeSelect, 'photo_package');
+
+        expect(screen.getByPlaceholderText('z.B. 10')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('z.B. 40')).toBeInTheDocument();
+        // The plain value field is hidden for photo_package.
+        expect(screen.queryByText('Betrag in €')).not.toBeInTheDocument();
+    });
+
+    it('keeps value field for fixed and hides package fields', async () => {
+        renderDrawer();
+
+        const selects = screen.getAllByRole('combobox');
+        const typeSelect = selects[0];
+
+        await userEvent.selectOptions(typeSelect, 'fixed');
+
+        expect(screen.getByText('Betrag in €')).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('z.B. 10')).not.toBeInTheDocument();
+    });
+
+    it('requires package fields for photo_package', async () => {
+        renderDrawer();
+
+        await userEvent.type(screen.getByPlaceholderText('z.B. SOMMER2026'), 'PHOTOPKG');
+
+        const selects = screen.getAllByRole('combobox');
+        await userEvent.selectOptions(selects[0], 'photo_package');
+
+        await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        await waitFor(() => {
+            expect(onSave).not.toHaveBeenCalled();
+            expect(screen.getByText('Anzahl Fotos muss mindestens 1 sein')).toBeInTheDocument();
+        });
+    });
+
+    it('submits photo_package with package fields', async () => {
+        renderDrawer();
+
+        await userEvent.type(screen.getByPlaceholderText('z.B. SOMMER2026'), 'PHOTOPKG');
+
+        const selects = screen.getAllByRole('combobox');
+        await userEvent.selectOptions(selects[0], 'photo_package');
+        await userEvent.selectOptions(selects[1], 'global');
+
+        const quantityInput = screen.getByPlaceholderText('z.B. 10');
+        const priceInput = screen.getByPlaceholderText('z.B. 40');
+        await userEvent.type(quantityInput, '10');
+        await userEvent.type(priceInput, '40');
+
+        await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        await waitFor(() => {
+            expect(onSave).toHaveBeenCalledTimes(1);
+        });
+
+        expect(onSave).toHaveBeenCalledWith(
+            expect.objectContaining({
+                code: 'PHOTOPKG',
+                type: 'photo_package',
+                package_quantity: 10,
+                package_price_cents: 40,
+                scope_type: 'global',
+                active: true,
+            }),
+        );
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
 });
