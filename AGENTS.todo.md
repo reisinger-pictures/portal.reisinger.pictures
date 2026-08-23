@@ -51,3 +51,9 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 - **F3** Brand Settings UI → ✅ erledigt (siehe oben)
 - **P1** Coupon photo_package → ✅ erledigt (siehe oben)
 - **Stack-Konsolidierung** → ❌ OBSOLET (SQLite-Richtung)
+
+---
+
+## 🚫 Blockiert (Dependency-Migration 2026-08-23)
+
+- **typescript 6→7:** Risiko durch TS7, erst nach Framework-Support. TS 7.0 ist zu frisch (kein Support durch Vite/Rolldown-Babel-Pipeline, ESLint-Typescript-Stack, React-Compiler-Preset). `frontend/package.json` bleibt bei `^6.0.3`. Nachzuziehen, sobald das Tooling TS7 deklariert.
