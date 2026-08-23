@@ -10,7 +10,6 @@
     "license": "MIT",
     "require": {
         "php": "^8.5",
-        "http-interop/http-factory-guzzle": "^1.2",
         "laravel/framework": "^13.0",
         "laravel/scout": "^11.1",
         "laravel/tinker": "^3.0",
