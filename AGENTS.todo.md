@@ -6,6 +6,30 @@
 
 ---
 
+## 🔴 NÄCHSTE PRIORITÄT (PRIO HOCH) — E2E-Instabilitäten stabilisieren
+
+> **Status:** E2E-Suite aktuell instabil (2/5 Shards rot). Muss vor neuer Feature-Arbeit
+> stabilisiert werden (Zero Pre-existing Failures Policy, AGENTS.md §3). **Nächstes
+> anzusehendes Thema nach der Dependency-Migration.**
+>
+> **Symptom:** `ci.yml` E2E-Shards `Desktop (1/2)` + `Mobile (1/2)` rot. Betroffene Specs:
+> `admin.spec.ts:69` (smoke), `ai-config.spec.ts:101` (strict-mode Heading),
+> `coupon-photo-package.spec.ts:26/:60`.
+>
+> **Root-Cause-Analyse:** siehe Abschnitte *„🔴 CI-Status PR #10"* + *„🟡 Flaky-/CI-Failures
+> Analyse"* weiter unten. Teil-Root-Causes bereits gefixt (Coupon-ENUM V031, ai-config
+> strict-mode), E2E bleibt dennoch instabil.
+>
+> **Offene Fixes (liegen committed auf Branch `chore/deps-2026-08-23`, Commit
+> `3d282ef fix(e2e): stabilize flaky admin tests`):** `frontend/tests/e2e/admin/ai-config.spec.ts`,
+> `.../projects-board.spec.ts`, `frontend/tests/e2e/helpers/AuthHelper.ts`, `.../SidebarHelper.ts`.
+>
+> **Action (TODO):** (1) E2E-Fix-Commit auf `main` mergen, (2) volle E2E-Suite / alle 5 Shards
+> neu ausführen, (3) alle Shards grün bekommen, (4) verbleibende Flakes per Playwright-Regel
+> debuggen (max. 3 Versuche, AGENTS.md §6). E2E-Grün = DoD für „abgeschlossen".
+
+---
+
 ## ✅ Erledigt (2026-08-19) — F3 + P1 + A1 Komplett
 
 Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ahead of `origin/main`):
