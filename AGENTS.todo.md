@@ -57,3 +57,14 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 ## 🚫 Blockiert (Dependency-Migration 2026-08-23)
 
 - **typescript 6→7:** Risiko durch TS7, erst nach Framework-Support. TS 7.0 ist zu frisch (kein Support durch Vite/Rolldown-Babel-Pipeline, ESLint-Typescript-Stack, React-Compiler-Preset). `frontend/package.json` bleibt bei `^6.0.3`. Nachzuziehen, sobald das Tooling TS7 deklariert.
+
+## 🔧 Backend Dependency-Migration 2026-08-23
+
+- **composer self-update:** durchgeführt (2.10.1 → 2.10.2).
+- **PHP-Constraint:** `^8.4` → `^8.5` (composer.json + lock).
+- **MAJOR stripe/stripe-php:** `^20.3.0` → `^21.0.0` (lock: v20.3.0 → v21.2.1). Laut Stripe-Changelog ist v21 *funktional ein Patch-Release* (gleiche gepinnte API-Version `2026-06-24.dahlia`, Major nur aus Vorsicht). Breaking-Changes betreffen nur V2/Private-Preview-Ressourcen (`ReceivedCredit.balance_transfer.payout_v1` u.ä.) — nicht genutzt (App nutzt `Webhook::constructEvent`, `StripeClient`/`paymentIntents->create|retrieve`). Kein Code-Change nötig.
+- **Minor/Patch:** laravel/framework v13.18.1 → v13.26.1, scout, pint, phpunit 13.2.2 → 13.3.1, jwt-auth 2.9.2 → v2.9.3, meilisearch 1.16.1 → 1.17.0, mockery 1.6.12 → 1.6.15, paratest v7.23.0 → v7.24.1, collision v8.9.4 → v8.9.5, symfony-* 8.1.x.
+- **Transitive Majors — Verify:**
+  - ✅ `hamcrest/hamcrest-php` v2.1.1 → v3.0.0 (automatisch via phpunit/mockery).
+  - ⛔ `guzzlehttp/guzzle` **blieb bei 7.15.3** (kein 8.0.2): guzzle 8 verlangt `psr7 ^3.0` + `promises ^3.0.1`; `psr7 ^3.0` wird durch direktes `require http-interop/http-factory-guzzle ^1.2` blockiert (nur `psr7 ^1.7||^2.0`, keine 3.0-fähige Version existiert). Guzzle-8 wäre Scope-Erweiterung (Bump von `http-interop/http-factory-guzzle` nötig, nicht in Aufgabe) → bewusst NICHT erzwungen.
+  - ⛔ `brick/math` **blieb bei 0.18.0** (kein 0.19): transitiv gedeckelt durch `ramsey/uuid 4.9.3` (`brick/math >=0.8.16 <=0.18`). 0.19 nur mit ramsey/uuid-Bump erreichbar (nicht in Aufgabe) → bewusst NICHT erzwungen.
