@@ -9,7 +9,7 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.4",
+        "php": "^8.5",
         "http-interop/http-factory-guzzle": "^1.2",
         "laravel/framework": "^13.0",
         "laravel/scout": "^11.1",
@@ -18,7 +18,7 @@
         "meilisearch/meilisearch-php": "^1.16",
         "php-open-source-saver/jwt-auth": "^2.9",
         "barryvdh/laravel-dompdf": "^3.0",
-        "stripe/stripe-php": "^20.3.0",
+        "stripe/stripe-php": "^21.0.0",
         "symfony/html-sanitizer": "^8.0",
         "ext-zip": "*"
     },
