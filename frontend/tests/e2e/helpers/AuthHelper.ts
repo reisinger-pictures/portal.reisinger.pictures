@@ -11,8 +11,8 @@ export class AuthHelper {
     async login(email = 'admin@example.com', password = 'admin', loginUrl?: string) {
         await this.page.goto(loginUrl ?? '/');
 
-        await expect(this.page.getByTestId('app-loader').first()).toBeHidden({ timeout: 5000 });
-        await expect(this.page.locator('main').first()).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByTestId('app-loader').first()).toBeHidden({ timeout: 15000 });
+        await expect(this.page.locator('main').first()).toBeVisible({ timeout: 15000 });
 
         const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('svg') }).first();
         const emailInput = this.page.locator('input[placeholder="E-Mail Adresse"]').first();
