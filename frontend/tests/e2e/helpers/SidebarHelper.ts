@@ -20,7 +20,9 @@ export class SidebarHelper {
         }
 
         const link = this.page.locator('ul.menu').getByText(menuText, { exact: false }).first();
-        await link.waitFor({ state: 'visible', timeout: 5000 });
+        // 10s statt 5s: unter CI-Last kann das Sidebar-Rendering den 5s-Timeout
+        // überschreiten (beobachtet 2026-08-23, no-b2b-label.spec.ts).
+        await link.waitFor({ state: 'visible', timeout: 10000 });
         await link.scrollIntoViewIfNeeded();
         await link.evaluate(el => (el as HTMLElement).click());
     }

@@ -106,7 +106,10 @@ test.describe('AI Configuration Page & Generate Button', () => {
         const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Einstellungen');
         await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
-        await expect(page.getByRole('heading', { name: /Einstellungen/i })).toBeVisible({ timeout: 5000 });
+        // Exakter H1-Name statt Regex /Einstellungen/i: seit der Brand-Settings-
+        // Card ("Markeneinstellungen", h2) matcht die Regex 2 Headings
+        // (strict mode violation).
+        await expect(page.getByRole('heading', { name: 'System-Einstellungen' })).toBeVisible({ timeout: 5000 });
     });
 
     test('AI generate button is visible in photo management for photographer', { tag: ['@feature:admin:ai'] }, async ({ page }) => {

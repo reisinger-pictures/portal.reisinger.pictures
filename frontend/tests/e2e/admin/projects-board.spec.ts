@@ -242,4 +242,63 @@ test.describe('Projekte-Board (Admin)', () => {
         await expect(assigneeBadge).toHaveCount(1);
         await expect(assigneeBadge).toHaveText(/E2E admin/);
     });
+
+    test('Super-Admin dropt ein Angebot-PDF auf das Board und das Projekt-Formular wird mit Kundenname & E-Mail vorbefüllt', { tag: ['@feature:admin:projects'] }, async ({ page, request }) => {
+        // extract-offer (Drop-Extraktion) + invoices/manual (PDF-Erzeugung) erfordern is_super_admin.
+        // Ein super_admin sieht den Board-Eintrag als "Workflow" (Sidebar.tsx), nicht "Projekte".
+        const superAdmin = await helper.createIsolatedUser('super_admin');
+        await setup(page, superAdmin, 'Workflow', 'Workflow');
+
+        // 1) Echtes Angebot-PDF mit eingebettetem Kundenname/-E-Mail über das Backend erzeugen.
+        const loginApi = await request.post('/api/auth/login', {
+            data: { email: superAdmin.email, password: superAdmin.password },
+            headers: { 'Accept': 'application/json' },
+        });
+        const setCookie = loginApi.headers()['set-cookie'] ?? '';
+        const tokenMatch = setCookie.match(/rp_jwt=([^;]+)/);
+        const cookie = tokenMatch ? `rp_jwt=${tokenMatch[1]}` : '';
+
+        const customerName = `Drop Kunde ${Math.random().toString(36).substring(2, 8)}`;
+        const customerEmail = `drop-kunde-${Math.random().toString(36).substring(2, 8)}@example.com`;
+
+        const pdfRes = await request.post('/api/management/invoices/manual', {
+            data: {
+                type: 'offer',
+                invoice_number: 'O-DROP-001',
+                date: '2026-08-19',
+                due_date: '2026-12-31',
+                customer_name: customerName,
+                customer_email: customerEmail,
+                items: [{ type: 'item', description: 'Fotografie', price: 250, qty: 1 }],
+            },
+            headers: { 'Accept': 'application/pdf', 'Cookie': cookie },
+        });
+        expect(pdfRes.status()).toBe(200);
+        const pdfBase64 = (await pdfRes.body()).toString('base64');
+
+        // 2) Native Drop-Simulation: Playwright kennt KEIN dataTransfer in dispatchEvent,
+        //    daher echtes DragEvent + DataTransfer im Browser-Kontext aufbauen.
+        await page.evaluate(({ selector, fileName, fileBase64 }) => {
+            const bytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
+            const file = new File([bytes], fileName, { type: 'application/pdf' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            const target = document.querySelector(selector);
+            if (!target) throw new Error(`Drop-Target ${selector} nicht gefunden`);
+            target.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+        }, { selector: 'main .kanban-grid', fileName: 'angebot.pdf', fileBase64: pdfBase64 });
+
+        // 3) Modal öffnet sich und ist mit den aus dem PDF extrahierten Feldern vorbefüllt.
+        const modal = page.locator('.modal-open');
+        await expect(modal).toBeVisible({ timeout: 20000 });
+
+        const nameInput = modal.locator('.form-control:has-text("Kundenname")').first().locator('input');
+        const emailInput = modal.locator('.form-control:has-text("E-Mail")').first().locator('input');
+
+        await expect(nameInput).toHaveValue(customerName, { timeout: 10000 });
+        await expect(emailInput).toHaveValue(customerEmail, { timeout: 10000 });
+
+        await modal.getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(modal).toHaveCount(0, { timeout: 5000 });
+    });
 });
