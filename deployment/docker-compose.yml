@@ -86,19 +86,17 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       # ---
-      # E-Mail-Versand (SMTP vs. Gmail REST)
-      # Standard ist klassisches SMTP. Setze in der .env (bzw. Umgebung):
+      # E-Mail-Versand (SMTP via ZeptoMail, Migration vom Gmail-REST-OAuth am 2026-08-24)
+      # Konfiguration liegt in .env.production:
       #   MAIL_MAILER=smtp
-      #   MAIL_HOST=smtp.dein-server.tld
+      #   MAIL_HOST=smtp.zeptomail.eu
       #   MAIL_PORT=587
       #   MAIL_ENCRYPTION=tls
-      #   MAIL_USERNAME=dein-user
-      #   MAIL_PASSWORD=dein-passwort
+      #   MAIL_USERNAME=emailapikey
+      #   MAIL_PASSWORD=<ZeptoMail-API-Key>
       #   MAIL_FROM_ADDRESS=noreply@reisinger.pictures
-      #   MAIL_FROM_NAME=Reisinger Foto Portal
-      # Der Gmail-REST-Transport (OAUTH_*-Vars) ist nur aktiv, wenn
-      # MAIL_MAILER=gmail_rest gesetzt ist. Für Produktion reicht SMTP —
-      # die OAUTH_*-Variablen können dann leer bleiben.
+      # Der Gmail-REST-OAuth-Transport (GmailRestTransport) bleibt als Fallback
+      # im Code erhalten; OAUTH_*-Secrets sind aus dem PROD-Setup entfernt.
       # ---
       - MAIL_MAILER=${MAIL_MAILER}
       - MAIL_HOST=${MAIL_HOST}
@@ -108,14 +106,11 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
-      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-      - OAUTH_REFRESH_TOKEN=${OAUTH_REFRESH_TOKEN}
       - MAKE_WEBHOOK_URL=${MAKE_WEBHOOK_URL}
       - MAKE_API_KEY=${MAKE_API_KEY}
       - MEILISEARCH_HOST=http://search:7700
       - MEILISEARCH_KEY=${MEILI_MASTER_KEY}
-      - GALLERY_CLEANUP_GRACE_MONTHS=3
+      - GALLERY_CLEANUP_GRACE_MONTHS=${GALLERY_CLEANUP_GRACE_MONTHS}
       - AUTH_THROTTLE_LIMIT=10
       - DOWNLOAD_THROTTLE=120
       - ZIP_DOWNLOAD_THROTTLE=10
@@ -123,7 +118,7 @@ services:
       - STRIPE_KEY=${STRIPE_KEY}
       - STRIPE_SECRET=${STRIPE_SECRET}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - PROXY_DELIVERY_HEADER=X-Accel-Redirect
+      - PROXY_DELIVERY_HEADER=${PROXY_DELIVERY_HEADER}
       - AI_ENABLED=${AI_ENABLED}
       - AI_TYPE=${AI_TYPE}
       - AI_BASE_URL=${AI_BASE_URL}
