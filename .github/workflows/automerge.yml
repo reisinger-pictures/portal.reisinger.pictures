@@ -49,8 +49,12 @@ jobs:
             // und werden bewusst NIE auto-gemergt
             const notDocker = !dependencyGroup.includes('docker');
 
-            const result = (safeGroup || safeIndividual) && notDocker;
-            core.setOutput('result', String(result));
+            // WICHTIG: `return` statt core.setOutput('result', ...) - github-script
+            // reserviert den Output-Namen "result" für den Script-Rückgabewert und
+            // überschreibt ein manuell gesetztes Output "result" sonst mit "".
+            // (Bewiesen im Debug-Lauf 2026-08-25; ohne Fix werden die Merge-Schritte
+            // still geskippt, obwohl der Run "success" meldet.)
+            return (safeGroup || safeIndividual) && notDocker;
 
       - name: Wait for CI checks
         if: steps.should-merge.outputs.result == 'true'
