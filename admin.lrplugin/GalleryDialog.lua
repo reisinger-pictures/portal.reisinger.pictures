@@ -75,7 +75,7 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
         if mode == "selection" then
             table.insert(rows, f:row {
                 f:static_text { title = "Sichtbarkeit:", width = 120 },
-                f:static_text { title = "Privat (Auswahl-Galerien sind immer privat)", text_color = LrView.color(0.5,0.5,0.5) }
+                f:static_text { title = "Privat (Auswahl-Galerien sind immer privat)", text_color = import 'LrColor'(0.5, 0.5, 0.5) }
             })
         else
             table.insert(rows, f:row {
