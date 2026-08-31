@@ -1,4 +1,5 @@
 import { Trans } from "@lingui/react/macro";
+import { Link } from 'react-router-dom';
 import PageLayout from './components/PageLayout';
 
 export default function Impressum() {
@@ -41,6 +42,16 @@ export default function Impressum() {
                     <p>
                         <Trans>Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter</Trans> <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer">https://ec.europa.eu/consumers/odr/</a> <Trans>finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</Trans>
                     </p>
+
+                    <h2 className="text-2xl font-bold mt-8 mb-4"><Trans>Weitere rechtliche Informationen</Trans></h2>
+                    <p className="space-y-1">
+                        <Trans>Widerrufs-, AGB- und Datenschutzinformationen finden Sie auf den folgenden Seiten:</Trans>
+                    </p>
+                    <ul className="list-disc list-inside">
+                        <li><Link to="/widerruf" className="link link-primary"><Trans>Widerrufsbelehrung</Trans></Link></li>
+                        <li><Link to="/license-terms" className="link link-primary"><Trans>AGB &amp; Lizenzbedingungen</Trans></Link></li>
+                        <li><Link to="/privacy" className="link link-primary"><Trans>Datenschutzerklärung</Trans></Link></li>
+                    </ul>
                 </div>
             </div>
         </PageLayout>

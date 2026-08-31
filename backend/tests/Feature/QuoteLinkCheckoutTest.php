@@ -2,17 +2,18 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Photo;
 use App\Models\Gallery;
 use App\Models\Order;
-use App\Services\OfferTokenService;
-use App\Services\CheckoutService;
+use App\Models\Photo;
+use App\Models\Setting;
+use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
+use App\Services\CheckoutService;
+use App\Services\OfferTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
 
 class QuoteLinkCheckoutTest extends TestCase
 {
@@ -23,11 +24,11 @@ class QuoteLinkCheckoutTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new CheckoutService(new ScopeLicensingStrategy());
+        $this->service = new CheckoutService(new ScopeLicensingStrategy);
 
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
+        Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
     }
 
     private function makeRequest(array $items, array $extra = []): Request
@@ -39,6 +40,7 @@ class QuoteLinkCheckoutTest extends TestCase
             'billing_street' => 'Street 1',
             'billing_zip' => '1234',
             'billing_city' => 'Wien',
+            'withdrawal_waived' => true,
         ], $extra);
 
         return Request::create('/', 'POST', $payload);
@@ -62,7 +64,7 @@ class QuoteLinkCheckoutTest extends TestCase
 
         $response = $this->service->processCheckout(
             $this->makeRequest(
-                array_map(fn($pid) => [
+                array_map(fn ($pid) => [
                     'photoId' => $pid,
                     'isQuote' => false,
                     'tier' => 'original',

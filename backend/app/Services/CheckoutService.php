@@ -1,24 +1,41 @@
 <?php
+
 namespace App\Services;
+
 use App\Contracts\PricingStrategy;
+use App\Mail\CustomMail;
+use App\Mail\InvoiceMail;
+use App\Models\Coupon;
 use App\Models\Gallery;
-use App\Models\Order;
+use App\Models\InvoiceSequence;
 use App\Models\InvoiceSnapshot;
 use App\Models\LicenseUseCase;
+use App\Models\Order;
 use App\Models\Photo;
+use App\Models\VolumePreset;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
-use App\Services\CouponService;
 use App\Support\BrandRegistry;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\CustomMail;
-use App\Mail\InvoiceMail;
 
-class CheckoutService {
+class CheckoutService
+{
+    /**
+     * Kanonischer Wortlaut des Widerrufsverzichts (immutables Evidence Package).
+     * Wird unveränderlich im InvoiceSnapshot abgelegt, in der Kaufmail zitiert
+     * und auf der Rechnung ausgewiesen.
+     */
+    public const WITHDRAWAL_CONSENT_TEXT = 'Ich willige ausdrücklich ein, dass vor Ablauf der Widerrufsfrist mit der Ausführung des Vertrags über digitale Inhalte begonnen wird (sofortiger Download der digitalen Bilddaten). Mir ist bekannt, dass mit dieser Zustimmung mein Rücktritts- bzw. Widerrufsrecht für diesen Vertrag erlischt, sobald die digitalen Bilddaten zum Download bereitgestellt wurden (§ 18 Abs. 1 Z 11 FAGG).';
+
     protected $strategy;
+
     private StripePaymentService $stripePayment;
+
     private CouponService $couponService;
 
     public function __construct(
@@ -31,19 +48,31 @@ class CheckoutService {
         $this->couponService = $couponService ?? app(CouponService::class);
     }
 
-    public function processCheckout($request, $user, $paymentMethod) {
+    public function processCheckout($request, $user, $paymentMethod)
+    {
         try {
             [$strategyItems, $isQuoteRequest] = $this->validateItems($request->items, $user);
+
+            // Server-seitige Durchsetzung des Widerrufsverzichts (WI-A):
+            // Nur echte Käufe – inkl. des quote_token-Flows – benötigen eine
+            // ausdrückliche Zustimmung. Angebots-Requests (isQuote) sind ausgenommen.
+            if (! $isQuoteRequest && ! $request->boolean('withdrawal_waived')) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Sie müssen auf Ihr Widerrufsrecht verzichten, um digitale Bilddaten zu kaufen.'], 422)
+                );
+            }
+
+            $withdrawalWaived = ! $isQuoteRequest && $request->boolean('withdrawal_waived');
 
             $quoteToken = $request->input('quote_token');
 
             $appliedCoupon = null;
 
             if ($quoteToken !== null) {
-                $offerTokenService = app(\App\Services\OfferTokenService::class);
+                $offerTokenService = app(OfferTokenService::class);
                 $tokenPayload = $offerTokenService->verify($quoteToken);
                 if ($tokenPayload === null) {
-                    throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                    throw new HttpResponseException(
                         response()->json(['error' => 'Angebot ist abgelaufen oder ungültig.'], 422)
                     );
                 }
@@ -81,33 +110,33 @@ class CheckoutService {
                 $customConditions = null;
             }
 
-            if ($totalNetCents <= 0 && !$isQuoteRequest && $quoteToken === null) {
+            if ($totalNetCents <= 0 && ! $isQuoteRequest && $quoteToken === null) {
                 return response()->json(['error' => 'Warenkorb hat keinen Wert.'], 400);
             }
 
-            $order = DB::transaction(function () use ($request, $user, $paymentMethod, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions) {
+            $order = DB::transaction(function () use ($request, $user, $paymentMethod, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived) {
                 $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
 
                 $appliedCouponId = null;
                 if ($appliedCoupon !== null) {
                     [$lockedCoupon, $couponError] = $this->couponService->lockAndRevalidateCoupon($appliedCoupon, $user->id);
                     if ($lockedCoupon === null) {
-                        throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => $couponError], 422));
+                        throw new HttpResponseException(response()->json(['error' => $couponError], 422));
                     }
                     $appliedCouponId = $lockedCoupon->id;
                 }
 
-                $order = $this->createOrder($user, $totalNetCents, $isQuoteRequest, $paymentMethod, $appliedCouponId, $couponDiscountCents);
+                $order = $this->createOrder($user, $totalNetCents, $isQuoteRequest, $paymentMethod, $appliedCouponId, $couponDiscountCents, $withdrawalWaived);
 
-                $this->createInvoiceSnapshot($order, $request, $user, $lineItems, $totalNetCents, $customConditions);
+                $this->createInvoiceSnapshot($order, $request, $user, $lineItems, $totalNetCents, $customConditions, $withdrawalWaived);
 
                 return $order;
             });
 
             return $this->respondBasedOnPayment($order, $request, $user, $isQuoteRequest, $paymentMethod, $totalNetCents);
-        } catch (\Illuminate\Http\Exceptions\HttpResponseException $e) {
+        } catch (HttpResponseException $e) {
             return $e->getResponse();
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
                 return response()->json(['error' => 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'], 503);
             }
@@ -122,22 +151,22 @@ class CheckoutService {
 
         foreach ($items as $item) {
             $photo = Photo::with('gallery')->findOrFail($item['photoId']);
-            if (!$photo->gallery->is_public && !$user->canAccessGallery($photo->gallery_id)) {
-                throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => 'Zugriff verweigert'], 403));
+            if (! $photo->gallery->is_public && ! $user->canAccessGallery($photo->gallery_id)) {
+                throw new HttpResponseException(response()->json(['error' => 'Zugriff verweigert'], 403));
             }
 
             $isItemQuote = isset($item['isQuote']) && $item['isQuote'];
 
-            if (!$isItemQuote && !empty($item['useCaseId'])) {
+            if (! $isItemQuote && ! empty($item['useCaseId'])) {
                 $useCase = LicenseUseCase::find($item['useCaseId']);
                 if ($useCase) {
                     $currentBrand = BrandRegistry::current();
                     if ($currentBrand !== null && $useCase->brand !== null && $useCase->brand !== $currentBrand) {
-                        throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => 'Ungültige Lizenz-Auswahl.'], 422));
+                        throw new HttpResponseException(response()->json(['error' => 'Ungültige Lizenz-Auswahl.'], 422));
                     }
-                    $isCommercial = $useCase->is_commercial || preg_match('/werbung|kampagne|kommerziell/i', $useCase->name . ' ' . $useCase->description);
+                    $isCommercial = $useCase->is_commercial || preg_match('/werbung|kampagne|kommerziell/i', $useCase->name.' '.$useCase->description);
                     if ($isCommercial && ($photo->effective_is_editorial_only || $photo->is_editorial_only)) {
-                        throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."], 403));
+                        throw new HttpResponseException(response()->json(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."], 403));
                     }
                 }
             }
@@ -167,8 +196,9 @@ class CheckoutService {
             $presetKey = $mode === 'volume_licensing'
                 ? ($gallery?->volume_preset_id ?: 'default')
                 : 'default';
-            $groups[$mode . '|' . $presetKey][] = $item;
+            $groups[$mode.'|'.$presetKey][] = $item;
         }
+
         return $groups;
     }
 
@@ -186,11 +216,11 @@ class CheckoutService {
             if ($mode === 'volume_licensing') {
                 $presetService = app(VolumePresetService::class);
                 $preset = $presetKey === 'default'
-                    ? $presetService->resolveDefaultForBrand(\App\Support\BrandRegistry::currentOrDefault())
-                    : \App\Models\VolumePreset::findOrFail($presetKey);
+                    ? $presetService->resolveDefaultForBrand(BrandRegistry::currentOrDefault())
+                    : VolumePreset::findOrFail($presetKey);
                 $strategy = new VolumeLicensingStrategy($preset, $this->couponService);
             } else {
-                $strategy = new ScopeLicensingStrategy();
+                $strategy = new ScopeLicensingStrategy;
             }
 
             $groupCouponCode = $strategy->supportsCoupons() ? $couponCode : null;
@@ -199,10 +229,10 @@ class CheckoutService {
             $allItems = array_merge($allItems, $result['items']);
             $totalCents += $result['totalCents'];
             $discountCents += (int) ($result['discountCents'] ?? 0);
-            if (!empty($result['couponId'])) {
+            if (! empty($result['couponId'])) {
                 $couponId = $result['couponId'];
             }
-            if (!empty($result['tier_breakdown'])) {
+            if (! empty($result['tier_breakdown'])) {
                 $allTierBreakdown = array_merge($allTierBreakdown, $result['tier_breakdown']);
             }
         }
@@ -216,7 +246,7 @@ class CheckoutService {
         ];
     }
 
-    private function resolveCoupon(?string $couponCode, array $items, $user): ?\App\Models\Coupon
+    private function resolveCoupon(?string $couponCode, array $items, $user): ?Coupon
     {
         if ($couponCode === null) {
             return null;
@@ -244,7 +274,7 @@ class CheckoutService {
             $couponCode, $brand, $galleryId, $metaGalleryId, $user->id,
         );
         if ($validCoupon === null) {
-            throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['error' => 'Der Rabattcode ist nicht mehr gültig.'], 422));
+            throw new HttpResponseException(response()->json(['error' => 'Der Rabattcode ist nicht mehr gültig.'], 422));
         }
 
         return $validCoupon;
@@ -262,7 +292,7 @@ class CheckoutService {
 
             $lineItems[] = [
                 'photoId' => $photoId,
-                'filename' => $photo ? ($photo->title ?: 'Bild ' . substr($photo->id, 0, 8)) : 'Unbekannt',
+                'filename' => $photo ? ($photo->title ?: 'Bild '.substr($photo->id, 0, 8)) : 'Unbekannt',
                 'tier' => $pricedItem['tier'] ?? ($item['tier'] ?? 'web'),
                 'useCaseId' => $item['useCaseId'] ?? null,
                 'useCaseName' => $pricedItem['useCaseName'] ?? ($item['useCaseName'] ?? 'Standard Lizenz'),
@@ -281,7 +311,7 @@ class CheckoutService {
         $couponDiscountCents = (int) ($pricingResult['discountCents'] ?? 0);
         $couponType = $pricingResult['couponType'] ?? null;
         if ($couponDiscountCents > 0 && $couponType !== null) {
-            $nonQuoteItems = array_filter($lineItems, fn($li) => empty($li['isQuote']));
+            $nonQuoteItems = array_filter($lineItems, fn ($li) => empty($li['isQuote']));
             $nonQuoteCount = count($nonQuoteItems);
             if ($nonQuoteCount > 0) {
                 $perImageCents = (int) round($couponDiscountCents / $nonQuoteCount);
@@ -299,7 +329,7 @@ class CheckoutService {
         return $lineItems;
     }
 
-    private function createOrder($user, int $totalNetCents, bool $isQuoteRequest, string $paymentMethod, $appliedCouponId, int $couponDiscountCents): Order
+    private function createOrder($user, int $totalNetCents, bool $isQuoteRequest, string $paymentMethod, $appliedCouponId, int $couponDiscountCents, bool $withdrawalWaived = false): Order
     {
         $org = $user->org;
         $isLieferschein = $org && $org->invoice_frequency !== 'immediate';
@@ -312,11 +342,15 @@ class CheckoutService {
             'total_amount' => $totalNetCents,
             'is_quote_request' => $isQuoteRequest,
         ];
+        if ($withdrawalWaived) {
+            $orderData['withdrawal_waived'] = true;
+            $orderData['withdrawal_consent_at'] = now();
+        }
         if ($appliedCouponId !== null) {
             $orderData['coupon_id'] = $appliedCouponId;
             $orderData['coupon_discount_cents'] = $couponDiscountCents;
 
-            $coupon = \App\Models\Coupon::find($appliedCouponId);
+            $coupon = Coupon::find($appliedCouponId);
             if ($coupon) {
                 $this->couponService->incrementUsage($coupon, $user->id);
             }
@@ -337,7 +371,7 @@ class CheckoutService {
             $photo = Photo::find($photoId);
             $lineItems[] = [
                 'photoId' => $photoId,
-                'filename' => $photo ? ($photo->title ?: 'Bild ' . substr($photo->id, 0, 8)) : 'Unbekannt',
+                'filename' => $photo ? ($photo->title ?: 'Bild '.substr($photo->id, 0, 8)) : 'Unbekannt',
                 'tier' => 'original',
                 'useCaseId' => null,
                 'useCaseName' => 'Angebot (Festpreis)',
@@ -347,15 +381,16 @@ class CheckoutService {
                 'notes' => null,
             ];
         }
+
         return $lineItems;
     }
 
-    private function createInvoiceSnapshot(Order $order, $request, $user, array $lineItems, int $totalNetCents, null|string|array $customConditions = null): InvoiceSnapshot
+    private function createInvoiceSnapshot(Order $order, $request, $user, array $lineItems, int $totalNetCents, null|string|array $customConditions = null, bool $withdrawalWaived = false): InvoiceSnapshot
     {
         $org = $user->org;
         $isLieferschein = $org && $org->invoice_frequency !== 'immediate';
         $prefix = $isLieferschein ? 'L-' : 'P-';
-        $invoiceNumber = \App\Models\InvoiceSequence::getNextInvoiceNumber($prefix);
+        $invoiceNumber = InvoiceSequence::getNextInvoiceNumber($prefix);
 
         $customerDetails = [
             'name' => $request->billing_name, 'company' => $request->billing_company, 'street' => $request->billing_street,
@@ -367,6 +402,15 @@ class CheckoutService {
             $customerDetails['custom_conditions'] = $customConditions;
         }
 
+        if ($withdrawalWaived) {
+            // Immutables Evidence Package: unveränderlicher Nachweis der Zustimmung.
+            $customerDetails['withdrawal_consent'] = [
+                'waived' => true,
+                'at' => now()->toISOString(),
+                'text' => self::WITHDRAWAL_CONSENT_TEXT,
+            ];
+        }
+
         return InvoiceSnapshot::create([
             'order_id' => $order->id,
             'invoice_number' => $invoiceNumber,
@@ -376,7 +420,7 @@ class CheckoutService {
         ]);
     }
 
-    private function respondBasedOnPayment(Order $order, $request, $user, bool $isQuoteRequest, string $paymentMethod, int $totalNetCents): \Illuminate\Http\JsonResponse
+    private function respondBasedOnPayment(Order $order, $request, $user, bool $isQuoteRequest, string $paymentMethod, int $totalNetCents): JsonResponse
     {
         $snapshot = $order->invoiceSnapshot;
 
@@ -389,6 +433,7 @@ class CheckoutService {
 
         if ($isLieferschein || $paymentMethod === 'invoice') {
             Mail::to($user->email)->queue(new InvoiceMail($order, $snapshot));
+
             return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
         }
 
@@ -402,9 +447,11 @@ class CheckoutService {
                 'message' => $e->getMessage(),
                 'exception' => $e,
             ]);
-            Mail::to(BrandRegistry::configOrDefault()->accountingEmail)->queue(new CustomMail('Zahlungsfehler', 'Bestellung ' . $order->id . ' konnte nicht bezahlt werden. Ein technischer Fehler ist aufgetreten. Bitte kontaktieren Sie den Support.'));
+            Mail::to(BrandRegistry::configOrDefault()->accountingEmail)->queue(new CustomMail('Zahlungsfehler', 'Bestellung '.$order->id.' konnte nicht bezahlt werden. Ein technischer Fehler ist aufgetreten. Bitte kontaktieren Sie den Support.'));
+
             return response()->json(['error' => 'Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.'], 502);
         }
+
         return response()->json(['success' => true, 'requires_action' => true, 'client_secret' => $paymentResult['client_secret'], 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
     }
 }

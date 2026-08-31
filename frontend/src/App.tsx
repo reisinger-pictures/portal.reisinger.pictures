@@ -27,6 +27,8 @@ const ManagementOrgDetailView = lazy(() => import('./ui/management/ManagementOrg
 const UserProfileView = lazy(() => import('./ui/UserProfileView'));
 const Privacy = lazy(() => import('./ui/Privacy'));
 const Impressum = lazy(() => import('./ui/Impressum'));
+const LicenseTerms = lazy(() => import('./ui/LicenseTerms'));
+const Widerrufsbelehrung = lazy(() => import('./ui/Widerrufsbelehrung'));
 const ClientNotificationsView = lazy(() => import('./ui/client/ClientNotificationsView'));
 const ClientCartView = lazy(() => import('./ui/client/ClientCartView'));
 const ClientOrdersView = lazy(() => import('./ui/client/ClientOrdersView'));
@@ -113,6 +115,8 @@ export default function App() {
                                 element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                                             <Route path="/privacy" element={<ErrorBoundary><Privacy/></ErrorBoundary>}/>
                             <Route path="/impressum" element={<ErrorBoundary><Impressum/></ErrorBoundary>}/>
+                            <Route path="/license-terms" element={<ErrorBoundary><LicenseTerms/></ErrorBoundary>}/>
+                            <Route path="/widerruf" element={<ErrorBoundary><Widerrufsbelehrung/></ErrorBoundary>}/>
                             <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/cart" element={<ProtectedRoute><ErrorBoundary><ClientCartView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/orders" element={<ProtectedRoute><ErrorBoundary><ClientOrdersView/></ErrorBoundary></ProtectedRoute>}/>

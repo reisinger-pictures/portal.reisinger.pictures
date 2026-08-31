@@ -206,6 +206,10 @@ msgstr "1 Jahr:"
 msgid "1. Automatische Datenerfassung und IP-Adressen"
 msgstr "1. Automatische Datenerfassung und IP-Adressen"
 
+#: src/ui/LicenseTerms.tsx
+msgid "1. Geltungsbereich"
+msgstr "1. Geltungsbereich"
+
 #: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "1. Nutzungsart"
 msgstr "1. Nutzungsart"
@@ -213,6 +217,14 @@ msgstr "1. Nutzungsart"
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "1. Typ / Grundhonorar"
 msgstr "1. Typ / Grundhonorar"
+
+#: src/ui/LicenseTerms.tsx
+msgid "10. Haftung"
+msgstr "10. Haftung"
+
+#: src/ui/LicenseTerms.tsx
+msgid "11. Schlussbestimmungen"
+msgstr "11. Schlussbestimmungen"
 
 #: src/ui/Privacy.tsx
 msgid "2. Cookies und Authentifizierung"
@@ -226,13 +238,45 @@ msgstr "2. Nutzungsdauer"
 msgid "2. Optionale Zuschläge"
 msgstr "2. Optionale Zuschläge"
 
+#: src/ui/LicenseTerms.tsx
+msgid "2. Vertragsgegenstand"
+msgstr "2. Vertragsgegenstand"
+
 #: src/ui/Privacy.tsx
 msgid "3. Download-Tracking und Urheberrechtsschutz"
 msgstr "3. Download-Tracking und Urheberrechtsschutz"
 
+#: src/ui/LicenseTerms.tsx
+msgid "3. Zustandekommen des Vertrages"
+msgstr "3. Zustandekommen des Vertrages"
+
 #: src/ui/Privacy.tsx
 msgid "4. Ihre Rechte"
 msgstr "4. Ihre Rechte"
+
+#: src/ui/LicenseTerms.tsx
+msgid "4. Preise und Zahlungsbedingungen"
+msgstr "4. Preise und Zahlungsbedingungen"
+
+#: src/ui/LicenseTerms.tsx
+msgid "5. Lieferung digitaler Inhalte"
+msgstr "5. Lieferung digitaler Inhalte"
+
+#: src/ui/LicenseTerms.tsx
+msgid "6. Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
+msgstr "6. Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
+
+#: src/ui/LicenseTerms.tsx
+msgid "7. Widerrufsrecht"
+msgstr "7. Widerrufsrecht"
+
+#: src/ui/LicenseTerms.tsx
+msgid "8. Lizenzbedingungen und Nutzungsrechte"
+msgstr "8. Lizenzbedingungen und Nutzungsrechte"
+
+#: src/ui/LicenseTerms.tsx
+msgid "9. Urheberrecht"
+msgstr "9. Urheberrecht"
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Ab"
@@ -366,6 +410,13 @@ msgstr "Admin Download"
 msgid "Administrator"
 msgstr "Administrator"
 
+#: src/ui/components/Sidebar.tsx
+#: src/ui/Impressum.tsx
+#: src/ui/LicenseTerms.tsx
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "AGB & Lizenzbedingungen"
+msgstr "AGB & Lizenzbedingungen"
+
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Akt & Boudoir"
 msgstr "Akt & Boudoir"
@@ -430,6 +481,10 @@ msgstr "Alle Bilder einer Bestellung werden zum Einheitspreis der erreichten Sta
 #: src/ui/management/ManagementStructureView.tsx
 msgid "Alle einklappen"
 msgstr "Alle einklappen"
+
+#: src/ui/LicenseTerms.tsx
+msgid "Alle gelieferten Fotografien unterliegen dem Urheberrecht des Fotografen. Etwaige Metadaten (IPTC/EXIF), die Hinweise auf den Rechteinhaber und die Lizenzbedingungen enthalten, dürfen nicht entfernt oder verändert werden. Jede nicht ausdrücklich gestattete Verwendung stellt eine Urheberrechtsverletzung dar und berechtigt den Fotografen zu Schadenersatz und Unterlassung."
+msgstr "Alle gelieferten Fotografien unterliegen dem Urheberrecht des Fotografen. Etwaige Metadaten (IPTC/EXIF), die Hinweise auf den Rechteinhaber und die Lizenzbedingungen enthalten, dürfen nicht entfernt oder verändert werden. Jede nicht ausdrücklich gestattete Verwendung stellt eine Urheberrechtsverletzung dar und berechtigt den Fotografen zu Schadenersatz und Unterlassung."
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Alle generieren (leere)"
@@ -636,6 +691,10 @@ msgstr "Ausständig / Angebot"
 msgid "Ausstehende Lieferscheine werden nun gebündelt, eine P-Rechnungsnummer erzeugt und als PDF an deine E-Mail versendet."
 msgstr "Ausstehende Lieferscheine werden nun gebündelt, eine P-Rechnungsnummer erzeugt und als PDF an deine E-Mail versendet."
 
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Ausübung des Widerrufs"
+msgstr "Ausübung des Widerrufs"
+
 #: src/ui/client/ClientNotificationsView.tsx
 #: src/ui/management/ManagementStructureView.tsx
 msgid "Auswahl"
@@ -734,6 +793,10 @@ msgstr "Bearbeitung"
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Beauftragt"
 msgstr "Beauftragt"
+
+#: src/ui/LicenseTerms.tsx
+msgid "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
+msgstr "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Beigetreten"
@@ -1120,6 +1183,10 @@ msgstr "Darf maximal 999 sein"
 msgid "Darf nicht negativ sein"
 msgstr "Darf nicht negativ sein"
 
+#: src/ui/LicenseTerms.tsx
+msgid "dargestellt."
+msgstr "dargestellt."
+
 #: src/ui/ResetPassword.tsx
 msgid "Das Passwort muss mindestens 8 Zeichen lang sein."
 msgstr "Das Passwort muss mindestens 8 Zeichen lang sein."
@@ -1131,6 +1198,10 @@ msgstr "Das Preset \"{name}\" wirklich löschen? Galerien mit diesem Preset fall
 #: src/ui/ContractSignView.tsx
 msgid "Das unterschriebene Vertragsdokument wird dir nach Vertragsschluss per E-Mail zugesendet."
 msgstr "Das unterschriebene Vertragsdokument wird dir nach Vertragsschluss per E-Mail zugesendet."
+
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Das Widerrufsrecht erlischt bei Verträgen über die Lieferung digitaler Inhalte, wenn die Ausführung des Vertrages mit Ihrer ausdrücklichen Zustimmung begonnen hat, bevor die Widerrufsfrist abgelaufen ist, und wenn Sie zur Kenntnis genommen haben, dass Sie durch die Zustimmung Ihr Widerrufsrecht verlieren."
+msgstr "Das Widerrufsrecht erlischt bei Verträgen über die Lieferung digitaler Inhalte, wenn die Ausführung des Vertrages mit Ihrer ausdrücklichen Zustimmung begonnen hat, bevor die Widerrufsfrist abgelaufen ist, und wenn Sie zur Kenntnis genommen haben, dass Sie durch die Zustimmung Ihr Widerrufsrecht verlieren."
 
 #: src/ui/components/GalleryHeader.tsx
 #: src/ui/components/Sidebar.tsx
@@ -1154,7 +1225,10 @@ msgstr "Daten konnten nicht geladen werden."
 msgid "Datenbank Version:"
 msgstr "Datenbank Version:"
 
+#: src/ui/Impressum.tsx
+#: src/ui/LicenseTerms.tsx
 #: src/ui/Privacy.tsx
+#: src/ui/Widerrufsbelehrung.tsx
 msgid "Datenschutzerklärung"
 msgstr "Datenschutzerklärung"
 
@@ -1272,6 +1346,10 @@ msgstr "Delivery (Downloads)"
 msgid "Delta (Aufpreis):"
 msgstr "Delta (Aufpreis):"
 
+#: src/ui/LicenseTerms.tsx
+msgid "Der Fotograf haftet für Schäden, die durch Vorsatz oder grobe Fahrlässigkeit verursacht werden, sowie nach den zwingenden gesetzlichen Bestimmungen. Die Haftung für leichte Fahrlässigkeit ist auf die bei Vertragsabschluss vorhersehbaren und vertragstypischen Schäden beschränkt, soweit keine zwingenden gesetzlichen Haftungsbestimmungen entgegenstehen."
+msgstr "Der Fotograf haftet für Schäden, die durch Vorsatz oder grobe Fahrlässigkeit verursacht werden, sowie nach den zwingenden gesetzlichen Bestimmungen. Die Haftung für leichte Fahrlässigkeit ist auf die bei Vertragsabschluss vorhersehbaren und vertragstypischen Schäden beschränkt, soweit keine zwingenden gesetzlichen Haftungsbestimmungen entgegenstehen."
+
 #: src/ui/client/DeliveryView.tsx
 #: src/ui/client/SelectionView.tsx
 msgid "Der Fotograf hat noch keine Bilder für diese Galerie freigegeben."
@@ -1301,6 +1379,10 @@ msgstr "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzule
 msgid "der Nutzer oder Gäste in unseren Audit- und Download-Logs. Webserver-Logs werden, sofern sie IP-Adressen enthalten, automatisch nach wenigen Tagen rotiert und gelöscht."
 msgstr "der Nutzer oder Gäste in unseren Audit- und Download-Logs. Webserver-Logs werden, sofern sie IP-Adressen enthalten, automatisch nach wenigen Tagen rotiert und gelöscht."
 
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
+msgstr "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
+
 #: src/ui/Privacy.tsx
 msgid "Der Schutz Ihrer Daten ist uns wichtig. Nachfolgend informieren wir Sie über die Verarbeitung personenbezogener Daten bei der Nutzung dieses Foto-Portals."
 msgstr "Der Schutz Ihrer Daten ist uns wichtig. Nachfolgend informieren wir Sie über die Verarbeitung personenbezogener Daten bei der Nutzung dieses Foto-Portals."
@@ -1318,6 +1400,10 @@ msgstr "Details"
 msgid "Details & Metadaten"
 msgstr "Details & Metadaten"
 
+#: src/ui/LicenseTerms.tsx
+msgid "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
+msgstr "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
+
 #: src/ui/management/components/invoice/InvoiceDragDropZone.tsx
 msgid "Die Daten werden automatisch in die Rechnung übernommen."
 msgstr "Die Daten werden automatisch in die Rechnung übernommen."
@@ -1334,6 +1420,10 @@ msgstr "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeile
 msgid "Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert. Setze <0>AI_ENABLED=true</0> und <1>AI_API_KEY</1> als Umgebungsvariablen."
 msgstr "Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert. Setze <0>AI_ENABLED=true</0> und <1>AI_API_KEY</1> als Umgebungsvariablen."
 
+#: src/ui/LicenseTerms.tsx
+msgid "Die Lieferung der bestellten digitalen Inhalte erfolgt ausschließlich in elektronischer Form. Unmittelbar nach Abschluss der Zahlung werden die bestellten Dateien für den Download freigeschaltet (sofortiger Download). Der Kunde erhält über sein Konto oder per E-Mail Zugriff auf die Download-Bereiche. Mangels körperlicher Übertragung sind die Regelungen über Versand und Gefahrübergang nicht anwendbar."
+msgstr "Die Lieferung der bestellten digitalen Inhalte erfolgt ausschließlich in elektronischer Form. Unmittelbar nach Abschluss der Zahlung werden die bestellten Dateien für den Download freigeschaltet (sofortiger Download). Der Kunde erhält über sein Konto oder per E-Mail Zugriff auf die Download-Bereiche. Mangels körperlicher Übertragung sind die Regelungen über Versand und Gefahrübergang nicht anwendbar."
+
 #: src/ui/ResetPassword.tsx
 msgid "Die Passwörter stimmen nicht überein."
 msgstr "Die Passwörter stimmen nicht überein."
@@ -1345,6 +1435,14 @@ msgstr "Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch 
 #: src/ui/client/DeliveryView.tsx
 msgid "Dies ist eine LIVE Galerie. Sobald der Fotograf Bilder hochlädt, erscheinen sie hier (automatischer Refresh alle 10s)."
 msgstr "Dies ist eine LIVE Galerie. Sobald der Fotograf Bilder hochlädt, erscheinen sie hier (automatischer Refresh alle 10s)."
+
+#: src/ui/LicenseTerms.tsx
+msgid "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelten für sämtliche über dieses Portal angebotenen Fotoprodukte und digitalen Inhalte (im Folgenden „Download-Dateien“) sowie für alle Verträge, die über dieses Portal geschlossen werden."
+msgstr "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelten für sämtliche über dieses Portal angebotenen Fotoprodukte und digitalen Inhalte (im Folgenden „Download-Dateien“) sowie für alle Verträge, die über dieses Portal geschlossen werden."
+
+#: src/ui/LicenseTerms.tsx
+msgid "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
+msgstr "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!"
@@ -1601,6 +1699,10 @@ msgstr "Erlaubt dem User kostenpflichtige Upgrades (höhere Auflösungen) im Che
 msgid "Erlaubt Kunden mit der Rolle \"Metadaten bearbeiten\" das Ändern von IPTC-Daten in dieser Galerie."
 msgstr "Erlaubt Kunden mit der Rolle \"Metadaten bearbeiten\" das Ändern von IPTC-Daten in dieser Galerie."
 
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
+msgstr "Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
+
 #: src/ui/components/ErrorBoundary.tsx
 #: src/ui/components/ErrorMessage.tsx
 msgid "Erneut versuchen"
@@ -1633,6 +1735,14 @@ msgstr "Erstellt:"
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Erweiterte Rechte als Angebot beim Fotografen anfragen"
 msgstr "Erweiterte Rechte als Angebot beim Fotografen anfragen"
+
+#: src/ui/LicenseTerms.tsx
+msgid "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
+msgstr "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
+
+#: src/ui/LicenseTerms.tsx
+msgid "Es gilt österreichisches Recht unter Ausschluss des UN-Kaufrechts. Sollte eine Bestimmung dieser Bedingungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Fotografen."
+msgstr "Es gilt österreichisches Recht unter Ausschluss des UN-Kaufrechts. Sollte eine Bestimmung dieser Bedingungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Fotografen."
 
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
@@ -1906,6 +2016,10 @@ msgstr "Flatrate-Pools"
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Flex Tarif Rechner"
 msgstr "Flex Tarif Rechner"
+
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Folgen des Widerrufs"
+msgstr "Folgen des Widerrufs"
 
 #: src/ui/client/DeliveryView.tsx
 msgid "Format"
@@ -2259,6 +2373,10 @@ msgstr "Historie konnte nicht geladen werden."
 msgid "Ich akzeptiere die <0>Allgemeinen Geschäftsbedingungen und Lizenzvereinbarungen</0>."
 msgstr "Ich akzeptiere die <0>Allgemeinen Geschäftsbedingungen und Lizenzvereinbarungen</0>."
 
+#: src/ui/client/ClientCartView.tsx
+msgid "Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download). Mir ist bekannt, dass mein Rücktritts- bzw. Widerrufsrecht damit vorzeitig erlischt."
+msgstr "Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download). Mir ist bekannt, dass mein Rücktritts- bzw. Widerrufsrecht damit vorzeitig erlischt."
+
 #: src/ui/ContractSignView.tsx
 msgid "Ich habe den Vertrag gelesen und stimme allen Bedingungen verbindlich zu."
 msgstr "Ich habe den Vertrag gelesen und stimme allen Bedingungen verbindlich zu."
@@ -2270,8 +2388,8 @@ msgid "Ich habe die <0>Datenschutzerklärung</0> gelesen und akzeptiert."
 msgstr "Ich habe die <0>Datenschutzerklärung</0> gelesen und akzeptiert."
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt."
-msgstr "Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt."
+#~ msgid "Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt."
+#~ msgstr "Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt."
 
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Ignoriert"
@@ -2300,6 +2418,8 @@ msgid "Importiert"
 msgstr "Importiert"
 
 #: src/ui/Impressum.tsx
+#: src/ui/LicenseTerms.tsx
+#: src/ui/Widerrufsbelehrung.tsx
 msgid "Impressum"
 msgstr "Impressum"
 
@@ -2657,6 +2777,10 @@ msgstr "Kommerziell (x3)"
 #: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "Kommerziell:"
 msgstr "Kommerziell:"
+
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Konkret bedeutet dies für Bestellungen in diesem Portal: Wenn Sie beim Kauf Ihrer Fotos der sofortigen Ausführung des Vertrages zustimmen (sofortiger Download unmittelbar nach Zahlungsabschluss) und dies ausdrücklich per Checkbox bestätigen, haben Sie zur Kenntnis genommen, dass Ihr Rücktritts- bzw. Widerrufsrecht mit Beginn des Downloads vorzeitig erlischt."
+msgstr "Konkret bedeutet dies für Bestellungen in diesem Portal: Wenn Sie beim Kauf Ihrer Fotos der sofortigen Ausführung des Vertrages zustimmen (sofortiger Download unmittelbar nach Zahlungsabschluss) und dies ausdrücklich per Checkbox bestätigen, haben Sie zur Kenntnis genommen, dass Ihr Rücktritts- bzw. Widerrufsrecht mit Beginn des Downloads vorzeitig erlischt."
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Konnte Link nicht kopieren."
@@ -3120,6 +3244,14 @@ msgstr "Mindestens eine Preisstaffel erforderlich"
 msgid "Mit deiner Unterschrift bestätigst du, den Vertrag gelesen zu haben und akzeptierst alle Bedingungen. Deine IP-Adresse und der Zeitpunkt werden im Audit-Trail protokolliert."
 msgstr "Mit deiner Unterschrift bestätigst du, den Vertrag gelesen zu haben und akzeptierst alle Bedingungen. Deine IP-Adresse und der Zeitpunkt werden im Audit-Trail protokolliert."
 
+#: src/ui/LicenseTerms.tsx
+msgid "Mit dem Erwerb einer Lizenz erhält der Kunde das einfache, nicht übertragbare Recht, die erworbenen Fotografien für den in der jeweiligen Lizenzvereinbarung festgelegten Zweck und Umfang zu nutzen. Eine darüber hinausgehende, insbesondere gewerbliche oder öffentliche Nutzung, die Weitergabe, der Weiterverkauf oder die Unterlizenzierung der Dateien bedarf der vorherigen schriftlichen Zustimmung des Fotografen."
+msgstr "Mit dem Erwerb einer Lizenz erhält der Kunde das einfache, nicht übertragbare Recht, die erworbenen Fotografien für den in der jeweiligen Lizenzvereinbarung festgelegten Zweck und Umfang zu nutzen. Eine darüber hinausgehende, insbesondere gewerbliche oder öffentliche Nutzung, die Weitergabe, der Weiterverkauf oder die Unterlizenzierung der Dateien bedarf der vorherigen schriftlichen Zustimmung des Fotografen."
+
+#: src/ui/LicenseTerms.tsx
+msgid "Mit der Bestätigung der Checkbox „Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download)“ erteilt der Kunde diese ausdrückliche Zustimmung. Ab dem Zeitpunkt der Freischaltung des Downloads gilt das Rücktrittsrecht als erloschen."
+msgstr "Mit der Bestätigung der Checkbox „Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download)“ erteilt der Kunde diese ausdrückliche Zustimmung. Ab dem Zeitpunkt der Freischaltung des Downloads gilt das Rücktrittsrecht als erloschen."
+
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Mobiles Blitz-Setup"
 msgstr "Mobiles Blitz-Setup"
@@ -3213,6 +3345,10 @@ msgstr "Muss mindestens 1 sein"
 #: src/ui/management/components/LicenseSettingsCard.tsx
 msgid "Muss positiv sein"
 msgstr "Muss positiv sein"
+
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Muster-Widerrufsformular"
+msgstr "Muster-Widerrufsformular"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Nach Ablauf kann niemand mehr über den Link beitreten"
@@ -4165,6 +4301,10 @@ msgstr "Sichtbarkeits-Vorgabe"
 msgid "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
 msgstr "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
 
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses."
+msgstr "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses."
+
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "SMTP-Verbindungstest"
 msgstr "SMTP-Verbindungstest"
@@ -4576,6 +4716,10 @@ msgstr "UID"
 msgid "um den Rechnungs- und Bestellprozess zu aktivieren."
 msgstr "um den Rechnungs- und Bestellprozess zu aktivieren."
 
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (den Betreiber dieses Portals) mittels einer eindeutigen Erklärung über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren. Sie können dafür das unten beschriebene Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist. Zur Wahrung der Widerrufsfrist genügt es, dass Sie die Mitteilung über die Ausübung des Widerrufsrechts vor Ablauf der Widerrufsfrist absenden."
+msgstr "Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (den Betreiber dieses Portals) mittels einer eindeutigen Erklärung über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren. Sie können dafür das unten beschriebene Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist. Zur Wahrung der Widerrufsfrist genügt es, dass Sie die Mitteilung über die Ausübung des Widerrufsrechts vor Ablauf der Widerrufsfrist absenden."
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "unbegrenzt"
 msgstr "unbegrenzt"
@@ -4702,6 +4846,14 @@ msgstr "URL Slug"
 msgid "Verbindliche Unterzeichnung"
 msgstr "Verbindliche Unterzeichnung"
 
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte das folgende gesetzliche Widerrufsrecht."
+msgstr "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte das folgende gesetzliche Widerrufsrecht."
+
+#: src/ui/LicenseTerms.tsx
+msgid "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
+msgstr "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
+
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 #~ msgid "Veröffentlicht"
 #~ msgstr "Veröffentlicht"
@@ -4763,6 +4915,10 @@ msgstr "Vertrag wurde geschlossen."
 #: src/ui/components/Sidebar.tsx
 msgid "Verträge"
 msgstr "Verträge"
+
+#: src/ui/LicenseTerms.tsx
+msgid "Vertragsgegenstand ist die Übertragung einfacher, nicht ausschließlicher Nutzungsrechte an fotografischen Werken (Lizenzierung) sowie die Bereitstellung der bestellten digitalen Dateien zum Download. Anzahl, Auflösung und Lizenzumfang der gelieferten Dateien ergeben sich aus der jeweiligen Bestellung und den auf dem Portal angegebenen Lizenzbedingungen."
+msgstr "Vertragsgegenstand ist die Übertragung einfacher, nicht ausschließlicher Nutzungsrechte an fotografischen Werken (Lizenzierung) sowie die Bereitstellung der bestellten digitalen Dateien zum Download. Anzahl, Auflösung und Lizenzumfang der gelieferten Dateien ergeben sich aus der jeweiligen Bestellung und den auf dem Portal angegebenen Lizenzbedingungen."
 
 #: src/ui/ContractSignView.tsx
 msgid "Vertragsinhalt"
@@ -4958,9 +5114,22 @@ msgstr "Weiter →"
 msgid "Weiter als {inviteName}"
 msgstr "Weiter als {inviteName}"
 
+#: src/ui/Impressum.tsx
+msgid "Weitere rechtliche Informationen"
+msgstr "Weitere rechtliche Informationen"
+
+#: src/ui/LicenseTerms.tsx
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Weitere rechtliche Informationen:"
+msgstr "Weitere rechtliche Informationen:"
+
 #: src/ui/Privacy.tsx
 msgid "Wenn Sie Bilder aus unseren Galerien herunterladen, dokumentieren wir diesen Vorgang in einer internen Datenbank (Audit-Log), um den Zugriff auf unsere urheberrechtlich geschützten Werke nachvollziehen zu können. Dabei speichern wir Ihren Namen (sofern angegeben) und den Zeitpunkt des Downloads."
 msgstr "Wenn Sie Bilder aus unseren Galerien herunterladen, dokumentieren wir diesen Vorgang in einer internen Datenbank (Audit-Log), um den Zugriff auf unsere urheberrechtlich geschützten Werke nachvollziehen zu können. Dabei speichern wir Ihren Namen (sofern angegeben) und den Zeitpunkt des Downloads."
+
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, einschließlich der Lieferkosten, unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf bei uns eingegangen ist. Für die Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart."
+msgstr "Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, einschließlich der Lieferkosten, unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf bei uns eingegangen ist. Für die Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart."
 
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -4993,6 +5162,21 @@ msgstr "Wichtiger Hinweis zu Metadaten:"
 #: src/ui/management/components/InviteModal.tsx
 msgid "Widerrufen"
 msgstr "Widerrufen"
+
+#: src/ui/Impressum.tsx
+msgid "Widerrufs-, AGB- und Datenschutzinformationen finden Sie auf den folgenden Seiten:"
+msgstr "Widerrufs-, AGB- und Datenschutzinformationen finden Sie auf den folgenden Seiten:"
+
+#: src/ui/components/Sidebar.tsx
+#: src/ui/Impressum.tsx
+#: src/ui/LicenseTerms.tsx
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Widerrufsbelehrung"
+msgstr "Widerrufsbelehrung"
+
+#: src/ui/Widerrufsbelehrung.tsx
+msgid "Widerrufsrecht"
+msgstr "Widerrufsrecht"
 
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Wiederherstellen"

@@ -4,13 +4,15 @@ namespace App\Mail;
 
 use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
-use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Log;
 
 class InvoiceMail extends AbstractBrandAwareMailable
 {
     public $order;
+
     public $snapshot;
+
     public $additionalDocuments;
 
     public function __construct($order, $snapshot, $additionalDocuments = [])
@@ -48,21 +50,32 @@ class InvoiceMail extends AbstractBrandAwareMailable
                 'secondaryColor' => $brandConfig?->secondaryColor ?? '#A4B494',
             ]);
 
-            $mail = $this->subject('Ihre Rechnung ' . $this->snapshot->invoice_number)
-                        ->bcc($this->brandBcc())
-                        ->view('emails.custom')
-                        ->with([
-                            'subject' => 'Ihre Rechnung ' . $this->snapshot->invoice_number,
-                            'customBody' => '<p>Guten Tag ' . $this->snapshot->customer_details['name'] . ',</p><p>vielen Dank für Ihre Bestellung im Bild-Portal. Anbei erhalten Sie Ihre Rechnung als PDF-Dokument.</p><p>Ihre Lizenzen und Downloads sind ab sofort in Ihrem Account verfügbar.</p>',
-                            'logoUrl' => $this->brandLogoUrl(),
-                        ])
-                        ->attachData($pdf->output(), $this->snapshot->invoice_number . '.pdf', [
-                            'mime' => 'application/pdf',
-                        ]);
+            $customBody = '<p>Guten Tag '.$this->snapshot->customer_details['name'].',</p><p>vielen Dank für Ihre Bestellung im Bild-Portal. Anbei erhalten Sie Ihre Rechnung als PDF-Dokument.</p><p>Ihre Lizenzen und Downloads sind ab sofort in Ihrem Account verfügbar.</p>';
+
+            if ($this->order->withdrawal_waived) {
+                $consentAt = $this->order->withdrawal_consent_at
+                    ? $this->order->withdrawal_consent_at->format('d.m.Y, H:i \U\h\r')
+                    : null;
+                $consentSuffix = $consentAt !== null ? ' (erteilt am '.$consentAt.')' : '';
+                $customBody .= '<p>Sie haben beim Kauf dem sofortigen Download der digitalen Bilddaten ausdrücklich zugestimmt'.$consentSuffix.'. Gemäß § 18 Abs. 1 Z 11 Fern- und Auswärtsgeschäfte-Gesetz (FAGG) erlischt Ihr Rücktritts- bzw. Widerrufsrecht für digitale Inhalte, sobald mit ausdrücklicher Zustimmung vor Ablauf der Widerrufsfrist mit der Ausführung des Vertrags begonnen wurde. Für diese Bestellung besteht daher kein Widerrufs- bzw. Rücktrittsrecht mehr.</p>';
+            }
+
+            $mail = $this->subject('Ihre Rechnung '.$this->snapshot->invoice_number)
+                ->bcc($this->brandBcc())
+                ->view('emails.custom')
+                ->with([
+                    'subject' => 'Ihre Rechnung '.$this->snapshot->invoice_number,
+                    'customBody' => $customBody,
+                    'logoUrl' => $this->brandLogoUrl(),
+                ])
+                ->attachData($pdf->output(), $this->snapshot->invoice_number.'.pdf', [
+                    'mime' => 'application/pdf',
+                ]);
 
             foreach ($this->additionalDocuments as $filename => $pdfData) {
                 $mail->attachData($pdfData, $filename, ['mime' => 'application/pdf']);
             }
+
             return $mail;
         } finally {
             BrandRegistry::set($previousBrand);

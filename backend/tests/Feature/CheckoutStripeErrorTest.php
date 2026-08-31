@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Brand;
 use App\Mail\CustomMail;
 use App\Models\Gallery;
 use App\Models\Order;
@@ -9,8 +10,8 @@ use App\Models\Photo;
 use App\Models\User;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CheckoutService;
+use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
-use App\Enums\Brand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -29,7 +30,7 @@ class CheckoutStripeErrorTest extends TestCase
         parent::setUp();
         BrandRegistry::set(Brand::B2B);
         $this->service = new CheckoutService(new VolumeLicensingStrategy(
-            app(\App\Services\VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B)
+            app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B)
         ));
         Mail::fake();
     }
@@ -60,6 +61,7 @@ class CheckoutStripeErrorTest extends TestCase
             'billing_street' => 'Teststr. 1',
             'billing_zip' => '1010',
             'billing_city' => 'Wien',
+            'withdrawal_waived' => true,
         ]);
 
         $response = $this->service->processCheckout($request, $user, 'stripe');

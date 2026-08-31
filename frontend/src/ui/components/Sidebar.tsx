@@ -141,6 +141,10 @@ export default function Sidebar(props: SidebarProps) {
                     <a href={impressumUrl ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                         <span className="iconify mdi--open-in-new"></span> <Trans>Impressum & Datenschutz</Trans>
                     </a>
+                    <div className="mt-2 flex flex-col gap-1">
+                        <Link to="/widerruf" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity"><Trans>Widerrufsbelehrung</Trans></Link>
+                        <Link to="/license-terms" className="text-sm font-bold opacity-50 hover:opacity-100 transition-opacity"><Trans>AGB & Lizenzbedingungen</Trans></Link>
+                    </div>
                 </div>
                 {user && (
                     <div className="p-4 pt-0">
