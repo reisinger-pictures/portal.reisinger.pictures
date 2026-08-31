@@ -78,7 +78,7 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
         local rows = { spacing = f:control_spacing(), width = 700 }
 
         if props.error then
-            table.insert(rows, f:static_text { title = "Fehler beim Laden der Bewertungen.", text_color = LrView.color(0.8, 0, 0) })
+            table.insert(rows, f:static_text { title = "Fehler beim Laden der Bewertungen.", text_color = import 'LrColor'(0.8, 0, 0) })
         else
             table.insert(rows, f:static_text { title = "Beteiligte Personen", font = "<system/bold>" })
             table.insert(rows, f:spacer { height = 5 })
@@ -99,7 +99,7 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
                     readonly = true
                 })
             else
-                table.insert(rows, f:static_text { title = "Keine Personen mit Bewertungen.", text_color = LrView.color(0.5, 0.5, 0.5) })
+                table.insert(rows, f:static_text { title = "Keine Personen mit Bewertungen.", text_color = import 'LrColor'(0.5, 0.5, 0.5) })
             end
 
             table.insert(rows, f:spacer { height = 15 })
@@ -123,7 +123,7 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
                     readonly = true
                 })
             else
-                table.insert(rows, f:static_text { title = "Noch keine Bewertungen vorhanden.", text_color = LrView.color(0.5, 0.5, 0.5) })
+                table.insert(rows, f:static_text { title = "Noch keine Bewertungen vorhanden.", text_color = import 'LrColor'(0.5, 0.5, 0.5) })
             end
 
             table.insert(rows, f:spacer { height = 15 })
