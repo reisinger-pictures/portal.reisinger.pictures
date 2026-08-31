@@ -24,7 +24,8 @@ import CouponInput from './components/CouponInput';
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 const stripePromise = loadStripe(stripePublicKey);
 
-const checkoutSchema = z.object({
+// Schema-Factory (kein module-scope `t` — siehe frontend/AGENTS.md, Lingui-Regel)
+const createCheckoutSchema = () => z.object({
     billing_name: z.string().min(2, t`Name ist erforderlich`),
     billing_company: z.string().optional(),
     billing_street: z.string().min(3, t`Straße ist erforderlich`),
@@ -35,7 +36,7 @@ const checkoutSchema = z.object({
     withdrawal_waived: z.boolean().optional()
 });
 
-type CheckoutFormValues = z.infer<typeof checkoutSchema>;
+type CheckoutFormValues = z.infer<ReturnType<typeof createCheckoutSchema>>;
 
 export default function ClientCartView() {
     "use no memo";
@@ -57,6 +58,9 @@ export default function ClientCartView() {
     const [quoteToken, setQuoteToken] = useState<string | null>(null);
 
     const redirectStatus = searchParams.get('redirect_status');
+
+    const checkoutSchema = createCheckoutSchema();
+
     useEffect(() => {
         if (!redirectStatus) return;
         if (redirectStatus === 'succeeded') {
@@ -336,7 +340,7 @@ export default function ClientCartView() {
                                                 <input type="checkbox" {...register('withdrawal_waived')}
                                                        className={`checkbox mt-0.5 shrink-0 ${errors.withdrawal_waived ? 'checkbox-error' : 'checkbox-primary'}`}/>
                                                 <span className="label-text text-sm leading-tight">
-                                                    <Trans>Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt.</Trans>
+                                                    <Trans>Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download). Mir ist bekannt, dass mein Rücktritts- bzw. Widerrufsrecht damit vorzeitig erlischt.</Trans>
                                                 </span>
                                             </label>
                                         )}

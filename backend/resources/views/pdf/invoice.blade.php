@@ -66,6 +66,15 @@
                 {!! $snapshot->customer_details['custom_html_terms'] !!}
             </div>
         @endif
+        @if(!empty($snapshot->customer_details['withdrawal_consent']) && !empty($snapshot->customer_details['withdrawal_consent']['waived']))
+            <div style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 11px; color: #444;">
+                <strong>Widerrufsrecht bei digitalen Inhalten</strong>
+                <p style="margin: 6px 0;">{{ $snapshot->customer_details['withdrawal_consent']['text'] ?? '' }}</p>
+                @if(!empty($snapshot->customer_details['withdrawal_consent']['at']))
+                    <p style="margin: 4px 0;">Ihre Zustimmung wurde am {{ \Carbon\Carbon::parse($snapshot->customer_details['withdrawal_consent']['at'])->format('d.m.Y, H:i') }} Uhr erteilt.</p>
+                @endif
+            </div>
+        @endif
     </div>
 
     @include('pdf.footer', ['bankHolder' => $bankHolder, 'bankIban' => $bankIban, 'bankBic' => $bankBic])

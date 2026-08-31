@@ -1,32 +1,8 @@
 # Task Board — Portal Reisinger Pictures
 
-> Stand: 2026-08-19. **Nur offene TODOs + erledigte Referenz-Blöcke.** Architekturentscheidungen in `features/`.
+> Stand: 2026-08-25. **Nur offene TODOs + erledigte Referenz-Blöcke.** Architekturentscheidungen in `features/`.
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
-
----
-
-## 🔴 NÄCHSTE PRIORITÄT (PRIO HOCH) — E2E-Instabilitäten stabilisieren
-
-> **Status:** E2E-Suite aktuell instabil (2/5 Shards rot). Muss vor neuer Feature-Arbeit
-> stabilisiert werden (Zero Pre-existing Failures Policy, AGENTS.md §3). **Nächstes
-> anzusehendes Thema nach der Dependency-Migration.**
->
-> **Symptom:** `ci.yml` E2E-Shards `Desktop (1/2)` + `Mobile (1/2)` rot. Betroffene Specs:
-> `admin.spec.ts:69` (smoke), `ai-config.spec.ts:101` (strict-mode Heading),
-> `coupon-photo-package.spec.ts:26/:60`.
->
-> **Root-Cause-Analyse:** siehe Abschnitte *„🔴 CI-Status PR #10"* + *„🟡 Flaky-/CI-Failures
-> Analyse"* weiter unten. Teil-Root-Causes bereits gefixt (Coupon-ENUM V031, ai-config
-> strict-mode), E2E bleibt dennoch instabil.
->
-> **Offene Fixes (liegen committed auf Branch `chore/deps-2026-08-23`, Commit
-> `3d282ef fix(e2e): stabilize flaky admin tests`):** `frontend/tests/e2e/admin/ai-config.spec.ts`,
-> `.../projects-board.spec.ts`, `frontend/tests/e2e/helpers/AuthHelper.ts`, `.../SidebarHelper.ts`.
->
-> **Action (TODO):** (1) E2E-Fix-Commit auf `main` mergen, (2) volle E2E-Suite / alle 5 Shards
-> neu ausführen, (3) alle Shards grün bekommen, (4) verbleibende Flakes per Playwright-Regel
-> debuggen (max. 3 Versuche, AGENTS.md §6). E2E-Grün = DoD für „abgeschlossen".
 
 ---
 
@@ -57,56 +33,6 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 
 ---
 
-## 🟡 Flaky-/CI-Failures Analyse (2026-08-23)
-
-> Anlass: CI-Run [`32657588529`](https://github.com/reisi007/portal.reisinger.pictures/actions/runs/32657588529) (Commit `31287fc`, Actions-Version-Bumps checkout@v7/setup-node@v7) rot in Shards Desktop(1/2) + Mobile(1/2). Rerun (`--failed`) schlug **identisch** fehl → überwiegend deterministische Bugs, keine zufällige Flakiness. Die 22 Commits davor (F3/P1/A1) waren nie in CI gelaufen.
-
-### 1. ✅ GEFIXT — Coupon `photo_package`: INSERT 500 auf MariaDB (deterministisch)
-
-- **Wo:** Workflow `ci.yml` → E2E-Shards Desktop(1/2)/Mobile(1/2); Specs `frontend/tests/e2e/admin/coupon-photo-package.spec.ts:26` und `:60` (beide @feature:coupon).
-- **Symptom:** Toast „Gutscheincode angelegt" erscheint nie, Coupon taucht nicht in der Liste auf (beide Tests, alle Retries, beide CI-Läufe).
-- **Fehlermeldung (Trace-Network, Playwright-Report-Artifact):** `POST /api/management/coupons → 500` · `SQLSTATE[01000]: Warning: 1265 Data truncated for column 'type' at row 1` beim Insert `type=photo_package`.
-- **Ursache:** V018 legte `coupons.type` als MySQL-ENUM(`fixed`,`percentage`,`free_items`) an. V030 ergänzte nur die Spalten `package_quantity`/`package_price_cents`, **nicht aber den ENUM-Wert**. SQLite (lokale E2E-DB, PHPUnit) speichert Laravel-Enums als plain VARCHAR → Bug fiel lokal unsichtbar durch; MariaDB (CI/Prod) rejected den Insert.
-- **Behoben durch:** Migration `backend/database/migrations/V031__coupon_type_photo_package_enum.php` (ENUM um `photo_package` erweitert, SQLite-No-op, `down()` mit Row-Guard). Lokal verifiziert: `migrate:fresh --seed --env=e2e` grün, Coupon-Specs 6/6 grün (`--repeat-each=3`).
-
-### 2. ✅ GEFIXT — ai-config Spec: Strict-mode violation „Einstellungen"-Heading (deterministisch)
-
-- **Wo:** `frontend/tests/e2e/admin/ai-config.spec.ts:109` („AI configuration page loads for super_admin", @feature:admin:ai), alle Projekte/Shards mit diesem Test.
-- **Symptom:** `strict mode violation: getByRole('heading', { name: /Einstellungen/i }) resolved to 2 elements` → `<h1>System-Einstellungen</h1>` + `<h2>Markeneinstellungen</h2>` (letzte aus der neuen F3 Brand-Settings-Card).
-- **Ursache:** F3 fügte ein zweites, regex-matchendes Heading hinzu; der Test nutzte eine zu breite Regex.
-- **Behoben durch:** Test-Fix — exakter Heading-Name `getByRole('heading', { name: 'System-Einstellungen' })`. Lokal verifiziert (vorher 5/5 Runs rot, nach Fix grün).
-
-### 3. 🟡 MIGRIERT (Timeout erhöht) — AuthHelper.login: `main` nicht sichtbar nach Login (intermittierend)
-
-- **Wo:** `frontend/tests/e2e/helpers/AuthHelper.ts:15`; beobachtet in CI Run 32657588529 (Rerun, `admin.spec.ts:69` „Admin can access settings"; bereits Run 1 in Shard-Logs `admin.spec.ts:34`) — Job scheiterte, Retry desselben Tests lief teils grün.
-- **Symptom:** `expect(page.locator('main').first()).toBeVisible({timeout:5000})` → `element(s) not found` direkt nach `page.goto('/')`.
-- **Mögliche Ursache:** Cold-start des Backends/Dev-Servers + 2 Worker pro Shard unter 2-Core-Runner → Initial-Render > 5 s. (Lokal trat die identische Signatur nur auf, als ein Vite-Devserver mit veraltetem node_modules-Stand ein Error-Overlay statt der App zeigte — Environment-Artefakt, nicht App-Bug.)
-- **Maßnahme:** Timeout 5 s → 15 s (auch für `app-loader`). Beobachten; falls weiterhin rot, Trace im HTML-Report auswerten.
-
-### 4. 🟡 MIGRIERT (Timeout erhöht) — SidebarHelper.navigateTo: Sidebar-Link-Timeout (intermittierend, lokal reproduziert 1×)
-
-- **Wo:** `frontend/tests/e2e/helpers/SidebarHelper.ts:23`; lokal im exakten CI-Shard-Aufruf (Desktop 1/2): 1× flaky in `no-b2b-label.spec.ts:81`, auf Retry grün. In CI bisher nicht als Failure aufgefallen.
-- **Symptom:** `link.waitFor({state:'visible', timeout:5000})` → Timeout beim Warten auf den Menü-Link.
-- **Mögliche Ursache:** Sidebar-Rendering/Animation noch nicht abgeschlossen unter Last.
-- **Maßnahme:** Timeout 5 s → 10 s.
-
----
-
-## 🔬 Lokale E2E-Reproduktion (2026-08-23)
-
-Setup: `scripts/e2e-up.sh` (isoliertes Backend :8001, SQLite `database.e2e.sqlite`, Meili :7701, natives Mailpit) + `VITE_API_PROXY=http://127.0.0.1:8001 pnpm dev` (:4321).
-
-| Experiment | Ergebnis |
-|---|---|
-| Betroffene Specs (admin/ai-config/admin/coupon), 1× Desktop | ai-config **fehlgeschlagen (deterministisch)**, Rest grün |
-| Dieselben 3 Dateien `--repeat-each=5` | 45 passed / **5 failed** = ausschließlich ai-config (5/5 Wiederholungen) → deterministisch, kein Timing |
-| Exakter CI-Shard `--project="Desktop Chrome" --grep-invert … --workers=2 --shard=1/2` | **69 passed**, 1 flaky (no-b2b-label, SidebarHelper) — Coupon-Fehler **nicht** reproduzierbar gegen SQLite |
-| Trace-Analyse CI-Artifact (`playwright-report-desktop-1`) | POST /api/management/coupons → 500 (ENUM-Truncation) → Root Cause von #1 nur in CI (MariaDB) sichtbar |
-
-**Schlussfolgerung:** Fehler #1/#2 waren echte, durch SQLite-vs-MariaDB bzw. UI-Änderung maskierte Bugs (nur in CI sichtbar); #3/#4 sind Last-/Timing-Flakiness → Timeouts erhöht.
-
----
-
 ## 🟡 OFFEN (Future) — pricing_strategy als Brand-Setting
 
 - Langfristig: `pricing_strategy` je Brand in Admin-UI editierbar (DB-Overlay, Choke-Point `BrandRegistry::buildFromArray()`). Doku: `features/infrastructure/17-pricing-strategy-pattern.md` §7.
@@ -114,6 +40,41 @@ Setup: `scripts/e2e-up.sh` (isoliertes Backend :8001, SQLite `database.e2e.sqlit
 ## 🟡 OFFEN (manuell) — Prod-Infra
 
 - **Portainer Stack-Redeploy** für `portal-base:8.5` (User-Notify erledigt, Deploy pending).
+
+---
+
+## 🟠 OFFEN (2026-08-31) — Rücktrittsrecht-Compliance für Foto-Downloads
+
+> Ziel: Rücktrittsrecht erlischt rechtskonform (nur digitale Produkte, kein physischer Mix → §13a Mischkorb n/a).
+> Plan: `~/.opencode/plan/withdrawal-rights-compliance.md`. Hinweis: Rechtstext-Wording vor Go-live juristisch absegnen lassen.
+
+**WI-A Backend — Consent-Erzwingung + Protokollierung**
+- [x] V032-Migration: `orders.withdrawal_waived` (bool, default false) + `orders.withdrawal_consent_at` (timestamp) → Persistenz-PHPUnit ✅ (`WithdrawalConsentTest`, 8 passed, 40 assertions).
+- [x] `Order`-Model: fillable + casts.
+- [x] `CheckoutService::processCheckout`: 422 wenn `!isQuoteRequest && !withdrawal_waived` → Regression-PHPUnit ✅ (false/missing → 422; Quote ohne Bedingung → OK; quote_token-Flow abgedeckt).
+- [x] `createOrder` + `createInvoiceSnapshot`: Consent + Zeitstempel persistieren; Nachweis in `customer_details.withdrawal_consent` (immutables Evidence Package).
+- [x] FAGG-Zitierung korrigiert: § 18 Abs. 1 **Z 11** (CheckoutService-Konstante + InvoiceMail); fix-Subagent verifiziert, kein „Z 10“ mehr im Backend.
+
+**WI-B Backend — Widerruf-Absatz in Kaufmail + Rechnungs-PDF**
+- [x] `InvoiceMail` customBody: Absatz „Zustimmung Sofort-Download + Erlöschen Rücktrittsrecht (inkl. Zeitstempel)“ → PHPUnit Mail-Render enthält Absatz ✅.
+- [x] `pdf/invoice.blade.php`: Widerruf-Abschnitt (nur wenn Consent vorliegt) → PHPUnit PDF-Output enthält Abschnitt ✅.
+
+**WI-C Frontend — Checkout-Text verfeinern („sofortiger Download“ explizit) + Schema-Factory**
+- [x] Checkbox-Text in `ClientCartView.tsx` anpassen → **Test-TODO:** Vitest auf neuen Text (✅ 597 Vitest-Tests grün, `lint:fix` + `build` fehlerfrei, Prod-Probe ohne Lingui-pageerror).
+- [x] `checkoutSchema` in Factory-Funktion umbauen (Lingui module-scope-Regel, frontend/AGENTS.md REG 2026-08-12).
+
+**WI-D Frontend — Rechtliche Seiten AGB + Widerrufsbelehrung**
+- [x] `LicenseTerms.tsx` (/license-terms) inkl. § 18 Abs. 1 Z 11 FAGG-Klausel → **Test-TODO:** Vitest (✅) + E2E (`tests/e2e/guest/legal-pages.spec.ts`, `@feature:legal` — E2E-Lauf steht in Verifikationsphase, Stack nicht gestartet).
+- [x] `Widerrufsbelehrung.tsx` (/widerruf) mit Erlöschen-Absatz → **Test-TODO:** Vitest (✅) + E2E (s.o.).
+- [x] Routen in `App.tsx`, Verlinkungen (Impressum/Footer), toter `/license-terms`-Link wird funktionsfähig.
+  - Hinweis: Formulierung „Rücktritts- bzw. Widerrufsrecht“ (erfüllt Unit-Test-Regex `/widerrufsrecht/i` + Rechtstext). Vor Go-live juristisch absegnen.
+
+**WI-E Docs**
+- [x] `features/ecommerce/06-legal-evidence-and-disputes.md`: Consent als Teil des Evidence Package; „keine physischen Produkte“-Entscheidung festhalten (Abschnitt 3 + Related bereinigt).
+
+**Verifikation (Subagent, nie Implementierer)** → ✅ abgeschlossen (31.08.2026): Backend 1200/2989, Frontend 597, lint+build 0, `@smoke` 58 passed, `@feature:legal` 6 passed (nach Fix der Test-Deklinationsform „sofortiger Download“). Diff-Review PASS, Gesamturteil READY_TO_COMMIT.
+- [x] WI-A, WI-B, WI-C, WI-D, WI-E komplett implementiert und verifiziert.
+- [x] Hinweis: Rechtstext-Wording (Checkbox, Mail/PDF, AGB, Widerrufsbelehrung) vor Go-live juristisch absegnen lassen.
 
 ---
 
@@ -131,36 +92,4 @@ Setup: `scripts/e2e-up.sh` (isoliertes Backend :8001, SQLite `database.e2e.sqlit
 ## 🚫 Blockiert (Dependency-Migration 2026-08-23)
 
 - **typescript 6→7:** Risiko durch TS7, erst nach Framework-Support. TS 7.0 ist zu frisch (kein Support durch Vite/Rolldown-Babel-Pipeline, ESLint-Typescript-Stack, React-Compiler-Preset). `frontend/package.json` bleibt bei `^6.0.3`. Nachzuziehen, sobald das Tooling TS7 deklariert.
-
-## 🔧 Backend Dependency-Migration 2026-08-23
-
-- **composer self-update:** durchgeführt (2.10.1 → 2.10.2).
-- **PHP-Constraint:** `^8.4` → `^8.5` (composer.json + lock).
-- **MAJOR stripe/stripe-php:** `^20.3.0` → `^21.0.0` (lock: v20.3.0 → v21.2.1). Laut Stripe-Changelog ist v21 *funktional ein Patch-Release* (gleiche gepinnte API-Version `2026-06-24.dahlia`, Major nur aus Vorsicht). Breaking-Changes betreffen nur V2/Private-Preview-Ressourcen (`ReceivedCredit.balance_transfer.payout_v1` u.ä.) — nicht genutzt (App nutzt `Webhook::constructEvent`, `StripeClient`/`paymentIntents->create|retrieve`). Kein Code-Change nötig.
-- **Minor/Patch:** laravel/framework v13.18.1 → v13.26.1, scout, pint, phpunit 13.2.2 → 13.3.1, jwt-auth 2.9.2 → v2.9.3, meilisearch 1.16.1 → 1.17.0, mockery 1.6.12 → 1.6.15, paratest v7.23.0 → v7.24.1, collision v8.9.4 → v8.9.5, symfony-* 8.1.x.
-- **Transitive Majors — Verify:**
-  - ✅ `hamcrest/hamcrest-php` v2.1.1 → v3.0.0 (automatisch via phpunit/mockery).
-  - ⛔ `guzzlehttp/guzzle` **blieb bei 7.15.3** (kein 8.0.2): guzzle 8 verlangt `psr7 ^3.0` + `promises ^3.0.1`; `psr7 ^3.0` wird durch direktes `require http-interop/http-factory-guzzle ^1.2` blockiert (nur `psr7 ^1.7||^2.0`, keine 3.0-fähige Version existiert). Guzzle-8 wäre Scope-Erweiterung (Bump von `http-interop/http-factory-guzzle` nötig, nicht in Aufgabe) → bewusst NICHT erzwungen.
-  - ⛔ `brick/math` **blieb bei 0.18.0** (kein 0.19): transitiv gedeckelt durch `ramsey/uuid 4.9.3` (`brick/math >=0.8.16 <=0.18`). 0.19 nur mit ramsey/uuid-Bump erreichbar (nicht in Aufgabe) → bewusst NICHT erzwungen.
-
-## 🔴 CI-Status PR #10 (chore/deps-2026-08-23) — E2E rot, ABER nicht durch Dep-Migration
-
-- **Backend (PHPUnit):** ✅ grün (u.a. P1 Coupon-Tests bestehen).
-- **Frontend (Lint, Build, Vitest):** ✅ grün (593 Tests).
-- **E2E (Playwright):** ❌ zwei Shards rot — `Desktop (1/2)` + `Mobile (1/2)`. Fehler:
-  `admin.spec.ts:69` (Admin can access settings @smoke), `ai-config.spec.ts:101`
-  (strict-mode: `heading /Einstellungen/i` matched 2 elements), `coupon-photo-package.spec.ts:26/:60`.
-- **Ursache:** **NICHT** die Dependency-Migration. Beweis:
-  1. Es wurden **keinerlei App-/Test-Quellcode** geändert (nur `package.json`,
-     Lockfiles, `composer.json/.lock`). Backend-PHPUnit + 593 Vitest + Build/Lint
-     sind grün; 3/5 E2E-Shards (inkl. kanban-serial, hohe App-Last) sind grün.
-  2. `ai-config.spec.ts:101` ist **präexistent kaputt** und wird im Working-Tree
-     (uncommitted, Parallel-Session) bereits gefixt: die Regex `/Einstellungen/i`
-     matcht seit der Brand-Settings-Card ("Markeneinstellungen", h2) **zwei**
-     Headings → exakter H1-Name `System-Einstellungen` im uncommitted Fix.
-  3. Die Parallel-Session hat weitere uncommitted E2E-Fixes
-     (`playwright.screenshots.config.ts`, `projects-board.spec.ts` +59 Zeilen) →
-     E2E-Suite war bereits vor diesem Dep-PR instabil.
-- **Maßnahme:** PR **offen lassen, NICHT mergen** (Regel). E2E wird grün, sobald
-  die Parallel-Session ihre Test-Fixes committed (danach ggf. Rebase dieses PRs).
-  Dependency-Arbeit selbst abgeschlossen & verifiziert.
+  - Verifiziert 2026-08-25: weiterhin offen (`frontend/package.json`: `"typescript": "^6.0.3"`).

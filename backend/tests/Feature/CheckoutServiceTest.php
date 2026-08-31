@@ -6,13 +6,13 @@ use App\Contracts\PricingStrategy;
 use App\Enums\Brand;
 use App\Models\Coupon;
 use App\Models\Gallery;
-use App\Models\GalleryGroup;
 use App\Models\InvoiceSnapshot;
 use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
 use App\Models\Order;
-use App\Models\Photo;
 use App\Models\Org;
+use App\Models\Photo;
+use App\Models\Setting;
 use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Services\CheckoutService;
@@ -21,32 +21,34 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+use PHPUnit\Framework\Attributes\Group;
+use Stripe\ApiRequestor;
+use Stripe\HttpClient\ClientInterface;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
-#[\PHPUnit\Framework\Attributes\Group('mailpit')]
+#[Group('mailpit')]
 class CheckoutServiceTest extends TestCase
 {
-    use RefreshDatabase, MailpitAssertions;
+    use MailpitAssertions, RefreshDatabase;
 
     private CheckoutService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new CheckoutService(new ScopeLicensingStrategy());
+        $this->service = new CheckoutService(new ScopeLicensingStrategy);
 
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
+        Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
     }
 
     protected function tearDown(): void
     {
         // Prozessglobalen Stripe-Client zurücksetzen, damit andere Tests nicht verunreinigt werden
         try {
-            \Stripe\ApiRequestor::setHttpClient(null);
+            ApiRequestor::setHttpClient(null);
         } catch (\Throwable $e) {
             // ignore
         }
@@ -68,6 +70,7 @@ class CheckoutServiceTest extends TestCase
             'billing_zip' => '1234',
             'billing_city' => 'Wien',
             'quote_message' => $quoteMessage,
+            'withdrawal_waived' => true,
         ], $billing);
 
         return Request::create('/', 'POST', $payload);
@@ -80,11 +83,11 @@ class CheckoutServiceTest extends TestCase
     {
         [$user, $photo, $useCase] = $this->setupPaidItem();
 
-        $clientMock = $this->createMock(\Stripe\HttpClient\ClientInterface::class);
+        $clientMock = $this->createMock(ClientInterface::class);
         $clientMock->expects($this->once())->method('request')->willReturnCallback(function ($method, $absUrl, $headers, $params, $hasFile) {
             return [json_encode(['id' => 'pi_test_123', 'client_secret' => 'sec_test_123']), 200, []];
         });
-        \Stripe\ApiRequestor::setHttpClient($clientMock);
+        ApiRequestor::setHttpClient($clientMock);
 
         try {
             $response = $this->service->processCheckout(
@@ -105,7 +108,7 @@ class CheckoutServiceTest extends TestCase
             $this->assertSame('pi_test_123', $order->stripe_payment_intent_id);
             $this->assertNotNull($order->ip_address);
         } finally {
-            \Stripe\ApiRequestor::setHttpClient(null);
+            ApiRequestor::setHttpClient(null);
         }
     }
 
@@ -296,11 +299,11 @@ class CheckoutServiceTest extends TestCase
         $user->org_id = $org->id;
         $user->save();
 
-        $clientMock = $this->createMock(\Stripe\HttpClient\ClientInterface::class);
+        $clientMock = $this->createMock(ClientInterface::class);
         $clientMock->expects($this->once())->method('request')->willReturnCallback(function () {
             return [json_encode(['id' => 'pi_test_imm', 'client_secret' => 'sec_test_imm']), 200, []];
         });
-        \Stripe\ApiRequestor::setHttpClient($clientMock);
+        ApiRequestor::setHttpClient($clientMock);
 
         try {
             $response = $this->service->processCheckout(
@@ -315,7 +318,7 @@ class CheckoutServiceTest extends TestCase
             $this->assertEquals('pending_payment', $order->status);
             $this->assertSame('pi_test_imm', $order->stripe_payment_intent_id);
         } finally {
-            \Stripe\ApiRequestor::setHttpClient(null);
+            ApiRequestor::setHttpClient(null);
         }
     }
 
@@ -345,9 +348,9 @@ class CheckoutServiceTest extends TestCase
         [$user, $photo, $useCase] = $this->setupPaidItem();
 
         // Stripe-Client wirft Exception — passiert NACH dem DB::transaction-Commit
-        $clientMock = $this->createMock(\Stripe\HttpClient\ClientInterface::class);
+        $clientMock = $this->createMock(ClientInterface::class);
         $clientMock->expects($this->once())->method('request')->willThrowException(new \RuntimeException('Stripe down'));
-        \Stripe\ApiRequestor::setHttpClient($clientMock);
+        ApiRequestor::setHttpClient($clientMock);
 
         try {
             $response = $this->service->processCheckout(
@@ -359,7 +362,7 @@ class CheckoutServiceTest extends TestCase
             $this->assertEquals(502, $response->status());
             $this->assertSame('Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.', $response->getData(true)['error']);
         } finally {
-            \Stripe\ApiRequestor::setHttpClient(null);
+            ApiRequestor::setHttpClient(null);
         }
 
         // Order/Snapshot sind erhalten, da die DB-Transaktion vor dem Stripe-Call committed wurde
@@ -624,5 +627,4 @@ class CheckoutServiceTest extends TestCase
             BrandRegistry::reset();
         }
     }
-
 }

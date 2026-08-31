@@ -36,7 +36,7 @@ class MixedCartPricingTest extends TestCase
         Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123']);
         Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
 
-        $this->service = new CheckoutService(new ScopeLicensingStrategy());
+        $this->service = new CheckoutService(new ScopeLicensingStrategy);
     }
 
     protected function tearDown(): void
@@ -74,6 +74,7 @@ class MixedCartPricingTest extends TestCase
             'billing_street' => 'Street',
             'billing_zip' => '1234',
             'billing_city' => 'City',
+            'withdrawal_waived' => true,
         ]);
 
         $response = $this->service->processCheckout($request, $user, 'invoice');
@@ -112,6 +113,7 @@ class MixedCartPricingTest extends TestCase
             'billing_street' => 'Street',
             'billing_zip' => '1234',
             'billing_city' => 'City',
+            'withdrawal_waived' => true,
         ]);
 
         $response = $this->service->processCheckout($request, $user, 'invoice');
@@ -141,6 +143,7 @@ class MixedCartPricingTest extends TestCase
             'billing_street' => 'Street',
             'billing_zip' => '1234',
             'billing_city' => 'City',
+            'withdrawal_waived' => true,
         ]);
 
         $response = $this->service->processCheckout($request, $user, 'invoice');
@@ -174,6 +177,7 @@ class MixedCartPricingTest extends TestCase
             'billing_street' => 'Street',
             'billing_zip' => '1234',
             'billing_city' => 'City',
+            'withdrawal_waived' => true,
         ]);
 
         $response = $this->service->processCheckout($request, $user, 'invoice');
@@ -205,6 +209,7 @@ class MixedCartPricingTest extends TestCase
             'billing_street' => 'Street',
             'billing_zip' => '1234',
             'billing_city' => 'City',
+            'withdrawal_waived' => true,
         ]);
 
         $response = $this->service->processCheckout($request, $user, 'invoice');
