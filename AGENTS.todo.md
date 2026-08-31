@@ -43,6 +43,15 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 
 ---
 
+## ✅ ERLEDIGT (2026-08-31, magenta) — Prod-Bildlieferung: Header-Mismatch (X-Sendfile vs X-Accel-Redirect)
+
+- **Fix:** `.env.production` → `PROXY_DELIVERY_HEADER=X-Accel-Redirect` + `PHOTO_STORAGE_PATH=/var/www/photos`; `deployment/docker-compose.yml` → Pass-through `PHOTO_STORAGE_PATH=${PHOTO_STORAGE_PATH}` ergänzt; Backend-Container neu deployt.
+- **Verifiziert:** alle `/api/media/*`-Größen (250/400/800/1200/2000) + Original-Branch liefern echte WebP/JPEG-Bytes (10–780 KB), kein `x-sendfile`/`x-accel-redirect`-Leak mehr; `/context`, `license-terms`, alle SPA-Chunks 200.
+- **Restbefund:** „Fehler persistierte“ war Browser-Cache der leeren `immutable`-Antworten (max-age 1 Jahr) + alte Bundle-Stände — nach Cache-Leeren + Voll-Refresh behoben.
+- **Hinweis:** `deployment/docker-compose.yml`-Änderung (1 Zeile, git-getrackt) liegt noch als `M` im Working Tree — Commit+Pull steht aus.
+
+---
+
 ## 🟠 OFFEN (2026-08-31) — Rücktrittsrecht-Compliance für Foto-Downloads
 
 > Ziel: Rücktrittsrecht erlischt rechtskonform (nur digitale Produkte, kein physischer Mix → §13a Mischkorb n/a).
