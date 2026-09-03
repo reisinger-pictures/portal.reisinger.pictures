@@ -2,9 +2,11 @@
 namespace App\AI\Providers;
 
 use App\AI\Contracts\AIProvider;
+use App\AI\Concerns\HasSessionHeader;
 
 class AnthropicProvider implements AIProvider
 {
+    use HasSessionHeader;
     public function buildRequest(string $model, array $messages): array
     {
         $system = null;
@@ -36,13 +38,13 @@ class AnthropicProvider implements AIProvider
         return $body;
     }
 
-    public function buildHeaders(): array
+    public function buildHeaders(?string $sessionId = null): array
     {
-        return [
+        return $this->withSessionHeader([
             'x-api-key' => config('services.ai.api_key'),
             'anthropic-version' => '2023-06-01',
             'Content-Type' => 'application/json',
-        ];
+        ], $sessionId);
     }
 
     public function getEndpoint(): string

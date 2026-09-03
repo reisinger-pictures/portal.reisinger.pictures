@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Setting;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Persists and reads per-brand overrides of brand configuration (F3, Option B — DB-Overlay).
@@ -104,6 +105,12 @@ class BrandSettingsService
      */
     public function overridesFor(string $brand): array
     {
+        // Tolerate a missing table (fresh :memory: test DBs without
+        // RefreshDatabase, pre-migration states): no overrides then.
+        if (!Schema::hasTable('settings')) {
+            return [];
+        }
+
         $rows = Setting::query()
             ->where('brand', $brand)
             ->where('key', 'like', self::KEY_PREFIX.'%')

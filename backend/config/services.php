@@ -48,6 +48,8 @@ return [
         'base_url' => env('AI_BASE_URL', 'https://api.openai.com/v1'),
         'api_key' => env('AI_API_KEY'),
         'model' => env('AI_MODEL', 'gpt-4o'),
+        'session_header' => env('AI_SESSION_HEADER', 'x-opencode-session'),
+        'session_prefix' => env('AI_SESSION_PREFIX', 'portal-'),
     ],
 
     'accounting_email' => env('ACCOUNTING_EMAIL'),

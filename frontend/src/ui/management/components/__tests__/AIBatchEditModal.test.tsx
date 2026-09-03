@@ -108,7 +108,7 @@ describe('AIBatchEditModal', () => {
         await user.click(generateButtons[0]);
 
         await vi.waitFor(() => {
-            expect(mockGenerateMetadata).toHaveBeenCalledWith('p1', '', '', expect.any(AbortSignal));
+            expect(mockGenerateMetadata).toHaveBeenCalledWith('p1', '', '', expect.any(AbortSignal), undefined);
         });
     });
 
@@ -135,7 +135,7 @@ describe('AIBatchEditModal', () => {
         await user.click(generateButtons[0]);
 
         await vi.waitFor(() => {
-            expect(mockGenerateMetadata).toHaveBeenCalledWith('p1', 'Global Context', 'Specific Context', expect.any(AbortSignal));
+            expect(mockGenerateMetadata).toHaveBeenCalledWith('p1', 'Global Context', 'Specific Context', expect.any(AbortSignal), undefined);
         });
     });
 
@@ -169,6 +169,12 @@ describe('AIBatchEditModal', () => {
         await vi.waitFor(() => {
             expect(mockGenerateMetadata).toHaveBeenCalledTimes(3);
         });
+
+        // All batch calls share one stable session id (prompt-cache routing).
+        const sessionIds = mockGenerateMetadata.mock.calls.map(call => call[4]);
+        expect(sessionIds[0]).toEqual(expect.any(String));
+        expect(sessionIds[1]).toBe(sessionIds[0]);
+        expect(sessionIds[2]).toBe(sessionIds[0]);
     });
 
     it('Speichern saves metadata and shows success toast', async () => {
