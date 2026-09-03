@@ -13,7 +13,13 @@ class LMStudioProvider implements AIProvider
         ];
     }
 
-    public function buildHeaders(): array
+    public function sessionHeaderName(): ?string
+    {
+        // Local inference needs no session affinity / sticky routing.
+        return null;
+    }
+
+    public function buildHeaders(?string $sessionId = null): array
     {
         $headers = [
             'Content-Type' => 'application/json',

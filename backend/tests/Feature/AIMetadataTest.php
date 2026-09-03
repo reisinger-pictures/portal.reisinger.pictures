@@ -337,4 +337,68 @@ class AIMetadataTest extends TestCase
 
         $response->assertStatus(502);
     }
+
+    public function test_generate_metadata_forwards_session_id_as_session_header()
+    {
+        $this->setupStorageWithPhotoImage();
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => '{"title": "T", "description": "D", "keywords": "k", "location": "", "detected_city": ""}'
+                    ]
+                ]]
+            ])
+        ]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata', [
+                'photo_id' => $this->photo->id,
+                'session_id' => 'batch-42',
+            ]);
+
+        $response->assertStatus(200);
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            return $request->header('x-opencode-session') === ['portal-batch-42'];
+        });
+    }
+
+    public function test_generate_metadata_omits_session_header_without_session_id()
+    {
+        $this->setupStorageWithPhotoImage();
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => '{"title": "T", "description": "D", "keywords": "k", "location": "", "detected_city": ""}'
+                    ]
+                ]]
+            ])
+        ]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata', [
+                'photo_id' => $this->photo->id,
+            ]);
+
+        $response->assertStatus(200);
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            return $request->header('x-opencode-session') === [];
+        });
+    }
+
+    public function test_generate_metadata_rejects_oversized_session_id()
+    {
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata', [
+                'photo_id' => $this->photo->id,
+                'session_id' => str_repeat('x', 129),
+            ]);
+
+        $response->assertStatus(422);
+    }
 }

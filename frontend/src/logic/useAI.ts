@@ -93,13 +93,14 @@ export function useAI() {
         photoId: string,
         globalContext: string,
         specificContext: string,
-        signal?: AbortSignal
+        signal?: AbortSignal,
+        sessionId?: string
     ): Promise<AIResponse> => {
         if (mode === 'server') {
             const res = await fetch('/api/ai/generate-metadata', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ photo_id: photoId, global_context: globalContext, specific_context: specificContext }),
+                body: JSON.stringify({ photo_id: photoId, global_context: globalContext, specific_context: specificContext, session_id: sessionId }),
                 credentials: 'include',
                 signal
             });

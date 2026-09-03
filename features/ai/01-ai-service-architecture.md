@@ -133,7 +133,8 @@ The AI subsystem uses a Strategy Pattern via `AIProvider` interface to support m
 interface AIProvider
 {
     public function buildRequest(string $model, array $messages): array;
-    public function buildHeaders(): array;
+    public function buildHeaders(?string $sessionId = null): array;
+    public function sessionHeaderName(): ?string;
     public function getEndpoint(): string;
     public function parseResponse(array $responseData): string;
     public function supportsJsonMode(): bool;
@@ -185,21 +186,50 @@ class AIProviderFactory
 | `isDisabled()` | state | `AI_ENABLED === 'DISABLED'` |
 | `isUnconfigured()` | state | `!isDisabled() && !isAvailable()` |
 | `isAvailable()` | state | `AI_ENABLED truthy && api_key present` |
-| `generateMetadata(Photo, context)` | vision | Photo file on disk, `loadAndCompressImage` |
-| `generateMetadataFromText(string)` | text | None |
+| `generateMetadata(Photo, context, sessionId?)` | vision | Photo file on disk, `loadAndCompressImage` |
+| `generateMetadataFromText(string, sessionId?)` | text | None |
 | `loadAndCompressImage(Photo)` | helper | GD library, `Storage::disk('photos')` |
-| `callAI(messages)` | transport | `AIProviderFactory::make()`, HTTP client, `config('services.ai.*')` |
+| `callAI(messages, sessionId?)` | transport | `AIProviderFactory::make()`, HTTP client, `config('services.ai.*')` |
+
+### 5.7 Session-affinity header (prompt-cache routing)
+
+Batch vision requests (`AIBatchEditModal` → "Alle generieren") share an identical
+prefix (system prompt + global context) and differ only per image. To let
+gateways reuse the cached prefix, the frontend generates **one UUID per batch
+run** and sends it as `session_id`; the backend forwards it as an HTTP header:
+
+```
+AIBatchEditModal (handleGenerateAll → crypto.randomUUID())
+  → useAI.generateMetadata(..., sessionId)
+  → POST /api/ai/generate-metadata { ..., session_id }
+  → AIController → AIService::generateMetadata(..., $sessionId)
+  → AIProvider::buildHeaders($sessionId) → {session_header}: {prefix}{id}
+```
+
+- `AIProvider::sessionHeaderName(): ?string` returns the provider-specific
+  header name, or `null` when the provider needs no session affinity
+  (`LMStudioProvider`). `OpenAIProvider` and `AnthropicProvider` share the
+  `HasSessionHeader` trait and default to `x-opencode-session` (OpenCode Go).
+- The header name is configurable per deployment via `AI_SESSION_HEADER`
+  (empty value disables the header); the value prefix via `AI_SESSION_PREFIX`
+  (default `portal-`). Values are sanitized to `[A-Za-z0-9._-]` and clamped to
+  128 chars.
+- Without a `session_id` no session header is sent at all (no generated
+  fallback); `generate-metadata-text` accepts an optional `session_id` but the
+  UI does not send one (single text-only request, no batch prefix to reuse).
 
 ## 6. Configuration
 
 ```php
 // config/services.php
 'ai' => [
-    'enabled'  => env('AI_ENABLED', false),           // boolean (true|false)
-    'type'     => env('AI_TYPE', 'openai'),            // openai|anthropic|lmstudio
-    'base_url' => env('AI_BASE_URL', 'https://api.openai.com/v1'),
-    'api_key'  => env('AI_API_KEY'),
-    'model'    => env('AI_MODEL', 'gpt-4o'),
+    'enabled'        => env('AI_ENABLED', false),           // boolean (true|false)
+    'type'           => env('AI_TYPE', 'openai'),            // openai|anthropic|lmstudio
+    'base_url'       => env('AI_BASE_URL', 'https://api.openai.com/v1'),
+    'api_key'        => env('AI_API_KEY'),
+    'model'          => env('AI_MODEL', 'gpt-4o'),
+    'session_header' => env('AI_SESSION_HEADER', 'x-opencode-session'), // '' disables
+    'session_prefix' => env('AI_SESSION_PREFIX', 'portal-'),
 ],
 ```
 

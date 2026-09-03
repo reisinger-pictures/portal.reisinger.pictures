@@ -31,6 +31,7 @@ class AIController extends Controller
             'photo_id' => 'required|string|exists:photos,id',
             'global_context' => 'nullable|string|max:1000',
             'specific_context' => 'nullable|string|max:1000',
+            'session_id' => 'nullable|string|max:128',
         ]);
 
         $photo = Photo::with('gallery')->findOrFail($request->photo_id);
@@ -44,7 +45,8 @@ class AIController extends Controller
             $result = $this->aiService->generateMetadata(
                 $photo,
                 $request->global_context ?? '',
-                $request->specific_context ?? null
+                $request->specific_context ?? null,
+                $request->session_id
             );
             return response()->json($result);
         } catch (\RuntimeException $e) {
@@ -61,12 +63,14 @@ class AIController extends Controller
         $request->validate([
             'text_input' => 'required|string|max:2000',
             'global_context' => 'nullable|string|max:1000',
+            'session_id' => 'nullable|string|max:128',
         ]);
 
         try {
             $result = $this->aiService->generateMetadataFromText(
                 $request->text_input,
-                $request->global_context ?? ''
+                $request->global_context ?? '',
+                $request->session_id
             );
             return response()->json($result);
         } catch (\RuntimeException $e) {

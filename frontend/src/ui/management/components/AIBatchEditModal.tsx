@@ -101,7 +101,7 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
 
     if (!isOpen) return null;
 
-    const processRow = async (index: number, currentRows: RowState[], signal?: AbortSignal): Promise<RowState[]> => {
+    const processRow = async (index: number, currentRows: RowState[], signal?: AbortSignal, sessionId?: string): Promise<RowState[]> => {
         const row = currentRows[index];
         const photo = photos.find(p => p.id === row.photoId);
         if (!photo || !photo.url) return currentRows;
@@ -111,7 +111,7 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
         setRows(updatedRows);
 
         try {
-            const aiData = await generateMetadata(row.photoId, globalContext, row.specificContext, signal);
+            const aiData = await generateMetadata(row.photoId, globalContext, row.specificContext, signal, sessionId);
             let locData = {
                 location: aiData.location || row.location,
                 city: aiData.detected_city || row.city,
@@ -180,11 +180,14 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
     const handleGenerateAll = async () => {
         setIsGeneratingAll(true);
         setProgress(0);
+        // One stable session id per batch run: the provider reuses the cached
+        // system prompt + global context prefix across all images in the batch.
+        const batchSessionId = crypto.randomUUID();
         let currentRows = [...rows];
         for (let i = 0; i < currentRows.length; i++) {
             if (abortControllerRef.current?.signal.aborted) break;
             if (!currentRows[i].title) {
-                currentRows = await processRow(i, currentRows, abortControllerRef.current?.signal);
+                currentRows = await processRow(i, currentRows, abortControllerRef.current?.signal, batchSessionId);
             }
             setProgress(Math.round(((i + 1) / currentRows.length) * 100));
         }

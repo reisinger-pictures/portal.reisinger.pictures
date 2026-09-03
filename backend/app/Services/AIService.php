@@ -32,7 +32,7 @@ class AIService
         return !empty(config('services.ai.api_key'));
     }
 
-    public function generateMetadata(Photo $photo, string $globalContext = '', ?string $specificContext = null): array
+    public function generateMetadata(Photo $photo, string $globalContext = '', ?string $specificContext = null, ?string $sessionId = null): array
     {
         $imageData = $this->loadAndCompressImage($photo);
 
@@ -48,10 +48,10 @@ class AIService
             ]]
         ];
 
-        return $this->callAI($messages);
+        return $this->callAI($messages, $sessionId);
     }
 
-    public function generateMetadataFromText(string $textInput, string $globalContext = ''): array
+    public function generateMetadataFromText(string $textInput, string $globalContext = '', ?string $sessionId = null): array
     {
         $systemPrompt = "Du bist ein professioneller Senior-Bildredakteur für eine internationale Premium-Stockfoto-Agentur. Deine Aufgabe ist die präzise, objektive und maximal markttaugliche Verschlagwortung (Keywording) und Beschreibung von Bildern basierend auf einer Textbeschreibung.\n\nREGELN FÜR METADATEN:\n1. TITEL: SEO-optimiert, prägnant, 70-150 Zeichen.\n2. BESCHREIBUNG: Beantworte journalistisch W-Fragen in 1-3 flüssigen Sätzen.\n3. KEYWORDS: Generiere exakt 20-30 Keywords. Trenne strikt mit Komma.\n4. LOCATION: Basierend auf der Beschreibung.\n5. FORMAT: Antworte AUSSCHLIESSLICH im validen JSON-Format ohne Markdown-Wrapper.";
 
@@ -62,10 +62,10 @@ class AIService
             ['role' => 'user', 'content' => $userPrompt]
         ];
 
-        return $this->callAI($messages);
+        return $this->callAI($messages, $sessionId);
     }
 
-    private function callAI(array $messages): array
+    private function callAI(array $messages, ?string $sessionId = null): array
     {
         $provider = app(AIProviderFactory::class)->make();
 
@@ -77,7 +77,7 @@ class AIService
             $requestBody['response_format'] = ['type' => 'json_object'];
         }
 
-        $response = Http::withHeaders($provider->buildHeaders())
+        $response = Http::withHeaders($provider->buildHeaders($sessionId))
             ->timeout(120)
             ->post(rtrim(config('services.ai.base_url'), '/') . $provider->getEndpoint(), $requestBody);
 

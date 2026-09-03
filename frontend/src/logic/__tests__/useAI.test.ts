@@ -145,6 +145,25 @@ describe('useAI — generateMetadata server mode', () => {
         });
     });
 
+    it('forwards sessionId as session_id for batch prompt-cache routing', async () => {
+        mockGenerateMetadata({ title: 'Test', description: 'Desc', keywords: 'kw', location: '', detected_city: '' });
+
+        const { result } = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+
+        await result.current.generateMetadata('photo-1', 'Event', 'Main subject', undefined, 'batch-42');
+
+        const call = vi.mocked(fetch).mock.calls[1];
+        expect(call[0]).toBe('/api/ai/generate-metadata');
+        const body = JSON.parse(call[1]!.body as string);
+        expect(body).toEqual({
+            photo_id: 'photo-1',
+            global_context: 'Event',
+            specific_context: 'Main subject',
+            session_id: 'batch-42',
+        });
+    });
+
     it('returns parsed AIResponse on success', async () => {
         const mockResponse = { title: 'AI Title', description: 'AI Desc', keywords: 'k1, k2', location: 'Vienna', detected_city: 'Vienna' };
         mockGenerateMetadata(mockResponse);
