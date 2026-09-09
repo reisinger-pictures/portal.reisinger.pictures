@@ -217,6 +217,12 @@ AIBatchEditModal (handleGenerateAll → crypto.randomUUID())
 - Without a `session_id` no session header is sent at all (no generated
   fallback); `generate-metadata-text` accepts an optional `session_id` but the
   UI does not send one (single text-only request, no batch prefix to reuse).
+- Every provider request additionally carries a **hardcoded** `User-Agent:
+  reisinger.pictures Portal` header, applied by all three providers in
+  `buildHeaders()` via the shared `HasUserAgent` concern. The value is
+  deliberately not configurable (no env/config key): OpenCode Go requires
+  proper client identification and blocks generic defaults such as Guzzle's
+  `GuzzleHttp/x.y`.
 
 ## 6. Configuration
 
@@ -237,6 +243,10 @@ AIBatchEditModal (handleGenerateAll → crypto.randomUUID())
 - OpenAI: `https://api.openai.com/v1`
 - Anthropic: `https://api.anthropic.com/v1`
 - LM Studio: `http://127.0.0.1:1234/v1`
+
+The `User-Agent` header (`reisinger.pictures Portal`) is intentionally absent
+from this config: it is hardcoded in `App\AI\Concerns\HasUserAgent` (OpenCode
+Go identification) and must not become an env key.
 
 ### 6.1 Status endpoint (`GET /api/ai/status`)
 

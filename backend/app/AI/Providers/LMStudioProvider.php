@@ -2,9 +2,12 @@
 namespace App\AI\Providers;
 
 use App\AI\Contracts\AIProvider;
+use App\AI\Concerns\HasUserAgent;
 
 class LMStudioProvider implements AIProvider
 {
+    use HasUserAgent;
+
     public function buildRequest(string $model, array $messages): array
     {
         return [
@@ -30,7 +33,7 @@ class LMStudioProvider implements AIProvider
             $headers['Authorization'] = 'Bearer ' . $apiKey;
         }
 
-        return $headers;
+        return $this->withUserAgent($headers);
     }
 
     public function getEndpoint(): string

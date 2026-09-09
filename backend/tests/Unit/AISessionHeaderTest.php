@@ -79,4 +79,28 @@ class AISessionHeaderTest extends TestCase
         $this->assertNull($provider->sessionHeaderName());
         $this->assertArrayNotHasKey('x-opencode-session', $provider->buildHeaders('sess-1'));
     }
+
+    public function test_openai_provider_sends_hardcoded_user_agent()
+    {
+        // UA must be independent of the session-header config (empty disables session affinity only).
+        config(['services.ai.session_header' => '']);
+
+        $headers = (new OpenAIProvider())->buildHeaders();
+
+        $this->assertSame('reisinger.pictures Portal', $headers['User-Agent']);
+    }
+
+    public function test_anthropic_provider_sends_hardcoded_user_agent()
+    {
+        $headers = (new AnthropicProvider())->buildHeaders('batch-42');
+
+        $this->assertSame('reisinger.pictures Portal', $headers['User-Agent']);
+    }
+
+    public function test_lmstudio_provider_sends_hardcoded_user_agent()
+    {
+        $headers = (new LMStudioProvider())->buildHeaders();
+
+        $this->assertSame('reisinger.pictures Portal', $headers['User-Agent']);
+    }
 }
