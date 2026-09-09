@@ -35,7 +35,7 @@
         "@lingui/vite-plugin": "^6.6.0",
         "@stripe/react-stripe-js": "^6.8.2",
         "@stripe/stripe-js": "^9.14.0",
-        "@tiptap/core": "^3.30.2",
+        "@tiptap/core": "^3.30.5",
         "@tiptap/extension-link": "^3.30.2",
         "@tiptap/extension-table": "^3.30.2",
         "@tiptap/extension-table-cell": "^3.30.2",
