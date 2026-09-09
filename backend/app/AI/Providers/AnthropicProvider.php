@@ -3,10 +3,12 @@ namespace App\AI\Providers;
 
 use App\AI\Contracts\AIProvider;
 use App\AI\Concerns\HasSessionHeader;
+use App\AI\Concerns\HasUserAgent;
 
 class AnthropicProvider implements AIProvider
 {
     use HasSessionHeader;
+    use HasUserAgent;
     public function buildRequest(string $model, array $messages): array
     {
         $system = null;
@@ -40,11 +42,11 @@ class AnthropicProvider implements AIProvider
 
     public function buildHeaders(?string $sessionId = null): array
     {
-        return $this->withSessionHeader([
+        return $this->withUserAgent($this->withSessionHeader([
             'x-api-key' => config('services.ai.api_key'),
             'anthropic-version' => '2023-06-01',
             'Content-Type' => 'application/json',
-        ], $sessionId);
+        ], $sessionId));
     }
 
     public function getEndpoint(): string

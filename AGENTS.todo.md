@@ -6,6 +6,21 @@
 
 ---
 
+## ✅ ERLEDIGT (2026-09-09) — OpenCode Go Compliance (User-Agent + Session-Header)
+
+> Mail 2026-09-07 (OpenCode Go): 1) kein missbräuchlicher Traffic, 2) proper User-Agent (kein generischer), 3) `x-opencode-session`-Header für Prompt-Caching.
+> Befund: 3) ✅ erfüllt (`HasSessionHeader`, default `x-opencode-session`, Prefix `portal-`, Tests grün), 1) ✅ kein Retry/Polling (ein Request pro `callAI()`, timeout 120), 2) ❌ fehlt (kein `User-Agent` in `buildHeaders`, fällt auf Guzzle-Default zurück).
+> Vorgabe User: User-Agent hart auf `reisinger.pictures Portal` setzen. Wenn nur das → gleich commit+push+CI grün, sonst manuelle Bestätigung.
+
+- [x] Backend: `User-Agent: reisinger.pictures Portal` hart in allen AI-Providern senden (zentral, nicht konfigurierbar) → PHPUnit Regression (OpenAI/Anthropic/LMStudio `buildHeaders` enthält Header, Feature `Http::assertSent` prüft Header)
+- [x] Doku: SOLL-Zustand in `features/ai/01-ai-service-architecture.md` (§5.7 / §6) + `.env.example`-Kommentar prüfen (kein neuer Env-Key)
+- [x] Verifikation (separater Subagent, nie Implementer): `php artisan test` grün, Diff-Review, dann commit+push+CI grün
+- Verifiziert 2026-09-09: volle Suite 1213 passed / 0 failed (3012 Assertions); `HasUserAgent`-Concern, 3 UA-Regressionstests; Urteil READY_TO_COMMIT.
+
+---
+
+---
+
 ## ✅ Erledigt (2026-08-19) — F3 + P1 + A1 Komplett
 
 Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ahead of `origin/main`):

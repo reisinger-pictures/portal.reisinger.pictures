@@ -3,10 +3,12 @@ namespace App\AI\Providers;
 
 use App\AI\Contracts\AIProvider;
 use App\AI\Concerns\HasSessionHeader;
+use App\AI\Concerns\HasUserAgent;
 
 class OpenAIProvider implements AIProvider
 {
     use HasSessionHeader;
+    use HasUserAgent;
 
     public function buildRequest(string $model, array $messages): array
     {
@@ -18,10 +20,10 @@ class OpenAIProvider implements AIProvider
 
     public function buildHeaders(?string $sessionId = null): array
     {
-        return $this->withSessionHeader([
+        return $this->withUserAgent($this->withSessionHeader([
             'Authorization' => 'Bearer ' . config('services.ai.api_key'),
             'Content-Type' => 'application/json',
-        ], $sessionId);
+        ], $sessionId));
     }
 
     public function getEndpoint(): string
