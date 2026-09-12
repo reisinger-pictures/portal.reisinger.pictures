@@ -101,7 +101,7 @@
 
 - [ ] **P2-T1 (MEDIUM)** E2E localStorage-Injection (STRICT-Verstoß) — `frontend/tests/e2e/client/cart-persistence.spec.ts:31-56`.
 - [ ] **P2-T2 (MEDIUM)** Kanban-E2E: `waitForTimeout` + Pixel-Drag-Retries = flaky — `tests/e2e/helpers/KanbanHelper.ts:135,143,196,231`.
-- [ ] **P2-T3 (VERIFY)** E2E-Timeout-Policy im Config nicht abbildbar — `frontend/playwright.config.ts:11`.
+- [x] **P2-T3 (VERIFY)** E2E-Timeout-Policy im Config abgebildet — `frontend/playwright.config.ts`: `timeout: 120000` (per-test) + `globalTimeout: 900000` (whole-run, Policy 7→15 min). Validiert 2026-09-12 (CI-Run 34710924406: Shard ~3 min; lokal ~7 min).
 - [ ] **P2-T4 (LOW)** Keine Lua-Tests; `useAuth.test` mockt SWR komplett; `ManagementGalleryView.test` stubbt ~12 Kinder; `StorageLifecycleTest` `sleep(1)`.
 - [ ] **P2-T5** Doku-Drift Deployment (C1–C3b-Fallbacks entfernt, Doku behauptet sie noch) — `features/infrastructure/01-deployment.md`.
 
