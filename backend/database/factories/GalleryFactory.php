@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Brand;
 use App\Models\Gallery;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -16,6 +17,7 @@ class GalleryFactory extends Factory
         $type = $this->faker->randomElement(['selection', 'delivery']);
         
         return [
+            'brand' => Brand::B2B,
             'gallery_group_id' => null,
             'name' => ucfirst($name),
             'slug' => Str::slug($name) . '-' . $this->faker->unique()->numberBetween(1, 1000),

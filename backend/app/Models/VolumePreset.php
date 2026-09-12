@@ -39,9 +39,17 @@ class VolumePreset extends Model
         return $query->where('is_default', true);
     }
 
+    /**
+     * Resolve the default preset for a brand, falling back to any preset when
+     * no row is explicitly flagged as default.
+     */
     public static function forBrand(Brand|string $brand): ?self
     {
         $value = $brand instanceof Brand ? $brand->value : $brand;
-        return static::query()->where('brand', $value)->first();
+
+        return static::query()
+            ->where('brand', $value)
+            ->orderByDesc('is_default')
+            ->first();
     }
 }

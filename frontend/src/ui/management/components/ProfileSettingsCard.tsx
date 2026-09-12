@@ -60,11 +60,12 @@ export default function ProfileSettingsCard() {
             <div className="card-body">
                 <h2 className="card-title text-2xl mb-4"><Trans>Profil & Standardwerte</Trans></h2>
                 
-                <form onSubmit={profileForm.handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={profileForm.handleSubmit(onSubmit)} className="space-y-6" noValidate>
                     <div className="form-control">
                         <label className="label"><span className="label-text font-bold"><Trans>Dein Name</Trans></span></label>
                         <input 
                             type="text" 
+                            required
                             {...profileForm.register('name')} 
                             className={`input input-bordered w-full ${profileForm.formState.errors.name ? 'input-error' : ''}`}
                         />

@@ -1,23 +1,28 @@
 <?php
+
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\Photo;
-use App\Enums\UserRole;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
 class AIMetadataTest extends TestCase
 {
     use RefreshDatabase;
 
     private User $photographer;
+
     private User $client;
+
     private Gallery $gallery;
+
     private Photo $photo;
 
     protected function setUp(): void
@@ -194,8 +199,8 @@ class AIMetadataTest extends TestCase
     private function setupStorageWithPhotoImage(): void
     {
         Storage::fake('photos');
-        $sampleContent = file_get_contents(__DIR__ . '/../Fixtures/sample.jpg');
-        Storage::disk('photos')->put($this->gallery->id . '/' . $this->photo->filename, $sampleContent);
+        $sampleContent = file_get_contents(__DIR__.'/../Fixtures/sample.jpg');
+        Storage::disk('photos')->put($this->gallery->id.'/'.$this->photo->filename, $sampleContent);
     }
 
     public function test_photographer_can_generate_metadata()
@@ -206,10 +211,10 @@ class AIMetadataTest extends TestCase
             '*/chat/completions' => Http::response([
                 'choices' => [[
                     'message' => [
-                        'content' => '{"title": "AI Title", "description": "AI Description", "keywords": "kw1, kw2", "location": "Berlin", "detected_city": "Berlin"}'
-                    ]
-                ]]
-            ])
+                        'content' => '{"title": "AI Title", "description": "AI Description", "keywords": "kw1, kw2", "location": "Berlin", "detected_city": "Berlin"}',
+                    ],
+                ]],
+            ]),
         ]);
 
         $response = $this->actingAs($this->photographer, 'api')
@@ -237,10 +242,10 @@ class AIMetadataTest extends TestCase
             '*/chat/completions' => Http::response([
                 'choices' => [[
                     'message' => [
-                        'content' => '{"title": "Client AI Title", "description": "Client Desc", "keywords": "test", "location": "", "detected_city": ""}'
-                    ]
-                ]]
-            ])
+                        'content' => '{"title": "Client AI Title", "description": "Client Desc", "keywords": "test", "location": "", "detected_city": ""}',
+                    ],
+                ]],
+            ]),
         ]);
 
         $response = $this->actingAs($this->client, 'api')
@@ -287,19 +292,19 @@ class AIMetadataTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_generate_metadata_text_works_for_all_users()
+    public function test_photographer_can_generate_metadata_text()
     {
         Http::fake([
             '*/chat/completions' => Http::response([
                 'choices' => [[
                     'message' => [
-                        'content' => '{"title": "Text Title", "description": "Text Desc", "keywords": "text, based", "location": "Paris"}'
-                    ]
-                ]]
-            ])
+                        'content' => '{"title": "Text Title", "description": "Text Desc", "keywords": "text, based", "location": "Paris"}',
+                    ],
+                ]],
+            ]),
         ]);
 
-        $response = $this->actingAs($this->client, 'api')
+        $response = $this->actingAs($this->photographer, 'api')
             ->postJson('/api/ai/generate-metadata-text', [
                 'text_input' => 'A landscape photo of the Eiffel Tower',
                 'global_context' => 'Travel photography',
@@ -312,6 +317,19 @@ class AIMetadataTest extends TestCase
                 'keywords' => 'text, based',
                 'location' => 'Paris',
             ]);
+    }
+
+    public function test_client_cannot_generate_metadata_text()
+    {
+        Http::fake();
+
+        $response = $this->actingAs($this->client, 'api')
+            ->postJson('/api/ai/generate-metadata-text', [
+                'text_input' => 'A landscape photo of the Eiffel Tower',
+            ]);
+
+        $response->assertStatus(403);
+        Http::assertNothingSent();
     }
 
     public function test_generate_metadata_text_requires_text_input()
@@ -346,10 +364,10 @@ class AIMetadataTest extends TestCase
             '*/chat/completions' => Http::response([
                 'choices' => [[
                     'message' => [
-                        'content' => '{"title": "T", "description": "D", "keywords": "k", "location": "", "detected_city": ""}'
-                    ]
-                ]]
-            ])
+                        'content' => '{"title": "T", "description": "D", "keywords": "k", "location": "", "detected_city": ""}',
+                    ],
+                ]],
+            ]),
         ]);
 
         $response = $this->actingAs($this->photographer, 'api')
@@ -360,7 +378,7 @@ class AIMetadataTest extends TestCase
 
         $response->assertStatus(200);
 
-        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+        Http::assertSent(function (Request $request) {
             return $request->header('x-opencode-session') === ['portal-batch-42'];
         });
     }
@@ -373,10 +391,10 @@ class AIMetadataTest extends TestCase
             '*/chat/completions' => Http::response([
                 'choices' => [[
                     'message' => [
-                        'content' => '{"title": "T", "description": "D", "keywords": "k", "location": "", "detected_city": ""}'
-                    ]
-                ]]
-            ])
+                        'content' => '{"title": "T", "description": "D", "keywords": "k", "location": "", "detected_city": ""}',
+                    ],
+                ]],
+            ]),
         ]);
 
         $response = $this->actingAs($this->photographer, 'api')
@@ -386,7 +404,7 @@ class AIMetadataTest extends TestCase
 
         $response->assertStatus(200);
 
-        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+        Http::assertSent(function (Request $request) {
             return $request->header('x-opencode-session') === [];
         });
     }

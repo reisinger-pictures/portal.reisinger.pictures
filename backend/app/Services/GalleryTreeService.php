@@ -2,32 +2,55 @@
 
 namespace App\Services;
 
-use App\Models\GalleryGroup;
+use App\Enums\Brand;
 use App\Models\Gallery;
+use App\Models\GalleryGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
 class GalleryTreeService
 {
     /**
-     * Get the complete gallery tree for admin view with optional filtering
+     * Get the complete gallery tree for admin view with optional filtering.
+     *
+     * Brand isolation: a brand-bound user (brand != null) only gets a tree
+     * containing their own brand's groups and galleries, cached under a
+     * brand-specific key. Cross-brand users (brand === null, e.g. Super-Admin)
+     * get the full tree across all brands, cached under the global
+     * `gallery_tree_admin` key (intended).
      */
     public function getAdminTree(User $user, ?string $filterType = null, ?string $orgId = null): array
     {
-        $buildTree = function () {
-            $groups = GalleryGroup::query()->whereNull('parent_id')->with(['children', 'galleries', 'orgs'])->get();
-            $rootGalleries = Gallery::query()->whereNull('gallery_group_id')->get();
+        $brand = $user->brand === null
+            ? null
+            : ($user->brand instanceof Brand ? $user->brand->value : (string) $user->brand);
+
+        $cacheKey = $brand === null ? 'gallery_tree_admin' : 'gallery_tree_admin_'.$brand;
+
+        $buildTree = function () use ($brand) {
+            $groupQuery = GalleryGroup::query()
+                ->whereNull('parent_id')
+                ->with(['children', 'children.galleries.galleryGroup.parent', 'galleries.galleryGroup.parent', 'orgs']);
+            $galleryQuery = Gallery::query()
+                ->whereNull('gallery_group_id')
+                ->with('galleryGroup.parent');
+
+            if ($brand !== null) {
+                $groupQuery->where('brand', $brand);
+                $galleryQuery->where('brand', $brand);
+            }
+
             return [
-                'groups' => $groups->toArray(),
-                'root_galleries' => $rootGalleries->toArray()
+                'groups' => $groupQuery->get()->toArray(),
+                'root_galleries' => $galleryQuery->get()->toArray(),
             ];
         };
-        $tree = Cache::rememberForever('gallery_tree_admin', $buildTree);
+        $tree = Cache::rememberForever($cacheKey, $buildTree);
 
         $treeArray = json_decode(json_encode($tree), true);
 
         // Apply permission filter for non-admin users
-        if (!$user->is_admin) {
+        if (! $user->is_admin) {
             $allowedGalleryIds = $user->getAllowedGalleryIds();
             $treeArray = $this->filterTreeByPermissions($treeArray, $user, $allowedGalleryIds);
         }
@@ -43,13 +66,12 @@ class GalleryTreeService
         return $treeArray;
     }
 
-
     private function filterGroupsRecursive(array $groups, callable $galleryPredicate, ?callable $groupPredicate = null): array
     {
-        $groupPredicate = $groupPredicate ?? fn(array $node): bool => true;
+        $groupPredicate = $groupPredicate ?? fn (array $node): bool => true;
         $result = [];
         foreach ($groups as $group) {
-            if (!$groupPredicate($group)) {
+            if (! $groupPredicate($group)) {
                 continue;
             }
             if (isset($group['galleries'])) {
@@ -60,6 +82,7 @@ class GalleryTreeService
             }
             $result[] = $group;
         }
+
         return $result;
     }
 
@@ -70,18 +93,18 @@ class GalleryTreeService
     {
         $explicitGroupIds = [];
         if ($user->is_photographer) {
-            $unrestrictedGroups = \App\Models\GalleryGroup::query()->where('restricted_photographers', false)->orWhereNull('restricted_photographers')->pluck('id')->toArray();
+            $unrestrictedGroups = GalleryGroup::query()->where('restricted_photographers', false)->orWhereNull('restricted_photographers')->pluck('id')->toArray();
             $assignedGroups = $user->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
             $explicitGroupIds = array_unique(array_merge($unrestrictedGroups, $assignedGroups));
         } else {
             $explicitGroupIds = $user->galleryGroups()->pluck('gallery_groups.id')->toArray();
         }
-        
-        if (!empty($explicitGroupIds)) {
-            $explicitGroupIds = array_unique(array_merge($explicitGroupIds, app(\App\Services\AuthorizationService::class)->getSubGroupIds($explicitGroupIds)));
+
+        if (! empty($explicitGroupIds)) {
+            $explicitGroupIds = array_unique(array_merge($explicitGroupIds, app(AuthorizationService::class)->getSubGroupIds($explicitGroupIds)));
         }
 
-        $galleryPredicate = fn(array $g): bool => in_array($g['id'], $allowedGalleryIds);
+        $galleryPredicate = fn (array $g): bool => in_array($g['id'], $allowedGalleryIds);
         $treeArray['groups'] = $this->pruneEmptyGroups(
             $this->filterGroupsRecursive($treeArray['groups'], $galleryPredicate),
             $explicitGroupIds
@@ -96,7 +119,7 @@ class GalleryTreeService
      */
     private function filterTreeByType(array $treeArray, string $filterType): array
     {
-        $galleryPredicate = fn(array $g): bool => $g['type'] === $filterType;
+        $galleryPredicate = fn (array $g): bool => $g['type'] === $filterType;
         $treeArray['groups'] = $this->pruneEmptyGroups($this->filterGroupsRecursive($treeArray['groups'], $galleryPredicate));
         $treeArray['root_galleries'] = array_values(array_filter($treeArray['root_galleries'], $galleryPredicate));
 
@@ -108,10 +131,10 @@ class GalleryTreeService
      */
     private function filterTreeByOrg(array $treeArray, string $orgId): array
     {
-        $orgGroupIds = \App\Models\GalleryGroup::whereHas('orgs', fn($q) => $q->where('org_id', $orgId))->pluck('id')->toArray();
-        $orgGalleryIds = \App\Models\Gallery::whereHas('orgs', fn($q) => $q->where('org_id', $orgId))->pluck('id')->toArray();
-        $groupPredicate = fn(array $node): bool => in_array($node['id'], $orgGroupIds);
-        $galleryPredicate = fn(array $g): bool => in_array($g['id'], $orgGalleryIds);
+        $orgGroupIds = GalleryGroup::whereHas('orgs', fn ($q) => $q->where('org_id', $orgId))->pluck('id')->toArray();
+        $orgGalleryIds = Gallery::whereHas('orgs', fn ($q) => $q->where('org_id', $orgId))->pluck('id')->toArray();
+        $groupPredicate = fn (array $node): bool => in_array($node['id'], $orgGroupIds);
+        $galleryPredicate = fn (array $g): bool => in_array($g['id'], $orgGalleryIds);
         $treeArray['groups'] = $this->pruneEmptyGroups(
             $this->filterGroupsRecursive($treeArray['groups'], $galleryPredicate, $groupPredicate)
         );
@@ -130,11 +153,12 @@ class GalleryTreeService
         foreach ($groups as $group) {
             $children = isset($group['children']) ? $this->pruneEmptyGroups($group['children'], $explicitGroupIds) : [];
             $galleries = $group['galleries'] ?? [];
-            if (!empty($galleries) || !empty($children) || in_array($group['id'], $explicitGroupIds)) {
+            if (! empty($galleries) || ! empty($children) || in_array($group['id'], $explicitGroupIds)) {
                 $group['children'] = $children;
                 $result[] = $group;
             }
         }
+
         return $result;
     }
 
@@ -148,15 +172,34 @@ class GalleryTreeService
             $ids[] = $child->id;
             $ids = array_merge($ids, $this->getAllSubgroupIds($child));
         }
+
         return $ids;
     }
 
     /**
      * Clear the cached gallery tree and related caches.
+     *
+     * The tree is cached once globally for cross-brand users and once per brand
+     * for brand-bound users — all of those keys must be dropped.
      */
     public function clearCache(): void
     {
         Cache::forget('gallery_tree_admin');
         Cache::forget('unrestricted_photographer_gallery_ids');
+
+        $brands = array_keys(config('brands', []));
+
+        $dbBrands = Gallery::query()->distinct()->pluck('brand')
+            ->merge(GalleryGroup::query()->distinct()->pluck('brand'))
+            ->filter()
+            ->map(fn ($brand) => $brand instanceof Brand ? $brand->value : (string) $brand);
+
+        foreach ($brands as $brand) {
+            Cache::forget('gallery_tree_admin_'.$brand);
+        }
+
+        foreach ($dbBrands->unique() as $brand) {
+            Cache::forget('gallery_tree_admin_'.$brand);
+        }
     }
 }

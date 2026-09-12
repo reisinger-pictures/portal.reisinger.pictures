@@ -6,6 +6,7 @@ import {
     removeFromCartPure,
     calculateTotalAmount,
     loadCartItems,
+    splitTotalEvenly,
 } from '../cartLogic';
 import {CartItem} from '../CartContext';
 
@@ -166,5 +167,31 @@ describe('loadCartItems', () => {
         expect(result.error).toBe('none');
         expect(result.items).toHaveLength(1);
         expect(result.items[0].photoId).toBe('1');
+    });
+});
+
+describe('splitTotalEvenly', () => {
+    it('distributes a remainder so the sum matches the total exactly', () => {
+        expect(splitTotalEvenly(100, 3)).toEqual([34, 33, 33]);
+        expect(splitTotalEvenly(100, 3).reduce((a, b) => a + b, 0)).toBe(100);
+    });
+
+    it('distributes the cent remainder to the first positions', () => {
+        expect(splitTotalEvenly(10, 4)).toEqual([3, 3, 2, 2]);
+    });
+
+    it('handles an exact division without remainder', () => {
+        expect(splitTotalEvenly(900, 3)).toEqual([300, 300, 300]);
+    });
+
+    it('returns an empty array for a non-positive count', () => {
+        expect(splitTotalEvenly(100, 0)).toEqual([]);
+        expect(splitTotalEvenly(100, -1)).toEqual([]);
+    });
+
+    it('fixes the rounding drift of a realistic quote-token split', () => {
+        // The old Math.round(100 / 3) logic yields 99 cents for a 100-cent quote.
+        expect(Math.round(100 / 3) * 3).toBe(99);
+        expect(splitTotalEvenly(100, 3).reduce((a, b) => a + b, 0)).toBe(100);
     });
 });

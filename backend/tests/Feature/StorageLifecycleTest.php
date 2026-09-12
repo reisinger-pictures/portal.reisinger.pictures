@@ -10,6 +10,7 @@ use App\Models\Photo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 class StorageLifecycleTest extends TestCase
 {
@@ -54,14 +55,23 @@ class StorageLifecycleTest extends TestCase
         // Verify Cache is set
         $this->assertTrue(Cache::has('photo_hit_' . $photo->id));
 
-        // Sleep briefly and request again
-        sleep(1);
-        $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->get('/api/media/' . $gallery->slug . '/' . $photo->id . '.jpg')
-             ->assertStatus(200);
+        // Advance the clock deterministically instead of a real sleep(1): a second
+        // request "one second later" must still hit the 24h cache and therefore must
+        // NOT touch last_accessed_at. Advancing time (rather than not advancing) is
+        // what makes a broken throttle detectable, since SQLite timestamps have
+        // 1-second resolution and an erroneous re-write would otherwise be invisible.
+        Carbon::setTestNow(Carbon::now()->addSecond());
 
-        // Verify DB was NOT updated again due to cache throttling
-        $photo->refresh();
-        $this->assertEquals($firstTimestamp, $photo->last_accessed_at);
+        try {
+            $this->withHeaders(['Authorization' => "Bearer $token"])
+                 ->get('/api/media/' . $gallery->slug . '/' . $photo->id . '.jpg')
+                 ->assertStatus(200);
+
+            // Verify DB was NOT updated again due to cache throttling
+            $photo->refresh();
+            $this->assertEquals($firstTimestamp, $photo->last_accessed_at);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 }

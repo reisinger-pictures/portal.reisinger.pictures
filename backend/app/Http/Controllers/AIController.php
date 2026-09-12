@@ -1,8 +1,11 @@
 <?php
+
 namespace App\Http\Controllers;
 
+use App\Models\Gallery;
 use App\Models\Photo;
 use App\Services\AIService;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -23,7 +26,7 @@ class AIController extends Controller
 
     public function generateMetadata(Request $request)
     {
-        if (!$this->aiService->isAvailable()) {
+        if (! $this->aiService->isAvailable()) {
             return response()->json(['error' => 'KI-Dienst ist nicht verfügbar.'], 503);
         }
 
@@ -48,7 +51,10 @@ class AIController extends Controller
                 $request->specific_context ?? null,
                 $request->session_id
             );
+
             return response()->json($result);
+        } catch (ConnectionException $e) {
+            return response()->json(['error' => 'KI-Dienst ist derzeit nicht erreichbar.'], 503);
         } catch (\RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 502);
         }
@@ -56,7 +62,7 @@ class AIController extends Controller
 
     public function generateMetadataText(Request $request)
     {
-        if (!$this->aiService->isAvailable()) {
+        if (! $this->aiService->isAvailable()) {
             return response()->json(['error' => 'KI-Dienst ist nicht verfügbar.'], 503);
         }
 
@@ -66,13 +72,22 @@ class AIController extends Controller
             'session_id' => 'nullable|string|max:128',
         ]);
 
+        // The text flow is only used while creating gallery defaults, so it is
+        // limited to users allowed to create galleries (photographer/super-admin).
+        if (Gate::denies('create', Gallery::class)) {
+            return response()->json(['error' => 'Keine Berechtigung für KI-Generierung.'], 403);
+        }
+
         try {
             $result = $this->aiService->generateMetadataFromText(
                 $request->text_input,
                 $request->global_context ?? '',
                 $request->session_id
             );
+
             return response()->json($result);
+        } catch (ConnectionException $e) {
+            return response()->json(['error' => 'KI-Dienst ist derzeit nicht erreichbar.'], 503);
         } catch (\RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 502);
         }

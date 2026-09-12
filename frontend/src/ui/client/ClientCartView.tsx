@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
 import {CartItem, useCart} from '../../logic/CartContext';
+import {splitTotalEvenly} from '../../logic/cartLogic';
 import {useUI} from '../components/UIContext';
 import {apiMutate, CheckoutResponse} from '../../api';
 import {useAuth} from '../../logic/useAuth';
@@ -47,7 +48,8 @@ export default function ClientCartView() {
     const {showToast} = useUI();
     const {user, mutate: mutateUser} = useAuth();
     const {isPowerUser, isAdmin} = usePermissions();
-    const {couponCode, isValid: isCouponValid, removeCoupon} = useCoupon();
+    const couponState = useCoupon({galleryId: cartGalleryId});
+    const {couponCode, isValid: isCouponValid, removeCoupon} = couponState;
     const navigate = useNavigate();
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
@@ -92,12 +94,13 @@ export default function ClientCartView() {
                 }
                 setQuoteToken(incomingToken);
                 clearCart();
-                data.photos.forEach((pid: string) => {
+                const perPhotoPrices = splitTotalEvenly(data.price, data.photos.length);
+                data.photos.forEach((pid: string, index: number) => {
                     addToCart({
                         photoId: pid,
                         filename: 'Individuelles Angebot',
                         tier: 'original',
-                        price: Math.round(data.price / data.photos.length),
+                        price: perPhotoPrices[index],
                         isQuote: false,
                         notes: ''
                     });
@@ -211,7 +214,7 @@ export default function ClientCartView() {
                         <div className="lg:col-span-3 space-y-6">
                             <CartItemList items={items} handleUpdateItem={handleUpdateItem} removeFromCart={removeFromCart}
                                            hasQuotes={hasQuotes} totalAmount={totalAmount} volumeLicensing={volumeLicensing}/>
-                            <CouponInput galleryId={cartGalleryId} />
+                            <CouponInput state={couponState} />
                         </div>
 
                         <div className="lg:col-span-2">
@@ -331,7 +334,7 @@ export default function ClientCartView() {
                                             <input type="checkbox" {...register('agb_accepted')}
                                                    className={`checkbox mt-0.5 shrink-0 ${errors.agb_accepted ? 'checkbox-error' : 'checkbox-primary'}`}/>
                                             <span className="label-text text-sm leading-tight">
-                                                <Trans>Ich akzeptiere die <a href="/license-terms" target="_blank"
+                                                <Trans>Ich akzeptiere die <a href="/license-terms" target="_blank" rel="noopener noreferrer"
                                                                       className="link link-primary">Allgemeinen Geschäftsbedingungen und Lizenzvereinbarungen</a>.</Trans>
                                             </span>
                                         </label>

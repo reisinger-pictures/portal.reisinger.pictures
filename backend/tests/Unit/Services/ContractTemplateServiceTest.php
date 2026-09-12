@@ -103,6 +103,37 @@ class ContractTemplateServiceTest extends TestCase
         ]);
     }
 
+    public function test_signer_failure_rolls_back_the_contract(): void
+    {
+        $template = Contract::factory()->template()->create([
+            'status' => 'active',
+        ]);
+
+        $contractsBefore = Contract::count();
+
+        ContractSigner::creating(function () {
+            throw new \RuntimeException('signer insert failed');
+        });
+
+        $service = new ContractTemplateService();
+
+        try {
+            $service->createInstance($template, [
+                'name' => 'Rollback',
+                'email' => 'rollback@example.com',
+                'roles' => ['Model'],
+                'personal_token' => 'rollback-token',
+            ]);
+            $this->fail('Expected the signer failure to bubble up.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('signer insert failed', $e->getMessage());
+        }
+
+        // No orphaned contract row must remain.
+        $this->assertSame($contractsBefore, Contract::count());
+        $this->assertDatabaseCount('contract_signers', 0);
+    }
+
     public function test_multiple_instances_from_same_template(): void
     {
         $template = Contract::factory()->template()->create([

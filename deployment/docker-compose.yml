@@ -77,7 +77,8 @@ services:
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
       - APP_ENV=${APP_ENV}
-      - APP_DEBUG=${APP_DEBUG}
+      # Default false: never enable debug by accident in production.
+      - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL}
       - FRONTEND_URL=${FRONTEND_URL}
       - APP_KEY=${APP_KEY}
@@ -135,14 +136,10 @@ services:
       start_period: 40s
     command: >
       sh -c "
-      if [ \"$APP_ENV\" = \"production\" ]; then
-        if [ -z \"$APP_KEY\" ] || [ -z \"$JWT_SECRET\" ]; then
-          echo 'FATAL: APP_KEY oder JWT_SECRET ist nicht gesetzt. Produktion verweigert den Start!';
-          exit 1;
-        fi;
+      if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ]; then
+        echo 'FATAL: APP_KEY oder JWT_SECRET ist nicht gesetzt. Start verweigert (fail-closed)!';
+        exit 1;
       fi;
-      if [ -z \"$APP_KEY\" ]; then php artisan key:generate --force; fi;
-      if [ -z \"$JWT_SECRET\" ]; then php artisan jwt:secret --force; fi;
       php artisan cache:clear;
       php artisan optimize;
       php artisan migrate --force;

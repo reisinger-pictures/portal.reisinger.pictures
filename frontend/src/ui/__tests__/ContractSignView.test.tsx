@@ -157,4 +157,41 @@ describe('ContractSignView stale detection', () => {
         // No script anywhere in the rendered terms
         expect(container.innerHTML).not.toContain('alert("xss")');
     });
+
+    it('applies percentage discounts when computing the grand total (backend snapshot semantics)', async () => {
+        const dataWithDiscounts = {
+            contract: {
+                id: 'contract-discounts',
+                terms_html: '<p>Version 1</p>',
+                items: [
+                    { type: 'item', description: 'Fotos', notes: '', qty: 2, price: 5000, row_total: 10000 },
+                ],
+                discounts: [
+                    // 10% => stored as basis points (percent × 100)
+                    { type: 'discount_percent', description: '10% Rabatt', notes: '', price: 1000 },
+                    { type: 'discount_fixed', description: 'Bonus', notes: '', price: 500 },
+                ],
+                billing_details: null,
+                available_roles: ['Model'],
+                content_version: 0,
+            },
+            signer: {
+                id: 'signer-1',
+                name: 'Test User',
+                email: 'test@example.com',
+                roles: ['Model'],
+                status: 'joined',
+            },
+        };
+        vi.mocked(fetchSignContract).mockResolvedValueOnce(dataWithDiscounts);
+
+        renderWithProviders(<ContractSignView />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Gesamtbetrag')).toBeInTheDocument();
+        });
+
+        // 10000 - round(10000 × 1000 / 10000) = 9000; 9000 - 500 = 8500
+        expect(screen.getByText('85,00 €')).toBeInTheDocument();
+    });
 });

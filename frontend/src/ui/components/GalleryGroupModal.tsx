@@ -65,13 +65,19 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
     const onSubmit = async (data: GroupFormValues) => {
         const isPub = data.is_public === 'null' ? null : data.is_public === 'true';
         const pId = data.parent_id === '' ? null : data.parent_id;
+        const extraOpts: GalleryGroupExtraOpts = {
+            is_free_download: data.is_free_download,
+            is_editorial_only: data.is_editorial_only,
+            is_hidden: data.is_hidden,
+            org_id: data.org_id ? data.org_id : null
+        };
 
         try {
             if (editingGroup) {
-                await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download, is_editorial_only: data.is_editorial_only, is_hidden: data.is_hidden });
+                await onUpdate(editingGroup.id, data.name, data.slug, isPub, pId, extraOpts);
                 showToast('success', t`Ordner erfolgreich aktualisiert.`);
             } else {
-                await onCreate(data.name, data.slug, isPub, pId, { is_free_download: data.is_free_download, is_editorial_only: data.is_editorial_only, is_hidden: data.is_hidden });
+                await onCreate(data.name, data.slug, isPub, pId, extraOpts);
                 showToast('success', t`Ordner erfolgreich erstellt.`);
             }
             onClose();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
 use App\Mail\OrgInviteMail;
 use App\Models\Org;
 use App\Models\OrgInvite;
@@ -20,6 +21,8 @@ use Illuminate\Support\Str;
 
 class OrgInviteController extends Controller
 {
+    use EnforcesBrandIsolation;
+
     public function invite(Request $request, $orgId)
     {
         $user = auth('api')->user();
@@ -28,6 +31,11 @@ class OrgInviteController extends Controller
         // Scoped Policy: Nur Admins oder Org-Admin DES Org dürfen einladen
         $svc = app(AuthorizationService::class);
         if (! $svc->isAdmin($user) && ! ($svc->isOrgAdmin($user) && $user->org_id === $orgId)) {
+            return response()->json(['error' => 'Keine Berechtigung, Nutzer in diese Organisation einzuladen.'], 403);
+        }
+
+        // Brand isolation: a brand-bound actor may only invite into orgs of their own brand.
+        if ($this->isBrandMismatch($user, $org)) {
             return response()->json(['error' => 'Keine Berechtigung, Nutzer in diese Organisation einzuladen.'], 403);
         }
 
@@ -87,13 +95,32 @@ class OrgInviteController extends Controller
             ->with('org')
             ->firstOrFail();
 
+        // Brand isolation: the invite belongs to the org of a specific brand. A
+        // brand-bound actor may only redeem an invite of their own brand — this
+        // also blocks a brand-bound actor from being flipped to cross-brand via a
+        // brand-less org invite. Cross-brand actors (brand = null) may act across
+        // brands (magic-link trust: holding the token is the credential).
+        if ($user && $this->isBrandMismatch($user, $invite->org)) {
+            return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
+        }
+
         return DB::transaction(function () use ($request, $invite, $user) {
             if (! $user) {
                 // Neuen User erstellen
-                $user = User::firstOrCreate(
-                    ['email' => $invite->email],
-                    ['name' => $request->name, 'password' => Hash::make($request->password)]
-                );
+                $existing = User::where('email', $invite->email)->first();
+
+                // Brand isolation also applies to the logged-out flow: an existing
+                // brand-bound account must not be moved into a foreign-brand (or
+                // brand-less) org via an invite of another brand.
+                if ($existing && $this->isBrandMismatch($existing, $invite->org)) {
+                    return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
+                }
+
+                $user = $existing ?? User::create([
+                    'name' => $request->name,
+                    'email' => $invite->email,
+                    'password' => Hash::make($request->password),
+                ]);
 
                 if (empty($user->password)) {
                     $user->password = Hash::make($request->password);

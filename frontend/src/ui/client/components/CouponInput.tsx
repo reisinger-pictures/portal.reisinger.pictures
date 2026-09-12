@@ -2,21 +2,23 @@
  * CouponInput – coupon entry field for the client checkout.
  *
  * Renders a daisyUI `join` input group for entering a coupon code, plus
- * a result panel that reflects the validation state of `useCoupon()`.
+ * a result panel that reflects the validation state owned by the checkout
+ * view (single shared `useCoupon()` instance passed down as `state`).
  */
 
 import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
-import useCoupon from '../../../logic/useCoupon';
+import type {UseCouponResult} from '../../../logic/useCoupon';
 import {formatMoney} from '../../../logic/utils';
 
 interface CouponInputProps {
-    galleryId?: string;
+    /** Shared coupon state owned by the checkout view (single source of truth). */
+    state: UseCouponResult;
 }
 
-export default function CouponInput({galleryId}: CouponInputProps) {
-    const {couponCode, coupon, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = useCoupon({galleryId});
+export default function CouponInput({state}: CouponInputProps) {
+    const {couponCode, coupon, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = state;
     const [inputValue, setInputValue] = useState<string>('');
 
     const packageQuantity = coupon?.package_quantity ?? null;

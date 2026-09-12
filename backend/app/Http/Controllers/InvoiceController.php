@@ -2,20 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Http\Requests\GenerateManualInvoiceRequest;
+use App\Models\InvoiceSnapshot;
+use App\Services\ManualInvoiceService;
+use App\Support\BrandRegistry;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 
 class InvoiceController extends Controller
 {
     public function __construct(
-        private \App\Services\ManualInvoiceService $invoiceService,
-        private \Symfony\Component\HtmlSanitizer\HtmlSanitizer $sanitizer,
+        private ManualInvoiceService $invoiceService,
+        private HtmlSanitizer $sanitizer,
     ) {}
 
     public function generateManualInvoice(GenerateManualInvoiceRequest $request)
     {
         $user = auth('api')->user();
         $validated = $request->validated();
+        $validated['invoice_number'] = $this->normalizeInvoiceNumber($validated['invoice_number']);
 
         $processed = $this->invoiceService->processItems($validated['items']);
         $mappedItems = $processed['items'];
@@ -25,9 +31,9 @@ class InvoiceController extends Controller
 
         $isOffer = ($validated['type'] ?? 'invoice') === 'offer';
         $docTitle = $isOffer ? 'ANGEBOT' : 'RECHNUNG';
-        $filename = $isOffer ? 'Angebot-' . date('Y-m-d') : $validated['invoice_number'];
+        $filename = $isOffer ? 'Angebot-'.date('Y-m-d') : $validated['invoice_number'];
 
-        $snapshot = new \App\Models\InvoiceSnapshot([
+        $snapshot = new InvoiceSnapshot([
             'invoice_number' => $validated['invoice_number'],
             'customer_details' => array_merge($customerDetails, [
                 'service_date' => $validated['service_date'] ?? null,
@@ -42,10 +48,10 @@ class InvoiceController extends Controller
         $viewName = $isOffer ? 'pdf.manual_offer' : 'pdf.invoice';
         $bankDetails = $this->invoiceService->getBankDetails();
 
-        $pfx = \App\Support\BrandRegistry::prefix();
-        $brandConfig = \App\Support\BrandRegistry::configOrDefault();
+        $pfx = BrandRegistry::prefix();
+        $brandConfig = BrandRegistry::configOrDefault();
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
+        $pdf = Pdf::loadView($viewName, [
             'title' => $docTitle,
             'snapshot' => $snapshot,
             'items' => $mappedItems,
@@ -65,10 +71,37 @@ class InvoiceController extends Controller
             $output .= "\n{$payloadData['marker']}\n";
         }
 
-        return response()->streamDownload(function() use ($output) {
+        return response()->streamDownload(function () use ($output) {
             echo $output;
-        }, $filename . '.pdf', [
+        }, $filename.'.pdf', [
             'Content-Type' => 'application/pdf',
         ]);
+    }
+
+    /**
+     * Normalise and validate a manually supplied document number.
+     *
+     * Manual documents are rendered on the fly (not persisted), so a full
+     * duplicate guarantee would require persisting them. We can still reject
+     * malformed numbers and numbers that collide with an already persisted
+     * invoice snapshot (which shares the global `invoice_number` primary key).
+     */
+    private function normalizeInvoiceNumber(string $invoiceNumber): string
+    {
+        $invoiceNumber = trim($invoiceNumber);
+
+        if ($invoiceNumber === '' || strlen($invoiceNumber) > 64 || ! preg_match('/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/', $invoiceNumber)) {
+            throw ValidationException::withMessages([
+                'invoice_number' => 'Ungültige Rechnungsnummer. Erlaubt sind Buchstaben, Ziffern, Punkt, Bindestrich, Unterstrich und Schrägstrich (max. 64 Zeichen).',
+            ]);
+        }
+
+        if (InvoiceSnapshot::where('invoice_number', $invoiceNumber)->exists()) {
+            throw ValidationException::withMessages([
+                'invoice_number' => 'Diese Rechnungsnummer ist bereits vergeben.',
+            ]);
+        }
+
+        return $invoiceNumber;
     }
 }

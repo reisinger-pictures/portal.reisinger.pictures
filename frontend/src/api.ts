@@ -7,7 +7,7 @@ export interface ApiError extends Error {
     info?: unknown;
 }
 let globalErrorCallback: GlobalErrorCallback | null = null;
-export const setGlobalErrorCallback = (cb: GlobalErrorCallback) => { globalErrorCallback = cb; };
+export const setGlobalErrorCallback = (cb: GlobalErrorCallback | null) => { globalErrorCallback = cb; };
 
 
 const refreshToken = async (): Promise<boolean> => {

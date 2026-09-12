@@ -4,11 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\SendQuoteRequest;
 use App\Mail\CustomMail;
+use App\Models\Gallery;
 use App\Models\Order;
+use App\Models\Photo;
 use App\Services\AuthorizationService;
 use App\Services\ManualInvoiceService;
 use App\Services\QuoteLinkService;
+use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 
 class QuoteController extends Controller
@@ -21,13 +25,45 @@ class QuoteController extends Controller
     public function sendQuote(SendQuoteRequest $request, $id)
     {
         $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
 
-        $validated = $request->validated();
+        // Brand isolation (defense in depth): never touch orders of another brand.
+        $order = Order::with(['user', 'invoiceSnapshot'])
+            ->where(function ($query) {
+                $query->where('brand', BrandRegistry::currentId())->orWhereNull('brand');
+            })
+            ->findOrFail($id);
 
-        $order = Order::with(['user', 'invoiceSnapshot'])->findOrFail($id);
+        // Only an open quote request may be answered. A paid/invoiced order must
+        // never be silently cancelled by re-issuing a custom offer.
+        if (! $order->is_quote_request || $order->status !== 'pending') {
+            return response()->json(['error' => 'Nur offene Angebotsanfragen können beantwortet werden.'], 422);
+        }
+
+        // Ownership: non-admins may only answer quote requests for galleries they manage.
+        if (! $svc->isAdmin($user)) {
+            $galleryIds = $this->orderGalleryIds($order);
+
+            if ($galleryIds === []) {
+                return response()->json(['error' => 'Keine Berechtigung'], 403);
+            }
+
+            foreach ($galleryIds as $galleryId) {
+                $gallery = Gallery::find($galleryId);
+                if ($gallery === null || Gate::denies('manage', $gallery)) {
+                    return response()->json(['error' => 'Keine Berechtigung'], 403);
+                }
+            }
+        }
+
+        // A quote link must always carry a positive amount (see checkout guard).
+        if ((int) $request->custom_price < 1) {
+            return response()->json(['error' => 'Der Angebotspreis muss größer als 0 sein.'], 422);
+        }
+
         $order->update(['status' => 'cancelled']);
 
-        $items = $order->invoiceSnapshot->customer_details['items'] ?? [];
+        $items = $order->invoiceSnapshot?->customer_details['items'] ?? [];
         $photoIds = array_column($items, 'photoId');
 
         $link = $this->quoteLinkService->generateQuoteLink($photoIds, $request->custom_price, rightsText: $request->rights_text);
@@ -40,6 +76,27 @@ class QuoteController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Distinct gallery IDs referenced by an order's invoice snapshot.
+     *
+     * @return array<string>
+     */
+    private function orderGalleryIds(Order $order): array
+    {
+        $items = $order->invoiceSnapshot?->customer_details['items'] ?? [];
+        $photoIds = array_filter(array_column($items, 'photoId'));
+
+        if ($photoIds === []) {
+            return [];
+        }
+
+        return Photo::whereIn('id', $photoIds)
+            ->pluck('gallery_id')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function generateQuoteLink(Request $request)
     {
         $svc = app(AuthorizationService::class);
@@ -47,7 +104,7 @@ class QuoteController extends Controller
         if (! $svc->isAdmin($user) && ! $svc->isPhotographer($user)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
-        $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer', 'rights_text' => 'nullable|string|max:2000']);
+        $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer|min:1', 'rights_text' => 'nullable|string|max:2000']);
 
         $link = $this->quoteLinkService->generateQuoteLink($request->photo_ids, $request->custom_price, rightsText: $request->rights_text);
 

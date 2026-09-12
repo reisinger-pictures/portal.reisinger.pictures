@@ -24,12 +24,34 @@ class PhotoDownloadController extends Controller
         private readonly ImageProcessor $imageProcessor,
     ) {}
 
+    /**
+     * Allowed download tiers mapped to their maximum width (null = original).
+     * Anything outside this whitelist is rejected with 422 — an unknown tier
+     * must never silently fall back to the highest resolution.
+     */
+    private const DOWNLOAD_TIERS = ['web' => 2560, 'print' => 4000, 'original' => null];
+
+    /**
+     * Resolve a requested download tier to its maximum width, rejecting unknown
+     * tiers instead of treating them as "original".
+     */
+    private function resolveDownloadTier(string $tier): ?int
+    {
+        if (! array_key_exists($tier, self::DOWNLOAD_TIERS)) {
+            abort(422, 'Unbekannter Auflösungs-Tier.');
+        }
+
+        return self::DOWNLOAD_TIERS[$tier];
+    }
+
     private function authorizeGalleryAccess($gallery)
     {
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
         $isExpired = $gallery->expires_at && Carbon::parse($gallery->expires_at)->isPast();
-        $canManage = $user && ($svc->isAdmin($user) || ($svc->isPhotographer($user) && $svc->canAccessGallery($user, $gallery->id)));
+        // Brand-aware management check (a brand-bound admin/photographer from a
+        // foreign brand must not manage or bypass watermarking on this gallery).
+        $canManage = $user && $svc->canManageGallery($user, $gallery->id);
 
         if ($isExpired && ! $canManage) {
             abort(403, 'Galerie abgelaufen.');
@@ -162,10 +184,11 @@ class PhotoDownloadController extends Controller
         $svc = app(AuthorizationService::class);
 
         $tier = $request->query('tier', 'original');
+        $maxWidth = $this->resolveDownloadTier($tier);
         $userRank = $user && $user->flatrate_level ? (TierRanks::RANKS[$user->flatrate_level] ?? 0) : 0;
-        $reqRank = TierRanks::RANKS[$tier] ?? 3;
+        $reqRank = TierRanks::RANKS[$tier];
 
-        $hasFullAccess = $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
+        $hasFullAccess = $user && $svc->canManageGallery($user, $gallery->id);
         $isCoveredByFlatrate = $userRank >= $reqRank;
         $hasPurchased = $user && app(PurchaseService::class)->hasPurchasedPhoto($user, $photo->id, $tier);
 
@@ -193,8 +216,6 @@ class PhotoDownloadController extends Controller
             'resolution_tier' => $tier,
             'user_agent' => $request->userAgent(),
         ]);
-
-        $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
 
         $tempDir = storage_path('app/private/temp');
         if (! is_dir($tempDir)) {
@@ -230,10 +251,11 @@ class PhotoDownloadController extends Controller
         $svc = app(AuthorizationService::class);
 
         $tier = $request->query('tier', 'original');
+        $maxWidth = $this->resolveDownloadTier($tier);
         $userRank = $user && $user->flatrate_level ? (TierRanks::RANKS[$user->flatrate_level] ?? 0) : 0;
-        $reqRank = TierRanks::RANKS[$tier] ?? 3;
+        $reqRank = TierRanks::RANKS[$tier];
 
-        $hasFullAccess = $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
+        $hasFullAccess = $user && $svc->canManageGallery($user, $gallery->id);
         $isCoveredByFlatrate = $userRank >= $reqRank;
 
         if (! $hasFullAccess && ! $isCoveredByFlatrate && ! $gallery->effective_is_free_download) {
@@ -257,9 +279,8 @@ class PhotoDownloadController extends Controller
             'photo_count' => $photoCount,
         ]);
 
-        return response()->streamDownload(function () use ($gallery, $baseStoragePath, $userName, $tier, $hasFullAccess) {
+        return response()->streamDownload(function () use ($gallery, $baseStoragePath, $userName, $tier, $hasFullAccess, $maxWidth) {
             $zip = new ZipStream(sendHttpHeaders: false);
-            $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
 
             $tempDir = storage_path('app/private/temp');
             if (! is_dir($tempDir)) {
@@ -325,7 +346,7 @@ class PhotoDownloadController extends Controller
         if ($order->is_quote_request && $order->status === 'pending') {
             abort(403, 'Angebot noch nicht abgerechnet.');
         }
-        if (in_array($order->status, ['disputed', 'refunded', 'cancelled'])) {
+        if (! app(PurchaseService::class)->isOrderDownloadEligible($order)) {
             abort(403, 'Zugriff aufgrund des Bestellstatus gesperrt.');
         }
         $snapshot = $order->invoiceSnapshot;
@@ -374,7 +395,9 @@ class PhotoDownloadController extends Controller
                     continue;
                 }
 
-                $maxWidth = ['web' => 2560, 'print' => 4000, 'original' => null][$tier] ?? null;
+                // Tier comes from the persisted order snapshot; an unexpected value
+                // must never fall back to the highest resolution.
+                $maxWidth = self::DOWNLOAD_TIERS[$tier] ?? self::DOWNLOAD_TIERS['web'];
                 $scaledBase = $tempDir.'/base_scale_'.$photo->id.'_'.$tier.'.jpg';
                 $tempFiles[] = $scaledBase;
                 $lockKey = 'scale_'.$photo->id.'_'.$tier;

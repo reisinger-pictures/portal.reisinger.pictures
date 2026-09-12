@@ -78,16 +78,33 @@ export function useBrand() {
     };
 }
 
+let removeThemeListener: (() => void) | null = null;
+
 export function applyTheme() {
+    // Re-apply safe: remove a previous listener before installing a new one.
+    removeThemeListener?.();
+    removeThemeListener = null;
+
     const brand = getBrandFromHostname(window.location.hostname);
     const theme = getBrandTheme(brand);
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
     const setTheme = (dark: boolean) => {
         document.documentElement.setAttribute('data-theme', dark ? theme.dark : theme.light);
         document.documentElement.setAttribute('data-brand', brand);
     };
 
-    setTheme(isDark);
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => setTheme(e.matches));
+    setTheme(mediaQuery.matches);
+
+    const onMediaChange = (e: MediaQueryListEvent) => setTheme(e.matches);
+    mediaQuery.addEventListener('change', onMediaChange);
+    removeThemeListener = () => mediaQuery.removeEventListener('change', onMediaChange);
+}
+
+// HMR-Safety: beim Ersetzen dieses Moduls den alten matchMedia-Listener abräumen.
+if (import.meta.hot) {
+    import.meta.hot.dispose(() => {
+        removeThemeListener?.();
+        removeThemeListener = null;
+    });
 }

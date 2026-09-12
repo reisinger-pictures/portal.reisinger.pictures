@@ -14,6 +14,7 @@ use App\Services\AIService;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -25,7 +26,10 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $credentials = $request->only('email', 'password');
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
 
         $user = User::where('email', $credentials['email'])->first();
         if ($user && $user->password && Hash::check($credentials['password'], $user->password)) {
@@ -111,10 +115,6 @@ class AuthController extends Controller
 
     public function resetPassword(Request $request)
     {
-        if ($request->email === config('admin.email')) {
-            return response()->json(['error' => 'Passwort-Reset für den System-Admin ist deaktiviert.'], 403);
-        }
-
         $request->validate([
             'email' => 'required|email',
             'token' => 'required|string',
@@ -123,7 +123,17 @@ class AuthController extends Controller
 
         $record = DB::table('password_reset_tokens')->where('email', $request->email)->first();
 
-        if (! $record || ! Hash::check($request->token, $record->token)) {
+        // Token expiry: password_reset_tokens.created_at is compared against the
+        // configured broker lifetime (config('auth.passwords.users.expire')).
+        $expireMinutes = (int) config('auth.passwords.users.expire', 60);
+        $expired = $record && $record->created_at
+            && Carbon::parse($record->created_at)->lt(now()->subMinutes($expireMinutes));
+
+        // The system admin reset is disabled, but it must not be distinguishable
+        // from any other invalid/expired token (no account-enumeration oracle).
+        $isSystemAdmin = $request->email === config('admin.email');
+
+        if ($isSystemAdmin || $expired || ! $record || ! Hash::check($request->token, $record->token)) {
             return response()->json(['error' => 'Der Setup-Link ist ungültig oder abgelaufen.'], 400);
         }
 

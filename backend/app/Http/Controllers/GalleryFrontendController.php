@@ -109,7 +109,7 @@ class GalleryFrontendController extends Controller
     {
         $request->validate([
             'rating' => 'required|integer|min:0|max:5',
-            'comment' => 'nullable|string',
+            'comment' => 'nullable|string|max:2000',
         ]);
 
         $photo = Photo::with('gallery')->findOrFail($photoId);

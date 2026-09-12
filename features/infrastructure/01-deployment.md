@@ -42,25 +42,20 @@ status: active
 - **Kommando:** `php artisan admin:update`
 - **Logik:** Synchronisiert beim Start des `backend-init`-Containers den Admin-Nutzer basierend auf den ENV-Variablen `ADMIN_EMAIL` und `ADMIN_PASSWORD`. Dies stellt sicher, dass ein Login auch ohne initiale Datenbank-Seeds sofort möglich ist.
 
-## 8. Local Development Defaults (Intentional)
+## 8. Secrets, Environment & Debug Defaults
 
-Several config files ship with hardcoded fallback values for **zero-config local development**:
+All sensitive config is read strictly via `env(...)` with **no hardcoded fallbacks** anywhere under `backend/config/` (Security-Review C1/C2/C3b):
 
-| Config Key | File | Default Value |
+| Config Key | File | Resolution |
 |---|---|---|
-| `APP_KEY` | `config/app.php` | `base64:jQkBT0mi24S6wKESY5wMW44SUl2HO5Mu+JwzPK/pnHQ=` |
-| `JWT_SECRET` | `config/jwt.php` | `rC2PoXX5CAbw8Ubbr5E58BPsxVo5WZQSaytUuo7vhaQ=` |
-| `STRIPE_KEY` | `config/services.php` | `pk_test_...` (dev-mode only) |
-| `STRIPE_SECRET` | `config/services.php` | `sk_test_...` (dev-mode only) |
-| `DB_PASSWORD` | `config/database.php` | `admin` |
+| `APP_KEY` | `config/app.php` | `env('APP_KEY')` |
+| `JWT_SECRET` | `config/jwt.php` | `env('JWT_SECRET')` |
+| `STRIPE_KEY` / `STRIPE_SECRET` / `STRIPE_WEBHOOK_SECRET` | `config/services.php` | `env(...)`, no `production ? null :` guard |
+| `DB_PASSWORD` | `config/database.php` | `env('DB_PASSWORD')` |
 
-**Policy:** These are **intentionally weak/public defaults** so that `git clone && ./vendor/bin/sail up` (or equivalent) works without any manual `.env` setup. They are **never used in production** because:
-
-- The `backend-init` container explicitly rejects them in production (see §9).
-- Production environments set real values via Portainer environment variables, which override all fallbacks.
-- `config/services.php` has a `production ? null :` guard for Stripe keys.
-
-> **Rule for contributors:** Never rely on these defaults for security. Always set real secrets in `.env` for staging/production. The defaults are for local dev only.
+- **Fail closed:** Missing `APP_KEY`/`JWT_SECRET` aborts the production start (see §9). Blank env values are treated as unset — never silently replaced.
+- **Debug mode:** `APP_DEBUG` defaults to **`false`** (`config/app.php`) and MUST stay `false` in production. Verbose error pages are a local-dev-only opt-in (`.env.example` ships `APP_DEBUG=true`); `docker-compose.yml` defaults to `${APP_DEBUG:-false}`.
+- **Production secrets are machine-local:** `backend/.env.production` (and `deployment/.env.production`) is **untracked/gitignored**. Only key names and placeholder templates live in the repo — real values (DB, SMTP/ZeptoMail, Stripe live keys) are provided per host via Portainer env / the local env file. Never commit or quote secret values.
 
 ## 9. Produktion-Sicherheits-Gatekeeper
 - **Validierung:** Der `backend`-Container verweigert den Start in 'production', wenn `APP_KEY` oder `JWT_SECRET` nicht gesetzt sind (leer). Die Prüfung erfolgt generisch ohne hartcodierte Schlüsselwerte, um eine erneute Exposition über das Repository zu vermeiden.
@@ -93,3 +88,7 @@ Das `app:search-rebuild`-Command flushed alle 5 Indizes (Photo, Gallery, Locatio
 - **Die Lösung:** Nach einem Rclone-Sync von Backend-Dateien muss der PHP-Container (PHP-FPM) zwingend neu gestartet werden, um den Cache zu leeren:
   `docker restart portal_backend`
 - **App-Cache (2026-08-17):** Das `command`-Block des Backend-Containers führt bei jedem Start `php artisan cache:clear` aus. Damit werden forever-gecachte Werte wie `laravel_build_time` (System-Info-Seite) bei jedem Deploy/Neustart frisch berechnet — der Timestamp ist die neueste mtime **aller** PHP-Dateien (exkl. `vendor/`, `storage/`, `bootstrap/cache/`), nicht nur einzelner Verzeichnisse.
+
+## 12. Frontend E2E-Artefakte (Playwright, CI)
+- **Traces werden im CI nie aufgezeichnet oder hochgeladen.** `frontend/playwright.config.ts` setzt `trace` unter `CI` auf `off`; Grund: Ein Trace serialisiert den Browser-Storage inkl. httpOnly-Auth-Cookies, und dieses Repository ist öffentlich — CI-Artefakte wären weltlesbar. Lokales Tracing ist explizit per `PW_TRACE=1` opt-in (`on-first-retry`).
+- **Video ist global deaktiviert** (`video: 'off'`).

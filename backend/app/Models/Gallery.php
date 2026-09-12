@@ -2,17 +2,19 @@
 
 namespace App\Models;
 
-use App\Enums\Brand;
+use App\Casts\AsBrand;
+use App\Services\GalleryTreeService;
 use App\Support\BrandRegistry;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Laravel\Scout\Searchable;
 
 class Gallery extends Model
 {
     use HasFactory, HasUuids;
-
     use Searchable;
 
     protected $visible = [
@@ -22,7 +24,7 @@ class Gallery extends Model
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
         'org_ids', 'brand', 'licensing_mode', 'effective_licensing_mode',
         'volume_preset_id',
-        'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers'
+        'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers',
     ];
 
     protected $fillable = [
@@ -51,14 +53,14 @@ class Gallery extends Model
         'brand',
         'licensing_mode',
         'volume_preset_id',
-        'expires_at'
+        'expires_at',
     ];
 
     protected $casts = [
         'is_public' => 'boolean',
         'is_live' => 'boolean',
         'allow_client_metadata_edit' => 'boolean',
-        'brand' => \App\Casts\AsBrand::class,
+        'brand' => AsBrand::class,
         'apply_metadata_to_photos' => 'boolean',
         'expires_at' => 'datetime',
         'is_free_download' => 'boolean',
@@ -75,8 +77,12 @@ class Gallery extends Model
             return $this->licensing_mode;
         }
 
+        // Prefer the gallery's own brand so the mode is correct even when the
+        // gallery is rendered while another brand is the active context.
+        $brand = $this->brand ?? BrandRegistry::currentOrDefault();
+
         return Setting::where('key', 'pricing_strategy')
-            ->where('brand', BrandRegistry::currentOrDefault())
+            ->where('brand', $brand)
             ->value('value') ?? 'scope_licensing';
     }
 
@@ -92,8 +98,13 @@ class Gallery extends Model
 
     public function getEffectiveRestrictedPhotographersAttribute(): bool
     {
-        if ($this->restricted_photographers !== null) return (bool) $this->restricted_photographers;
-        if ($this->galleryGroup) return $this->galleryGroup->effective_restricted_photographers;
+        if ($this->restricted_photographers !== null) {
+            return (bool) $this->restricted_photographers;
+        }
+        if ($this->galleryGroup) {
+            return $this->galleryGroup->effective_restricted_photographers;
+        }
+
         return false;
     }
 
@@ -115,28 +126,28 @@ class Gallery extends Model
             }
             $visited[$group->id] = true;
 
-            $path = $group->slug . '/' . $path;
+            $path = $group->slug.'/'.$path;
             $group = $group->parent;
         }
 
-        return 'galleries/' . $path;
+        return 'galleries/'.$path;
     }
 
     protected static function booted()
     {
         static::saved(function (self $gallery) {
-            \Illuminate\Support\Facades\DB::afterCommit(function() {
-                app(\App\Services\GalleryTreeService::class)->clearCache();
+            DB::afterCommit(function () {
+                app(GalleryTreeService::class)->clearCache();
             });
             if ($gallery->wasRecentlyCreated || $gallery->wasChanged('restricted_photographers')) {
-                \Illuminate\Support\Facades\Cache::forget('unrestricted_photographer_gallery_ids');
+                Cache::forget('unrestricted_photographer_gallery_ids');
             }
         });
         static::deleted(function () {
-            \Illuminate\Support\Facades\DB::afterCommit(function() {
-                app(\App\Services\GalleryTreeService::class)->clearCache();
+            DB::afterCommit(function () {
+                app(GalleryTreeService::class)->clearCache();
             });
-            \Illuminate\Support\Facades\Cache::forget('unrestricted_photographer_gallery_ids');
+            Cache::forget('unrestricted_photographer_gallery_ids');
         });
     }
 
@@ -167,9 +178,10 @@ class Gallery extends Model
 
     public function getOrgIdsAttribute(): array
     {
-        if (!$this->relationLoaded('orgs')) {
-            return [];
+        if (! $this->relationLoaded('orgs')) {
+            $this->load('orgs');
         }
+
         return $this->orgs->pluck('id')->toArray();
     }
 

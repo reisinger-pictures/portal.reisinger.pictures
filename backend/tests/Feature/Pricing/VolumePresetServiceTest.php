@@ -139,4 +139,21 @@ class VolumePresetServiceTest extends TestCase
 
         $this->assertSame($default->id, $this->service->resolveForGallery($gallery)->id);
     }
+
+    public function test_for_brand_prefers_the_default_preset(): void
+    {
+        $this->service->create('A', [['min_quantity' => 0, 'price_cents' => 1000]]);
+        $second = $this->service->create('B', [['min_quantity' => 0, 'price_cents' => 2000]]);
+        $this->service->setDefault($second);
+
+        $this->assertSame($second->id, VolumePreset::forBrand(Brand::B2B)?->id);
+    }
+
+    public function test_for_brand_falls_back_to_any_preset_without_default_flag(): void
+    {
+        $preset = $this->service->create('Only', [['min_quantity' => 0, 'price_cents' => 1000]]);
+        VolumePreset::where('id', $preset->id)->update(['is_default' => false]);
+
+        $this->assertSame($preset->id, VolumePreset::forBrand(Brand::B2B)?->id);
+    }
 }

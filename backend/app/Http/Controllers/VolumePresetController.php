@@ -49,6 +49,8 @@ class VolumePresetController extends Controller
             'tiers.*.price_cents' => 'required|integer|min:0',
         ]);
 
+        $this->validateTierMonotonicity($data['tiers']);
+
         $preset = $this->presetService->create($data['name'], $data['tiers']);
         return response()->json($this->serialize($preset));
     }
@@ -65,6 +67,8 @@ class VolumePresetController extends Controller
             'tiers.*.min_quantity' => 'required|integer|min:0',
             'tiers.*.price_cents' => 'required|integer|min:0',
         ]);
+
+        $this->validateTierMonotonicity($data['tiers']);
 
         $preset = $this->presetService->update($preset, $data['name'], $data['tiers']);
         return response()->json($this->serialize($preset));
@@ -93,6 +97,42 @@ class VolumePresetController extends Controller
         $preset = $this->presetService->setDefault($preset);
 
         return response()->json($this->serialize($preset));
+    }
+
+    /**
+     * A volume preset must be monotonic: `min_quantity` strictly increases and
+     * `price_cents` strictly decreases per tier. Non-monotonic or duplicate
+     * tiers make the qualifying-tier price ambiguous and are rejected with 422.
+     *
+     * @param  array<int, array{min_quantity: int|string, price_cents: int|string}>  $tiers
+     */
+    private function validateTierMonotonicity(array $tiers): void
+    {
+        $sorted = collect($tiers)
+            ->sortBy(fn ($tier) => (int) $tier['min_quantity'])
+            ->values();
+
+        $errors = [];
+        $previousMin = null;
+        $previousPrice = null;
+
+        foreach ($sorted as $index => $tier) {
+            $minQuantity = (int) $tier['min_quantity'];
+            $priceCents = (int) $tier['price_cents'];
+
+            if ($previousMin !== null && $minQuantity <= $previousMin) {
+                $errors["tiers.{$index}.min_quantity"] = 'Die Mindestmenge muss pro Stufe streng ansteigen.';
+            } elseif ($previousPrice !== null && $priceCents >= $previousPrice) {
+                $errors["tiers.{$index}.price_cents"] = 'Der Preis muss mit steigender Menge streng sinken.';
+            }
+
+            $previousMin = $minQuantity;
+            $previousPrice = $priceCents;
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     private function serialize(VolumePreset $preset): array

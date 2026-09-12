@@ -74,6 +74,12 @@ class GalleryController extends Controller
     public function deleteGroup($id)
     {
         $group = GalleryGroup::findOrFail($id);
+        $user = auth('api')->user();
+        $svc = app(AuthorizationService::class);
+        if (! $user || ! $svc->canManageGalleryGroup($user, $group)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         $group->delete();
 
         return response()->json(['success' => true]);
@@ -154,10 +160,18 @@ class GalleryController extends Controller
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 
+        if (! $user || ! $svc->sharesBrand($user, $group->brand)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
         $groupIds = $this->galleryTreeService->getAllSubgroupIds($group);
         $groupIds[] = $group->id;
 
-        $galleryIds = Gallery::whereIn('gallery_group_id', $groupIds)->pluck('id')->toArray();
+        $galleryQuery = Gallery::whereIn('gallery_group_id', $groupIds);
+        if ($user->brand !== null) {
+            $galleryQuery->where('brand', $user->brand);
+        }
+        $galleryIds = $galleryQuery->pluck('id')->toArray();
 
         if (! $svc->isAdmin($user)) {
             $allowedGalleryIds = $user->getAllowedGalleryIds();
@@ -236,7 +250,7 @@ class GalleryController extends Controller
         $targetUser = User::findOrFail($validated['user_id']);
 
         $group = GalleryGroup::findOrFail($id);
-        if (! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user) && ! ($svc->isPhotographer($user) && $user->photographerGalleryGroups()->where('gallery_groups.id', $group->id)->exists())) {
+        if (! $user || ! $svc->canManageGalleryGroup($user, $group)) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
 

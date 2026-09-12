@@ -1,8 +1,10 @@
 <?php
 
 return [
-    // Wir machen den neuen Gmail REST Transport zum Standard!
-    'default' => env('MAIL_MAILER', 'smtp'),
+    // Safe default: without an explicit MAIL_MAILER the app writes mail to the
+    // log instead of silently attempting localhost:1025 (which fails on
+    // production). Local dev sets MAIL_MAILER=smtp (Mailpit) in .env.
+    'default' => env('MAIL_MAILER', 'log'),
 
     'mailers' => [
         // ... Laravel's Standard Mailer ...
@@ -16,7 +18,7 @@ return [
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ],
-        
+
         // UNSER NEUER CUSTOM MAILER
         'gmail_rest' => [
             'transport' => 'gmail_rest',

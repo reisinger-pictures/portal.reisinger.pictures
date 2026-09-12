@@ -42,6 +42,7 @@ export interface GalleryGroupExtraOpts {
     is_free_download?: boolean;
     is_editorial_only?: boolean;
     is_hidden?: boolean;
+    org_id?: string | null;
 }
 
 export interface GalleryMetadataOpts {

@@ -45,15 +45,15 @@ export default function CreateUserModal({ isOpen, onClose, onCreate }: Props) {
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
                 <h3 className="font-bold text-lg mb-4"><Trans>Neuen Nutzer einladen</Trans></h3>
                 <p className="text-sm opacity-70 mb-4"><Trans>Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen.</Trans></p>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
                     <div className="form-control">
                         <label className="label"><span className="label-text font-bold"><Trans>Name</Trans></span></label>
-                        <input type="text" {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
+                        <input type="text" required {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
                         {errors.name && <span className="text-error text-sm mt-1">{errors.name.message}</span>}
                     </div>
                     <div className="form-control">
                         <label className="label"><span className="label-text font-bold"><Trans>E-Mail Adresse</Trans></span></label>
-                        <input type="email" {...register('email')} className={`input input-bordered ${errors.email ? 'input-error' : ''}`} />
+                        <input type="email" required {...register('email')} className={`input input-bordered ${errors.email ? 'input-error' : ''}`} />
                         {errors.email && <span className="text-error text-sm mt-1">{errors.email.message}</span>}
                     </div>
                     <div className="modal-action col-span-full">

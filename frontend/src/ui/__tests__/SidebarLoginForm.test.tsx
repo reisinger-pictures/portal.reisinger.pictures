@@ -36,6 +36,12 @@ describe('SidebarLoginForm', () => {
         expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument();
     });
 
+    it('marks email and password as required', () => {
+        renderForm();
+        expect(screen.getByPlaceholderText('E-Mail Adresse')).toBeRequired();
+        expect(screen.getByPlaceholderText('Passwort')).toBeRequired();
+    });
+
     it('shows validation error for empty email', async () => {
         const user = userEvent.setup();
         renderForm();

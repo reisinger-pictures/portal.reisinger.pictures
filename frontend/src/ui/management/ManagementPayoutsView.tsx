@@ -68,13 +68,18 @@ export default function ManagementPayoutsView() {
                     <div className="form-control w-full md:w-32">
                         <label className="label"><span className="label-text font-bold"><Trans>Monat</Trans></span></label>
                         <input type="number" min="1" max="12" value={month}
-                               onChange={e => setMonth(parseInt(e.target.value))}
+                               onChange={e => {
+                                   const parsed = parseInt(e.target.value, 10);
+                                   setMonth(Number.isNaN(parsed) ? 1 : parsed);
+                               }}
                                className="input input-bordered" required/>
                     </div>
                     <div className="form-control w-full md:w-32">
                         <label className="label"><span className="label-text font-bold"><Trans>Jahr</Trans></span></label>
-                        <input type="number" min="2024" value={year} onChange={e => setYear(parseInt(e.target.value))}
-                               className="input input-bordered" required/>
+                        <input type="number" min="2024" value={year} onChange={e => {
+                            const parsed = parseInt(e.target.value, 10);
+                            setYear(Number.isNaN(parsed) ? new Date().getFullYear() : parsed);
+                        }} className="input input-bordered" required/>
                     </div>
                     <div className="form-control w-full md:w-48">
                         <label className="label">

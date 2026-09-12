@@ -108,6 +108,66 @@ describe('useAuth', () => {
         vi.unstubAllGlobals();
     });
 
+    it('login surfaces the backend error message instead of a generic one', async () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: false,
+            status: 401,
+            json: () => Promise.resolve({ message: 'Zugangsdaten ungültig' }),
+        }));
+
+        const { result } = renderHook(() => useAuth());
+        await expect(result.current.login('a@b.com', 'secret')).rejects.toThrow('Zugangsdaten ungültig');
+
+        vi.unstubAllGlobals();
+    });
+
+    it('login falls back to the generic message when the error body is not JSON', async () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: false,
+            status: 500,
+            json: () => Promise.reject(new Error('not json')),
+        }));
+
+        const { result } = renderHook(() => useAuth());
+        await expect(result.current.login('a@b.com', 'secret')).rejects.toThrow('Login fehlgeschlagen.');
+
+        vi.unstubAllGlobals();
+    });
+
+    it('register surfaces the backend error message instead of crashing on a non-JSON body', async () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: undefined,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: false,
+            status: 500,
+            json: () => Promise.reject(new Error('not json')),
+        }));
+
+        const { result } = renderHook(() => useAuth());
+        await expect(result.current.register('Max', 'max@test.com')).rejects.toThrow('Registrierung fehlgeschlagen');
+
+        vi.unstubAllGlobals();
+    });
+
     it('logout calls fetch and revalidates', async () => {
         const mockMutate = vi.fn();
         vi.mocked(useSWR).mockReturnValue({

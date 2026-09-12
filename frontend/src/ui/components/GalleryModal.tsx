@@ -96,6 +96,13 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         forcedVisibility = false;
     }
 
+    // Sync the forced (disabled) visibility into the form value so a submit can
+    // never send a privacy that the UI is not actually showing.
+    useEffect(() => {
+        if (!isVisibilityForced) return;
+        setValue('is_public', forcedVisibility ?? false);
+    }, [isVisibilityForced, forcedVisibility, setValue]);
+
     const onSubmit = async (data: GalleryFormValues) => {
         const pId = data.gallery_group_id === '' ? null : data.gallery_group_id;
         const metaOpts = { 

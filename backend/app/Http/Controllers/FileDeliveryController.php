@@ -32,7 +32,9 @@ class FileDeliveryController extends Controller
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
         $isExpired = $gallery->expires_at && Carbon::parse($gallery->expires_at)->isPast();
-        $canManage = $user && ($svc->isAdmin($user) || ($svc->isPhotographer($user) && $svc->canAccessGallery($user, $gallery->id)));
+        // Brand-aware management check: a foreign-brand or unassigned photographer
+        // must not inherit management/watermark-bypass rights.
+        $canManage = $user && $svc->canManageGallery($user, $gallery->id);
 
         if ($isExpired && ! $canManage) {
             return response()->json(['error' => 'Galerie abgelaufen'], 403);
@@ -53,7 +55,10 @@ class FileDeliveryController extends Controller
         $logicalNeedsWatermark = true;
         if ($gallery->effective_is_free_download) {
             $logicalNeedsWatermark = false;
-        } elseif ($user && ($svc->isAdmin($user) || $svc->isPhotographer($user))) {
+        } elseif ($canManage) {
+            // Only brand-authorized admins and actually-assigned photographers may
+            // bypass the watermark. A photographer without access to a public
+            // `restricted_photographers` gallery must still get watermarked files.
             $logicalNeedsWatermark = false;
         } elseif ($user && $svc->canAccessGallery($user, $gallery->id)) {
             if ((TierRanks::RANKS[$user->flatrate_level ?? 'none'] ?? 0) >= 1) {

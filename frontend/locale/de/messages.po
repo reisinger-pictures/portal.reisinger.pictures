@@ -3672,8 +3672,12 @@ msgid "Nutzerrechte gespeichert."
 msgstr "Nutzerrechte gespeichert."
 
 #: src/ui/management/ManagementOrdersView.tsx
-msgid "Nutzungsrechte (optional)"
-msgstr "Nutzungsrechte (optional)"
+msgid "Nutzungsrechte"
+msgstr "Nutzungsrechte"
+
+#: src/ui/management/ManagementOrdersView.tsx
+#~ msgid "Nutzungsrechte (optional)"
+#~ msgstr "Nutzungsrechte (optional)"
 
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Ø Sterne"

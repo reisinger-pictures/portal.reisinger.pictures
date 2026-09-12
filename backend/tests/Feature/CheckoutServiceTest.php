@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Contracts\PricingStrategy;
 use App\Enums\Brand;
+use App\Mail\InvoiceMail;
 use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
@@ -16,6 +17,8 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Services\CheckoutService;
+use App\Services\PurchaseService;
+use App\Services\StripePaymentService;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -574,9 +577,10 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 16. Coupon-Rabatt macht Warenkorb wertlos -> 400
+    // 16. 100%-Coupon -> Warenkorb auf 0 -> kostenlose, settled Order
+    //     (kein Stripe-Call), Download freigeschaltet.
     // ------------------------------------------------------------------
-    public function test_process_checkout_with_coupon_that_makes_total_zero(): void
+    public function test_process_checkout_with_full_discount_creates_settled_free_order(): void
     {
         BrandRegistry::set(Brand::B2B);
 
@@ -597,8 +601,8 @@ class CheckoutServiceTest extends TestCase
             $strategy = $this->createStub(PricingStrategy::class);
             $strategy->method('calculateCart')->willReturn([
                 'items' => [
-                    ['itemId' => $photo1->id, 'priceCents' => 0, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-                    ['itemId' => $photo2->id, 'priceCents' => 0, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+                    ['itemId' => $photo1->id, 'priceCents' => 0, 'tier' => 'original', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+                    ['itemId' => $photo2->id, 'priceCents' => 0, 'tier' => 'original', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
                 ],
                 'totalCents' => 0,
                 'discountCents' => 6000,
@@ -606,16 +610,74 @@ class CheckoutServiceTest extends TestCase
                 'couponType' => 'fixed',
             ]);
 
-            $this->service = new CheckoutService($strategy);
+            // Amount 0 must never produce a PaymentIntent.
+            $stripe = $this->createMock(StripePaymentService::class);
+            $stripe->expects($this->never())->method('createPaymentIntent');
+
+            Mail::fake();
+
+            $this->service = new CheckoutService($strategy, $stripe);
 
             $response = $this->service->processCheckout(
                 $this->makeRequest(
                     [
-                        ['photoId' => $photo1->id, 'tier' => 'srp'],
-                        ['photoId' => $photo2->id, 'tier' => 'srp'],
+                        ['photoId' => $photo1->id, 'tier' => 'original'],
+                        ['photoId' => $photo2->id, 'tier' => 'original'],
                     ],
                     ['coupon_code' => 'ZERO60']
                 ),
+                $user,
+                'stripe'
+            );
+
+            $this->assertEquals(200, $response->status());
+
+            $order = Order::first();
+            $this->assertNotNull($order);
+            $this->assertSame(0, $order->total_amount);
+            $this->assertSame('paid', $order->status);
+            $this->assertNull($order->stripe_payment_intent_id);
+            $this->assertSame(1, InvoiceSnapshot::count());
+
+            Mail::assertQueued(InvoiceMail::class);
+
+            $purchaseService = app(PurchaseService::class);
+            $this->assertTrue($purchaseService->isOrderDownloadEligible($order));
+            $this->assertTrue($purchaseService->hasPurchasedPhoto($user, $photo1->id, 'original'));
+        } finally {
+            BrandRegistry::reset();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 17. Negativer Total -> 400 (keine Order).
+    // ------------------------------------------------------------------
+    public function test_process_checkout_negative_total_is_rejected(): void
+    {
+        BrandRegistry::set(Brand::B2B);
+
+        try {
+            $gallery = Gallery::factory()->create(['is_public' => true]);
+            $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+            $user = User::factory()->create();
+
+            $strategy = $this->createStub(PricingStrategy::class);
+            $strategy->method('calculateCart')->willReturn([
+                'items' => [
+                    ['itemId' => $photo->id, 'priceCents' => -100, 'tier' => 'srp', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+                ],
+                'totalCents' => -100,
+                'discountCents' => 0,
+                'couponId' => null,
+                'couponType' => null,
+            ]);
+
+            Mail::fake();
+
+            $this->service = new CheckoutService($strategy);
+
+            $response = $this->service->processCheckout(
+                $this->makeRequest([['photoId' => $photo->id, 'tier' => 'srp']]),
                 $user,
                 'invoice'
             );

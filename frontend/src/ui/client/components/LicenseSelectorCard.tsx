@@ -197,6 +197,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                     {finalPrice === 0 ? (
                         <a href={`/api/photos/${photo.id}/download?tier=${photo?.gallery?.effective_is_free_download ? 'original' : selectedUseCase?.flatrate_tier}`}
                            target="_blank"
+                           rel="noopener noreferrer"
                            className="btn btn-success btn-md text-white w-full shadow-sm"><span
                             className="iconify mdi--download text-lg"></span> <Trans>Download</Trans></a>
                     ) : canBuy ? (
@@ -215,6 +216,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
                     {hasFullAccess && (
                         <a href={`/api/photos/${photo.id}/download?tier=original`}
                            target="_blank"
+                           rel="noopener noreferrer"
                            className="btn btn-outline btn-neutral btn-sm w-full shadow-sm mt-1">
                             <span className="iconify mdi--shield-check-outline text-lg"></span> <Trans>Admin Download</Trans>
                         </a>

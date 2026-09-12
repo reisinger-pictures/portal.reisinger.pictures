@@ -188,4 +188,22 @@ describe('ManagementOrdersView', () => {
         expect(showToast).toHaveBeenCalledWith('success', 'Angebot per E-Mail gesendet!');
         expect(mutate).toHaveBeenCalled();
     });
+
+    it('does not label the rights field as optional', async () => {
+        const user = userEvent.setup();
+
+        vi.mocked(useSWR).mockReturnValue({
+            data: mockOrders,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        renderView();
+
+        await user.click(screen.getByText('Kalkulieren & Antworten'));
+
+        expect(screen.getByText('Nutzungsrechte')).toBeInTheDocument();
+        expect(screen.queryByText(/\(optional\)/i)).not.toBeInTheDocument();
+    });
 });

@@ -9,6 +9,7 @@ use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\InvoiceSequence;
 use App\Models\InvoiceSnapshot;
+use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
 use App\Models\Order;
 use App\Models\Photo;
@@ -110,7 +111,21 @@ class CheckoutService
                 $customConditions = null;
             }
 
-            if ($totalNetCents <= 0 && ! $isQuoteRequest && $quoteToken === null) {
+            // A signed quote token must carry a positive amount. A €0/negative
+            // offer would otherwise create a downloadable order for free.
+            if ($quoteToken !== null && $totalNetCents <= 0) {
+                return response()->json(['error' => 'Angebot ist ungültig.'], 422);
+            }
+
+            // A negative total is never legitimate.
+            if ($totalNetCents < 0) {
+                return response()->json(['error' => 'Warenkorb hat keinen Wert.'], 400);
+            }
+
+            // A zero total is only legitimate when a real discount reduced a
+            // positive cart to zero. An empty/valueless cart (e.g. a flatrate-
+            // covered cart without a coupon) stays rejected.
+            if ($totalNetCents === 0 && ! $isQuoteRequest && $quoteToken === null && $couponDiscountCents <= 0) {
                 return response()->json(['error' => 'Warenkorb hat keinen Wert.'], 400);
             }
 
@@ -167,6 +182,20 @@ class CheckoutService
                     $isCommercial = $useCase->is_commercial || preg_match('/werbung|kampagne|kommerziell/i', $useCase->name.' '.$useCase->description);
                     if ($isCommercial && ($photo->effective_is_editorial_only || $photo->is_editorial_only)) {
                         throw new HttpResponseException(response()->json(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."], 403));
+                    }
+                }
+            }
+
+            // Cross-brand license modifiers must be rejected with a 4xx instead of
+            // bubbling up as a RuntimeException from the pricing strategy (500).
+            if (! $isItemQuote && ! empty($item['modifierIds'])) {
+                $currentBrand = BrandRegistry::current();
+                if ($currentBrand !== null) {
+                    $modifiers = LicenseModifier::whereIn('id', $item['modifierIds'])->get();
+                    foreach ($modifiers as $modifier) {
+                        if ($modifier->brand !== null && $modifier->brand !== $currentBrand) {
+                            throw new HttpResponseException(response()->json(['error' => 'Ungültige Lizenz-Auswahl.'], 422));
+                        }
                     }
                 }
             }
@@ -428,6 +457,12 @@ class CheckoutService
             return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
         }
 
+        // A €0 order fully covered by a valid discount (100%-off coupon / free
+        // package) is already settled. Stripe must never be called with amount 0.
+        if ($totalNetCents === 0) {
+            return $this->respondForSettledFreeOrder($order, $user);
+        }
+
         $org = $user->org;
         $isLieferschein = $org && $org->invoice_frequency !== 'immediate';
 
@@ -453,5 +488,25 @@ class CheckoutService
         }
 
         return response()->json(['success' => true, 'requires_action' => true, 'client_secret' => $paymentResult['client_secret'], 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
+    }
+
+    /**
+     * Fulfil a €0 order that was fully covered by a valid discount.
+     *
+     * No payment is due, so no PaymentIntent is created. The order is moved to a
+     * settled, download-eligible status (unless the Org invoice/Lieferschein flow
+     * already assigned one) and the usual invoice/confirmation is sent.
+     */
+    private function respondForSettledFreeOrder(Order $order, $user): JsonResponse
+    {
+        if ($order->status === 'pending_payment') {
+            $order->update(['status' => 'paid']);
+        }
+
+        $snapshot = $order->invoiceSnapshot;
+
+        Mail::to($user->email)->queue(new InvoiceMail($order, $snapshot));
+
+        return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
     }
 }

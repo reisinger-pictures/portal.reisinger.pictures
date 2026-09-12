@@ -132,15 +132,22 @@ export class KanbanHelper {
         const attempts = 3;
         for (let attempt = 1; attempt <= attempts; attempt++) {
             await this.performDragAttempt(card, target, cardText, targetLabel, opts);
-            await this.page.waitForTimeout(400);
-            const ok = opts?.verify
-                ? await opts.verify()
-                : (await target.getByText(cardText, { exact: false }).count()) > 0;
+            // Bedingungsbasiertes Settle statt fester 400ms-Sleep: pollt dasselbe
+            // Erfolgskriterium wie die Retry-Logik, damit ein schneller Drop sofort
+            // weiterläuft und ein langsamer bis zu 2s Zeit bekommt.
+            const ok = await expect
+                .poll(
+                    async () => (opts?.verify
+                        ? await opts.verify()
+                        : (await target.getByText(cardText, { exact: false }).count()) > 0),
+                    { timeout: 2000, intervals: [100, 200, 400] },
+                )
+                .toBe(true)
+                .then(() => true, () => false);
             if (ok) {
                 break;
             }
             console.warn(`[KanbanHelper] dragCard "${cardText}" → ${targetLabel}: nach Versuch ${attempt}/${attempts} noch nicht am Ziel — neuer Versuch`);
-            await this.page.waitForTimeout(700);
         }
 
         await expect(this.column(targetLabel)).toContainText(cardText, { timeout: 10000 });
@@ -192,8 +199,9 @@ export class KanbanHelper {
         const resetTargetScroll = async () => {
             const scrollable = target.locator('.overflow-y-auto');
             if (await scrollable.count()) {
-                await scrollable.first().evaluate((el) => { el.scrollTop = 0; });
-                await this.page.waitForTimeout(80);
+                const scroller = scrollable.first();
+                await scroller.evaluate((el) => { el.scrollTop = 0; });
+                await expect(scroller).toHaveJSProperty('scrollTop', 0);
             }
         };
 
@@ -228,6 +236,10 @@ export class KanbanHelper {
             const edgeX = dropPoint.x > vp.width / 2 ? vp.width - 12 : 12;
             for (let i = 0; i < 100; i++) {
                 await this.page.mouse.move(edgeX, edgeY);
+                // Bewusst zeitbasiert: Der Browser-Auto-Scroll ist eine native,
+                // nicht adressierbare Animation; die kleine Dwell-Zeit lässt sie
+                // fortschreiten, bevor die Zielbox neu vermessen wird. Die
+                // Abbruchbedingung ist dagegen inhaltlich (candidate im Viewport).
                 await this.page.waitForTimeout(30);
                 const targetBox = await target.boundingBox();
                 if (!targetBox) break;

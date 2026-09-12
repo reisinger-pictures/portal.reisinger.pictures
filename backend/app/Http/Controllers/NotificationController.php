@@ -45,6 +45,12 @@ class NotificationController extends Controller {
         $user = auth('api')->user();
         if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
 
+        // Guests have no persistent user row (user_galleries.user_id is NOT NULL),
+        // so a guest opt-in can never be stored safely. Registered users only.
+        if (!$user->id) {
+            return response()->json(['error' => 'Gäste können keine Benachrichtigungen abonnieren.'], 403);
+        }
+
         // IDOR guard: only users who can access the gallery may toggle notifications for it.
         if (!$user->canAccessGallery($id)) {
             return response()->json(['error' => 'Forbidden'], 403);
@@ -61,6 +67,12 @@ class NotificationController extends Controller {
         $request->validate(['wants_notifications' => 'required|boolean']);
         $user = auth('api')->user();
         if (!$user) return response()->json(['error' => 'Unauthenticated'], 401);
+
+        // Guests have no persistent user row (user_gallery_groups.user_id is NOT NULL),
+        // so a guest opt-in can never be stored safely. Registered users only.
+        if (!$user->id) {
+            return response()->json(['error' => 'Gäste können keine Benachrichtigungen abonnieren.'], 403);
+        }
 
         // IDOR guard: only users who belong to the group may toggle notifications for it.
         if (!$user->galleryGroups()->where('gallery_groups.id', $id)->exists()) {

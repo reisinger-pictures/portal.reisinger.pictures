@@ -53,7 +53,7 @@ class StoreBrandSettingsRequest extends FormRequest
             'secondary_color' => ['sometimes', 'nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'frontend_url' => ['sometimes', 'nullable', 'url'],
             'from_address' => ['sometimes', 'nullable', 'email'],
-            'from_name' => ['sometimes', 'nullable', 'email'],
+            'from_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'accounting_email' => ['sometimes', 'nullable', 'email'],
             'features.orgs' => ['sometimes', 'nullable', 'boolean'],
         ];

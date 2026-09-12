@@ -1,7 +1,8 @@
-import {describe, it, expect} from 'vitest';
+import {describe, it, expect, vi, afterEach} from 'vitest';
 import {
     getBrandFromHostname,
     getBrandTheme,
+    applyTheme,
 } from '../brandRegistry';
 
 describe('brandRegistry', () => {
@@ -47,6 +48,34 @@ describe('brandRegistry', () => {
             const theme = getBrandTheme('unknown');
             expect(theme.light).toBe('rp-light');
             expect(theme.dark).toBe('rp-dark');
+        });
+    });
+
+    describe('applyTheme', () => {
+        afterEach(() => {
+            vi.unstubAllGlobals();
+        });
+
+        it('removes the previous matchMedia change listener on re-apply', () => {
+            const addEventListener = vi.fn();
+            const removeEventListener = vi.fn();
+            const mediaQueryList = {
+                matches: false,
+                media: '(prefers-color-scheme: dark)',
+                onchange: null,
+                addEventListener,
+                removeEventListener,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            } as unknown as MediaQueryList;
+            vi.stubGlobal('matchMedia', vi.fn(() => mediaQueryList));
+
+            applyTheme();
+            applyTheme();
+
+            expect(addEventListener).toHaveBeenCalledTimes(2);
+            expect(removeEventListener).toHaveBeenCalledTimes(1);
         });
     });
 });

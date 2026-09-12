@@ -9,6 +9,12 @@ on:
   push:
   pull_request:
 
+# Least privilege: CI only reads the repository. Container images are pulled
+# anonymously from public GHCR (no `packages` scope needed) and artifact
+# uploads use the runner's runtime token.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

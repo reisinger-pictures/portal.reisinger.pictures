@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\CustomMail;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
@@ -257,6 +258,7 @@ class StripeWebhookTest extends TestCase
             'data' => [
                 'object' => [
                     'payment_intent' => 'pi_refund_123',
+                    'refunded' => true,
                 ],
             ],
         ];
@@ -304,7 +306,7 @@ class StripeWebhookTest extends TestCase
             'status' => 'disputed',
         ]);
 
-        Mail::assertQueued(\App\Mail\CustomMail::class, 1);
+        Mail::assertQueued(CustomMail::class, 1);
 
         $this->postJson('/api/webhooks/stripe', $payloadData, [
             'Stripe-Signature' => $sigHeader,
@@ -315,7 +317,7 @@ class StripeWebhookTest extends TestCase
             'status' => 'disputed',
         ]);
 
-        Mail::assertQueued(\App\Mail\CustomMail::class, 1);
+        Mail::assertQueued(CustomMail::class, 1);
     }
 
     public function test_refunded_webhook_is_idempotent(): void
@@ -333,6 +335,7 @@ class StripeWebhookTest extends TestCase
             'data' => [
                 'object' => [
                     'payment_intent' => 'pi_refund_idemp_123',
+                    'refunded' => true,
                 ],
             ],
         ];
