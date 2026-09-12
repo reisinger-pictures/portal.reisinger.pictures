@@ -14,9 +14,12 @@ use App\Services\CouponService;
  *
  * The preset holds an arbitrary number of tiers (position, min_quantity,
  * price_cents). All non-quote items are priced at the base tier price (the
- * tier with the smallest min_quantity); the tier that applies is determined by
- * the total count of non-quote items, and the volume discount is itemized as
- * `tier_breakdown` discount_fixed lines (one per step below the qualifying tier).
+ * tier with the smallest min_quantity); the qualifying tier is the one with the
+ * highest min_quantity that is still <= the total count of non-quote items. The
+ * resulting volume discount is itemized as `tier_breakdown` discount_fixed
+ * lines: one per step for monotonic presets, or a single aggregate line when the
+ * tier prices are non-monotonic/duplicate. In both cases the breakdown sums to
+ * the qualifying tier price, so item lines and total stay consistent.
  *
  * Quote items are 0 cents and do not count toward the volume tier.
  */
@@ -183,36 +186,80 @@ class VolumeLicensingStrategy implements PricingStrategy
     }
 
     /**
-     * Build the retroactive discount lines: one step per tier below the
-     * qualifying tier, priced as the difference to the next tier.
+     * Build the retroactive discount lines.
+     *
+     * The authoritative price for the cart is the qualifying tier's price. As
+     * long as every higher tier is strictly cheaper, the discount can be
+     * itemized progressively: one line per step below the qualifying tier,
+     * priced as the difference to the next tier. For non-monotonic or
+     * inconsistent tier data (a higher `min_quantity` that is not cheaper) the
+     * per-step differences no longer telescope to the qualifying price, so a
+     * single accurate aggregate line is emitted instead. In both cases the sum
+     * of `row_total` equals `nonQuoteCount × (basePrice − qualifyingPrice)`,
+     * which keeps the itemized invoice consistent with `totalCents`.
      */
     private function buildTierBreakdown(int $qualifyingIndex, int $nonQuoteCount): array
     {
         $breakdown = [];
 
-        if ($nonQuoteCount <= 0 || $qualifyingIndex <= 0) {
+        if ($nonQuoteCount <= 0 || $qualifyingIndex <= 0 || count($this->tiers) === 0) {
             return $breakdown;
         }
 
-        for ($i = 1; $i <= $qualifyingIndex; $i++) {
-            $upperPrice = $this->tiers[$i - 1]->price_cents;
-            $lowerPrice = $this->tiers[$i]->price_cents;
-            $diff = $upperPrice - $lowerPrice;
+        $basePrice = $this->basePriceCents();
+        $qualifyingPrice = (int) $this->tiers[$qualifyingIndex]->price_cents;
 
-            if ($diff <= 0) {
-                continue;
-            }
+        // Volume pricing must never increase the unit price above the base tier.
+        $perItemDiscount = max(0, $basePrice - $qualifyingPrice);
 
-            $breakdown[] = [
-                'type' => 'discount_fixed',
-                'filename' => 'Mengenrabatt ab ' . $this->tiers[$i]->min_quantity . ' Bildern',
-                'notes' => sprintf('%d × -%s €', $nonQuoteCount, number_format($diff / 100, 2, ',', '.')),
-                'price' => -$diff,
-                'qty' => $nonQuoteCount,
-                'row_total' => -($nonQuoteCount * $diff),
-            ];
+        if ($perItemDiscount === 0) {
+            return $breakdown;
         }
 
-        return $breakdown;
+        $steps = [];
+        for ($i = 1; $i <= $qualifyingIndex; $i++) {
+            $diff = (int) $this->tiers[$i - 1]->price_cents - (int) $this->tiers[$i]->price_cents;
+            if ($diff > 0) {
+                $steps[] = [
+                    'min_quantity' => (int) $this->tiers[$i]->min_quantity,
+                    'diff' => $diff,
+                ];
+            }
+        }
+
+        $stepDiscount = array_sum(array_column($steps, 'diff'));
+
+        if ($stepDiscount === $perItemDiscount) {
+            foreach ($steps as $step) {
+                $breakdown[] = $this->discountLine($step['min_quantity'], $step['diff'], $nonQuoteCount);
+            }
+
+            return $breakdown;
+        }
+
+        // Non-monotonic/duplicate tier prices: fall back to a single line that
+        // reflects the actual discount implied by the qualifying tier.
+        return [
+            $this->discountLine(
+                (int) $this->tiers[$qualifyingIndex]->min_quantity,
+                $perItemDiscount,
+                $nonQuoteCount,
+            ),
+        ];
+    }
+
+    /**
+     * @return array{type: string, filename: string, notes: string, price: int, qty: int, row_total: int}
+     */
+    private function discountLine(int $minQuantity, int $diffPerItem, int $nonQuoteCount): array
+    {
+        return [
+            'type' => 'discount_fixed',
+            'filename' => 'Mengenrabatt ab ' . $minQuantity . ' Bildern',
+            'notes' => sprintf('%d × -%s €', $nonQuoteCount, number_format($diffPerItem / 100, 2, ',', '.')),
+            'price' => -$diffPerItem,
+            'qty' => $nonQuoteCount,
+            'row_total' => -($nonQuoteCount * $diffPerItem),
+        ];
     }
 }

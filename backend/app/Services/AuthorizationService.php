@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Models\Gallery;
+use App\Models\GalleryGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -188,18 +190,30 @@ class AuthorizationService
 
     /**
      * Mirrors User::canPhotographerAccessGallery().
+     *
+     * Brand isolation: a brand-bound user (brand != null) may only access
+     * galleries of their own brand. Cross-brand users (brand = null, e.g.
+     * Super-Admin) may act across all brands.
      */
     public function canPhotographerAccessGallery(User $user, string $galleryId): bool
     {
-        if ($this->isSuperAdmin($user)) {
+        if ($this->isCrossBrandSuperAdmin($user)) {
             return true;
-        }
-        if (! $this->isPhotographer($user)) {
-            return false;
         }
 
         $gallery = Gallery::find($galleryId);
         if (! $gallery) {
+            return false;
+        }
+
+        if (! $this->sharesBrand($user, $gallery->brand)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+        if (! $this->isPhotographer($user)) {
             return false;
         }
 
@@ -227,6 +241,19 @@ class AuthorizationService
      */
     public function canAccessGallery(User $user, string $galleryId): bool
     {
+        if ($this->isCrossBrandSuperAdmin($user)) {
+            return true;
+        }
+
+        $gallery = Gallery::find($galleryId);
+        if (! $gallery) {
+            return false;
+        }
+
+        if (! $this->sharesBrand($user, $gallery->brand)) {
+            return false;
+        }
+
         if ($this->isSuperAdmin($user)) {
             return true;
         }
@@ -240,11 +267,106 @@ class AuthorizationService
 
     /**
      * Mirrors GalleryPolicy::manage().
+     *
+     * Brand isolation: a brand-bound user must not manage a gallery of another
+     * brand. Only cross-brand users (brand === null, e.g. Super-Admin) may act
+     * across brands.
      */
     public function canManageGallery(User $user, string $galleryId): bool
     {
+        if ($this->isCrossBrandSuperAdmin($user)) {
+            return true;
+        }
+
+        $gallery = Gallery::find($galleryId);
+        if (! $gallery) {
+            return false;
+        }
+
+        if (! $this->sharesBrand($user, $gallery->brand)) {
+            return false;
+        }
+
         return $this->isSuperAdmin($user)
             || $this->isAdmin($user)
             || ($this->isPhotographer($user) && $this->canPhotographerAccessGallery($user, $galleryId));
+    }
+
+    /**
+     * Whether a user may manage a gallery group (rename/reparent/delete,
+     * sync access). This is the group-level equivalent of GalleryPolicy::manage.
+     *
+     * Brand-isolated and role-gated. Photographers additionally need a personal
+     * group assignment or at least one manageable gallery in the group's
+     * subtree; empty groups are manageable for photographers within their own
+     * brand (a group has no separate ownership marker).
+     */
+    public function canManageGalleryGroup(User $user, GalleryGroup $group): bool
+    {
+        if (! $this->sharesBrand($user, $group->brand)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($user) || $this->isAdmin($user)) {
+            return true;
+        }
+
+        if (! $this->isPhotographer($user)) {
+            return false;
+        }
+
+        if ($user->photographerGalleryGroups()->where('gallery_groups.id', $group->id)->exists()) {
+            return true;
+        }
+
+        $groupIds = $this->getSubGroupIds([$group->id]);
+        $galleryIds = Gallery::whereIn('gallery_group_id', $groupIds)->pluck('id')->all();
+
+        if (empty($galleryIds)) {
+            return true;
+        }
+
+        foreach ($galleryIds as $galleryId) {
+            if ($this->canManageGallery($user, $galleryId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether a user may act on a resource of the given brand.
+     *
+     * Cross-brand users (brand === null) may act across all brands; every
+     * brand-bound user is restricted to their own brand. A null resource brand
+     * never matches a brand-bound user.
+     */
+    public function sharesBrand(User $user, mixed $resourceBrand): bool
+    {
+        if ($user->brand === null) {
+            return true;
+        }
+
+        return $this->normalizeBrand($resourceBrand) === $this->normalizeBrand($user->brand);
+    }
+
+    private function normalizeBrand(mixed $brand): ?string
+    {
+        if ($brand === null) {
+            return null;
+        }
+
+        return $brand instanceof Brand ? $brand->value : (string) $brand;
+    }
+
+    /**
+     * Cross-brand super admins (brand === null) are the only actors allowed to
+     * operate across brands; they short-circuit the per-gallery brand lookup.
+     * A (hypothetical) brand-bound super admin is still brand-isolated.
+     */
+    private function isCrossBrandSuperAdmin(User $user): bool
+    {
+        return $user->brand === null && $this->isSuperAdmin($user);
     }
 }

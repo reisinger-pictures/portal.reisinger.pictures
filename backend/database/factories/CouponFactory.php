@@ -67,9 +67,9 @@ class CouponFactory extends Factory
     }
 
     /**
-     * Scope the coupon to a specific gallery.
+     * Scope the coupon to a specific gallery (UUID string).
      */
-    public function scopedToGallery(int $galleryId): static
+    public function scopedToGallery(int|string $galleryId): static
     {
         return $this->state(fn (array $_) => [
             'scope_type' => 'gallery',
@@ -92,9 +92,9 @@ class CouponFactory extends Factory
     }
 
     /**
-     * Scope the coupon to a specific meta-gallery (gallery group).
+     * Scope the coupon to a specific meta-gallery (gallery group, UUID string).
      */
-    public function scopedToMetaGallery(int $metaGalleryId): static
+    public function scopedToMetaGallery(int|string $metaGalleryId): static
     {
         return $this->state(fn (array $_) => [
             'scope_type' => 'meta_gallery',

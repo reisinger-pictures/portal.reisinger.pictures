@@ -61,6 +61,9 @@ const GlobalSWRConfig = ({ children }: GlobalSWRConfigProps) => {
         setGlobalErrorCallback((_status, message) => {
             showToast('error', message || t`Ein unerwarteter Serverfehler ist aufgetreten.`);
         });
+        // Cleanup: verhindert, dass ein Callback auf ein unmounted
+        // GlobalSWRConfig (z. B. bei HMR / Provider-Remount) weiterlebt.
+        return () => setGlobalErrorCallback(null);
     }, [showToast]);
 
     return (

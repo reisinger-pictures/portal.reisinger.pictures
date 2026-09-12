@@ -13,6 +13,27 @@ function formatMoney(cents: number): string {
     return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
 
+type ContractItem = SignContractResponse['contract']['items'][number];
+type ContractDiscount = SignContractResponse['contract']['discounts'][number];
+
+/**
+ * Mirrors the backend snapshot semantics (`ContractCloseService::close`):
+ * discounts are applied in order to a running subtotal. A `discount_percent`
+ * stores its rate as basis points (`percent × 100`, e.g. 10% => 1000) and is
+ * subtracted as `round(subtotal × price / 10000)`.
+ */
+function calcContractTotal(items: ContractItem[], discounts: ContractDiscount[]): number {
+    let subtotal = items.reduce((sum, item) => sum + (item.row_total ?? item.price * item.qty), 0);
+    for (const discount of discounts) {
+        if (discount.type === 'discount_fixed') {
+            subtotal -= discount.price;
+        } else if (discount.type === 'discount_percent') {
+            subtotal -= Math.round(subtotal * discount.price / 10000);
+        }
+    }
+    return Math.max(0, subtotal);
+}
+
 export default function ContractSignView() {
     const { token } = useParams<{ token: string }>();
     const navigate = useNavigate();
@@ -104,8 +125,7 @@ export default function ContractSignView() {
 
     const items = data?.contract.items ?? [];
     const discounts = data?.contract.discounts ?? [];
-    const itemsTotal = items.reduce((sum, i) => sum + (i.row_total ?? i.price * i.qty), 0);
-    const discountFixedTotal = discounts.filter(d => d.type === 'discount_fixed').reduce((sum, d) => sum + d.price, 0);
+    const grandTotal = calcContractTotal(items, discounts);
 
     return (
         <PageLayout>
@@ -179,7 +199,7 @@ export default function ContractSignView() {
                                     <tfoot>
                                         <tr className="text-lg font-bold">
                                             <td colSpan={3} className="text-right"><Trans>Gesamtbetrag</Trans></td>
-                                            <td className="text-right">{formatMoney(itemsTotal - discountFixedTotal)}</td>
+                                            <td className="text-right">{formatMoney(grandTotal)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>

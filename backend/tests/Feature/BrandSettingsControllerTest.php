@@ -143,8 +143,10 @@ class BrandSettingsControllerTest extends TestCase
             ->putJson('/api/management/brand-settings/rp', ['from_address' => 'not-an-email'])
             ->assertStatus(422);
 
+        // `from_name` is a display name, not an e-mail — it must accept plain
+        // strings (see BrandSettingsFromNameTest for the positive case).
         $this->withHeaders($this->bearer($token))
-            ->putJson('/api/management/brand-settings/rp', ['from_name' => 'not-an-email'])
+            ->putJson('/api/management/brand-settings/rp', ['from_name' => str_repeat('a', 256)])
             ->assertStatus(422);
 
         $this->withHeaders($this->bearer($token))

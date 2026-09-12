@@ -33,12 +33,18 @@ jobs:
       - name: Determine whether to merge
         id: should-merge
         uses: actions/github-script@v9
+        env:
+          # SECURITY: step outputs are untrusted data and must NEVER be
+          # interpolated into the JavaScript source (script injection). Pass
+          # them via env and read them from process.env inside the script.
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          DEPENDENCY_GROUP: ${{ steps.metadata.outputs.dependency-group }}
         with:
           script: |
-            const updateType = '${{ steps.metadata.outputs.update-type }}';
+            const updateType = process.env.UPDATE_TYPE || '';
             // output ist `dependency-group` (singular): ein PR hängt an maximal
             // EINER Dependabot-Gruppe (leer, wenn keine Gruppe aktiv ist)
-            const dependencyGroup = '${{ steps.metadata.outputs.dependency-group }}';
+            const dependencyGroup = process.env.DEPENDENCY_GROUP || '';
 
             // Minor/Patch-Gruppen sind per Konstruktion sicher (dependabot.yml
             // matcht dort nur update-types minor+patch) - auch wenn die
@@ -57,8 +63,12 @@ jobs:
             return (safeGroup || safeIndividual) && notDocker;
 
       # running-workflow-name verhindert, dass wait-on-check auf SICH SELBST
-      # wartet (der AutomERGE-Run hängt am head-sha). allowed-conclusions
-      # inkl. "skipped": sonst blockiert ein übersprungener Deploy-Job den Merge.
+      # wartet (der AutomERGE-Run hängt am head-sha).
+      # SECURITY: allowed-conclusions ist bewusst NUR "success". Ein
+      # übersprungener Check hat nichts verifiziert und darf einen
+      # unbeaufsichtigten Auto-Merge nicht freischalten. Sollte je ein
+      # legitim übersprungener Pflicht-Check auftauchen, wird der JOB gefixt
+      # (nicht das Merge-Gate aufgeweicht).
       # ACHTUNG: v1.9.1 kennt KEINEN "timeout"-Input (würde ignoriert -> potenziell
       # 6h-Hängen). Warte-Zeit nur über wait-interval (Sekunden zwischen Polls) +
       # das absichtlich kurze CI-Fenster im Repo begrenzt.
@@ -70,7 +80,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           running-workflow-name: automerge
           wait-interval: 60
-          allowed-conclusions: success,skipped
+          allowed-conclusions: success
 
       # pull_request_target checkt per Default KEIN Repo aus -> "gh pr merge"
       # scheitert mit "not a git repository". Daher main auschecken (nur Metadaten/

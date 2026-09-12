@@ -3,7 +3,7 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 
-test.describe('Cart Persistence & Validation Workflow', () => {
+test.describe('Cart Persistence', () => {
     let helper: E2ESessionHelper;
     let testUser = { email: '', password: '', id: '' };
 
@@ -16,47 +16,45 @@ test.describe('Cart Persistence & Validation Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Invalid or corrupted localStorage is caught by Zod and results in empty cart', { tag: ['@feature:client:cart'] }, async ({ page }) => {
+    // User-Flow statt localStorage-Injektion (frontend/AGENTS.md, "localStorage Injection"):
+    // Der Warenkorb wird API-basiert über den realen Admin-Quote-Link befüllt (derselbe
+    // Code-Pfad wie im Quote-Restore-Flow, kein hardcodierter `rp_cart_*`-Storage-Key).
+    // Danach wird die Seite vollständig neu geladen und die Re-Hydrierung aus dem
+    // user-scoped Persistenz-Key geprüft. Die Zod-Validierung korrupter localStorage-
+    // Inhalte ist auf Unit-Ebene abgedeckt (src/logic/__tests__/cartLogic.test.ts).
+    test('Cart items persist across a full page reload', { tag: ['@feature:client:cart'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
-        await auth.login(testUser.email, testUser.password);
-        
-        const cartKey = `rp_cart_${btoa(String(testUser.id))}`;
-
-        // Einmal initial zum Cart navigieren
         const sidebar = new SidebarHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        // API-Seeding des Warenkorbs über den realen Admin-Quote-Link.
+        const quoteRes = await request.post('/api/management/orders/quote-link', {
+            data: { photo_ids: ['mocked-photo-1', 'mocked-photo-2'], custom_price: 150000 },
+            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+        });
+        expect(quoteRes.ok()).toBeTruthy();
+        const quoteData = await quoteRes.json();
+        const quoteToken = quoteData.link.split('quote_token=')[1];
+
+        // SPA-Navigation zum Warenkorb, Quote-Token per History-API setzen (Real-Flow).
         await sidebar.navigateTo('Warenkorb');
-        await expect(page.locator('text=Dein Warenkorb ist leer.')).toBeVisible();
+        await page.evaluate((t) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('quote_token', t);
+            window.history.pushState({}, '', url.toString());
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        }, quoteToken);
 
-        // 1. Inject completely corrupted JSON
-        await page.addInitScript((key) => {
-            localStorage.setItem(key, 'THIS_IS_NOT_JSON');
-        }, cartKey);
-        await page.reload();
-        await expect(page.locator('text=Dein Warenkorb ist leer.')).toBeVisible();
+        await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.');
+        await expect(page.getByRole('button', { name: 'Entfernen' })).toHaveCount(2);
+        await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1500.00 €');
 
-        // 2. Inject valid JSON but invalid schema (missing required fields)
-        await page.addInitScript((key) => {
-            localStorage.setItem(key, JSON.stringify([{ invalid: 'data', price: 'not-a-number' }]));
-        }, cartKey);
+        // Persistenz: vollständiger Reload — Items müssen aus dem user-scoped
+        // Cart-Key re-hydriert werden (der quote_token ist zu diesem Zeitpunkt
+        // bereits aus der URL entfernt, also kein erneutes API-Seeding).
         await page.reload();
-        await expect(page.locator('text=Dein Warenkorb ist leer.')).toBeVisible();
-
-        // 3. Inject valid cart matching the Zod schema
-        await page.addInitScript((key) => {
-            localStorage.setItem(key, JSON.stringify([{
-                photoId: 'valid-id-123',
-                filename: 'Test Bild',
-                thumb_url: 'https://placehold.co/100',
-                tier: 'web',
-                price: 1500,
-                useCaseName: 'E2E Test Lizenz',
-                modifierNames: [],
-                isQuote: false
-            }]));
-        }, cartKey);
-        await page.reload();
-        
-        await expect(page.locator('text=Dein Warenkorb ist leer.')).toBeHidden();
-        await expect(page.locator('text=Test Bild').or(page.locator('text=E2E Test Lizenz')).first()).toBeVisible();
+        await expect(page.locator('h1:has-text("Dein Warenkorb")')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Entfernen' })).toHaveCount(2);
+        await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1500.00 €');
     });
 });

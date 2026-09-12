@@ -2,15 +2,19 @@
 
 namespace Tests\Unit\Services;
 
+use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
+use App\Models\Org;
+use App\Models\Photo;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\GalleryService;
 use App\Services\SlugService;
-use App\Enums\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\MockObject\Stub;
 use Tests\TestCase;
 
 class GalleryServiceTest extends TestCase
@@ -18,7 +22,8 @@ class GalleryServiceTest extends TestCase
     use RefreshDatabase;
 
     private GalleryService $service;
-    private SlugService|\PHPUnit\Framework\MockObject\Stub $slugService;
+
+    private SlugService|Stub $slugService;
 
     protected function setUp(): void
     {
@@ -30,7 +35,7 @@ class GalleryServiceTest extends TestCase
 
     // ─── storeGroup() ───────────────────────────────────────────────
 
-    public function test_storeGroup_creates_group_with_slug_from_service(): void
+    public function test_store_group_creates_group_with_slug_from_service(): void
     {
         $this->slugService = $this->createMock(SlugService::class);
         $this->service = new GalleryService($this->slugService);
@@ -56,7 +61,7 @@ class GalleryServiceTest extends TestCase
         $this->assertDatabaseHas('gallery_groups', ['slug' => 'meine-gruppe']);
     }
 
-    public function test_storeGroup_uses_name_for_slug_when_slug_not_provided(): void
+    public function test_store_group_uses_name_for_slug_when_slug_not_provided(): void
     {
         $this->slugService = $this->createMock(SlugService::class);
         $this->service = new GalleryService($this->slugService);
@@ -72,7 +77,7 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('meine-gruppe', $group->slug);
     }
 
-    public function test_storeGroup_accepts_parent_id_and_org_id(): void
+    public function test_store_group_accepts_parent_id_and_org_id(): void
     {
         $parent = GalleryGroup::factory()->create();
 
@@ -93,7 +98,7 @@ class GalleryServiceTest extends TestCase
 
     // ─── updateGroup() ──────────────────────────────────────────────
 
-    public function test_updateGroup_updates_existing_group(): void
+    public function test_update_group_updates_existing_group(): void
     {
         $group = GalleryGroup::factory()->create([
             'name' => 'Original',
@@ -119,7 +124,7 @@ class GalleryServiceTest extends TestCase
         ]);
     }
 
-    public function test_updateGroup_renews_slug_when_changed(): void
+    public function test_update_group_renews_slug_when_changed(): void
     {
         $group = GalleryGroup::factory()->create([
             'name' => 'Original',
@@ -143,7 +148,7 @@ class GalleryServiceTest extends TestCase
 
     // ─── storeGallery() ─────────────────────────────────────────────
 
-    public function test_storeGallery_creates_gallery_with_basic_data(): void
+    public function test_store_gallery_creates_gallery_with_basic_data(): void
     {
         $this->slugService = $this->createMock(SlugService::class);
         $this->service = new GalleryService($this->slugService);
@@ -166,7 +171,7 @@ class GalleryServiceTest extends TestCase
         $this->assertDatabaseHas('galleries', ['slug' => 'meine-galerie']);
     }
 
-    public function test_storeGallery_inherits_public_from_group(): void
+    public function test_store_gallery_inherits_public_from_group(): void
     {
         $group = GalleryGroup::factory()->create(['is_public' => true]);
 
@@ -181,7 +186,7 @@ class GalleryServiceTest extends TestCase
         $this->assertTrue($gallery->is_public);
     }
 
-    public function test_storeGallery_selection_type_always_not_public_and_not_live(): void
+    public function test_store_gallery_selection_type_always_not_public_and_not_live(): void
     {
         $this->slugService->method('makeUnique')->willReturn('selection-slug');
 
@@ -197,7 +202,7 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('selection', $gallery->type);
     }
 
-    public function test_storeGallery_assigns_photographer_via_sync(): void
+    public function test_store_gallery_assigns_photographer_via_sync(): void
     {
         $photographer = User::factory()->create();
         $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
@@ -215,7 +220,7 @@ class GalleryServiceTest extends TestCase
         ]);
     }
 
-    public function test_storeGallery_does_not_sync_non_photographer(): void
+    public function test_store_gallery_does_not_sync_non_photographer(): void
     {
         $client = User::factory()->create();
 
@@ -232,7 +237,7 @@ class GalleryServiceTest extends TestCase
         ]);
     }
 
-    public function test_storeGallery_applies_password_hash(): void
+    public function test_store_gallery_applies_password_hash(): void
     {
         $this->slugService->method('makeUnique')->willReturn('pw-slug');
 
@@ -244,10 +249,10 @@ class GalleryServiceTest extends TestCase
 
         $this->assertNotNull($gallery->password_hash);
         $this->assertNotSame('secret123', $gallery->password_hash);
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('secret123', $gallery->password_hash));
+        $this->assertTrue(Hash::check('secret123', $gallery->password_hash));
     }
 
-    public function test_storeGallery_parses_expires_at_to_end_of_day(): void
+    public function test_store_gallery_parses_expires_at_to_end_of_day(): void
     {
         $this->slugService->method('makeUnique')->willReturn('expires-slug');
 
@@ -261,7 +266,7 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('2026-12-31 23:59:59', $gallery->expires_at->format('Y-m-d H:i:s'));
     }
 
-    public function test_storeGallery_throws_on_invalid_expires_at(): void
+    public function test_store_gallery_throws_on_invalid_expires_at(): void
     {
         $this->slugService->method('makeUnique')->willReturn('bad-date');
 
@@ -276,7 +281,7 @@ class GalleryServiceTest extends TestCase
 
     // ─── updateGallery() ────────────────────────────────────────────
 
-    public function test_updateGallery_updates_basic_fields(): void
+    public function test_update_gallery_updates_basic_fields(): void
     {
         $gallery = Gallery::factory()->create(['name' => 'Original Name']);
 
@@ -291,7 +296,7 @@ class GalleryServiceTest extends TestCase
         ]);
     }
 
-    public function test_updateGallery_enforces_slug_uniqueness(): void
+    public function test_update_gallery_enforces_slug_uniqueness(): void
     {
         $gallery = Gallery::factory()->create(['slug' => 'existing-slug']);
 
@@ -309,7 +314,7 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('new-slug-1', $updated->slug);
     }
 
-    public function test_updateGallery_does_not_check_uniqueness_when_slug_unchanged(): void
+    public function test_update_gallery_does_not_check_uniqueness_when_slug_unchanged(): void
     {
         $gallery = Gallery::factory()->create(['slug' => 'my-slug']);
 
@@ -323,7 +328,7 @@ class GalleryServiceTest extends TestCase
         ]);
     }
 
-    public function test_updateGallery_selection_type_forces_is_live_and_is_public_false(): void
+    public function test_update_gallery_selection_type_forces_is_live_and_is_public_false(): void
     {
         $gallery = Gallery::factory()->create([
             'type' => 'delivery',
@@ -341,7 +346,7 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('selection', $updated->type);
     }
 
-    public function test_updateGallery_converts_null_booleans_to_false(): void
+    public function test_update_gallery_converts_null_booleans_to_false(): void
     {
         $gallery = Gallery::factory()->create();
 
@@ -356,7 +361,7 @@ class GalleryServiceTest extends TestCase
         $this->assertFalse($updated->is_hidden);
     }
 
-    public function test_updateGallery_updates_password_hash(): void
+    public function test_update_gallery_updates_password_hash(): void
     {
         $gallery = Gallery::factory()->create(['password_hash' => null]);
 
@@ -365,10 +370,10 @@ class GalleryServiceTest extends TestCase
         ]);
 
         $this->assertNotNull($updated->password_hash);
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('new-password', $updated->password_hash));
+        $this->assertTrue(Hash::check('new-password', $updated->password_hash));
     }
 
-    public function test_updateGallery_parses_expires_at(): void
+    public function test_update_gallery_parses_expires_at(): void
     {
         $gallery = Gallery::factory()->create(['expires_at' => null]);
 
@@ -380,7 +385,7 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('2027-06-15 23:59:59', $updated->expires_at->format('Y-m-d H:i:s'));
     }
 
-    public function test_updateGallery_does_not_change_slug_when_only_name_changes(): void
+    public function test_update_gallery_does_not_change_slug_when_only_name_changes(): void
     {
         $gallery = Gallery::factory()->create([
             'name' => 'Original',
@@ -398,16 +403,68 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('original-slug', $updated->slug);
     }
 
+    public function test_update_gallery_keeps_orgs_when_org_ids_absent(): void
+    {
+        $gallery = Gallery::factory()->create(['is_live' => false]);
+        $org = Org::factory()->create();
+        $gallery->orgs()->attach($org->id);
+
+        $updated = $this->service->updateGallery($gallery, ['is_live' => true]);
+
+        $this->assertTrue($updated->is_live);
+        $this->assertDatabaseHas('gallery_org', [
+            'gallery_id' => $gallery->id,
+            'org_id' => $org->id,
+        ]);
+    }
+
+    public function test_update_gallery_syncs_orgs_when_org_ids_provided(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $orgA = Org::factory()->create();
+        $orgB = Org::factory()->create();
+        $gallery->orgs()->attach($orgA->id);
+
+        $this->service->updateGallery($gallery, ['org_ids' => [$orgB->id]]);
+
+        $this->assertDatabaseMissing('gallery_org', [
+            'gallery_id' => $gallery->id,
+            'org_id' => $orgA->id,
+        ]);
+        $this->assertDatabaseHas('gallery_org', [
+            'gallery_id' => $gallery->id,
+            'org_id' => $orgB->id,
+        ]);
+    }
+
+    public function test_update_gallery_ignores_null_slug(): void
+    {
+        $gallery = Gallery::factory()->create(['slug' => 'keep-me']);
+
+        $this->slugService = $this->createMock(SlugService::class);
+        $this->service = new GalleryService($this->slugService);
+        $this->slugService->expects($this->never())->method('makeUnique');
+
+        $updated = $this->service->updateGallery($gallery, [
+            'slug' => null,
+            'name' => 'Name stays',
+        ]);
+
+        $this->assertSame('keep-me', $updated->slug);
+        $this->assertSame('Name stays', $updated->name);
+        $this->assertDatabaseHas('galleries', ['id' => $gallery->id, 'slug' => 'keep-me']);
+    }
+
     // ─── applyMetadataToPhotos() ────────────────────────────────────
 
-    public function test_applyMetadataToPhotos_does_nothing_when_disabled(): void
+    public function test_apply_metadata_to_photos_does_nothing_when_disabled(): void
     {
         $gallery = Gallery::factory()->create([
             'apply_metadata_to_photos' => false,
             'default_title' => 'Default Title',
         ]);
 
-        $photo = \App\Models\Photo::factory()->create([
+        $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'title' => null,
         ]);
@@ -417,7 +474,7 @@ class GalleryServiceTest extends TestCase
         $this->assertNull($photo->fresh()->title);
     }
 
-    public function test_applyMetadataToPhotos_fills_empty_fields(): void
+    public function test_apply_metadata_to_photos_fills_empty_fields(): void
     {
         $gallery = Gallery::factory()->create([
             'apply_metadata_to_photos' => true,
@@ -430,7 +487,7 @@ class GalleryServiceTest extends TestCase
             'default_iso_country' => 'AT',
         ]);
 
-        $photo = \App\Models\Photo::factory()->create([
+        $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'title' => null,
             'description' => null,
@@ -454,7 +511,7 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('AT', $photo->iso_country);
     }
 
-    public function test_applyMetadataToPhotos_does_not_overwrite_existing_values(): void
+    public function test_apply_metadata_to_photos_does_not_overwrite_existing_values(): void
     {
         $gallery = Gallery::factory()->create([
             'apply_metadata_to_photos' => true,
@@ -462,7 +519,7 @@ class GalleryServiceTest extends TestCase
             'default_description' => 'Default Description',
         ]);
 
-        $photo = \App\Models\Photo::factory()->create([
+        $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'title' => 'Existing Title',
             'description' => null,

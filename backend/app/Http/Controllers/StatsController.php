@@ -37,6 +37,13 @@ class StatsController extends Controller
             $query->where('resolution_tier', $tier);
         }
 
+        // Brand scoping: brand-bound users only see download logs of galleries
+        // belonging to their own brand. Cross-brand users (brand = null, e.g.
+        // super_admin) see all brands.
+        if ($user->brand !== null) {
+            $query->whereHas('gallery', fn ($q) => $q->where('brand', $user->brand));
+        }
+
         if ($svc->isOrgAdmin($user) && ! $svc->isAdmin($user)) {
             $orgUserIds = User::where('org_id', $user->org_id)->pluck('id');
             $query->whereIn('user_id', $orgUserIds);

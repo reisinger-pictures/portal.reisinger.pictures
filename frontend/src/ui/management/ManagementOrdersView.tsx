@@ -148,7 +148,7 @@ export default function ManagementOrdersView() {
                         </div>
 
                         <div className="form-control mb-4">
-                            <label className="label"><span className="label-text font-bold"><Trans>Nutzungsrechte (optional)</Trans></span></label>
+                            <label className="label"><span className="label-text font-bold"><Trans>Nutzungsrechte</Trans></span></label>
                             <WysiwygEditor value={rightsText} onChange={setRightsText} />
                         </div>
 

@@ -8,6 +8,7 @@ use App\Models\Rating;
 use App\Models\User;
 use App\Services\RatingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -25,7 +26,7 @@ class RatingServiceTest extends TestCase
 
     // ─── ratingStatus() ─────────────────────────────────────────────
 
-    public function test_ratingStatus_returns_empty_users_and_zero_photos_for_gallery_without_photos(): void
+    public function test_rating_status_returns_empty_users_and_zero_photos_for_gallery_without_photos(): void
     {
         $gallery = Gallery::factory()->create();
 
@@ -34,7 +35,7 @@ class RatingServiceTest extends TestCase
         $this->assertSame(['users' => [], 'total_photos' => 0], $result);
     }
 
-    public function test_ratingStatus_returns_correct_progress_for_user_ratings(): void
+    public function test_rating_status_returns_correct_progress_for_user_ratings(): void
     {
         $gallery = Gallery::factory()->create();
         $photos = Photo::factory()->count(5)->create(['gallery_id' => $gallery->id]);
@@ -60,7 +61,7 @@ class RatingServiceTest extends TestCase
         $this->assertSame(5, $userStatus['total_photos']);
     }
 
-    public function test_ratingStatus_counts_only_positive_ratings(): void
+    public function test_rating_status_counts_only_positive_ratings(): void
     {
         $gallery = Gallery::factory()->create();
         $photos = Photo::factory()->count(4)->create(['gallery_id' => $gallery->id]);
@@ -76,7 +77,7 @@ class RatingServiceTest extends TestCase
         $this->assertSame(2, $result['users'][0]['rated_count']);
     }
 
-    public function test_ratingStatus_returns_multiple_users(): void
+    public function test_rating_status_returns_multiple_users(): void
     {
         $gallery = Gallery::factory()->create();
         $photos = Photo::factory()->count(3)->create(['gallery_id' => $gallery->id]);
@@ -94,7 +95,7 @@ class RatingServiceTest extends TestCase
         $this->assertCount(2, $result['users']);
     }
 
-    public function test_ratingStatus_includes_guest_ratings(): void
+    public function test_rating_status_includes_guest_ratings(): void
     {
         $gallery = Gallery::factory()->create();
         $photos = Photo::factory()->count(3)->create(['gallery_id' => $gallery->id]);
@@ -115,7 +116,7 @@ class RatingServiceTest extends TestCase
 
         $result = $this->service->ratingStatus($gallery);
 
-        $guests = array_values(array_filter($result['users'], fn($u) => str_starts_with($u['user_id'], 'guest_')));
+        $guests = array_values(array_filter($result['users'], fn ($u) => str_starts_with($u['user_id'], 'guest_')));
         $this->assertCount(1, $guests);
         $this->assertSame("guest_{$guestId}", $guests[0]['user_id']);
         $this->assertSame('Max Mustermann', $guests[0]['name']);
@@ -123,7 +124,40 @@ class RatingServiceTest extends TestCase
         $this->assertSame(3, $guests[0]['total_photos']);
     }
 
-    public function test_ratingStatus_guest_without_name_falls_back_to_Gast(): void
+    public function test_rating_status_query_count_is_constant_regardless_of_user_count(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $photos = Photo::factory()->count(3)->create(['gallery_id' => $gallery->id]);
+
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+        $userA->galleries()->attach($gallery->id);
+        $userB->galleries()->attach($gallery->id);
+        Rating::create(['photo_id' => $photos[0]->id, 'user_id' => $userA->id, 'rating' => 4]);
+
+        DB::enableQueryLog();
+        $this->service->ratingStatus($gallery);
+        $smallCount = count(DB::getQueryLog());
+        DB::flushQueryLog();
+
+        for ($i = 0; $i < 8; $i++) {
+            $extra = User::factory()->create();
+            $extra->galleries()->attach($gallery->id);
+        }
+
+        DB::flushQueryLog();
+        $this->service->ratingStatus($gallery);
+        $largeCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame(
+            $smallCount,
+            $largeCount,
+            "ratingStatus() must not scale its query count with the number of users ({$smallCount} vs {$largeCount})."
+        );
+    }
+
+    public function test_rating_status_guest_without_name_falls_back_to_gast(): void
     {
         $gallery = Gallery::factory()->create();
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
@@ -137,13 +171,13 @@ class RatingServiceTest extends TestCase
 
         $result = $this->service->ratingStatus($gallery);
 
-        $guest = current(array_filter($result['users'], fn($u) => str_starts_with($u['user_id'], 'guest_')));
+        $guest = current(array_filter($result['users'], fn ($u) => str_starts_with($u['user_id'], 'guest_')));
         $this->assertSame('Gast', $guest['name']);
     }
 
     // ─── exportRatings() ────────────────────────────────────────────
 
-    public function test_exportRatings_returns_empty_array_for_unrated_gallery(): void
+    public function test_export_ratings_returns_empty_array_for_unrated_gallery(): void
     {
         $gallery = Gallery::factory()->create();
         Photo::factory()->count(3)->create(['gallery_id' => $gallery->id]);
@@ -153,7 +187,7 @@ class RatingServiceTest extends TestCase
         $this->assertSame([], $result);
     }
 
-    public function test_exportRatings_returns_correct_structure(): void
+    public function test_export_ratings_returns_correct_structure(): void
     {
         $gallery = Gallery::factory()->create();
         $photo = Photo::factory()->create([
@@ -182,7 +216,7 @@ class RatingServiceTest extends TestCase
         $this->assertStringContainsString('Gast User (4 Sterne): Schönes Foto!', $entry['all_comments']);
     }
 
-    public function test_exportRatings_uses_fallback_filename_when_title_empty(): void
+    public function test_export_ratings_uses_fallback_filename_when_title_empty(): void
     {
         $gallery = Gallery::factory()->create();
         $photo = Photo::factory()->create([
@@ -202,7 +236,7 @@ class RatingServiceTest extends TestCase
         $this->assertStringStartsWith('Bild ', $result[0]['filename']);
     }
 
-    public function test_exportRatings_ignored_ratings_show_ignoriert(): void
+    public function test_export_ratings_ignored_ratings_show_ignoriert(): void
     {
         $gallery = Gallery::factory()->create();
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'title' => 'Test']);
@@ -219,7 +253,7 @@ class RatingServiceTest extends TestCase
         $this->assertStringContainsString('Ignoriert', $result[0]['all_comments']);
     }
 
-    public function test_exportRatings_calculates_correct_avg_rating(): void
+    public function test_export_ratings_calculates_correct_avg_rating(): void
     {
         $gallery = Gallery::factory()->create();
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'title' => 'Avg Test']);
@@ -234,7 +268,7 @@ class RatingServiceTest extends TestCase
         $this->assertEquals(4, $result[0]['avg_rating']);
     }
 
-    public function test_exportRatings_avg_rating_ignores_zero_ratings(): void
+    public function test_export_ratings_avg_rating_ignores_zero_ratings(): void
     {
         $gallery = Gallery::factory()->create();
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'title' => 'Zero Test']);
@@ -249,7 +283,7 @@ class RatingServiceTest extends TestCase
         $this->assertEquals(4, $result[0]['avg_rating']);
     }
 
-    public function test_exportRatings_linked_user_name_is_used(): void
+    public function test_export_ratings_linked_user_name_is_used(): void
     {
         $gallery = Gallery::factory()->create();
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'title' => 'User Rated']);
@@ -267,7 +301,7 @@ class RatingServiceTest extends TestCase
         $this->assertStringContainsString('Anna Beispiel (5 Sterne): Fantastisch!', $result[0]['all_comments']);
     }
 
-    public function test_exportRatings_handles_multiple_photos_and_ratings(): void
+    public function test_export_ratings_handles_multiple_photos_and_ratings(): void
     {
         $gallery = Gallery::factory()->create();
         $photoA = Photo::factory()->create(['gallery_id' => $gallery->id, 'title' => 'Photo A']);
@@ -279,5 +313,36 @@ class RatingServiceTest extends TestCase
         $result = $this->service->exportRatings($gallery);
 
         $this->assertCount(2, $result);
+    }
+
+    public function test_export_ratings_query_count_is_constant_regardless_of_photo_count(): void
+    {
+        $gallery = Gallery::factory()->create();
+
+        $photos = Photo::factory()->count(3)->create(['gallery_id' => $gallery->id]);
+        foreach ($photos as $photo) {
+            Rating::create(['photo_id' => $photo->id, 'guest_id' => Str::uuid()->toString(), 'rating' => 4]);
+        }
+
+        DB::enableQueryLog();
+        $this->service->exportRatings($gallery);
+        $smallCount = count(DB::getQueryLog());
+        DB::flushQueryLog();
+
+        $morePhotos = Photo::factory()->count(7)->create(['gallery_id' => $gallery->id]);
+        foreach ($morePhotos as $photo) {
+            Rating::create(['photo_id' => $photo->id, 'guest_id' => Str::uuid()->toString(), 'rating' => 5]);
+        }
+
+        DB::flushQueryLog();
+        $this->service->exportRatings($gallery);
+        $largeCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame(
+            $smallCount,
+            $largeCount,
+            "exportRatings() must not scale its query count with the number of photos ({$smallCount} vs {$largeCount})."
+        );
     }
 }

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
+use App\Models\GalleryGroup;
 use App\Models\Order;
 use App\Models\Org;
 use App\Models\User;
@@ -14,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 class OrgController extends Controller
 {
+    use EnforcesBrandIsolation;
+
     public function index()
     {
         $svc = app(AuthorizationService::class);
@@ -94,6 +98,10 @@ class OrgController extends Controller
 
         $org = Org::findOrFail($id);
 
+        if ($this->isBrandMismatch($user, $org)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'domain' => 'nullable|string|max:255|unique:orgs,domain,'.$id,
@@ -117,6 +125,10 @@ class OrgController extends Controller
         }
 
         $org = Org::findOrFail($id);
+
+        if ($this->isBrandMismatch(auth('api')->user(), $org)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
 
         DB::transaction(function () use ($org) {
             $userIds = $org->users()->pluck('users.id');
@@ -155,6 +167,12 @@ class OrgController extends Controller
             'user_ids.*' => 'exists:users,id',
         ]);
 
+        $org = Org::findOrFail($id);
+
+        if ($this->isBrandMismatch($user, $org)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         $superAdmins = User::whereIn('id', $request->user_ids ?? [])
             ->whereHas('roles', function ($q) {
                 $q->where('name', UserRole::SUPER_ADMIN->value);
@@ -165,16 +183,16 @@ class OrgController extends Controller
             return response()->json(['error' => 'Super-Admins können keiner Organisation zugewiesen werden.'], 422);
         }
 
-        $org = Org::findOrFail($id);
-
-        if ($org->brand !== null) {
-            $conflictingUsers = User::whereIn('id', $request->user_ids ?? [])
-                ->whereNotNull('brand')
-                ->where('brand', '!=', $org->brand)
-                ->exists();
-            if ($conflictingUsers) {
-                return response()->json(['error' => 'Ein oder mehrere Benutzer sind für eine andere Marke registriert und können dieser Organisation nicht zugewiesen werden.'], 422);
-            }
+        // Brand consistency: assigned users must share the org's brand. This also
+        // covers brand-less orgs (brand = null), which may only absorb brand-less
+        // users — previously they could absorb users of any brand.
+        $orgBrand = $this->brandValue($org);
+        $conflictingUsers = User::whereIn('id', $request->user_ids ?? [])
+            ->whereNotNull('brand')
+            ->when($orgBrand !== null, fn ($query) => $query->where('brand', '!=', $orgBrand))
+            ->exists();
+        if ($conflictingUsers) {
+            return response()->json(['error' => 'Ein oder mehrere Benutzer sind für eine andere Marke registriert und können dieser Organisation nicht zugewiesen werden.'], 422);
         }
 
         // Get currently assigned user IDs before syncing
@@ -217,9 +235,36 @@ class OrgController extends Controller
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $request->validate(['group_ids' => 'array']);
+        $request->validate([
+            'group_ids' => 'array',
+            'group_ids.*' => 'exists:gallery_groups,id',
+        ]);
         $org = Org::findOrFail($id);
-        $org->galleryGroups()->sync($request->group_ids ?? []);
+
+        if ($this->isBrandMismatch($user, $org)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
+        // Brand consistency: only groups sharing the org's brand may be attached.
+        $orgBrand = $this->brandValue($org);
+        $groupIds = $request->group_ids ?? [];
+        if (! empty($groupIds)) {
+            $foreignGroups = GalleryGroup::whereIn('id', $groupIds)
+                ->when(
+                    $orgBrand !== null,
+                    fn ($query) => $query->where(function ($inner) use ($orgBrand) {
+                        $inner->where('brand', '!=', $orgBrand)->orWhereNull('brand');
+                    }),
+                    fn ($query) => $query->whereNotNull('brand'),
+                )
+                ->exists();
+
+            if ($foreignGroups) {
+                return response()->json(['error' => 'Ein oder mehrere Galerie-Gruppen gehören zu einer anderen Marke und können dieser Organisation nicht zugewiesen werden.'], 422);
+            }
+        }
+
+        $org->galleryGroups()->sync($groupIds);
 
         return response()->json(['success' => true]);
     }
@@ -233,6 +278,11 @@ class OrgController extends Controller
         }
 
         $org = Org::findOrFail($id);
+
+        if ($this->isBrandMismatch($user, $org)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         $result = $invoiceService->generateForOrg($org, $user);
 
         if (! $result['success']) {

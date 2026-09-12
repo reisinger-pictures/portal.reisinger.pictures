@@ -19,11 +19,17 @@ class SitemapController extends Controller
         
         Gallery::where('is_public', true)
             ->where('brand', BrandRegistry::currentId())
+            ->where('is_hidden', false)
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
             ->chunk(100, function ($galleries) use (&$xml, $baseUrl) {
             foreach ($galleries as $gallery) {
+                // Hidden inherits from parent groups → effective flag.
+                if ($gallery->effective_is_hidden) {
+                    continue;
+                }
+
                 $lastMod = $gallery->created_at ? Carbon::parse($gallery->created_at)->toAtomString() : now()->toAtomString();
                 
                 $xml .= '  <url>' . "\n";
@@ -47,14 +53,21 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">' . "\n";
         
-        Photo::whereHas('gallery', function ($query) {
-            $query->where('is_public', true)
-                ->where('brand', BrandRegistry::currentId())
-                ->where(function ($q) {
-                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                });
-        })->with('gallery')->chunk(100, function ($photos) use (&$xml, $baseUrl) {
+        Photo::where('is_hidden', false)
+            ->whereHas('gallery', function ($query) {
+                $query->where('is_public', true)
+                    ->where('brand', BrandRegistry::currentId())
+                    ->where('is_hidden', false)
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    });
+            })->with('gallery')->chunk(100, function ($photos) use (&$xml, $baseUrl) {
             foreach ($photos as $photo) {
+                // Hidden inherits from the gallery / parent groups → effective flag.
+                if ($photo->effective_is_hidden) {
+                    continue;
+                }
+
                 $pageUrl = $baseUrl . '/photos/' . $photo->id;
                 $imageUrl = $baseUrl . '/api/media/' . $photo->gallery_id . '/' . $photo->filename;
                 

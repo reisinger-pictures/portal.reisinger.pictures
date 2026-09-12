@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\PayoutPool;
-use App\Models\PhotographerStatement;
 use App\Http\Resources\PayoutPoolResource;
 use App\Http\Resources\PhotographerStatementResource;
+use App\Models\PayoutPool;
+use App\Models\PhotographerStatement;
 use App\Services\PayoutCalculationService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class PayoutController extends Controller
@@ -17,10 +17,10 @@ class PayoutController extends Controller
         $pools = PayoutPool::orderBy('year', 'desc')->orderBy('month', 'desc')->get();
         $statements = PhotographerStatement::with('user:id,name,email')
             ->orderBy('year', 'desc')->orderBy('month', 'desc')->get();
-        
+
         return response()->json([
-            'pools' => $pools->map(fn($p) => new PayoutPoolResource($p))->values(),
-            'statements' => $statements->map(fn($s) => new PhotographerStatementResource($s))->values(),
+            'pools' => $pools->map(fn ($p) => new PayoutPoolResource($p))->values(),
+            'statements' => $statements->map(fn ($s) => new PhotographerStatementResource($s))->values(),
         ]);
     }
 
@@ -29,7 +29,7 @@ class PayoutController extends Controller
         $request->validate([
             'month' => 'required|integer|min:1|max:12',
             'year' => 'required|integer|min:2024',
-            'net_pool_cents' => 'required|integer|min:0|max:100000000'
+            'net_pool_cents' => 'required|integer|min:0|max:100000000',
         ]);
 
         DB::transaction(function () use ($request, $service) {
@@ -38,8 +38,13 @@ class PayoutController extends Controller
                 ['net_pool_cents' => $request->net_pool_cents, 'photographer_share_percent' => 50]
             );
 
+            // Never destroy the audit trail: approved/paid statements are locked and
+            // must survive a recalculation. Only recalculable (pending/rollover)
+            // statements are replaced; the service guards skip the locked rows.
             PhotographerStatement::where('month', $request->month)
-                ->where('year', $request->year)->delete();
+                ->where('year', $request->year)
+                ->whereNotIn('status', ['approved', 'paid'])
+                ->delete();
 
             $service->calculatePoolShares($pool);
             $service->calculatePowerUserDelta($request->month, $request->year);
@@ -55,6 +60,7 @@ class PayoutController extends Controller
         if ($stmt->status === 'pending') {
             $stmt->update(['status' => 'approved']);
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -64,6 +70,7 @@ class PayoutController extends Controller
         if ($stmt->status === 'approved') {
             $stmt->update(['status' => 'paid']);
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -72,7 +79,7 @@ class PayoutController extends Controller
         $user = auth('api')->user();
         $statements = PhotographerStatement::where('user_id', $user->id)
             ->orderBy('year', 'desc')->orderBy('month', 'desc')->get();
-            
-        return response()->json($statements->map(fn($s) => new PhotographerStatementResource($s))->values());
+
+        return response()->json($statements->map(fn ($s) => new PhotographerStatementResource($s))->values());
     }
 }

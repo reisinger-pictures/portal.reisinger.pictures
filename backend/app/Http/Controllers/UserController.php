@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\UserRole;
+use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
@@ -20,6 +21,8 @@ use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
+    use EnforcesBrandIsolation;
+
     public function index()
     {
         $svc = app(AuthorizationService::class);
@@ -34,6 +37,12 @@ class UserController extends Controller
                 return response()->json(['data' => []]);
             }
             $query->where('org_id', $user->org_id);
+        }
+
+        // Brand isolation: a brand-bound actor only sees users of their own brand
+        // (a brand-less cross-brand user stays hidden).
+        if (! $this->isCrossBrand($user)) {
+            $query->where('brand', $this->brandValue($user));
         }
 
         return UserResource::collection($query->get());
@@ -134,11 +143,30 @@ class UserController extends Controller
             }
         }
 
+        // Brand isolation: a brand-bound actor may only manage users of their own brand.
+        if ($this->isBrandMismatch($currentUser, $user)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         $superAdminRole = Role::where('name', UserRole::SUPER_ADMIN->value)->first();
         $wantsSuperAdmin = $superAdminRole && in_array($superAdminRole->id, $request->role_ids ?? []);
 
         if ($wantsSuperAdmin !== $svc->isSuperAdmin($user) && ! $svc->isSuperAdmin($currentUser)) {
             return response()->json(['error' => 'Nur Super Admins können die Super Admin Rolle verwalten.'], 403);
+        }
+
+        // Privilege escalation guard: a non-super-admin may only assign roles at or
+        // below their own privilege level (covers self-escalation and cross-role
+        // escalation, e.g. an org_admin assigning `admin`).
+        if (! $svc->isSuperAdmin($currentUser) && $request->has('role_ids')) {
+            $callerRank = $this->highestRoleRank($currentUser);
+            $requestedRoleNames = Role::whereIn('id', $request->role_ids ?? [])->pluck('name')->all();
+
+            foreach ($requestedRoleNames as $requestedRoleName) {
+                if ($this->roleRank($requestedRoleName) > $callerRank) {
+                    return response()->json(['error' => 'Es dürfen nur Rollen auf oder unterhalb der eigenen Berechtigungsstufe vergeben werden.'], 403);
+                }
+            }
         }
 
         $validated = $request->validated();
@@ -179,6 +207,33 @@ class UserController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Privilege rank for a role name. Unknown roles rank highest so they are only
+     * assignable by a Super Admin (which skips the rank check entirely).
+     */
+    private function roleRank(string $roleName): int
+    {
+        return match ($roleName) {
+            UserRole::SUPER_ADMIN->value => 100,
+            UserRole::ADMIN->value => 80,
+            UserRole::ORG_ADMIN->value => 60,
+            UserRole::PHOTOGRAPHER->value => 50,
+            UserRole::POWER_USER->value => 40,
+            UserRole::CLIENT->value => 10,
+            default => PHP_INT_MAX,
+        };
+    }
+
+    /**
+     * Highest privilege rank across all roles of the given user.
+     */
+    private function highestRoleRank(User $user): int
+    {
+        return $user->roles->pluck('name')
+            ->map(fn ($name) => $this->roleRank($name))
+            ->max() ?? 0;
+    }
+
     public function destroy($id)
     {
         $svc = app(AuthorizationService::class);
@@ -192,6 +247,11 @@ class UserController extends Controller
             if ($user->org_id !== $currentUser->org_id) {
                 return response()->json(['error' => 'Forbidden (Org Isolation)'], 403);
             }
+        }
+
+        // Brand isolation: a brand-bound actor may only delete users of their own brand.
+        if ($this->isBrandMismatch($currentUser, $user)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
         $user->delete();

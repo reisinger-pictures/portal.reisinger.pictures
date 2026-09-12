@@ -163,6 +163,49 @@ class VolumeLicensingStrategyTest extends TestCase
         $this->assertEmpty($result['tier_breakdown']);
     }
 
+    public function test_non_monotonic_tiers_charge_the_qualifying_tier_price(): void
+    {
+        // 0 → 3000, 10 → 1000, 20 → 2000: 25 items qualify for the 20-tier (2000).
+        // The intermediate drop to 1000 must not leak into the total.
+        $strategy = $this->makeStrategy([[0, 3000], [10, 1000], [20, 2000]]);
+
+        $user = User::factory()->create();
+        $result = $strategy->calculateCart($this->buildItems(25, false), $user);
+
+        $this->assertSame(25 * 2000, $result['totalCents']);
+
+        $breakdownTotal = array_sum(array_column($result['tier_breakdown'], 'row_total'));
+        $this->assertSame(25 * 2000 - 25 * 3000, $breakdownTotal);
+    }
+
+    public function test_duplicate_tier_prices_do_not_over_discount(): void
+    {
+        // 0 → 3000, 10 → 2500, 20 → 2500: only one real discount step.
+        $strategy = $this->makeStrategy([[0, 3000], [10, 2500], [20, 2500]]);
+
+        $user = User::factory()->create();
+        $result = $strategy->calculateCart($this->buildItems(25, false), $user);
+
+        $this->assertSame(25 * 2500, $result['totalCents']);
+        $this->assertSame(
+            -(25 * 500),
+            array_sum(array_column($result['tier_breakdown'], 'row_total'))
+        );
+    }
+
+    public function test_qualifying_tier_above_base_price_never_adds_a_surcharge(): void
+    {
+        // Pathological data: 10 → 5000 is more expensive than the base (3000).
+        // Volume pricing must never increase the unit price.
+        $strategy = $this->makeStrategy([[0, 3000], [10, 5000]]);
+
+        $user = User::factory()->create();
+        $result = $strategy->calculateCart($this->buildItems(15, false), $user);
+
+        $this->assertSame(15 * 3000, $result['totalCents']);
+        $this->assertEmpty($result['tier_breakdown']);
+    }
+
     /**
      * @param array<array{0: int, 1: int}> $tiers [min_quantity, price_cents]
      */

@@ -17,7 +17,8 @@ class ImageProcessor
         $height = imagesy($img);
 
         if ($width > $size) {
-            $newHeight = (int)($height * ($size / $width));
+            // Extreme landscape ratios would floor to 0; GD requires >= 1px.
+            $newHeight = max(1, (int)($height * ($size / $width)));
             $newImg = imagecreatetruecolor($size, $newHeight);
             imagealphablending($newImg, false);
             imagesavealpha($newImg, true);
@@ -43,7 +44,7 @@ class ImageProcessor
         if ($width > $maxWidth) {
             $ratio = $maxWidth / $width;
             $newWidth = $maxWidth;
-            $newHeight = (int)($height * $ratio);
+            $newHeight = max(1, (int)($height * $ratio));
             $resized = imagecreatetruecolor($newWidth, $newHeight);
             imagealphablending($resized, false);
             imagesavealpha($resized, true);
@@ -84,7 +85,7 @@ class ImageProcessor
         if ($maxWidth && $width > $maxWidth) {
             $ratio = $maxWidth / $width;
             $newWidth = $maxWidth;
-            $newHeight = (int)($height * $ratio);
+            $newHeight = max(1, (int)($height * $ratio));
             $resized = imagecreatetruecolor($newWidth, $newHeight);
             imagealphablending($resized, false);
             imagesavealpha($resized, true);
@@ -118,10 +119,10 @@ class ImageProcessor
                 $wmRatio = $wmWidth / $wmHeight;
                 if ($wmWidth > $wmHeight) {
                     $newWmWidth = $targetWmSize;
-                    $newWmHeight = (int)($targetWmSize / $wmRatio);
+                    $newWmHeight = max(1, (int)($targetWmSize / $wmRatio));
                 } else {
                     $newWmHeight = $targetWmSize;
-                    $newWmWidth = (int)($targetWmSize * $wmRatio);
+                    $newWmWidth = max(1, (int)($targetWmSize * $wmRatio));
                 }
 
                 $wmResized = imagecreatetruecolor($newWmWidth, $newWmHeight);

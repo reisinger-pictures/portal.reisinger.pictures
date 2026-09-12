@@ -104,6 +104,24 @@ class PricingStrategyResolutionTest extends TestCase
         $this->assertSame('volume_licensing', $gallery->effective_licensing_mode);
     }
 
+    public function test_effective_licensing_mode_uses_the_gallery_brand_without_active_context(): void
+    {
+        Setting::updateOrCreate(
+            ['key' => 'pricing_strategy', 'brand' => Brand::B2B->value],
+            ['value' => 'volume_licensing']
+        );
+
+        $gallery = Gallery::factory()->create([
+            'is_public' => true,
+            'licensing_mode' => null,
+            'brand' => Brand::B2B,
+        ]);
+
+        BrandRegistry::reset();
+
+        $this->assertSame('volume_licensing', $gallery->effective_licensing_mode);
+    }
+
     public function test_effective_licensing_mode_is_appended_to_json_response(): void
     {
         $gallery = Gallery::factory()->create([

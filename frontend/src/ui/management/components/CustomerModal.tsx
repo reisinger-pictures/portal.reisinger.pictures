@@ -70,11 +70,11 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                     {editingCustomer ? 'Kunde bearbeiten' : 'Neuen Kunden anlegen'}
                 </h3>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">Name / Ansprechpartner</span></label>
-                            <input type="text" {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
+                            <input type="text" required {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
                             {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
                         </div>
                         <div className="form-control">

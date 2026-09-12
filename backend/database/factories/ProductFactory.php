@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Brand;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -13,6 +14,7 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
+            'brand' => Brand::B2B,
             'type' => $this->faker->randomElement(['web', 'print', 'original']),
             'name' => $this->faker->words(2, true),
             'price' => $this->faker->numberBetween(500, 30000),

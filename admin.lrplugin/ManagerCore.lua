@@ -25,28 +25,28 @@ return function(mode, baseUrl)
         local photoCount = #targetPhotos
 
         local jwt = nil
+        local prefs = import 'LrPrefs'.prefsForPlugin()
+        -- Move any plaintext password from an older plugin version into the
+        -- OS-protected credential store, then try a silent login with the
+        -- saved credentials.
+        Api.migrateLegacyPassword()
+        local credEmail = prefs.apiUser or ""
+        local credPassword = Api.getStoredPassword()
+
         local loginFailed = false
         local lastErr = ""
         local lastDetail = ""
         
         -- 1. Login Loop
         while true do
-            jwt, lastErr, lastDetail = Api.login()
-            if jwt then
-                local isAllowed, userData = Api.checkRole(jwt)
-                if isAllowed then break else
-                    LrDialogs.message(Api.getTitle("Zugriff verweigert"), "Dein Account hat nicht die erforderliche Fotografen- oder Admin-Rolle.", "critical")
-                    return
-                end
-            else
-                local success = false
+            if not credPassword then
+                local submitted = false
                 LrFunctionContext.callWithContext("LoginDialogContext", function(context)
                     local f = LrView.osFactory()
-                    local prefs = import 'LrPrefs'.prefsForPlugin()
                     local props = LrBinding.makePropertyTable(context)
                     
-                    props.email = prefs.apiUser or ""
-                    props.password = prefs.apiPass or ""
+                    props.email = credEmail
+                    props.password = ""
 
                     local errUI = f:spacer { height = 0 }
                     if loginFailed then
@@ -83,14 +83,36 @@ return function(mode, baseUrl)
                     }
 
                     if res == "ok" then
-                        prefs.apiUser = props.email
-                        prefs.apiPass = props.password
-                        loginFailed = true
-                        success = true
+                        credEmail = props.email or ""
+                        credPassword = props.password or ""
+                        submitted = true
                     end
                 end)
                 
-                if not success then return end
+                if not submitted then return end
+                -- Only the e-mail goes into LrPrefs; the password is stored
+                -- separately in the OS-protected credential store (on success, below).
+                prefs.apiUser = credEmail
+                loginFailed = true
+            end
+
+            jwt, lastErr, lastDetail = Api.login(credEmail, credPassword)
+            if jwt then
+                Api.storePassword(credPassword)
+                local isAllowed, userData, roleStatus = Api.checkRole(jwt)
+                if isAllowed then
+                    break
+                elseif roleStatus == 200 then
+                    LrDialogs.message(Api.getTitle("Zugriff verweigert"), "Dein Account hat nicht die erforderliche Fotografen- oder Admin-Rolle.", "critical")
+                    return
+                else
+                    LrDialogs.message(Api.getTitle("Verbindung fehlgeschlagen"), "Die Rolle konnte nicht geprüft werden (HTTP " .. tostring(roleStatus) .. "). Bitte erneut versuchen.", "critical")
+                    return
+                end
+            else
+                -- Wrong credentials or a network error: show the dialog again.
+                loginFailed = true
+                credPassword = nil
             end
         end
 
@@ -98,12 +120,16 @@ return function(mode, baseUrl)
         local treeData = nil
         local function reloadTree()
             local data, status = Api.call("/api/management/galleries?filter_type=" .. mode, "GET", nil, jwt)
-            if status == 200 and data then treeData = data end
+            if status == 200 and data then
+                treeData = data
+                return true
+            end
+            return false, status
         end
-        reloadTree()
 
-        if not treeData then
-            LrDialogs.message(Api.getTitle("Fehler"), "Galerien konnten nicht geladen werden.", "critical")
+        local treeOk, treeStatus = reloadTree()
+        if not treeOk or not treeData then
+            LrDialogs.message(Api.getTitle("Fehler"), "Galerien konnten nicht geladen werden (HTTP " .. tostring(treeStatus) .. ").", "critical")
             return
         end
 
@@ -157,7 +183,11 @@ return function(mode, baseUrl)
             end)
 
             local function handleReload()
-                reloadTree()
+                local ok, status = reloadTree()
+                if not ok then
+                    LrDialogs.message(Api.getTitle("Fehler"), "Galerien konnten nicht neu geladen werden (HTTP " .. tostring(status) .. ").", "warning")
+                    return
+                end
                 updateDropdown()
             end
 
@@ -293,10 +323,17 @@ return function(mode, baseUrl)
                     logMsg("Galerie ID: " .. tostring(props.selectedGalleryId))
                     logMsg("Anzahl Bilder: " .. tostring(photoCount))
 
-                    if mode == "delivery" and props.convertToDelivery then Api.call("/api/management/galleries/" .. props.selectedGalleryId, "PUT", { is_live = false }, jwt) end
+                    if mode == "delivery" and props.convertToDelivery then
+                        local _, convertStatus = Api.call("/api/management/galleries/" .. props.selectedGalleryId, "PUT", { is_live = false }, jwt)
+                        if convertStatus ~= 200 then
+                            logMsg("Live-Modus konnte nicht beendet werden (HTTP " .. tostring(convertStatus) .. "). Upload abgebrochen.")
+                            LrDialogs.message(Api.getTitle("Fehler"), "Der Live-Modus konnte nicht beendet werden. Upload abgebrochen.", "critical")
+                            return
+                        end
+                    end
 
                     local progress = LrProgressScope({ title = Api.getTitle("Exportiere und Lade hoch (" .. photoCount .. " Bilder)...") })
-                    progress:setCancelable(true)
+                    if progress then progress:setCancelable(true) end
 
                     local exportSettings = { LR_format = "JPEG", LR_export_quality = 80, LR_export_colorSpace = "sRGB", LR_export_destinationType = "specificFolder", LR_export_destinationPathPrefix = galleryUploadDir, LR_export_useSubfolder = false }
                     if mode == "selection" then
@@ -310,9 +347,10 @@ return function(mode, baseUrl)
                     local session = LrExportSession({ photosToExport = targetPhotos, exportSettings = exportSettings })
                     local i = 0
                     local errorCount = 0
+                    local sessionExpired = false
                     
                     for _, rendition in session:renditions() do
-                        if progress:isCanceled() then 
+                        if progress and progress:isCanceled() then 
                             logMsg("Upload durch Benutzer abgebrochen.")
                             break 
                         end
@@ -343,25 +381,45 @@ return function(mode, baseUrl)
                         if success and path then
                             local filename = LrPathUtils.leafName(path)
                             local lrUuid = rendition.photo:getRawMetadata("uuid")
-                            progress:setCaption("Upload " .. i .. "/" .. photoCount .. ": " .. filename)
+                            if progress then progress:setCaption("Upload " .. i .. "/" .. photoCount .. ": " .. filename) end
 
                             logMsg("Starte Upload für UUID: " .. tostring(lrUuid) .. " (Backend generiert nun UUID-Filenames)")
                             
-                            local resBody, status = Api.uploadMultipart("/api/management/upload", {
+                            local formFields = {
                                 { name = "gallery_id", value = tostring(props.selectedGalleryId) },
                                 { name = "lr_uuid",    value = lrUuid },
                                 { name = "replace",    value = "1" },
                                 { name = "file",       fileName = filename, filePath = path, contentType = "image/jpeg" }
-                            }, jwt)
+                            }
+
+                            local resBody, status, uploadErr = Api.uploadMultipart("/api/management/upload", formFields, jwt)
 
                             logMsg("HTTP Status: " .. tostring(status))
 
-                            if status == 200 then 
+                            if status == 401 then
+                                -- The JWT expired (TTL 240 min). Re-login silently
+                                -- with the saved credentials and retry the upload
+                                -- once; `replace = 1` makes the retry idempotent.
+                                logMsg("Sitzung abgelaufen (HTTP 401). Erneute Anmeldung wird versucht...")
+                                local newJwt = Api.login(credEmail)
+                                if newJwt then
+                                    jwt = newJwt
+                                    logMsg("Erneut angemeldet. Wiederhole Upload.")
+                                    resBody, status, uploadErr = Api.uploadMultipart("/api/management/upload", formFields, jwt)
+                                    logMsg("HTTP Status (2. Versuch): " .. tostring(status))
+                                end
+                            end
+
+                            if status == 401 then
+                                sessionExpired = true
+                                logMsg("Sitzung abgelaufen (HTTP 401). Upload abgebrochen.")
+                                break
+                            elseif status == 200 then 
                                 logMsg("Upload erfolgreich. Lösche lokale Datei.")
                                 LrFileUtils.delete(path) 
                             else 
                                 errorCount = errorCount + 1
-                                local errDetail = resBody or ("HTTP " .. tostring(status))
+                                local errDetail = uploadErr or ("HTTP " .. tostring(status))
                                 logMsg("UPLOAD FEHLER: " .. tostring(errDetail))
                                 LrFunctionContext.callWithContext("UploadError", function(cx)
                                     local viewFactory = LrView.osFactory()
@@ -381,9 +439,14 @@ return function(mode, baseUrl)
                             logMsg("Überspringe Upload, success=false oder path=nil")
                             errorCount = errorCount + 1
                         end
-                        progress:setPortionComplete(i, photoCount)
+                        if progress then progress:setPortionComplete(i, photoCount) end
                     end
-                    progress:done()
+                    if progress then progress:done() end
+
+                    if sessionExpired then
+                        LrDialogs.message(Api.getTitle("Sitzung abgelaufen"), "Deine Anmeldung ist abgelaufen. Bitte den Manager schließen, neu starten und erneut anmelden.", "critical")
+                        return
+                    end
 
                     -- Temp-Dir aufräumen bei komplett erfolgreichem Upload
                     if errorCount == 0 then

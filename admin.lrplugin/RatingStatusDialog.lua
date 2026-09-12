@@ -11,7 +11,11 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
         local f = LrView.osFactory()
         local props = LrBinding.makePropertyTable(context)
 
+        props.loading = true
+        props.loaded = false
         props.error = false
+        props.contentVisible = false
+        props.errorText = "Fehler beim Laden der Bewertungen."
         props.users = {}
         props.totalPhotos = 0
         props.ratings = {}
@@ -19,10 +23,34 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
         props.syncPick = true
         props.syncRating = true
         props.syncComments = true
+        props.usersText = ""
+        props.ratingsText = ""
 
+        local function buildUserLines(users, totalPhotos)
+            local lines = {}
+            for _, u in ipairs(users) do
+                local name = u.name or "Unbekannt"
+                local email = ""
+                if u.email and not string.find(u.email, "@invite.local") then email = u.email end
+                local progress = tostring(u.rated_count) .. "/" .. tostring(totalPhotos) .. " bewertet"
+                table.insert(lines, name .. (email ~= "" and (" (" .. email .. ")") or "") .. " — " .. progress)
+            end
+            return table.concat(lines, "\n")
+        end
+
+        local function buildRatingLines(ratings)
+            local lines = {}
+            for _, r in ipairs(ratings) do
+                local stars = r.avg_rating and r.avg_rating > 0 and (string.rep("★", r.avg_rating) .. string.rep("☆", 5 - r.avg_rating)) or "—"
+                local comments = (r.all_comments and r.all_comments ~= "") and r.all_comments or "—"
+                table.insert(lines, r.filename .. " | " .. stars .. " | " .. comments)
+            end
+            return table.concat(lines, "\n\n")
+        end
+
+        -- Runs inside an async task: LrHttp must never be called while the
+        -- dialog is being constructed, or Lightroom freezes.
         local function loadData()
-            props.error = false
-
             local dataExport, statusExport = Api.call("/api/management/galleries/" .. galleryId .. "/export", "GET", nil, jwt)
             local dataStatus, statusStatus = Api.call("/api/management/galleries/" .. galleryId .. "/rating-status", "GET", nil, jwt)
 
@@ -31,12 +59,18 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
                 props.users = dataStatus.users or {}
                 props.totalPhotos = dataStatus.total_photos or 0
                 props.syncEnabled = (#props.ratings > 0)
+                props.usersText = (#props.users > 0) and buildUserLines(props.users, props.totalPhotos) or "Keine Personen mit Bewertungen."
+                props.ratingsText = (#props.ratings > 0) and buildRatingLines(props.ratings) or "Noch keine Bewertungen vorhanden."
+                props.error = false
+                props.contentVisible = true
             else
+                props.errorText = "Fehler beim Laden der Bewertungen (HTTP " .. tostring(statusExport) .. "/" .. tostring(statusStatus) .. ")."
                 props.error = true
+                props.contentVisible = false
             end
+            props.loading = false
+            props.loaded = true
         end
-
-        loadData()
 
         local function runSync()
             local catalog = LrApplication.activeCatalog()
@@ -77,64 +111,54 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
 
         local rows = { spacing = f:control_spacing(), width = 700 }
 
-        if props.error then
-            table.insert(rows, f:static_text { title = "Fehler beim Laden der Bewertungen.", text_color = import 'LrColor'(0.8, 0, 0) })
-        else
-            table.insert(rows, f:static_text { title = "Beteiligte Personen", font = "<system/bold>" })
-            table.insert(rows, f:spacer { height = 5 })
+        table.insert(rows, f:static_text {
+            title = "Lade Bewertungen...",
+            visible = LrView.bind{ key = "loading", bind_to_object = props }
+        })
+        table.insert(rows, f:static_text {
+            title = LrView.bind{ key = "errorText", bind_to_object = props },
+            text_color = import 'LrColor'(0.8, 0, 0),
+            visible = LrView.bind{ key = "error", bind_to_object = props }
+        })
 
-            if #props.users > 0 then
-                local userLines = {}
-                for _, u in ipairs(props.users) do
-                    local name = u.name or "Unbekannt"
-                    local email = ""
-                    if u.email and not string.find(u.email, "@invite.local") then email = u.email end
-                    local progress = u.rated_count .. "/" .. props.totalPhotos .. " bewertet"
-                    table.insert(userLines, name .. (email ~= "" and (" (" .. email .. ")") or "") .. " — " .. progress)
-                end
-                table.insert(rows, f:edit_field {
-                    value = table.concat(userLines, "\n"),
-                    height_in_lines = math.min(#userLines, 8),
-                    width_in_chars = 60,
-                    readonly = true
-                })
-            else
-                table.insert(rows, f:static_text { title = "Keine Personen mit Bewertungen.", text_color = import 'LrColor'(0.5, 0.5, 0.5) })
-            end
+        local content = f:column {
+            spacing = f:control_spacing(),
+            f:static_text { title = "Beteiligte Personen", font = "<system/bold>" },
+            f:spacer { height = 5 },
+            f:edit_field {
+                value = LrView.bind{ key = "usersText", bind_to_object = props },
+                height_in_lines = 4,
+                width_in_chars = 60,
+                readonly = true
+            },
+            f:spacer { height = 15 },
+            f:separator { fill_horizontal = 1 },
+            f:spacer { height = 5 },
+            f:static_text { title = "Detaillierte Auswertungen (Bild-Bewertungen)", font = "<system/bold>" },
+            f:spacer { height = 5 },
+            f:edit_field {
+                value = LrView.bind{ key = "ratingsText", bind_to_object = props },
+                height_in_lines = 12,
+                width_in_chars = 80,
+                readonly = true
+            },
+            f:spacer { height = 15 },
+            f:separator { fill_horizontal = 1 },
+            f:spacer { height = 5 },
+            f:static_text { title = "Synchronisations-Optionen", font = "<system/bold>" },
+            f:checkbox { title = "Ø Sterne in LR-Rating übernehmen", value = LrView.bind{key="syncRating", bind_to_object=props}, enabled = LrView.bind{key="syncEnabled", bind_to_object=props} },
+            f:checkbox { title = "Pick-Flag bei Ø ≥ 4 Sterne setzen", value = LrView.bind{key="syncPick", bind_to_object=props}, enabled = LrView.bind{key="syncEnabled", bind_to_object=props} },
+            f:checkbox { title = "Kommentare in LR-Instructions schreiben", value = LrView.bind{key="syncComments", bind_to_object=props}, enabled = LrView.bind{key="syncEnabled", bind_to_object=props} }
+        }
 
-            table.insert(rows, f:spacer { height = 15 })
-            table.insert(rows, f:separator { fill_horizontal = 1 })
-            table.insert(rows, f:spacer { height = 5 })
+        table.insert(rows, f:row {
+            visible = LrView.bind{ key = "contentVisible", bind_to_object = props },
+            content
+        })
 
-            table.insert(rows, f:static_text { title = "Detaillierte Auswertungen (Bild-Bewertungen)", font = "<system/bold>" })
-            table.insert(rows, f:spacer { height = 5 })
-
-            if #props.ratings > 0 then
-                local ratingLines = {}
-                for _, r in ipairs(props.ratings) do
-                    local stars = r.avg_rating and r.avg_rating > 0 and (string.rep("★", r.avg_rating) .. string.rep("☆", 5 - r.avg_rating)) or "—"
-                    local comments = (r.all_comments and r.all_comments ~= "") and r.all_comments or "—"
-                    table.insert(ratingLines, r.filename .. " | " .. stars .. " | " .. comments)
-                end
-                table.insert(rows, f:edit_field {
-                    value = table.concat(ratingLines, "\n\n"),
-                    height_in_lines = math.min(#ratingLines * 3, 15),
-                    width_in_chars = 80,
-                    readonly = true
-                })
-            else
-                table.insert(rows, f:static_text { title = "Noch keine Bewertungen vorhanden.", text_color = import 'LrColor'(0.5, 0.5, 0.5) })
-            end
-
-            table.insert(rows, f:spacer { height = 15 })
-            table.insert(rows, f:separator { fill_horizontal = 1 })
-            table.insert(rows, f:spacer { height = 5 })
-
-            table.insert(rows, f:static_text { title = "Synchronisations-Optionen", font = "<system/bold>" })
-            table.insert(rows, f:checkbox { title = "Ø Sterne in LR-Rating übernehmen", value = LrView.bind{key="syncRating", bind_to_object=props}, enabled = LrView.bind{key="syncEnabled", bind_to_object=props} })
-            table.insert(rows, f:checkbox { title = "Pick-Flag bei Ø ≥ 4 Sterne setzen", value = LrView.bind{key="syncPick", bind_to_object=props}, enabled = LrView.bind{key="syncEnabled", bind_to_object=props} })
-            table.insert(rows, f:checkbox { title = "Kommentare in LR-Instructions schreiben", value = LrView.bind{key="syncComments", bind_to_object=props}, enabled = LrView.bind{key="syncEnabled", bind_to_object=props} })
-        end
+        LrTasks.startAsyncTask(function()
+            loadData()
+        end)
 
         local result = LrDialogs.presentModalDialog {
             title = Api.getTitle("Bewertungen & Status — " .. galleryName),

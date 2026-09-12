@@ -95,6 +95,76 @@ class VolumePresetControllerTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_non_monotonic_price_tiers_are_rejected(): void
+    {
+        $token = $this->superAdminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/settings/volume-presets', [
+                'name' => 'Steigend',
+                'tiers' => [
+                    ['min_quantity' => 0, 'price_cents' => 1000],
+                    ['min_quantity' => 10, 'price_cents' => 2000],
+                ],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['tiers.1.price_cents']);
+    }
+
+    public function test_duplicate_tier_prices_are_rejected(): void
+    {
+        $token = $this->superAdminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/settings/volume-presets', [
+                'name' => 'Gleich',
+                'tiers' => [
+                    ['min_quantity' => 0, 'price_cents' => 1000],
+                    ['min_quantity' => 10, 'price_cents' => 1000],
+                ],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['tiers.1.price_cents']);
+    }
+
+    public function test_duplicate_min_quantity_is_rejected(): void
+    {
+        $token = $this->superAdminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/settings/volume-presets', [
+                'name' => 'Doppelt',
+                'tiers' => [
+                    ['min_quantity' => 0, 'price_cents' => 3000],
+                    ['min_quantity' => 0, 'price_cents' => 2000],
+                ],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['tiers.1.min_quantity']);
+    }
+
+    public function test_update_rejects_non_monotonic_tiers(): void
+    {
+        $token = $this->superAdminToken();
+
+        $res = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/settings/volume-presets', [
+                'name' => 'Ok',
+                'tiers' => [['min_quantity' => 0, 'price_cents' => 3000]],
+            ]);
+        $id = $res->json('id');
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson("/api/management/settings/volume-presets/{$id}", [
+                'name' => 'Bad',
+                'tiers' => [
+                    ['min_quantity' => 0, 'price_cents' => 1000],
+                    ['min_quantity' => 5, 'price_cents' => 1500],
+                ],
+            ])
+            ->assertStatus(422);
+    }
+
     public function test_normal_admin_cannot_manage_presets(): void
     {
         $admin = User::factory()->create();

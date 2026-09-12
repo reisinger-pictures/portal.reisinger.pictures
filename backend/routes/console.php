@@ -9,20 +9,20 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Führe die Bereinigung täglich um 03:00 Uhr nachts aus
-Schedule::command('app:cleanup-galleries')->dailyAt('03:00');
+Schedule::command('app:cleanup-galleries')->dailyAt('03:00')->withoutOverlapping()->onOneServer();
 
 // Board-Cleanup (Projekte + Photo-Jobs in Endstatus)
-Schedule::command('app:cleanup-board-items')->dailyAt('06:00');
+Schedule::command('app:cleanup-board-items')->dailyAt('06:00')->withoutOverlapping()->onOneServer();
 
 // Storage Lifecycle & Cache Registry
-Schedule::command('app:downscale-editorial')->dailyAt('04:00');
-Schedule::command('app:cleanup-derivatives')->dailyAt('05:00');
+Schedule::command('app:downscale-editorial')->dailyAt('04:00')->withoutOverlapping()->onOneServer();
+Schedule::command('app:cleanup-derivatives')->dailyAt('05:00')->withoutOverlapping()->onOneServer();
 
 // Temp-Dateien (alte Skalierungs-Caches & Artefakte) bereinigen
-Schedule::command('app:cleanup-temp')->dailyAt('02:30');
+Schedule::command('app:cleanup-temp')->dailyAt('02:30')->withoutOverlapping()->onOneServer();
 
 // Automatische Sammelrechnungen (monatlich)
-Schedule::command('app:process-collective-invoices --frequency=monthly')->monthly();
+Schedule::command('app:process-collective-invoices --frequency=monthly')->monthly()->withoutOverlapping()->onOneServer();
 
 // Automatische Sammelrechnungen (quartalsweise)
-Schedule::command('app:process-collective-invoices --frequency=quarterly')->quarterly();
+Schedule::command('app:process-collective-invoices --frequency=quarterly')->quarterly()->withoutOverlapping()->onOneServer();

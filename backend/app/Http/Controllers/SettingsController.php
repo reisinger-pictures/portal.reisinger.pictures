@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Brand;
 use App\Http\Requests\StoreBrandSettingsRequest;
 use App\Models\Gallery;
 use App\Services\BrandSettingsService;
@@ -72,7 +73,14 @@ class SettingsController extends Controller
             abort(404);
         }
 
-        return response()->file($path, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'no-cache, no-store, must-revalidate']);
+        // The SVG is user-uploaded; serve it with a restrictive CSP + nosniff so
+        // a malicious SVG can never execute script when opened directly.
+        return response()->file($path, [
+            'Content-Type' => 'image/svg+xml',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function getWatermark(SettingResolver $resolver)
@@ -184,7 +192,15 @@ class SettingsController extends Controller
         if ($galleryId !== null) {
             $gallery = Gallery::find($galleryId);
             if ($gallery !== null) {
-                $pricingStrategy = $gallery->effective_licensing_mode;
+                // Cross-brand leak guard: a gallery of another brand must never
+                // influence this brand's licensing mode / volume pricing.
+                // Legacy null-brand galleries are still accepted.
+                $galleryBrand = $gallery->brand instanceof Brand ? $gallery->brand->value : $gallery->brand;
+                if ($galleryBrand !== null && $galleryBrand !== BrandRegistry::currentId()) {
+                    $gallery = null;
+                } else {
+                    $pricingStrategy = $gallery->effective_licensing_mode;
+                }
             }
         }
 

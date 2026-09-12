@@ -55,6 +55,21 @@ export interface CartLoadResult {
 }
 
 /**
+ * Verteilt einen Gesamtbetrag (in Cent) exakt und gleichmäßig auf `count` Positionen.
+ *
+ * `Math.round(total/count)` pro Position kann den Gesamtbetrag um bis zu
+ * `count/2` Cent verfälschen (Rundungsdrift). Deshalb wird der Cent-Rest
+ * deterministisch auf die ersten Positionen verteilt, sodass die Summe der
+ * Einzelpreise wieder exakt `totalCents` ergibt.
+ */
+export function splitTotalEvenly(totalCents: number, count: number): number[] {
+    if (count <= 0) return [];
+    const base = Math.floor(totalCents / count);
+    const remainder = totalCents - base * count;
+    return Array.from({length: count}, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
+/**
  * Reine Lade-Logik (aus CartProvider extrahiert, verhaltensgleich): validiert den gespeicherten
  * Cart-Inhalt via Zod. Schema-Mismatch → console.warn (wie im Original).
  */
@@ -68,7 +83,9 @@ export function loadCartItems(saved: string | null): CartLoadResult {
     }
     const validation = cartSchema.safeParse(parsed);
     if (validation.success) return {items: validation.data, error: 'none'};
-    console.warn('LocalStorage Cart Mismatch:', validation.error);
+    if (import.meta.env.DEV) {
+        console.warn('LocalStorage Cart Mismatch:', validation.error);
+    }
     return {items: [], error: 'schema'};
 }
 

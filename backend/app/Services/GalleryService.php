@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\Brand;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
+use App\Models\VolumePreset;
 use App\Support\BrandRegistry;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +42,7 @@ class GalleryService
             'brand' => BrandRegistry::currentOrDefault()->value,
         ]);
 
-        if (!empty($data['org_id'])) {
+        if (! empty($data['org_id'])) {
             $group->orgs()->attach($data['org_id']);
         }
 
@@ -52,7 +54,7 @@ class GalleryService
      */
     public function updateGroup(GalleryGroup $group, array $data): GalleryGroup
     {
-        $slug = !empty($data['slug']) ? Str::slug($data['slug']) : Str::slug($data['name']);
+        $slug = ! empty($data['slug']) ? Str::slug($data['slug']) : Str::slug($data['name']);
         if ($slug !== $group->slug) {
             $slug = $this->slugService->makeUnique($slug, 'gallery_groups');
         }
@@ -83,9 +85,9 @@ class GalleryService
 
         $isPublic = $data['is_public'] ?? false;
 
-        if (!empty($data['gallery_group_id'])) {
+        if (! empty($data['gallery_group_id'])) {
             $group = GalleryGroup::find($data['gallery_group_id']);
-            if ($group && !is_null($group->is_public)) {
+            if ($group && ! is_null($group->is_public)) {
                 $isPublic = $group->is_public;
             }
         }
@@ -111,7 +113,7 @@ class GalleryService
                 'is_hidden' => $data['is_hidden'] ?? false,
                 'restricted_photographers' => $data['restricted_photographers'] ?? null,
                 'gallery_group_id' => $data['gallery_group_id'] ?? null,
-                'password_hash' => !empty($data['password']) ? Hash::make($data['password']) : null,
+                'password_hash' => ! empty($data['password']) ? Hash::make($data['password']) : null,
                 'expires_at' => $expiresAt,
                 'allow_client_metadata_edit' => $data['allow_client_metadata_edit'] ?? false,
                 'apply_metadata_to_photos' => $data['apply_metadata_to_photos'] ?? false,
@@ -146,15 +148,21 @@ class GalleryService
             $this->assertPresetForBrand($data['volume_preset_id']);
         }
 
-        if (array_key_exists('slug', $data) && $data['slug'] !== $gallery->slug) {
-            $data['slug'] = $this->slugService->makeUnique($data['slug'], 'galleries');
+        if (array_key_exists('slug', $data)) {
+            if ($data['slug'] === null || $data['slug'] === '') {
+                // A null/empty slug means "no change" — never null out the column
+                // or pass null into SlugService::makeUnique(string ...).
+                unset($data['slug']);
+            } elseif ($data['slug'] !== $gallery->slug) {
+                $data['slug'] = $this->slugService->makeUnique($data['slug'], 'galleries');
+            }
         }
 
         if (array_key_exists('expires_at', $data)) {
             $data['expires_at'] = $this->parseExpiresAt($data['expires_at']);
         }
 
-        if (!empty($data['password'])) {
+        if (! empty($data['password'])) {
             $data['password_hash'] = Hash::make($data['password']);
         }
         unset($data['password']);
@@ -172,7 +180,12 @@ class GalleryService
 
         $gallery->update($data);
 
-        $gallery->orgs()->sync($data['org_ids'] ?? []);
+        // `org_ids` is optional ("sometimes"): only touch the pivot when the
+        // caller actually sent the key, otherwise a partial update would detach
+        // every org assignment.
+        if (array_key_exists('org_ids', $data)) {
+            $gallery->orgs()->sync($data['org_ids'] ?? []);
+        }
 
         $this->applyMetadataToPhotos($gallery);
 
@@ -184,7 +197,7 @@ class GalleryService
      */
     public function applyMetadataToPhotos(Gallery $gallery): void
     {
-        if (!$gallery->apply_metadata_to_photos) {
+        if (! $gallery->apply_metadata_to_photos) {
             return;
         }
 
@@ -250,9 +263,9 @@ class GalleryService
             return;
         }
 
-        $preset = \App\Models\VolumePreset::find($presetId);
+        $preset = VolumePreset::find($presetId);
         $currentBrand = BrandRegistry::currentOrDefault()->value;
-        $presetBrand = $preset?->brand instanceof \App\Enums\Brand ? $preset->brand->value : $preset?->brand;
+        $presetBrand = $preset?->brand instanceof Brand ? $preset->brand->value : $preset?->brand;
         if ($preset === null || $presetBrand !== $currentBrand) {
             throw ValidationException::withMessages([
                 'volume_preset_id' => 'Das gewählte Volume-Preset gehört nicht zur aktuellen Brand.',

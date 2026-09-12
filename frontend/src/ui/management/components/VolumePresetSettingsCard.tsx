@@ -18,22 +18,58 @@ interface PresetEditorProps {
     onCancel: () => void;
 }
 
+/**
+ * Editable string draft so partially typed decimals (e.g. "1.") survive the
+ * keystroke instead of being normalised to "1.00" on every change.
+ */
+interface TierDraft {
+    min_quantity: string;
+    price: string;
+}
+
+function toTierDraft(row: TierEditorRow): TierDraft {
+    return {min_quantity: String(row.min_quantity), price: (row.price_cents / 100).toFixed(2)};
+}
+
+function parsePriceCents(raw: string): number {
+    const parsed = Number.parseFloat(raw.trim().replace(',', '.'));
+    return Number.isFinite(parsed) ? Math.round(parsed * 100) : Number.NaN;
+}
+
+function parseMinQuantity(raw: string): number {
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function normalizePriceDraft(raw: string): string {
+    const cents = parsePriceCents(raw);
+    return Number.isFinite(cents) ? (Math.max(0, cents) / 100).toFixed(2) : '0.00';
+}
+
+function normalizeQuantityDraft(raw: string): string {
+    const quantity = parseMinQuantity(raw);
+    return Number.isFinite(quantity) ? String(Math.max(0, quantity)) : '0';
+}
+
 function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }: PresetEditorProps) {
     const [name, setName] = useState(initialName);
-    const [tiers, setTiers] = useState<TierEditorRow[]>(
-        initialTiers.length > 0 ? initialTiers : [{ min_quantity: 0, price_cents: 3000 }]
+    const [tiers, setTiers] = useState<TierDraft[]>(
+        () => (initialTiers.length > 0 ? initialTiers : [{min_quantity: 0, price_cents: 3000}]).map(toTierDraft)
     );
     const [saving, setSaving] = useState(false);
     const { showToast } = useUI();
 
-    const updateTier = (index: number, patch: Partial<TierEditorRow>) => {
+    const updateTier = (index: number, patch: Partial<TierDraft>) => {
         setTiers(prev => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
     };
 
     const addTier = () => {
         const last = tiers[tiers.length - 1];
-        const nextMin = last ? last.min_quantity + 10 : 0;
-        setTiers(prev => [...prev, { min_quantity: nextMin, price_cents: last ? Math.max(0, last.price_cents - 500) : 2500 }]);
+        const lastQuantity = last ? parseMinQuantity(last.min_quantity) : 0;
+        const nextMin = (Number.isFinite(lastQuantity) ? lastQuantity : 0) + 10;
+        const lastCents = last ? parsePriceCents(last.price) : Number.NaN;
+        const nextCents = Math.max(0, (Number.isFinite(lastCents) ? lastCents : 0) - 500);
+        setTiers(prev => [...prev, {min_quantity: String(nextMin), price: (nextCents / 100).toFixed(2)}]);
     };
 
     const removeTier = (index: number) => {
@@ -50,12 +86,15 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
             showToast('error', t`Mindestens eine Preisstaffel erforderlich`);
             return;
         }
-        const sorted = [...tiers].sort((a, b) => a.min_quantity - b.min_quantity);
+        const sorted = tiers.map(row => ({
+            min_quantity: parseMinQuantity(row.min_quantity) || 0,
+            price_cents: Math.max(0, parsePriceCents(row.price) || 0)
+        })).sort((a, b) => a.min_quantity - b.min_quantity);
         // Die erste Staffel ist der Basispreis und gilt immer ab 0 Bildern.
         sorted[0] = { ...sorted[0], min_quantity: 0 };
         setSaving(true);
         try {
-            await onSave(name.trim(), sorted.map(row => ({ min_quantity: row.min_quantity, price_cents: Math.round(row.price_cents) })));
+            await onSave(name.trim(), sorted);
             showToast('success', t`Preset gespeichert`);
             onCancel();
         } catch {
@@ -65,7 +104,7 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
         }
     };
 
-    const basePrice = tiers[0]?.price_cents ?? 0;
+    const basePriceDraft = tiers[0]?.price ?? '0.00';
 
     return (
         <ModalDialogShell
@@ -106,8 +145,9 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
                     <input
                         type="number" min="0" step="0.01"
                         className="input input-bordered w-36 text-right text-lg"
-                        value={(basePrice / 100).toFixed(2)}
-                        onChange={e => updateTier(0, { price_cents: Math.round((parseFloat(e.target.value) || 0) * 100) })}
+                        value={basePriceDraft}
+                        onChange={e => updateTier(0, { price: e.target.value })}
+                        onBlur={() => updateTier(0, { price: normalizePriceDraft(basePriceDraft) })}
                     />
                     <span className="font-bold opacity-70 text-lg">€</span>
                 </div>
@@ -130,7 +170,8 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
                                     type="number" min="0" step="1"
                                     className="input input-bordered w-24 text-right"
                                     value={row.min_quantity}
-                                    onChange={e => updateTier(realIndex, { min_quantity: parseInt(e.target.value, 10) || 0 })}
+                                    onChange={e => updateTier(realIndex, { min_quantity: e.target.value })}
+                                    onBlur={() => updateTier(realIndex, { min_quantity: normalizeQuantityDraft(row.min_quantity) })}
                                 />
                                 <span className="font-bold opacity-70 whitespace-nowrap"><Trans>Bildern</Trans></span>
                             </div>
@@ -138,8 +179,9 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
                                 <input
                                     type="number" min="0" step="0.01"
                                     className="input input-bordered w-32 text-right"
-                                    value={(row.price_cents / 100).toFixed(2)}
-                                    onChange={e => updateTier(realIndex, { price_cents: Math.round((parseFloat(e.target.value) || 0) * 100) })}
+                                    value={row.price}
+                                    onChange={e => updateTier(realIndex, { price: e.target.value })}
+                                    onBlur={() => updateTier(realIndex, { price: normalizePriceDraft(row.price) })}
                                 />
                                 <span className="font-bold opacity-70">€</span>
                             </div>

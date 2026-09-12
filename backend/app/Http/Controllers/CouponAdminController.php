@@ -16,6 +16,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class CouponAdminController extends Controller
 {
@@ -182,6 +183,7 @@ class CouponAdminController extends Controller
     public function galleryCoupons(Request $request, string $galleryId): JsonResponse
     {
         $gallery = $this->findAndVerifyGallery($galleryId);
+        $this->authorizeGalleryManage($gallery);
 
         $perPage = min((int) $request->query('per_page', 20), 100);
 
@@ -216,6 +218,7 @@ class CouponAdminController extends Controller
     public function storeGalleryCoupon(CouponStoreRequest $request, string $galleryId): JsonResponse
     {
         $gallery = $this->findAndVerifyGallery($galleryId);
+        $this->authorizeGalleryManage($gallery);
 
         $user = auth()->user();
         $svc = app(AuthorizationService::class);
@@ -249,6 +252,8 @@ class CouponAdminController extends Controller
         if ($group->brand !== null && $groupBrandValue !== $brand->value) {
             return response()->json(['error' => 'Not found.'], 404);
         }
+
+        $this->authorizeGroupManage($group);
 
         $perPage = min((int) $request->query('per_page', 20), 100);
 
@@ -292,6 +297,8 @@ class CouponAdminController extends Controller
             return response()->json(['error' => 'Not found.'], 404);
         }
 
+        $this->authorizeGroupManage($group);
+
         $user = auth()->user();
         $svc = app(AuthorizationService::class);
         $validated = $this->normalizePackagePrice($request->validated());
@@ -326,5 +333,41 @@ class CouponAdminController extends Controller
         }
 
         return $gallery;
+    }
+
+    /**
+     * Gallery-scoped coupons may only be managed by users who may manage the gallery.
+     * The brand check alone is not sufficient (photographers must not reach foreign galleries).
+     */
+    private function authorizeGalleryManage(Gallery $gallery): void
+    {
+        if (Gate::denies('manage', $gallery)) {
+            abort(403, 'Forbidden');
+        }
+    }
+
+    /**
+     * Group-scoped coupons may only be managed by admins or photographers assigned
+     * to the group (including its subgroups) via `photographer_gallery_groups`.
+     */
+    private function authorizeGroupManage(GalleryGroup $group): void
+    {
+        $svc = app(AuthorizationService::class);
+        $user = auth()->user();
+
+        if ($svc->isSuperAdmin($user) || $svc->isAdmin($user)) {
+            return;
+        }
+
+        if ($svc->isPhotographer($user)) {
+            $groupIds = $user->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
+            $allGroupIds = $svc->getSubGroupIds($groupIds);
+
+            if (in_array($group->id, $allGroupIds, true)) {
+                return;
+            }
+        }
+
+        abort(403, 'Forbidden');
     }
 }

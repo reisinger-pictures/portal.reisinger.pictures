@@ -135,6 +135,22 @@ class BrandSettingsServiceTest extends TestCase
         $this->assertSame(1, Setting::where('key', 'brand_config.name')->where('brand', 'other')->count());
     }
 
+    /**
+     * Regression: because `Setting::$primaryKey` is `key` (not the composite
+     * `(key, brand)`), re-applying an override for one brand used to update the
+     * rows of all other brands sharing that key.
+     */
+    public function test_update_of_one_brand_does_not_clobber_other_brand(): void
+    {
+        $this->service->apply('rp', ['name' => 'RP Name']);
+        $this->service->apply('legacy', ['name' => 'Legacy Name']);
+        $this->service->apply('rp', ['name' => 'RP Name 2']);
+
+        $this->assertSame('Legacy Name', Setting::where('key', 'brand_config.name')->where('brand', 'legacy')->value('value'));
+        $this->assertSame('RP Name 2', Setting::where('key', 'brand_config.name')->where('brand', 'rp')->value('value'));
+        $this->assertSame(2, Setting::where('key', 'brand_config.name')->count());
+    }
+
     public function test_public_brand_config_endpoint_reflects_override(): void
     {
         $this->service->apply('rp', [

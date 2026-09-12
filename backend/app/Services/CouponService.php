@@ -6,6 +6,7 @@ use App\Enums\Brand;
 use App\Models\Coupon;
 use App\Models\CouponUserUsage;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,12 +19,12 @@ class CouponService
     /**
      * Find a valid coupon by code and brand, checking scope, expiry, usage limits, and per-account limit.
      *
-     * @param  string      $code          Coupon code entered by the user.
-     * @param  Brand       $brand         Current brand (SRP or B2B).
-     * @param  int|null    $galleryId     Gallery ID from the cart (null if mixed/unknown).
-     * @param  int|null    $metaGalleryId Meta-gallery ID from the cart (null if mixed/unknown).
-     * @param  int|string|null $userId    Authenticated user ID (for per-account limit check). Accepts UUID strings.
-     * @return array{0: Coupon|null, 1: string|null}  [coupon, errorMessage]
+     * @param  string  $code  Coupon code entered by the user.
+     * @param  Brand  $brand  Current brand (SRP or B2B).
+     * @param  int|null  $galleryId  Gallery ID from the cart (null if mixed/unknown).
+     * @param  int|null  $metaGalleryId  Meta-gallery ID from the cart (null if mixed/unknown).
+     * @param  int|string|null  $userId  Authenticated user ID (for per-account limit check). Accepts UUID strings.
+     * @return array{0: Coupon|null, 1: string|null} [coupon, errorMessage]
      */
     public function findValidCoupon(
         string $code,
@@ -42,7 +43,7 @@ class CouponService
         }
 
         // Check active flag
-        if (!$coupon->active) {
+        if (! $coupon->active) {
             return [null, 'This coupon is not active.'];
         }
 
@@ -97,7 +98,7 @@ class CouponService
 
             // Check gallery group access
             $groupIds = $photographer->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
-            if (!empty($groupIds)) {
+            if (! empty($groupIds)) {
                 $galleryInGroup = DB::table('gallery_gallery_group')
                     ->whereIn('gallery_group_id', $groupIds)
                     ->where('gallery_id', $galleryId)
@@ -140,7 +141,7 @@ class CouponService
         try {
             /** @var Coupon|null $fresh */
             $fresh = Coupon::where('id', $coupon->id)->lockForUpdate()->first();
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
                 return [null, 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'];
             }
@@ -151,6 +152,16 @@ class CouponService
             return [null, 'Coupon not found.'];
         }
 
+        // Full re-validation on the locked row: active flag, expiry and usage
+        // limits may all have changed between preview and checkout.
+        if (! $fresh->active) {
+            return [null, 'This coupon is not active.'];
+        }
+
+        if ($fresh->isExpired()) {
+            return [null, 'This coupon has expired.'];
+        }
+
         if ($fresh->isGloballyMaxedOut()) {
             return [null, 'This coupon has reached its usage limit.'];
         }
@@ -159,15 +170,36 @@ class CouponService
             return [null, 'You have reached the usage limit for this coupon.'];
         }
 
+        // The discount was priced from the pre-lock coupon. If any definition
+        // relevant to the discount (or scope) changed in the meantime, reject the
+        // checkout instead of charging a total that no longer matches the coupon.
+        if ($this->couponDefinitionChanged($coupon, $fresh)) {
+            return [null, 'Der Rabattcode ist nicht mehr gültig.'];
+        }
+
         return [$fresh, null];
+    }
+
+    /**
+     * Detect definition changes between the pre-lock coupon and the freshly locked row.
+     */
+    private function couponDefinitionChanged(Coupon $before, Coupon $after): bool
+    {
+        return $before->type !== $after->type
+            || (float) $before->value !== (float) $after->value
+            || $before->max_items !== $after->max_items
+            || $before->package_quantity !== $after->package_quantity
+            || $before->package_price_cents !== $after->package_price_cents
+            || $before->scope_type !== $after->scope_type
+            || (string) $before->scope_id !== (string) $after->scope_id;
     }
 
     /**
      * Apply a valid coupon to the cart calculation.
      *
-     * @param  Coupon $coupon         The validated coupon.
-     * @param  array  $pricedItems    Items from PricingStrategy result (with 'priceCents', 'itemId').
-     * @param  int    $currentTotalCents  Total before coupon discount.
+     * @param  Coupon  $coupon  The validated coupon.
+     * @param  array  $pricedItems  Items from PricingStrategy result (with 'priceCents', 'itemId').
+     * @param  int  $currentTotalCents  Total before coupon discount.
      * @return array{totalCents: int, discountCents: int, items: array}
      */
     public function applyCoupon(Coupon $coupon, array $pricedItems, int $currentTotalCents): array

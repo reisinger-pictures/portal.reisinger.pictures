@@ -2,21 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Order;
-use Illuminate\Support\Facades\Mail;
+use App\Mail\CustomMail;
 use App\Mail\InvoiceMail;
-use Illuminate\Support\Facades\Log;
+use App\Models\Order;
+use App\Services\StripePaymentService;
 use App\Support\BrandRegistry;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Stripe\Exception\SignatureVerificationException;
+use Stripe\Webhook;
 
 class WebhookController extends Controller
 {
-    private \App\Services\StripePaymentService $stripePayment;
+    private StripePaymentService $stripePayment;
 
-    public function __construct(?\App\Services\StripePaymentService $stripePayment = null)
+    public function __construct(?StripePaymentService $stripePayment = null)
     {
-        $this->stripePayment = $stripePayment ?? app(\App\Services\StripePaymentService::class);
+        $this->stripePayment = $stripePayment ?? app(StripePaymentService::class);
     }
 
     public function handleStripe(Request $request)
@@ -38,30 +42,32 @@ class WebhookController extends Controller
 
         foreach ($secrets as $secret) {
             try {
-                $event = \Stripe\Webhook::constructEvent($payload, $sig_header, $secret);
+                $event = Webhook::constructEvent($payload, $sig_header, $secret);
                 $lastException = null;
                 break; // Gültige Signatur gefunden, Schleife abbrechen!
-            } catch (\Stripe\Exception\SignatureVerificationException $e) {
+            } catch (SignatureVerificationException $e) {
                 $lastException = $e;
             } catch (\UnexpectedValueException $e) {
                 Log::error('Stripe Webhook Error: Invalid payload', ['exception' => $e->getMessage()]);
+
                 return response()->json(['error' => 'Invalid payload'], 400);
             }
         }
 
         // Falls kein Secret passte, schlage lautstark fehl
-        if ($lastException || !$event) {
+        if ($lastException || ! $event) {
             Log::error('Stripe Webhook Error: Invalid signature across all configured secrets', [
                 'exception' => $lastException ? $lastException->getMessage() : 'No secrets configured',
-                'configured_secrets_count' => count($secrets)
+                'configured_secrets_count' => count($secrets),
             ]);
+
             return response()->json(['error' => 'Invalid signature'], 400);
         }
 
         if ($event->type === 'payment_intent.succeeded') {
             $paymentIntent = $event->data->object;
             $orderId = $paymentIntent->metadata->order_id ?? null;
-            
+
             if ($orderId) {
                 $order = Order::with(['user', 'invoiceSnapshot'])->find($orderId);
                 if ($order && $order->status !== 'paid') {
@@ -77,22 +83,25 @@ class WebhookController extends Controller
                             'expected_cents' => $expectedCents,
                             'received_cents' => $receivedCents,
                         ]);
+
                         return response()->json(['status' => 'ignored', 'reason' => 'underpaid'], 200);
                     }
 
                     $feeCents = $this->stripePayment->retrievePaymentIntentWithFee($paymentIntent->id);
-                    
+
                     if ($feeCents === 0) {
                         Log::warning("Stripe Webhook: Balance transaction missing or fee is 0 for Order {$orderId}");
                     }
 
                     $order->update([
                         'status' => 'paid',
-                        'stripe_fee_cents' => $feeCents
+                        'stripe_fee_cents' => $feeCents,
                     ]);
-                    if ($order->user && !Cache::has('invoice_sent_' . $order->id)) {
+                    // Atomically claim the send slot: Cache::add() returns false when a
+                    // concurrent duplicate webhook already queued the mail, so the
+                    // invoice is never sent twice.
+                    if ($order->user && Cache::add('invoice_sent_'.$order->id, true, now()->addDays(7))) {
                         Mail::to($order->user->email)->queue(new InvoiceMail($order, $order->invoiceSnapshot));
-                        Cache::put('invoice_sent_' . $order->id, true, now()->addDays(7));
                     }
                 }
             }
@@ -101,6 +110,7 @@ class WebhookController extends Controller
             $piId = $dispute->payment_intent ?? null;
             if ($piId === null) {
                 Log::warning('Webhook: dispute with null payment_intent, skipping', ['dispute_id' => $dispute->id ?? null]);
+
                 return response()->json(['status' => 'success']);
             }
             $order = Order::where('stripe_payment_intent_id', $piId)->first();
@@ -108,15 +118,30 @@ class WebhookController extends Controller
                 $order->update(['status' => 'disputed']);
                 $this->clearPurchasedCache($order);
                 Mail::to(BrandRegistry::configOrDefault()->accountingEmail ?? 'accounting@reisinger.pictures')
-                    ->send(new \App\Mail\CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$order->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
+                    ->send(new CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$order->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
             }
         } elseif ($event->type === 'charge.refunded') {
             $charge = $event->data->object;
             $piId = $charge->payment_intent ?? null;
             if ($piId === null) {
                 Log::warning('Webhook: refund with null payment_intent, skipping', ['charge_id' => $charge->id ?? null]);
+
                 return response()->json(['status' => 'success']);
             }
+            // `charge.refunded` fires for partial refunds too. In this domain the
+            // `refunded` order state means a FULL refund (see
+            // features/ecommerce/09-stripe-checkout-flow.md), so partial refunds
+            // must not revoke the customer's download access.
+            if (! $this->isFullRefund($charge)) {
+                Log::warning('Webhook: partial refund received, order access preserved', [
+                    'charge_id' => $charge->id ?? null,
+                    'amount' => $charge->amount ?? null,
+                    'amount_refunded' => $charge->amount_refunded ?? null,
+                ]);
+
+                return response()->json(['status' => 'success']);
+            }
+
             $order = Order::where('stripe_payment_intent_id', $piId)->first();
             if ($order && $order->status !== 'refunded') {
                 $order->update(['status' => 'refunded']);
@@ -127,14 +152,36 @@ class WebhookController extends Controller
         return response()->json(['status' => 'success']);
     }
 
+    /**
+     * A Stripe Charge is only fully refunded when `refunded` is true. Partial
+     * refunds keep the order's download access intact.
+     */
+    private function isFullRefund(object $charge): bool
+    {
+        if (isset($charge->refunded)) {
+            return (bool) $charge->refunded;
+        }
+
+        // Fallback for payloads that omit the `refunded` flag: only treat the
+        // charge as fully refunded when the refunded amount covers the charge.
+        $amount = (int) ($charge->amount ?? 0);
+        $amountRefunded = (int) ($charge->amount_refunded ?? 0);
+
+        return $amount > 0 && $amountRefunded >= $amount;
+    }
+
     private function clearPurchasedCache(Order $order): void
     {
         $snapshot = $order->invoiceSnapshot;
-        if (!$snapshot) return;
+        if (! $snapshot) {
+            return;
+        }
 
         $items = $snapshot->customer_details['items'] ?? [];
         foreach ($items as $item) {
-            if (!isset($item['photoId'])) continue;
+            if (! isset($item['photoId'])) {
+                continue;
+            }
             foreach (['web', 'print', 'original'] as $tier) {
                 Cache::forget("user.{$order->user_id}.purchased.{$item['photoId']}.{$tier}");
             }

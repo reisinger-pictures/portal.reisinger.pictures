@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
@@ -191,6 +191,10 @@ describe('ClientCartView', () => {
         setupDefaultMocks();
     });
 
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
     // ------------------------------------------------------------------
     // Empty cart
     // ------------------------------------------------------------------
@@ -322,5 +326,57 @@ describe('ClientCartView', () => {
         expect(
             screen.getByText(/widerrufsrecht/i),
         ).toBeInTheDocument();
+    });
+
+    // ------------------------------------------------------------------
+    // Coupon → checkout payload (regression: state was duplicated across
+    // ClientCartView and CouponInput, so the payload always sent null)
+    // ------------------------------------------------------------------
+
+    it('includes an applied coupon code in the checkout payload', async () => {
+        const user = userEvent.setup();
+
+        vi.mocked(useCart).mockReturnValue({
+            items: mockCartItems,
+            removeFromCart: vi.fn(),
+            totalAmount: 4000,
+            clearCart: vi.fn(),
+            addToCart: vi.fn(),
+            itemCount: 2,
+        });
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({
+                valid: true,
+                coupon: { code: 'SAVE10', type: 'fixed', value: 1000 },
+                discount_cents: 1000,
+            }),
+        }));
+
+        vi.mocked(apiMutate).mockResolvedValue({
+            success: true,
+            invoice_number: 'INV-1',
+        });
+
+        renderCartView();
+
+        await user.type(screen.getByLabelText('Rabattcode'), 'SAVE10');
+        await user.click(screen.getByRole('button', { name: 'Anwenden' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('SAVE10')).toBeInTheDocument();
+        });
+
+        await user.click(
+            screen.getByRole('button', { name: /zahlungspflichtig bestellen/i }),
+        );
+
+        await waitFor(() => {
+            expect(apiMutate).toHaveBeenCalled();
+        });
+
+        const payload = vi.mocked(apiMutate).mock.calls[0][2] as Record<string, unknown>;
+        expect(payload.coupon_code).toBe('SAVE10');
     });
 });

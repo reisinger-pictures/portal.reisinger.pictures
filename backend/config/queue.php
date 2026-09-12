@@ -13,7 +13,10 @@ return [
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', 'sync'),
+    // Default to the database driver so queued jobs (file deletion, mails)
+    // are not run inline and silently inside web requests. Local development
+    // sets `QUEUE_CONNECTION=sync` in .env; tests set it in phpunit.xml.
+    'default' => env('QUEUE_CONNECTION', 'database'),
 
     /*
     |--------------------------------------------------------------------------

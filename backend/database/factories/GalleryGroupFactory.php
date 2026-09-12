@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Brand;
 use App\Models\GalleryGroup;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -14,6 +15,7 @@ class GalleryGroupFactory extends Factory
     {
         $name = $this->faker->words(2, true);
         return [
+            'brand' => Brand::B2B,
             'name' => ucfirst($name),
             'slug' => Str::slug($name) . '-' . $this->faker->unique()->numberBetween(1, 1000),
             'is_public' => $this->faker->boolean(),

@@ -4,12 +4,7 @@ import {renderWithProviders} from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import {MemoryRouter} from 'react-router-dom';
 import CouponInput from '../client/components/CouponInput';
-
-const mockUseCoupon = vi.fn();
-
-vi.mock('../../logic/useCoupon', () => ({
-    default: () => mockUseCoupon(),
-}));
+import type {UseCouponResult} from '../../logic/useCoupon';
 
 vi.mock('swr', () => ({
     default: () => ({
@@ -38,21 +33,22 @@ vi.mock('../components/ErrorMessage', () => ({
 
 import ManagementCouponsView from '../management/ManagementCouponsView';
 
-function setupMocks(overrides: Record<string, unknown> = {}) {
-    const defaults = {
+function makeState(overrides: Partial<UseCouponResult> = {}): UseCouponResult {
+    return {
         couponCode: null,
+        coupon: null,
         isValid: false,
         discount: null,
         isLoading: false,
         error: null,
         applyCoupon: vi.fn(),
         removeCoupon: vi.fn(),
+        ...overrides,
     };
-    mockUseCoupon.mockReturnValue({...defaults, ...overrides});
 }
 
-function renderCouponInput() {
-    return renderWithProviders(<CouponInput />);
+function renderCouponInput(state: UseCouponResult) {
+    return renderWithProviders(<CouponInput state={state} />);
 }
 
 describe('CouponInput', () => {
@@ -61,16 +57,14 @@ describe('CouponInput', () => {
     });
 
     it('renders input and button', () => {
-        setupMocks();
-        renderCouponInput();
+        renderCouponInput(makeState());
 
         expect(screen.getByLabelText('Rabattcode')).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Anwenden'})).toBeInTheDocument();
     });
 
     it('button disabled when input empty', () => {
-        setupMocks();
-        renderCouponInput();
+        renderCouponInput(makeState());
 
         const button = screen.getByRole('button', {name: 'Anwenden'});
         expect(button).toBeDisabled();
@@ -78,8 +72,7 @@ describe('CouponInput', () => {
 
     it('calls onValidate with code on submit', async () => {
         const applyCoupon = vi.fn();
-        setupMocks({applyCoupon});
-        renderCouponInput();
+        renderCouponInput(makeState({applyCoupon}));
 
         const input = screen.getByLabelText('Rabattcode');
         await userEvent.type(input, 'SAVE10');
@@ -93,20 +86,18 @@ describe('CouponInput', () => {
     });
 
     it('shows loading state during validation', () => {
-        setupMocks({isLoading: true});
-        renderCouponInput();
+        renderCouponInput(makeState({isLoading: true}));
 
         expect(screen.getByText('Prüfe…')).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Prüfe…'})).toBeDisabled();
     });
 
     it('shows valid state with discount info', () => {
-        setupMocks({
+        renderCouponInput(makeState({
             couponCode: 'SAVE10',
             isValid: true,
             discount: 1000,
-        });
-        renderCouponInput();
+        }));
 
         expect(screen.getByText('SAVE10')).toBeInTheDocument();
         expect(screen.getByText(/−/)).toBeInTheDocument();
@@ -114,21 +105,19 @@ describe('CouponInput', () => {
     });
 
     it('shows invalid state with error message', () => {
-        setupMocks({
+        renderCouponInput(makeState({
             error: 'Rabattcode nicht gefunden.',
-        });
-        renderCouponInput();
+        }));
 
         expect(screen.getByRole('alert')).toBeInTheDocument();
         expect(screen.getByText('Rabattcode nicht gefunden.')).toBeInTheDocument();
     });
 
     it('remove button appears when coupon active', () => {
-        setupMocks({
+        renderCouponInput(makeState({
             couponCode: 'SAVE10',
             isValid: true,
-        });
-        renderCouponInput();
+        }));
 
         expect(screen.getByText('Entfernen')).toBeInTheDocument();
         expect(screen.getByLabelText('Rabattcode entfernen')).toBeInTheDocument();
@@ -136,12 +125,11 @@ describe('CouponInput', () => {
 
     it('remove button calls onRemove', async () => {
         const removeCoupon = vi.fn();
-        setupMocks({
+        renderCouponInput(makeState({
             couponCode: 'SAVE10',
             isValid: true,
             removeCoupon,
-        });
-        renderCouponInput();
+        }));
 
         await userEvent.click(screen.getByText('Entfernen'));
 
@@ -149,11 +137,10 @@ describe('CouponInput', () => {
     });
 
     it('input hidden when coupon active (shows applied coupon instead)', () => {
-        setupMocks({
+        renderCouponInput(makeState({
             couponCode: 'SAVE10',
             isValid: true,
-        });
-        renderCouponInput();
+        }));
 
         expect(screen.queryByLabelText('Rabattcode')).not.toBeInTheDocument();
         expect(screen.getByText('SAVE10')).toBeInTheDocument();
@@ -161,10 +148,9 @@ describe('CouponInput', () => {
 });
 
 describe('CouponInput additional', () => {
-    it('passes galleryId and scopeGalleryId to validation', async () => {
+    it('forwards the typed code to the shared applyCoupon', async () => {
         const applyCoupon = vi.fn();
-        setupMocks({ applyCoupon });
-        renderCouponInput();
+        renderCouponInput(makeState({ applyCoupon }));
 
         const input = screen.getByLabelText('Rabattcode');
         await userEvent.type(input, 'GALLERY10');
@@ -175,10 +161,9 @@ describe('CouponInput additional', () => {
     });
 
     it('shows Netzwerkfehler when fetch fails', () => {
-        setupMocks({
+        renderCouponInput(makeState({
             error: 'Netzwerkfehler: Rabattcode konnte nicht geprüft werden.',
-        });
-        renderCouponInput();
+        }));
 
         expect(screen.getByRole('alert')).toBeInTheDocument();
         expect(screen.getByText('Netzwerkfehler: Rabattcode konnte nicht geprüft werden.')).toBeInTheDocument();

@@ -110,6 +110,35 @@ class ImageServicesTest extends TestCase
         $this->assertTrue(app(ImageProcessor::class)->applyCenteredWatermark($source, $dest, null, 'delivery'));
     }
 
+    public function test_generate_thumbnail_clamps_extreme_landscape_height_to_one(): void
+    {
+        if (!function_exists('imagecreatetruecolor') || !function_exists('imagewebp')) {
+            $this->markTestSkipped('GD extension (with webp) not available');
+        }
+
+        $source = tempnam(sys_get_temp_dir(), 'wide') . '.jpg';
+        $dest = tempnam(sys_get_temp_dir(), 'thumb') . '.webp';
+
+        // 4000×1 landscape at size 400 → 4000 * (400/4000) = 0.4 → would floor to 0.
+        $img = imagecreatetruecolor(4000, 1);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        imagefill($img, 0, 0, $white);
+        imagejpeg($img, $source);
+        imagedestroy($img);
+
+        try {
+            $this->assertTrue($this->imageProcessor->generateThumbnail($source, $dest, 400));
+
+            $size = getimagesize($dest);
+            $this->assertNotFalse($size);
+            $this->assertSame(400, $size[0]);
+            $this->assertGreaterThanOrEqual(1, $size[1]);
+        } finally {
+            @unlink($source);
+            @unlink($dest);
+        }
+    }
+
     // =========================================================================
     // PhotoProcessingService — Frühreturn-Verzweigungen (ohne ExifTool)
     // =========================================================================
