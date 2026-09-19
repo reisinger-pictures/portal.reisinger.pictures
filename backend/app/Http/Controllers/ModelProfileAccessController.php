@@ -3,15 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Brand;
+use App\Mail\ModelProfileUpdatedMail;
 use App\Models\Customer;
 use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
+use App\Models\ModelRegistrationInvite;
 use App\Services\ModelFileStore;
 use App\Services\ModelQuestionnaire;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -143,6 +146,10 @@ class ModelProfileAccessController extends Controller
             $this->fileStore->delete($previousAgeProof);
         }
 
+        // Notify the inviting admin only after the transaction committed, so a
+        // rollback can never send a notification for data that was never stored.
+        $this->notifyInviter($profile, $customer);
+
         return response()->json([
             'success' => true,
             'catalog_version' => $profile->catalog_version,
@@ -205,6 +212,45 @@ class ModelProfileAccessController extends Controller
     private function touch(ModelAccessToken $accessToken): void
     {
         $accessToken->forceFill(['last_used_at' => now()])->save();
+    }
+
+    /**
+     * Mail the admin who invited this model. A customer can belong to several
+     * acts, and the invite may hang on any of them, so the inviter is resolved
+     * over ALL acts of the customer (Customer → Acts → latest Invite). The
+     * invite's own act provides the act metadata in the mail. Without a usable
+     * act/invite (e.g. an admin-created profile) the update simply sends no
+     * notification — it is not an error.
+     */
+    private function notifyInviter(ModelProfile $profile, Customer $customer): void
+    {
+        $actIds = $customer->acts()->pluck('acts.id');
+        if ($actIds->isEmpty()) {
+            return;
+        }
+
+        $invite = ModelRegistrationInvite::query()
+            ->whereIn('act_id', $actIds)
+            ->whereNotNull('invited_by')
+            ->with(['inviter', 'act'])
+            ->latest()
+            ->first();
+
+        $inviter = $invite?->inviter;
+        $act = $invite?->act;
+        if ($inviter === null || $act === null) {
+            return;
+        }
+
+        Mail::to($inviter->email)->queue(new ModelProfileUpdatedMail(
+            $inviter->name,
+            $customer->name ?? '',
+            $act->act_type,
+            $act->person_count,
+            $customer->id,
+            now()->format('d.m.Y H:i'),
+            Brand::tryFrom($profile->brandValue() ?? ''),
+        ));
     }
 
     /**

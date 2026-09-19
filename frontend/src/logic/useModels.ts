@@ -113,10 +113,20 @@ export function serializeModelFilters(filters: ModelFilters): URLSearchParams {
     // Threshold filters: one `willingness_<category>=<level>` per selected
     // category (backend OR-links them); no threshold = no restriction ("Egal").
     const threshold = (filters.willingness_level ?? '').trim();
+    const willingnessCategories = (filters.willingness_categories ?? [])
+        .map(category => category.trim())
+        .filter(category => category !== '');
     if (threshold !== '') {
-        for (const category of filters.willingness_categories ?? []) {
-            const key = category.trim();
-            if (key !== '') params.append(`willingness_${key}`, threshold);
+        for (const category of willingnessCategories) {
+            params.append(`willingness_${category}`, threshold);
+        }
+    } else {
+        // Without a level the per-category threshold params cannot carry the
+        // selection, so persist the chosen categories as a meta list. The
+        // backend ignores them without a level; the admin UI needs them so the
+        // threshold slider stays enabled ("Egal" clears only the level).
+        for (const category of willingnessCategories) {
+            params.append('willingness_category[]', category);
         }
     }
 
@@ -141,14 +151,23 @@ export function parseModelFilters(params: URLSearchParams): ModelFilters {
     if (categories.length > 0) filters.category = categories;
 
     const willingnessCategories: string[] = [];
+    const pushCategory = (value: string) => {
+        const category = value.trim();
+        if (category !== '' && !willingnessCategories.includes(category)) willingnessCategories.push(category);
+    };
+    // Meta selection (no threshold yet): repeatable `willingness_category[]`.
+    for (const value of [...params.getAll('willingness_category[]'), ...params.getAll('willingness_category')]) {
+        pushCategory(value);
+    }
+
     let threshold = '';
     // Alias/meta keys must not be mistaken for a `<category>` suffix.
-    const ALIAS_KEYS = new Set(['willingness_category', 'willingness_level', 'willingness_levels']);
+    const ALIAS_KEYS = new Set(['willingness_category', 'willingness_category[]', 'willingness_level', 'willingness_levels']);
     for (const [key, value] of params.entries()) {
         if (!key.startsWith('willingness_') || ALIAS_KEYS.has(key)) continue;
         const category = key.slice('willingness_'.length);
         if (category !== '' && value.trim() !== '') {
-            willingnessCategories.push(category);
+            pushCategory(category);
             threshold = value.trim();
         }
     }

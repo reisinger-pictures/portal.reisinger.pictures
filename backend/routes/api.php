@@ -263,6 +263,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::delete('/management/model-invites/{id}', [ModelInviteController::class, 'destroy'])->name('api.management.model-invites.destroy');
     Route::get('/management/models', [ModelManagementController::class, 'index'])->name('api.management.models.index');
     Route::get('/management/models/{id}/age-proof', [ModelManagementController::class, 'ageProof'])->name('api.management.models.age-proof');
+    Route::get('/management/models/{id}/contact-sheet', [ModelManagementController::class, 'contactSheet'])->name('api.management.models.contact-sheet');
     Route::get('/management/models/{id}/photos/{photoId}', [ModelManagementController::class, 'photo'])->name('api.management.models.photos.download');
     Route::delete('/management/models/{id}/photos/{photoId}', [ModelManagementController::class, 'destroyPhoto'])->name('api.management.models.photos.destroy');
     Route::post('/management/models/{id}/photos/{photoId}/primary', [ModelManagementController::class, 'setPrimaryPhoto'])->name('api.management.models.photos.primary');

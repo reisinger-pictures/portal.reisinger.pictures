@@ -201,6 +201,65 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'PATCH'
     throw new Error('Server hat kein valides JSON zurückgegeben.');
 };
 
+export interface DownloadedFile {
+    blob: Blob;
+    /** Server-provided filename from `Content-Disposition`, if present. */
+    filename: string | null;
+}
+
+/**
+ * Parse the `filename` parameter of a `Content-Disposition` header. The
+ * RFC 5987 extended form (`filename*=UTF-8''…`) takes precedence over the
+ * plain `filename=…` form.
+ */
+export function filenameFromContentDisposition(header: string | null): string | null {
+    if (!header) return null;
+
+    const extended = header.match(/filename\*=UTF-8''([^;]+)/i);
+    if (extended) {
+        try {
+            return decodeURIComponent(extended[1].trim().replace(/^"|"$/g, ''));
+        } catch {
+            return null;
+        }
+    }
+
+    const simple = header.match(/filename="?([^";]+)"?/i);
+    return simple ? simple[1].trim() : null;
+}
+
+/**
+ * Authenticated binary download (e.g. PDF streams). Unlike `fetcher`, it
+ * returns the raw `Blob` plus the server-provided filename and reuses the same
+ * 401-refresh and error-normalisation paths.
+ */
+export const apiDownload = async (url: string): Promise<DownloadedFile> => {
+    const headers = { 'Accept': 'application/pdf, application/octet-stream' };
+
+    let res: Response;
+    try {
+        res = await fetch(url, { headers, credentials: 'include' });
+    } catch {
+        const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as ApiError;
+        error.status = 0;
+        throw error;
+    }
+
+    if (res.status === 401 && !url.includes('/api/auth/')) {
+        const success = await refreshToken();
+        if (success) {
+            res = await fetch(url, { headers, credentials: 'include' });
+        }
+    }
+
+    if (!res.ok) {
+        await handleApiError(res);
+    }
+
+    const blob = await res.blob();
+    return { blob, filename: filenameFromContentDisposition(res.headers.get('content-disposition')) };
+};
+
 // --- Global Data Contracts ---
 export interface Customer { id: string; name: string; company?: string | null; email?: string | null; birthdate?: string | null; street?: string | null; zip?: string | null; city?: string | null; country?: string | null; uid?: string | null; }
 export interface Product { id: string; type: 'item' | 'discount_fixed' | 'discount_percent'; name: string; description?: string | null; price: number; }

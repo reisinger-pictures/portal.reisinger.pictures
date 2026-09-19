@@ -11,6 +11,10 @@ import {
     setPrimaryModelPhoto,
     type ManagedModel,
 } from '../../../logic/useModels';
+import {
+    downloadModelContactSheet,
+    type ModelContactSheetVariant,
+} from '../../../logic/modelContactSheet';
 import { usePermissions } from '../../../logic/usePermissions';
 import {
     experienceMapFromAnswers,
@@ -92,7 +96,7 @@ function answerIsEmpty(answer: ModelProfileAnswer): boolean {
 
 export default function ModelDetailModal({ model, onClose, onChanged, pinnedCategories = [] }: Props) {
     const { showToast, confirm } = useUI();
-    const { isSuperAdmin } = usePermissions();
+    const { isSuperAdmin, isAdmin } = usePermissions();
     const [isWorking, setIsWorking] = useState(false);
 
     if (!model) return null;
@@ -110,6 +114,10 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
     const visibleAnswers = model.answers.filter(answer => !answerIsEmpty(answer));
     const sectionGroups = groupModelAnswersBySection(visibleAnswers);
     const accessLink = model.access_link;
+    const contactSheetActions: Array<{ variant: ModelContactSheetVariant; testId: string; label: string }> = [
+        { variant: 'internal', testId: 'model-contact-sheet-internal', label: t`Contact Sheet (intern)` },
+        { variant: 'external', testId: 'model-contact-sheet-external', label: t`Contact Sheet (extern)` },
+    ];
 
     const handleCopy = async (link: string) => {
         try {
@@ -198,6 +206,18 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
             onChanged();
         } catch {
             showToast('error', t`Fehler beim Löschen des Fotos.`);
+        } finally {
+            setIsWorking(false);
+        }
+    };
+
+    const handleContactSheet = async (variant: ModelContactSheetVariant) => {
+        setIsWorking(true);
+        try {
+            await downloadModelContactSheet(model.id, variant);
+            showToast('success', t`Contact Sheet wurde heruntergeladen.`);
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : t`Fehler beim Erstellen des Contact Sheets.`);
         } finally {
             setIsWorking(false);
         }
@@ -456,6 +476,25 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                 )}
 
                 <div className="modal-action">
+                    {isAdmin && (
+                        <div className="flex flex-wrap gap-2 mr-auto" data-testid="model-contact-sheet-actions">
+                            {contactSheetActions.map(action => (
+                                <button
+                                    key={action.variant}
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    disabled={isWorking}
+                                    onClick={() => handleContactSheet(action.variant)}
+                                    data-testid={action.testId}
+                                >
+                                    {isWorking
+                                        ? <span className="loading loading-spinner loading-xs"></span>
+                                        : <span className="iconify mdi--file-pdf-box"></span>}
+                                    {action.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Schließen</Trans></button>
                 </div>
             </div>

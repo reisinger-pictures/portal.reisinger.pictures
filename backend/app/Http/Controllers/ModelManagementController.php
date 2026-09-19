@@ -8,6 +8,7 @@ use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
 use App\Services\AuthorizationService;
+use App\Services\ModelContactSheetService;
 use App\Services\ModelFileStore;
 use App\Services\ModelProfileEraser;
 use App\Services\ModelQuestionnaire;
@@ -44,6 +45,7 @@ class ModelManagementController extends Controller
     public function __construct(
         private readonly ModelFileStore $fileStore,
         private readonly ModelQuestionnaire $questionnaire,
+        private readonly ModelContactSheetService $contactSheetService,
     ) {}
 
     public function index(Request $request)
@@ -189,6 +191,44 @@ class ModelManagementController extends Controller
             'altersnachweis.'.$extension,
             self::AGE_PROOF_MIME_BY_EXTENSION[strtolower($extension)] ?? 'application/octet-stream',
         );
+    }
+
+    /**
+     * Druckfähiges Contact Sheet als PDF (`variant=internal|external`).
+     *
+     * Intern: alle Fotos + PII; extern: nur `public`-Fotos, kein PII, mit
+     * Wasserzeichen. Jeder Export wird PII-frei audit-geloggt.
+     */
+    public function contactSheet(Request $request, string $id)
+    {
+        $this->authorizeAdmin();
+        $brand = $this->adminBrand();
+
+        $variant = $request->query('variant');
+        if (! is_string($variant) || ! in_array($variant, ModelContactSheetService::VARIANTS, true)) {
+            throw ValidationException::withMessages([
+                'variant' => 'Ungültige Variante. Erlaubt sind „internal" und „external".',
+            ]);
+        }
+
+        $profile = ModelProfile::query()
+            ->forBrand($brand)
+            ->findOrFail($id);
+
+        $pdf = $this->contactSheetService->render($profile, $variant);
+
+        Log::info('model.contact_sheet.export', [
+            'model_profile_id' => $profile->id,
+            'customer_id' => $profile->customer_id,
+            'variant' => $variant,
+            'user_id' => auth('api')->id(),
+        ]);
+
+        $filename = sprintf('model-%s-%s-%s.pdf', $profile->id, $variant, now()->format('Ymd'));
+
+        return response()->streamDownload(function () use ($pdf): void {
+            echo $pdf;
+        }, $filename, ['Content-Type' => 'application/pdf']);
     }
 
     public function photo(string $id, string $photoId)

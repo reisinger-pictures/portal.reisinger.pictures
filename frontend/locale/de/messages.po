@@ -1172,6 +1172,18 @@ msgstr "Code eingeben"
 msgid "Code ist erforderlich"
 msgstr "Code ist erforderlich"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Contact Sheet (extern)"
+msgstr "Contact Sheet (extern)"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Contact Sheet (intern)"
+msgstr "Contact Sheet (intern)"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Contact Sheet wurde heruntergeladen."
+msgstr "Contact Sheet wurde heruntergeladen."
+
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 msgid "Coupon angelegt"
@@ -1959,6 +1971,10 @@ msgstr "Fehler beim Erstellen"
 #: src/ui/management/components/ModelInviteDialog.tsx
 msgid "Fehler beim Erstellen der Einladung."
 msgstr "Fehler beim Erstellen der Einladung."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Fehler beim Erstellen des Contact Sheets."
+msgstr "Fehler beim Erstellen des Contact Sheets."
 
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Fehler beim Erstellen des Profil-Links."
