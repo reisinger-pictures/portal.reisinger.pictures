@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
     buildProfilePhotoPayload,
     buildRegistrationFormData,
@@ -19,6 +19,7 @@ import {
     makeActAnswers,
     makePersonAnswers,
     makeRegistrationValues,
+    managerTransferCandidates,
     modelActTypeLabel,
     modelActTypeLabels,
     modelActTypeOptions,
@@ -41,8 +42,10 @@ import {
     sections,
     selectedCategories,
     sortSkillMatrixRows,
+    transferModelProfileManager,
     willingnessLevelFromOrdinal,
     willingnessOrdinal,
+    type ModelProfileAccessAct,
     type ModelProfileAccessPhoto,
     type ModelRegistrationCheck,
     type ModelProfileAnswer,
@@ -615,5 +618,42 @@ describe('skill matrix & answer sections', () => {
         ];
         expect(groupModelAnswersBySection(snapshot).map(group => group.key))
             .toEqual(['basisdaten', 'erfahrung', 'einwilligungen']);
+    });
+});
+
+describe('manager transfer', () => {
+    const act: ModelProfileAccessAct = {
+        id: 'act-1',
+        act_type: 'couple',
+        person_count: 2,
+        is_manager: true,
+        manager_customer_id: 'customer-manager',
+        manager_name: 'Manager Person',
+        members: [
+            { customer_id: 'customer-manager', name: 'Manager Person', is_manager: true },
+            { customer_id: 'customer-member', name: 'Mitglied Person', is_manager: false },
+        ],
+    };
+
+    it('offers every member except the current manager as transfer target', () => {
+        expect(managerTransferCandidates(act).map(member => member.customer_id)).toEqual(['customer-member']);
+    });
+
+    it('posts the transfer payload to the owner-scoped endpoint', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(new Response(
+            JSON.stringify({ success: true, act: { ...act, is_manager: false, manager_customer_id: 'customer-member' } }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+        ));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const result = await transferModelProfileManager('token-123', 'act-1', 'customer-member');
+
+        expect(result.success).toBe(true);
+        expect(result.act.manager_customer_id).toBe('customer-member');
+        const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(url).toBe('/api/model-profil/token-123/transfer-manager');
+        expect(init.method).toBe('POST');
+        expect(init.body).toBe(JSON.stringify({ act_id: 'act-1', new_manager_customer_id: 'customer-member' }));
+        vi.unstubAllGlobals();
     });
 });

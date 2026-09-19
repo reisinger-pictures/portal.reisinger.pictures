@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
@@ -6,9 +6,12 @@ import ErrorMessage from '../components/ErrorMessage';
 import EmptyState from '../components/EmptyState';
 import ModelDetailModal from './components/ModelDetailModal';
 import ModelInviteDialog from './components/ModelInviteDialog';
+import { useUI } from '../components/UIContext';
 import { usePermissions } from '../../logic/usePermissions';
 import {
     EMPTY_MODEL_FILTERS,
+    isRestrictedLifecycleFilter,
+    lifecycleFilterValues,
     parseModelFilters,
     serializeModelFilters,
     useModels,
@@ -125,10 +128,31 @@ function ModelCard({ model, matchedCategories, pinnedCategories, onOpen }: {
 export default function ManagementModelsView() {
     const [searchParams, setSearchParams] = useSearchParams();
     const { isAdmin, isSuperAdmin } = usePermissions();
+    const { showToast } = useUI();
     const [inviteOpen, setInviteOpen] = useState(false);
     // Filters live in the URL (shareable/bookmarkable; Back/Forward consistent).
     const filters = parseModelFilters(searchParams);
     const { models, error, isLoading, mutate } = useModels(filters);
+
+    // A non-super-admin must not query inactive/all (backend 403, fail-closed).
+    // The UI hides those options; a tampered/deep-linked URL is answered with a
+    // toast and reset to the active default instead of a silent error.
+    const restrictedLifecycle = isRestrictedLifecycleFilter(filters.lifecycle_status, isSuperAdmin);
+    const forbiddenLifecycleNotified = useRef(false);
+    useEffect(() => {
+        if (error?.status !== 403 || !restrictedLifecycle) {
+            forbiddenLifecycleNotified.current = false;
+            return;
+        }
+        if (forbiddenLifecycleNotified.current) return;
+        forbiddenLifecycleNotified.current = true;
+        showToast('error', t`Nur Super-Admins können inaktive Profile sehen. Der Status-Filter wurde zurückgesetzt.`);
+        setSearchParams(previous => {
+            const next = new URLSearchParams(previous);
+            next.delete('lifecycle_status');
+            return next;
+        }, { replace: true });
+    }, [error, restrictedLifecycle, setSearchParams, showToast]);
 
     // Deeplink: `/admin-models?model=<profileId|customerId>` coexists with filters.
     const modelParam = searchParams.get('model');
@@ -163,6 +187,13 @@ export default function ManagementModelsView() {
     const actTypeOptions = modelActTypeOptions();
     const willingnessOptions = modelWillingnessOptions();
     const willingnessCategories = modelWillingnessCategories();
+    // Inactive/all are super-admin only (backend 403, fail-closed).
+    const lifecycleOptions = lifecycleFilterValues(isSuperAdmin);
+    const lifecycleOptionLabel = (value: '' | 'inactive' | 'all') => {
+        if (value === 'inactive') return t`Inaktiv`;
+        if (value === 'all') return t`Alle`;
+        return t`Aktiv`;
+    };
 
     const update = (key: keyof ModelFilters, value: string) => {
         updateFilters(previous => ({ ...previous, [key]: value }));
@@ -277,9 +308,9 @@ export default function ManagementModelsView() {
                     <div className="form-control">
                         <label className="label" htmlFor="model-filter-lifecycle"><span className="label-text font-bold"><Trans>Status</Trans></span></label>
                         <select id="model-filter-lifecycle" className="select select-bordered w-full" value={filters.lifecycle_status ?? ''} onChange={event => update('lifecycle_status', event.target.value)}>
-                            <option value="">{t`Aktiv`}</option>
-                            <option value="inactive">{t`Inaktiv`}</option>
-                            <option value="all">{t`Alle`}</option>
+                            {lifecycleOptions.map(value => (
+                                <option key={value || 'active'} value={value}>{lifecycleOptionLabel(value)}</option>
+                            ))}
                         </select>
                     </div>
                 </div>

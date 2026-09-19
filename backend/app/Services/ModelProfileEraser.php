@@ -34,6 +34,11 @@ class ModelProfileEraser
         // Capture affected acts before act_members cascade away.
         $actIds = ActMember::where('customer_id', $customer->id)->pluck('act_id')->all();
 
+        // A deleted manager must not tear the whole act (and its remaining
+        // members) down via the manager FK: promote the first remaining member
+        // before the customer row disappears.
+        $this->reassignManagedActs($customer);
+
         // The portal account is unlinked, never deleted.
         if ($customer->user_id !== null) {
             $customer->user_id = null;
@@ -65,6 +70,37 @@ class ModelProfileEraser
         ], $stats));
 
         return $stats;
+    }
+
+    /**
+     * Hand management of every act led by the customer to the first remaining
+     * member (lowest `position`) before the customer is deleted.
+     *
+     * Without a successor the act keeps its temporary manager reference (the FK
+     * is nullable + nullOnDelete) and is removed by the memberless-cleanup in
+     * {@see erase()} — exactly one manager role remains per surviving act.
+     */
+    private function reassignManagedActs(Customer $customer): void
+    {
+        $managedActIds = Act::where('manager_customer_id', $customer->id)->pluck('id');
+
+        foreach ($managedActIds as $actId) {
+            $successor = ActMember::where('act_id', $actId)
+                ->where('customer_id', '!=', $customer->id)
+                ->orderBy('position')
+                ->orderBy('id')
+                ->first();
+
+            if ($successor === null) {
+                continue;
+            }
+
+            // Exactly one manager per act: demote all, then promote successor.
+            ActMember::where('act_id', $actId)->update(['role' => 'member']);
+            $successor->forceFill(['role' => 'manager'])->save();
+
+            Act::where('id', $actId)->update(['manager_customer_id' => $successor->customer_id]);
+        }
     }
 
     private function brandValue(Customer $customer): ?string

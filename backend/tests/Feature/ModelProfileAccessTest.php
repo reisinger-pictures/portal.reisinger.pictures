@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use App\Models\Act;
+use App\Models\ActMember;
 use App\Models\Customer;
 use App\Models\ModelAccessToken;
 use App\Models\ModelProfile;
@@ -365,5 +367,113 @@ class ModelProfileAccessTest extends TestCase
         // Old file untouched, freshly stored proof cleaned up (exactly one file).
         Storage::disk('local')->assertExists($oldPath);
         $this->assertCount(1, Storage::disk('local')->allFiles('model-age-proofs'));
+    }
+
+    /**
+     * Add a second person to the act of the given manager profile.
+     *
+     * @return array{0: Act, 1: Customer}
+     */
+    private function actWithSecondMember(ModelProfile $managerProfile): array
+    {
+        $act = $managerProfile->customer->acts()->firstOrFail();
+        $member = Customer::factory()->create(['brand' => 'rp', 'name' => 'Zweite Person']);
+        ActMember::create([
+            'act_id' => $act->id,
+            'customer_id' => $member->id,
+            'role' => 'member',
+            'position' => 1,
+        ]);
+
+        return [$act, $member];
+    }
+
+    public function test_public_show_exposes_owner_acts_with_members(): void
+    {
+        $profile = $this->createModel();
+        [$act, $member] = $this->actWithSecondMember($profile);
+        $token = $this->issueToken($profile->customer);
+
+        $response = $this->getJson("/api/model-profil/{$token->token}");
+
+        $response->assertOk()
+            ->assertJsonPath('acts.0.id', $act->id)
+            ->assertJsonPath('acts.0.is_manager', true)
+            ->assertJsonPath('acts.0.manager_customer_id', $profile->customer_id)
+            ->assertJsonCount(2, 'acts.0.members');
+
+        $memberIds = array_column($response->json('acts.0.members'), 'customer_id');
+        $this->assertContains($member->id, $memberIds);
+    }
+
+    public function test_manager_can_transfer_management_to_a_member(): void
+    {
+        $profile = $this->createModel();
+        [$act, $member] = $this->actWithSecondMember($profile);
+        $token = $this->issueToken($profile->customer);
+
+        $this->postJson("/api/model-profil/{$token->token}/transfer-manager", [
+            'act_id' => $act->id,
+            'new_manager_customer_id' => $member->id,
+        ])->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('act.manager_customer_id', $member->id)
+            ->assertJsonPath('act.is_manager', false);
+
+        $this->assertDatabaseHas('acts', ['id' => $act->id, 'manager_customer_id' => $member->id]);
+        $this->assertDatabaseHas('act_members', [
+            'act_id' => $act->id,
+            'customer_id' => $member->id,
+            'role' => 'manager',
+        ]);
+        $this->assertDatabaseHas('act_members', [
+            'act_id' => $act->id,
+            'customer_id' => $profile->customer_id,
+            'role' => 'member',
+        ]);
+    }
+
+    public function test_transfer_is_forbidden_for_a_non_manager(): void
+    {
+        $managerProfile = $this->createModel('rp', 'manager@example.com');
+        [$act, $member] = $this->actWithSecondMember($managerProfile);
+
+        $intruder = $this->createModel('rp', 'intruder@example.com');
+        $intruderToken = $this->issueToken($intruder->customer);
+
+        $this->postJson("/api/model-profil/{$intruderToken->token}/transfer-manager", [
+            'act_id' => $act->id,
+            'new_manager_customer_id' => $member->id,
+        ])->assertStatus(403);
+
+        $this->assertDatabaseHas('acts', [
+            'id' => $act->id,
+            'manager_customer_id' => $managerProfile->customer_id,
+        ]);
+    }
+
+    public function test_transfer_rejects_a_target_outside_the_act(): void
+    {
+        $profile = $this->createModel('rp', 'manager2@example.com');
+        [$act] = $this->actWithSecondMember($profile);
+        $outsider = Customer::factory()->create(['brand' => 'rp']);
+        $token = $this->issueToken($profile->customer);
+
+        $this->postJson("/api/model-profil/{$token->token}/transfer-manager", [
+            'act_id' => $act->id,
+            'new_manager_customer_id' => $outsider->id,
+        ])->assertStatus(422)->assertJsonValidationErrors(['new_manager_customer_id']);
+    }
+
+    public function test_transfer_rejects_self_as_new_manager(): void
+    {
+        $profile = $this->createModel('rp', 'manager3@example.com');
+        [$act] = $this->actWithSecondMember($profile);
+        $token = $this->issueToken($profile->customer);
+
+        $this->postJson("/api/model-profil/{$token->token}/transfer-manager", [
+            'act_id' => $act->id,
+            'new_manager_customer_id' => $profile->customer_id,
+        ])->assertStatus(422)->assertJsonValidationErrors(['new_manager_customer_id']);
     }
 }

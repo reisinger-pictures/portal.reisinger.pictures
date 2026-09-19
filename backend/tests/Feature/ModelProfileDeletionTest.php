@@ -164,6 +164,78 @@ class ModelProfileDeletionTest extends TestCase
             ->once();
     }
 
+    public function test_deleting_manager_promotes_first_remaining_member(): void
+    {
+        $superAdmin = $this->userWithRole(UserRole::SUPER_ADMIN, 'rp');
+        $model = $this->modelWithFiles('rp');
+        $manager = $model['customer'];
+
+        $act = Act::create([
+            'brand' => 'rp',
+            'manager_customer_id' => $manager->id,
+            'act_type' => 'group',
+            'catalog_version' => 'v1',
+            'answers' => [],
+            'person_count' => 3,
+            'submitted_at' => now(),
+        ]);
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $manager->id, 'role' => 'manager', 'position' => 0]);
+
+        $second = Customer::factory()->create(['brand' => 'rp', 'name' => 'Zweite Person']);
+        $third = Customer::factory()->create(['brand' => 'rp', 'name' => 'Dritte Person']);
+        // Deliberately not in position order, to prove the lowest position wins.
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $third->id, 'role' => 'member', 'position' => 2]);
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $second->id, 'role' => 'member', 'position' => 1]);
+
+        $this->actingAs($superAdmin, 'api')
+            ->deleteJson("/api/management/models/{$manager->id}")
+            ->assertOk();
+
+        // The act survives with the first remaining member as its new manager.
+        $this->assertDatabaseHas('acts', [
+            'id' => $act->id,
+            'manager_customer_id' => $second->id,
+        ]);
+        $this->assertDatabaseHas('act_members', [
+            'act_id' => $act->id,
+            'customer_id' => $second->id,
+            'role' => 'manager',
+        ]);
+        $this->assertDatabaseHas('act_members', [
+            'act_id' => $act->id,
+            'customer_id' => $third->id,
+            'role' => 'member',
+        ]);
+        $this->assertDatabaseMissing('act_members', ['act_id' => $act->id, 'customer_id' => $manager->id]);
+        $this->assertDatabaseMissing('customers', ['id' => $manager->id]);
+    }
+
+    public function test_direct_customer_delete_nulls_manager_but_keeps_act_and_members(): void
+    {
+        $model = $this->modelWithFiles('rp');
+        $manager = $model['customer'];
+
+        $act = Act::create([
+            'brand' => 'rp',
+            'manager_customer_id' => $manager->id,
+            'act_type' => 'group',
+            'catalog_version' => 'v1',
+            'answers' => [],
+            'person_count' => 2,
+            'submitted_at' => now(),
+        ]);
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $manager->id, 'role' => 'manager', 'position' => 0]);
+
+        $member = Customer::factory()->create(['brand' => 'rp', 'name' => 'Restmitglied']);
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $member->id, 'role' => 'member', 'position' => 1]);
+
+        // Bypasses the eraser on purpose: the relaxed FK must not cascade the act.
+        $manager->delete();
+
+        $this->assertDatabaseHas('acts', ['id' => $act->id, 'manager_customer_id' => null]);
+        $this->assertDatabaseHas('act_members', ['act_id' => $act->id, 'customer_id' => $member->id]);
+    }
+
     public function test_admin_cannot_erase_model_profile(): void
     {
         $admin = $this->userWithRole(UserRole::ADMIN, 'rp');

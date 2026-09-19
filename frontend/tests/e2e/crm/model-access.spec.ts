@@ -153,6 +153,37 @@ test.describe('Model-Profil-Zugang (Magic Link)', () => {
         await expect(page.getByTestId('profile-photos').getByRole('radio').nth(1)).toBeChecked();
     });
 
+    test('Manager gibt die Verwaltung im Profil an ein Mitglied ab', { tag: ['@feature:model-access'] }, async ({ page }) => {
+        // Two-person group via the sanctioned API helper (person 0 = manager).
+        const group = await helper.createRegisteredGroup();
+        if (!group.manager.customerId) throw new Error('Registered group manager has no customer id');
+        const access = await helper.createModelAccessLink(group.manager.customerId);
+        expect(access.link).toContain('/model-profil/');
+
+        await page.goto(access.link);
+        await expect(page.getByTestId('model-profile-access')).toBeVisible({ timeout: 15000 });
+
+        const main = page.locator('main');
+        const managerSection = main.getByTestId('model-profile-manager');
+        await expect(managerSection).toBeVisible();
+
+        const actBlock = managerSection.locator('[data-testid^="model-profile-act-"]').first();
+        await expect(actBlock).toContainText(`${group.manager.firstName} Gruppe`);
+
+        await actBlock.getByLabel('Verwaltung abgeben an').selectOption({ label: `${group.member.firstName} Gruppe` });
+        await actBlock.getByRole('button', { name: 'Verwaltung abgeben' }).click();
+        await page.locator('.modal-global').getByRole('button', { name: 'Bestätigen', exact: true }).click();
+        await expect(page.locator('.toast')).toContainText('Verwaltung wurde abgegeben');
+
+        // Reload proves persistence: the member is now the manager and the
+        // owner (former manager) no longer sees the hand-over control.
+        await page.reload();
+        await expect(main.getByTestId('model-profile-manager')).toBeVisible({ timeout: 15000 });
+        const reloadedAct = main.getByTestId('model-profile-manager').locator('[data-testid^="model-profile-act-"]').first();
+        await expect(reloadedAct).toContainText(`${group.member.firstName} Gruppe`);
+        await expect(reloadedAct.getByLabel('Verwaltung abgeben an')).toHaveCount(0);
+    });
+
     test('Unbekannter Profil-Token zeigt 404', { tag: ['@feature:model-access'] }, async ({ page }) => {
         await page.goto('/model-profil/' + 'a'.repeat(64));
         await expect(page.getByTestId('model-profile-error')).toContainText('Profil-Link nicht gefunden', { timeout: 15000 });

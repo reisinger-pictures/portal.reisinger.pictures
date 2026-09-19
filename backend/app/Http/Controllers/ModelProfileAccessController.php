@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Enums\Brand;
 use App\Mail\ModelProfileUpdatedMail;
+use App\Models\Act;
+use App\Models\ActMember;
 use App\Models\Customer;
 use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
@@ -177,6 +179,68 @@ class ModelProfileAccessController extends Controller
         $profiles = $query->orderByDesc('updated_at')->get();
 
         return response()->json($profiles->map(fn (ModelProfile $profile) => $this->serializeMine($profile)));
+    }
+
+    /**
+     * Hand management of one of the owner's acts to another member.
+     *
+     * Guards: the token owner must be the act's current manager (403 otherwise)
+     * and the target must be a member of the same act (422). Only the manager
+     * acts here — no super-admin involvement.
+     */
+    public function transferManager(Request $request, string $token)
+    {
+        $accessToken = $this->resolveToken($token);
+        $profile = $this->profileFor($accessToken);
+        $customer = $profile->customer;
+
+        $validated = Validator::make($request->all(), [
+            'act_id' => ['required', 'uuid'],
+            'new_manager_customer_id' => ['required', 'uuid'],
+        ])->validate();
+
+        $act = Act::where('id', $validated['act_id'])->first();
+
+        if ($act === null || $act->manager_customer_id !== $customer->id) {
+            abort(response()->json(['error' => 'Nur der aktuelle Manager kann die Verwaltung abgeben.'], 403));
+        }
+
+        $newManagerId = $validated['new_manager_customer_id'];
+
+        if ($newManagerId === $customer->id) {
+            throw ValidationException::withMessages([
+                'new_manager_customer_id' => 'Du bist bereits Manager dieses Acts.',
+            ]);
+        }
+
+        $isMember = ActMember::where('act_id', $act->id)
+            ->where('customer_id', $newManagerId)
+            ->exists();
+
+        if (! $isMember) {
+            throw ValidationException::withMessages([
+                'new_manager_customer_id' => 'Die gewählte Person gehört nicht zu diesem Act.',
+            ]);
+        }
+
+        DB::transaction(function () use ($act, $newManagerId): void {
+            // Exactly one manager per act.
+            ActMember::where('act_id', $act->id)->update(['role' => 'member']);
+            ActMember::where('act_id', $act->id)
+                ->where('customer_id', $newManagerId)
+                ->update(['role' => 'manager']);
+
+            $act->forceFill(['manager_customer_id' => $newManagerId])->save();
+        });
+
+        $this->touch($accessToken);
+
+        $act->refresh()->load(['manager', 'members.customer']);
+
+        return response()->json([
+            'success' => true,
+            'act' => $this->serializeAct($act, $customer->id),
+        ]);
     }
 
     private function resolveToken(string $token): ModelAccessToken
@@ -416,6 +480,7 @@ class ModelProfileAccessController extends Controller
             'lifecycle_status' => $profile->lifecycleStatus(),
             'categories' => $this->questionnaire->categoriesPayload(),
             'sections' => $this->questionnaire->sections(),
+            'acts' => $customer !== null ? $this->serializeActs($customer) : [],
             'photos' => $profile->photos->map(fn (ModelPhoto $photo) => [
                 'id' => $photo->id,
                 'visibility' => $photo->visibility,
@@ -423,6 +488,48 @@ class ModelProfileAccessController extends Controller
                 'mime_type' => $photo->mime_type,
             ])->values(),
             'expires_at' => $accessToken->expires_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Acts the token owner belongs to, with the current manager and members.
+     * Members are only exposed inside this owner-scoped magic-link context; the
+     * owner needs the member list to hand management over.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function serializeActs(Customer $customer): array
+    {
+        $acts = Act::query()
+            ->with(['manager', 'members.customer'])
+            ->whereHas('members', fn ($query) => $query->where('customer_id', $customer->id))
+            ->orderByDesc('submitted_at')
+            ->get();
+
+        return $acts->map(fn (Act $act) => $this->serializeAct($act, $customer->id))->values()->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeAct(Act $act, string $viewerCustomerId): array
+    {
+        return [
+            'id' => $act->id,
+            'act_type' => $act->act_type,
+            'person_count' => (int) $act->person_count,
+            'is_manager' => $act->manager_customer_id === $viewerCustomerId,
+            'manager_customer_id' => $act->manager_customer_id,
+            'manager_name' => $act->manager?->name,
+            'members' => $act->members
+                ->sortBy('position')
+                ->values()
+                ->map(fn (ActMember $member) => [
+                    'customer_id' => $member->customer_id,
+                    'name' => $member->customer?->name,
+                    'is_manager' => $member->customer_id === $act->manager_customer_id,
+                ])
+                ->all(),
         ];
     }
 
