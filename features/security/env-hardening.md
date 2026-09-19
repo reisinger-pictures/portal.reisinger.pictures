@@ -57,6 +57,36 @@ Services). Siehe `AGENTS.md` §7 Risk Register.
 `STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET` sind verpflichtend über
 Env-Variablen zu setzen. Tests verwenden `Config::set(...)` mit Mock-Werten.
 
+## File Encryption at Rest (2026-09-19)
+
+Sensible Model-Dateien (**Altersnachweis** + **Personen-Fotos**) werden
+verschlüsselt auf der privaten `local`-Disk abgelegt, ebenso der
+`model_profiles.answers`-Snapshot in der DB (Laravel `encrypted:array`).
+Such-/Filterfelder (`gender`, `customer.city`, `birthdate`) bleiben plaintext.
+
+- **Mechanismus Dateien:** AES-256-GCM, chunked streaming (64 KB Default) über
+  das MIT-Paket `ercsctt/laravel-file-encryption` (`FileEncrypter`-Facade).
+  Kein Voll-Load in Memory; pro Chunk eigener Nonce + GCM-Auth-Tag, Header-HMAC.
+- **Eigener Key (NICHT `APP_KEY`):** `FILE_ENCRYPTION_KEY`, Format
+  `base64:<32 Byte>`. Generieren:
+  `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`
+- **Key-Rotation:** Neuen Key als `FILE_ENCRYPTION_KEY` setzen, den alten Key
+  kommagetrennt in `FILE_ENCRYPTION_PREVIOUS_KEYS` übernehmen. Beim Entschlüsseln
+  werden Primary + Previous-Keys der Reihe nach probiert; ein falscher Key
+  scheitert am GCM-Auth-Tag (`DecryptException`). Altdaten lassen sich bei Bedarf
+  mit `php artisan file:decrypt`/`file:encrypt` re-encrypten.
+- **Tests:** `phpunit.xml` setzt einen deterministischen, nicht-geheimen
+  Test-Key; `backend/.env.ci` einen CI-Key. `backend/.env.example` enthält nur
+  den leeren Platzhalter.
+- **Metadata-Stripping:** Raster-Bilder (jpg/png/webp) werden vor dem
+  Verschlüsseln per GD re-encodiert (EXIF/GPS entfernt); PDF/Unbekannt bleiben
+  unverändert (aber weiterhin verschlüsselt).
+- **Deployment-Guard (fail-closed):** `deployment/docker-compose.yml` verweigert
+  den Start, wenn `FILE_ENCRYPTION_KEY` — zusammen mit `APP_KEY` und
+  `JWT_SECRET` — leer ist. Ohne Key wären gespeicherte Ausweise/Fotos und
+  `answers`-Snapshots unwiederbringlich; der Guard verhindert einen stillen
+  Fehlstart mit unbrauchbarem Storage.
+
 ## .gitignore-Strategie
 
 Root-`.gitignore` (Frontend-Sektion):
@@ -118,6 +148,8 @@ pnpm install
 - **C1/C2 (`APP_KEY`/`JWT_SECRET` Fallbacks):** ✅ RESOLVED (2026-07-21) — Schlüssel rotiert.
   Deployment-Guard in `docker-compose.yml` prüft nun generisch auf leere Werte
   statt auf konkrete Strings — keine erneute Exposition über das Repository möglich.
+  Seit 2026-09-19 prüft derselbe Guard zusätzlich `FILE_ENCRYPTION_KEY`
+  (fail-closed, siehe „File Encryption at Rest").
 
 ## DoD / Verifikation
 

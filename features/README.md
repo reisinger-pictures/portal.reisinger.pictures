@@ -32,6 +32,11 @@ This directory serves as the single source of truth for all technical concepts, 
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.
 * [02-ratings-feature.md](gallery/02-ratings-feature.md) - Photo ratings (stars + comments) in selection galleries.
 
+### 🧑💼 CRM
+* [04-birthdate-age-verification.md](crm/04-birthdate-age-verification.md) - Birthdate & Age Verification (CRM), live age calculation.
+* [05-model-registration.md](crm/05-model-registration.md) - Model-Registrierung über Einladungslink: Act + 1..n Personen, versionierter Fragenkatalog, Altersnachweis (privat), API-Vertrag.
+* [06-model-profile-iteration.md](crm/06-model-profile-iteration.md) - **SOLL:** Katalog v2 (Bereitschaft, Erotik-, Fashion-/Business- und Agentur-Entscheidungen, Alt-Snapshot-Migration), Form-/UX-Iteration, Lifecycle/Retention mit Timer- & Mail-Regeln, Admin-Karten/Hauptbild, Sicherheit der Bildspeicherung.
+
 ### ⚙️ Infrastructure
 * [01-deployment.md](infrastructure/01-deployment.md) - Docker, Portainer, and Reverse Proxy.
 * [02-email-system.md](infrastructure/02-email-system.md) - Mailpit, Custom Mails, and Opt-ins.

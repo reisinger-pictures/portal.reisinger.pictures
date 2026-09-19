@@ -20,6 +20,10 @@ use App\Http\Controllers\InvoiceDownloadController;
 use App\Http\Controllers\LicenseCatalogController;
 use App\Http\Controllers\LightroomCatalogController;
 use App\Http\Controllers\MailController;
+use App\Http\Controllers\ModelInviteController;
+use App\Http\Controllers\ModelManagementController;
+use App\Http\Controllers\ModelProfileAccessController;
+use App\Http\Controllers\ModelRegistrationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrgController;
@@ -95,6 +99,19 @@ Route::get('/sitemap-images.xml', [SitemapController::class, 'images'])->name('a
 Route::get('/invites/{token}', [InviteController::class, 'check'])->name('api.invites.check');
 Route::get('/org-invites/{token}', [OrgInviteController::class, 'check'])->name('api.org-invites.check');
 
+// Model-Registrierung (öffentlich, Token = Credential). Eigener benannter
+// Rate-Limiter, damit das Budget nicht mit den positionalen `throttle:*`-Routen
+// (Auth/Invites, geteilter `sha1(domain|ip)`-Key) geteilt wird.
+Route::middleware('throttle:model-registration')->group(function () {
+    Route::get('/model-registration/{token}', [ModelRegistrationController::class, 'check'])->name('api.model-registration.check');
+    Route::post('/model-registration/{token}', [ModelRegistrationController::class, 'submit'])->name('api.model-registration.submit');
+
+    // Profil-Zugang (Token = Credential): einsehen, bestätigen, aktualisieren.
+    Route::get('/model-profil/{token}', [ModelProfileAccessController::class, 'show'])->name('api.model-profile.show');
+    Route::post('/model-profil/{token}', [ModelProfileAccessController::class, 'update'])->name('api.model-profile.update');
+    Route::post('/model-profil/{token}/confirm', [ModelProfileAccessController::class, 'confirm'])->name('api.model-profile.confirm');
+});
+
 Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check'])->name('api.contracts.join.check');
 Route::post('/contracts/join/{token}', [ContractJoinController::class, 'join'])->name('api.contracts.join.join');
 Route::get('/contracts/sign/{personalToken}', [ContractJoinController::class, 'contractContent'])->name('api.contracts.sign.content');
@@ -118,6 +135,7 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
     Route::post('/auth/refresh', [AuthController::class, 'refresh'])->name('api.auth.refresh');
     Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
+    Route::get('/me/models', [ModelProfileAccessController::class, 'mine'])->name('api.me.models');
     Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->name('api.auth.profile');
     // R-01 (naming): Bankverbindung & Impressum — sensibel, nur authentifiziert.
     Route::get('/settings/billing-details', [SettingsController::class, 'getBillingDetails'])->name('api.settings.billing-details');
@@ -239,6 +257,18 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::put('/management/orgs/{id}/users', [OrgController::class, 'syncUsers'])->name('api.management.orgs.sync-users');
     Route::put('/management/orgs/{id}/groups', [OrgController::class, 'syncGroups'])->name('api.management.orgs.sync-groups');
 
+    // Model-Registrierung: Einladungen + Model-Suche (Admin-Gate im Controller).
+    Route::get('/management/model-invites', [ModelInviteController::class, 'index'])->name('api.management.model-invites.index');
+    Route::post('/management/model-invites', [ModelInviteController::class, 'store'])->name('api.management.model-invites.store');
+    Route::delete('/management/model-invites/{id}', [ModelInviteController::class, 'destroy'])->name('api.management.model-invites.destroy');
+    Route::get('/management/models', [ModelManagementController::class, 'index'])->name('api.management.models.index');
+    Route::get('/management/models/{id}/age-proof', [ModelManagementController::class, 'ageProof'])->name('api.management.models.age-proof');
+    Route::get('/management/models/{id}/photos/{photoId}', [ModelManagementController::class, 'photo'])->name('api.management.models.photos.download');
+    Route::delete('/management/models/{id}/photos/{photoId}', [ModelManagementController::class, 'destroyPhoto'])->name('api.management.models.photos.destroy');
+    Route::post('/management/models/{id}/photos/{photoId}/primary', [ModelManagementController::class, 'setPrimaryPhoto'])->name('api.management.models.photos.primary');
+    Route::post('/management/models/{customer}/access-link', [ModelManagementController::class, 'accessLink'])->name('api.management.models.access-link.store');
+    Route::delete('/management/models/{customer}/access-link', [ModelManagementController::class, 'revokeAccessLink'])->name('api.management.models.access-link.destroy');
+
     Route::get('/management/orders', [OrderController::class, 'indexAdmin'])->name('api.management.orders.index');
     Route::put('/management/orders/{id}/status', [OrderController::class, 'updateStatus'])->name('api.management.orders.status');
     Route::post('/management/orders/quote-link', [QuoteController::class, 'generateQuoteLink'])->name('api.management.orders.quote-link');
@@ -254,6 +284,9 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         Route::post('/management/customers', [CustomerController::class, 'store'])->name('api.management.customers.store');
         Route::put('/management/customers/{id}', [CustomerController::class, 'update'])->name('api.management.customers.update');
         Route::delete('/management/customers/{id}', [CustomerController::class, 'destroy'])->name('api.management.customers.destroy');
+
+        // DSGVO-Löschung eines Model-Profils (restlos, inkl. Storage-Dateien).
+        Route::delete('/management/models/{customer}', [ModelManagementController::class, 'destroyModel'])->name('api.management.models.destroy');
 
         Route::get('/management/text-snippets', [TextSnippetController::class, 'index'])->name('api.management.text-snippets.index');
         Route::post('/management/text-snippets', [TextSnippetController::class, 'store'])->name('api.management.text-snippets.store');

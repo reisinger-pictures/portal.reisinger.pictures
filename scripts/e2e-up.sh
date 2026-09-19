@@ -69,6 +69,7 @@ set_env MAIL_PORT "1025"
 set_env MAIL_ENCRYPTION ""
 set_env MAIL_FROM_ADDRESS "test@reisinger.pictures"
 set_env AUTH_THROTTLE_LIMIT "1000"
+set_env MODEL_REGISTRATION_THROTTLE_LIMIT "1000"
 
 # --- 3. E2E-SQLite-DB anlegen + migrieren + seeden --------------------------
 log "Lege E2E-SQLite-DB an ($E2E_DB) ..."

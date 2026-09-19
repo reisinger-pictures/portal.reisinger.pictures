@@ -6,7 +6,9 @@ use App\Auth\TransientUserProvider;
 use App\Contracts\PricingStrategy;
 use App\Enums\UserRole;
 use App\Mail\Transports\GmailRestTransport;
+use App\Models\Customer;
 use App\Models\Setting;
+use App\Observers\CustomerObserver;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\AuthorizationService;
@@ -121,6 +123,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('coupon-validate', fn (Request $request) => Limit::perMinute(10)->by($request->user('api')?->getKey() ?? $request->ip())
         );
 
+        // Dedicated bucket for the public model-registration endpoints. A named
+        // limiter gets its own cache key (md5(name.key)) instead of sharing the
+        // positional `sha1(domain|ip)` key with the auth routes — otherwise a
+        // burst of login/invite traffic in E2E (or behind NAT) would consume the
+        // model-registration budget. Kept bounded in every environment.
+        RateLimiter::for('model-registration', fn (Request $request) => Limit::perMinute(
+            (int) config('app.throttle_model_registration', 10)
+        )->by($request->ip()));
+
         // Reset brand state before each queue job to prevent stale config carrying over
         // between jobs in long-running queue workers (php artisan queue:work).
         // Consumers like InvoiceMail::build() call BrandRegistry::set() explicitly, so they
@@ -132,5 +143,9 @@ class AppServiceProvider extends ServiceProvider
             // next job. clearCache() is idempotent (no-op when nothing cached).
             BrandRegistry::clearCache();
         });
+
+        // DSGVO general safety net: any Customer deletion also removes the
+        // encrypted age proof / person photo files from the private disk.
+        Customer::observe(CustomerObserver::class);
     }
 }

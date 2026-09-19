@@ -33,6 +33,13 @@
     --radius-selector: 1rem;
     --radius-field: 0.5rem;
     --radius-box: 0.75rem;
+    /* daisyUI component size/border tokens: without these, calc()-based
+       component styles (e.g. .badge padding-inline) become invalid CSS. */
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
 }
 
 @plugin "daisyui/theme" {
@@ -57,6 +64,11 @@
     --radius-selector: 1rem;
     --radius-field: 0.5rem;
     --radius-box: 0.75rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
 }
 
 @plugin "daisyui" {
@@ -148,5 +160,23 @@
 
     .checkbox, .radio {
         border: 2px solid var(--color-primary);
+    }
+
+    /* daisyUI derives both checkbox and radio corners from --radius-selector
+       (1rem = circle). Keep radios circular, but render checkboxes as clearly
+       square so the checked mark cannot be mistaken for a radio dot. */
+    .checkbox {
+        --radius-selector: 0.25rem;
+    }
+
+    /* daisyUI's .label is `white-space: nowrap`, which clips long consent /
+       checkbox texts (e.g. consent statements on mobile). Wrap those instead. */
+    .label:has(input[type="checkbox"]) {
+        white-space: normal;
+        align-items: flex-start;
+    }
+
+    .label:has(input[type="checkbox"]) .label-text {
+        min-width: 0;
     }
 }

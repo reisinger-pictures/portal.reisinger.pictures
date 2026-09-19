@@ -17,6 +17,10 @@ msgstr ""
 msgid "--- €"
 msgstr "--- €"
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "„Beste Übereinstimmung\" gewichtet Lust stärker als Erfahrung."
+msgstr "„Beste Übereinstimmung\" gewichtet Lust stärker als Erfahrung."
+
 #: src/ui/client/components/CartItemList.tsx
 msgid "(Preis auf Anfrage)"
 msgstr "(Preis auf Anfrage)"
@@ -36,56 +40,6 @@ msgstr "[Name des Fotografen / Unternehmens]"
 #: src/ui/Impressum.tsx
 msgid "[PLZ, Ort]"
 msgstr "[PLZ, Ort]"
-
-#. placeholder {0}: user.name
-#: src/ui/management/components/UserPermissionsModal.tsx
-#~ msgid "{0} bearbeiten"
-#~ msgstr "{0} bearbeiten"
-
-#. placeholder {0}: items.length
-#. placeholder {1}: formatMoney(volumeLicensing.pricePerItemCents)
-#. placeholder {2}: volumeLicensing.tier
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{0} Bilder × {1} (Tier {2})"
-#~ msgstr "{0} Bilder × {1} (Tier {2})"
-
-#. placeholder {0}: coupons.length
-#. placeholder {1}: coupons.length === 1 ? '' : 's'
-#: src/ui/management/components/GalleryCouponsTab.tsx
-#~ msgid "{0} Coupon{1} für diese Galerie"
-#~ msgstr "{0} Coupon{1} für diese Galerie"
-
-#. placeholder {0}: coupons.length
-#. placeholder {1}: coupons.length === 1 ? '' : 's'
-#: src/ui/management/components/GalleryGroupCouponsTab.tsx
-#~ msgid "{0} Coupon{1} für diese Galerie-Gruppe"
-#~ msgstr "{0} Coupon{1} für diese Galerie-Gruppe"
-
-#. placeholder {0}: g.count
-#: src/ui/management/ManagementStatsView.tsx
-#~ msgid "{0} Downloads"
-#~ msgstr "{0} Downloads"
-
-#. placeholder {0}: downloadsCount || 0
-#: src/ui/management/ManagementMetaGalleryView.tsx
-#~ msgid "{0} Downloads gesamt"
-#~ msgstr "{0} Downloads gesamt"
-
-#. placeholder {0}: formatMoney(volumeLicensing.pricePerItemCents)
-#. placeholder {1}: volumeLicensing.tier
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{0} pro Bild (Tier {1})"
-#~ msgstr "{0} pro Bild (Tier {1})"
-
-#. placeholder {0}: u.rated_count
-#: src/ui/management/components/RatingStatusModal.tsx
-#~ msgid "{0} von {totalGalleryPhotos} Bildern"
-#~ msgstr "{0} von {totalGalleryPhotos} Bildern"
-
-#. placeholder {0}: (config.tier1PriceCents / 100).toFixed(0)
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "{0}€ pro Bild"
-#~ msgstr "{0}€ pro Bild"
 
 #: src/ui/management/components/GalleryCouponsTab.tsx
 msgid "{couponsLength} Coupon{couponsPlural} für diese Galerie"
@@ -131,11 +85,6 @@ msgstr "{progress}% abgeschlossen"
 msgid "{ratedCount} von {totalGalleryPhotos} Bildern"
 msgstr "{ratedCount} von {totalGalleryPhotos} Bildern"
 
-#. placeholder {0}: star > 1 ? 'e' : ''
-#: src/ui/client/components/DaisyUIRatingBridge.tsx
-#~ msgid "{star} Stern{0} (Shortcut: {star})"
-#~ msgstr "{star} Stern{0} (Shortcut: {star})"
-
 #: src/ui/client/components/DaisyUIRatingBridge.tsx
 msgid "{star} Stern{starSuffix} (Shortcut: {star})"
 msgstr "{star} Stern{starSuffix} (Shortcut: {star})"
@@ -143,15 +92,6 @@ msgstr "{star} Stern{starSuffix} (Shortcut: {star})"
 #: src/ui/management/components/UploadDropzone.tsx
 msgid "{successCount} Bild(er) hochgeladen"
 msgstr "{successCount} Bild(er) hochgeladen"
-
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "{t1Price}€ pro Bild"
-#~ msgstr "{t1Price}€ pro Bild"
-
-#. placeholder {0}: total === 1 ? '' : 's'
-#: src/ui/management/ManagementCouponsView.tsx
-#~ msgid "{total} Gutscheincode{0} insgesamt"
-#~ msgstr "{total} Gutscheincode{0} insgesamt"
 
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "{total} Gutscheincode{totalPlural} insgesamt"
@@ -173,11 +113,6 @@ msgstr "/ 100.000 Zeichen (HTML)"
 msgid "← Zurück"
 msgstr "← Zurück"
 
-#. placeholder {0}: upgradePrice.toFixed(2)
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "+ {0} €"
-#~ msgstr "+ {0} €"
-
 #: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "+ {upgradePriceFormatted} €"
 msgstr "+ {upgradePriceFormatted} €"
@@ -197,10 +132,6 @@ msgstr "1 Jahr (x1)"
 #: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "1 Jahr:"
 msgstr "1 Jahr:"
-
-#: src/ui/client/components/VolumeLicensingCard.tsx
-#~ msgid "1–9 Bilder"
-#~ msgstr "1–9 Bilder"
 
 #: src/ui/Privacy.tsx
 msgid "1. Automatische Datenerfassung und IP-Adressen"
@@ -282,45 +213,9 @@ msgstr "9. Urheberrecht"
 msgid "Ab"
 msgstr "Ab"
 
-#. placeholder {0}: config.tier2Threshold
-#. placeholder {0}: config.tier3Threshold
-#. placeholder {1}: (config.tier2PriceCents / 100).toFixed(0)
-#. placeholder {1}: (config.tier3PriceCents / 100).toFixed(0)
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "Ab {0} Bildern {1}€ pro Bild"
-#~ msgstr "Ab {0} Bildern {1}€ pro Bild"
-
 #: src/logic/useVolumeLicensing.ts
 msgid "Ab {minQuantity} Bildern {price}€ pro Bild"
 msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
-
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "Ab {nt2Threshold} Bildern {nt2Price}€ pro Bild"
-#~ msgstr "Ab {nt2Threshold} Bildern {nt2Price}€ pro Bild"
-
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "Ab {nt3Threshold} Bildern {nt3Price}€ pro Bild"
-#~ msgstr "Ab {nt3Threshold} Bildern {nt3Price}€ pro Bild"
-
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "Ab {t2Threshold} Bildern {t2Price}€ pro Bild"
-#~ msgstr "Ab {t2Threshold} Bildern {t2Price}€ pro Bild"
-
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "Ab {t3Threshold} Bildern {t3Price}€ pro Bild"
-#~ msgstr "Ab {t3Threshold} Bildern {t3Price}€ pro Bild"
-
-#: src/ui/client/components/VolumeLicensingCard.tsx
-#~ msgid "Ab 10 Bilder"
-#~ msgstr "Ab 10 Bilder"
-
-#: src/ui/client/components/VolumeLicensingCard.tsx
-#~ msgid "Ab 20 Bilder"
-#~ msgstr "Ab 20 Bilder"
-
-#: src/ui/management/components/VolumePresetSettingsCard.tsx
-#~ msgid "Ab dieser Anzahl Bilder gilt der Einheitspreis für alle Bilder der Bestellung. Die erste Staffel beginnt bei 0 Bildern."
-#~ msgstr "Ab dieser Anzahl Bilder gilt der Einheitspreis für alle Bilder der Bestellung. Die erste Staffel beginnt bei 0 Bildern."
 
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/components/WysiwygEditor.tsx
@@ -345,6 +240,11 @@ msgstr "Abbrechen"
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Abgebrochen"
 msgstr "Abgebrochen"
+
+#: src/logic/modelRegistration.ts
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Abgelaufen"
+msgstr "Abgelaufen"
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Ablaufdatum"
@@ -390,6 +290,10 @@ msgstr "Absatz"
 msgid "Abschließen"
 msgstr "Abschließen"
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Abschluss"
+msgstr "Abschluss"
+
 #: src/ui/OrgInviteView.tsx
 msgid "Account aktivieren & Beitreten"
 msgstr "Account aktivieren & Beitreten"
@@ -402,6 +306,15 @@ msgstr "Account erstellen"
 msgid "ACHTUNG: Alle Unterordner werden dabei in die Root-Ebene verschoben!"
 msgstr "ACHTUNG: Alle Unterordner werden dabei in die Root-Ebene verschoben!"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Act-Typ"
+msgstr "Act-Typ"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Act-Umfang"
+msgstr "Act-Umfang"
+
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Admin Download"
 msgstr "Admin Download"
@@ -413,9 +326,14 @@ msgstr "Administrator"
 #: src/ui/components/Sidebar.tsx
 #: src/ui/Impressum.tsx
 #: src/ui/LicenseTerms.tsx
+#: src/ui/ModelRegistrationView.tsx
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "AGB & Lizenzbedingungen"
 msgstr "AGB & Lizenzbedingungen"
+
+#: src/logic/modelRegistration.ts
+msgid "Akt"
+msgstr "Akt"
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Akt & Boudoir"
@@ -429,6 +347,7 @@ msgstr "Aktion"
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -436,6 +355,7 @@ msgstr "Aktion"
 msgid "Aktionen"
 msgstr "Aktionen"
 
+#: src/logic/modelRegistration.ts
 #: src/ui/client/components/CouponInput.tsx
 #: src/ui/client/components/VolumeLicensingCard.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
@@ -443,6 +363,7 @@ msgstr "Aktionen"
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementCouponsView.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Aktiv"
 msgstr "Aktiv"
 
@@ -459,6 +380,7 @@ msgid "Aktuelle Ziel-Galerie"
 msgstr "Aktuelle Ziel-Galerie"
 
 #: src/ui/client/components/SelectionFilterBar.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Alle"
 msgstr "Alle"
 
@@ -518,6 +440,10 @@ msgstr "Als Angebot anfragen"
 msgid "Als Bezahlt markieren"
 msgstr "Als Bezahlt markieren"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Als Hauptbild"
+msgstr "Als Hauptbild"
+
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Als Standard"
 msgstr "Als Standard"
@@ -525,6 +451,35 @@ msgstr "Als Standard"
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Als Standard gesetzt"
 msgstr "Als Standard gesetzt"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Alter"
+msgstr "Alter"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Alter bis"
+msgstr "Alter bis"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Alter von"
+msgstr "Alter von"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/ModelRegistrationView.tsx
+msgid "Altersnachweis"
+msgstr "Altersnachweis"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Altersnachweis (Ausweis)"
+msgstr "Altersnachweis (Ausweis)"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Altersnachweis ausstehend"
+msgstr "Altersnachweis ausstehend"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Änderungen speichern"
+msgstr "Änderungen speichern"
 
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Änderungshistorie (Vor-Zustände)"
@@ -683,9 +638,17 @@ msgstr "Aus Gründen der Datensparsamkeit und zur Einhaltung der DSGVO protokoll
 msgid "Ausbezahlt"
 msgstr "Ausbezahlt"
 
+#: src/logic/modelRegistration.ts
+msgid "Aussehen & Maße"
+msgstr "Aussehen & Maße"
+
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Ausständig / Angebot"
 msgstr "Ausständig / Angebot"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Ausstehend"
+msgstr "Ausstehend"
 
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Ausstehende Lieferscheine werden nun gebündelt, eine P-Rechnungsnummer erzeugt und als PDF an deine E-Mail versendet."
@@ -741,17 +704,13 @@ msgstr "Automatischer Beitritt fehlgeschlagen. Bitte manuell versuchen."
 msgid "Automatischer Refresh für Besucher alle 10 Sekunden."
 msgstr "Automatischer Refresh für Besucher alle 10 Sekunden."
 
-#: src/ui/management/components/ShootingCalculatorModal.tsx
-#~ msgid "B2C Flex-Paket"
-#~ msgstr "B2C Flex-Paket"
-
-#: src/ui/management/components/ShootingCalculatorModal.tsx
-#~ msgid "B2C Flex-Paket Rechner"
-#~ msgstr "B2C Flex-Paket Rechner"
-
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "Backend:"
 msgstr "Backend:"
+
+#: src/logic/modelRegistration.ts
+msgid "Basisdaten"
+msgstr "Basisdaten"
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Basispreis"
@@ -772,10 +731,6 @@ msgstr "Baustein angelegt"
 #: src/ui/management/ManagementTextSnippetsView.tsx
 msgid "Baustein gelöscht"
 msgstr "Baustein gelöscht"
-
-#: src/ui/components/WysiwygEditor.tsx
-#~ msgid "Baustein..."
-#~ msgstr "Baustein..."
 
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
@@ -805,6 +760,10 @@ msgstr "Beigetreten"
 #: src/ui/Privacy.tsx
 msgid "Beim Download hochauflösender Bilder wird Ihr Name bzw. Ihre Kennung sowie ein Verweis auf unsere Nutzungsbedingungen technisch in die Metadaten (IPTC/EXIF) der Bilddatei eingebettet. Dies dient dem Schutz vor unautorisierter Weitergabe und Leaks."
 msgstr "Beim Download hochauflösender Bilder wird Ihr Name bzw. Ihre Kennung sowie ein Verweis auf unsere Nutzungsbedingungen technisch in die Metadaten (IPTC/EXIF) der Bilddatei eingebettet. Dies dient dem Schutz vor unautorisierter Weitergabe und Leaks."
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Beim nächsten Speichern wird dein Profil auf den aktuellen Fragenkatalog aktualisiert."
+msgstr "Beim nächsten Speichern wird dein Profil auf den aktuellen Fragenkatalog aktualisiert."
 
 #: src/ui/OrgInviteView.tsx
 msgid "Beitreten & Fortfahren"
@@ -856,6 +815,34 @@ msgstr "Berechnen & Hinzufügen"
 msgid "Bereits im Warenkorb — der Preis wird basierend auf der Gesamtanzahl berechnet."
 msgstr "Bereits im Warenkorb — der Preis wird basierend auf der Gesamtanzahl berechnet."
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Bereitschaft (höchste zuerst)"
+msgstr "Bereitschaft (höchste zuerst)"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Bereitschaft (Kategorien, beliebige)"
+msgstr "Bereitschaft (Kategorien, beliebige)"
+
+#: src/logic/modelRegistration.ts
+msgid "Bereitschaft & Erfahrung"
+msgstr "Bereitschaft & Erfahrung"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Bereitschaft mindestens"
+msgstr "Bereitschaft mindestens"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Bereitschafts-Kategorien"
+msgstr "Bereitschafts-Kategorien"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Bereitschafts-Übersicht"
+msgstr "Bereitschafts-Übersicht"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Bereitschaftsstufe"
+msgstr "Bereitschaftsstufe"
+
 #: src/ui/client/components/CartItemList.tsx
 msgid "Beschreibe deine speziellen Nutzungsanforderungen (z.B. Weltweite Rechte, Exklusivität)..."
 msgstr "Beschreibe deine speziellen Nutzungsanforderungen (z.B. Weltweite Rechte, Exklusivität)..."
@@ -874,6 +861,10 @@ msgstr "Beschreibung"
 msgid "Beschreibung:"
 msgstr "Beschreibung:"
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Beste Übereinstimmung"
+msgstr "Beste Übereinstimmung"
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "Bestehende Links"
 msgstr "Bestehende Links"
@@ -881,11 +872,6 @@ msgstr "Bestehende Links"
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Bestellung"
 msgstr "Bestellung"
-
-#. placeholder {0}: response.invoice_number
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Bestellung erfolgreich! (Beleg: {0})"
-#~ msgstr "Bestellung erfolgreich! (Beleg: {0})"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Bestellung erfolgreich! (Beleg: {invoiceNumber})"
@@ -898,11 +884,6 @@ msgstr "Bestellungen & Anfragen"
 #: src/ui/client/components/CartItemList.tsx
 msgid "Bester Rabatt aktiv"
 msgstr "Bester Rabatt aktiv"
-
-#. placeholder {0}: formatMoney(2000)
-#: src/ui/client/components/VolumeLicensingCard.tsx
-#~ msgid "Bester Rabatt aktiv — {0} pro Bild"
-#~ msgstr "Bester Rabatt aktiv — {0} pro Bild"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "Bester Rabatt aktiv — {bestPrice} pro Bild"
@@ -946,17 +927,16 @@ msgstr "Bewertungs-Galerien sind zwingend privat."
 msgid "Bezahlt"
 msgstr "Bezahlt"
 
+#: src/logic/modelRegistration.ts
+msgid "Bikini"
+msgstr "Bikini"
+
 #: src/ui/client/DeliveryView.tsx
 #: src/ui/client/SelectionView.tsx
 #: src/ui/management/components/RatingStatusModal.tsx
 #: src/ui/PhotoDetailView.tsx
 msgid "Bild"
 msgstr "Bild"
-
-#. placeholder {0}: photo.id.substring(0, 8)
-#: src/ui/client/components/LicenseSelectorCard.tsx
-#~ msgid "Bild {0}"
-#~ msgstr "Bild {0}"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Bild {photoIdShort}"
@@ -1046,6 +1026,10 @@ msgstr "Bitte alle Titel/Namen bei den Leistungen ausfüllen."
 msgid "Bitte bestätige den Verzicht auf das Widerrufsrecht."
 msgstr "Bitte bestätige den Verzicht auf das Widerrufsrecht."
 
+#: src/logic/modelRegistration.ts
+msgid "Bitte ein Datum in der Vergangenheit angeben."
+msgstr "Bitte ein Datum in der Vergangenheit angeben."
+
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Bitte eine gültige Anzahl eingeben"
 msgstr "Bitte eine gültige Anzahl eingeben"
@@ -1053,6 +1037,27 @@ msgstr "Bitte eine gültige Anzahl eingeben"
 #: src/ui/management/components/ProjectModal.tsx
 msgid "Bitte eine gültige E-Mail angeben"
 msgstr "Bitte eine gültige E-Mail angeben"
+
+#: src/logic/modelRegistration.ts
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Bitte eine gültige E-Mail-Adresse angeben."
+msgstr "Bitte eine gültige E-Mail-Adresse angeben."
+
+#: src/logic/modelRegistration.ts
+msgid "Bitte eine gültige Managerperson wählen."
+msgstr "Bitte eine gültige Managerperson wählen."
+
+#: src/logic/modelRegistration.ts
+msgid "Bitte eine gültige URL angeben."
+msgstr "Bitte eine gültige URL angeben."
+
+#: src/logic/modelRegistration.ts
+msgid "Bitte eine Zahl angeben."
+msgstr "Bitte eine Zahl angeben."
+
+#: src/logic/modelRegistration.ts
+msgid "Bitte einen Altersnachweis hochladen."
+msgstr "Bitte einen Altersnachweis hochladen."
 
 #: src/ui/management/components/ProjectModal.tsx
 msgid "Bitte einen gültigen Betrag eingeben"
@@ -1083,6 +1088,15 @@ msgstr "Bitte hinterlege deine Firmendaten in den"
 msgid "Bitte lade eine gültige PDF-Datei hoch."
 msgstr "Bitte lade eine gültige PDF-Datei hoch."
 
+#: src/logic/modelRegistration.ts
+msgid "Bitte mindestens eine Option wählen."
+msgstr "Bitte mindestens eine Option wählen."
+
+#: src/ui/ModelProfileAccessView.tsx
+#: src/ui/ModelRegistrationView.tsx
+msgid "Bitte prüfe die markierten Felder."
+msgstr "Bitte prüfe die markierten Felder."
+
 #: src/ui/client/ClientCartView.tsx
 msgid "Bitte schließe die Zahlung ab."
 msgstr "Bitte schließe die Zahlung ab."
@@ -1102,6 +1116,14 @@ msgstr "Bitte überweise den Rechnungsbetrag zeitnah. Gib als Verwendungszweck d
 #: src/ui/ContractJoinView.tsx
 msgid "Bitte wähle eine Rolle"
 msgstr "Bitte wähle eine Rolle"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Bitte wählen"
+msgstr "Bitte wählen"
+
+#: src/logic/modelRegistration.ts
+msgid "Boudoir"
+msgstr "Boudoir"
 
 #: src/ui/management/components/WatermarkSettingsCard.tsx
 msgid "Brand-Logo konnte nicht geladen werden."
@@ -1126,6 +1148,10 @@ msgstr "Bundesland/Kanton"
 #: src/ui/components/Sidebar.tsx
 msgid "Büro & Dokumente"
 msgstr "Büro & Dokumente"
+
+#: src/logic/modelRegistration.ts
+msgid "Business / Corporate"
+msgstr "Business / Corporate"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
@@ -1175,6 +1201,10 @@ msgstr "Coupons"
 msgid "Culling"
 msgstr "Culling"
 
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Damit wird die letzte Bestätigung auf jetzt gesetzt. Der Fragenkatalog wird dabei nicht verändert."
+msgstr "Damit wird die letzte Bestätigung auf jetzt gesetzt. Der Fragenkatalog wird dabei nicht verändert."
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Darf maximal 999 sein"
 msgstr "Darf maximal 999 sein"
@@ -1186,6 +1216,10 @@ msgstr "Darf nicht negativ sein"
 #: src/ui/LicenseTerms.tsx
 msgid "dargestellt."
 msgstr "dargestellt."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Das Foto wird von der privaten Ablage entfernt."
+msgstr "Das Foto wird von der privaten Ablage entfernt."
 
 #: src/ui/ResetPassword.tsx
 msgid "Das Passwort muss mindestens 8 Zeichen lang sein."
@@ -1227,10 +1261,15 @@ msgstr "Datenbank Version:"
 
 #: src/ui/Impressum.tsx
 #: src/ui/LicenseTerms.tsx
+#: src/ui/ModelRegistrationView.tsx
 #: src/ui/Privacy.tsx
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Datenschutzerklärung"
 msgstr "Datenschutzerklärung"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Datenstand:"
+msgstr "Datenstand:"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Datum"
@@ -1259,10 +1298,6 @@ msgstr "Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste."
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Definiere den Basispreis und Mengenrabatt-Staffeln pro Preset. Der Brand-Standard gilt für alle Galerien ohne eigenes Preset; Galerien können im Galerie-Dialog ein anderes Preset zugewiesen bekommen."
 msgstr "Definiere den Basispreis und Mengenrabatt-Staffeln pro Preset. Der Brand-Standard gilt für alle Galerien ohne eigenes Preset; Galerien können im Galerie-Dialog ein anderes Preset zugewiesen bekommen."
-
-#: src/ui/management/components/VolumePresetSettingsCard.tsx
-#~ msgid "Definiere Mengenrabatt-Staffeln pro Preset. Der Brand-Standard gilt für alle Galerien ohne eigenes Preset; Galerien können im Galerie-Dialog ein anderes Preset zugewiesen bekommen."
-#~ msgstr "Definiere Mengenrabatt-Staffeln pro Preset. Der Brand-Standard gilt für alle Galerien ohne eigenes Preset; Galerien können im Galerie-Dialog ein anderes Preset zugewiesen bekommen."
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Definiert die Mengenrabatt-Staffeln für diese Galerie. Ohne Auswahl gilt das Standard-Preset der Brand."
@@ -1346,6 +1381,10 @@ msgstr "Delivery (Downloads)"
 msgid "Delta (Aufpreis):"
 msgstr "Delta (Aufpreis):"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Der Einladungslink wird ungültig und kann nicht mehr verwendet werden."
+msgstr "Der Einladungslink wird ungültig und kann nicht mehr verwendet werden."
+
 #: src/ui/LicenseTerms.tsx
 msgid "Der Fotograf haftet für Schäden, die durch Vorsatz oder grobe Fahrlässigkeit verursacht werden, sowie nach den zwingenden gesetzlichen Bestimmungen. Die Haftung für leichte Fahrlässigkeit ist auf die bei Vertragsabschluss vorhersehbaren und vertragstypischen Schäden beschränkt, soweit keine zwingenden gesetzlichen Haftungsbestimmungen entgegenstehen."
 msgstr "Der Fotograf haftet für Schäden, die durch Vorsatz oder grobe Fahrlässigkeit verursacht werden, sowie nach den zwingenden gesetzlichen Bestimmungen. Die Haftung für leichte Fahrlässigkeit ist auf die bei Vertragsabschluss vorhersehbaren und vertragstypischen Schäden beschränkt, soweit keine zwingenden gesetzlichen Haftungsbestimmungen entgegenstehen."
@@ -1362,6 +1401,10 @@ msgstr "Der Fotograf wurde erfolgreich benachrichtigt!"
 #: src/ui/management/components/InviteModal.tsx
 msgid "Der Gast wird direkt ohne Anmeldung durchgewunken."
 msgstr "Der Gast wird direkt ohne Anmeldung durchgewunken."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Der Link wird sofort ungültig und kann nicht mehr verwendet werden."
+msgstr "Der Link wird sofort ungültig und kann nicht mehr verwendet werden."
 
 #: src/ui/Impressum.tsx
 msgid "Der Medieninhaber übernimmt keine Haftung für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte dieser Website. Trotz sorgfältiger Kontrolle wird keine Haftung für die Inhalte externer Links übernommen. Für den Inhalt verlinkter Seiten sind ausschließlich deren Betreiber verantwortlich."
@@ -1387,6 +1430,10 @@ msgstr "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular ber
 msgid "Der Schutz Ihrer Daten ist uns wichtig. Nachfolgend informieren wir Sie über die Verarbeitung personenbezogener Daten bei der Nutzung dieses Foto-Portals."
 msgstr "Der Schutz Ihrer Daten ist uns wichtig. Nachfolgend informieren wir Sie über die Verarbeitung personenbezogener Daten bei der Nutzung dieses Foto-Portals."
 
+#: src/logic/modelRegistration.ts
+msgid "Der Text ist zu lang."
+msgstr "Der Text ist zu lang."
+
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Detaillierte Auswertungen (Bild-Bewertungen)"
 msgstr "Detaillierte Auswertungen (Bild-Bewertungen)"
@@ -1408,10 +1455,6 @@ msgstr "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar
 msgid "Die Daten werden automatisch in die Rechnung übernommen."
 msgstr "Die Daten werden automatisch in die Rechnung übernommen."
 
-#: src/ui/management/components/VolumePresetSettingsCard.tsx
-#~ msgid "Die erste Staffel muss ab 0 Bildern gelten"
-#~ msgstr "Die erste Staffel muss ab 0 Bildern gelten"
-
 #: src/ui/Impressum.tsx
 msgid "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter"
 msgstr "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter"
@@ -1428,6 +1471,10 @@ msgstr "Die Lieferung der bestellten digitalen Inhalte erfolgt ausschließlich i
 msgid "Die Passwörter stimmen nicht überein."
 msgstr "Die Passwörter stimmen nicht überein."
 
+#: src/logic/modelRegistration.ts
+msgid "Die Telefonnummer ist zu lang."
+msgstr "Die Telefonnummer ist zu lang."
+
 #: src/ui/management/ManagementGalleryView.tsx
 msgid "Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10 Sekunden."
 msgstr "Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10 Sekunden."
@@ -1443,6 +1490,10 @@ msgstr "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelt
 #: src/ui/LicenseTerms.tsx
 msgid "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
 msgstr "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Diese Einladung ist ungültig oder abgelaufen."
+msgstr "Diese Einladung ist ungültig oder abgelaufen."
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!"
@@ -1461,6 +1512,10 @@ msgstr "Dieser Bereich ist aktuell für <0>alle Fotografen</0> freigegeben. Du m
 msgid "Dieser Einladungslink ist ungültig oder abgelaufen."
 msgstr "Dieser Einladungslink ist ungültig oder abgelaufen."
 
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Dieser Profil-Link ist ungültig oder abgelaufen."
+msgstr "Dieser Profil-Link ist ungültig oder abgelaufen."
+
 #: src/ui/management/ManagementContractView.tsx
 msgid "Dieser Vertrag ist geschlossen und kann nicht mehr bearbeitet werden."
 msgstr "Dieser Vertrag ist geschlossen und kann nicht mehr bearbeitet werden."
@@ -1468,6 +1523,22 @@ msgstr "Dieser Vertrag ist geschlossen und kann nicht mehr bearbeitet werden."
 #: src/ui/ContractSignView.tsx
 msgid "Dieser Vertrag wurde nach dem Öffnen bearbeitet. Bitte laden Sie die Seite neu, um die aktuelle Version zu lesen und zu unterschreiben."
 msgstr "Dieser Vertrag wurde nach dem Öffnen bearbeitet. Bitte laden Sie die Seite neu, um die aktuelle Version zu lesen und zu unterschreiben."
+
+#: src/logic/modelRegistration.ts
+msgid "Dieses Feld ist erforderlich."
+msgstr "Dieses Feld ist erforderlich."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Dieses Profil wird unwiderruflich gelöscht – inklusive aller Fotos, des Altersnachweises und der Act-Mitgliedschaften. Ein verknüpftes Portal-Konto bleibt bestehen."
+msgstr "Dieses Profil wird unwiderruflich gelöscht – inklusive aller Fotos, des Altersnachweises und der Act-Mitgliedschaften. Ein verknüpftes Portal-Konto bleibt bestehen."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Dieses Profil wurde mit einem älteren Fragenkatalog erfasst. Beim nächsten Speichern wird es auf den aktuellen Stand migriert."
+msgstr "Dieses Profil wurde mit einem älteren Fragenkatalog erfasst. Beim nächsten Speichern wird es auf den aktuellen Stand migriert."
+
+#: src/logic/modelRegistration.ts
+msgid "Divers"
+msgstr "Divers"
 
 #: src/logic/useInvoiceDraft.ts
 msgid "Dokument wurde erstellt."
@@ -1489,6 +1560,10 @@ msgstr "Downloads"
 msgid "Downloads Gesamt"
 msgstr "Downloads Gesamt"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "DSGVO-Löschung"
+msgstr "DSGVO-Löschung"
+
 #: src/ui/client/ClientNotificationsView.tsx
 msgid "Du bist aktuell keinen speziellen Ordnern oder privaten Galerien zugewiesen."
 msgstr "Du bist aktuell keinen speziellen Ordnern oder privaten Galerien zugewiesen."
@@ -1496,10 +1571,6 @@ msgstr "Du bist aktuell keinen speziellen Ordnern oder privaten Galerien zugewie
 #: src/ui/OrgInviteView.tsx
 msgid "Du bist dabei, <0>{orgName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
 msgstr "Du bist dabei, <0>{orgName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
-
-#: src/ui/TenantInviteView.tsx
-#~ msgid "Du bist dabei, <0>{tenantName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
-#~ msgstr "Du bist dabei, <0>{tenantName}</0> beizutreten. Erstelle deinen Account, um fortzufahren."
 
 #: src/ui/OrgInviteView.tsx
 msgid "Du erhältst Zugriff auf freigeschaltete Galerien"
@@ -1521,10 +1592,11 @@ msgstr "Du hast noch keine eigenen Galerien oder Bilder."
 msgid "Du wurdest eingeladen, der Organisation <0>{orgName}</0> beizutreten."
 msgstr "Du wurdest eingeladen, der Organisation <0>{orgName}</0> beizutreten."
 
-#: src/ui/TenantInviteView.tsx
-#~ msgid "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten."
-#~ msgstr "Du wurdest eingeladen, der Organisation <0>{tenantName}</0> beizutreten."
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Durchsuche registrierte Models und filtere nach Kriterien."
+msgstr "Durchsuche registrierte Models und filtere nach Kriterien."
 
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/ManagementContractView.tsx
@@ -1543,6 +1615,10 @@ msgstr "E-Mail (wird angedruckt)"
 msgid "E-Mail Adresse"
 msgstr "E-Mail Adresse"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "E-Mail der eingeladenen Person"
+msgstr "E-Mail der eingeladenen Person"
+
 #: src/ui/management/components/ManagementGalleryActions.tsx
 msgid "E-Mail senden..."
 msgstr "E-Mail senden..."
@@ -1559,9 +1635,17 @@ msgstr "E-Mail:"
 msgid "E-Mail: [E-Mail-Adresse]"
 msgstr "E-Mail: [E-Mail-Adresse]"
 
-#: src/ui/components/ErrorMessage.tsx
-#~ msgid "Ein Fehler ist aufgetreten"
-#~ msgstr "Ein Fehler ist aufgetreten"
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Egal"
+msgstr "Egal"
+
+#: src/logic/modelRegistration.ts
+msgid "Eher ja"
+msgstr "Eher ja"
+
+#: src/logic/modelRegistration.ts
+msgid "Eher nicht"
+msgstr "Eher nicht"
 
 #: src/ui/components/ErrorMessage.tsx
 #: src/ui/components/ManagementPageShell.tsx
@@ -1576,9 +1660,25 @@ msgstr "Ein unerwarteter Fehler ist aufgetreten"
 msgid "Ein unerwarteter Serverfehler ist aufgetreten."
 msgstr "Ein unerwarteter Serverfehler ist aufgetreten."
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Eine Person"
+msgstr "Eine Person"
+
 #: src/ui/management/ManagementContractView.tsx
 msgid "Eingeladen"
 msgstr "Eingeladen"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Eingeladen von"
+msgstr "Eingeladen von"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Eingelöst"
+msgstr "Eingelöst"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Eingereicht:"
+msgstr "Eingereicht:"
 
 #: src/ui/components/Sidebar.tsx
 msgid "Einkäufe & Anfragen"
@@ -1596,25 +1696,50 @@ msgstr "Einladung erfolgreich versendet."
 msgid "Einladung erforderlich"
 msgstr "Einladung erforderlich"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Einladung erstellen"
+msgstr "Einladung erstellen"
+
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Einladung Senden"
 msgstr "Einladung Senden"
 
 #: src/ui/management/components/InviteModal.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 msgid "Einladung widerrufen?"
 msgstr "Einladung widerrufen?"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Einladung widerrufen."
+msgstr "Einladung widerrufen."
 
 #: src/ui/management/components/InviteModal.tsx
 msgid "Einladung wirklich widerrufen? Der Link funktioniert dann nicht mehr."
 msgstr "Einladung wirklich widerrufen? Der Link funktioniert dann nicht mehr."
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Einladung wurde angelegt."
+msgstr "Einladung wurde angelegt."
+
 #: src/ui/OrgInviteView.tsx
 msgid "Einladung zu Organisation"
 msgstr "Einladung zu Organisation"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Einladungen"
+msgstr "Einladungen"
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "Einladungen verwalten"
 msgstr "Einladungen verwalten"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Einladungslink"
+msgstr "Einladungslink"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Einladungslink (zum Kopieren)"
+msgstr "Einladungslink (zum Kopieren)"
 
 #: src/ui/management/components/ManagementGalleryActions.tsx
 msgid "Einladungslink..."
@@ -1646,15 +1771,28 @@ msgstr "Eintrag löschen?"
 msgid "Einträge erfolgreich aktualisiert"
 msgstr "Einträge erfolgreich aktualisiert"
 
+#: src/logic/modelRegistration.ts
+msgid "Einwilligungen"
+msgstr "Einwilligungen"
+
+#: src/logic/modelRegistration.ts
+msgid "Einzelperson"
+msgstr "Einzelperson"
+
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Empfänger:"
 msgstr "Empfänger:"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Endgültig löschen"
+msgstr "Endgültig löschen"
 
 #: src/ui/client/components/CartItemList.tsx
 #: src/ui/client/components/CouponInput.tsx
 #: src/ui/components/WysiwygEditor.tsx
 #: src/ui/management/components/GalleryAccessModal.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
+#: src/ui/ModelRegistrationView.tsx
 msgid "Entfernen"
 msgstr "Entfernen"
 
@@ -1670,10 +1808,18 @@ msgstr "Entwurf speichern"
 msgid "Erben (Aktuell:"
 msgstr "Erben (Aktuell:"
 
-#. placeholder {0}: data.notified_count
-#: src/ui/management/components/EmailComposerModal.tsx
-#~ msgid "Erfolg! {0} E-Mails versendet."
-#~ msgstr "Erfolg! {0} E-Mails versendet."
+#: src/logic/modelRegistration.ts
+msgid "Erfahren"
+msgstr "Erfahren"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Erfahrung"
+msgstr "Erfahrung"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Erfahrung (in Kategorie)"
+msgstr "Erfahrung (in Kategorie)"
 
 #: src/ui/management/components/EmailComposerModal.tsx
 msgid "Erfolg! {notifiedCount} E-Mails versendet."
@@ -1716,10 +1862,15 @@ msgstr "Erstelle ein unverbindliches Angebot für Kunden."
 msgid "Erstelle eine freie PDF-Rechnung."
 msgstr "Erstelle eine freie PDF-Rechnung."
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Erstelle einen kopierbaren Einladungslink und teile ihn z. B. per WhatsApp. Eine E-Mail ist optional."
+msgstr "Erstelle einen kopierbaren Einladungslink und teile ihn z. B. per WhatsApp. Eine E-Mail ist optional."
+
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Erstellen"
 msgstr "Erstellen"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Erstellt"
 msgstr "Erstellt"
@@ -1749,12 +1900,12 @@ msgid "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erst
 msgstr "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
 
 #: src/ui/photographer/PhotographerProductionBoard.tsx
-#~ msgid "Export"
-#~ msgstr "Export"
-
-#: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Exportiert"
 msgstr "Exportiert"
+
+#: src/logic/modelRegistration.ts
+msgid "Fashion / Editorial"
+msgstr "Fashion / Editorial"
 
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Favoriten"
@@ -1772,14 +1923,13 @@ msgstr "Fehler bei der Berechnung"
 msgid "Fehler bei der KI Generierung für ein Bild."
 msgstr "Fehler bei der KI Generierung für ein Bild."
 
-#. placeholder {0}: aiData.detected_city
-#: src/ui/management/components/AIBatchEditModal.tsx
-#~ msgid "Fehler bei der Stadt-Validierung für \"{0}\"."
-#~ msgstr "Fehler bei der Stadt-Validierung für \"{0}\"."
-
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Fehler bei der Stadt-Validierung für \"{detectedCity}\"."
 msgstr "Fehler bei der Stadt-Validierung für \"{detectedCity}\"."
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Fehler beim Absenden."
+msgstr "Fehler beim Absenden."
 
 #: src/logic/usePdfExtraction.ts
 #: src/logic/useProjectPdfDrop.ts
@@ -1794,6 +1944,10 @@ msgstr "Fehler beim Beitreten."
 msgid "Fehler beim Beitritt."
 msgstr "Fehler beim Beitritt."
 
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Fehler beim Bestätigen."
+msgstr "Fehler beim Bestätigen."
+
 #: src/ui/client/ClientCartView.tsx
 msgid "Fehler beim Checkout."
 msgstr "Fehler beim Checkout."
@@ -1802,9 +1956,21 @@ msgstr "Fehler beim Checkout."
 msgid "Fehler beim Erstellen"
 msgstr "Fehler beim Erstellen"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Fehler beim Erstellen der Einladung."
+msgstr "Fehler beim Erstellen der Einladung."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Fehler beim Erstellen des Profil-Links."
+msgstr "Fehler beim Erstellen des Profil-Links."
+
 #: src/logic/useInvoiceDraft.ts
 msgid "Fehler beim Generieren (Bitte Eingaben prüfen)."
 msgstr "Fehler beim Generieren (Bitte Eingaben prüfen)."
+
+#: src/ui/MyModelsView.tsx
+msgid "Fehler beim Laden deiner Profile."
+msgstr "Fehler beim Laden deiner Profile."
 
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Fehler beim Laden der Abrechnungen."
@@ -1831,6 +1997,10 @@ msgstr "Fehler beim Laden der Coupons."
 msgid "Fehler beim Laden der Einkäufe."
 msgstr "Fehler beim Laden der Einkäufe."
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Fehler beim Laden der Einladungen."
+msgstr "Fehler beim Laden der Einladungen."
+
 #: src/ui/SearchView.tsx
 msgid "Fehler beim Laden der Ergebnisse."
 msgstr "Fehler beim Laden der Ergebnisse."
@@ -1842,6 +2012,10 @@ msgstr "Fehler beim Laden der Gutscheincodes."
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Fehler beim Laden der Kunden."
 msgstr "Fehler beim Laden der Kunden."
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Fehler beim Laden der Models."
+msgstr "Fehler beim Laden der Models."
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Fehler beim Laden der Payouts."
@@ -1876,6 +2050,14 @@ msgstr "Fehler beim Laden."
 msgid "Fehler beim Löschen"
 msgstr "Fehler beim Löschen"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Fehler beim Löschen des Fotos."
+msgstr "Fehler beim Löschen des Fotos."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Fehler beim Löschen des Profils."
+msgstr "Fehler beim Löschen des Profils."
+
 #: src/ui/management/ManagementContractView.tsx
 msgid "Fehler beim Öffnen."
 msgstr "Fehler beim Öffnen."
@@ -1895,6 +2077,10 @@ msgstr "Fehler beim Senden der Benachrichtigung."
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "Fehler beim Senden: {mailError}"
 msgstr "Fehler beim Senden: {mailError}"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Fehler beim Setzen des Hauptbilds."
+msgstr "Fehler beim Setzen des Hauptbilds."
 
 #: src/ui/ResetPassword.tsx
 msgid "Fehler beim Setzen des Passworts. Evtl. ist der Link abgelaufen."
@@ -1937,6 +2123,7 @@ msgstr "Fehler beim Speichern einiger Einträge"
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 #: src/ui/management/ManagementContractView.tsx
+#: src/ui/ModelProfileAccessView.tsx
 #: src/ui/PhotoDetailView.tsx
 msgid "Fehler beim Speichern."
 msgstr "Fehler beim Speichern."
@@ -1949,16 +2136,17 @@ msgstr "Fehler beim Umschalten"
 msgid "Fehler beim Versenden der Einladung."
 msgstr "Fehler beim Versenden der Einladung."
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Fehler beim Widerrufen des Profil-Links."
+msgstr "Fehler beim Widerrufen des Profil-Links."
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Fehler beim Widerrufen."
+msgstr "Fehler beim Widerrufen."
+
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Fehler beim Wiederherstellen der Version."
 msgstr "Fehler beim Wiederherstellen der Version."
-
-#. placeholder {0}: err instanceof Error ? (err as Error).message : 'Unbekannter Fehler'
-#. placeholder {0}: err instanceof Error ? err.message : 'Nutzer konnte nicht angelegt werden.'
-#: src/ui/management/components/CreateUserModal.tsx
-#: src/ui/management/components/EmailComposerModal.tsx
-#~ msgid "Fehler: {0}"
-#~ msgstr "Fehler: {0}"
 
 #: src/ui/management/components/CreateUserModal.tsx
 msgid "Fehler: {createError}"
@@ -1987,6 +2175,10 @@ msgstr "Festpreis in € (Y)"
 msgid "Fett"
 msgstr "Fett"
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Filter zurücksetzen"
+msgstr "Filter zurücksetzen"
+
 #: src/ui/Impressum.tsx
 msgid "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
 msgstr "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
@@ -2004,10 +2196,6 @@ msgstr "Firma:"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Flatrate"
 msgstr "Flatrate"
-
-#: src/ui/management/ManagementPayoutsView.tsx
-#~ msgid "Flatrate-Netto (€)"
-#~ msgstr "Flatrate-Netto (€)"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Flatrate-Pools"
@@ -2035,12 +2223,22 @@ msgstr "Fortschritt"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
 #: src/ui/components/SearchBarWithSuggestions.tsx
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/ModelProfileAccessView.tsx
 msgid "Foto"
 msgstr "Foto"
 
 #: src/ui/PhotoDetailView.tsx
 msgid "Foto konnte nicht geladen werden oder keine Berechtigung."
 msgstr "Foto konnte nicht geladen werden oder keine Berechtigung."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Foto löschen?"
+msgstr "Foto löschen?"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Foto wurde gelöscht."
+msgstr "Foto wurde gelöscht."
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
@@ -2068,6 +2266,9 @@ msgstr "Fotografen-Team"
 msgid "Fotografen..."
 msgstr "Fotografen..."
 
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/ModelProfileAccessView.tsx
+#: src/ui/ModelRegistrationView.tsx
 #: src/ui/SearchView.tsx
 msgid "Fotos"
 msgstr "Fotos"
@@ -2091,6 +2292,10 @@ msgstr "Freitext..."
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "FTP Inbox"
 msgstr "FTP Inbox"
+
+#: src/logic/modelRegistration.ts
+msgid "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
+msgstr "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
 
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 msgid "Für Galerie:"
@@ -2164,10 +2369,6 @@ msgstr "Galerie-Typ"
 msgid "Galerie:"
 msgstr "Galerie:"
 
-#: src/ui/InviteView.tsx
-#~ msgid "Galerie: "
-#~ msgstr "Galerie: "
-
 #: src/ui/components/GalleryHeader.tsx
 #: src/ui/management/components/UserPermissionsModal.tsx
 #: src/ui/management/ManagementStructureView.tsx
@@ -2195,6 +2396,10 @@ msgstr "Gäste können Bilder dieses Ordners direkt ohne Wasserzeichen herunterl
 msgid "Geändert von"
 msgstr "Geändert von"
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Gehört zu diesem Act eine Person oder mehrere?"
+msgstr "Gehört zu diesem Act eine Person oder mehrere?"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Geltungsbereich"
 msgstr "Geltungsbereich"
@@ -2202,6 +2407,10 @@ msgstr "Geltungsbereich"
 #: src/ui/management/components/InviteModal.tsx
 msgid "Generieren"
 msgstr "Generieren"
+
+#: src/logic/modelRegistration.ts
+msgid "Gerne"
+msgstr "Gerne"
 
 #: src/ui/ContractSignView.tsx
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
@@ -2217,11 +2426,6 @@ msgstr "Gesamt (Auszahlung)"
 msgid "Gesamtbetrag"
 msgstr "Gesamtbetrag"
 
-#. placeholder {0}: total.toFixed(2)
-#: src/ui/management/components/invoice/InvoiceTotalSummary.tsx
-#~ msgid "Gesamtbetrag: {0} €"
-#~ msgstr "Gesamtbetrag: {0} €"
-
 #: src/ui/management/components/invoice/InvoiceTotalSummary.tsx
 msgid "Gesamtbetrag: {totalFormatted} €"
 msgstr "Gesamtbetrag: {totalFormatted} €"
@@ -2229,6 +2433,11 @@ msgstr "Gesamtbetrag: {totalFormatted} €"
 #: src/ui/client/components/CartItemList.tsx
 msgid "Gesamtsumme"
 msgstr "Gesamtsumme"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Geschlecht"
+msgstr "Geschlecht"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Geschlossen"
@@ -2255,6 +2464,10 @@ msgstr "Globaler Kontext (Für alle Bilder)"
 msgid "Grundhonorar durch Flatrate gedeckt"
 msgstr "Grundhonorar durch Flatrate gedeckt"
 
+#: src/logic/modelRegistration.ts
+msgid "Gruppe"
+msgstr "Gruppe"
+
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Gruppen"
 msgstr "Gruppen"
@@ -2263,11 +2476,6 @@ msgstr "Gruppen"
 #: src/ui/management/ManagementContractView.tsx
 msgid "Gültig bis"
 msgstr "Gültig bis"
-
-#. placeholder {0}: formatLocaleDate(d)
-#: src/logic/useInvoiceDraft.ts
-#~ msgid "Gültig bis {0}"
-#~ msgstr "Gültig bis {0}"
 
 #: src/logic/useInvoiceDraft.ts
 msgid "Gültig bis {validUntil}"
@@ -2302,10 +2510,6 @@ msgstr "Gutscheincode gelöscht"
 msgid "Gutscheincode löschen?"
 msgstr "Gutscheincode löschen?"
 
-#: src/ui/management/ManagementCouponsView.tsx
-#~ msgid "Gutscheincodes erfordern Volume-Licensing als Preisstrategie."
-#~ msgstr "Gutscheincodes erfordern Volume-Licensing als Preisstrategie."
-
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Gutscheincodes können eingelöst werden"
 msgstr "Gutscheincodes können eingelöst werden"
@@ -2313,10 +2517,6 @@ msgstr "Gutscheincodes können eingelöst werden"
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Gutscheincodes sind deaktiviert"
 msgstr "Gutscheincodes sind deaktiviert"
-
-#: src/ui/management/ManagementCouponsView.tsx
-#~ msgid "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
-#~ msgstr "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
 
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Gutschrift erstellt (Bitte Rechnung legen)"
@@ -2331,12 +2531,18 @@ msgid "Hallo <0>{inviteName}</0>, bitte gib das Galerie-Passwort ein."
 msgstr "Hallo <0>{inviteName}</0>, bitte gib das Galerie-Passwort ein."
 
 #: src/ui/management/ManagementOrdersView.tsx
-#~ msgid "Hallo, hier ist mein Angebot für Ihre speziellen Rechte..."
-#~ msgstr "Hallo, hier ist mein Angebot für Ihre speziellen Rechte..."
-
-#: src/ui/management/ManagementOrdersView.tsx
 msgid "Hallo, hier ist mein Angebot..."
 msgstr "Hallo, hier ist mein Angebot..."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/ModelProfileAccessView.tsx
+#: src/ui/ModelRegistrationView.tsx
+msgid "Hauptbild"
+msgstr "Hauptbild"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Hauptbild wurde aktualisiert."
+msgstr "Hauptbild wurde aktualisiert."
 
 #: src/ui/management/ManagementStructureView.tsx
 msgid "Hauptverzeichnis (Ohne Ordner)"
@@ -2369,6 +2575,10 @@ msgstr "Historie"
 msgid "Historie konnte nicht geladen werden."
 msgstr "Historie konnte nicht geladen werden."
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Hochgeladen am"
+msgstr "Hochgeladen am"
+
 #: src/ui/client/ClientCartView.tsx
 msgid "Ich akzeptiere die <0>Allgemeinen Geschäftsbedingungen und Lizenzvereinbarungen</0>."
 msgstr "Ich akzeptiere die <0>Allgemeinen Geschäftsbedingungen und Lizenzvereinbarungen</0>."
@@ -2387,10 +2597,6 @@ msgstr "Ich habe den Vertrag gelesen und stimme allen Bedingungen verbindlich zu
 msgid "Ich habe die <0>Datenschutzerklärung</0> gelesen und akzeptiert."
 msgstr "Ich habe die <0>Datenschutzerklärung</0> gelesen und akzeptiert."
 
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt."
-#~ msgstr "Ich stimme der sofortigen Ausführung des Vertrages zu und verzichte auf mein Widerrufsrecht, da es sich um digitale Güter handelt."
-
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Ignoriert"
 msgstr "Ignoriert"
@@ -2404,11 +2610,6 @@ msgstr "Im Frontend verstecken"
 msgid "Im Warenkorb"
 msgstr "Im Warenkorb"
 
-#. placeholder {0}: data.processed
-#: src/ui/management/ManagementFtpInbox.tsx
-#~ msgid "Import abgeschlossen. {0} Bilder wurden verschoben."
-#~ msgstr "Import abgeschlossen. {0} Bilder wurden verschoben."
-
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Import abgeschlossen. {processedCount} Bilder wurden verschoben."
 msgstr "Import abgeschlossen. {processedCount} Bilder wurden verschoben."
@@ -2419,6 +2620,7 @@ msgstr "Importiert"
 
 #: src/ui/Impressum.tsx
 #: src/ui/LicenseTerms.tsx
+#: src/ui/ModelRegistrationView.tsx
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Impressum"
 msgstr "Impressum"
@@ -2454,11 +2656,17 @@ msgstr "In Prüfung"
 msgid "In welchem Ordner soll die Galerie liegen?"
 msgstr "In welchem Ordner soll die Galerie liegen?"
 
+#: src/logic/modelRegistration.ts
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/ManagementCouponsView.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Inaktiv"
 msgstr "Inaktiv"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Inaktive Profile sind über den Status-Filter „Inaktiv\" oder „Alle\" für die DSGVO-Löschung findbar."
+msgstr "Inaktive Profile sind über den Status-Filter „Inaktiv\" oder „Alle\" für die DSGVO-Löschung findbar."
 
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Individueller Text..."
@@ -2485,6 +2693,12 @@ msgstr "Inklusive"
 msgid "Instanzen"
 msgstr "Instanzen"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/ModelProfileAccessView.tsx
+#: src/ui/ModelRegistrationView.tsx
+msgid "Intern"
+msgstr "Intern"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "IPTC Metadaten"
 msgstr "IPTC Metadaten"
@@ -2493,6 +2707,7 @@ msgstr "IPTC Metadaten"
 msgid "ISO"
 msgstr "ISO"
 
+#: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #: src/ui/management/components/UserTable.tsx
 msgid "Ja"
@@ -2501,6 +2716,12 @@ msgstr "Ja"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Jahr"
 msgstr "Jahr"
+
+#: src/ui/management/ManagementModelsView.tsx
+#: src/ui/ModelProfileAccessView.tsx
+#: src/ui/ModelRegistrationView.tsx
+msgid "Jahre"
+msgstr "Jahre"
 
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Jeder Account benötigt eine Brand-Zuweisung (U-02)."
@@ -2550,9 +2771,26 @@ msgstr "Katalog löschen?"
 msgid "Katalog-Eintrag bearbeiten"
 msgstr "Katalog-Eintrag bearbeiten"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Kategorie"
+msgstr "Kategorie"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Kategorien"
+msgstr "Kategorien"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Kategorien (beliebige)"
+msgstr "Kategorien (beliebige)"
+
 #: src/ui/client/ClientCartView.tsx
 msgid "Kauf auf Rechnung"
 msgstr "Kauf auf Rechnung"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Kein aktiver Profil-Link."
+msgstr "Kein aktiver Profil-Link."
 
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Kein Katalog"
@@ -2563,6 +2801,7 @@ msgstr "Kein Katalog"
 msgid "Kein Zugriff auf dieses Board."
 msgstr "Kein Zugriff auf dieses Board."
 
+#: src/logic/modelRegistration.ts
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Keine"
@@ -2571,6 +2810,10 @@ msgstr "Keine"
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Keine Angabe"
 msgstr "Keine Angabe"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Keine Antworten gespeichert."
+msgstr "Keine Antworten gespeichert."
 
 #: src/ui/management/ManagementOrgsView.tsx
 msgid "Keine Auto-Join Domain"
@@ -2629,6 +2872,10 @@ msgstr "Keine Empfänger mit Opt-In vorhanden"
 msgid "Keine Flatrate (0.00x)"
 msgstr "Keine Flatrate (0.00x)"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Keine Fotos hinterlegt."
+msgstr "Keine Fotos hinterlegt."
+
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Keine generelle Nachricht"
 msgstr "Keine generelle Nachricht"
@@ -2648,6 +2895,10 @@ msgstr "keine IP-Adressen"
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Keine Kunden gefunden."
 msgstr "Keine Kunden gefunden."
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Keine Models gefunden."
+msgstr "Keine Models gefunden."
 
 #: src/ui/management/components/UserTable.tsx
 msgid "Keine Nutzer gefunden, die \"{searchTerm}\" entsprechen."
@@ -2782,6 +3033,8 @@ msgstr "Kommerziell:"
 msgid "Konkret bedeutet dies für Bestellungen in diesem Portal: Wenn Sie beim Kauf Ihrer Fotos der sofortigen Ausführung des Vertrages zustimmen (sofortiger Download unmittelbar nach Zahlungsabschluss) und dies ausdrücklich per Checkbox bestätigen, haben Sie zur Kenntnis genommen, dass Ihr Rücktritts- bzw. Widerrufsrecht mit Beginn des Downloads vorzeitig erlischt."
 msgstr "Konkret bedeutet dies für Bestellungen in diesem Portal: Wenn Sie beim Kauf Ihrer Fotos der sofortigen Ausführung des Vertrages zustimmen (sofortiger Download unmittelbar nach Zahlungsabschluss) und dies ausdrücklich per Checkbox bestätigen, haben Sie zur Kenntnis genommen, dass Ihr Rücktritts- bzw. Widerrufsrecht mit Beginn des Downloads vorzeitig erlischt."
 
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Konnte Link nicht kopieren."
 msgstr "Konnte Link nicht kopieren."
@@ -2795,6 +3048,8 @@ msgid "Konto einrichten"
 msgstr "Konto einrichten"
 
 #: src/ui/management/components/InviteModal.tsx
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Kopieren"
 msgstr "Kopieren"
@@ -2906,6 +3161,7 @@ msgstr "Lädt..."
 #: src/ui/components/IptcMetadataEditor.tsx
 #: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementContractView.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Land"
 msgstr "Land"
 
@@ -2925,9 +3181,14 @@ msgstr "Laravel"
 msgid "Laravel Update:"
 msgstr "Laravel Update:"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Läuft ab"
 msgstr "Läuft ab"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Läuft ab:"
+msgstr "Läuft ab:"
 
 #: src/ui/components/KanbanBoard.tsx
 msgid "Leer"
@@ -2971,22 +3232,30 @@ msgstr "Leistungsdatum / Zeitraum"
 msgid "Letzte Aktivitäten"
 msgstr "Letzte Aktivitäten"
 
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Letzte Bestätigung"
+msgstr "Letzte Bestätigung"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/MyModelsView.tsx
+msgid "Letzte Bestätigung:"
+msgstr "Letzte Bestätigung:"
+
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Lightroom-Katalog"
 msgstr "Lightroom-Katalog"
-
-#: src/ui/management/components/LightroomCatalogSettings.tsx
-#~ msgid "Lightroom-Kataloge"
-#~ msgstr "Lightroom-Kataloge"
 
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Link einfügen"
 msgstr "Link einfügen"
 
 #: src/ui/management/components/InviteModal.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 msgid "Link kopieren"
 msgstr "Link kopieren"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Link wurde kopiert."
 msgstr "Link wurde kopiert."
@@ -3029,10 +3298,6 @@ msgid "Login"
 msgstr "Login"
 
 #: src/logic/useAuth.ts
-#~ msgid "Login fehlgeschlagen"
-#~ msgstr "Login fehlgeschlagen"
-
-#: src/logic/useAuth.ts
 #: src/ui/components/SidebarLoginForm.tsx
 msgid "Login fehlgeschlagen."
 msgstr "Login fehlgeschlagen."
@@ -3049,6 +3314,7 @@ msgstr "Lokal:"
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
+#: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
@@ -3070,6 +3336,23 @@ msgstr "Löschen fehlgeschlagen"
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Löschen nicht möglich (bereits verwendet)"
 msgstr "Löschen nicht möglich (bereits verwendet)"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Löscht das Profil dauerhaft – inklusive aller Fotos, des Altersnachweises und der Act-Mitgliedschaften. Diese Aktion kann nicht rückgängig gemacht werden."
+msgstr "Löscht das Profil dauerhaft – inklusive aller Fotos, des Altersnachweises und der Act-Mitgliedschaften. Diese Aktion kann nicht rückgängig gemacht werden."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Lust"
+msgstr "Lust"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Managerperson"
+msgstr "Managerperson"
+
+#: src/logic/modelRegistration.ts
+msgid "Männlich"
+msgstr "Männlich"
 
 #: src/ui/components/Sidebar.tsx
 #: src/ui/management/components/invoice/InvoiceDragDropZone.tsx
@@ -3102,9 +3385,13 @@ msgstr "Max. globale Verwendungen"
 msgid "Max. Verwendungen pro Account"
 msgstr "Max. Verwendungen pro Account"
 
-#: src/ui/management/components/CalculatorSettingsCard.tsx
-#~ msgid "Maximal 100%"
-#~ msgstr "Maximal 100%"
+#: src/logic/modelRegistration.ts
+msgid "Maximal 5 Fotos pro Person."
+msgstr "Maximal 5 Fotos pro Person."
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Maximal 5 Fotos pro Person. Standardmäßig intern; nur öffentliche Fotos können als Hauptbild dienen."
+msgstr "Maximal 5 Fotos pro Person. Standardmäßig intern; nur öffentliche Fotos können als Hauptbild dienen."
 
 #: src/ui/management/components/CalculatorSettingsCard.tsx
 msgid "Maximal 900%"
@@ -3122,12 +3409,20 @@ msgstr "Medien"
 msgid "Medieninhaber & Herausgeber"
 msgstr "Medieninhaber & Herausgeber"
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Mehr erfahren"
+msgstr "Mehr erfahren"
+
 #: src/ui/client/DeliveryView.tsx
 #: src/ui/client/SelectionView.tsx
 #: src/ui/management/ManagementGalleryView.tsx
 #: src/ui/management/ManagementMetaGalleryView.tsx
 msgid "Mehr laden"
 msgstr "Mehr laden"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Mehrere Personen"
+msgstr "Mehrere Personen"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Mehrere Rollen pro Unterzeichner erlauben"
@@ -3140,6 +3435,10 @@ msgstr "Mehrere Unterzeichner auf einem Vertrag"
 #: src/ui/ContractJoinView.tsx
 msgid "Mehrfachauswahl möglich"
 msgstr "Mehrfachauswahl möglich"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Mein Model-Profil"
+msgstr "Mein Model-Profil"
 
 #: src/ui/components/Sidebar.tsx
 #: src/ui/UserProfileView.tsx
@@ -3158,6 +3457,15 @@ msgstr "Meine Abrechnungen"
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Meine Einkäufe & Lizenzen"
 msgstr "Meine Einkäufe & Lizenzen"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Meine Fotos"
+msgstr "Meine Fotos"
+
+#: src/ui/components/Sidebar.tsx
+#: src/ui/MyModelsView.tsx
+msgid "Meine Profile"
+msgstr "Meine Profile"
 
 #: src/ui/ContractSignView.tsx
 #: src/ui/management/components/invoice/InvoiceItemsTable.tsx
@@ -3220,10 +3528,6 @@ msgstr "Metadaten-Vorgaben gespeichert"
 msgid "Mindestens 1 Bild"
 msgstr "Mindestens 1 Bild"
 
-#: src/ui/management/components/CalculatorSettingsCard.tsx
-#~ msgid "Mindestens 10%"
-#~ msgstr "Mindestens 10%"
-
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Mindestens 2 Zeichen"
 msgstr "Mindestens 2 Zeichen"
@@ -3235,6 +3539,10 @@ msgstr "Mindestens 3 Zeichen"
 #: src/ui/OrgInviteView.tsx
 msgid "Mindestens 8 Zeichen"
 msgstr "Mindestens 8 Zeichen"
+
+#: src/logic/modelRegistration.ts
+msgid "Mindestens eine Person muss erfasst werden."
+msgstr "Mindestens eine Person muss erfasst werden."
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Mindestens eine Preisstaffel erforderlich"
@@ -3252,6 +3560,10 @@ msgstr "Mit dem Erwerb einer Lizenz erhält der Kunde das einfache, nicht übert
 msgid "Mit der Bestätigung der Checkbox „Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download)“ erteilt der Kunde diese ausdrückliche Zustimmung. Ab dem Zeitpunkt der Freischaltung des Downloads gilt das Rücktrittsrecht als erloschen."
 msgstr "Mit der Bestätigung der Checkbox „Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download)“ erteilt der Kunde diese ausdrückliche Zustimmung. Ab dem Zeitpunkt der Freischaltung des Downloads gilt das Rücktrittsrecht als erloschen."
 
+#: src/logic/modelRegistration.ts
+msgid "Mittel"
+msgstr "Mittel"
+
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Mobiles Blitz-Setup"
 msgstr "Mobiles Blitz-Setup"
@@ -3268,30 +3580,14 @@ msgstr "Möchtest du deine Auswahl wirklich abschließen? Der Fotograf wird bena
 msgid "Möchtest du den Auftrag \"{title}\" wirklich löschen?"
 msgstr "Möchtest du den Auftrag \"{title}\" wirklich löschen?"
 
-#. placeholder {0}: coupon.code
-#: src/ui/management/components/GalleryCouponsTab.tsx
-#: src/ui/management/components/GalleryGroupCouponsTab.tsx
-#~ msgid "Möchtest du den Coupon \"{0}\" wirklich entfernen?"
-#~ msgstr "Möchtest du den Coupon \"{0}\" wirklich entfernen?"
-
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 msgid "Möchtest du den Coupon \"{couponCode}\" wirklich entfernen?"
 msgstr "Möchtest du den Coupon \"{couponCode}\" wirklich entfernen?"
 
-#. placeholder {0}: coupon.code
-#: src/ui/management/ManagementCouponsView.tsx
-#~ msgid "Möchtest du den Gutscheincode \"{0}\" wirklich entfernen?"
-#~ msgstr "Möchtest du den Gutscheincode \"{0}\" wirklich entfernen?"
-
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Möchtest du den Gutscheincode \"{couponCode}\" wirklich entfernen?"
 msgstr "Möchtest du den Gutscheincode \"{couponCode}\" wirklich entfernen?"
-
-#. placeholder {0}: formatMoney(cents)
-#: src/ui/management/ManagementPayoutsView.tsx
-#~ msgid "Möchtest du den Pool für {month}/{year} wirklich mit {0} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
-#~ msgstr "Möchtest du den Pool für {month}/{year} wirklich mit {0} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Möchtest du den Pool für {month}/{year} wirklich mit {formattedPayout} berechnen? Bestehende (nicht ausbezahlte) Statements für dieses Monat werden überschrieben."
@@ -3324,6 +3620,23 @@ msgstr "Möchtest du diesen Kunden wirklich aus dem CRM entfernen?"
 #: src/ui/PhotoDetailView.tsx
 msgid "Möchtest du dieses Bild wirklich endgültig löschen?"
 msgstr "Möchtest du dieses Bild wirklich endgültig löschen?"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Model"
+msgstr "Model"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Model-Registrierung"
+msgstr "Model-Registrierung"
+
+#: src/ui/components/Sidebar.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Models"
+msgstr "Models"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Models für Kategorie"
+msgstr "Models für Kategorie"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Monat"
@@ -3366,6 +3679,14 @@ msgstr "Nach dem Start kann der Vertrag nicht mehr bearbeitet werden. Der generi
 msgid "Nach dem Start kann die Vorlage über den Join-Link von mehreren Personen signiert werden. Jeder Unterzeichner erhält eine eigene Vertragsinstanz. Fortfahren?"
 msgstr "Nach dem Start kann die Vorlage über den Join-Link von mehreren Personen signiert werden. Jeder Unterzeichner erhält eine eigene Vertragsinstanz. Fortfahren?"
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Nach oben"
+msgstr "Nach oben"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Nach unten"
+msgstr "Nach unten"
+
 #: src/ui/management/components/EmailComposerModal.tsx
 msgid "Nachricht"
 msgstr "Nachricht"
@@ -3381,6 +3702,10 @@ msgstr "Nachricht an Kunden senden"
 #: src/ui/management/components/EmailComposerModal.tsx
 msgid "Nachricht Senden"
 msgstr "Nachricht Senden"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Nachweis öffnen"
+msgstr "Nachweis öffnen"
 
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
@@ -3406,6 +3731,14 @@ msgstr "Name / Ansprechpartner"
 msgid "Name / Firma"
 msgstr "Name / Firma"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Name / Notiz"
+msgstr "Name / Notiz"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Name / Notiz darf höchstens 255 Zeichen lang sein."
+msgstr "Name / Notiz darf höchstens 255 Zeichen lang sein."
+
 #: src/ui/components/GalleryModal.tsx
 msgid "Name der Galerie"
 msgstr "Name der Galerie"
@@ -3425,18 +3758,24 @@ msgstr "Name ist erforderlich"
 msgid "Name oder Ansprechpartner ist erforderlich"
 msgstr "Name oder Ansprechpartner ist erforderlich"
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Name, E-Mail oder Ort"
+msgstr "Name, E-Mail oder Ort"
+
 #: src/ui/ContractSignView.tsx
 msgid "Name:"
 msgstr "Name:"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "name@beispiel.de"
+msgstr "name@beispiel.de"
+
+#: src/logic/modelRegistration.ts
+#: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #: src/ui/management/components/UserTable.tsx
 msgid "Nein"
 msgstr "Nein"
-
-#: src/ui/management/ManagementPayoutsView.tsx
-#~ msgid "Netto-Topf:"
-#~ msgstr "Netto-Topf:"
 
 #: src/ui/management/components/InviteModal.tsx
 msgid "Netzwerkfehler"
@@ -3449,6 +3788,10 @@ msgstr "Netzwerkfehler: Rabattcode konnte nicht geprüft werden."
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Neu"
 msgstr "Neu"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Neue Einladung"
+msgstr "Neue Einladung"
 
 #: src/ui/components/GalleryModal.tsx
 #: src/ui/management/ManagementStructureView.tsx
@@ -3559,29 +3902,17 @@ msgstr "Neues Volume-Preset"
 msgid "Neueste Entdeckungen"
 msgstr "Neueste Entdeckungen"
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Neueste zuerst"
+msgstr "Neueste zuerst"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Nicht erforderlich"
+msgstr "Nicht erforderlich"
+
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Nicht verfügbar"
 msgstr "Nicht verfügbar"
-
-#. placeholder {0}: volumeLicensing.nextTierCount
-#. placeholder {1}: volumeLicensing.nextTierCount === 1 ? '' : 'er'
-#. placeholder {2}: volumeLicensing.nextTierLabel
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "Noch {0} {1} bis {2}"
-#~ msgstr "Noch {0} {1} bis {2}"
-
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "Noch {nextCount} {nextPlural} bis {nextLabel}"
-#~ msgstr "Noch {nextCount} {nextPlural} bis {nextLabel}"
-
-#. placeholder {0}: nextTierCount === 1 ? '' : 'er'
-#: src/ui/client/components/VolumeLicensingCard.tsx
-#~ msgid "Noch {nextTierCount} Bild{0} bis zum nächsten Rabatt:"
-#~ msgstr "Noch {nextTierCount} Bild{0} bis zum nächsten Rabatt:"
-
-#: src/ui/client/components/VolumeLicensingCard.tsx
-#~ msgid "Noch {nextTierCount} Bild{nextTierPlural} bis zum nächsten Rabatt:"
-#~ msgstr "Noch {nextTierCount} Bild{nextTierPlural} bis zum nächsten Rabatt:"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Noch keine Bestellungen im System."
@@ -3608,6 +3939,10 @@ msgstr "Noch keine Downloads aufgezeichnet."
 msgid "Noch keine Einladungen"
 msgstr "Noch keine Einladungen"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Noch keine Einladungen angelegt."
+msgstr "Noch keine Einladungen angelegt."
+
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
 msgid "Noch keine Lightroom-Kataloge angelegt."
 msgstr "Noch keine Lightroom-Kataloge angelegt."
@@ -3619,6 +3954,10 @@ msgstr "Noch keine Pools berechnet."
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Noch keine Presets angelegt."
 msgstr "Noch keine Presets angelegt."
+
+#: src/ui/MyModelsView.tsx
+msgid "Noch keine Profile verknüpft."
+msgstr "Noch keine Profile verknüpft."
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Noch keine Verträge vorhanden."
@@ -3642,6 +3981,11 @@ msgstr "Nur für redaktionelle Nutzung (Shop)"
 #: src/ui/management/components/TextSnippetModal.tsx
 msgid "Nur Kleinbuchstaben, Zahlen, - und _"
 msgstr "Nur Kleinbuchstaben, Zahlen, - und _"
+
+#: src/logic/modelRegistration.ts
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Nur öffentliche Fotos können als Hauptbild dienen."
+msgstr "Nur öffentliche Fotos können als Hauptbild dienen."
 
 #: src/ui/management/components/CreateUserModal.tsx
 msgid "Nutzer angelegt! Eine E-Mail zur Einrichtung wurde verschickt."
@@ -3675,10 +4019,6 @@ msgstr "Nutzerrechte gespeichert."
 msgid "Nutzungsrechte"
 msgstr "Nutzungsrechte"
 
-#: src/ui/management/ManagementOrdersView.tsx
-#~ msgid "Nutzungsrechte (optional)"
-#~ msgstr "Nutzungsrechte (optional)"
-
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Ø Sterne"
 msgstr "Ø Sterne"
@@ -3691,6 +4031,7 @@ msgstr "Oberste Ebene (Root)"
 msgid "oder auf den Button klicken, um Dateien auszuwählen"
 msgstr "oder auf den Button klicken, um Dateien auszuwählen"
 
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
@@ -3709,6 +4050,12 @@ msgstr "Offen / Rechnung"
 msgid "Offene Lieferscheine"
 msgstr "Offene Lieferscheine"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/ModelProfileAccessView.tsx
+#: src/ui/ModelRegistrationView.tsx
+msgid "Öffentlich"
+msgstr "Öffentlich"
+
 #: src/ui/components/GalleryModal.tsx
 msgid "Öffentlich (Für alle sichtbar)"
 msgstr "Öffentlich (Für alle sichtbar)"
@@ -3722,6 +4069,7 @@ msgid "Öffentliche Entdeckungen"
 msgstr "Öffentliche Entdeckungen"
 
 #: src/ui/client/ClientDashboard.tsx
+#: src/ui/management/components/ModelDetailModal.tsx
 msgid "Öffnen"
 msgstr "Öffnen"
 
@@ -3822,7 +4170,9 @@ msgstr "Original Master-File (4.00x)"
 
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/components/IptcMetadataEditor.tsx
+#: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/ManagementCustomersView.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Ort"
 msgstr "Ort"
 
@@ -3846,6 +4196,14 @@ msgstr "Österreich"
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Outdoor (Natur)"
 msgstr "Outdoor (Natur)"
+
+#: src/logic/modelRegistration.ts
+msgid "Paar"
+msgstr "Paar"
+
+#: src/logic/modelRegistration.ts
+msgid "Paar / Familie"
+msgstr "Paar / Familie"
 
 #: src/ui/management/components/ProjectModal.tsx
 msgid "Paket"
@@ -3884,10 +4242,6 @@ msgstr "Passwort speichern & Anmelden"
 msgid "Pauschalpreis"
 msgstr "Pauschalpreis"
 
-#: src/ui/management/ManagementOrdersView.tsx
-#~ msgid "Pauschalpreis (Netto in €)"
-#~ msgstr "Pauschalpreis (Netto in €)"
-
 #: src/ui/components/Sidebar.tsx
 msgid "Payouts & Abrechnung"
 msgstr "Payouts & Abrechnung"
@@ -3896,9 +4250,25 @@ msgstr "Payouts & Abrechnung"
 msgid "PDF Generieren"
 msgstr "PDF Generieren"
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Person"
+msgstr "Person"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Person(en) erfasst"
+msgstr "Person(en) erfasst"
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "Persönlicher Link (Einzelperson)"
 msgstr "Persönlicher Link (Einzelperson)"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Pflicht, solange noch kein Ausweis hinterlegt ist. JPG, PNG, WebP oder PDF, max. 10 MB."
+msgstr "Pflicht, solange noch kein Ausweis hinterlegt ist. JPG, PNG, WebP oder PDF, max. 10 MB."
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Pflichtfelder sind mit * markiert. Der Altersnachweis wird ausschließlich verschlüsselt auf einem privaten Speicher abgelegt."
+msgstr "Pflichtfelder sind mit * markiert. Der Altersnachweis wird ausschließlich verschlüsselt auf einem privaten Speicher abgelegt."
 
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "PHP"
@@ -3931,6 +4301,11 @@ msgstr "Pool:"
 msgid "Portal (reisinger.pictures)"
 msgstr "Portal (reisinger.pictures)"
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Portal-Konto für diese Person anlegen"
+msgstr "Portal-Konto für diese Person anlegen"
+
+#: src/logic/modelRegistration.ts
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Portrait"
 msgstr "Portrait"
@@ -3962,16 +4337,8 @@ msgid "Preise & Lizenzen"
 msgstr "Preise & Lizenzen"
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
-#~ msgid "Preisstaffeln (retroaktiv)"
-#~ msgstr "Preisstaffeln (retroaktiv)"
-
-#: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preisstruktur (retroaktiv)"
 msgstr "Preisstruktur (retroaktiv)"
-
-#: src/ui/management/components/ShootingCalculatorModal.tsx
-#~ msgid "Premium Tarif"
-#~ msgstr "Premium Tarif"
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preset bearbeiten"
@@ -4001,11 +4368,6 @@ msgstr "Print (bis A4)"
 msgid "Print bis 4000px (2.00x)"
 msgstr "Print bis 4000px (2.00x)"
 
-#: src/ui/photographer/components/PhotoJobModal.tsx
-#: src/ui/photographer/PhotographerProductionBoard.tsx
-#~ msgid "Privat"
-#~ msgstr "Privat"
-
 #: src/ui/components/GalleryModal.tsx
 msgid "Privat (Nur mit Link / Passwort)"
 msgstr "Privat (Nur mit Link / Passwort)"
@@ -4034,13 +4396,78 @@ msgstr "Produkte & Rabatte"
 msgid "Professionelle Fotografie, Bildbearbeitung sowie der Vertrieb und die Lizenzierung von fotografischen Werken über dieses Online-Portal."
 msgstr "Professionelle Fotografie, Bildbearbeitung sowie der Vertrieb und die Lizenzierung von fotografischen Werken über dieses Online-Portal."
 
+#: src/logic/modelRegistration.ts
+msgid "Profi"
+msgstr "Profi"
+
 #: src/ui/management/components/ProfileSettingsCard.tsx
 msgid "Profil & Standardwerte"
 msgstr "Profil & Standardwerte"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Profil aktualisieren"
+msgstr "Profil aktualisieren"
+
 #: src/ui/management/components/ProfileSettingsCard.tsx
 msgid "Profil aktualisiert"
 msgstr "Profil aktualisiert"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Profil bestätigen"
+msgstr "Profil bestätigen"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Profil bestätigen?"
+msgstr "Profil bestätigen?"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil endgültig löschen?"
+msgstr "Profil endgültig löschen?"
+
+#: src/ui/MyModelsView.tsx
+msgid "Profil kann auf den aktuellen Katalog aktualisiert werden."
+msgstr "Profil kann auf den aktuellen Katalog aktualisiert werden."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil löschen"
+msgstr "Profil löschen"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Profil wurde bestätigt."
+msgstr "Profil wurde bestätigt."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil wurde gelöscht."
+msgstr "Profil wurde gelöscht."
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Profil wurde gespeichert."
+msgstr "Profil wurde gespeichert."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil-Angaben"
+msgstr "Profil-Angaben"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil-Link erstellen"
+msgstr "Profil-Link erstellen"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil-Link widerrufen?"
+msgstr "Profil-Link widerrufen?"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil-Link wurde erstellt."
+msgstr "Profil-Link wurde erstellt."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil-Link wurde widerrufen."
+msgstr "Profil-Link wurde widerrufen."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Profil-Zugang"
+msgstr "Profil-Zugang"
 
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Projekt aktualisiert"
@@ -4159,6 +4586,18 @@ msgstr "Redaktionell (x1)"
 msgid "Redaktionell:"
 msgstr "Redaktionell:"
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Registrierung abgeschlossen. Dein Einladungslink ist damit verbraucht."
+msgstr "Registrierung abgeschlossen. Dein Einladungslink ist damit verbraucht."
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Registrierung absenden"
+msgstr "Registrierung absenden"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Registrierung erfolgreich"
+msgstr "Registrierung erfolgreich"
+
 #: src/logic/useAuth.ts
 msgid "Registrierung fehlgeschlagen"
 msgstr "Registrierung fehlgeschlagen"
@@ -4193,12 +4632,6 @@ msgstr "Rollover:"
 msgid "Sammelansicht aller Fotos. Uploads sind nur in den Untergalerien möglich."
 msgstr "Sammelansicht aller Fotos. Uploads sind nur in den Untergalerien möglich."
 
-#. placeholder {0}: res.invoice_number
-#. placeholder {1}: res.processed_orders
-#: src/ui/management/ManagementTenantDetailView.tsx
-#~ msgid "Sammelrechnung {0} mit {1} Positionen erfolgreich erstellt."
-#~ msgstr "Sammelrechnung {0} mit {1} Positionen erfolgreich erstellt."
-
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Sammelrechnung {invoiceNumber} mit {processedOrders} Positionen erfolgreich erstellt."
 msgstr "Sammelrechnung {invoiceNumber} mit {processedOrders} Positionen erfolgreich erstellt."
@@ -4225,6 +4658,8 @@ msgstr "Schliessen"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/InviteModal.tsx
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Schließen"
 msgstr "Schließen"
@@ -4236,6 +4671,10 @@ msgstr "Scope"
 #: src/ui/components/GalleryModal.tsx
 msgid "Scope-Lizenzierung"
 msgstr "Scope-Lizenzierung"
+
+#: src/logic/modelRegistration.ts
+msgid "Sehr gerne"
+msgstr "Sehr gerne"
 
 #: src/ui/components/Pagination.tsx
 msgid "Seite {page} von {lastPage}"
@@ -4277,19 +4716,13 @@ msgstr "Shares / Info"
 msgid "Shares gesamt:"
 msgstr "Shares gesamt:"
 
-#: src/ui/photographer/PhotographerProductionBoard.tsx
-#~ msgid "Shooting"
-#~ msgstr "Shooting"
-
-#: src/ui/management/components/ShootingCalculatorModal.tsx
-#~ msgid "Shooting-Paket Kalkulator"
-#~ msgstr "Shooting-Paket Kalkulator"
-
 #: src/ui/components/Sidebar.tsx
 msgid "Shop-Bestellungen"
 msgstr "Shop-Bestellungen"
 
 #: src/ui/components/GalleryModal.tsx
+#: src/ui/ModelProfileAccessView.tsx
+#: src/ui/ModelRegistrationView.tsx
 msgid "Sichtbarkeit"
 msgstr "Sichtbarkeit"
 
@@ -4324,6 +4757,14 @@ msgstr "Sofort Download"
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Sonderanfrage (Angebot)"
 msgstr "Sonderanfrage (Angebot)"
+
+#: src/logic/modelRegistration.ts
+msgid "Sonstiges"
+msgstr "Sonstiges"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Sortierung"
+msgstr "Sortierung"
 
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Spalte danach hinzufügen"
@@ -4375,9 +4816,9 @@ msgstr "Sperrt kommerzielle Lizenzen im Checkout."
 msgid "Spezifischer Bild-Kontext"
 msgstr "Spezifischer Bild-Kontext"
 
-#: src/ui/management/components/UserPermissionsModal.tsx
-#~ msgid "SRP (buy.reisinger.pictures)"
-#~ msgstr "SRP (buy.reisinger.pictures)"
+#: src/logic/modelRegistration.ts
+msgid "Sport / Fitness"
+msgstr "Sport / Fitness"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
@@ -4385,11 +4826,6 @@ msgstr "Spezifischer Bild-Kontext"
 #: src/ui/management/ManagementContractView.tsx
 msgid "Stadt"
 msgstr "Stadt"
-
-#. placeholder {0}: aiData.detected_city
-#: src/ui/management/components/AIBatchEditModal.tsx
-#~ msgid "Stadt \"{0}\" wurde nicht in der Datenbank gefunden."
-#~ msgstr "Stadt \"{0}\" wurde nicht in der Datenbank gefunden."
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Stadt \"{detectedCity}\" wurde nicht in der Datenbank gefunden."
@@ -4439,10 +4875,6 @@ msgstr "Standard-Vertrag"
 msgid "Standard-Wert"
 msgstr "Standard-Wert"
 
-#: src/ui/management/components/ProductModal.tsx
-#~ msgid "Standard-Wert *"
-#~ msgstr "Standard-Wert *"
-
 #: src/ui/management/ManagementContractView.tsx
 msgid "Starten"
 msgstr "Starten"
@@ -4453,10 +4885,12 @@ msgstr "Statistiken & Audit-Logs"
 
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/RatingStatusModal.tsx
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementCouponsView.tsx
+#: src/ui/management/ManagementModelsView.tsx
 #: src/ui/photographer/components/PhotoJobModal.tsx
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Status"
@@ -4484,6 +4918,10 @@ msgstr "Status gespeichert"
 msgid "Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG."
 msgstr "Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG."
 
+#: src/logic/modelRegistration.ts
+msgid "Stock-Fotos"
+msgstr "Stock-Fotos"
+
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementOrdersView.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
@@ -4510,6 +4948,14 @@ msgstr "Straße:"
 #: src/ui/Impressum.tsx
 msgid "Streitbeilegung"
 msgstr "Streitbeilegung"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Stufe abwählen"
+msgstr "Stufe abwählen"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Suche"
+msgstr "Suche"
 
 #: src/ui/components/Sidebar.tsx
 msgid "Suche & Entdecken"
@@ -4617,10 +5063,6 @@ msgstr "Titel / Beschreibung"
 msgid "Titel / Name"
 msgstr "Titel / Name"
 
-#: src/ui/management/components/ProductModal.tsx
-#~ msgid "Titel / Name *"
-#~ msgstr "Titel / Name *"
-
 #: src/ui/management/components/TextSnippetModal.tsx
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Titel ist erforderlich"
@@ -4638,6 +5080,10 @@ msgstr "Top 5 Galerien"
 msgid "Top Domains"
 msgstr "Top Domains"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Top-Kategorien & Bereitschaft"
+msgstr "Top-Kategorien & Bereitschaft"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -4647,10 +5093,6 @@ msgstr "Top Domains"
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Typ"
 msgstr "Typ"
-
-#: src/ui/management/components/ProductModal.tsx
-#~ msgid "Typ *"
-#~ msgstr "Typ *"
 
 #: src/ui/management/components/RecipientFormSection.tsx
 msgid "U-ID (Umsatzsteuer-ID)"
@@ -4704,6 +5146,10 @@ msgstr "Überschrift 4"
 msgid "Übersicht"
 msgstr "Übersicht"
 
+#: src/ui/MyModelsView.tsx
+msgid "Übersicht deiner mit diesem Konto verknüpften Model-Profile."
+msgstr "Übersicht deiner mit diesem Konto verknüpften Model-Profile."
+
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Übersicht deiner monatlichen Einnahmen durch Flatrate-Anteile und Aufpreise."
 msgstr "Übersicht deiner monatlichen Einnahmen durch Flatrate-Anteile und Aufpreise."
@@ -4750,9 +5196,26 @@ msgstr "Unbekannt"
 msgid "Unbekannter Fehler"
 msgstr "Unbekannter Fehler"
 
+#: src/ui/MyModelsView.tsx
+msgid "Unbenannt"
+msgstr "Unbenannt"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Unbenanntes Model"
+msgstr "Unbenanntes Model"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Ungespeicherte Änderungen"
 msgstr "Ungespeicherte Änderungen"
+
+#: src/logic/modelRegistration.ts
+msgid "Ungültige Auswahl."
+msgstr "Ungültige Auswahl."
+
+#: src/logic/modelRegistration.ts
+msgid "Ungültige Datei."
+msgstr "Ungültige Datei."
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Ungültige E-Mail"
@@ -4771,6 +5234,10 @@ msgstr "Ungültige IBAN (AT/DE)"
 #: src/ui/ResetPassword.tsx
 msgid "Ungültiger Link. Token oder E-Mail fehlen."
 msgstr "Ungültiger Link. Token oder E-Mail fehlen."
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Ungültiger Wert."
+msgstr "Ungültiger Wert."
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Unique DLs:"
@@ -4857,10 +5324,6 @@ msgstr "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte
 #: src/ui/LicenseTerms.tsx
 msgid "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
 msgstr "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
-
-#: src/ui/photographer/PhotographerProductionBoard.tsx
-#~ msgid "Veröffentlicht"
-#~ msgstr "Veröffentlicht"
 
 #: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
@@ -4993,10 +5456,6 @@ msgstr "Verwalte Vorlagen für Verträge und Sonderkonditionen."
 msgid "Verwaltung"
 msgstr "Verwaltung"
 
-#: src/ui/management/components/LightroomCatalogSettings.tsx
-#~ msgid "Verwaltung der Lightroom-Kataloge, die Aufträgen in der Bildbearbeitung zugewiesen werden können."
-#~ msgstr "Verwaltung der Lightroom-Kataloge, die Aufträgen in der Bildbearbeitung zugewiesen werden können."
-
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -5010,11 +5469,6 @@ msgstr "Verwerfen"
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Via Magic Link"
 msgstr "Via Magic Link"
-
-#. placeholder {0}: data?.signer.name
-#: src/ui/ContractSignView.tsx
-#~ msgid "Vielen Dank, {0}."
-#~ msgstr "Vielen Dank, {0}."
 
 #: src/ui/ContractSignView.tsx
 msgid "Vielen Dank, {signerName}."
@@ -5031,11 +5485,6 @@ msgstr "Volume-Preset"
 #: src/ui/management/components/PricingSettingsTabs.tsx
 msgid "Volume-Pricing"
 msgstr "Volume-Pricing"
-
-#. placeholder {0}: volumeLicensing.tier
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "Volumenpreis (Tier {0})"
-#~ msgstr "Volumenpreis (Tier {0})"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Volumenpreis (Tier {tierNum})"
@@ -5068,11 +5517,6 @@ msgstr "Vorschlag:"
 #: src/ui/client/SelectionView.tsx
 msgid "Wähle deine Favoriten aus."
 msgstr "Wähle deine Favoriten aus."
-
-#. placeholder {0}: photo.title || t`Foto`
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Wähle die gewünschte Auflösung für das Bild <0>{0}</0>."
-#~ msgstr "Wähle die gewünschte Auflösung für das Bild <0>{0}</0>."
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
@@ -5110,6 +5554,10 @@ msgstr "Web & Social Media"
 msgid "Website: [Domain]"
 msgstr "Website: [Domain]"
 
+#: src/logic/modelRegistration.ts
+msgid "Weiblich"
+msgstr "Weiblich"
+
 #: src/ui/components/Pagination.tsx
 msgid "Weiter →"
 msgstr "Weiter →"
@@ -5117,6 +5565,10 @@ msgstr "Weiter →"
 #: src/ui/InviteView.tsx
 msgid "Weiter als {inviteName}"
 msgstr "Weiter als {inviteName}"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Weitere Person hinzufügen"
+msgstr "Weitere Person hinzufügen"
 
 #: src/ui/Impressum.tsx
 msgid "Weitere rechtliche Informationen"
@@ -5126,6 +5578,10 @@ msgstr "Weitere rechtliche Informationen"
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Weitere rechtliche Informationen:"
 msgstr "Weitere rechtliche Informationen:"
+
+#: src/logic/modelRegistration.ts
+msgid "Wenig"
+msgstr "Wenig"
 
 #: src/ui/Privacy.tsx
 msgid "Wenn Sie Bilder aus unseren Galerien herunterladen, dokumentieren wir diesen Vorgang in einer internen Datenbank (Audit-Log), um den Zugriff auf unsere urheberrechtlich geschützten Werke nachvollziehen zu können. Dabei speichern wir Ihren Namen (sofern angegeben) und den Zeitpunkt des Downloads."
@@ -5164,6 +5620,8 @@ msgid "Wichtiger Hinweis zu Metadaten:"
 msgstr "Wichtiger Hinweis zu Metadaten:"
 
 #: src/ui/management/components/InviteModal.tsx
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/components/ModelInviteDialog.tsx
 msgid "Widerrufen"
 msgstr "Widerrufen"
 
@@ -5174,6 +5632,7 @@ msgstr "Widerrufs-, AGB- und Datenschutzinformationen finden Sie auf den folgend
 #: src/ui/components/Sidebar.tsx
 #: src/ui/Impressum.tsx
 #: src/ui/LicenseTerms.tsx
+#: src/ui/ModelRegistrationView.tsx
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Widerrufsbelehrung"
 msgstr "Widerrufsbelehrung"
@@ -5190,14 +5649,13 @@ msgstr "Wiederherstellen"
 msgid "Willkommen zur Fotoauswahl"
 msgstr "Willkommen zur Fotoauswahl"
 
-#. placeholder {0}: user.name
-#: src/ui/client/ClientDashboard.tsx
-#~ msgid "Willkommen zurück, {0}!"
-#~ msgstr "Willkommen zurück, {0}!"
-
 #: src/ui/client/ClientDashboard.tsx
 msgid "Willkommen zurück, {userName}!"
 msgstr "Willkommen zurück, {userName}!"
+
+#: src/ui/ModelRegistrationView.tsx
+msgid "Willkommen! Bitte erfasse alle Personen des Acts."
+msgstr "Willkommen! Bitte erfasse alle Personen des Acts."
 
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Wird automatisch befüllt..."
@@ -5210,6 +5668,10 @@ msgstr "Wird durch die übergeordnete Galerie erzwungen."
 #: src/ui/components/GalleryModal.tsx
 msgid "Wird durch Meta-Galerie erzwungen"
 msgstr "Wird durch Meta-Galerie erzwungen"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Wird eine E-Mail angegeben, versenden wir den Link zusätzlich per Mail."
+msgstr "Wird eine E-Mail angegeben, versenden wir den Link zusätzlich per Mail."
 
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
@@ -5224,6 +5686,10 @@ msgstr "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben
 #: src/ui/management/ManagementBoardsView.tsx
 msgid "Workflow"
 msgstr "Workflow"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "z. B. WhatsApp-Kontakt Anna"
+msgstr "z. B. WhatsApp-Kontakt Anna"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "z.B. 10"
@@ -5409,11 +5875,6 @@ msgstr "Zugriff entzogen"
 msgid "Zugriff erteilt"
 msgstr "Zugriff erteilt"
 
-#. placeholder {0}: order.status
-#: src/ui/client/ClientOrdersView.tsx
-#~ msgid "Zugriff gesperrt ({0})"
-#~ msgstr "Zugriff gesperrt ({0})"
-
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Zugriff gesperrt ({orderStatus})"
 msgstr "Zugriff gesperrt ({orderStatus})"
@@ -5450,6 +5911,10 @@ msgstr "Zusatz (kleingedruckt)"
 #: src/ui/management/components/ProductModal.tsx
 msgid "Zusatzbeschreibung"
 msgstr "Zusatzbeschreibung"
+
+#: src/ui/management/components/ModelInviteDialog.tsx
+msgid "Zusätzlich per E-Mail versendet."
+msgstr "Zusätzlich per E-Mail versendet."
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Zusätzliche Bilder:"

@@ -17,6 +17,9 @@ const ProtectedDashboard = lazy(() => import('./ui/ProtectedDashboard'));
 const GalleryView = lazy(() => import('./ui/GalleryView'));
 const InviteView = lazy(() => import('./ui/InviteView'));
 const OrgInviteView = lazy(() => import('./ui/OrgInviteView'));
+const ModelRegistrationView = lazy(() => import('./ui/ModelRegistrationView'));
+const ModelProfileAccessView = lazy(() => import('./ui/ModelProfileAccessView'));
+const MyModelsView = lazy(() => import('./ui/MyModelsView'));
 import ContractJoinView from './ui/ContractJoinView';
 import ContractSignView from './ui/ContractSignView';
 const PhotoDetailView = lazy(() => import('./ui/PhotoDetailView'));
@@ -101,6 +104,8 @@ export default function App() {
                             <Route path="/photos/:id" element={<ErrorBoundary><PhotoDetailView/></ErrorBoundary>}/>
                             <Route path="/invite/:token" element={<ErrorBoundary><InviteView/></ErrorBoundary>}/>
                             <Route path="/org-invite/:token" element={<ErrorBoundary><OrgInviteView/></ErrorBoundary>}/>
+                            <Route path="/model-registrierung/:token" element={<ErrorBoundary><ModelRegistrationView/></ErrorBoundary>}/>
+                            <Route path="/model-profil/:token" element={<ErrorBoundary><ModelProfileAccessView/></ErrorBoundary>}/>
                             <Route path="/contracts/join/:token" element={<ErrorBoundary><ContractJoinView/></ErrorBoundary>}/>
                             <Route path="/contracts/sign/:token" element={<ErrorBoundary><ContractSignView/></ErrorBoundary>}/>
 
@@ -123,6 +128,7 @@ export default function App() {
                             <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/cart" element={<ProtectedRoute><ErrorBoundary><ClientCartView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/orders" element={<ProtectedRoute><ErrorBoundary><ClientOrdersView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/my-models" element={<ProtectedRoute><ErrorBoundary><MyModelsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/orgs" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementOrgsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/orgs/:id" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementOrgDetailView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/tenants" element={<Navigate to="/orgs" replace />}/>
@@ -135,6 +141,8 @@ export default function App() {
                             <Route path="/admin-snippets" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-payouts" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-contracts" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/admin-model-invites" element={<Navigate to="/admin-models" replace/>}/>
+                            <Route path="/admin-models" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-coupons" element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-projects" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/boards" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>

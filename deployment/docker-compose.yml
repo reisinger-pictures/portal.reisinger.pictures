@@ -83,6 +83,11 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - APP_KEY=${APP_KEY}
       - JWT_SECRET=${JWT_SECRET}
+      # Separater Key für die verschlüsselte Ablage sensibler Model-Dateien
+      # (Altersnachweis/Fotos) + answers-Snapshots. Rotation via
+      # FILE_ENCRYPTION_PREVIOUS_KEYS.
+      - FILE_ENCRYPTION_KEY=${FILE_ENCRYPTION_KEY}
+      - FILE_ENCRYPTION_PREVIOUS_KEYS=${FILE_ENCRYPTION_PREVIOUS_KEYS}
       - LOG_CHANNEL=stderr
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
@@ -136,8 +141,8 @@ services:
       start_period: 40s
     command: >
       sh -c "
-      if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ]; then
-        echo 'FATAL: APP_KEY oder JWT_SECRET ist nicht gesetzt. Start verweigert (fail-closed)!';
+      if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ] || [ -z \"$${FILE_ENCRYPTION_KEY}\" ]; then
+        echo 'FATAL: APP_KEY, JWT_SECRET oder FILE_ENCRYPTION_KEY ist nicht gesetzt. Start verweigert (fail-closed)!';
         exit 1;
       fi;
       php artisan cache:clear;

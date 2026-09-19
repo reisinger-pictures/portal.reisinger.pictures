@@ -6,6 +6,7 @@ import SidebarLoginForm from './SidebarLoginForm';
 import {useAuth} from '../../logic/useAuth';
 import {Gallery, GalleryGroup, GalleryTreeResponse} from '../../logic/useGalleries';
 import { useCart } from '../../logic/CartContext';
+import { useMyModels } from '../../logic/useModelProfileAccess';
 
 interface SidebarProps {
     tree?: GalleryTreeResponse | null;
@@ -34,6 +35,9 @@ export default function Sidebar(props: SidebarProps) {
         await logout();
         navigate('/');
     };
+
+    const { models: myModels } = useMyModels(!!user);
+    const hasModels = (myModels?.length ?? 0) > 0;
 
     const isGuest = !user;
 
@@ -93,6 +97,7 @@ export default function Sidebar(props: SidebarProps) {
                                         <li><Link to="/admin-contracts" className={props.currentView === 'admin-contracts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-sign text-lg"></span> <Trans>Verträge</Trans></Link></li>
                                     </>
                                 )}
+                                <li><Link to="/admin-models" className={props.currentView === 'admin-models' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-search text-lg"></span> <Trans>Models</Trans></Link></li>
                             </>
                         )}
 
@@ -122,6 +127,9 @@ export default function Sidebar(props: SidebarProps) {
                         {isStaff && <div className="divider my-1 text-sm opacity-50"><Trans>Dein Account</Trans></div>}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> <Trans>Suche & Entdecken</Trans></Link></li>
                         <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> <Trans>Mein Profil</Trans></Link></li>
+                        {hasModels && (
+                            <li><Link to="/my-models" className={props.currentView === 'my-models' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-cog text-lg"></span> <Trans>Meine Profile</Trans></Link></li>
+                        )}
                         <li><Link to="/orders" className={props.currentView === 'orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--license text-lg"></span> <Trans>Einkäufe & Anfragen</Trans></Link></li>
                         {isPhotographer && <li><Link to="/my-payouts" className={props.currentView === 'payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> <Trans>Meine Abrechnungen</Trans></Link></li>}
                     </>
