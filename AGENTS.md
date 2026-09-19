@@ -130,6 +130,7 @@ Offene Security-TODOs (M6, L2) siehe `AGENTS.todo.md`. M1–M5, M7–M9, L1, L3�
 - Preisberechnung server-autoritativ (signiertes Offer-Token)
 - HTML-Sanitize beim Persistieren (Symfony `HtmlSanitizer`) + beim Render (DOMPurify)
 - Vertragssigning mit optimistischer Concurrency (`content_version` in UPDATE-WHERE)
+- Keine Eigenbau-Kryptografie (Security-Critical nur etablierte Pakete/Bordmittel, Entscheidung 2026-09-19)
 
 ## 10. IntelliJ Run-Configs (.run) — Benennungs-Konvention (STRICT)
 

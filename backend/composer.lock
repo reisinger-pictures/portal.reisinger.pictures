@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "93534f80d0814adea8824b36db7d0de4",
+    "content-hash": "14c4f892cdb27254c4877fe15f4b569d",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -738,6 +738,83 @@
                 }
             ],
             "time": "2025-03-06T22:45:56+00:00"
+        },
+        {
+            "name": "ercsctt/laravel-file-encryption",
+            "version": "v1.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ercsctt/laravel-file-encryption.git",
+                "reference": "adfefb8964685e5ea93d76267a24e017616195c5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ercsctt/laravel-file-encryption/zipball/adfefb8964685e5ea93d76267a24e017616195c5",
+                "reference": "adfefb8964685e5ea93d76267a24e017616195c5",
+                "shasum": ""
+            },
+            "require": {
+                "ext-openssl": "*",
+                "illuminate/console": "^11.0|^12.0|^13.0",
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "illuminate/filesystem": "^11.0|^12.0|^13.0",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "php": "^8.2",
+                "symfony/finder": "^7.0|^8.0"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.9",
+                "laravel/pint": "^1.27",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^10.5|^11.0"
+            },
+            "suggest": {
+                "laravel/prompts": "Required for interactive CLI commands (^0.1.0|^0.2.0|^0.3.0)"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "FileEncrypter": "Ercsctt\\FileEncryption\\Facades\\FileEncrypter"
+                    },
+                    "providers": [
+                        "Ercsctt\\FileEncryption\\FileEncryptionServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "Ercsctt\\FileEncryption\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Eric Scott",
+                    "email": "me@ericscott.co.uk"
+                }
+            ],
+            "description": "Secure file encryption and decryption for Laravel applications",
+            "homepage": "https://github.com/ercsctt/laravel-file-encryption",
+            "keywords": [
+                "aes-256-gcm",
+                "encryption",
+                "file-encryption",
+                "laravel",
+                "security"
+            ],
+            "support": {
+                "issues": "https://github.com/ercsctt/laravel-file-encryption/issues",
+                "source": "https://github.com/ercsctt/laravel-file-encryption"
+            },
+            "time": "2026-03-18T10:08:31+00:00"
         },
         {
             "name": "fruitcake/php-cors",

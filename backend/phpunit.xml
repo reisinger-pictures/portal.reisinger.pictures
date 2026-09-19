@@ -47,5 +47,7 @@
         
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="FILE_ENCRYPTION_KEY" value="base64:VFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFQ="/>
+        <env name="FILE_ENCRYPTION_PREVIOUS_KEYS" value=""/>
     </php>
 </phpunit>

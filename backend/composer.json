@@ -10,16 +10,17 @@
     "license": "MIT",
     "require": {
         "php": "^8.5",
+        "ext-zip": "*",
+        "barryvdh/laravel-dompdf": "^3.0",
+        "ercsctt/laravel-file-encryption": "^1.1",
         "laravel/framework": "^13.0",
         "laravel/scout": "^11.1",
         "laravel/tinker": "^3.0",
         "maennchen/zipstream-php": "^3.2",
         "meilisearch/meilisearch-php": "^1.16",
         "php-open-source-saver/jwt-auth": "^2.9",
-        "barryvdh/laravel-dompdf": "^3.0",
         "stripe/stripe-php": "^21.0.0",
-        "symfony/html-sanitizer": "^8.0",
-        "ext-zip": "*"
+        "symfony/html-sanitizer": "^8.0"
     },
     "require-dev": {
         "brianium/paratest": "*",

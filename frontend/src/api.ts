@@ -106,6 +106,56 @@ export const fetcher = async <T>(url: string): Promise<T> => {
     throw new Error('Server hat kein valides JSON zurückgegeben.');
 };
 
+/**
+ * Multipart counterpart of `apiMutate`. Sends a `FormData` body without a
+ * `Content-Type` header so the browser can set the multipart boundary.
+ * Reuses the same 401-refresh and error-normalisation paths as `fetcher`.
+ */
+export const apiUpload = async <T>(url: string, body: FormData): Promise<T> => {
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'include',
+            body
+        });
+    } catch {
+        const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as ApiError;
+        error.status = 0;
+        if (globalErrorCallback) globalErrorCallback(0, error.message);
+        throw error;
+    }
+
+    if (res.status === 401 && !url.includes('/api/auth/')) {
+        const success = await refreshToken();
+        if (success) {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                credentials: 'include',
+                body
+            });
+        }
+    }
+
+    if (!res.ok) {
+        await handleApiError(res);
+    }
+
+    const contentType = res.headers.get('content-type');
+    const text = await res.text();
+    if (contentType && contentType.includes('application/json')) {
+        try {
+            return text ? JSON.parse(text) : {} as T;
+        } catch {
+            throw new Error('Server-Antwort konnte nicht als JSON verarbeitet werden.');
+        }
+    }
+
+    throw new Error('Server hat kein valides JSON zurückgegeben.');
+};
+
 export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown): Promise<T> => {
     let res: Response;
     try {

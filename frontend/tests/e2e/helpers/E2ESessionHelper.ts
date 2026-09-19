@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { APIRequestContext } from '@playwright/test';
 import { MailpitHelper } from './MailpitHelper';
 
@@ -12,6 +14,8 @@ export class E2ESessionHelper {
     private createdContractIds: string[] = [];
     private createdCouponIds: string[] = [];
     private createdPresetIds: string[] = [];
+    private createdModelInviteIds: string[] = [];
+    private createdModelCustomerIds: string[] = [];
     private adminToken: string | null = null;
 
     constructor(private request: APIRequestContext) {}
@@ -109,6 +113,103 @@ export class E2ESessionHelper {
     trackContract(id: string) { if (id) this.createdContractIds.push(id); }
     trackCoupon(id: string) { if (id) this.createdCouponIds.push(id); }
     trackPreset(id: string) { if (id) this.createdPresetIds.push(id); }
+    trackModelInvite(id: string) { if (id) this.createdModelInviteIds.push(id); }
+    trackModelCustomer(id: string) { if (id) this.createdModelCustomerIds.push(id); }
+
+    /**
+     * Create a model-registration invite via the admin endpoint (magic-link
+     * primary). Accepts either a plain e-mail (legacy callers) or a payload.
+     */
+    async createModelInvite(payload: string | { email?: string; label?: string }) {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const input = typeof payload === 'string' ? { email: payload } : payload;
+        const data: { email?: string; label?: string } = {};
+        if (input.email) data.email = input.email;
+        if (input.label) data.label = input.label;
+        const res = await this.request.post('/api/management/model-invites', { data, headers });
+        if (!res.ok()) throw new Error(`Model invite creation failed: ${await res.text()}`);
+        const body = await res.json();
+        if (body?.invite?.id) this.trackModelInvite(body.invite.id);
+        return body as { success: boolean; link: string; invite: { id: string; email: string | null; link: string } };
+    }
+
+    /**
+     * Register a single model through the public API (current catalogue:
+     * willingness per category + stock, all mandatory consents, age proof
+     * upload). Tracks the created customer for teardown.
+     */
+    async createRegisteredModel(): Promise<{ firstName: string; email: string }> {
+        await this.ensureAdminLogin();
+        const unique = Math.random().toString(36).substring(2, 10);
+        const firstName = `E2EDel${unique}`;
+        const email = `e2e-model-${unique}@example.com`;
+
+        const invite = await this.createModelInvite({ email, label: `E2E ${unique}` });
+        const token = invite.link.split('/').pop() as string;
+        const ageProof = readFileSync(path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg'));
+
+        const willingnessKeys = [
+            'willingness_portrait',
+            'willingness_fashion',
+            'willingness_business',
+            'willingness_boudoir',
+            'willingness_bikini',
+            'willingness_akt',
+            'willingness_sport',
+            'willingness_couple_family',
+        ];
+        const fields: Record<string, string> = {
+            'persons[0][answers][first_name]': firstName,
+            'persons[0][answers][last_name]': 'Modell',
+            'persons[0][answers][birthdate]': '1995-05-05',
+            'persons[0][answers][gender]': 'weiblich',
+            'persons[0][answers][email]': email,
+            'persons[0][answers][phone]': '+43 660 1234567',
+            'persons[0][answers][street]': 'Teststraße 1',
+            'persons[0][answers][zip]': '4020',
+            'persons[0][answers][city]': 'Linz',
+            'persons[0][answers][country]': 'Österreich',
+            'persons[0][answers][experience_portrait]': '0',
+            'persons[0][answers][consent_privacy]': '1',
+            'persons[0][answers][consent_accuracy]': '1',
+            'persons[0][answers][consent_contact]': '1',
+            'persons[0][answers][consent_photos]': '1',
+            'persons[0][create_account]': '0',
+            'manager_index': '0',
+        };
+        for (const key of willingnessKeys) {
+            fields[`persons[0][answers][${key}]`] = key === 'willingness_portrait' ? 'gerne' : 'nein';
+        }
+        fields['persons[0][answers][willingness_stock]'] = 'nein';
+
+        const res = await this.request.post(`/api/model-registration/${token}`, {
+            headers: { 'Accept': 'application/json' },
+            multipart: {
+                ...fields,
+                'persons[0][age_proof]': { name: 'sample.jpg', mimeType: 'image/jpeg', buffer: ageProof },
+            },
+        });
+        if (!res.ok()) throw new Error(`Model registration failed (${res.status()}): ${await res.text()}`);
+
+        // Resolve the created customer for teardown (super-admin token sees all brands).
+        const listRes = await this.request.get('/api/management/models?q=' + encodeURIComponent(firstName), {
+            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
+        });
+        if (listRes.ok()) {
+            const list = await listRes.json() as Array<{ customer_id: string }>;
+            if (list[0]?.customer_id) this.trackModelCustomer(list[0].customer_id);
+        }
+
+        return { firstName, email };
+    }
+
+    /** Delete a customer created by a model registration (cascade removes the profile). */
+    async deleteModelCustomer(id: string) {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
+        await this.request.delete(`/api/management/customers/${id}`, { headers }).catch(() => undefined);
+    }
 
     async createVolumePreset(data: { name: string; tiers: Array<{ min_quantity: number; price_cents: number }> }) {
         await this.ensureAdminLogin();
@@ -174,5 +275,7 @@ export class E2ESessionHelper {
         await this.deleteResources(this.createdProductIds, '/api/management/products', 'product');
         await this.deleteResources(this.createdCouponIds, '/api/management/coupons', 'coupon');
         await this.deleteResources(this.createdPresetIds, '/api/management/settings/volume-presets', 'volume-preset');
+        await this.deleteResources(this.createdModelInviteIds, '/api/management/model-invites', 'model-invite');
+        await this.deleteResources(this.createdModelCustomerIds, '/api/management/customers', 'model-customer');
     }
 }

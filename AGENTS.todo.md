@@ -6,6 +6,118 @@
 
 ---
 
+## 🆕 OFFEN (2026-09-18) — Model-Registrierung (Einladungslink)
+
+> Plan: `~/.opencode/plan/model-registrierung.md`. Admin lädt eine Managerperson per Einmal-Link ein; diese registriert login-frei einen **Act** mit 1..n Personen (je Person = eigener CRM-Customer/Model). Altersnachweis **je Person** nur bei Bikini/Akt/Erotik. Erfolgsmail an den **einladenden User**. Fragenkatalog **Code-first + Answers-Snapshot** (alte Fragen bleiben bis Profilaktualisierung sichtbar). Berechtigung: nur Admin/Super-Admin.
+
+**Backend (DoD: PHPUnit)** — ✅ implementiert (Session 2026-09-18)
+- [x] V033-Migration: `customers.user_id`/`is_model`; `model_profiles`; `acts`; `act_members`; `model_registration_invites`
+- [x] Modelle + Relations + DB-Projektion (`categories()`/`actTypes()`/`brandValue()`; Model-Suche per DB-Filter, kein Scout)
+- [x] `ModelQuestionnaire` (versioniert v1; Sektionen A/B/C/G/H; Kategorien mit Beschreibung)
+- [x] Controller: Admin-`invite`, öffentlich `check`/`submit` (multipart, Einmal-Token atomar), Admin-Liste/Revoke, Model-Suche, Age-Proof-Download (auth-gated)
+- [x] Mailables: Invite-Mail + Success-Mail an `invited_by` (brand-aware)
+- [x] Privater Storage-Disk (`local`); Retention-Konzept bleibt offen (s. u.)
+- [x] Feature-/Unit-Tests: `ModelRegistrationTest`, `ModelInviteAdminTest`, `ModelManagementTest`, `ModelProfileAttributesTest`, `ModelQuestionnaireTest`
+- [x] Orphan-Cleanup-Test (R2): 2 Regressionstests grün; dabei echter Bug in `storeAgeProof` gefunden+gefixt (Datei wird bei Metadaten-Fehler jetzt selbst gelöscht)
+- Kontrakt-Doku: `features/crm/05-model-registration.md` (API-Vertrag eingefroren)
+
+**Frontend (DoD: Vitest + Playwright)** — ✅ implementiert (Session 2026-09-18)
+- [x] Öffentliche Route `/model-registrierung/:token` (Gast-Layout, RHF+Zod, Personenblöcke, Uploads)
+- [x] Admin: Einladung anlegen/Liste + Model-Suche-View (Filter)
+- [x] Vitest: Zod-Schema-Factory, Personen-Form-State, Hooks
+- [x] Playwright `@feature:model-registration` + `@smoke` Admin-Gate
+
+**Offen (Frontend, vor Go-live)**
+- [ ] Profilaktualisierung (v1 nur Admin — „Profil aktualisieren"-Banner zeigt nur an, es gibt noch keinen Migrations-Trigger im UI)
+- [ ] Client-seitiges Sanity-Limit der Personenzahl (Plan §Offene Punkte)
+- [ ] Lokale E2E-Flakiness: `database is locked` (SQLite `busy_timeout=null` in `backend/config/database.php`) bei parallelen Playwright-Workern; reproduzierbar auch in bestehenden Specs (`admin/no-b2b-label.spec.ts`) → Workaround `--workers=1`; Fix wäre `busy_timeout`/WAL in der Dev-DB-Config (Backend-Thema)
+
+**Doku**
+- [x] `features/crm/05-model-registration.md` (SOLL-Zustand, inkl. API-Vertrag + akzeptierte 404/410-UX)
+
+**Offen (vor Go-live)**
+- [ ] Löschkonzept für Altersnachweise (Aufbewahrungsfrist)
+- [ ] Kategorien-Admin-UI (später); Profilaktualisierung durch Kontoinhaber (später); Personen-Bestätigungslink (später)
+
+**Magic Link = Primary Flow (User-Entscheidung 2026-09-19)**
+- [ ] Backend: V033 amenden (uncommitted): `invites.email` nullable + `label` (Name/Notiz); `store` gibt `link` zurück; Liste enthält `link`+`label`; Mail nur wenn E-Mail vorhanden
+- [ ] Frontend: Link-Copy-UI (nach Anlegen + in Liste), Label-Feld, E-Mail optional; E2E für No-Mail-Flow (Link aus UI kopieren → öffnen)
+- [ ] Doku: `features/crm/05-model-registration.md` auf Magic-Link-Primary aktualisieren
+
+**UI-Review Screenshot-Loop (User-Feedback 2026-09-19: sichtbare UI-Fehler, bisher KEINE Screenshot-Tests — nur DOM-E2E)**
+- [x] Harness scaffolding (`playwright.screenshots.config.ts` + Manifest + Spec, Skill `ui-review`)
+- [x] Capture + Vision-Analyse (34 PNGs, Model-Seiten filled/empty, desktop/mobile) — Analyse manuell (Vision-Subagenten ohne FS-Zugriff)
+- [x] Findings fixen (F1 Gast-Layout, F2 Badge-Clipping, F3 Consent-Wrap mobil, F4 Checkbox-Optik) + Re-Capture + Vergleich
+- [x] APPROVED (2026-09-19, Vorher/Nachher-Captures geprüft: Gast-Layout minimal, Badges vollständig, Consent wrappt, Checkboxen eckig)
+
+**Model-Profile Iteration (User-Feedback 2026-09-19 — umgesetzt + verifiziert, bereit für manuellen Test)**
+> Verifikation (final): Backend READY (1573 Suite), Frontend READY (702 Vitest, 12 E2E), UI-Review APPROVED. Dev-DB frisch für manuellen Test (Backup `.../portal-database-backup-final-20260919.sqlite`). Runde 2 komplett drin (Slider, Matrix, URL-Sync, Match-Score, Threshold, Multi-Chips, Deeplinks, Detail read-only, Status-Filter, Foto-Clear, Mail-Fakten, Expiry-Delete, DSGVO-Löschung + Button).
+> **Offen (deine Entscheidungen):** Update-Mail an Einladenden bei Profil-Update? Manager-Act-Kaskade ok (N1)? Inaktive für alle Admins sichtbar ok (N2)? E2E-Ausbau + PDF-Export (Future)?
+> **Offen:** Update-Mail an Einladenden bei Profil-Update (keine Entscheidung); Manager-Act-Kaskade bei Löschung (N1: fachlich fixieren).
+> **Standing (User 2026-09-19):** Beim nächsten manuellen Test EXPLIZIT nachfragen/prüfen, ob wirklich die aktuelle Version im Browser liegt (Hard-Reload Cmd+Shift+R, Marker: kein Katalogstand im Gast-Formular, Karten-Layout, Slider) — keine alte Version testen.
+> **Entschieden (2026-09-19):** Erotik raus (Single-v1, kein Split); Fashion/Business getrennt; Agentur Name+Link; Encryption at rest (Files + answers-JSON, Suchfelder plaintext, Paket-only); Model-Zugang (24h-Link + Meine Profile) mitgebaut; Version nicht im Kunden-UI.
+> **Offen:** Update-Mail an Einladenden bei Profil-Update (User-Frage, keine Entscheidung); Manager-Act-Kaskade bei Löschung (N1: fachlich fixieren).
+Form/UX — alle umgesetzt (P3, E2E grün):
+- [x] Managerperson-Radio nur bei >1 Person; Alter neben Geburtsdatum; Kontaktweg-Validierung client+server; Fotos max 5 + public/internal + Hauptbild; Aussehen default zugeklappt; Bereitschaft (+Stock) vor Erfahrung; Act-Einstieg oben + Notizen nur >1; Ausweis immer Pflicht; Consents als Sätze mit Links + `consent_photos`
+Katalog (Single-v1):
+- [x] Erotik entfernt; Fashion/Business getrennt; Bereitschafts-Stufen + Admin-Suche mit Priorisierung; Agentur Name+Link
+- [x] Label „Wenn es sein muss" → „Eher ja" (nur Anzeige, Codes/Ordinale unverändert) — verifiziert READY
+- [x] Fähigkeiten vereinfachen: nur Freitext-Feld „Fähigkeiten" (Multiselect, „Sprachen & Niveau", „Selbstbeschreibung" entfernen) — verifiziert READY
+- [ ] Matrix mobil: läuft aus der Karte (Lust-Spalte abgeschnitten) — responsive machen (Wrap/Scroll/kompakte Pills)
+Lifecycle/Retention:
+- [x] `last_confirmed_at`, 13+2-Zeiten, Reminder T+12/13/14, Confirm-Reset (auch ohne Änderung); Profil-Zugang 24h-Link + `/me/models`
+- [x] Expired (nach 15 Monaten) = Hard-Delete (DRY-Eraser, verifiziert); Admin-Liste default nur aktiv; Super-Admin findet Inaktive
+Admin:
+- [x] Detail kompakt (leere Felder aus) + Galerie; Karten-Layout mit Hauptbild; Multi-Select; Bereitschafts-Filter/Sort; Lifecycle-Badges
+- [x] **DSGVO-Löschung (Super-Admin)** — Backend READY-verifiziert (Super-Admin-Gate, Brand-Scope, Dateien per Storage-Assertion weg, Observer, Audit ohne PII, Suite 1545)
+  - [x] Frontend: Löschen-Button (nur Super-Admin) mit Confirm + E2E (687 Vitest, 12 E2E) — finale Frontend-Verifikation läuft
+Sicherheit:
+- [x] Bildspeicherung: private Disk + AES-256-GCM (Paket, eigener Key) + Auth-Gate + Audit-Log; Suchfelder plaintext (belegt)
+
+**Model-Iteration Runde 2 (User-Feedback 2026-09-19 — in Umsetzung)**
+- [ ] Bereitschaft/Selects: Slider statt Dropdown (daisyUI range, 5 Stufen, farbcodiert rot/hellrot/gelb/hellgrün/dunkelgrün) — auch im Formular
+- [ ] Stock-Fotos: Bereitschaft fehlt (prüfen + ergänzen, Formular + Admin)
+- [ ] Portal-Konto-Label als optional kennzeichnen
+- [ ] Letzte Checkbox: doppelten Link entfernen
+- [ ] Regel: Hauptbild muss öffentlich sein (sobald öffentliche Bilder existieren) — client + server
+- [ ] Datei-Vorschau (Thumbnails) bei Ausweis-Upload + Fotos
+- [ ] Foto-Reihenfolge: Drag & Drop (Desktop) + Pfeil-Buttons (mobil)
+- [ ] Eingelöste Einladung → Deeplink zum Model-Profil
+- [ ] Dialog-Höhe: minimal kleiner als Fensterhöhe (Modal max-height)
+- [ ] Bereitschaft: nach Stufen gruppiert absteigend + farbcodiert (Admin + Formular)
+- [ ] Bereitschafts-Filter als Mindest-Schwelle (ab Stufe X, bessere immer dabei); Sortierung primär nach Erfahrung
+- [ ] Default-Sortierung = Match-Score (Lust dominiert, Erfahrung Tiebreak): Score = Lust × 10 + Erfahrung, Max über Kategorien; „Neueste" bleibt wählbar
+- [ ] Bereitschafts-Kategorie ebenfalls als Multi-Select-Chips (wie Hauptfilter) — Backend-ODER existiert bereits
+- [ ] Bereitschafts-Slider: Tabs/Chips darunter entfernen (Slider allein); Leermodus „Egal" statt „Nein", dann Param nicht mitschicken
+- [ ] Bug: Bereitschafts-Schwelle aktuell nicht änderbar — nach Slider-Umbau verifizieren + E2E (Stufe setzen/wechseln/löschen)
+- [ ] Update-/Lifecycle-Badge: Höhe bei mehrzeiligem/langem Inhalt fixen
+- [ ] Stock-Fotos-Zeile fehlt (Matrix/Formular): willingness_stock immer zeigen (Erfahrung „–")
+- [ ] „Egal"-Button wieder weg: Abwahl per erneutem Klick auf aktive Stufe (Reset bleibt global)
+- [x] **Free-Review-Fixes (CHANGES_REQUIRED → READY-verifiziert)**: B1 Mails aus Transaktion (deferred+Rollback-Test), B2 Lifecycle-Null-Anker, B3 Owner-Update atomar, B4 Constraint-Drop eingeschränkt, F1 Owner Age-Proof-Upload, F2 Alias-Skip; B6 als akzeptiertes Risiko dokumentiert
+- [ ] Foto-Demotion: Hauptbild auf intern stellen ohne Ersatz muss gehen (Primary-Clear statt 422-Sackgasse)
+- [ ] Slider-Layout: Überschrift in eigener Zeile (Label + Wert-Pill), Slider darunter volle Breite; 2-Spalten-Grid (Bereitschaft | Erfahrung) bleibt
+- [ ] Sortier-Kategorie entfernen (sinnlos); Experience-Sort über Max aller Kategorien
+- [ ] Alter von/bis als Range-Slider (Dual-Thumb, mobil bedienbar, mit Zahlen-Fallback)
+- [ ] Revert: Alter von/bis zurück auf reine Zahlen-Textfelder (User-Entscheidung — Slider verworfen)
+- [ ] Ergebnis-Matrix statt „Nein"-Filter-Verwirrung: pro Model und Kategorie Erfahrung (`--/-/0/+/++`) × Lust (farbcodiert) in einer Matrix zeigen; Filter-Schwelle als „mindestens" labeln
+- [ ] Matrix-Zeilen: nach Erfahrung/Lust sortiert, gesuchte (gematchte) Kategorie fixiert oben
+- [ ] Admin-Models-URL mit Deeplink zum geöffneten Profil (`?model=<id>`)
+- [ ] Suchparameter in der URL (Filter als Query-String: teilbar, bookmarkable, Back-Button-konsistent)
+- [ ] Detail-Dialog als Read-only-Faktenansicht im Formular-Aufbau (Sektionen wie im Formular, harte Fakten oben, Datenstand sichtbar, interne Keys ausblenden)
+- [ ] Fertigstellungs-Mail an Einladenden: Deeplink zum Model-Profil + harte Fakten direkt in der Mail (Personen, Alter, Kategorien/Bereitschaft, Ausweis-Status)
+- [ ] Admin-Suche: gewählte Kategorien im Suchergebnis unten sichtbar hervorheben (Treffer-Badges + Count)
+- [ ] Erfahrungsskala: `-- / - / 0 / + / ++` (statt keine/Anfänger/erfahren/Profi); „Lust" (Bereitschaft) farbcodiert
+- [ ] **Future (nur TODO):** PDF-Export intern/extern — noch zu verfeinern, nicht umsetzen
+- [ ] Struktur: nur EIN Models-Menüpunkt; Einladung als Dialog auf der Models-Seite (separate Einladungs-Seite/Route auflösen)
+
+**Model-Zugang: Profile einsehen/aktualisieren (User-Anforderung 2026-09-19)**
+> Models aktualisieren „unter dem Jahr" ihre Profile. Zwei Zugangswege: (a) **ausgeloggt per Profil-Magic-Link** — pro Model-Profil (Customer) ein eigener wiederverwendbarer Link mit langem Ablauf + Revoke; (b) **eingeloggt mit Portal-Konto** — „Meine Profile". Status quo: KEINS davon existiert (Account wird nur angelegt/verknüpft, führt nirgendwo hin).
+- [ ] Backend: `model_access_tokens` (customer_id, token, expires_at **24h** (User-Entscheidung 2026-09-19), last_used_at, revoked_at); Admin create/revoke (brand-scoped, Link zum Kopieren); öffentlich GET+POST `/api/model-profil/{token}` (lesen + aktualisieren gegen aktuellen Katalog, Snapshot-Versionierung); `GET /api/me/models` (Owner-Zugriff); PHPUnit (Ablauf/Revoke/Brand/Owner/last_used_at)
+- [ ] Frontend: Admin „Zugangslink kopieren" im Model-Detail; öffentlich `/model-profil/:token` (lesen + aktualisieren); eingeloggt „Meine Profile"; Vitest + Playwright `@feature:model-access`
+- [ ] Doku: `features/crm/05-model-registration.md` (Profil-Zugang); danach Screenshot-Capture + Vision-Review der neuen Seiten
+
+---
+
 ## 🟢 CODE REVIEW (2026-09-12) — Full-Main-Audit (9 Subareas) — FIXED & VERIFIED
 
 > Methodik: 9 read-only Subagenten über Backend (Auth/Security, Checkout/Payments, Controllers/Requests, Modelle/Data, AI/Mail/Jobs), Frontend (Logic, UI), Infra/CI, Lua/Tests. Fixes durch **separate** Implementer-Subagenten, nie der Reviewer.

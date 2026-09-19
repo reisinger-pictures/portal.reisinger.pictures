@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Enums\Brand;
 use Illuminate\Support\Facades\Log;
 
 class ActivateAccountMail extends AbstractBrandAwareMailable
@@ -12,14 +13,14 @@ class ActivateAccountMail extends AbstractBrandAwareMailable
     public $actionText;
     public $mailSubject;
 
-    public function __construct($userName, $introText, $actionUrl, $actionText, $mailSubject)
+    public function __construct($userName, $introText, $actionUrl, $actionText, $mailSubject, ?Brand $brand = null)
     {
         $this->userName = $userName;
         $this->introText = $introText;
         $this->actionUrl = $actionUrl;
         $this->actionText = $actionText;
         $this->mailSubject = $mailSubject;
-        $this->initializeBrand();
+        $this->initializeBrand($brand);
     }
 
     public function build()

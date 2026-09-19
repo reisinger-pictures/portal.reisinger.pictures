@@ -17,6 +17,7 @@
         "test:e2e:failed": "playwright test --last-failed",
         "test:e2e:ui": "playwright test --ui",
         "test:screenshots": "playwright test -c playwright.screenshots.config.ts",
+        "test:screenshots:grep": "playwright test -c playwright.screenshots.config.ts --grep",
         "test": "vitest",
         "test:run": "vitest run",
         "test:coverage": "vitest run --coverage",

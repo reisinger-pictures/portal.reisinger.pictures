@@ -46,4 +46,8 @@ export class MailpitHelper {
     async extractOrgInviteToken(email: string): Promise<string | null> {
         return this.extractLinkForEmail(email, /org-invite\/([a-zA-Z0-9]+)/);
     }
+
+    async extractModelRegistrationToken(email: string): Promise<string | null> {
+        return this.extractLinkForEmail(email, /model-registrierung\/([a-zA-Z0-9]+)/);
+    }
 }
