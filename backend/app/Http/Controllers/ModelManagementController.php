@@ -73,6 +73,15 @@ class ModelManagementController extends Controller
         if (! in_array($status, [ModelProfile::LIFECYCLE_ACTIVE, ModelProfile::LIFECYCLE_INACTIVE, 'all'], true)) {
             $status = ModelProfile::LIFECYCLE_ACTIVE;
         }
+
+        // Inactive/expired profiles are hidden from regular admins: the only
+        // super-admin action they enable is the DSGVO deletion. Fail closed
+        // with 403 (consistent with the destroy gate) instead of silently
+        // falling back, so URL tampering cannot enumerate hidden profiles.
+        if ($status !== ModelProfile::LIFECYCLE_ACTIVE && ! $this->isSuperAdmin()) {
+            abort(response()->json(['error' => 'Keine Berechtigung.'], 403));
+        }
+
         if ($status !== 'all') {
             $profiles = $profiles
                 ->filter(fn (ModelProfile $profile) => $profile->lifecycleStatus() === $status)
@@ -335,7 +344,7 @@ class ModelManagementController extends Controller
         // Defense-in-depth: the route is additionally gated by the
         // `super_admin` middleware (isSuperAdmin).
         $user = auth('api')->user();
-        if (! $user || ! app(AuthorizationService::class)->isSuperAdmin($user)) {
+        if (! $this->isSuperAdmin()) {
             abort(response()->json(['error' => 'Keine Berechtigung.'], 403));
         }
 
@@ -348,6 +357,16 @@ class ModelManagementController extends Controller
         app(ModelProfileEraser::class)->erase($model, 'dsgvo', $user->id);
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Shared super-admin check for the lifecycle listing and DSGVO deletion.
+     */
+    private function isSuperAdmin(): bool
+    {
+        $user = auth('api')->user();
+
+        return $user !== null && app(AuthorizationService::class)->isSuperAdmin($user);
     }
 
     private function resolvePhoto(ModelProfile $profile, string $photoId, bool $requireFile = true): ModelPhoto

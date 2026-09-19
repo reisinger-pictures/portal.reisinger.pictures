@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { apiMutate, fetcher } from '../api';
+import { apiMutate, fetcher, type ApiError } from '../api';
 import {
     isCatalogOutdated,
     type ModelProfileAnswer,
@@ -80,6 +80,23 @@ export interface ModelFilters {
 }
 
 export const EMPTY_MODEL_FILTERS: ModelFilters = {};
+
+/**
+ * Lifecycle filter values the current admin may select. Inactive/all expose
+ * profiles hidden from regular admins (backend fails closed with 403); only
+ * super-admins get the extra options.
+ */
+export function lifecycleFilterValues(isSuperAdmin: boolean): Array<'' | 'inactive' | 'all'> {
+    return isSuperAdmin ? ['', 'inactive', 'all'] : [''];
+}
+
+/**
+ * `true` when a lifecycle filter is present that the user is not allowed to
+ * query (non-super-admin with `inactive`/`all`).
+ */
+export function isRestrictedLifecycleFilter(status: string | undefined, isSuperAdmin: boolean): boolean {
+    return !isSuperAdmin && (status === 'inactive' || status === 'all');
+}
 
 const STRING_FILTER_KEYS: Array<keyof Pick<ModelFilters, 'q' | 'gender' | 'city' | 'country' | 'age_min' | 'age_max' | 'act_type' | 'lifecycle_status'>> = [
     'q',
@@ -191,7 +208,7 @@ export function buildModelsQuery(filters: ModelFilters): string {
 
 export function useModels(filters: ModelFilters) {
     const query = buildModelsQuery(filters);
-    const { data, error, isLoading, mutate } = useSWR<ManagedModel[]>(
+    const { data, error, isLoading, mutate } = useSWR<ManagedModel[], ApiError>(
         `/api/management/models${query}`,
         fetcher,
     );

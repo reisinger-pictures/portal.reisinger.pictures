@@ -379,6 +379,10 @@ msgstr "Aktuell sind keine privaten Galerien für dich freigeschaltet."
 msgid "Aktuelle Ziel-Galerie"
 msgstr "Aktuelle Ziel-Galerie"
 
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Aktueller Manager"
+msgstr "Aktueller Manager"
+
 #: src/ui/client/components/SelectionFilterBar.tsx
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Alle"
@@ -1117,6 +1121,7 @@ msgstr "Bitte überweise den Rechnungsbetrag zeitnah. Gib als Verwendungszweck d
 msgid "Bitte wähle eine Rolle"
 msgstr "Bitte wähle eine Rolle"
 
+#: src/ui/ModelProfileAccessView.tsx
 #: src/ui/ModelRegistrationView.tsx
 msgid "Bitte wählen"
 msgstr "Bitte wählen"
@@ -1470,6 +1475,10 @@ msgstr "Die Daten werden automatisch in die Rechnung übernommen."
 #: src/ui/Impressum.tsx
 msgid "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter"
 msgstr "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
+msgstr "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
 
 #: src/ui/management/ManagementDashboard.tsx
 msgid "Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert. Setze <0>AI_ENABLED=true</0> und <1>AI_API_KEY</1> als Umgebungsvariablen."
@@ -3470,6 +3479,10 @@ msgstr "Mein Team"
 msgid "Meine Abrechnungen"
 msgstr "Meine Abrechnungen"
 
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Meine Acts"
+msgstr "Meine Acts"
+
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Meine Einkäufe & Lizenzen"
 msgstr "Meine Einkäufe & Lizenzen"
@@ -4003,6 +4016,10 @@ msgstr "Nur Kleinbuchstaben, Zahlen, - und _"
 msgid "Nur öffentliche Fotos können als Hauptbild dienen."
 msgstr "Nur öffentliche Fotos können als Hauptbild dienen."
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Nur Super-Admins können inaktive Profile sehen. Der Status-Filter wurde zurückgesetzt."
+msgstr "Nur Super-Admins können inaktive Profile sehen. Der Status-Filter wurde zurückgesetzt."
+
 #: src/ui/management/components/CreateUserModal.tsx
 msgid "Nutzer angelegt! Eine E-Mail zur Einrichtung wurde verschickt."
 msgstr "Nutzer angelegt! Eine E-Mail zur Einrichtung wurde verschickt."
@@ -4269,6 +4286,10 @@ msgstr "PDF Generieren"
 #: src/ui/ModelRegistrationView.tsx
 msgid "Person"
 msgstr "Person"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Person(en)"
+msgstr "Person(en)"
 
 #: src/ui/ModelRegistrationView.tsx
 msgid "Person(en) erfasst"
@@ -5471,6 +5492,26 @@ msgstr "Verwalte Vorlagen für Verträge und Sonderkonditionen."
 #: src/ui/components/Sidebar.tsx
 msgid "Verwaltung"
 msgstr "Verwaltung"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Verwaltung abgeben"
+msgstr "Verwaltung abgeben"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Verwaltung abgeben an"
+msgstr "Verwaltung abgeben an"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Verwaltung abgeben?"
+msgstr "Verwaltung abgeben?"
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Verwaltung konnte nicht abgegeben werden."
+msgstr "Verwaltung konnte nicht abgegeben werden."
+
+#: src/ui/ModelProfileAccessView.tsx
+msgid "Verwaltung wurde abgegeben."
+msgstr "Verwaltung wurde abgegeben."
 
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx

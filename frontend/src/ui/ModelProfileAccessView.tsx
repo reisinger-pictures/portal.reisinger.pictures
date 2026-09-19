@@ -16,12 +16,15 @@ import {
     createProfileAnswersSchema,
     isQuestionVisible,
     makePersonAnswers,
+    managerTransferCandidates,
+    modelActTypeLabel,
     normalizeAnswersForForm,
     modelLifecycleBadgeClass,
     modelLifecycleLabel,
     sections,
     type AnswersRecord,
     type ModelProfileAccess,
+    type ModelProfileAccessAct,
     type ModelProfileAccessPhoto,
     type ModelProfilePhotoUpdate,
     type ModelRegistrationCheck,
@@ -254,9 +257,79 @@ function ProfileEditForm({ profile, onSave, photoError, ageProofError }: {
     );
 }
 
+/**
+ * Owner section: acts the token holder belongs to, current manager, and the
+ * hand-over control. Only shown for acts the owner currently manages.
+ */
+function ManagerSection({ acts, onTransfer }: {
+    acts: ModelProfileAccessAct[];
+    onTransfer: (actId: string, newManagerCustomerId: string) => Promise<void>;
+}) {
+    const [selection, setSelection] = useState<Record<string, string>>({});
+
+    if (acts.length === 0) return null;
+
+    return (
+        <div className="card bg-base-100 border border-base-300 shadow-sm" data-testid="model-profile-manager">
+            <div className="card-body gap-3">
+                <h2 className="card-title text-xl"><Trans>Meine Acts</Trans></h2>
+                {acts.map(act => {
+                    const candidates = managerTransferCandidates(act);
+                    const selected = selection[act.id] ?? '';
+                    return (
+                        <div
+                            key={act.id}
+                            className="rounded-box bg-base-200 p-3 space-y-2"
+                            data-testid={`model-profile-act-${act.id}`}
+                        >
+                            <div className="text-sm">
+                                <span className="font-bold">{modelActTypeLabel(act.act_type)}</span>
+                                <span className="opacity-70"> · {act.person_count} {t`Person(en)`}</span>
+                            </div>
+                            <div className="text-xs opacity-70">
+                                <Trans>Aktueller Manager</Trans>:{' '}
+                                <span className="font-bold">{act.manager_name ?? '–'}</span>
+                            </div>
+                            {act.is_manager && candidates.length > 0 && (
+                                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                                    <label className="form-control flex-1">
+                                        <span className="label-text text-xs"><Trans>Verwaltung abgeben an</Trans></span>
+                                        <select
+                                            className="select select-bordered select-sm"
+                                            aria-label={t`Verwaltung abgeben an`}
+                                            value={selected}
+                                            onChange={event => setSelection(previous => ({ ...previous, [act.id]: event.target.value }))}
+                                        >
+                                            <option value="">{t`Bitte wählen`}</option>
+                                            {candidates.map(member => (
+                                                <option key={member.customer_id} value={member.customer_id}>
+                                                    {member.name ?? member.customer_id}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm"
+                                        disabled={selected === ''}
+                                        onClick={() => onTransfer(act.id, selected)}
+                                        data-testid={`model-profile-transfer-${act.id}`}
+                                    >
+                                        <Trans>Verwaltung abgeben</Trans>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 export default function ModelProfileAccessView() {
     const { token } = useParams<{ token: string }>();
-    const { profile, error, isLoading, update, confirm } = useModelProfileAccess(token);
+    const { profile, error, isLoading, update, confirm, transfer } = useModelProfileAccess(token);
     const { showToast, confirm: confirmDialog } = useUI();
     const [isConfirming, setIsConfirming] = useState(false);
     const [fatalError, setFatalError] = useState('');
@@ -323,6 +396,29 @@ export default function ModelProfileAccessView() {
         }
     };
 
+    const handleTransfer = async (actId: string, newManagerCustomerId: string) => {
+        if (newManagerCustomerId === '') return;
+        if (!(await confirmDialog({
+            title: t`Verwaltung abgeben?`,
+            message: t`Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen.`,
+            confirmColor: 'warning',
+        }))) return;
+        try {
+            await transfer(actId, newManagerCustomerId);
+            showToast('success', t`Verwaltung wurde abgegeben.`);
+        } catch (err: unknown) {
+            if (err instanceof Error && (err as { status?: number }).status === 410) {
+                setFatalError(err.message);
+                return;
+            }
+            const validationErrors = extractValidationErrors(err);
+            const message = validationErrors
+                ? (Object.values(validationErrors)[0]?.[0] ?? t`Verwaltung konnte nicht abgegeben werden.`)
+                : (err instanceof Error && err.message ? err.message : t`Verwaltung konnte nicht abgegeben werden.`);
+            showToast('error', message);
+        }
+    };
+
     return (
         <GuestLayout>
             <div className="mx-auto w-full max-w-4xl p-4 md:p-8">
@@ -380,6 +476,8 @@ export default function ModelProfileAccessView() {
                                 </div>
                             </div>
                         </div>
+
+                        <ManagerSection acts={profile.acts} onTransfer={handleTransfer} />
 
                         <div className="card bg-base-100 border border-base-300 shadow-sm">
                             <div className="card-body">

@@ -3,11 +3,13 @@ import {
     confirmModelProfileAccess,
     fetchModelProfileAccess,
     fetchMyModels,
+    transferModelProfileManager,
     updateModelProfileAccess,
     type AnswersRecord,
     type ModelProfileAccess,
     type ModelProfileConfirmResult,
     type ModelProfilePhotoUpdate,
+    type ModelProfileTransferResult,
     type ModelProfileUpdateResult,
     type MyModel,
 } from './modelRegistration';
@@ -44,7 +46,15 @@ export function useModelProfileAccess(token: string | undefined) {
         });
     };
 
-    return { profile: data, error, isLoading, mutate, update, confirm };
+    const transfer = (actId: string, newManagerCustomerId: string): Promise<ModelProfileTransferResult> => {
+        if (!token) return Promise.reject(new Error('Missing token'));
+        return transferModelProfileManager(token, actId, newManagerCustomerId).then(result => {
+            void mutate();
+            return result;
+        });
+    };
+
+    return { profile: data, error, isLoading, mutate, update, confirm, transfer };
 }
 
 /**

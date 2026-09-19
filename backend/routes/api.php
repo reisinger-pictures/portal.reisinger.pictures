@@ -110,6 +110,7 @@ Route::middleware('throttle:model-registration')->group(function () {
     Route::get('/model-profil/{token}', [ModelProfileAccessController::class, 'show'])->name('api.model-profile.show');
     Route::post('/model-profil/{token}', [ModelProfileAccessController::class, 'update'])->name('api.model-profile.update');
     Route::post('/model-profil/{token}/confirm', [ModelProfileAccessController::class, 'confirm'])->name('api.model-profile.confirm');
+    Route::post('/model-profil/{token}/transfer-manager', [ModelProfileAccessController::class, 'transferManager'])->name('api.model-profile.transfer-manager');
 });
 
 Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check'])->name('api.contracts.join.check');

@@ -16,7 +16,7 @@ import { apiMutate, apiUpload } from '../../api';
 import { useModelRegistration } from '../useModelRegistration';
 import { useModelInvites, buildCreateInviteBody, inviteLinkFromCreate } from '../useModelInvites';
 import { updateModelProfileAccess } from '../modelRegistration';
-import { useModels, buildModelsQuery, ageProofDownloadUrl, deleteModel, isModelOutdated, parseModelFilters, serializeModelFilters } from '../useModels';
+import { useModels, buildModelsQuery, ageProofDownloadUrl, deleteModel, isModelOutdated, parseModelFilters, serializeModelFilters, lifecycleFilterValues, isRestrictedLifecycleFilter } from '../useModels';
 
 const mutate = vi.fn();
 
@@ -196,6 +196,20 @@ describe('useModels helpers', () => {
         expect(buildModelsQuery({ lifecycle_status: '' })).toBe('');
         expect(buildModelsQuery({ lifecycle_status: 'inactive' })).toBe('?lifecycle_status=inactive');
         expect(buildModelsQuery({ lifecycle_status: 'all' })).toBe('?lifecycle_status=all');
+    });
+
+    it('exposes inactive/all lifecycle filter options to super-admins only', () => {
+        expect(lifecycleFilterValues(true)).toEqual(['', 'inactive', 'all']);
+        expect(lifecycleFilterValues(false)).toEqual(['']);
+    });
+
+    it('flags inactive/all as restricted for non-super-admins', () => {
+        expect(isRestrictedLifecycleFilter('inactive', false)).toBe(true);
+        expect(isRestrictedLifecycleFilter('all', false)).toBe(true);
+        expect(isRestrictedLifecycleFilter('', false)).toBe(false);
+        expect(isRestrictedLifecycleFilter(undefined, false)).toBe(false);
+        expect(isRestrictedLifecycleFilter('inactive', true)).toBe(false);
+        expect(isRestrictedLifecycleFilter('all', true)).toBe(false);
     });
 
     it('serialises and trims active filters', () => {

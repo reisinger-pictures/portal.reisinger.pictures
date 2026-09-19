@@ -12,6 +12,7 @@
 > Admin lädt eine Managerperson per kopierbarem Magic-Link ein (Mail optional); diese registriert login-frei einen **Act** mit 1..n Personen (je Person = CRM-Customer + ModelProfile). Altersnachweis **immer Pflicht**. Fragenkatalog **Code-first + Answers-Snapshot**.
 > **Status:** deployed (Commit `3db7437`, push + Redeploy done). Backend **1577** PHPUnit, Frontend **706** Vitest, Lint/Build grün, **12** Feature-E2E.
 > **Nachtrag 2026-09-19 (uncommitted):** Profil-Update-Mail + Contact-Sheet-Export (Backend+Frontend) + E2E-Ausbau. Backend **1587** PHPUnit, Frontend **722** Vitest, E2E-Grep (`model-registration|model-access|model-export`) **22** passed — alles READY-verifiziert.
+> **Nachtrag 2 (2026-09-19):** N1 (Manager-Transfer + Nachfolge + V035) + N2 (Inaktive nur Super-Admin, 403 fail-closed). Backend **1596**, Vitest **726**, E2E-Grep **28/28** — READY-verifiziert.
 
 **Backend (PHPUnit) — implementiert & verifiziert**
 - [x] V033-Migration (`customers.user_id`/`is_model`, `model_profiles`, `acts`, `act_members`, `model_registration_invites`) + V034 (Fotos/Tokens/Lifecycle)
@@ -34,8 +35,8 @@
 - [x] UI-Review Screenshot-Loop: Harness + Captures (desktop/mobile, filled/empty), Findings F1–F4 gefixt, APPROVED
 
 **Offen (User-Entscheidungen / Nachträge)**
-- [ ] **N1 — Manager-Act-Kaskade fixieren.** `acts.manager_customer_id` ist `cascadeOnDelete`: geht der **Manager** (DSGVO-Löschung/Expiry), löscht die FK den **ganzen Act** — auch `act_members` verbleibender Mitglieder, obwohl deren Profile bestehen bleiben. Vorschlag: `manager_customer_id` nullable + `nullOnDelete`, memberless-Cleanup greift bereits (`ModelProfileEraser`). Erklärung Session 2026-09-19.
-- [ ] **N2 — Sichtbarkeit inaktiver Modelle:** für alle Admins sichtbar oder nur Super-Admin?
+- [ ] **N1 — Manager-Act-Kaskade (entschieden + umgesetzt 2026-09-19).** Manager-Transfer im Self-Service (`POST /api/model-profil/{token}/transfer-manager`, nur Manager darf abgeben) + Auto-Nachfolge (bei Manager-Löschung wird das erste Restmitglied Manager, `ModelProfileEraser::reassignManagedActs`) + V035 (`manager_customer_id` nullable + `nullOnDelete`). READY-verifiziert (1596 PHPUnit, 726 Vitest, 28 E2E).
+- [x] **N2 — Sichtbarkeit inaktiver Modelle: nur Super-Admin** (User-Entscheidung 2026-09-19). Backend: `ModelManagementController::index` liefert `lifecycle_status=inactive|all` für Nicht-Super-Admins **403 (fail-closed, konsistent mit dem DSGVO-Destroy-Gate)**; Default ohne Param bleibt für alle `active`, unbekannte Werte fallen auf `active` zurück. Frontend: Status-Optionen „Inaktiv"/„Alle" nur für Super-Admins (`lifecycleFilterValues`); ein deep-gelinkter/tampered 403 wird mit Toast + Reset auf „Aktiv" abgefangen. Tests: PHPUnit `ModelProfileLifecycleExpiryTest` (Super-Admin 200 / Admin 403 / Default active / ungültig→active), Vitest `useModelRegistration.test.ts`, E2E `crm/model-lifecycle-filter.spec.ts`. Verifikation: PHPUnit **1589 passed**, Vitest **724 passed**, Lint/Build grün, E2E-Grep `model-registration|model-access` **24 passed** (`--workers=1`). Kein Commit/Push.
 - [x] E2E-Ausbau Runde 2 (Slider/Schwelle, Deeplink, Foto-Management/Primary-Clear, Delete-Cancel) — erledigt 2026-09-19 (Details unten)
 - [ ] Age-Proof-Positivfall (Re-Upload **ohne** vorhandenen Proof) — durch die UI nicht erzeugbar, siehe Analyse unten (produktionsseitig auf `age_proof_path`-NULL beschränkt)
 - [x] Profil-Update-Mail an Einladenden (`ModelProfileUpdatedMail`, Inviter via Act→Invite, stiller Skip ohne Invite, Multi-Act-Auflösung) — umgesetzt + READY-verifiziert 2026-09-19

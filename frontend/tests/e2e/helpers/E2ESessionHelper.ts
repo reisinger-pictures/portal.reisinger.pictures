@@ -225,6 +225,90 @@ export class E2ESessionHelper {
         return { firstName, email, customerId };
     }
 
+    /**
+     * Resolve a registered model's customer id by first name and track it for
+     * teardown (super-admin token sees all brands).
+     */
+    private async resolveModelCustomerId(firstName: string): Promise<string | null> {
+        const listRes = await this.request.get('/api/management/models?q=' + encodeURIComponent(firstName), {
+            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
+        });
+        if (!listRes.ok()) return null;
+        const list = await listRes.json() as Array<{ customer_id: string }>;
+        const customerId = list[0]?.customer_id ?? null;
+        if (customerId) this.trackModelCustomer(customerId);
+        return customerId;
+    }
+
+    /**
+     * Register a two-person group through the public API (person 0 = manager).
+     * Returns both persons with their resolved customer ids so the transfer flow
+     * and teardown can address them.
+     */
+    async createRegisteredGroup(): Promise<{
+        manager: { firstName: string; email: string; customerId: string | null };
+        member: { firstName: string; email: string; customerId: string | null };
+    }> {
+        await this.ensureAdminLogin();
+        const unique = Math.random().toString(36).substring(2, 10);
+        const manager = { first: `E2EGrpA${unique}`, email: `e2e-group-a-${unique}@example.com` };
+        const member = { first: `E2EGrpB${unique}`, email: `e2e-group-b-${unique}@example.com` };
+
+        const invite = await this.createModelInvite({ email: manager.email, label: `E2E Group ${unique}` });
+        const token = invite.link.split('/').pop() as string;
+        const ageProof = readFileSync(path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg'));
+
+        const willingnessKeys = [
+            'willingness_portrait',
+            'willingness_fashion',
+            'willingness_business',
+            'willingness_boudoir',
+            'willingness_bikini',
+            'willingness_akt',
+            'willingness_sport',
+            'willingness_couple_family',
+        ];
+        const fields: Record<string, string> = { 'manager_index': '0' };
+        [manager, member].forEach((person, index) => {
+            fields[`persons[${index}][answers][first_name]`] = person.first;
+            fields[`persons[${index}][answers][last_name]`] = 'Gruppe';
+            fields[`persons[${index}][answers][birthdate]`] = '1995-05-05';
+            fields[`persons[${index}][answers][gender]`] = 'weiblich';
+            fields[`persons[${index}][answers][email]`] = person.email;
+            fields[`persons[${index}][answers][phone]`] = '+43 660 1234567';
+            fields[`persons[${index}][answers][street]`] = 'Teststraße 1';
+            fields[`persons[${index}][answers][zip]`] = '4020';
+            fields[`persons[${index}][answers][city]`] = 'Linz';
+            fields[`persons[${index}][answers][country]`] = 'Österreich';
+            fields[`persons[${index}][answers][experience_portrait]`] = '0';
+            fields[`persons[${index}][answers][consent_privacy]`] = '1';
+            fields[`persons[${index}][answers][consent_accuracy]`] = '1';
+            fields[`persons[${index}][answers][consent_contact]`] = '1';
+            fields[`persons[${index}][answers][consent_photos]`] = '1';
+            fields[`persons[${index}][answers][consent_all_persons]`] = '1';
+            for (const key of willingnessKeys) {
+                fields[`persons[${index}][answers][${key}]`] = key === 'willingness_portrait' ? 'gerne' : 'nein';
+            }
+            fields[`persons[${index}][answers][willingness_stock]`] = 'nein';
+            fields[`persons[${index}][create_account]`] = '0';
+        });
+
+        const res = await this.request.post(`/api/model-registration/${token}`, {
+            headers: { 'Accept': 'application/json' },
+            multipart: {
+                ...fields,
+                'persons[0][age_proof]': { name: 'sample.jpg', mimeType: 'image/jpeg', buffer: ageProof },
+                'persons[1][age_proof]': { name: 'sample.jpg', mimeType: 'image/jpeg', buffer: ageProof },
+            },
+        });
+        if (!res.ok()) throw new Error(`Group registration failed (${res.status()}): ${await res.text()}`);
+
+        return {
+            manager: { firstName: manager.first, email: manager.email, customerId: await this.resolveModelCustomerId(manager.first) },
+            member: { firstName: member.first, email: member.email, customerId: await this.resolveModelCustomerId(member.first) },
+        };
+    }
+
     /** Create a 24h profile access link for a registered model (admin endpoint). */
     async createModelAccessLink(customerId: string): Promise<{ link: string; expires_at: string | null }> {
         await this.ensureAdminLogin();
