@@ -138,8 +138,12 @@ export class E2ESessionHelper {
      * Register a single model through the public API (current catalogue:
      * willingness per category + stock, all mandatory consents, age proof
      * upload). Tracks the created customer for teardown.
+     *
+     * `photoCount` optionally uploads person photos: the first is public and
+     * elected as primary, the rest are internal (matches the frontend defaults
+     * plus one elected main image for owner photo-management tests).
      */
-    async createRegisteredModel(): Promise<{ firstName: string; email: string }> {
+    async createRegisteredModel(options?: { photoCount?: number }): Promise<{ firstName: string; email: string; customerId: string | null }> {
         await this.ensureAdminLogin();
         const unique = Math.random().toString(36).substring(2, 10);
         const firstName = `E2EDel${unique}`;
@@ -183,25 +187,51 @@ export class E2ESessionHelper {
         }
         fields['persons[0][answers][willingness_stock]'] = 'nein';
 
+        const photoFields: Record<string, { name: string; mimeType: string; buffer: Buffer }> = {};
+        const photoCount = options?.photoCount ?? 0;
+        for (let index = 0; index < photoCount; index += 1) {
+            photoFields[`persons[0][photos][${index}][file]`] = {
+                name: `sample-${index}.jpg`,
+                mimeType: 'image/jpeg',
+                buffer: ageProof,
+            };
+            fields[`persons[0][photos][${index}][visibility]`] = index === 0 ? 'public' : 'internal';
+            if (index === 0) fields[`persons[0][photos][${index}][is_primary]`] = '1';
+        }
+
         const res = await this.request.post(`/api/model-registration/${token}`, {
             headers: { 'Accept': 'application/json' },
             multipart: {
                 ...fields,
+                ...photoFields,
                 'persons[0][age_proof]': { name: 'sample.jpg', mimeType: 'image/jpeg', buffer: ageProof },
             },
         });
         if (!res.ok()) throw new Error(`Model registration failed (${res.status()}): ${await res.text()}`);
 
         // Resolve the created customer for teardown (super-admin token sees all brands).
+        let customerId: string | null = null;
         const listRes = await this.request.get('/api/management/models?q=' + encodeURIComponent(firstName), {
             headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
         });
         if (listRes.ok()) {
             const list = await listRes.json() as Array<{ customer_id: string }>;
-            if (list[0]?.customer_id) this.trackModelCustomer(list[0].customer_id);
+            if (list[0]?.customer_id) {
+                customerId = list[0].customer_id;
+                this.trackModelCustomer(customerId);
+            }
         }
 
-        return { firstName, email };
+        return { firstName, email, customerId };
+    }
+
+    /** Create a 24h profile access link for a registered model (admin endpoint). */
+    async createModelAccessLink(customerId: string): Promise<{ link: string; expires_at: string | null }> {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const res = await this.request.post(`/api/management/models/${customerId}/access-link`, { data: {}, headers });
+        if (!res.ok()) throw new Error(`Model access link creation failed: ${await res.text()}`);
+        return res.json() as Promise<{ link: string; expires_at: string | null }>;
     }
 
     /** Delete a customer created by a model registration (cascade removes the profile). */

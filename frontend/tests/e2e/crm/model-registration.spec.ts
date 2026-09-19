@@ -165,7 +165,9 @@ test.describe('Model-Registrierung (öffentlicher Flow)', () => {
         const link = await page.getByTestId('model-invite-link').inputValue();
         expect(link).toContain('/model-registrierung/');
         await expect(page.getByTestId('model-invite-created')).not.toContainText('Zusätzlich per E-Mail versendet');
-        await expect(page.locator('main').locator('table')).toContainText(label);
+        // Scope to the invite dialog: the Models list renders model-card matrices
+        // (`main table`) as well, which made the bare locator ambiguous.
+        await expect(page.getByTestId('model-invite-dialog').locator('table')).toContainText(label);
 
         await auth.logout();
 

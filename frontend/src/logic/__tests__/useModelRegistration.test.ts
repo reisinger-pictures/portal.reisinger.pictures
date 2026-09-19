@@ -205,9 +205,15 @@ describe('useModels helpers', () => {
             .toBe('?category%5B%5D=bikini&category%5B%5D=akt');
     });
 
-    it('omits the threshold when "Egal" (no willingness params)', () => {
-        expect(buildModelsQuery({ willingness_categories: ['bikini'] })).toBe('');
-        expect(buildModelsQuery({ willingness_categories: ['bikini'], willingness_level: '' })).toBe('');
+    it('persists selected categories as a meta list while "Egal" (no threshold)', () => {
+        // Without a level the per-category params cannot carry the selection;
+        // the meta list keeps the threshold slider enabled until a level is set.
+        expect(buildModelsQuery({ willingness_categories: ['bikini'] }))
+            .toBe('?willingness_category%5B%5D=bikini');
+        expect(buildModelsQuery({ willingness_categories: ['bikini'], willingness_level: '' }))
+            .toBe('?willingness_category%5B%5D=bikini');
+        expect(parseModelFilters(new URLSearchParams('willingness_category%5B%5D=bikini&willingness_category%5B%5D=sport')))
+            .toEqual({ willingness_categories: ['bikini', 'sport'] });
     });
 
     it('round-trips filters through the URL params', () => {

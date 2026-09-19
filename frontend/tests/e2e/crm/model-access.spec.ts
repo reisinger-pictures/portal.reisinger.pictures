@@ -110,6 +110,49 @@ test.describe('Model-Profil-Zugang (Magic Link)', () => {
         }
     });
 
+    test('Owner stuft das einzige öffentliche Hauptbild auf intern zurück (Primary-Clear statt 422) und wählt danach ein neues Hauptbild', { tag: ['@feature:model-access'] }, async ({ page }) => {
+        // Fixture via the sanctioned API helper: 2 photos, first public + primary.
+        const model = await helper.createRegisteredModel({ photoCount: 2 });
+        if (!model.customerId) throw new Error('Registered model has no customer id');
+        const access = await helper.createModelAccessLink(model.customerId);
+        expect(access.link).toContain('/model-profil/');
+
+        await page.goto(access.link);
+        await expect(page.getByTestId('model-profile-access')).toBeVisible({ timeout: 15000 });
+
+        const photos = page.getByTestId('profile-photos');
+        await expect(photos).toBeVisible();
+        const visibility = photos.getByLabel('Sichtbarkeit');
+        await expect(visibility).toHaveCount(2);
+        await expect(visibility.nth(0)).toHaveValue('public');
+        await expect(photos.getByRole('radio').nth(0)).toBeChecked();
+
+        // Demote the only public (primary) photo to internal without a replacement.
+        // The frontend must send `is_primary: false` so the backend clears the
+        // election instead of rejecting the update with a 422.
+        await visibility.nth(0).selectOption('internal');
+        await expect(photos.getByRole('radio').nth(0)).toBeDisabled();
+        await page.getByTestId('model-profile-save').click();
+        await expect(page.locator('.toast')).toContainText('Profil wurde gespeichert');
+        await expect(page.getByTestId('profile-photos-error')).toHaveCount(0);
+
+        // Reload proves persistence: photo internal, no primary left.
+        await page.reload();
+        await expect(page.getByTestId('profile-photos')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByTestId('profile-photos').getByLabel('Sichtbarkeit').nth(0)).toHaveValue('internal');
+        await expect(page.getByTestId('profile-photos').getByRole('radio').nth(0)).not.toBeChecked();
+
+        // Promote the second photo: make it public, then elect it as main image.
+        await page.getByTestId('profile-photos').getByLabel('Sichtbarkeit').nth(1).selectOption('public');
+        await page.getByTestId('profile-photos').getByRole('radio').nth(1).check();
+        await page.getByTestId('model-profile-save').click();
+        await expect(page.locator('.toast')).toContainText('Profil wurde gespeichert');
+
+        await page.reload();
+        await expect(page.getByTestId('profile-photos').getByLabel('Sichtbarkeit').nth(1)).toHaveValue('public', { timeout: 15000 });
+        await expect(page.getByTestId('profile-photos').getByRole('radio').nth(1)).toBeChecked();
+    });
+
     test('Unbekannter Profil-Token zeigt 404', { tag: ['@feature:model-access'] }, async ({ page }) => {
         await page.goto('/model-profil/' + 'a'.repeat(64));
         await expect(page.getByTestId('model-profile-error')).toContainText('Profil-Link nicht gefunden', { timeout: 15000 });

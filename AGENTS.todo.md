@@ -1,120 +1,81 @@
 # Task Board — Portal Reisinger Pictures
 
-> Stand: 2026-09-12. **Nur offene TODOs + erledigte Referenz-Blöcke.** Architekturentscheidungen in `features/`.
+> Stand: 2026-09-19. **Nur offene TODOs + erledigte Referenz-Blöcke.** Architekturentscheidungen in `features/`.
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 
 ---
 
-## 🆕 OFFEN (2026-09-18) — Model-Registrierung (Einladungslink)
+## ✅ ERLEDIGT (2026-09-18/19) — Model-Registrierung (Magic-Link) + Profile-Iteration
 
-> Plan: `~/.opencode/plan/model-registrierung.md`. Admin lädt eine Managerperson per Einmal-Link ein; diese registriert login-frei einen **Act** mit 1..n Personen (je Person = eigener CRM-Customer/Model). Altersnachweis **je Person** nur bei Bikini/Akt/Erotik. Erfolgsmail an den **einladenden User**. Fragenkatalog **Code-first + Answers-Snapshot** (alte Fragen bleiben bis Profilaktualisierung sichtbar). Berechtigung: nur Admin/Super-Admin.
+> Plan: `~/.opencode/plan/model-registrierung.md` · SOLL: `features/crm/05-model-registration.md` + `features/crm/06-model-profile-iteration.md`.
+> Admin lädt eine Managerperson per kopierbarem Magic-Link ein (Mail optional); diese registriert login-frei einen **Act** mit 1..n Personen (je Person = CRM-Customer + ModelProfile). Altersnachweis **immer Pflicht**. Fragenkatalog **Code-first + Answers-Snapshot**.
+> **Status:** deployed (Commit `3db7437`, push + Redeploy done). Backend **1577** PHPUnit, Frontend **706** Vitest, Lint/Build grün, **12** Feature-E2E.
+> **Nachtrag 2026-09-19 (uncommitted):** Profil-Update-Mail + Contact-Sheet-Export (Backend+Frontend) + E2E-Ausbau. Backend **1587** PHPUnit, Frontend **722** Vitest, E2E-Grep (`model-registration|model-access|model-export`) **22** passed — alles READY-verifiziert.
 
-**Backend (DoD: PHPUnit)** — ✅ implementiert (Session 2026-09-18)
-- [x] V033-Migration: `customers.user_id`/`is_model`; `model_profiles`; `acts`; `act_members`; `model_registration_invites`
-- [x] Modelle + Relations + DB-Projektion (`categories()`/`actTypes()`/`brandValue()`; Model-Suche per DB-Filter, kein Scout)
-- [x] `ModelQuestionnaire` (versioniert v1; Sektionen A/B/C/G/H; Kategorien mit Beschreibung)
-- [x] Controller: Admin-`invite`, öffentlich `check`/`submit` (multipart, Einmal-Token atomar), Admin-Liste/Revoke, Model-Suche, Age-Proof-Download (auth-gated)
-- [x] Mailables: Invite-Mail + Success-Mail an `invited_by` (brand-aware)
-- [x] Privater Storage-Disk (`local`); Retention-Konzept bleibt offen (s. u.)
-- [x] Feature-/Unit-Tests: `ModelRegistrationTest`, `ModelInviteAdminTest`, `ModelManagementTest`, `ModelProfileAttributesTest`, `ModelQuestionnaireTest`
-- [x] Orphan-Cleanup-Test (R2): 2 Regressionstests grün; dabei echter Bug in `storeAgeProof` gefunden+gefixt (Datei wird bei Metadaten-Fehler jetzt selbst gelöscht)
-- Kontrakt-Doku: `features/crm/05-model-registration.md` (API-Vertrag eingefroren)
+**Backend (PHPUnit) — implementiert & verifiziert**
+- [x] V033-Migration (`customers.user_id`/`is_model`, `model_profiles`, `acts`, `act_members`, `model_registration_invites`) + V034 (Fotos/Tokens/Lifecycle)
+- [x] Modelle + Relations + DB-Projektion (DB-Filter-Suche, kein Scout)
+- [x] `ModelQuestionnaire` (Single-Katalog v1; Sektionen; Kategorien; Schwellen-/Score-/Ordinal-Helper)
+- [x] Controller: Admin-Invite (Magic-Link primary, Mail optional), öffentlich check/submit (multipart, Einmal-Token atomar), Admin-Liste/Revoke, Model-Suche, Age-Proof-Download (auth-gated)
+- [x] Mailables: Invite- + Success-Mail an `invited_by` (brand-aware, harte Fakten + Deeplinks)
+- [x] Encrypted Storage (AES-256-GCM, Paket, eigener `FILE_ENCRYPTION_KEY`) + EXIF-Strip + Auth-Gate + Audit
+- [x] Lifecycle 13+2 (Reminder T+12/13/14, Confirm-Reset, Expiry-Hard-Delete) + DSGVO-Löschung (Super-Admin, DRY-Eraser)
+- [x] Profil-Zugang: Profil-Magic-Link 24h + Revoke, öffentlich lesen/aktualisieren, „Meine Profile", Foto-Management, Altersnachweis-Re-Upload
+- [x] Suche: Kategorie-/Bereitschafts-Multi-Chips, Schwellen (Minimum-Semantik), Match-Score-Default-Sort, Alter von/bis als Zahlenfelder
+- [x] Free-Review-Fixes B1–B4 + F1/F2 (deferred Mails, Lifecycle-Null-Anker, atomarer Owner-Update, eingeschränkter Constraint-Drop, Age-Proof-Upload) — READY-verifiziert
 
-**Frontend (DoD: Vitest + Playwright)** — ✅ implementiert (Session 2026-09-18)
-- [x] Öffentliche Route `/model-registrierung/:token` (Gast-Layout, RHF+Zod, Personenblöcke, Uploads)
-- [x] Admin: Einladung anlegen/Liste + Model-Suche-View (Filter)
-- [x] Vitest: Zod-Schema-Factory, Personen-Form-State, Hooks
-- [x] Playwright `@feature:model-registration` + `@smoke` Admin-Gate
+**Frontend (Vitest + Playwright) — implementiert & verifiziert**
+- [x] Öffentliche Route `/model-registrierung/:token` (Gast-Layout, RHF+Zod, Personenblöcke, Slider, Foto-DnD, Uploads)
+- [x] Admin: **ein** Menüpunkt „Models"; Einladung als Dialog auf der Models-Seite (`/admin-model-invites` → Redirect)
+- [x] Models-Suche: Karten-Layout (breit, kein innerer Scroll), Matrix (Zeilen sortiert + gematchte Kategorie oben), Detail-Dialog read-only, `?model=`-Deeplink, URL-synchronisierte Filter, Status-/Lifecycle-Filter, Delete-Button (Super-Admin)
+- [x] Öffentliches Profil `/model-profil/:token` (read-only Aufbau, Foto-Clear, Confirm) + „Meine Profile"
+- [x] Vitest 706 / Lint 0 / Build grün; `@feature:model-registration` + `@feature:model-access` 12 passed — READY-verifiziert
+- [x] UI-Review Screenshot-Loop: Harness + Captures (desktop/mobile, filled/empty), Findings F1–F4 gefixt, APPROVED
 
-**Offen (Frontend, vor Go-live)**
-- [ ] Profilaktualisierung (v1 nur Admin — „Profil aktualisieren"-Banner zeigt nur an, es gibt noch keinen Migrations-Trigger im UI)
-- [ ] Client-seitiges Sanity-Limit der Personenzahl (Plan §Offene Punkte)
-- [ ] Lokale E2E-Flakiness: `database is locked` (SQLite `busy_timeout=null` in `backend/config/database.php`) bei parallelen Playwright-Workern; reproduzierbar auch in bestehenden Specs (`admin/no-b2b-label.spec.ts`) → Workaround `--workers=1`; Fix wäre `busy_timeout`/WAL in der Dev-DB-Config (Backend-Thema)
+**Offen (User-Entscheidungen / Nachträge)**
+- [ ] **N1 — Manager-Act-Kaskade fixieren.** `acts.manager_customer_id` ist `cascadeOnDelete`: geht der **Manager** (DSGVO-Löschung/Expiry), löscht die FK den **ganzen Act** — auch `act_members` verbleibender Mitglieder, obwohl deren Profile bestehen bleiben. Vorschlag: `manager_customer_id` nullable + `nullOnDelete`, memberless-Cleanup greift bereits (`ModelProfileEraser`). Erklärung Session 2026-09-19.
+- [ ] **N2 — Sichtbarkeit inaktiver Modelle:** für alle Admins sichtbar oder nur Super-Admin?
+- [x] E2E-Ausbau Runde 2 (Slider/Schwelle, Deeplink, Foto-Management/Primary-Clear, Delete-Cancel) — erledigt 2026-09-19 (Details unten)
+- [ ] Age-Proof-Positivfall (Re-Upload **ohne** vorhandenen Proof) — durch die UI nicht erzeugbar, siehe Analyse unten (produktionsseitig auf `age_proof_path`-NULL beschränkt)
+- [x] Profil-Update-Mail an Einladenden (`ModelProfileUpdatedMail`, Inviter via Act→Invite, stiller Skip ohne Invite, Multi-Act-Auflösung) — umgesetzt + READY-verifiziert 2026-09-19
+- [x] PDF-Export „Contact Sheet" intern/extern (Phase 1+2, extern mit Wasserzeichen) — umgesetzt + READY-verifiziert 2026-09-19 (SOLL: `features/crm/07-model-contact-sheet-export.md`)
+- [ ] Client-seitiges Sanity-Limit der Personenzahl (Plan §Offene Punkte) — verifizieren
+- [ ] Lokale E2E-Flakiness `database is locked` (SQLite `busy_timeout=null`) → Workaround `--workers=1`; Fix wäre `busy_timeout`/WAL (Backend)
+- Hinweis (Setup): lokale `backend/.env` braucht `MODEL_REGISTRATION_THROTTLE_LIMIT=1000` (Parität zu `.env.ci`), sonst 429-Flakes im E2E-Grep-Lauf. `.env` ist gitignored.
 
-**Doku**
-- [x] `features/crm/05-model-registration.md` (SOLL-Zustand, inkl. API-Vertrag + akzeptierte 404/410-UX)
+**Future (nur TODO, nicht umsetzen)**
+- [ ] Contact Sheet Phase 3 (Bulk/Ergebnisliste) + Phase 4 (signierter Extern-Link) — Plan: `~/.opencode/plan/pdf-contact-sheet-export.md`
+- [ ] Kategorien-Admin-UI; Personen-Bestätigungslink; Löschkonzept für Altersnachweise (Aufbewahrungsfrist)
 
-**Offen (vor Go-live)**
-- [ ] Löschkonzept für Altersnachweise (Aufbewahrungsfrist)
-- [ ] Kategorien-Admin-UI (später); Profilaktualisierung durch Kontoinhaber (später); Personen-Bestätigungslink (später)
+**Model-Zugang (User-Anforderung 2026-09-19) — umgesetzt**
+- [x] `model_access_tokens` (24h-TTL, `last_used_at`, `revoked_at`); Admin create/revoke (brand-scoped); öffentlich GET/POST `/api/model-profil/{token}` + `/confirm`; `GET /api/me/models` — PHPUnit
+- [x] Frontend Admin „Zugangslink kopieren" im Detail; öffentlich `/model-profil/:token`; „Meine Profile" — Vitest + Playwright `@feature:model-access`
+- [x] Doku `features/crm/05-model-registration.md`; Screenshot-Capture + Review
 
-**Magic Link = Primary Flow (User-Entscheidung 2026-09-19)**
-- [ ] Backend: V033 amenden (uncommitted): `invites.email` nullable + `label` (Name/Notiz); `store` gibt `link` zurück; Liste enthält `link`+`label`; Mail nur wenn E-Mail vorhanden
-- [ ] Frontend: Link-Copy-UI (nach Anlegen + in Liste), Label-Feld, E-Mail optional; E2E für No-Mail-Flow (Link aus UI kopieren → öffnen)
-- [ ] Doku: `features/crm/05-model-registration.md` auf Magic-Link-Primary aktualisieren
+---
 
-**UI-Review Screenshot-Loop (User-Feedback 2026-09-19: sichtbare UI-Fehler, bisher KEINE Screenshot-Tests — nur DOM-E2E)**
-- [x] Harness scaffolding (`playwright.screenshots.config.ts` + Manifest + Spec, Skill `ui-review`)
-- [x] Capture + Vision-Analyse (34 PNGs, Model-Seiten filled/empty, desktop/mobile) — Analyse manuell (Vision-Subagenten ohne FS-Zugriff)
-- [x] Findings fixen (F1 Gast-Layout, F2 Badge-Clipping, F3 Consent-Wrap mobil, F4 Checkbox-Optik) + Re-Capture + Vergleich
-- [x] APPROVED (2026-09-19, Vorher/Nachher-Captures geprüft: Gast-Layout minimal, Badges vollständig, Consent wrappt, Checkboxen eckig)
+## ✅ ERLEDIGT (2026-09-19) — E2E-Ausbau Runde 2 (Model-Registrierung/-Zugang)
 
-**Model-Profile Iteration (User-Feedback 2026-09-19 — umgesetzt + verifiziert, bereit für manuellen Test)**
-> Verifikation (final): Backend READY (1573 Suite), Frontend READY (702 Vitest, 12 E2E), UI-Review APPROVED. Dev-DB frisch für manuellen Test (Backup `.../portal-database-backup-final-20260919.sqlite`). Runde 2 komplett drin (Slider, Matrix, URL-Sync, Match-Score, Threshold, Multi-Chips, Deeplinks, Detail read-only, Status-Filter, Foto-Clear, Mail-Fakten, Expiry-Delete, DSGVO-Löschung + Button).
-> **Offen (deine Entscheidungen):** Update-Mail an Einladenden bei Profil-Update? Manager-Act-Kaskade ok (N1)? Inaktive für alle Admins sichtbar ok (N2)? E2E-Ausbau + PDF-Export (Future)?
-> **Offen:** Update-Mail an Einladenden bei Profil-Update (keine Entscheidung); Manager-Act-Kaskade bei Löschung (N1: fachlich fixieren).
-> **Standing (User 2026-09-19):** Beim nächsten manuellen Test EXPLIZIT nachfragen/prüfen, ob wirklich die aktuelle Version im Browser liegt (Hard-Reload Cmd+Shift+R, Marker: kein Katalogstand im Gast-Formular, Karten-Layout, Slider) — keine alte Version testen.
-> **Entschieden (2026-09-19):** Erotik raus (Single-v1, kein Split); Fashion/Business getrennt; Agentur Name+Link; Encryption at rest (Files + answers-JSON, Suchfelder plaintext, Paket-only); Model-Zugang (24h-Link + Meine Profile) mitgebaut; Version nicht im Kunden-UI.
-> **Offen:** Update-Mail an Einladenden bei Profil-Update (User-Frage, keine Entscheidung); Manager-Act-Kaskade bei Löschung (N1: fachlich fixieren).
-Form/UX — alle umgesetzt (P3, E2E grün):
-- [x] Managerperson-Radio nur bei >1 Person; Alter neben Geburtsdatum; Kontaktweg-Validierung client+server; Fotos max 5 + public/internal + Hauptbild; Aussehen default zugeklappt; Bereitschaft (+Stock) vor Erfahrung; Act-Einstieg oben + Notizen nur >1; Ausweis immer Pflicht; Consents als Sätze mit Links + `consent_photos`
-Katalog (Single-v1):
-- [x] Erotik entfernt; Fashion/Business getrennt; Bereitschafts-Stufen + Admin-Suche mit Priorisierung; Agentur Name+Link
-- [x] Label „Wenn es sein muss" → „Eher ja" (nur Anzeige, Codes/Ordinale unverändert) — verifiziert READY
-- [x] Fähigkeiten vereinfachen: nur Freitext-Feld „Fähigkeiten" (Multiselect, „Sprachen & Niveau", „Selbstbeschreibung" entfernen) — verifiziert READY
-- [ ] Matrix mobil: läuft aus der Karte (Lust-Spalte abgeschnitten) — responsive machen (Wrap/Scroll/kompakte Pills)
-Lifecycle/Retention:
-- [x] `last_confirmed_at`, 13+2-Zeiten, Reminder T+12/13/14, Confirm-Reset (auch ohne Änderung); Profil-Zugang 24h-Link + `/me/models`
-- [x] Expired (nach 15 Monaten) = Hard-Delete (DRY-Eraser, verifiziert); Admin-Liste default nur aktiv; Super-Admin findet Inaktive
-Admin:
-- [x] Detail kompakt (leere Felder aus) + Galerie; Karten-Layout mit Hauptbild; Multi-Select; Bereitschafts-Filter/Sort; Lifecycle-Badges
-- [x] **DSGVO-Löschung (Super-Admin)** — Backend READY-verifiziert (Super-Admin-Gate, Brand-Scope, Dateien per Storage-Assertion weg, Observer, Audit ohne PII, Suite 1545)
-  - [x] Frontend: Löschen-Button (nur Super-Admin) mit Confirm + E2E (687 Vitest, 12 E2E) — finale Frontend-Verifikation läuft
-Sicherheit:
-- [x] Bildspeicherung: private Disk + AES-256-GCM (Paket, eigener Key) + Auth-Gate + Audit-Log; Suchfelder plaintext (belegt)
+> Auftrag: Lücken der Runde-2-Features mit **echten Nutzer-Interaktionen** schließen (semantische, gescopte Locators, Tags, kein `page.goto`-SPA-Missbrauch, keine localStorage-Injektion).
+> **Verifikation:** `pnpm vitest run` **706 passed**, `pnpm lint:fix` 0, `pnpm build` grün; `npx playwright test --grep "@feature:model-registration|@feature:model-access" --workers=1` **20 passed** (Desktop + Mobile). Kein Commit/Push, keine Backend-Änderung.
 
-**Model-Iteration Runde 2 (User-Feedback 2026-09-19 — in Umsetzung)**
-- [ ] Bereitschaft/Selects: Slider statt Dropdown (daisyUI range, 5 Stufen, farbcodiert rot/hellrot/gelb/hellgrün/dunkelgrün) — auch im Formular
-- [ ] Stock-Fotos: Bereitschaft fehlt (prüfen + ergänzen, Formular + Admin)
-- [ ] Portal-Konto-Label als optional kennzeichnen
-- [ ] Letzte Checkbox: doppelten Link entfernen
-- [ ] Regel: Hauptbild muss öffentlich sein (sobald öffentliche Bilder existieren) — client + server
-- [ ] Datei-Vorschau (Thumbnails) bei Ausweis-Upload + Fotos
-- [ ] Foto-Reihenfolge: Drag & Drop (Desktop) + Pfeil-Buttons (mobil)
-- [ ] Eingelöste Einladung → Deeplink zum Model-Profil
-- [ ] Dialog-Höhe: minimal kleiner als Fensterhöhe (Modal max-height)
-- [ ] Bereitschaft: nach Stufen gruppiert absteigend + farbcodiert (Admin + Formular)
-- [ ] Bereitschafts-Filter als Mindest-Schwelle (ab Stufe X, bessere immer dabei); Sortierung primär nach Erfahrung
-- [ ] Default-Sortierung = Match-Score (Lust dominiert, Erfahrung Tiebreak): Score = Lust × 10 + Erfahrung, Max über Kategorien; „Neueste" bleibt wählbar
-- [ ] Bereitschafts-Kategorie ebenfalls als Multi-Select-Chips (wie Hauptfilter) — Backend-ODER existiert bereits
-- [ ] Bereitschafts-Slider: Tabs/Chips darunter entfernen (Slider allein); Leermodus „Egal" statt „Nein", dann Param nicht mitschicken
-- [ ] Bug: Bereitschafts-Schwelle aktuell nicht änderbar — nach Slider-Umbau verifizieren + E2E (Stufe setzen/wechseln/löschen)
-- [ ] Update-/Lifecycle-Badge: Höhe bei mehrzeiligem/langem Inhalt fixen
-- [ ] Stock-Fotos-Zeile fehlt (Matrix/Formular): willingness_stock immer zeigen (Erfahrung „–")
-- [ ] „Egal"-Button wieder weg: Abwahl per erneutem Klick auf aktive Stufe (Reset bleibt global)
-- [x] **Free-Review-Fixes (CHANGES_REQUIRED → READY-verifiziert)**: B1 Mails aus Transaktion (deferred+Rollback-Test), B2 Lifecycle-Null-Anker, B3 Owner-Update atomar, B4 Constraint-Drop eingeschränkt, F1 Owner Age-Proof-Upload, F2 Alias-Skip; B6 als akzeptiertes Risiko dokumentiert
-- [ ] Foto-Demotion: Hauptbild auf intern stellen ohne Ersatz muss gehen (Primary-Clear statt 422-Sackgasse)
-- [ ] Slider-Layout: Überschrift in eigener Zeile (Label + Wert-Pill), Slider darunter volle Breite; 2-Spalten-Grid (Bereitschaft | Erfahrung) bleibt
-- [ ] Sortier-Kategorie entfernen (sinnlos); Experience-Sort über Max aller Kategorien
-- [ ] Alter von/bis als Range-Slider (Dual-Thumb, mobil bedienbar, mit Zahlen-Fallback)
-- [ ] Revert: Alter von/bis zurück auf reine Zahlen-Textfelder (User-Entscheidung — Slider verworfen)
-- [ ] Ergebnis-Matrix statt „Nein"-Filter-Verwirrung: pro Model und Kategorie Erfahrung (`--/-/0/+/++`) × Lust (farbcodiert) in einer Matrix zeigen; Filter-Schwelle als „mindestens" labeln
-- [ ] Matrix-Zeilen: nach Erfahrung/Lust sortiert, gesuchte (gematchte) Kategorie fixiert oben
-- [ ] Admin-Models-URL mit Deeplink zum geöffneten Profil (`?model=<id>`)
-- [ ] Suchparameter in der URL (Filter als Query-String: teilbar, bookmarkable, Back-Button-konsistent)
-- [ ] Detail-Dialog als Read-only-Faktenansicht im Formular-Aufbau (Sektionen wie im Formular, harte Fakten oben, Datenstand sichtbar, interne Keys ausblenden)
-- [ ] Fertigstellungs-Mail an Einladenden: Deeplink zum Model-Profil + harte Fakten direkt in der Mail (Personen, Alter, Kategorien/Bereitschaft, Ausweis-Status)
-- [ ] Admin-Suche: gewählte Kategorien im Suchergebnis unten sichtbar hervorheben (Treffer-Badges + Count)
-- [ ] Erfahrungsskala: `-- / - / 0 / + / ++` (statt keine/Anfänger/erfahren/Profi); „Lust" (Bereitschaft) farbcodiert
-- [ ] **Future (nur TODO):** PDF-Export intern/extern — noch zu verfeinern, nicht umsetzen
-- [ ] Struktur: nur EIN Models-Menüpunkt; Einladung als Dialog auf der Models-Seite (separate Einladungs-Seite/Route auflösen)
+**Neue/geänderte Tests**
+- [x] `frontend/tests/e2e/crm/model-filters.spec.ts` (**neu**): Bereitschafts-Kategorie-Chip → `willingness_<kat>=<level>`; Stufe wechseln (Slider) → Param ändert sich; Stufe abwählen → Param weg, Kategorie bleibt; Reload → Filter bleibt; `?model=<id>`-Deeplink → Detail-Dialog offen, Schließen entfernt Param.
+- [x] `frontend/tests/e2e/crm/model-access.spec.ts`: **Owner-Foto-Management** — einziges öffentliches Hauptbild auf `internal` stellen (Primary-Clear statt 422), Reload-Persistenz, danach zweites Foto öffentlich + als Hauptbild wählen; Negativfall „Feld verborgen bei vorhandenem Proof" bleibt.
+- [x] `frontend/tests/e2e/crm/model-delete.spec.ts`: **Löschen-Cancel** — Danger-Zone-Löschung abbrechen → Profil bleibt (Reload-geprüft).
+- [x] `frontend/tests/e2e/helpers/E2ESessionHelper.ts`: `createRegisteredModel({ photoCount })` (erstes Foto public+primary, Rest internal) + `createModelAccessLink(customerId)`; Helper-API = sanktioniertes Test-Setup (kein DB-/localStorage-Hack).
+- [x] `frontend/tests/e2e/crm/model-registration.spec.ts`: **Regression-Fix (pre-existing, Zero-Pre-existing-Failures-Policy)** — `main table` war mehrdeutig (3 Treffer: 2× Model-Karten-Matrix + Einladungstabelle) → auf `model-invite-dialog` gescopt.
 
-**Model-Zugang: Profile einsehen/aktualisieren (User-Anforderung 2026-09-19)**
-> Models aktualisieren „unter dem Jahr" ihre Profile. Zwei Zugangswege: (a) **ausgeloggt per Profil-Magic-Link** — pro Model-Profil (Customer) ein eigener wiederverwendbarer Link mit langem Ablauf + Revoke; (b) **eingeloggt mit Portal-Konto** — „Meine Profile". Status quo: KEINS davon existiert (Account wird nur angelegt/verknüpft, führt nirgendwo hin).
-- [ ] Backend: `model_access_tokens` (customer_id, token, expires_at **24h** (User-Entscheidung 2026-09-19), last_used_at, revoked_at); Admin create/revoke (brand-scoped, Link zum Kopieren); öffentlich GET+POST `/api/model-profil/{token}` (lesen + aktualisieren gegen aktuellen Katalog, Snapshot-Versionierung); `GET /api/me/models` (Owner-Zugriff); PHPUnit (Ablauf/Revoke/Brand/Owner/last_used_at)
-- [ ] Frontend: Admin „Zugangslink kopieren" im Model-Detail; öffentlich `/model-profil/:token` (lesen + aktualisieren); eingeloggt „Meine Profile"; Vitest + Playwright `@feature:model-access`
-- [ ] Doku: `features/crm/05-model-registration.md` (Profil-Zugang); danach Screenshot-Capture + Vision-Review der neuen Seiten
+**Gefundener & gefixter Frontend-Bug (durch den neuen E2E-Test aufgedeckt)**
+- [x] `frontend/src/logic/useModels.ts`: Die ausgewählte **Bereitschafts-Kategorie** ging verloren, solange der Level „Egal" war — `serializeModelFilters` schrieb die Kategorie nur zusammen mit einer Schwelle, während `parseModelFilters` sie ausschließlich aus `willingness_<kat>` rekonstruiert. Folge: Chip wirkte nach dem Klick inaktiv (`aria-pressed=false`) und der **Schwellen-Slider blieb dauerhaft `disabled`** → Schwelle nie setzbar. Fix: Kategorien ohne Level als Meta-Liste `willingness_category[]` persistieren (Backend ignoriert sie ohne Level) + Parser liest `[]`/skalare Variante. Regressionstest: `frontend/src/logic/__tests__/useModelRegistration.test.ts` (Test ersetzt, der das alte Verhalten festhielt).
+
+**Bewusst ausgelassen (begründet)**
+- [ ] **Age-Proof-Positivfall (Re-Upload ohne vorhandenen Proof):** nicht ohne Backend-Eingriff erzeugbar. `ProfileEditForm` blendet das Feld nur bei `profile.age_proof_required && !profile.age_proof_uploaded_at` ein; das öffentliche `POST /api/model-registration/{token}` erzwingt den Nachweis (`required`, v2), und der Owner-`POST /api/model-profil/{token}` setzt `age_proof_required=true` + die Datei (beim Bestehen bleibt `age_proof_uploaded_at` gesetzt). `age_proof_path === null` bei `age_proof_required === true` ist damit nur über Altbestände/einen direkten DB-Reset erreichbar — ein solcher Zustand existiert produktionsseitig nicht regulär.
+
+**Umgebungs-Hinweise (kein Code-Delta)**
+- Lokal scheiterte der Lauf zunächst an `429 Too Many Attempts`: das (gitignored) `backend/.env` hat **keinen** `MODEL_REGISTRATION_THROTTLE_LIMIT` → Limiter-Default 10/min. CI setzt in `backend/.env.ci` `MODEL_REGISTRATION_THROTTLE_LIMIT=1000`. Für die Verifikation wurde `.env` temporär auf 1000 gesetzt und danach **byte-identisch wiederhergestellt** (md5-geprüft).
+- `pnpm test:e2e:smoke` (ohne `--workers=1`) verzeichnet die bekannte lokale SQLite-Flakiness `database is locked` (siehe Offen N3) — unabhängig von dieser Änderung.
 
 ---
 
@@ -206,14 +167,14 @@ Sicherheit:
 - [ ] **P1-I4 (MEDIUM)** Deploy-Secret-Gate fail-open wenn `APP_ENV != production` — `deployment/docker-compose.yml:138-145`.
 - [ ] **P1-I5 (MEDIUM)** Container laufen als root (inkl. Queue-Worker auf Bind-Mounts) — `deployment/Dockerfile:26-27`, `docker-compose.yml:55-73,136-158`.
 - [ ] **P1-I6 (MEDIUM)** CI ohne minimales `permissions:`-Block; Actions/Images nur per Tag gepinnt (Supply-Chain) — `.github/workflows/*.yml`, `docker-compose.yml:49,56`, `Dockerfile.e2e:18,30`.
-- [ ] **P1-I7 (MEDIUM)** `rclone-backend-filter.txt` schließt `.env.production`/`.env.ci` nicht aus (destruktiver `sync`) — `:1-27`, `sync.sh:8`.
+- [ ] **P1-I7 (MEDIUM)** `rclone-backend-filter.txt` schließt `.env.production`/`.env.ci` nicht aus (destruktiver `sync`) — `:1-27`, `sync.sh:8`. (Anm. 2026-09-19: Remote-Ziel führt aktuell keine `.env.production`; Restrisiko bei künftiger Ablage.)
 - [ ] **P1-I8 (LOW)** CI-Debug-Step fingerprintet Key-Material; getracktes `.env.encrypted`; Node-Runtime ohne Checksum; `ACCOUNTING_EMAIL`-Env-Drift; Deployment-Doku widerspricht Code (`features/infrastructure/01-deployment.md:49-55`).
 
 ### P2 — Tests / Doku — ⏳ OFFEN
 
 - [ ] **P2-T1 (MEDIUM)** E2E localStorage-Injection (STRICT-Verstoß) — `frontend/tests/e2e/client/cart-persistence.spec.ts:31-56`.
 - [ ] **P2-T2 (MEDIUM)** Kanban-E2E: `waitForTimeout` + Pixel-Drag-Retries = flaky — `tests/e2e/helpers/KanbanHelper.ts:135,143,196,231`.
-- [x] **P2-T3 (VERIFY)** E2E-Timeout-Policy im Config abgebildet — `frontend/playwright.config.ts`: `timeout: 120000` (per-test) + `globalTimeout: 900000` (whole-run, Policy 7→15 min). Validiert 2026-09-12 (CI-Run 34710924406: Shard ~3 min; lokal ~7 min).
+- [x] **P2-T3 (VERIFY)** E2E-Timeout-Policy im Config abgebildet — `frontend/playwright.config.ts`: `timeout: 120000` (per-test) + `globalTimeout: 900000` (whole-run, Policy 7→15 min). Validiert 2026-09-12 (CI-Run 34710924406: Shard ~3 min; lokal ~7 min). Commit `38d8664`.
 - [ ] **P2-T4 (LOW)** Keine Lua-Tests; `useAuth.test` mockt SWR komplett; `ManagementGalleryView.test` stubbt ~12 Kinder; `StorageLifecycleTest` `sleep(1)`.
 - [ ] **P2-T5** Doku-Drift Deployment (C1–C3b-Fallbacks entfernt, Doku behauptet sie noch) — `features/infrastructure/01-deployment.md`.
 
@@ -293,6 +254,7 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 ## 🟡 OFFEN (manuell) — Prod-Infra
 
 - **Portainer Stack-Redeploy** für `portal-base:8.5` (User-Notify erledigt, Deploy pending).
+  - Anm. 2026-09-19: Model-Deploy (`3db7437`) durch User redeployed.
 
 ---
 
@@ -300,7 +262,7 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 
 - **Fix:** `.env.production` → `PROXY_DELIVERY_HEADER=X-Accel-Redirect` + `PHOTO_STORAGE_PATH=/var/www/photos`; `deployment/docker-compose.yml` → Pass-through `PHOTO_STORAGE_PATH=${PHOTO_STORAGE_PATH}` ergänzt; Backend-Container neu deployt.
 - **Verifiziert:** alle `/api/media/*`-Größen (250/400/800/1200/2000) + Original-Branch liefern echte WebP/JPEG-Bytes (10–780 KB), kein `x-sendfile`/`x-accel-redirect`-Leak mehr; `/context`, `license-terms`, alle SPA-Chunks 200.
-- **Restbefund:** „Fehler persistierte“ war Browser-Cache der leeren `immutable`-Antworten (max-age 1 Jahr) + alte Bundle-Stände — nach Cache-Leeren + Voll-Refresh behoben.
+- **Restbefund:** „Fehler persistierte" war Browser-Cache der leeren `immutable`-Antworten (max-age 1 Jahr) + alte Bundle-Stände — nach Cache-Leeren + Voll-Refresh behoben.
 - **Hinweis:** `deployment/docker-compose.yml`-Änderung (1 Zeile, git-getrackt) liegt noch als `M` im Working Tree — Commit+Pull steht aus.
 
 ---
