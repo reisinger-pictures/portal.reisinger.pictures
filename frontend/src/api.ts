@@ -156,15 +156,25 @@ export const apiUpload = async <T>(url: string, body: FormData): Promise<T> => {
     throw new Error('Server hat kein valides JSON zurückgegeben.');
 };
 
-export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown): Promise<T> => {
+export interface ApiMutateOptions {
+    headers?: Record<string, string>;
+}
+
+export const apiMutate = async <T>(
+    url: string,
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    body?: unknown,
+    options: ApiMutateOptions = {}
+): Promise<T> => {
+    const requestOptions: RequestInit = {
+        method,
+        headers: {...getHeaders(), ...options.headers},
+        credentials: 'include',
+        body: body ? JSON.stringify(body) : undefined
+    };
     let res: Response;
     try {
-        res = await fetch(url, {
-            method,
-            headers: getHeaders(),
-            credentials: 'include',
-            body: body ? JSON.stringify(body) : undefined
-        });
+        res = await fetch(url, requestOptions);
     } catch {
         const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as ApiError;
         error.status = 0;
@@ -175,12 +185,7 @@ export const apiMutate = async <T>(url: string, method: 'POST' | 'PUT' | 'PATCH'
     if (res.status === 401 && !url.includes('/api/auth/')) {
         const success = await refreshToken();
         if (success) {
-            res = await fetch(url, {
-                method,
-                headers: getHeaders(),
-                credentials: 'include',
-                body: body ? JSON.stringify(body) : undefined
-            });
+            res = await fetch(url, requestOptions);
         }
     }
 
@@ -372,7 +377,7 @@ export interface InvoiceCustomerDetails {
 
 export interface InvoiceSnapshot { id?: string; invoice_number: string; total_gross: string | number; total_net: string | number; tax_rate: number; created_at: string; customer_details: string | InvoiceCustomerDetails; }
 export interface Order { id: string; user_id?: string; status: string; is_quote_request: boolean | number; total_net?: string | number; total_gross?: string | number; tax_rate: number; payment_method?: string; billing_name?: string; billing_company?: string; billing_street?: string; billing_zip?: string; billing_city?: string; created_at: string; updated_at: string; user?: { id?: string; name?: string; email?: string; }; invoice_snapshot?: InvoiceSnapshot; items?: OrderItem[]; }
-export interface CheckoutResponse { success?: boolean; requires_action?: boolean; client_secret?: string; invoice_number: string; order_id?: string; }
+export interface CheckoutResponse { success?: boolean; payment_pending?: boolean; requires_action?: boolean; client_secret?: string; invoice_number?: string | null; order_id?: string; status?: string; poll_url?: string; }
 export interface RedeemInviteResponse { full_path?: string; message?: string; requires_mail_verification?: boolean; }
 export interface SendMailResponse { success: boolean; notified_count: number; }
 export interface TestEmailResponse { success: boolean; sent_to: string; }

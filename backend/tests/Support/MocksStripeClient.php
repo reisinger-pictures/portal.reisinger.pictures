@@ -15,7 +15,13 @@ trait MocksStripeClient
                 $body = json_encode([
                     'id' => 'pi_test_' . md5($absUrl . json_encode($params)),
                     'object' => 'payment_intent',
+                    'status' => 'requires_payment_method',
                     'client_secret' => 'pi_test_secret',
+                    'amount' => (int) ($params['amount'] ?? 0),
+                    'currency' => $params['currency'] ?? 'eur',
+                    'created' => time(),
+                    'customer' => $params['customer'] ?? null,
+                    'metadata' => $params['metadata'] ?? [],
                     'latest_charge' => [
                         'balance_transaction' => [
                             'fee' => 0,

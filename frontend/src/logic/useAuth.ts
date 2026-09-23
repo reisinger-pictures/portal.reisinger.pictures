@@ -1,6 +1,7 @@
 import useSWR, {mutate as globalMutate} from 'swr';
 import {t} from "@lingui/core/macro";
 import {fetcher, User} from '../api';
+import {clearCheckoutSession} from './checkoutSession';
 
 // Re-export the canonical `User` type so existing imports from this module keep working.
 export type {User};
@@ -63,6 +64,7 @@ export function useAuth() {
         } catch (e) {
             throw new Error(e instanceof Error ? e.message : t`Logout fehlgeschlagen`, {cause: e});
         }
+        if (user?.id) clearCheckoutSession(user.id);
         await globalMutate(() => true, undefined, {revalidate: true});
     };
 

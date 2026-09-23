@@ -163,6 +163,12 @@ jobs:
       # prebuild (tsc -b + check-i18n) läuft automatisch vor `pnpm build`
       - name: Build
         run: pnpm build
+        env:
+          # Public build configuration only; never expose TURNSTILE_SECRET here.
+          # Set the repository variable to enable the production build gate.
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          TURNSTILE_BUILD_REQUIRED: ${{ vars.TURNSTILE_BUILD_REQUIRED || 'false' }}
       - name: Unit tests
         run: pnpm test:run
 
@@ -225,6 +231,17 @@ jobs:
       JWT_SECRET: 2d093d84542d70f133a1689afb5866bed31edd1b520ce8c02ea9d25559fb0834
       ADMIN_EMAIL: admin@example.com
       ADMIN_PASSWORD: admin
+      # Offizielle Cloudflare-Dummy-Keys (immer erfolgreich) fuer den
+      # Risk-Triggered-Turnstile-E2E-Test. Die User-Schwelle bleibt bei 3;
+      # IP-Schwelle hoch, weil alle E2E-Worker dieselbe Runner-IP nutzen.
+      TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET: 1x0000000000000000000000000000000AA
+      TURNSTILE_ALLOWED_HOSTNAMES: localhost,example.com
+      TURNSTILE_USER_THRESHOLD_PER_HOUR: 3
+      TURNSTILE_IP_THRESHOLD_PER_HOUR: 1000
+      # Isolated E2E buyers are created immediately before checkout; disable
+      # the production new-account delay so the risk threshold is what triggers.
+      STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS: 0
       # Mailpit-API fuer die E2E-Helper (MailpitHelper.ts liest MAILPIT_API_URL;
       # Default waere localhost:8025). Container-Modus: Dienste sind nur per
       # Service-Name erreichbar, nicht via 127.0.0.1.
@@ -335,6 +352,8 @@ jobs:
         run: php artisan db:seed --force
       - name: Start backend server
         working-directory: backend
+        env:
+          CI: "1"
         # WICHTIG: `--no-reload` NICHT entfernen! Laravels ServeCommand filtert
         # sonst alle Env-Vars heraus, die nicht in `$passthroughVariables`
         # stehen (APP_ENV, PATH, XDEBUG, ...). STRIPE_SECRET kommt aus den
@@ -372,6 +391,8 @@ jobs:
           # Publik-Key = VITE_STRIPE_PUBLIC_KEY, sonst Fallback auf STRIPE_KEY
           # (pk_test - Zuordnung entspricht backend/.env, siehe oben)
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY || secrets.STRIPE_KEY }}
+          # Matched with the official always-pass backend dummy key above.
+          VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       - name: Run E2E tests
         working-directory: frontend
         # `list`-Reporter fuer stdout-Zusammenfassung, `html` bleibt fuer den

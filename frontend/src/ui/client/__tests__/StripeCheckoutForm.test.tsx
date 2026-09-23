@@ -51,6 +51,7 @@ describe('StripeCheckoutForm', () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.unstubAllGlobals();
     });
 
@@ -114,7 +115,7 @@ describe('StripeCheckoutForm', () => {
 
         mockConfirmPayment.mockResolvedValue({
             error: undefined,
-            paymentIntent: { status: 'succeeded' },
+            paymentIntent: { status: 'requires_payment_method' },
         });
 
         renderForm();
@@ -127,21 +128,30 @@ describe('StripeCheckoutForm', () => {
         });
     });
 
-    it('calls onSuccess(true) after successful payment', async () => {
-        const user = userEvent.setup();
-
+    it('waits for the authenticated server paid state after Stripe succeeds', async () => {
+        vi.useFakeTimers();
         mockConfirmPayment.mockResolvedValue({
             error: undefined,
             paymentIntent: { status: 'succeeded' },
         });
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({id: 'ord_123', status: 'paid'}),
+        }));
 
         renderForm();
+        submitForm();
 
-        await user.click(findSubmitButton());
+        expect(defaultProps.onSuccess).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(2000);
 
-        await waitFor(() => {
-            expect(defaultProps.onSuccess).toHaveBeenCalledWith(true);
-        });
+        expect(fetch).toHaveBeenCalledWith('/api/orders/ord_123', expect.objectContaining({
+            credentials: 'include'
+        }));
+        expect(defaultProps.onSuccess).toHaveBeenCalledWith(true);
+
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
     });
 
     it('shows toast on stripe error', async () => {

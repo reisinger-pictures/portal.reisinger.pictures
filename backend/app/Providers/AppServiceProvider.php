@@ -15,6 +15,7 @@ use App\Services\AuthorizationService;
 use App\Services\CouponService;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
+use App\Support\CheckoutKey;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -119,6 +120,20 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('app.throttle_api', 120))->by($request->user('api')?->getKey() ?? $request->ip())
         );
+
+        RateLimiter::for('checkout', function (Request $request): array {
+            $userId = $request->user('api')?->getAuthIdentifier();
+            $ip = $request->ip();
+
+            return [
+                Limit::perHour(max(1, (int) config('app.checkout_throttle_user_per_hour', 5)))
+                    ->by(CheckoutKey::user($userId, 'checkout-quota')),
+                Limit::perHour(max(1, (int) config('app.checkout_throttle_ip_per_hour', 10)))
+                    ->by(CheckoutKey::ip($ip, 'checkout-quota-hour')),
+                Limit::perDay(max(1, (int) config('app.checkout_throttle_ip_per_day', 30)))
+                    ->by(CheckoutKey::ip($ip, 'checkout-quota-day')),
+            ];
+        });
 
         RateLimiter::for('coupon-validate', fn (Request $request) => Limit::perMinute(10)->by($request->user('api')?->getKey() ?? $request->ip())
         );

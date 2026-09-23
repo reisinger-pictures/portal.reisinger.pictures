@@ -6,7 +6,7 @@
     "packageManager": "pnpm@11.23.0",
     "scripts": {
         "dev": "vite",
-        "prebuild": "tsc -b && node scripts/check-i18n.mjs",
+        "prebuild": "node scripts/check-turnstile-build.mjs && tsc -b && node scripts/check-i18n.mjs",
         "build": "vite build",
         "preview": "vite preview",
         "lint": "eslint . --max-warnings 0",

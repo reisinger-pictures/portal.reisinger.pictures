@@ -46,7 +46,7 @@ class User extends Authenticatable implements JWTSubject
 
     protected $fillable = [
         'name', 'email', 'password', 'brand', 'metadata_copyright', 'can_edit_metadata', 'flatrate_level',
-        'can_purchase_upgrades', 'current_ftp_gallery_id', 'ftp_slug', 'org_id',
+        'can_purchase_upgrades', 'current_ftp_gallery_id', 'ftp_slug', 'org_id', 'stripe_customer_id',
         'billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city',
     ];
 

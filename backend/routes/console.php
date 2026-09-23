@@ -21,6 +21,9 @@ Schedule::command('app:cleanup-derivatives')->dailyAt('05:00')->withoutOverlappi
 // Temp-Dateien (alte Skalierungs-Caches & Artefakte) bereinigen
 Schedule::command('app:cleanup-temp')->dailyAt('02:30')->withoutOverlapping()->onOneServer();
 
+// Stripe: cancel incomplete PaymentIntents abandoned by abandoned checkouts
+Schedule::command('stripe:cancel-stale-payment-intents')->hourly()->withoutOverlapping()->onOneServer();
+
 // Model-Lifecycle: Reminder-Mails T+12/13/14 Monate (idempotent, brand-aware)
 Schedule::command('app:process-model-lifecycle')->dailyAt('07:00')->withoutOverlapping()->onOneServer();
 

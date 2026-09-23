@@ -150,6 +150,7 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions'])->name('api.photos.versions');
     Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata'])->name('api.photos.revert');
     Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');
+    Route::get('/orders/{id}', [OrderController::class, 'show'])->name('api.orders.show');
     Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
     Route::get('/orders/{id}/invoice', [InvoiceDownloadController::class, 'downloadInvoice'])->name('api.orders.invoice');
     Route::middleware('throttle:'.config('app.throttle_zip_download', 3).',1')->get('/orders/{id}/download-zip', [PhotoDownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');

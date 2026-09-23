@@ -8,9 +8,11 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Models\Role;
 use App\Enums\UserRole;
+use App\Services\ImageProcessor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class FileDeliveryControllerTest extends TestCase
@@ -309,6 +311,34 @@ class FileDeliveryControllerTest extends TestCase
         $this->actingAs($user, 'api')
             ->get('/api/media/' . $gallery->slug . '/_thumbs/800/' . $photo->id . '.webp')
             ->assertStatus(200);
+    }
+
+    public function test_thumbnail_generation_failure_logs_the_photo_context(): void
+    {
+        $user = User::factory()->create(['flatrate_level' => 'original']);
+        $gallery = $this->createPrivateDeliveryGallery();
+        $user->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, $this->fixtureContent);
+
+        $imageProcessor = $this->createMock(ImageProcessor::class);
+        $imageProcessor->expects($this->once())
+            ->method('generateThumbnail')
+            ->willThrowException(new \RuntimeException('simulated thumbnail failure'));
+        $this->app->instance(ImageProcessor::class, $imageProcessor);
+        Log::spy();
+
+        $this->withoutExceptionHandling()
+            ->actingAs($user, 'api')
+            ->get('/api/media/' . $gallery->slug . '/_thumbs/800/' . $photo->id . '.webp')
+            ->assertStatus(500)
+            ->assertJson(['error' => 'Thumbnail fehlt']);
+
+        Log::shouldHaveReceived('error')
+            ->once()
+            ->withArgs(fn (string $message, array $context): bool => $message === 'Thumbnail generation failed'
+                && $context['photo_id'] === $photo->id
+                && $context['error'] === 'simulated thumbnail failure');
     }
 
     public function test_thumbnail_for_nonexistent_photo_returns_404(): void

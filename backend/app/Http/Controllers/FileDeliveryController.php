@@ -99,7 +99,7 @@ class FileDeliveryController extends Controller
             $thumbPath = $baseStoragePath.'/'.$gallery->id.'/_thumbs/'.$size.'/'.$photo->id.'.webp';
 
             $thumbLockKey = 'thumb_generation_'.$photo->id.'_'.$size;
-            Cache::lock($thumbLockKey, 30)->block(10, function () use ($thumbPath, $originalPath, $size) {
+            Cache::lock($thumbLockKey, 30)->block(10, function () use ($photo, $thumbPath, $originalPath, $size) {
                 if (file_exists($thumbPath)) {
                     return;
                 }

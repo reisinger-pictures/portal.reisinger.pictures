@@ -18,6 +18,24 @@ class OrderController extends Controller
         return response()->json(OrderResource::collection($orders)->resolve());
     }
 
+    public function show(string $id)
+    {
+        $user = auth('api')->user();
+        $order = Order::query()
+            ->where('user_id', $user?->getAuthIdentifier())
+            ->with('invoiceSnapshot')
+            ->findOrFail($id);
+
+        return response()->json([
+            'id' => (string) $order->getKey(),
+            'order_id' => (string) $order->getKey(),
+            'status' => $order->status,
+            'invoice_number' => $order->invoiceSnapshot?->invoice_number,
+            'total_amount' => (int) $order->total_amount,
+            'currency' => 'eur',
+        ]);
+    }
+
     public function indexAdmin()
     {
         $user = auth('api')->user();

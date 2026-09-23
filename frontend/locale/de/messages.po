@@ -134,12 +134,16 @@ msgid "1 Jahr:"
 msgstr "1 Jahr:"
 
 #: src/ui/Privacy.tsx
-msgid "1. Automatische Datenerfassung und IP-Adressen"
-msgstr "1. Automatische Datenerfassung und IP-Adressen"
+#~ msgid "1. Automatische Datenerfassung und IP-Adressen"
+#~ msgstr "1. Automatische Datenerfassung und IP-Adressen"
 
 #: src/ui/LicenseTerms.tsx
 msgid "1. Geltungsbereich"
 msgstr "1. Geltungsbereich"
+
+#: src/ui/Privacy.tsx
+msgid "1. IP-Adressen und technische Protokolle"
+msgstr "1. IP-Adressen und technische Protokolle"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "1. Nutzungsart"
@@ -182,12 +186,20 @@ msgid "3. Zustandekommen des Vertrages"
 msgstr "3. Zustandekommen des Vertrages"
 
 #: src/ui/Privacy.tsx
-msgid "4. Ihre Rechte"
-msgstr "4. Ihre Rechte"
+#~ msgid "4. Ihre Rechte"
+#~ msgstr "4. Ihre Rechte"
 
 #: src/ui/LicenseTerms.tsx
 msgid "4. Preise und Zahlungsbedingungen"
 msgstr "4. Preise und Zahlungsbedingungen"
+
+#: src/ui/Privacy.tsx
+msgid "4. Zahlungsabwicklung und Betrugsprävention"
+msgstr "4. Zahlungsabwicklung und Betrugsprävention"
+
+#: src/ui/Privacy.tsx
+msgid "5. Cloudflare Turnstile"
+msgstr "5. Cloudflare Turnstile"
 
 #: src/ui/LicenseTerms.tsx
 msgid "5. Lieferung digitaler Inhalte"
@@ -196,6 +208,10 @@ msgstr "5. Lieferung digitaler Inhalte"
 #: src/ui/LicenseTerms.tsx
 msgid "6. Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
 msgstr "6. Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
+
+#: src/ui/Privacy.tsx
+msgid "6. Ihre Rechte"
+msgstr "6. Ihre Rechte"
 
 #: src/ui/LicenseTerms.tsx
 msgid "7. Widerrufsrecht"
@@ -634,8 +650,8 @@ msgid "Auftrag löschen?"
 msgstr "Auftrag löschen?"
 
 #: src/ui/Privacy.tsx
-msgid "Aus Gründen der Datensparsamkeit und zur Einhaltung der DSGVO protokollieren wir"
-msgstr "Aus Gründen der Datensparsamkeit und zur Einhaltung der DSGVO protokollieren wir"
+#~ msgid "Aus Gründen der Datensparsamkeit und zur Einhaltung der DSGVO protokollieren wir"
+#~ msgstr "Aus Gründen der Datensparsamkeit und zur Einhaltung der DSGVO protokollieren wir"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 #: src/ui/photographer/PhotographerPayoutsView.tsx
@@ -753,6 +769,10 @@ msgstr "Bearbeitung"
 msgid "Beauftragt"
 msgstr "Beauftragt"
 
+#: src/ui/Privacy.tsx
+msgid "Bei fehlgeschlagenen Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie: eine begrenzte Anzahl von Fehlversuchen, den Zeitpunkt des letzten Fehlers und einen bereinigten, gekürzten Decline-Code. Zur Vermeidung doppelter Verarbeitung wird anhand der Stripe-Event-ID eine kurzlebige technische Event-ID-Deduplizierung durchgeführt."
+msgstr "Bei fehlgeschlagenen Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie: eine begrenzte Anzahl von Fehlversuchen, den Zeitpunkt des letzten Fehlers und einen bereinigten, gekürzten Decline-Code. Zur Vermeidung doppelter Verarbeitung wird anhand der Stripe-Event-ID eine kurzlebige technische Event-ID-Deduplizierung durchgeführt."
+
 #: src/ui/LicenseTerms.tsx
 msgid "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
 msgstr "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
@@ -760,6 +780,14 @@ msgstr "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Beigetreten"
 msgstr "Beigetreten"
+
+#: src/ui/Privacy.tsx
+#~ msgid "Beim Checkout speichern wir die zum Zeitpunkt der Bestellung ermittelte IP-Adresse zusammen mit der Bestellung. Sie dient der Zahlungsabwicklung, der Betrugsprävention sowie der Nachvollziehbarkeit von Transaktionen und ist an die gesetzlichen Aufbewahrungsfristen gebunden. In den separaten Audit- und Download-Logs der Fotografen wird keine vollständige IP-Adresse gespeichert."
+#~ msgstr "Beim Checkout speichern wir die zum Zeitpunkt der Bestellung ermittelte IP-Adresse zusammen mit der Bestellung. Sie dient der Zahlungsabwicklung, der Betrugsprävention sowie der Nachvollziehbarkeit von Transaktionen und ist an die gesetzlichen Aufbewahrungsfristen gebunden. In den separaten Audit- und Download-Logs der Fotografen wird keine vollständige IP-Adresse gespeichert."
+
+#: src/ui/Privacy.tsx
+msgid "Beim Checkout speichern wir die zum Zeitpunkt der Bestellung ermittelte IP-Adresse zusammen mit der Bestellung. Sie wird für die Zahlungsabwicklung, die Betrugs- und Missbrauchsprävention sowie die Nachvollziehbarkeit der Transaktion verarbeitet. In den separaten Audit- und Download-Logs der Fotografen wird keine vollständige IP-Adresse gespeichert."
+msgstr "Beim Checkout speichern wir die zum Zeitpunkt der Bestellung ermittelte IP-Adresse zusammen mit der Bestellung. Sie wird für die Zahlungsabwicklung, die Betrugs- und Missbrauchsprävention sowie die Nachvollziehbarkeit der Transaktion verarbeitet. In den separaten Audit- und Download-Logs der Fotografen wird keine vollständige IP-Adresse gespeichert."
 
 #: src/ui/Privacy.tsx
 msgid "Beim Download hochauflösender Bilder wird Ihr Name bzw. Ihre Kennung sowie ein Verweis auf unsere Nutzungsbedingungen technisch in die Metadaten (IPTC/EXIF) der Bilddatei eingebettet. Dies dient dem Schutz vor unautorisierter Weitergabe und Leaks."
@@ -865,6 +893,10 @@ msgstr "Beschreibung"
 msgid "Beschreibung:"
 msgstr "Beschreibung:"
 
+#: src/ui/client/ClientCartView.tsx
+msgid "Bestätige die einmalige Prüfung, um den Checkout fortzusetzen."
+msgstr "Bestätige die einmalige Prüfung, um den Checkout fortzusetzen."
+
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Beste Übereinstimmung"
 msgstr "Beste Übereinstimmung"
@@ -876,6 +908,10 @@ msgstr "Bestehende Links"
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Bestellung"
 msgstr "Bestellung"
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Bestellung erfolgreich!"
+msgstr "Bestellung erfolgreich!"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Bestellung erfolgreich! (Beleg: {invoiceNumber})"
@@ -1029,6 +1065,14 @@ msgstr "Bitte alle Titel/Namen bei den Leistungen ausfüllen."
 #: src/ui/client/ClientCartView.tsx
 msgid "Bitte bestätige den Verzicht auf das Widerrufsrecht."
 msgstr "Bitte bestätige den Verzicht auf das Widerrufsrecht."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Bitte bestätige die Sicherheitsprüfung und versuche es erneut."
+msgstr "Bitte bestätige die Sicherheitsprüfung und versuche es erneut."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Bitte bestätige zuerst die Sicherheitsprüfung."
+msgstr "Bitte bestätige zuerst die Sicherheitsprüfung."
 
 #: src/logic/modelRegistration.ts
 msgid "Bitte ein Datum in der Vergangenheit angeben."
@@ -1234,6 +1278,18 @@ msgstr "Darf nicht negativ sein"
 msgid "dargestellt."
 msgstr "dargestellt."
 
+#: src/ui/Privacy.tsx
+#~ msgid "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig und wird von uns nicht gespeichert."
+#~ msgstr "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig und wird von uns nicht gespeichert."
+
+#: src/ui/Privacy.tsx
+#~ msgid "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei, sofern verfügbar, als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig und wird von uns nicht gespeichert."
+#~ msgstr "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei, sofern verfügbar, als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig und wird von uns nicht gespeichert."
+
+#: src/ui/Privacy.tsx
+msgid "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei, sofern verfügbar, als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig; das Token und die vollständige Siteverify-Antwort werden von uns nicht gespeichert."
+msgstr "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei, sofern verfügbar, als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig; das Token und die vollständige Siteverify-Antwort werden von uns nicht gespeichert."
+
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Das Foto wird von der privaten Ablage entfernt."
 msgstr "Das Foto wird von der privaten Ablage entfernt."
@@ -1436,8 +1492,8 @@ msgid "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzuleg
 msgstr "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen."
 
 #: src/ui/Privacy.tsx
-msgid "der Nutzer oder Gäste in unseren Audit- und Download-Logs. Webserver-Logs werden, sofern sie IP-Adressen enthalten, automatisch nach wenigen Tagen rotiert und gelöscht."
-msgstr "der Nutzer oder Gäste in unseren Audit- und Download-Logs. Webserver-Logs werden, sofern sie IP-Adressen enthalten, automatisch nach wenigen Tagen rotiert und gelöscht."
+#~ msgid "der Nutzer oder Gäste in unseren Audit- und Download-Logs. Webserver-Logs werden, sofern sie IP-Adressen enthalten, automatisch nach wenigen Tagen rotiert und gelöscht."
+#~ msgstr "der Nutzer oder Gäste in unseren Audit- und Download-Logs. Webserver-Logs werden, sofern sie IP-Adressen enthalten, automatisch nach wenigen Tagen rotiert und gelöscht."
 
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
@@ -1464,6 +1520,10 @@ msgstr "Details"
 msgid "Details & Metadaten"
 msgstr "Details & Metadaten"
 
+#: src/ui/Privacy.tsx
+msgid "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet sich je nach Datenkategorie nach der geltenden Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten. Die IP-Risikoschlüssel laufen mit dem jeweiligen konfigurierten Limitierungsfenster ab. Die konkrete Frist und die zugrunde liegende Zuordnung teilt der Betreiber auf Anfrage mit."
+msgstr "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet sich je nach Datenkategorie nach der geltenden Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten. Die IP-Risikoschlüssel laufen mit dem jeweiligen konfigurierten Limitierungsfenster ab. Die konkrete Frist und die zugrunde liegende Zuordnung teilt der Betreiber auf Anfrage mit."
+
 #: src/ui/LicenseTerms.tsx
 msgid "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
 msgstr "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
@@ -1484,6 +1544,10 @@ msgstr "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach di
 msgid "Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert. Setze <0>AI_ENABLED=true</0> und <1>AI_API_KEY</1> als Umgebungsvariablen."
 msgstr "Die KI-Funktion zur Metadaten-Generierung ist nicht aktiviert. Setze <0>AI_ENABLED=true</0> und <1>AI_API_KEY</1> als Umgebungsvariablen."
 
+#: src/ui/Privacy.tsx
+msgid "Die Kontaktdaten finden Sie im"
+msgstr "Die Kontaktdaten finden Sie im"
+
 #: src/ui/LicenseTerms.tsx
 msgid "Die Lieferung der bestellten digitalen Inhalte erfolgt ausschließlich in elektronischer Form. Unmittelbar nach Abschluss der Zahlung werden die bestellten Dateien für den Download freigeschaltet (sofortiger Download). Der Kunde erhält über sein Konto oder per E-Mail Zugriff auf die Download-Bereiche. Mangels körperlicher Übertragung sind die Regelungen über Versand und Gefahrübergang nicht anwendbar."
 msgstr "Die Lieferung der bestellten digitalen Inhalte erfolgt ausschließlich in elektronischer Form. Unmittelbar nach Abschluss der Zahlung werden die bestellten Dateien für den Download freigeschaltet (sofortiger Download). Der Kunde erhält über sein Konto oder per E-Mail Zugriff auf die Download-Bereiche. Mangels körperlicher Übertragung sind die Regelungen über Versand und Gefahrübergang nicht anwendbar."
@@ -1492,9 +1556,33 @@ msgstr "Die Lieferung der bestellten digitalen Inhalte erfolgt ausschließlich i
 msgid "Die Passwörter stimmen nicht überein."
 msgstr "Die Passwörter stimmen nicht überein."
 
+#: src/ui/client/ClientCartView.tsx
+msgid "Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support."
+msgstr "Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Die Sicherheitsprüfung konnte nicht geladen werden. Bitte versuche es erneut."
+msgstr "Die Sicherheitsprüfung konnte nicht geladen werden. Bitte versuche es erneut."
+
 #: src/logic/modelRegistration.ts
 msgid "Die Telefonnummer ist zu lang."
 msgstr "Die Telefonnummer ist zu lang."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten."
+msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet."
+msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen."
+msgstr "Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten."
+msgstr "Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten."
 
 #: src/ui/management/ManagementGalleryView.tsx
 msgid "Dies ist eine LIVE Galerie. Diese Ansicht aktualisiert sich automatisch alle 10 Sekunden."
@@ -2302,6 +2390,10 @@ msgstr "Fotos"
 msgid "Fotostudio"
 msgstr "Fotostudio"
 
+#: src/ui/Privacy.tsx
+msgid "Fragen zu Zwecken, Rechtsgrundlagen, Aufbewahrung, Löschung oder Auskunft richten Sie bitte an den verantwortlichen Betreiber oder die zuständige Datenschutz-Kontaktperson."
+msgstr "Fragen zu Zwecken, Rechtsgrundlagen, Aufbewahrung, Löschung oder Auskunft richten Sie bitte an den verantwortlichen Betreiber oder die zuständige Datenschutz-Kontaktperson."
+
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Freigeben"
 msgstr "Freigeben"
@@ -2318,9 +2410,21 @@ msgstr "Freitext..."
 msgid "FTP Inbox"
 msgstr "FTP Inbox"
 
+#: src/ui/Privacy.tsx
+#~ msgid "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete IP-Risikoschlüssel zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
+#~ msgstr "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete IP-Risikoschlüssel zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
+
+#: src/ui/Privacy.tsx
+msgid "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete Risikoschlüssel (IP-Risikoschlüssel) zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
+msgstr "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete Risikoschlüssel (IP-Risikoschlüssel) zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
+
 #: src/logic/modelRegistration.ts
 msgid "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
 msgstr "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
+
+#: src/ui/Privacy.tsx
+msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
+msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
 
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 msgid "Für Galerie:"
@@ -2631,6 +2735,10 @@ msgstr "Ignoriert"
 msgid "Im Frontend verstecken"
 msgstr "Im Frontend verstecken"
 
+#: src/ui/Privacy.tsx
+msgid "Im Portal speichern wir keine rohen Stripe-Fehlerobjekte, Kartendaten wie PAN oder CVC, Client-Secrets oder den vollständigen Zahlungsdatensatz. Die genannten Daten werden für die Zahlungsabwicklung, die Erkennung und Begrenzung automatisierter Kartentests und die Nachvollziehbarkeit von Transaktionen verarbeitet. Die jeweils zutreffende Rechtsgrundlage und die Aufbewahrung ergeben sich je nach Datenkategorie aus der geltenden Datenschutz- und Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten."
+msgstr "Im Portal speichern wir keine rohen Stripe-Fehlerobjekte, Kartendaten wie PAN oder CVC, Client-Secrets oder den vollständigen Zahlungsdatensatz. Die genannten Daten werden für die Zahlungsabwicklung, die Erkennung und Begrenzung automatisierter Kartentests und die Nachvollziehbarkeit von Transaktionen verarbeitet. Die jeweils zutreffende Rechtsgrundlage und die Aufbewahrung ergeben sich je nach Datenkategorie aus der geltenden Datenschutz- und Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten."
+
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "Im Warenkorb"
 msgstr "Im Warenkorb"
@@ -2646,6 +2754,7 @@ msgstr "Importiert"
 #: src/ui/Impressum.tsx
 #: src/ui/LicenseTerms.tsx
 #: src/ui/ModelRegistrationView.tsx
+#: src/ui/Privacy.tsx
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Impressum"
 msgstr "Impressum"
@@ -2914,8 +3023,8 @@ msgid "Keine Gutscheincodes vorhanden."
 msgstr "Keine Gutscheincodes vorhanden."
 
 #: src/ui/Privacy.tsx
-msgid "keine IP-Adressen"
-msgstr "keine IP-Adressen"
+#~ msgid "keine IP-Adressen"
+#~ msgstr "keine IP-Adressen"
 
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Keine Kunden gefunden."
@@ -4110,6 +4219,10 @@ msgstr "Öffnen"
 msgid "ohne @"
 msgstr "ohne @"
 
+#: src/ui/Privacy.tsx
+msgid "Ohne aktivierte Konfiguration wird Turnstile nicht geladen. Die Aufbewahrung von Turnstile-Signalen und technischen Protokolldaten richtet sich nach den beim Betreiber und bei Cloudflare geltenden Aufbewahrungsregeln; die konkreten Fristen teilt der Betreiber auf Anfrage mit."
+msgstr "Ohne aktivierte Konfiguration wird Turnstile nicht geladen. Die Aufbewahrung von Turnstile-Signalen und technischen Protokolldaten richtet sich nach den beim Betreiber und bei Cloudflare geltenden Aufbewahrungsregeln; die konkreten Fristen teilt der Betreiber auf Anfrage mit."
+
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Online-Verbot:"
 msgstr "Online-Verbot:"
@@ -4757,6 +4870,10 @@ msgstr "Shares gesamt:"
 msgid "Shop-Bestellungen"
 msgstr "Shop-Bestellungen"
 
+#: src/ui/client/ClientCartView.tsx
+msgid "Sicherheitsprüfung"
+msgstr "Sicherheitsprüfung"
+
 #: src/ui/components/GalleryModal.tsx
 #: src/ui/ModelProfileAccessView.tsx
 #: src/ui/ModelRegistrationView.tsx
@@ -4772,8 +4889,12 @@ msgid "Sichtbarkeits-Vorgabe"
 msgstr "Sichtbarkeits-Vorgabe"
 
 #: src/ui/Privacy.tsx
-msgid "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
-msgstr "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
+msgid "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten."
+msgstr "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten."
+
+#: src/ui/Privacy.tsx
+#~ msgid "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
+#~ msgstr "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
 
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses."
@@ -4985,6 +5106,10 @@ msgstr "Straße:"
 #: src/ui/Impressum.tsx
 msgid "Streitbeilegung"
 msgstr "Streitbeilegung"
+
+#: src/ui/Privacy.tsx
+msgid "Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor für die sofortige Kartenzahlung. Die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale werden für die Zahlungsabwicklung, 3D-Secure und die Betrugs- und Risikoerkennung genutzt. Die weitere Verarbeitung durch Stripe richtet sich nach den Datenschutzhinweisen von Stripe."
+msgstr "Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor für die sofortige Kartenzahlung. Die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale werden für die Zahlungsabwicklung, 3D-Secure und die Betrugs- und Risikoerkennung genutzt. Die weitere Verarbeitung durch Stripe richtet sich nach den Datenschutzhinweisen von Stripe."
 
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Stufe abwählen"
@@ -5279,6 +5404,14 @@ msgstr "Ungültiger Wert."
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Unique DLs:"
 msgstr "Unique DLs:"
+
+#: src/ui/Privacy.tsx
+#~ msgid "Unmittelbare Kartenzahlungen werden über Stripe abgewickelt. Dabei werden die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale zur Durchführung der Zahlung, für 3D-Secure und zur Betrugs- und Risikoerkennung genutzt. Stripe kann dabei auch IP-bezogene und weitere Geräte- und Aktivitätssignale auswerten; die konkrete Verarbeitung richtet sich nach den Datenschutzhinweisen von Stripe."
+#~ msgstr "Unmittelbare Kartenzahlungen werden über Stripe abgewickelt. Dabei werden die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale zur Durchführung der Zahlung, für 3D-Secure und zur Betrugs- und Risikoerkennung genutzt. Stripe kann dabei auch IP-bezogene und weitere Geräte- und Aktivitätssignale auswerten; die konkrete Verarbeitung richtet sich nach den Datenschutzhinweisen von Stripe."
+
+#: src/ui/Privacy.tsx
+#~ msgid "Unsere eigenen Sicherheitsprüfungen verarbeiten Portal-Kennung, Kontoalter, Checkout- und Bestellkennung, Zeitpunkte sowie begrenzte Fehler- und Idempotenzinformationen, um Zahlungsversuche eindeutig zuzuordnen und automatisierte Kartentests zu erkennen. Diese Daten dienen der Vertragserfüllung, unserem berechtigten Interesse an der Betrugsprävention und der Erfüllung gesetzlicher Nachweis- und Aufbewahrungspflichten. Kartendaten wie PAN oder CVC speichern wir nicht."
+#~ msgstr "Unsere eigenen Sicherheitsprüfungen verarbeiten Portal-Kennung, Kontoalter, Checkout- und Bestellkennung, Zeitpunkte sowie begrenzte Fehler- und Idempotenzinformationen, um Zahlungsversuche eindeutig zuzuordnen und automatisierte Kartentests zu erkennen. Diese Daten dienen der Vertragserfüllung, unserem berechtigten Interesse an der Betrugsprävention und der Erfüllung gesetzlicher Nachweis- und Aufbewahrungspflichten. Kartendaten wie PAN oder CVC speichern wir nicht."
 
 #: src/ui/Impressum.tsx
 msgid "Unternehmensgegenstand"
@@ -5607,6 +5740,10 @@ msgstr "Web & Social"
 msgid "Web & Social Media"
 msgstr "Web & Social Media"
 
+#: src/ui/Privacy.tsx
+#~ msgid "Webserver-Logs können technisch bedingt IP-Adressen enthalten. Sie werden nach wenigen Tagen rotiert und gelöscht. Für den Missbrauchsschutz werden checkoutbezogene IP-Angaben zusätzlich in einer pseudonymisierten, rotierbaren Form zur zeitlich begrenzten Limitierung von Versuchen verarbeitet."
+#~ msgstr "Webserver-Logs können technisch bedingt IP-Adressen enthalten. Sie werden nach wenigen Tagen rotiert und gelöscht. Für den Missbrauchsschutz werden checkoutbezogene IP-Angaben zusätzlich in einer pseudonymisierten, rotierbaren Form zur zeitlich begrenzten Limitierung von Versuchen verarbeitet."
+
 #: src/ui/Impressum.tsx
 msgid "Website: [Domain]"
 msgstr "Website: [Domain]"
@@ -5639,6 +5776,14 @@ msgstr "Weitere rechtliche Informationen:"
 #: src/logic/modelRegistration.ts
 msgid "Wenig"
 msgstr "Wenig"
+
+#: src/ui/Privacy.tsx
+msgid "Wenn Cloudflare Turnstile für das Portal konfiguriert ist, kann bei einem erhöhten Risiko eine zusätzliche Sicherheitsprüfung angezeigt werden. Cloudflare ist dabei der eingesetzte Sicherheitsprozessor. Cloudflare verarbeitet technisch notwendige Geräte- und Aktivitätssignale; je nach Konfiguration können hierfür Cookies oder vergleichbare Technologien verwendet werden."
+msgstr "Wenn Cloudflare Turnstile für das Portal konfiguriert ist, kann bei einem erhöhten Risiko eine zusätzliche Sicherheitsprüfung angezeigt werden. Cloudflare ist dabei der eingesetzte Sicherheitsprozessor. Cloudflare verarbeitet technisch notwendige Geräte- und Aktivitätssignale; je nach Konfiguration können hierfür Cookies oder vergleichbare Technologien verwendet werden."
+
+#: src/ui/Privacy.tsx
+#~ msgid "Wenn Cloudflare Turnstile für das Portal konfiguriert ist, kann bei einem erhöhten Risiko eine zusätzliche Sicherheitsprüfung angezeigt werden. Cloudflare verarbeitet dabei technisch notwendige Geräte- und Aktivitätssignale; je nach Konfiguration können hierfür Daten in Cookies oder vergleichbaren Technologien gespeichert werden. Das einmalig erzeugte Prüftoken wird zur serverseitigen Verifikation an Cloudflare übermittelt, ist nur einmal gültig und wird von uns nicht gespeichert. Ohne aktivierte Konfiguration wird Turnstile nicht geladen."
+#~ msgstr "Wenn Cloudflare Turnstile für das Portal konfiguriert ist, kann bei einem erhöhten Risiko eine zusätzliche Sicherheitsprüfung angezeigt werden. Cloudflare verarbeitet dabei technisch notwendige Geräte- und Aktivitätssignale; je nach Konfiguration können hierfür Daten in Cookies oder vergleichbaren Technologien gespeichert werden. Das einmalig erzeugte Prüftoken wird zur serverseitigen Verifikation an Cloudflare übermittelt, ist nur einmal gültig und wird von uns nicht gespeichert. Ohne aktivierte Konfiguration wird Turnstile nicht geladen."
 
 #: src/ui/Privacy.tsx
 msgid "Wenn Sie Bilder aus unseren Galerien herunterladen, dokumentieren wir diesen Vorgang in einer internen Datenbank (Audit-Log), um den Zugriff auf unsere urheberrechtlich geschützten Werke nachvollziehen zu können. Dabei speichern wir Ihren Namen (sofern angegeben) und den Zeitpunkt des Downloads."
@@ -5823,16 +5968,20 @@ msgid "Zahlung ausständig (Kauf auf Rechnung)"
 msgstr "Zahlung ausständig (Kauf auf Rechnung)"
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt."
-msgstr "Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt."
+#~ msgid "Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt."
+#~ msgstr "Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt."
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Zahlung erfolgreich!"
-msgstr "Zahlung erfolgreich!"
+#~ msgid "Zahlung erfolgreich!"
+#~ msgstr "Zahlung erfolgreich!"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Zahlung erfolgreich! Rechnung wurde versendet."
 msgstr "Zahlung erfolgreich! Rechnung wurde versendet."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Zahlung erneut prüfen"
+msgstr "Zahlung erneut prüfen"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Zahlung fehlgeschlagen — bitte versuche es erneut."
@@ -5951,6 +6100,10 @@ msgstr "Zuordnung"
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Zuordnung aufheben"
 msgstr "Zuordnung aufheben"
+
+#: src/ui/Privacy.tsx
+msgid "Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID des Portalkontos und die PaymentIntent-ID des Zahlungsvorgangs. Diese Kennungen sind Zahlungs- und Kontrollinformationen, keine Kartendaten. Für die technische Absicherung wird außerdem der Checkout-Fingerprint-Hash aus dem serverseitig kanonisierten Checkout-Kontext verwendet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet."
+msgstr "Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID des Portalkontos und die PaymentIntent-ID des Zahlungsvorgangs. Diese Kennungen sind Zahlungs- und Kontrollinformationen, keine Kartendaten. Für die technische Absicherung wird außerdem der Checkout-Fingerprint-Hash aus dem serverseitig kanonisierten Checkout-Kontext verwendet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet."
 
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/ContractSignView.tsx
