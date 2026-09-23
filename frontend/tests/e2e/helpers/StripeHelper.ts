@@ -13,27 +13,20 @@ export class StripeHelper {
      * Test-only simulation of the signed-webhook reconciliation delay.
      *
      * Install this only after checkout has returned the exact order ID. The
-     * route is restricted to that order path and an authenticated request;
+     * route intercepts only that order's normalized path and GET requests;
      * every other request is passed through to the normal network stack.
      */
     static async installPaidOrderStatusFixture(page: Page, orderId: string): Promise<void> {
         const orderPath = `/api/orders/${orderId}`;
+        const normalizePath = (pathname: string): string => pathname.replace(/\/+$/, '') || '/';
         let pollCount = 0;
 
         await page.route(
-            url => url.pathname === orderPath,
+            // URL.pathname already excludes query/hash; tolerate only trailing slashes.
+            url => normalizePath(url.pathname) === orderPath,
             async route => {
                 const request = route.request();
                 if (request.method() !== 'GET') {
-                    await route.fallback();
-                    return;
-                }
-
-                const headers = await request.allHeaders();
-                const hasAuthCookie = headers.cookie
-                    ?.split(';')
-                    .some(cookie => cookie.trim().startsWith('rp_jwt=')) ?? false;
-                if (!hasAuthCookie) {
                     await route.fallback();
                     return;
                 }
