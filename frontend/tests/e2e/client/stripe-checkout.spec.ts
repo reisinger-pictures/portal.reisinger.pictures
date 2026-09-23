@@ -142,14 +142,29 @@ test.describe('Stripe Checkout Workflow', () => {
 
     test('Positive Flow: Handles successful payment via Visa', { tag: ['@smoke', '@feature:client:checkout'] }, async ({page}) => {
         test.setTimeout(120000); // Erhöhtes Timeout für Multi-User Flow
-        await navigateToStripeIframe(page);
+        const {orderId} = await navigateToStripeIframe(page);
+        await StripeHelper.installPaidOrderStatusFixture(page, orderId);
 
         await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa);
         await expect(page.getByRole('button', {name: 'Jetzt bezahlen'})).toBeEnabled({ timeout: 10000 });
         const payButton = page.getByRole('button', {name: 'Jetzt bezahlen'});
+        const paidOrderResponsePromise = page.waitForResponse(async response => {
+            const responseUrl = new URL(response.url());
+            if (responseUrl.pathname !== `/api/orders/${orderId}` || response.request().method() !== 'GET') {
+                return false;
+            }
+            if (!response.ok()) return false;
+
+            const order: unknown = await response.json();
+            return typeof order === 'object'
+                && order !== null
+                && (order as { status?: unknown }).status === 'paid';
+        }, { timeout: 60000 });
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
-        // Stripe confirmPayment benoetigt externe Verarbeitung - Toast signalisiert Erfolg
+        // Stripe confirmation precedes the server-authoritative paid state.
+        // Wait for the authenticated status poll before checking the success toast.
+        await paidOrderResponsePromise;
         await expect(page.locator('.toast')).toContainText(/Zahlung erfolgreich/i, { timeout: 15000 });
 
         // Simuliere den Stripe-Return nach erfolgreichem Payment:
