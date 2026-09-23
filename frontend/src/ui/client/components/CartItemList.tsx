@@ -10,11 +10,12 @@ export interface CartItemListProps {
     removeFromCart: (photoId: string) => void;
     hasQuotes: boolean;
     totalAmount: number;
+    readOnly?: boolean;
     /** Volume licensing pricing summary (optional — only for volume licensing mode). */
     volumeLicensing?: VolumeLicensingResult;
 }
 
-export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes, totalAmount, volumeLicensing}: CartItemListProps) => {
+export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes, totalAmount, readOnly = false, volumeLicensing}: CartItemListProps) => {
     const isVolumeLicensingMode = volumeLicensing?.isVolumePricing;
     const pricePerItemStr = isVolumeLicensingMode ? formatMoney(volumeLicensing!.pricePerItemCents) : '';
     const tierNum = volumeLicensing?.tierIndex ?? 0;
@@ -69,6 +70,7 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                                             className="textarea textarea-bordered w-full h-16 text-sm resize-none"
                                             placeholder={t`Beschreibe deine speziellen Nutzungsanforderungen (z.B. Weltweite Rechte, Exklusivität)...`}
                                             value={item.notes || ''}
+                                             readOnly={readOnly}
                                             onChange={(e) => handleUpdateItem(item, 'notes', e.target.value)}
                                         />
                                     </div>
@@ -113,7 +115,7 @@ export const CartItemList = ({items, handleUpdateItem, removeFromCart, hasQuotes
                                             )}
                                         </div>
                                     )}
-                            <button onClick={() => removeFromCart(item.photoId)}
+                            <button onClick={() => removeFromCart(item.photoId)} disabled={readOnly}
                                     className="btn btn-ghost btn-sm btn-square text-error" title={t`Entfernen`}>
                                 <span className="iconify mdi--trash-can text-lg"></span>
                             </button>

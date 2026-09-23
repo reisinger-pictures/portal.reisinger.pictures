@@ -15,9 +15,10 @@ import {formatMoney} from '../../../logic/utils';
 interface CouponInputProps {
     /** Shared coupon state owned by the checkout view (single source of truth). */
     state: UseCouponResult;
+    disabled?: boolean;
 }
 
-export default function CouponInput({state}: CouponInputProps) {
+export default function CouponInput({state, disabled = false}: CouponInputProps) {
     const {couponCode, coupon, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = state;
     const [inputValue, setInputValue] = useState<string>('');
 
@@ -26,6 +27,7 @@ export default function CouponInput({state}: CouponInputProps) {
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (disabled) return;
         await applyCoupon(inputValue);
     };
 
@@ -64,6 +66,7 @@ export default function CouponInput({state}: CouponInputProps) {
                     <button
                         type="button"
                         onClick={handleRemove}
+                        disabled={disabled}
                         className="btn btn-ghost btn-sm text-error"
                         aria-label={t`Rabattcode entfernen`}
                     >
@@ -79,13 +82,13 @@ export default function CouponInput({state}: CouponInputProps) {
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             placeholder={t`Code eingeben`}
-                            disabled={isLoading}
+                            disabled={isLoading || disabled}
                             aria-label={t`Rabattcode`}
                             className="input input-bordered join-item w-full bg-base-100"
                         />
                         <button
                             type="submit"
-                            disabled={isLoading || inputValue.trim().length === 0}
+                            disabled={disabled || isLoading || inputValue.trim().length === 0}
                             className="btn btn-primary join-item"
                             aria-busy={isLoading}
                         >

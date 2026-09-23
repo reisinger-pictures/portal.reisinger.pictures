@@ -42,7 +42,16 @@ class StripeIdempotencyTest extends TestCase {
                        }
                        $this->assertTrue($hasIdempotencyKey, 'Idempotency-Key header is missing!');
                        
-                       return [json_encode(['id' => 'pi_test', 'client_secret' => 'sec_test']), 200, []];
+                       return [json_encode([
+                            'id' => 'pi_test',
+                            'status' => 'requires_payment_method',
+                            'client_secret' => 'sec_test',
+                            'amount' => (int) ($params['amount'] ?? 0),
+                            'currency' => $params['currency'] ?? 'eur',
+                            'created' => time(),
+                            'customer' => $params['customer'] ?? null,
+                            'metadata' => $params['metadata'] ?? [],
+                        ]), 200, []];
                    });
 
         \Stripe\ApiRequestor::setHttpClient($clientMock);
@@ -63,7 +72,7 @@ class StripeIdempotencyTest extends TestCase {
         \Stripe\ApiRequestor::setHttpClient(null);
     }
 
-    public function test_checkout_with_same_idempotency_key_returns_same_stripe_response(): void
+    public function test_two_checkout_sessions_with_different_fingerprints_use_distinct_stripe_keys(): void
     {
         \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
         \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
@@ -100,7 +109,16 @@ class StripeIdempotencyTest extends TestCase {
                        $this->assertNotNull($foundKey, "Call #$callCount missing Idempotency-Key header");
                        $keysUsed[] = $foundKey;
 
-                       return [json_encode(['id' => 'pi_test_' . $callCount, 'client_secret' => 'sec_test_' . $callCount]), 200, []];
+                       return [json_encode([
+                            'id' => 'pi_test_' . $callCount,
+                            'status' => 'requires_payment_method',
+                            'client_secret' => 'sec_test_' . $callCount,
+                            'amount' => (int) ($params['amount'] ?? 0),
+                            'currency' => $params['currency'] ?? 'eur',
+                            'created' => time(),
+                            'customer' => $params['customer'] ?? null,
+                            'metadata' => $params['metadata'] ?? [],
+                        ]), 200, []];
                    });
 
         \Stripe\ApiRequestor::setHttpClient($clientMock);
@@ -114,18 +132,29 @@ class StripeIdempotencyTest extends TestCase {
             'withdrawal_waived' => true,
         ];
 
-        $firstResponse = $this->withHeaders(['Authorization' => "Bearer $token"])
+        $firstResponse = $this->withHeaders([
+            'Authorization' => "Bearer $token",
+            'Idempotency-Key' => 'independent-checkout-0001',
+        ])
             ->postJson('/api/orders/checkout', $requestBody);
         $firstResponse->assertStatus(200);
         $firstResponse->assertJsonStructure(['client_secret', 'order_id']);
 
-        $secondResponse = $this->withHeaders(['Authorization' => "Bearer $token"])
+        // A different server fingerprint represents a separate checkout
+        // session; a new key with the same fingerprint is covered by the
+        // lost-session fallback test.
+        $requestBody['billing_street'] = 'Other Street 9';
+
+        $secondResponse = $this->withHeaders([
+            'Authorization' => "Bearer $token",
+            'Idempotency-Key' => 'independent-checkout-0002',
+        ])
             ->postJson('/api/orders/checkout', $requestBody);
         $secondResponse->assertStatus(200);
         $secondResponse->assertJsonStructure(['client_secret', 'order_id']);
 
         $this->assertCount(2, $keysUsed);
-        $this->assertNotEquals($keysUsed[0], $keysUsed[1], 'Two independent checkouts must use different idempotency keys');
+        $this->assertNotEquals($keysUsed[0], $keysUsed[1], 'Two independent checkout requests must use different Stripe idempotency keys');
 
         \Stripe\ApiRequestor::setHttpClient(null);
     }

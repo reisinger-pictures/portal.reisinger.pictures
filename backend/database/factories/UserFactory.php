@@ -19,6 +19,14 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'password' => static::$password ??= Hash::make('password'),
+            'created_at' => now()->subDays(2),
         ];
+    }
+
+    public function recentAccount(): static
+    {
+        return $this->state(fn (): array => [
+            'created_at' => now(),
+        ]);
     }
 }

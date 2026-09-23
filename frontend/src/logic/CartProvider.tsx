@@ -3,6 +3,7 @@ import {CartItem, CartContext} from './CartContext';
 import {useAuth} from './useAuth';
 import {useUI} from '../ui/components/UIContext';
 import {addToCartPure, removeFromCartPure, calculateTotalAmount, loadCartItems, persistCartItems} from './cartLogic';
+import {clearCheckoutSession} from './checkoutSession';
 import {useVolumeLicensing} from './useVolumeLicensing';
 
 export interface CartProviderProps {
@@ -49,7 +50,10 @@ export function CartProvider({children}: CartProviderProps) {
         setItems(prev => removeFromCartPure(prev, photoId));
     };
 
-    const clearCart = () => setItems([]);
+    const clearCart = () => {
+        if (user?.id) clearCheckoutSession(user.id);
+        setItems([]);
+    };
 
     // Derived values: volume licensing pricing + totalAmount (licensing-mode-aware)
     const volumeLicensing = useVolumeLicensing(items);

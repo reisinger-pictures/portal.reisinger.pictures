@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react';
 import {CartItem, useCart} from '../../logic/CartContext';
 import {splitTotalEvenly} from '../../logic/cartLogic';
 import {useUI} from '../components/UIContext';
-import {apiMutate, CheckoutResponse} from '../../api';
+import {apiMutate, type ApiError, type CheckoutResponse} from '../../api';
 import {useAuth} from '../../logic/useAuth';
 import {usePermissions} from '../../logic/usePermissions';
 import useCoupon from '../../logic/useCoupon';
@@ -14,16 +14,20 @@ import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 
 import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
-import {loadStripe} from '@stripe/stripe-js';
 import {Elements} from '@stripe/react-stripe-js';
 import PageLayout from '../components/PageLayout';
 
+import {stripePromise} from '../../logic/stripe';
+import {
+    clearCheckoutSession,
+    createCheckoutCartMarker,
+    loadOrCreateCheckoutSession,
+    replaceCheckoutSession
+} from '../../logic/checkoutSession';
 import {StripeCheckoutForm} from './components/StripeCheckoutForm';
 import {CartItemList} from './components/CartItemList';
+import {TurnstileWidget} from './components/TurnstileWidget';
 import CouponInput from './components/CouponInput';
-
-const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-const stripePromise = loadStripe(stripePublicKey);
 
 // Schema-Factory (kein module-scope `t` — siehe frontend/AGENTS.md, Lingui-Regel)
 const createCheckoutSchema = () => z.object({
@@ -39,6 +43,18 @@ const createCheckoutSchema = () => z.object({
 
 type CheckoutFormValues = z.infer<ReturnType<typeof createCheckoutSchema>>;
 
+const hasApiErrorFlag = (error: unknown, status: number, flag: string): boolean => {
+    if (!(error instanceof Error)) return false;
+    const apiError = error as ApiError;
+    if (apiError.status !== status || typeof apiError.info !== 'object' || apiError.info === null) {
+        return false;
+    }
+    return (apiError.info as Record<string, unknown>)[flag] === true;
+};
+
+const isTurnstileRequiredError = (error: unknown) => hasApiErrorFlag(error, 403, 'turnstile_required');
+const isIdempotencyConflict = (error: unknown) => hasApiErrorFlag(error, 409, 'idempotency_conflict');
+
 export default function ClientCartView() {
     "use no memo";
     const {items, removeFromCart, totalAmount, clearCart, addToCart, volumeLicensing} = useCart();
@@ -47,38 +63,62 @@ export default function ClientCartView() {
         : undefined;
     const {showToast} = useUI();
     const {user, mutate: mutateUser} = useAuth();
+    const userId = user?.id ?? null;
     const {isPowerUser, isAdmin} = usePermissions();
     const couponState = useCoupon({galleryId: cartGalleryId});
     const {couponCode, isValid: isCouponValid, removeCoupon} = couponState;
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const redirectStatus = searchParams.get('redirect_status');
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
     const [checkoutBilling, setCheckoutBilling] = useState<{line1: string; postalCode: string; city: string} | null>(null);
+    const [paymentRecoveryPending, setPaymentRecoveryPending] = useState(() => redirectStatus === 'succeeded');
+    const [turnstileRequired, setTurnstileRequired] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+    const [turnstileWidgetVersion, setTurnstileWidgetVersion] = useState(0);
+    const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
 
-    const [searchParams] = useSearchParams();
     const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'invoice'>('stripe');
     const [quoteToken, setQuoteToken] = useState<string | null>(null);
-
-    const redirectStatus = searchParams.get('redirect_status');
+    const cartMarker = createCheckoutCartMarker(items, quoteToken);
 
     const checkoutSchema = createCheckoutSchema();
 
     useEffect(() => {
         if (!redirectStatus) return;
         if (redirectStatus === 'succeeded') {
-            clearCart();
-            removeCoupon();
-            mutateUser().then(() => {
-                showToast('success', t`Zahlung erfolgreich!`);
-                navigate('/orders', {replace: true});
-            });
+            showToast('info', t`Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten.`);
+            navigate('/cart', {replace: true});
         } else {
             showToast('error', t`Zahlung fehlgeschlagen — bitte versuche es erneut.`);
             navigate('/cart', {replace: true});
         }
-    }, [redirectStatus, clearCart, removeCoupon, mutateUser, showToast, navigate]);
+    }, [redirectStatus, showToast, navigate]);
 
     const hasQuotes = items.some(i => i.isQuote);
+    const isImmediateStripeCheckout = !hasQuotes && paymentMethod === 'stripe' && totalAmount > 0;
+
+    const getCheckoutRecovery = () => (
+        userId && items.length > 0
+            ? loadOrCreateCheckoutSession(userId, cartMarker)
+            : null
+    );
+
+    const rotateCheckoutRecovery = () => {
+        if (userId) replaceCheckoutSession(userId, cartMarker);
+    };
+
+    const handlePaymentMethodChange = (method: 'stripe' | 'invoice') => {
+        if (paymentRecoveryPending) return;
+        setPaymentMethod(method);
+        const nextIsImmediateStripe = !hasQuotes && method === 'stripe' && totalAmount > 0;
+        if (!nextIsImmediateStripe) {
+            setTurnstileRequired(false);
+            setTurnstileToken(null);
+            setTurnstileWidgetVersion(version => version + 1);
+        }
+    };
 
     const incomingToken = searchParams.get('quote_token');
     useEffect(() => {
@@ -93,6 +133,7 @@ export default function ClientCartView() {
                     return;
                 }
                 setQuoteToken(incomingToken);
+                if (userId) clearCheckoutSession(userId);
                 clearCart();
                 const perPhotoPrices = splitTotalEvenly(data.price, data.photos.length);
                 data.photos.forEach((pid: string, index: number) => {
@@ -111,7 +152,7 @@ export default function ClientCartView() {
                 const cleanPath = window.location.pathname + (newParams.toString() ? '?' + newParams.toString() : '');
                 window.history.replaceState(null, '', cleanPath);
             }).catch(err => console.error('Token Decode Error:', err));
-    }, [incomingToken, clearCart, addToCart, showToast]);
+    }, [incomingToken, userId, clearCart, addToCart, showToast]);
 
     const {register, handleSubmit, reset, setError, formState: {errors, isSubmitting}} = useForm<CheckoutFormValues>({
         resolver: zodResolver(checkoutSchema),
@@ -149,6 +190,24 @@ export default function ClientCartView() {
             showToast('error', t`Bitte bestätige den Verzicht auf das Widerrufsrecht.`);
             return;
         }
+        if (turnstileRequired && !isImmediateStripeCheckout) {
+            setTurnstileRequired(false);
+            setTurnstileToken(null);
+            setTurnstileWidgetVersion(version => version + 1);
+        }
+        if (isImmediateStripeCheckout && turnstileRequired && !turnstileSiteKey) {
+            showToast('error', t`Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support.`);
+            return;
+        }
+        if (isImmediateStripeCheckout && turnstileRequired && !turnstileToken) {
+            showToast('info', t`Bitte bestätige zuerst die Sicherheitsprüfung.`);
+            return;
+        }
+
+        const checkoutRecovery = getCheckoutRecovery();
+        if (!checkoutRecovery) return;
+
+        const turnstileTokenForRequest = isImmediateStripeCheckout && turnstileRequired ? turnstileToken : null;
         try {
             const payload: Record<string, unknown> = {
                 items,
@@ -163,10 +222,28 @@ export default function ClientCartView() {
                 withdrawal_waived: !!data.withdrawal_waived,
                 coupon_code: isCouponValid && couponCode ? couponCode : null
             };
+            if (turnstileTokenForRequest) payload.turnstile_token = turnstileTokenForRequest;
 
-            const response = await apiMutate<CheckoutResponse>('/api/orders/checkout', 'POST', payload);
+            const response = await apiMutate<CheckoutResponse>('/api/orders/checkout', 'POST', payload, {
+                headers: {'Idempotency-Key': checkoutRecovery.idempotencyKey}
+            });
 
-            if (response.requires_action && response.client_secret) {
+            if (response.payment_pending) {
+                // The remote PI may already be succeeded while the signed
+                // webhook is still catching up. Keep the recovery session and
+                // poll/retry the order status instead of treating it as a new
+                // actionable payment.
+                setPaymentRecoveryPending(true);
+                setTurnstileRequired(false);
+                setTurnstileToken(null);
+                setClientSecret(null);
+                setPendingOrderId(response.order_id ?? null);
+                setCheckoutBilling(null);
+                showToast('info', t`Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen.`);
+            } else if (response.requires_action && response.client_secret) {
+                setPaymentRecoveryPending(false);
+                setTurnstileRequired(false);
+                setTurnstileToken(null);
                 setClientSecret(response.client_secret);
                 if (response.order_id) setPendingOrderId(response.order_id);
                 // Billing-Adresse an Stripe übergeben: Stripe sammelt sonst eine
@@ -175,14 +252,39 @@ export default function ClientCartView() {
                 setCheckoutBilling({line1: data.billing_street, postalCode: data.billing_zip, city: data.billing_city});
                 showToast('info', t`Bitte schließe die Zahlung ab.`);
             } else if (response.success) {
+                setPaymentRecoveryPending(false);
+                setTurnstileRequired(false);
+                setTurnstileToken(null);
+                if (userId) clearCheckoutSession(userId);
                 const invoiceNumber = response.invoice_number;
-                showToast('success', hasQuotes ? t`Angebot erfolgreich angefragt!` : t`Bestellung erfolgreich! (Beleg: ${invoiceNumber})`);
+                const successMessage = hasQuotes
+                    ? t`Angebot erfolgreich angefragt!`
+                    : invoiceNumber
+                        ? t`Bestellung erfolgreich! (Beleg: ${invoiceNumber})`
+                        : t`Bestellung erfolgreich!`;
+                showToast('success', successMessage);
                 clearCart();
                 removeCoupon();
                 await mutateUser();
                 navigate('/orders');
             }
         } catch (error: unknown) {
+            if (turnstileTokenForRequest) {
+                setTurnstileToken(null);
+                setTurnstileWidgetVersion(version => version + 1);
+            }
+            if (isIdempotencyConflict(error)) {
+                rotateCheckoutRecovery();
+            }
+            if (isImmediateStripeCheckout && isTurnstileRequiredError(error)) {
+                setTurnstileRequired(true);
+                if (turnstileSiteKey) {
+                    showToast('info', t`Bitte bestätige die Sicherheitsprüfung und versuche es erneut.`);
+                } else {
+                    showToast('error', t`Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support.`);
+                }
+                return;
+            }
             showToast('error', error instanceof Error ? error.message : t`Fehler beim Checkout.`);
         }
     };
@@ -213,8 +315,9 @@ export default function ClientCartView() {
 
                         <div className="lg:col-span-3 space-y-6">
                             <CartItemList items={items} handleUpdateItem={handleUpdateItem} removeFromCart={removeFromCart}
-                                           hasQuotes={hasQuotes} totalAmount={totalAmount} volumeLicensing={volumeLicensing}/>
-                            <CouponInput state={couponState} />
+                                           hasQuotes={hasQuotes} totalAmount={totalAmount} readOnly={paymentRecoveryPending}
+                                           volumeLicensing={volumeLicensing}/>
+                            <CouponInput state={couponState} disabled={paymentRecoveryPending} />
                         </div>
 
                         <div className="lg:col-span-2">
@@ -228,12 +331,18 @@ export default function ClientCartView() {
                                         <StripeCheckoutForm orderId={pendingOrderId!} defaultEmail={user?.email}
                                                             defaultName={user?.billing_name || user?.name}
                                                             billingAddress={checkoutBilling ?? undefined}
-                                                            onSuccess={(webhookSuccess) => {
-                                                                if (webhookSuccess) {
-                                                                    showToast('success', t`Zahlung erfolgreich! Rechnung wurde versendet.`);
-                                                                } else {
-                                                                    showToast('info', t`Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt.`);
+                                                            onSuccess={(serverPaid) => {
+                                                                if (!serverPaid) {
+                                                                    setClientSecret(null);
+                                                                    setPendingOrderId(null);
+                                                                    setCheckoutBilling(null);
+                                                                    setPaymentRecoveryPending(true);
+                                                                    showToast('info', t`Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten.`);
+                                                                    return;
                                                                 }
+                                                                setPaymentRecoveryPending(false);
+                                                                if (userId) clearCheckoutSession(userId);
+                                                                showToast('success', t`Zahlung erfolgreich! Rechnung wurde versendet.`);
                                                                 clearCart();
                                                                 mutateUser();
                                                                 navigate('/orders');
@@ -248,36 +357,44 @@ export default function ClientCartView() {
                                             className="iconify mdi--card-account-details text-primary"></span> <Trans>Rechnungsadresse</Trans>
                                     </h2>
 
+                                    {paymentRecoveryPending && (
+                                        <div role="status"
+                                             className="alert alert-info mb-6">
+                                            <span className="iconify mdi--refresh text-xl"></span>
+                                            <span><Trans>Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet.</Trans></span>
+                                        </div>
+                                    )}
+
                                     <div className="space-y-4">
                                         <div className="form-control">
                                             <label className="label py-1"><span
                                                 className="label-text text-sm font-bold"><Trans>Vor- & Nachname</Trans></span></label>
-                                            <input type="text" required {...register('billing_name')}
+                                            <input type="text" required {...register('billing_name')} disabled={paymentRecoveryPending}
                                                    className={`input input-bordered ${errors.billing_name ? 'input-error' : ''}`}/>
                                         </div>
                                         <div className="form-control">
                                             <label className="label py-1"><span
                                                 className="label-text text-sm font-bold"><Trans>Firma</Trans></span></label>
-                                            <input type="text" {...register('billing_company')}
+                                            <input type="text" {...register('billing_company')} disabled={paymentRecoveryPending}
                                                    className="input input-bordered"/>
                                         </div>
                                         <div className="form-control">
                                             <label className="label py-1"><span
                                                 className="label-text text-sm font-bold"><Trans>Straße & Hausnummer</Trans></span></label>
-                                            <input type="text" required {...register('billing_street')}
+                                            <input type="text" required {...register('billing_street')} disabled={paymentRecoveryPending}
                                                    className={`input input-bordered ${errors.billing_street ? 'input-error' : ''}`}/>
                                         </div>
                                         <div className="flex gap-4">
                                             <div className="form-control w-1/3">
                                                 <label className="label py-1"><span
                                                     className="label-text text-sm font-bold"><Trans>PLZ</Trans></span></label>
-                                                <input type="text" required {...register('billing_zip')}
+                                                <input type="text" required {...register('billing_zip')} disabled={paymentRecoveryPending}
                                                        className={`input input-bordered ${errors.billing_zip ? 'input-error' : ''}`}/>
                                             </div>
                                             <div className="form-control flex-1">
                                                 <label className="label py-1"><span
                                                     className="label-text text-sm font-bold"><Trans>Ort</Trans></span></label>
-                                                <input type="text" required {...register('billing_city')}
+                                                <input type="text" required {...register('billing_city')} disabled={paymentRecoveryPending}
                                                        className={`input input-bordered ${errors.billing_city ? 'input-error' : ''}`}/>
                                             </div>
                                         </div>
@@ -295,7 +412,7 @@ export default function ClientCartView() {
                                         <div className="form-control mb-6">
                                             <label className="label py-1"><span
                                                 className="label-text text-sm font-bold text-primary"><Trans>Allgemeine Anmerkungen zum Angebot</Trans></span></label>
-                                            <textarea {...register('quote_message')}
+                                            <textarea {...register('quote_message')} readOnly={paymentRecoveryPending}
                                                       className="textarea textarea-bordered h-20 w-full resize-none"
                                                       placeholder={t`Zusätzliche Infos für den Fotografen...`}></textarea>
                                         </div>
@@ -311,7 +428,8 @@ export default function ClientCartView() {
                                                     <input type="radio" name="payment_method" value="stripe"
                                                            className="radio radio-primary"
                                                            checked={paymentMethod === 'stripe'}
-                                                           onChange={() => setPaymentMethod('stripe')}/>
+                                                           disabled={paymentRecoveryPending}
+                                                           onChange={() => handlePaymentMethodChange('stripe')}/>
                                                     <span className="font-bold flex items-center gap-2"><span
                                                         className="iconify mdi--credit-card"></span> <Trans>Kreditkarte (Stripe)</Trans></span>
                                                 </label>
@@ -320,7 +438,8 @@ export default function ClientCartView() {
                                                         <input type="radio" name="payment_method" value="invoice"
                                                                className="radio radio-primary"
                                                                checked={paymentMethod === 'invoice'}
-                                                               onChange={() => setPaymentMethod('invoice')}/>
+                                                               disabled={paymentRecoveryPending}
+                                                               onChange={() => handlePaymentMethodChange('invoice')}/>
                                                         <span className="font-bold flex items-center gap-2"><span
                                                             className="iconify mdi--receipt-text-outline"></span> <Trans>Kauf auf Rechnung</Trans></span>
                                                     </label>
@@ -331,7 +450,7 @@ export default function ClientCartView() {
 
                                     <div className="space-y-4 mb-8">
                                         <label className="cursor-pointer flex items-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
-                                            <input type="checkbox" {...register('agb_accepted')}
+                                            <input type="checkbox" {...register('agb_accepted')} disabled={paymentRecoveryPending}
                                                    className={`checkbox mt-0.5 shrink-0 ${errors.agb_accepted ? 'checkbox-error' : 'checkbox-primary'}`}/>
                                             <span className="label-text text-sm leading-tight">
                                                 <Trans>Ich akzeptiere die <a href="/license-terms" target="_blank" rel="noopener noreferrer"
@@ -340,7 +459,7 @@ export default function ClientCartView() {
                                         </label>
                                         {!hasQuotes && (
                                             <label className="cursor-pointer flex items-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
-                                                <input type="checkbox" {...register('withdrawal_waived')}
+                                                <input type="checkbox" {...register('withdrawal_waived')} disabled={paymentRecoveryPending}
                                                        className={`checkbox mt-0.5 shrink-0 ${errors.withdrawal_waived ? 'checkbox-error' : 'checkbox-primary'}`}/>
                                                 <span className="label-text text-sm leading-tight">
                                                     <Trans>Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download). Mir ist bekannt, dass mein Rücktritts- bzw. Widerrufsrecht damit vorzeitig erlischt.</Trans>
@@ -349,13 +468,44 @@ export default function ClientCartView() {
                                         )}
                                     </div>
 
+                                    {isImmediateStripeCheckout && turnstileRequired && !turnstileSiteKey && (
+                                        <div role="alert"
+                                             className="alert alert-error mb-6">
+                                            <span className="iconify mdi--alert-circle text-xl"></span>
+                                            <span><Trans>Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support.</Trans></span>
+                                        </div>
+                                    )}
+
+                                    {isImmediateStripeCheckout && turnstileRequired && turnstileSiteKey && (
+                                        <section aria-labelledby="checkout-turnstile-heading"
+                                                 className="rounded-box border border-base-300 bg-base-200 p-4 mb-6 space-y-3">
+                                            <h3 id="checkout-turnstile-heading" className="font-bold">
+                                                <Trans>Sicherheitsprüfung</Trans>
+                                            </h3>
+                                            <p className="text-sm opacity-70">
+                                                <Trans>Bestätige die einmalige Prüfung, um den Checkout fortzusetzen.</Trans>
+                                            </p>
+                                            <TurnstileWidget
+                                                key={turnstileWidgetVersion}
+                                                siteKey={turnstileSiteKey}
+                                                userId={user?.id ?? ''}
+                                                onSuccess={setTurnstileToken}
+                                                onExpire={() => setTurnstileToken(null)}
+                                                onError={() => {
+                                                    setTurnstileToken(null);
+                                                    showToast('error', t`Die Sicherheitsprüfung konnte nicht geladen werden. Bitte versuche es erneut.`);
+                                                }}
+                                            />
+                                        </section>
+                                    )}
+
                                     <button
                                         type="submit"
                                         className="btn btn-primary w-full btn-lg"
-                                        disabled={items.length === 0 || isSubmitting}
+                                        disabled={items.length === 0 || isSubmitting || (isImmediateStripeCheckout && turnstileRequired && (!turnstileSiteKey || !turnstileToken))}
                                     >
                                         {isSubmitting ? <span
-                                            className="loading loading-spinner"></span> : (hasQuotes ? <Trans>Unverbindlich anfragen</Trans> : <Trans>Zahlungspflichtig bestellen</Trans>)}
+                                            className="loading loading-spinner"></span> : paymentRecoveryPending ? <Trans>Zahlung erneut prüfen</Trans> : (hasQuotes ? <Trans>Unverbindlich anfragen</Trans> : <Trans>Zahlungspflichtig bestellen</Trans>)}
                                     </button>
                                 </form>
                             )}

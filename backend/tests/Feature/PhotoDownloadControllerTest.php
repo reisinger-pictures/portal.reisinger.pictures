@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Gallery;
 use App\Models\Photo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 use ZipArchive;
@@ -201,6 +202,11 @@ class PhotoDownloadControllerTest extends TestCase
              ->assertStatus(403);
 
         $order->update(['status' => 'paid']);
+
+        // Positional throttle middleware uses the authenticated user ID as its
+        // key, so the requests above and below share one counter. This test is
+        // about the disputed-to-paid transition, not rate limiting.
+        RateLimiter::clear(sha1((string) $user->getAuthIdentifier()));
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
              ->get("/api/photos/{$photo->id}/download?tier=original")

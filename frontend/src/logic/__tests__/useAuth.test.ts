@@ -1,6 +1,7 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAuth } from '../useAuth';
+import {checkoutSessionStorageKey, loadOrCreateCheckoutSession} from '../checkoutSession';
 
 vi.mock('swr', () => {
     const mutate = vi.fn();
@@ -15,6 +16,7 @@ import useSWR from 'swr';
 describe('useAuth', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        sessionStorage.clear();
     });
 
     it('returns loading state initially when no data', () => {
@@ -178,6 +180,12 @@ describe('useAuth', () => {
         } as never);
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+        loadOrCreateCheckoutSession(
+            'u1',
+            'cart-v1-1111111111111111',
+            () => '11111111-1111-4111-8111-111111111111',
+            sessionStorage
+        );
 
         const { result } = renderHook(() => useAuth());
         await result.current.logout();
@@ -185,6 +193,7 @@ describe('useAuth', () => {
         expect(fetch).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({
             method: 'POST',
         }));
+        expect(sessionStorage.getItem(checkoutSessionStorageKey('u1'))).toBeNull();
 
         vi.unstubAllGlobals();
     });

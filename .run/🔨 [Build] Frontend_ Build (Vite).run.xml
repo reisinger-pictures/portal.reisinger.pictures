@@ -6,6 +6,9 @@
       <script value="build" />
     </scripts>
     <node-interpreter value="project" />
+    <!-- VITE_TURNSTILE_SITE_KEY is inherited from the IDE/process environment. For a
+         required production build, also set TURNSTILE_BUILD_REQUIRED=true and the
+         backend TURNSTILE_SITE_KEY. Never expose TURNSTILE_SECRET to this process. -->
     <envs />
     <method v="2" />
   </configuration>

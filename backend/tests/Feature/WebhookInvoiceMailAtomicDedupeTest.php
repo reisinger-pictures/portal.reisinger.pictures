@@ -8,9 +8,12 @@ use App\Models\Order;
 use App\Models\User;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\MailManager;
+use Illuminate\Mail\PendingMail;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
+use Mockery;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
 use Tests\TestCase;
@@ -42,9 +45,11 @@ class WebhookInvoiceMailAtomicDedupeTest extends TestCase
         $user = User::factory()->create();
         $order = Order::factory()->create([
             'user_id' => $user->id,
-            'status' => 'pending',
+            'status' => 'pending_payment',
             'total_amount' => 5000,
             'stripe_payment_intent_id' => 'pi_atomic_123',
+            'checkout_idempotency_key' => 'checkout-pi-atomic-123',
+            'checkout_fingerprint' => hash('sha256', 'pi_atomic_123'),
         ]);
         InvoiceSnapshot::create([
             'order_id' => $order->id,
@@ -97,8 +102,19 @@ class WebhookInvoiceMailAtomicDedupeTest extends TestCase
             'data' => [
                 'object' => [
                     'id' => 'pi_atomic_123',
+                    'amount' => 5000,
+                    'currency' => 'eur',
                     'amount_received' => 5000,
-                    'metadata' => ['order_id' => $order->id],
+                    'metadata' => [
+                        'order_id' => (string) $order->id,
+                        'checkout_idempotency_key' => (string) $order->checkout_idempotency_key,
+                        'checkout_fingerprint' => (string) $order->checkout_fingerprint,
+                        'generation' => (string) $order->payment_intent_generation,
+                        'portal_user_id' => (string) $order->user_id,
+                        'account_created_at' => (string) $order->user->created_at->getTimestamp(),
+                        'amount_cents' => (string) $order->total_amount,
+                        'currency' => 'eur',
+                    ],
                 ],
             ],
         ];
@@ -107,9 +123,9 @@ class WebhookInvoiceMailAtomicDedupeTest extends TestCase
         $this->mockStripeFee();
 
         // Simulate a concurrent webhook that already claimed the send slot:
-        // `add()` for the dedupe key returns false ("lost the race"), so this
-        // delivery must not queue a mail. Every other cache operation (e.g. the
-        // throttle limiter) still hits a real array store.
+        // the durable marker is already visible, so this delivery must not
+        // queue a mail. Every other cache operation (e.g. the throttle
+        // limiter) still hits a real array store.
         $raceKey = 'invoice_sent_'.$order->id;
         Cache::extend('race_test', function () use ($raceKey) {
             return Cache::repository(new class($raceKey) extends ArrayStore
@@ -119,13 +135,13 @@ class WebhookInvoiceMailAtomicDedupeTest extends TestCase
                     parent::__construct();
                 }
 
-                public function add($key, $value, $ttl = null)
+                public function get($key)
                 {
                     if ($key === $this->raceKey) {
-                        return false;
+                        return true;
                     }
 
-                    return parent::add($key, $value, $ttl);
+                    return parent::get($key);
                 }
             });
         });
@@ -140,6 +156,64 @@ class WebhookInvoiceMailAtomicDedupeTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'paid']);
     }
 
+    public function test_paid_order_retry_retries_mail_when_queue_throws(): void
+    {
+        $order = $this->makeOrder();
+        $secret = 'whsec_mail_retry';
+        Config::set('services.stripe.webhook_secret', $secret);
+        $payload = [
+            'id' => 'evt_mail_retry',
+            'type' => 'payment_intent.succeeded',
+            'data' => ['object' => [
+                'id' => 'pi_atomic_123',
+                'amount' => 5000,
+                'currency' => 'eur',
+                'amount_received' => 5000,
+                'metadata' => [
+                    'order_id' => (string) $order->id,
+                    'checkout_idempotency_key' => (string) $order->checkout_idempotency_key,
+                    'checkout_fingerprint' => (string) $order->checkout_fingerprint,
+                    'generation' => (string) $order->payment_intent_generation,
+                    'portal_user_id' => (string) $order->user_id,
+                    'account_created_at' => (string) $order->user->created_at->getTimestamp(),
+                    'amount_cents' => (string) $order->total_amount,
+                    'currency' => 'eur',
+                ],
+            ]],
+        ];
+        [, $signature] = $this->signedPayload($payload, $secret);
+        $this->mockStripeFee();
+
+        $mailCalls = 0;
+        $originalMail = Mail::getFacadeRoot();
+        $pendingMail = Mockery::mock(PendingMail::class);
+        $manager = Mockery::mock(MailManager::class);
+        $manager->shouldReceive('to')->twice()->andReturn($pendingMail);
+        $pendingMail->shouldReceive('queue')->twice()->andReturnUsing(function () use (&$mailCalls) {
+            $mailCalls++;
+            if ($mailCalls === 1) {
+                throw new \RuntimeException('queue unavailable');
+            }
+
+            return null;
+        });
+        Mail::swap($manager);
+
+        try {
+            $this->postJson('/api/webhooks/stripe', $payload, ['Stripe-Signature' => $signature])
+                ->assertStatus(503);
+            $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'paid']);
+            $this->assertFalse(Cache::has('invoice_sent_'.$order->id));
+            $this->assertNull(Cache::get('stripe-webhook-event:evt_mail_retry'));
+
+            $this->postJson('/api/webhooks/stripe', $payload, ['Stripe-Signature' => $signature])
+                ->assertOk();
+            $this->assertTrue(Cache::has('invoice_sent_'.$order->id));
+        } finally {
+            Mail::swap($originalMail);
+        }
+    }
+
     public function test_first_delivery_sends_mail_and_claims_the_slot(): void
     {
         $order = $this->makeOrder();
@@ -151,8 +225,19 @@ class WebhookInvoiceMailAtomicDedupeTest extends TestCase
             'data' => [
                 'object' => [
                     'id' => 'pi_atomic_123',
+                    'amount' => 5000,
+                    'currency' => 'eur',
                     'amount_received' => 5000,
-                    'metadata' => ['order_id' => $order->id],
+                    'metadata' => [
+                        'order_id' => (string) $order->id,
+                        'checkout_idempotency_key' => (string) $order->checkout_idempotency_key,
+                        'checkout_fingerprint' => (string) $order->checkout_fingerprint,
+                        'generation' => (string) $order->payment_intent_generation,
+                        'portal_user_id' => (string) $order->user_id,
+                        'account_created_at' => (string) $order->user->created_at->getTimestamp(),
+                        'amount_cents' => (string) $order->total_amount,
+                        'currency' => 'eur',
+                    ],
                 ],
             ],
         ];

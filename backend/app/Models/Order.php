@@ -13,6 +13,11 @@ class Order extends Model
 
     public const UPDATED_AT = null;
 
+    protected $attributes = [
+        'payment_intent_generation' => 1,
+        'payment_failure_count' => 0,
+    ];
+
     protected $fillable = [
         'user_id',
         'status',
@@ -24,6 +29,12 @@ class Order extends Model
         'is_quote_request',
         'ip_address',
         'stripe_payment_intent_id',
+        'checkout_idempotency_key',
+        'checkout_fingerprint',
+        'payment_intent_generation',
+        'payment_failure_count',
+        'last_payment_failure_at',
+        'last_payment_decline_code',
         'quote_status',
         'withdrawal_waived',
         'withdrawal_consent_at',
@@ -33,6 +44,9 @@ class Order extends Model
         'total_amount' => 'integer',
         'stripe_fee_cents' => 'integer',
         'coupon_discount_cents' => 'integer',
+        'payment_intent_generation' => 'integer',
+        'payment_failure_count' => 'integer',
+        'last_payment_failure_at' => 'datetime',
         'is_quote_request' => 'boolean',
         'withdrawal_waived' => 'boolean',
         'withdrawal_consent_at' => 'datetime',

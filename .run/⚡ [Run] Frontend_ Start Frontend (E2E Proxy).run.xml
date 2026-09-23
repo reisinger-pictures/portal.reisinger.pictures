@@ -8,6 +8,8 @@
     <node-interpreter value="project" />
     <envs>
       <env name="VITE_API_PROXY" value="http://127.0.0.1:8001" />
+      <!-- Official Cloudflare always-pass public test key; never a real credential. -->
+      <env name="VITE_TURNSTILE_SITE_KEY" value="1x00000000000000000000AA" />
     </envs>
     <method v="2" />
   </configuration>

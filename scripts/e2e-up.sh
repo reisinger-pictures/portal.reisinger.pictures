@@ -27,6 +27,12 @@ BACKEND="$ROOT/backend"
 E2E_ENV="$BACKEND/.env.e2e"
 E2E_DB="$BACKEND/database/database.e2e.sqlite"
 PORT="${E2E_PORT:-8001}"
+readonly E2E_CHECKOUT_NEW_ACCOUNT_HOURS=0
+readonly E2E_CHECKOUT_LIMIT=1000
+readonly E2E_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+readonly E2E_TURNSTILE_SECRET="1x0000000000000000000000000000000AA"
+readonly E2E_TURNSTILE_USER_THRESHOLD=3
+readonly E2E_TURNSTILE_IP_THRESHOLD=1000
 
 log()  { printf '[e2e-up] %s\n' "$*"; }
 fail() { printf '[e2e-up] FEHLER: %s\n' "$*" >&2; exit 1; }
@@ -55,6 +61,7 @@ set_env() { # key value
     grep -qE "^${key}=${value}$" "$E2E_ENV" || fail "Konnte ${key} nicht in ${E2E_ENV} setzen."
 }
 
+set_env APP_ENV "local"
 set_env APP_URL "http://localhost:${PORT}"
 set_env FRONTEND_URL "http://localhost:4321"
 set_env DB_CONNECTION "sqlite"
@@ -71,14 +78,44 @@ set_env MAIL_FROM_ADDRESS "test@reisinger.pictures"
 set_env AUTH_THROTTLE_LIMIT "1000"
 set_env MODEL_REGISTRATION_THROTTLE_LIMIT "1000"
 
+# Checkout defense overrides for the isolated E2E backend. The account-age
+# gate and dedicated checkout limiters stay test-only; the risk thresholds
+# still allow the Turnstile checkout spec to exercise its third-attempt path.
+set_env STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS "$E2E_CHECKOUT_NEW_ACCOUNT_HOURS"
+set_env CHECKOUT_THROTTLE_USER_PER_HOUR "$E2E_CHECKOUT_LIMIT"
+set_env CHECKOUT_THROTTLE_IP_PER_HOUR "$E2E_CHECKOUT_LIMIT"
+set_env CHECKOUT_THROTTLE_IP_PER_DAY "$E2E_CHECKOUT_LIMIT"
+set_env TURNSTILE_SITE_KEY "$E2E_TURNSTILE_SITE_KEY"
+set_env TURNSTILE_SECRET "$E2E_TURNSTILE_SECRET"
+set_env TURNSTILE_ALLOWED_HOSTNAMES "localhost"
+set_env TURNSTILE_USER_THRESHOLD_PER_HOUR "$E2E_TURNSTILE_USER_THRESHOLD"
+set_env TURNSTILE_IP_THRESHOLD_PER_HOUR "$E2E_TURNSTILE_IP_THRESHOLD"
+set_env TURNSTILE_ALLOW_DUMMY_TEST_KEYS "true"
+set_env CI "true"
+
 # --- 3. E2E-SQLite-DB anlegen + migrieren + seeden --------------------------
 log "Lege E2E-SQLite-DB an ($E2E_DB) ..."
 touch "$E2E_DB"
 log "Migriere + seede E2E-DB (env=e2e) ..."
-( cd "$BACKEND" && php artisan migrate:fresh --seed --env=e2e )
+( cd "$BACKEND" && env APP_ENV=local CI=true php artisan migrate:fresh --seed --env=e2e )
 
 # --- 4. Backend isoliert starten --------------------------------------------
 log "Starte E2E-Backend auf http://127.0.0.1:${PORT} (STRG+C = Stopp)"
 log "Frontend (separat):   VITE_API_PROXY=http://127.0.0.1:${PORT} pnpm dev"
 log "E2E-Tests:            pnpm test:e2e (Mailpit 8025 = Helper-Default)"
-exec php "$BACKEND/artisan" serve --host=127.0.0.1 --port="$PORT" --env=e2e --no-reload
+# Keep the isolated backend authoritative even if the invoking IDE exports
+# production or CI values. The official dummy-key compatibility path is CI-only.
+exec env \
+    APP_ENV=local \
+    CI=true \
+    STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS="$E2E_CHECKOUT_NEW_ACCOUNT_HOURS" \
+    CHECKOUT_THROTTLE_USER_PER_HOUR="$E2E_CHECKOUT_LIMIT" \
+    CHECKOUT_THROTTLE_IP_PER_HOUR="$E2E_CHECKOUT_LIMIT" \
+    CHECKOUT_THROTTLE_IP_PER_DAY="$E2E_CHECKOUT_LIMIT" \
+    TURNSTILE_SITE_KEY="$E2E_TURNSTILE_SITE_KEY" \
+    TURNSTILE_SECRET="$E2E_TURNSTILE_SECRET" \
+    TURNSTILE_ALLOWED_HOSTNAMES="localhost" \
+    TURNSTILE_USER_THRESHOLD_PER_HOUR="$E2E_TURNSTILE_USER_THRESHOLD" \
+    TURNSTILE_IP_THRESHOLD_PER_HOUR="$E2E_TURNSTILE_IP_THRESHOLD" \
+    TURNSTILE_ALLOW_DUMMY_TEST_KEYS="true" \
+    php "$BACKEND/artisan" serve --host=127.0.0.1 --port="$PORT" --env=e2e --no-reload

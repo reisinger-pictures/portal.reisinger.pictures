@@ -88,7 +88,16 @@ class CheckoutServiceTest extends TestCase
 
         $clientMock = $this->createMock(ClientInterface::class);
         $clientMock->expects($this->once())->method('request')->willReturnCallback(function ($method, $absUrl, $headers, $params, $hasFile) {
-            return [json_encode(['id' => 'pi_test_123', 'client_secret' => 'sec_test_123']), 200, []];
+            return [json_encode([
+                'id' => 'pi_test_123',
+                'status' => 'requires_payment_method',
+                'client_secret' => 'sec_test_123',
+                'amount' => (int) ($params['amount'] ?? 0),
+                'currency' => $params['currency'] ?? 'eur',
+                'created' => time(),
+                'customer' => $params['customer'] ?? null,
+                'metadata' => $params['metadata'] ?? [],
+            ]), 200, []];
         });
         ApiRequestor::setHttpClient($clientMock);
 
@@ -303,8 +312,17 @@ class CheckoutServiceTest extends TestCase
         $user->save();
 
         $clientMock = $this->createMock(ClientInterface::class);
-        $clientMock->expects($this->once())->method('request')->willReturnCallback(function () {
-            return [json_encode(['id' => 'pi_test_imm', 'client_secret' => 'sec_test_imm']), 200, []];
+        $clientMock->expects($this->once())->method('request')->willReturnCallback(function ($method, $absUrl, $headers, $params, $hasFile) {
+            return [json_encode([
+                'id' => 'pi_test_imm',
+                'status' => 'requires_payment_method',
+                'client_secret' => 'sec_test_imm',
+                'amount' => (int) ($params['amount'] ?? 0),
+                'currency' => $params['currency'] ?? 'eur',
+                'created' => time(),
+                'customer' => $params['customer'] ?? null,
+                'metadata' => $params['metadata'] ?? [],
+            ]), 200, []];
         });
         ApiRequestor::setHttpClient($clientMock);
 
@@ -374,7 +392,7 @@ class CheckoutServiceTest extends TestCase
 
         $order = Order::first();
         $this->assertNotNull($order);
-        $this->assertEquals('cancelled', $order->status);
+        $this->assertEquals('pending_payment', $order->status);
         $this->assertNull($order->stripe_payment_intent_id);
     }
 
