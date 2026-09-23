@@ -31,7 +31,9 @@ test.describe('Quote Checkout Workflow', () => {
     });
 
     test('Client completes Stripe checkout with quote token', { tag: ['@feature:quote', '@regression'] }, async ({ page, request }) => {
-        test.setTimeout(90000);
+        // The UI waits for the same owner-scoped order status poll (up to 60s)
+        // that production uses before reporting a successful payment.
+        test.setTimeout(120000);
         const auth = new AuthHelper(page);
         const modal = new ModalHelper(page);
         const form = new FormHelper(page, modal);
@@ -133,8 +135,23 @@ test.describe('Quote Checkout Workflow', () => {
         await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa, stripeFrames);
         await expect(page.getByRole('button', { name: 'Jetzt bezahlen' })).toBeEnabled({ timeout: 10000 });
         const payButton = page.getByRole('button', { name: 'Jetzt bezahlen' });
+        const paidOrderResponsePromise = page.waitForResponse(async response => {
+            const responseUrl = new URL(response.url());
+            if (responseUrl.pathname !== `/api/orders/${orderId}` || response.request().method() !== 'GET') {
+                return false;
+            }
+            if (!response.ok()) return false;
+
+            const order: unknown = await response.json();
+            return typeof order === 'object'
+                && order !== null
+                && (order as { status?: unknown }).status === 'paid';
+        }, { timeout: 60000 });
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
+        // Stripe confirmation precedes the server-authoritative paid state.
+        // Wait for the authenticated status poll before checking the success toast.
+        await paidOrderResponsePromise;
         await expect(page.locator('.toast')).toContainText(/Zahlung erfolgreich/i, { timeout: 15000 });
 
         await page.goto('/cart?redirect_status=succeeded');
