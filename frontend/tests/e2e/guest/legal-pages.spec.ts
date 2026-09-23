@@ -45,13 +45,33 @@ test.describe('Rechtliche Seiten (AGB & Widerruf) (G)', () => {
         );
 
         await expect(main.getByRole('heading', { name: '4. Zahlungsabwicklung und Betrugsprävention' })).toBeVisible();
-        await expect(main.getByText(/Stripe Customer-ID/)).toBeVisible();
-        await expect(main.getByText(/PaymentIntent-ID/)).toBeVisible();
-        await expect(main.getByText(/Checkout-Fingerprint-Hash/)).toBeVisible();
-        await expect(main.getByText(/PaymentIntent-Fehler-\/Decline-Telemetrie/)).toBeVisible();
-        await expect(main.getByText(/Event-ID-Deduplizierung/)).toBeVisible();
-        await expect(main.getByText(/Sitzungsspeicher/)).toBeVisible();
-        await expect(main.getByText(/Zahlungsprozessor/)).toBeVisible();
+
+        const paymentIdentifiersParagraph = main.locator('p').filter({
+            hasText: 'Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID'
+        });
+        await expect(paymentIdentifiersParagraph).toBeVisible();
+        await expect(paymentIdentifiersParagraph).toContainText('Stripe Customer-ID');
+        await expect(paymentIdentifiersParagraph).toContainText('PaymentIntent-ID');
+        await expect(paymentIdentifiersParagraph).toContainText('Checkout-Fingerprint-Hash');
+
+        const paymentTelemetryParagraph = main.locator('p').filter({
+            hasText: 'Bei fehlgeschlagenen Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie'
+        });
+        await expect(paymentTelemetryParagraph).toBeVisible();
+        await expect(paymentTelemetryParagraph).toContainText('PaymentIntent-Fehler-/Decline-Telemetrie');
+        await expect(paymentTelemetryParagraph).toContainText('Event-ID-Deduplizierung');
+
+        const checkoutSessionParagraph = main.locator('p').filter({
+            hasText: 'Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser'
+        });
+        await expect(checkoutSessionParagraph).toBeVisible();
+        await expect(checkoutSessionParagraph).toContainText('Sitzungsspeicher');
+
+        const paymentProcessorParagraph = main.locator('p').filter({
+            hasText: 'Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor'
+        });
+        await expect(paymentProcessorParagraph).toBeVisible();
+        await expect(paymentProcessorParagraph).toContainText('Zahlungsprozessor');
 
         await expect(main.getByRole('heading', { name: '5. Cloudflare Turnstile' })).toBeVisible();
         await expect(main.getByText(/Sicherheitsprozessor/)).toBeVisible();
