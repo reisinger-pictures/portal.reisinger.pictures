@@ -155,8 +155,6 @@ test.describe('Quote Checkout Workflow', () => {
         await paidOrderResponsePromise;
         await expect(page.locator('.toast')).toContainText(/Zahlung erfolgreich/i, { timeout: 15000 });
 
-        await page.goto('/cart?redirect_status=succeeded');
-
         await expect(page).toHaveURL(/.*\/orders/, { timeout: 15000 });
         await expect(page.locator('h1:has-text("Meine Einkäufe & Lizenzen")')).toBeVisible();
     });
