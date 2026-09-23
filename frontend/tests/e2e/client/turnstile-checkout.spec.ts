@@ -6,6 +6,7 @@ import {GalleryHelper} from '../helpers/GalleryHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
+import type {TurnstileRenderOptions} from '../../../src/ui/client/components/TurnstileWidget';
 
 interface GalleryPhoto {
     id: string;
@@ -24,6 +25,14 @@ interface LicenseUseCase {
 interface LicenseCatalogResponse {
     use_cases?: LicenseUseCase[];
 }
+
+interface TurnstileInitScriptArgument {
+    token: string;
+    statusText: string;
+}
+
+const TURNSTILE_TEST_TOKEN = 'e2e-turnstile-test-token';
+const TURNSTILE_TEST_STATUS = 'Sicherheitsprüfung abgeschlossen (Test)';
 
 test.describe('Risk-triggered Turnstile checkout', () => {
     test.describe.configure({retries: 2});
@@ -45,6 +54,28 @@ test.describe('Risk-triggered Turnstile checkout', () => {
     test('third checkout attempt renders Turnstile and submits its one-time token', {
         tag: ['@regression', '@feature:client:checkout', '@feature:card-testing']
     }, async ({page, request}) => {
+        await page.addInitScript(({token, statusText}: TurnstileInitScriptArgument) => {
+            const render = (container: HTMLElement | string, options: TurnstileRenderOptions): string => {
+                const element = typeof container === 'string'
+                    ? document.querySelector<HTMLElement>(container)
+                    : container;
+                if (!element) throw new Error('Turnstile E2E container was not found.');
+
+                const status = document.createElement('p');
+                status.setAttribute('role', 'status');
+                status.textContent = statusText;
+                element.replaceChildren(status);
+                options.callback?.(token);
+                return 'e2e-turnstile-widget';
+            };
+
+            window.turnstile = {
+                render,
+                remove: () => undefined,
+                reset: () => undefined
+            };
+        }, {token: TURNSTILE_TEST_TOKEN, statusText: TURNSTILE_TEST_STATUS});
+
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const form = new FormHelper(page, new ModalHelper(page));
@@ -142,7 +173,10 @@ test.describe('Risk-triggered Turnstile checkout', () => {
         expect(initialResponse.status()).toBe(403);
         expect(await initialResponse.json()).toEqual(expect.objectContaining({turnstile_required: true}));
         await expect(main.getByRole('heading', {name: 'Sicherheitsprüfung'})).toBeVisible({timeout: 15000});
-        await expect(main.getByTestId('turnstile-widget')).toBeVisible({timeout: 15000});
+        const turnstileSection = main.getByRole('region', {name: 'Sicherheitsprüfung'});
+        const turnstileStatus = turnstileSection.getByRole('status');
+        await expect(turnstileStatus).toBeVisible({timeout: 15000});
+        await expect(turnstileStatus).toHaveText(TURNSTILE_TEST_STATUS);
         await expect(checkoutButton).toBeEnabled({timeout: 15000});
 
         const verifiedRequestPromise = page.waitForRequest(request => (
@@ -160,7 +194,7 @@ test.describe('Risk-triggered Turnstile checkout', () => {
         expect(verifiedResponse.status(), await verifiedResponse.text()).toBe(200);
         expect(verifiedRequest.headers()['idempotency-key']).toBe(initialRequest.headers()['idempotency-key']);
         const verifiedPayload = verifiedRequest.postDataJSON() as Record<string, unknown>;
-        expect(verifiedPayload.turnstile_token).toEqual(expect.any(String));
+        expect(verifiedPayload.turnstile_token).toBe(TURNSTILE_TEST_TOKEN);
         await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
         await expect(main.getByRole('heading', {name: 'Sicherheitsprüfung'})).toHaveCount(0);
     });

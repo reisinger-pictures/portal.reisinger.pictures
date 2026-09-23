@@ -37,7 +37,12 @@ test.describe('Rechtliche Seiten (AGB & Widerruf) (G)', () => {
         await expect(main.getByRole('heading', { name: '1. IP-Adressen und technische Protokolle' })).toBeVisible();
         await expect(main.getByText(/Beim Checkout speichern wir/)).toBeVisible();
         await expect(main.getByText('Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete Risikoschlüssel (IP-Risikoschlüssel) zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten.', { exact: true })).toBeVisible();
-        await expect(main.getByText(/Aufbewahrungsrichtlinie/)).toBeVisible();
+        const ipRetentionParagraph = main.locator('p').filter({
+            hasText: 'Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten'
+        });
+        await expect(ipRetentionParagraph).toHaveText(
+            'Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet sich je nach Datenkategorie nach der geltenden Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten. Die IP-Risikoschlüssel laufen mit dem jeweiligen konfigurierten Limitierungsfenster ab. Die konkrete Frist und die zugrunde liegende Zuordnung teilt der Betreiber auf Anfrage mit.',
+        );
 
         await expect(main.getByRole('heading', { name: '4. Zahlungsabwicklung und Betrugsprävention' })).toBeVisible();
         await expect(main.getByText(/Stripe Customer-ID/)).toBeVisible();

@@ -126,6 +126,7 @@ test.describe('Quote Checkout Workflow', () => {
         const checkoutData = await checkoutRes.json();
         const orderId: string = checkoutData.order_id;
         expect(orderId).toBeTruthy();
+        await StripeHelper.installPaidOrderStatusFixture(page, orderId);
 
         // --- 5. Stripe-Zahlung (Visa 4242) ---
         await expect(page.locator('h2:has-text("Zahlung abschließen")')).toBeVisible({ timeout: 15000 });
