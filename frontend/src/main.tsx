@@ -9,9 +9,7 @@ import {BrowserRouter} from 'react-router-dom';
 import App from './App';
 import './index.css';
 import { applyTheme } from './logic/useBrand';
-import {stripePromise as applicationStripePromise} from './logic/stripe';
 
-void applicationStripePromise;
 applyTheme();
 
 createRoot(document.getElementById('root')!).render(

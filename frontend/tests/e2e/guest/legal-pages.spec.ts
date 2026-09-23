@@ -36,7 +36,7 @@ test.describe('Rechtliche Seiten (AGB & Widerruf) (G)', () => {
         await expect(main.getByRole('heading', { name: 'Datenschutzerklärung' })).toBeVisible({ timeout: 10000 });
         await expect(main.getByRole('heading', { name: '1. IP-Adressen und technische Protokolle' })).toBeVisible();
         await expect(main.getByText(/Beim Checkout speichern wir/)).toBeVisible();
-        await expect(main.getByText(/IP-Risikoschlüssel/)).toBeVisible();
+        await expect(main.getByText('Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete Risikoschlüssel (IP-Risikoschlüssel) zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten.', { exact: true })).toBeVisible();
         await expect(main.getByText(/Aufbewahrungsrichtlinie/)).toBeVisible();
 
         await expect(main.getByRole('heading', { name: '4. Zahlungsabwicklung und Betrugsprävention' })).toBeVisible();
