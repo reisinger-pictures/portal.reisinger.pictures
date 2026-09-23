@@ -167,12 +167,6 @@ test.describe('Stripe Checkout Workflow', () => {
         await paidOrderResponsePromise;
         await expect(page.locator('.toast')).toContainText(/Zahlung erfolgreich/i, { timeout: 15000 });
 
-        // Simuliere den Stripe-Return nach erfolgreichem Payment:
-        // Stripe leitet den User auf die return_url (/cart?redirect_status=succeeded) zurück.
-        // Der neue useEffect in ClientCartView erkennt redirect_status, cleart den Cart,
-        // und navigiert den User zu /orders.
-        await page.goto('/cart?redirect_status=succeeded');
-
         await expect(page).toHaveURL(/.*\/orders/, {timeout: 15000});
         await expect(page.locator('h1:has-text("Meine Einkäufe & Lizenzen")')).toBeVisible();
     });
