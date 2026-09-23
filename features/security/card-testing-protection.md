@@ -473,9 +473,10 @@ The existing PaymentIntent/Payment Element flow remains the payment surface.
 Do not hardcode `payment_method_types: ['card']`; payment method selection and
 3DS remain Stripe/Dashboard-driven. The frontend must handle asynchronous
 authentication and return flows, including a cancelled or expired 3DS
-challenge, without creating a fresh PI on every render. Loading Stripe.js on
-all shopping pages is a reliability requirement, not permission to bypass the
-server-side checks in section 3.
+challenge, without creating a fresh PI on every render. Stripe.js is loaded
+through the shared bounded loader when the checkout-capable shopping surface
+mounts; unrelated routes must not eagerly load it. This is a reliability
+requirement, not permission to bypass the server-side checks in section 3.
 
 Turnstile widget code is separate from Stripe.js and is loaded only when the
 server requests it. Both integrations must respect the application's CSP and
