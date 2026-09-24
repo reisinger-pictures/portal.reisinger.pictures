@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { extractCookieHeader } from '../helpers/E2ECookieJar';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
@@ -254,9 +255,9 @@ test.describe('Projekte-Board (Admin)', () => {
             data: { email: superAdmin.email, password: superAdmin.password },
             headers: { 'Accept': 'application/json' },
         });
-        const setCookie = loginApi.headers()['set-cookie'] ?? '';
-        const tokenMatch = setCookie.match(/rp_jwt=([^;]+)/);
-        const cookie = tokenMatch ? `rp_jwt=${tokenMatch[1]}` : '';
+        if (!loginApi.ok()) throw new Error(`Admin login failed: ${await loginApi.text()}`);
+        const cookie = extractCookieHeader(loginApi);
+        if (!cookie) throw new Error('Admin login response did not contain an auth cookie');
 
         const customerName = `Drop Kunde ${Math.random().toString(36).substring(2, 8)}`;
         const customerEmail = `drop-kunde-${Math.random().toString(36).substring(2, 8)}@example.com`;

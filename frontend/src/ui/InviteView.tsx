@@ -21,6 +21,12 @@ export default function InviteView() {
     const navigate = useNavigate();
     const { mutate } = useSWRConfig();
     const { user, isLoading: authLoading } = useAuth();
+    // A transient guest is authenticated for gallery access, but must not be
+    // treated as a registered user by the automatic redemption path. Keeping
+    // the identity as a primitive also prevents a harmless auth-cache refresh
+    // from cancelling an in-flight redemption.
+    const isRegisteredUser = user?.guest_id === null;
+    const userId = user?.id ?? null;
     const autoRedeemStartedRef = useRef(false);
     const autoRedeemAbortRef = useRef<AbortController | null>(null);
     const [autoRedeeming, setAutoRedeeming] = useState(false);
@@ -118,8 +124,9 @@ export default function InviteView() {
 
     
     useEffect(() => {
-        // Auto-Redeem nur wenn: Nicht am Laden, User eingeloggt, Galerie bekannt, kein PW nötig
-        if (!loading || authLoading || !token || resolvedToken !== token || !user || !galleryName || requiresPassword || error || autoRedeemStartedRef.current) {
+        // Auto-redeem only for a registered user after the public invite lookup;
+        // transient guests must explicitly submit the privacy form themselves.
+        if (loading || authLoading || !token || resolvedToken !== token || userId === null || !isRegisteredUser || !galleryName || requiresPassword || error || autoRedeemStartedRef.current) {
             return;
         }
 
@@ -138,7 +145,7 @@ export default function InviteView() {
             try {
                 const resData = await apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', {
                     token,
-                    accept_privacy: !!user
+                    accept_privacy: true
                 }, {signal: controller.signal});
                 if (cancelled || controller.signal.aborted) return;
 
@@ -167,7 +174,7 @@ export default function InviteView() {
                 autoRedeemAbortRef.current = null;
             }
         };
-    }, [loading, authLoading, resolvedToken, user, galleryName, requiresPassword, error, token, navigate, mutate]);
+    }, [loading, authLoading, resolvedToken, userId, isRegisteredUser, galleryName, requiresPassword, error, token, navigate, mutate]);
 
     if (!token) {
         return <PageLayout>

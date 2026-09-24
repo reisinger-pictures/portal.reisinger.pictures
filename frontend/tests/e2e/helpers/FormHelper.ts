@@ -101,7 +101,7 @@ export class FormHelper {
         if (params.name) await main.getByLabel('Vor- & Nachname').fill(params.name);
         if (params.street) await main.getByLabel('Straße & Hausnummer').fill(params.street);
         if (params.zip) await main.getByLabel('PLZ').fill(params.zip);
-        if (params.city) await main.getByLabel('Ort').fill(params.city);
+        if (params.city) await main.getByRole('textbox', {name: /^Ort\s*\*?$/}).fill(params.city);
         if (params.acceptAgb) await main.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i}).check();
         if (params.waiveWithdrawal) await main.getByRole('checkbox', {name: /widerrufsrecht/i}).check();
     }

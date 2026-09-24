@@ -1,6 +1,6 @@
 import { Locator, Page, expect } from '@playwright/test';
 
-const searchPlaceholder = 'Suche in allen Galerien...';
+const searchLabel = 'Suche';
 
 export class SearchHelper {
     private _input: Locator;
@@ -8,7 +8,7 @@ export class SearchHelper {
     constructor(private page: Page) {
         this._input = this.page
             .getByRole('banner')
-            .getByRole('textbox', { name: searchPlaceholder });
+            .getByRole('textbox', { name: searchLabel });
     }
 
     get input() {

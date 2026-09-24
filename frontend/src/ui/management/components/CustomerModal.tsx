@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { Customer } from '../../../api';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import { LocationResult } from '../../../logic/useLocations';
 
-const customerSchema = z.object({
+const createCustomerSchema = () => z.object({
     name: z.string().min(1, t`Name oder Ansprechpartner ist erforderlich`),
     company: z.string().optional(),
     email: z.string().email(t`Ungültige E-Mail-Adresse`).or(z.literal('')),
@@ -19,7 +19,7 @@ const customerSchema = z.object({
     uid: z.string().optional()
 });
 
-type CustomerFormValues = z.infer<typeof customerSchema>;
+type CustomerFormValues = z.infer<ReturnType<typeof createCustomerSchema>>;
 
 interface Props {
     isOpen: boolean;
@@ -30,6 +30,11 @@ interface Props {
 
 export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave }: Props) {
     "use no memo";
+    const formId = useId();
+    const nameInputId = `${formId}-name`;
+    const companyInputId = `${formId}-company`;
+    const birthdateInputId = `${formId}-birthdate`;
+    const customerSchema = createCustomerSchema();
     const { register, handleSubmit, reset, setValue, control, formState: { errors, isSubmitting } } = useForm<CustomerFormValues>({
         resolver: zodResolver(customerSchema)
     });
@@ -78,13 +83,13 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Name / Ansprechpartner</span></label>
-                            <input type="text" required {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
+                            <label className="label" htmlFor={nameInputId}><span className="label-text font-bold">Name / Ansprechpartner</span></label>
+                            <input id={nameInputId} type="text" required {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
                             {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
                         </div>
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Firma</span></label>
-                            <input type="text" {...register('company')} className="input input-bordered" />
+                            <label className="label" htmlFor={companyInputId}><span className="label-text font-bold">Firma</span></label>
+                            <input id={companyInputId} type="text" {...register('company')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">E-Mail Adresse</span></label>
@@ -92,8 +97,8 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                             {errors.email && <span className="text-error text-xs mt-1">{errors.email.message}</span>}
                         </div>
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Geburtsdatum</span></label>
-                            <input type="date" {...register('birthdate')} className="input input-bordered" />
+                            <label className="label" htmlFor={birthdateInputId}><span className="label-text font-bold">Geburtsdatum</span></label>
+                            <input id={birthdateInputId} type="date" {...register('birthdate')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
                             <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>

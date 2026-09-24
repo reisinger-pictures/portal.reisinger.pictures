@@ -5,7 +5,9 @@ namespace Tests\Unit;
 use App\Enums\Brand;
 use App\Models\Contract;
 use App\Support\BrandRegistry;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ContractAvailabilityTest extends TestCase
@@ -47,6 +49,31 @@ class ContractAvailabilityTest extends TestCase
             'expires_at' => null,
             'closes_at' => null,
         ]);
+    }
+
+    public function test_database_clock_read_uses_a_mariadb_safe_alias(): void
+    {
+        // SQLite accepts the old alias, so assert the portable SQL contract
+        // explicitly while keeping the default PHPUnit run self-contained.
+        $clockQueries = [];
+        DB::listen(function (QueryExecuted $query) use (&$clockQueries): void {
+            if (str_contains(strtoupper($query->sql), 'CURRENT_TIMESTAMP')) {
+                $clockQueries[] = $query->sql;
+            }
+        });
+
+        $databaseNow = Contract::databaseNow();
+
+        $this->assertTrue($databaseNow->isAfter(now()->subMinute()));
+        $this->assertCount(1, $clockQueries);
+        $this->assertStringContainsStringIgnoringCase(
+            'AS contract_database_now',
+            $clockQueries[0],
+        );
+        $this->assertStringNotContainsStringIgnoringCase(
+            'AS current_time',
+            $clockQueries[0],
+        );
     }
 
     public function test_instance_cannot_outlive_a_parent_with_an_earlier_deadline(): void

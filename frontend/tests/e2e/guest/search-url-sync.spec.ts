@@ -13,10 +13,14 @@ test.describe('Global Search URL synchronization', () => {
 
         await search.search(firstTerm);
         await expect(page).toHaveURL(new RegExp(`/search\\?q=${firstTerm}`));
+        await expect(page.getByRole('main').getByRole('heading', {
+            name: new RegExp(`Suchergebnisse für.*${firstTerm}`),
+        })).toBeVisible({ timeout: 15000 });
         await expect(search.input).toHaveValue(firstTerm);
 
-        // The second submit stays on /search. A marker on the input proves that
-        // browser history navigation reuses this exact DOM node.
+        // The route marker above confirms that the first result view is mounted
+        // before this DOM identity marker is attached. It then must survive all
+        // same-route history transitions.
         const mountMarker = `mounted-${Math.random().toString(36).substring(2, 10)}`;
         await search.input.evaluate((input, marker) => {
             input.setAttribute('data-e2e-mount-marker', marker);
@@ -24,16 +28,25 @@ test.describe('Global Search URL synchronization', () => {
 
         await search.search(secondTerm);
         await expect(page).toHaveURL(new RegExp(`/search\\?q=${secondTerm}`));
+        await expect(page.getByRole('main').getByRole('heading', {
+            name: new RegExp(`Suchergebnisse für.*${secondTerm}`),
+        })).toBeVisible({ timeout: 15000 });
         await expect(search.input).toHaveValue(secondTerm);
         await expect(search.input).toHaveAttribute('data-e2e-mount-marker', mountMarker);
 
         await page.goBack();
         await expect(page).toHaveURL(new RegExp(`/search\\?q=${firstTerm}`));
+        await expect(page.getByRole('main').getByRole('heading', {
+            name: new RegExp(`Suchergebnisse für.*${firstTerm}`),
+        })).toBeVisible({ timeout: 15000 });
         await expect(search.input).toHaveValue(firstTerm);
         await expect(search.input).toHaveAttribute('data-e2e-mount-marker', mountMarker);
 
         await page.goForward();
         await expect(page).toHaveURL(new RegExp(`/search\\?q=${secondTerm}`));
+        await expect(page.getByRole('main').getByRole('heading', {
+            name: new RegExp(`Suchergebnisse für.*${secondTerm}`),
+        })).toBeVisible({ timeout: 15000 });
         await expect(search.input).toHaveValue(secondTerm);
         await expect(search.input).toHaveAttribute('data-e2e-mount-marker', mountMarker);
     });

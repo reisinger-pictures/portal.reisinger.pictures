@@ -7,6 +7,7 @@ use App\Models\Contract;
 use App\Models\ContractSigner;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -191,6 +192,33 @@ class ContractJoinTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonStructure(['contract', 'signer']);
         $response->assertJsonPath('contract.terms_html', '<p>Terms</p>');
+    }
+
+    public function test_view_contract_content_returns_authoritative_total_for_ordered_discounts(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [
+                ['type' => 'item', 'description' => 'Fotoshooting', 'notes' => '', 'qty' => 2, 'price' => 5000],
+            ],
+            'discounts' => [
+                ['type' => 'discount_percent', 'description' => '10% Rabatt', 'notes' => '', 'price' => 1000],
+                ['type' => 'discount_fixed', 'description' => 'Bonus', 'notes' => '', 'price' => 500],
+            ],
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'discounted-contract',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->getJson('/api/contracts/sign/discounted-contract');
+
+        $response->assertOk();
+        $response->assertJsonPath('contract.discounts.0.price', 1000);
+        // 10000 - round(10000 × 1000 / 10000) = 9000; 9000 - 500 = 8500
+        $response->assertJsonPath('contract.total', 8500);
     }
 
     public function test_heartbeat_logs_audit(): void
@@ -703,7 +731,7 @@ class ContractJoinTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_repeated_join_with_same_email_fails_closed_without_disclosing_token(): void
+    public function test_repeated_join_with_same_email_waits_for_the_normalized_lock_and_fails_closed_without_disclosure(): void
     {
         $contract = Contract::factory()->create([
             'status' => 'active',
@@ -720,16 +748,35 @@ class ContractJoinTest extends TestCase
         $first->assertStatus(201);
         $firstToken = $first->json('personal_token');
 
-        $second = $this->postJson('/api/contracts/join/rejoin', [
-            'name' => 'Anna Test',
-            'email' => 'ANNA@EXAMPLE.COM',
-            'roles' => ['Model'],
-        ]);
+        // A competing request reaches the same cache-lock identity even when
+        // case and surrounding whitespace differ. Holding that exact lock for
+        // one second exercises Laravel's supported block/wait path without an
+        // unsafe second SQLite :memory: writer.
+        $lockKey = Contract::joinLockKey($contract->getKey(), '  ANNA@EXAMPLE.COM  ');
+        $lock = Cache::lock($lockKey, 1);
+        $this->assertTrue($lock->get());
+        $startedAt = microtime(true);
+
+        try {
+            $second = $this->postJson('/api/contracts/join/rejoin', [
+                'name' => 'Anna Test',
+                'email' => '  ANNA@EXAMPLE.COM  ',
+                'roles' => ['Model'],
+            ]);
+        } finally {
+            $lock->release();
+        }
+
+        $this->assertGreaterThan(0.5, microtime(true) - $startedAt);
         $second->assertStatus(409);
+        $second->assertExactJson(['error' => 'Für diese E-Mail besteht bereits ein Vertrag.']);
         $this->assertArrayNotHasKey('personal_token', $second->json());
         $this->assertArrayNotHasKey('name', $second->json());
         $this->assertArrayNotHasKey('roles', $second->json());
-        $this->assertNotSame($firstToken, $second->json('personal_token'));
+        $this->assertStringNotContainsString($firstToken, $second->getContent());
+        $this->assertStringNotContainsString('Anna Test', $second->getContent());
+        $this->assertStringNotContainsString('Model', $second->getContent());
+        $this->assertFalse(Cache::lock($lockKey)->isLocked());
 
         $this->assertEquals(1, ContractSigner::where('email', 'anna@example.com')->count());
         $this->assertDatabaseCount('contract_audit_logs', 1);
@@ -824,7 +871,7 @@ class ContractJoinTest extends TestCase
         ]);
     }
 
-    public function test_repeated_template_join_with_same_email_fails_closed_without_disclosing_token(): void
+    public function test_repeated_template_join_with_same_email_waits_for_the_normalized_lock_and_fails_closed_without_disclosure(): void
     {
         $template = Contract::factory()->create([
             'type' => 'template',
@@ -842,16 +889,31 @@ class ContractJoinTest extends TestCase
         $first->assertStatus(201);
         $firstToken = $first->json('personal_token');
 
-        $second = $this->postJson('/api/contracts/join/tpl-rejoin', [
-            'name' => 'Max Mustermann',
-            'email' => 'MAX-REJOIN@EXAMPLE.COM',
-            'roles' => ['Model'],
-        ]);
+        $lockKey = Contract::joinLockKey($template->getKey(), '  MAX-REJOIN@EXAMPLE.COM  ');
+        $lock = Cache::lock($lockKey, 1);
+        $this->assertTrue($lock->get());
+        $startedAt = microtime(true);
+
+        try {
+            $second = $this->postJson('/api/contracts/join/tpl-rejoin', [
+                'name' => 'Max Mustermann',
+                'email' => '  MAX-REJOIN@EXAMPLE.COM  ',
+                'roles' => ['Model'],
+            ]);
+        } finally {
+            $lock->release();
+        }
+
+        $this->assertGreaterThan(0.5, microtime(true) - $startedAt);
         $second->assertStatus(409);
+        $second->assertExactJson(['error' => 'Für diese E-Mail besteht bereits ein Vertrag.']);
         $this->assertArrayNotHasKey('personal_token', $second->json());
         $this->assertArrayNotHasKey('name', $second->json());
         $this->assertArrayNotHasKey('roles', $second->json());
-        $this->assertNotSame($firstToken, $second->json('personal_token'));
+        $this->assertStringNotContainsString($firstToken, $second->getContent());
+        $this->assertStringNotContainsString('Max Mustermann', $second->getContent());
+        $this->assertStringNotContainsString('Model', $second->getContent());
+        $this->assertFalse(Cache::lock($lockKey)->isLocked());
 
         $this->assertDatabaseCount('contracts', 2);
         $this->assertDatabaseCount('contract_signers', 1);
@@ -863,6 +925,92 @@ class ContractJoinTest extends TestCase
             'type' => 'contract',
         ]);
         $this->assertDatabaseCount('contract_audit_logs', 1);
+    }
+
+    public function test_normalized_email_uniqueness_is_isolated_per_direct_contract_and_template(): void
+    {
+        $directContracts = [
+            Contract::factory()->create([
+                'status' => 'active',
+                'join_token' => 'scope-direct-a',
+                'available_roles' => ['Model'],
+                'brand' => Brand::B2B,
+            ]),
+            Contract::factory()->create([
+                'status' => 'active',
+                'join_token' => 'scope-direct-b',
+                'available_roles' => ['Model'],
+                'brand' => Brand::B2B,
+            ]),
+        ];
+        $templates = [
+            Contract::factory()->create([
+                'type' => 'template',
+                'status' => 'active',
+                'join_token' => 'scope-template-a',
+                'available_roles' => ['Model'],
+                'brand' => Brand::B2B,
+            ]),
+            Contract::factory()->create([
+                'type' => 'template',
+                'status' => 'active',
+                'join_token' => 'scope-template-b',
+                'available_roles' => ['Model'],
+                'brand' => Brand::B2B,
+            ]),
+        ];
+
+        $responses = [
+            $this->postJson('/api/contracts/join/scope-direct-a', [
+                'name' => 'Scoped Signer',
+                'email' => 'scoped-signer@example.com',
+                'roles' => ['Model'],
+            ]),
+            $this->postJson('/api/contracts/join/scope-direct-b', [
+                'name' => 'Scoped Signer',
+                'email' => '  SCOPED-SIGNER@EXAMPLE.COM  ',
+                'roles' => ['Model'],
+            ]),
+            $this->postJson('/api/contracts/join/scope-template-a', [
+                'name' => 'Scoped Signer',
+                'email' => 'scoped-signer@example.com',
+                'roles' => ['Model'],
+            ]),
+            $this->postJson('/api/contracts/join/scope-template-b', [
+                'name' => 'Scoped Signer',
+                'email' => '  SCOPED-SIGNER@EXAMPLE.COM  ',
+                'roles' => ['Model'],
+            ]),
+        ];
+
+        foreach ($responses as $response) {
+            $response->assertCreated();
+        }
+
+        $tokens = array_map(
+            static fn ($response): string => (string) $response->json('personal_token'),
+            $responses,
+        );
+        $this->assertCount(4, array_unique($tokens));
+
+        foreach ($directContracts as $contract) {
+            $this->assertSame(1, $contract->signers()->count());
+        }
+        foreach ($templates as $template) {
+            $instances = Contract::query()
+                ->where('template_id', $template->getKey())
+                ->whereHas('signers', function ($query): void {
+                    $query->whereRaw('LOWER(TRIM(email)) = ?', ['scoped-signer@example.com']);
+                })
+                ->get();
+            $this->assertCount(1, $instances);
+            $this->assertSame(1, $instances->first()->signers()->count());
+        }
+
+        $this->assertSame(4, ContractSigner::query()
+            ->whereRaw('LOWER(TRIM(email)) = ?', ['scoped-signer@example.com'])
+            ->count());
+        $this->assertDatabaseCount('contract_audit_logs', 4);
     }
 
     public function test_template_join_copies_template_data(): void

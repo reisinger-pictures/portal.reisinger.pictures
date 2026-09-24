@@ -115,6 +115,7 @@ function SearchBarState({
                 <input
                     type="text"
                     placeholder={placeholder}
+                    aria-label={t`Suche`}
                     className="input input-bordered join-item w-full bg-base-100"
                     value={searchQuery}
                     onChange={(e) => {

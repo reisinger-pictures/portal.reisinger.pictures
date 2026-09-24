@@ -117,6 +117,22 @@ assert_contains "$AUTOMERGE_WORKFLOW" "            const dependencyGroup = proce
 assert_contains "$AUTOMERGE_WORKFLOW" "  if: github.actor == 'dependabot[bot]'" \
     'automerge must retain the Dependabot actor gate'
 
+wait_gate="$(
+    awk '
+        /- name: Wait for CI checks/ { in_gate = 1 }
+        in_gate { print }
+        in_gate && /- name: Checkout main/ { exit }
+    ' "$AUTOMERGE_WORKFLOW"
+)"
+ci_check_regexp='^(CI security contract|Backend \(PHPUnit\)|Frontend \(Lint, Build, Vitest\)|E2E \(Playwright\) — (Desktop \([1-3]/3\)|Mobile \([1-3]/3\)|serial \(isolated suites\)))$'
+if ! grep -Fq -- "          check-regexp: '${ci_check_regexp}'" <<<"$wait_gate"; then
+    fail 'automerge must filter the known repository CI check names'
+fi
+if grep -Eq '^[[:space:]]*fail-on-no-checks:[[:space:]]*true' <<<"$wait_gate" \
+    && ! grep -Eq '^[[:space:]]*check-(name|regexp):[[:space:]]*.+' <<<"$wait_gate"; then
+    fail 'fail-on-no-checks is ineffective without check-name or check-regexp'
+fi
+
 automerge_script="$(
     awk '
         /^[[:space:]]*script:[[:space:]]*\|/ { in_script = 1; next }

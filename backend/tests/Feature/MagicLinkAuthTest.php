@@ -88,7 +88,50 @@ class MagicLinkAuthTest extends TestCase
         $res->assertStatus(200)->assertCookie('rp_jwt');
     }
 
-    // --- TEST 4: Fachliche Logik: Angemeldeter User bewertet mit transientem JWT ---
+    // Gallery invite tokens are revocable access grants and remain redeemable.
+    public function test_gallery_invite_can_be_redeemed_by_guest_then_registered_user(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $gallery = Gallery::factory()->create([
+            'type' => 'selection',
+            'is_public' => false,
+        ]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'guest-then-registered-token',
+        ]);
+
+        $this->postJson('/api/invites/redeem', [
+            'token' => $invite->token,
+            'name' => 'Anonymous Guest',
+            'email' => 'anonymous-guest@example.com',
+            'accept_privacy' => true,
+        ])
+            ->assertOk()
+            ->assertJsonPath('full_path', $gallery->full_path);
+
+        $userToken = JWTAuth::fromUser($user);
+        $registered = $this->withHeaders(['Authorization' => "Bearer $userToken"])
+            ->postJson('/api/invites/redeem', [
+                'token' => $invite->token,
+                'accept_privacy' => true,
+            ]);
+        $registered->assertOk()
+            ->assertCookie('rp_jwt')
+            ->assertJsonPath('full_path', $gallery->full_path);
+
+        $accessToken = (string) $registered->getCookie('rp_jwt', false)->getValue();
+        $payload = app(\PHPOpenSourceSaver\JWTAuth\JWT::class)
+            ->setToken($accessToken)
+            ->getPayload();
+        $this->assertSame((string) $user->id, (string) $payload->get('sub'));
+        $this->assertSame([(string) $invite->id], $payload->get('transient_invite_ids'));
+
+        $this->assertDatabaseHas('gallery_invites', ['id' => $invite->id]);
+        $this->assertDatabaseMissing('users', ['email' => 'anonymous-guest@example.com']);
+    }
+
+    // --- TEST 5: Fachliche Logik: Angemeldeter User bewertet mit transientem JWT ---
     public function test_authenticated_user_with_transient_claim_can_rate_photo()
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);

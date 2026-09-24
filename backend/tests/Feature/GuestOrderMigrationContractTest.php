@@ -28,6 +28,24 @@ class GuestOrderMigrationContractTest extends TestCase
         );
         $this->assertStringContainsString('CREATE TRIGGER orders_owner_not_both_insert', $mariadbBranch);
         $this->assertStringContainsString('CREATE TRIGGER orders_owner_not_both_update', $mariadbBranch);
+        $this->assertSame(1, substr_count(
+            $mariadbBranch,
+            'DROP TRIGGER IF EXISTS orders_owner_not_both_insert',
+        ));
+        $this->assertSame(1, substr_count(
+            $mariadbBranch,
+            'DROP TRIGGER IF EXISTS orders_owner_not_both_update',
+        ));
+        $this->assertOccursBefore(
+            $mariadbBranch,
+            'DROP TRIGGER IF EXISTS orders_owner_not_both_insert',
+            'CREATE TRIGGER orders_owner_not_both_insert',
+        );
+        $this->assertOccursBefore(
+            $mariadbBranch,
+            'DROP TRIGGER IF EXISTS orders_owner_not_both_update',
+            'CREATE TRIGGER orders_owner_not_both_update',
+        );
         $this->assertSame(2, substr_count($mariadbBranch, "SIGNAL SQLSTATE '45000'"));
         $this->assertSame(2, substr_count(
             $mariadbBranch,
@@ -85,6 +103,16 @@ class GuestOrderMigrationContractTest extends TestCase
         } catch (QueryException $exception) {
             $this->assertStringContainsString('orders_owner_not_both', $exception->getMessage());
         }
+    }
+
+    private function assertOccursBefore(string $source, string $first, string $second): void
+    {
+        $firstPosition = strpos($source, $first);
+        $secondPosition = strpos($source, $second, $firstPosition === false ? 0 : $firstPosition);
+
+        $this->assertNotFalse($firstPosition);
+        $this->assertNotFalse($secondPosition);
+        $this->assertTrue($firstPosition < $secondPosition);
     }
 
     private function migrationSource(): string
