@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Schema;
  * Existing orders are intentionally not backfilled: a both-null row is an
  * ownerless legacy/system row and must remain inaccessible to every customer
  * actor. New rows may carry either a registered user_id or a guest_id, never
- * both. The model repeats this invariant for SQLite and for code paths that
- * bypass the database constraint.
+ * both. The model repeats this invariant for application writes; database
+ * triggers enforce it for direct writes on MySQL/MariaDB and SQLite, while
+ * PostgreSQL uses its native CHECK constraint.
  */
 return new class extends Migration
 {
@@ -40,9 +41,32 @@ return new class extends Migration
 
         $driver = DB::connection()->getDriverName();
         if (in_array($driver, ['mysql', 'mariadb'], true)) {
-            DB::statement(
-                'ALTER TABLE orders ADD CONSTRAINT orders_owner_not_both CHECK (user_id IS NULL OR guest_id IS NULL)'
-            );
+            // MariaDB 11.4 rejects a table-level owner constraint that references
+            // the foreign-key column user_id (SQLSTATE 1901). The owner invariant
+            // is still enforced below for direct SQL writes, independently of
+            // the Eloquent model guard.
+            DB::statement(<<<'SQL'
+                CREATE TRIGGER orders_owner_not_both_insert
+                BEFORE INSERT ON orders
+                FOR EACH ROW
+                BEGIN
+                    IF NEW.user_id IS NOT NULL AND NEW.guest_id IS NOT NULL THEN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'orders_owner_not_both';
+                    END IF;
+                END
+            SQL);
+            DB::statement(<<<'SQL'
+                CREATE TRIGGER orders_owner_not_both_update
+                BEFORE UPDATE ON orders
+                FOR EACH ROW
+                BEGIN
+                    IF NEW.user_id IS NOT NULL AND NEW.guest_id IS NOT NULL THEN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'orders_owner_not_both';
+                    END IF;
+                END
+            SQL);
         } elseif ($driver === 'sqlite') {
             // SQLite cannot add a CHECK constraint with ALTER TABLE. These
             // equivalent triggers preserve the at-most-one-owner invariant for

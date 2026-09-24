@@ -13,7 +13,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: read
+  checks: read
 
 concurrency:
   group: dependabot-automerge-${{ github.event.pull_request.number }}
@@ -81,6 +81,10 @@ jobs:
           running-workflow-name: automerge
           wait-interval: 60
           allowed-conclusions: success
+          # Fail closed if no checks are discoverable; do not let a duplicate
+          # stale run hide a failed check for the same name.
+          fail-on-no-checks: true
+          wait-for-duplicates: true
 
       # pull_request_target checkt per Default KEIN Repo aus -> "gh pr merge"
       # scheitert mit "not a git repository". Daher main auschecken (nur Metadaten/

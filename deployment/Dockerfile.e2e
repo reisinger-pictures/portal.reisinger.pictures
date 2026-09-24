@@ -30,7 +30,7 @@ RUN groupmod --gid "${RUNTIME_GID}" www-data \
 ARG PLAYWRIGHT_VERSION=1.62.1
 ARG NODE_VERSION=26.7.0
 ARG NODE_SHA256=982aa24dd8be4c889c6a8ab337ddff3b0896645b20f4239356e80552c16277ee
-ARG PNPM_VERSION=11.21.0
+ARG PNPM_VERSION=11.23.0
 
 # Playwright-Browser liegen global unter /ms-playwright
 # (Pfad-Konvention der offiziellen Playwright-Images).
@@ -51,7 +51,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Node.js — auf eine konkrete Version und deren offiziellen SHA-256-Digest
 # festgenagelt. Kein dynamisches Release-Verzeichnis: der Download ist damit
-# reproduzierbar und die Integrität wird vor dem Entpacken verifiziert.
+# reproduzierbar und die Integrität wird vor dem Entpacken verifiziert. Der
+# CI-Frontend-Job verwendet dieselbe exakte Versionsangabe.
 RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz \
     && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c --strict - \
     && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
