@@ -153,10 +153,12 @@ class WithdrawalConsentTest extends TestCase
         // Der Guard greift serverseitig auch im quote_token-Flow (isQuote=false).
         $gallery = Gallery::factory()->create(['is_public' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
-        $token = app(OfferTokenService::class)->issue([
-            'photos' => [$photo->id],
-            'price' => 5000,
-        ], now()->addDays(7));
+        $token = app(OfferTokenService::class)->issueQuote(
+            [$photo->id],
+            5000,
+            brand: 'rp',
+            expiresAt: now()->addDays(7),
+        );
 
         $user = User::factory()->create();
 
@@ -180,10 +182,12 @@ class WithdrawalConsentTest extends TestCase
     {
         $gallery = Gallery::factory()->create(['is_public' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
-        $token = app(OfferTokenService::class)->issue([
-            'photos' => [$photo->id],
-            'price' => 5000,
-        ], now()->addDays(7));
+        $token = app(OfferTokenService::class)->issueQuote(
+            [$photo->id],
+            5000,
+            brand: 'rp',
+            expiresAt: now()->addDays(7),
+        );
 
         $user = User::factory()->create();
 

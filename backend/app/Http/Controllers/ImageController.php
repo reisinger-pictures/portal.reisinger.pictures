@@ -76,7 +76,7 @@ class ImageController extends Controller
             $meta['title'] = $originalName;
         }
 
-        return DB::transaction(function () use ($file, $gallery, $user, $extension, $targetDir, $thumbsDir, $isLrUpload, $lrUuid, $request, $meta) {
+        return DB::transaction(function () use ($file, $gallery, $user, $extension, $targetDir, $thumbsDir, $isLrUpload, $lrUuid, $originalName, $request, $meta) {
 
             $query = Photo::where('gallery_id', $gallery->id);
             if ($isLrUpload) {

@@ -1,4 +1,6 @@
 #!/bin/zsh
+set -euo pipefail
+
 echo "==================================================="
 echo "🔄 Starte reinen Rclone Sync zum Server..."
 echo "==================================================="

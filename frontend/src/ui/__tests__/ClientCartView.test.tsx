@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ClientCartView from '../client/ClientCartView';
 import { useCart } from '../../logic/CartContext';
+import type {CartContextType, VolumeLicensingResult} from '../../logic/CartContext';
 import { useAuth } from '../../logic/useAuth';
 import { apiMutate, type ApiError } from '../../api';
 import { checkoutSessionStorageKey } from '../../logic/checkoutSession';
@@ -13,7 +14,12 @@ import { checkoutSessionStorageKey } from '../../logic/checkoutSession';
 // Mocks — external modules
 // --------------------------------------------------------------------------
 
-const {mockShowToast} = vi.hoisted(() => ({mockShowToast: vi.fn()}));
+const {mockShowToast, mockSearchParams, mockFormState, mockReset} = vi.hoisted(() => ({
+    mockShowToast: vi.fn(),
+    mockSearchParams: {value: ''},
+    mockFormState: {isDirty: false},
+    mockReset: vi.fn(),
+}));
 
 // Keep real router components, mock useNavigate and useSearchParams
 vi.mock('react-router-dom', async () => {
@@ -21,7 +27,7 @@ vi.mock('react-router-dom', async () => {
     return {
         ...actual,
         useNavigate: () => vi.fn(),
-        useSearchParams: () => [new URLSearchParams(), vi.fn()],
+        useSearchParams: () => [new URLSearchParams(mockSearchParams.value), vi.fn()],
     };
 });
 
@@ -138,9 +144,9 @@ vi.mock('react-hook-form', () => ({
                     });
                 },
         ),
-        reset: vi.fn(),
+        reset: mockReset,
         setError: vi.fn(),
-        formState: { errors: {}, isSubmitting: false },
+        formState: { errors: {}, isSubmitting: false, isDirty: mockFormState.isDirty },
     })),
 }));
 
@@ -150,6 +156,7 @@ vi.mock('react-hook-form', () => ({
 
 const mockUser = {
     id: 'u1',
+    guest_id: null,
     name: 'Test User',
     email: 'user@example.com',
     billing_name: 'Test User',
@@ -157,12 +164,20 @@ const mockUser = {
     billing_street: '',
     billing_zip: '',
     billing_city: '',
+    brand: null,
+    is_cross_brand: false,
     is_super_admin: false,
     is_admin: false,
     is_photographer: false,
+    is_org_admin: false,
+    is_power_user: false,
     is_pending: false,
     can_edit_metadata: false,
+    can_purchase_upgrades: false,
     roles: [],
+    transient_galleries: [],
+    transient_meta_galleries: [],
+    photographer_gallery_groups: [],
 };
 
 const mockCartItems = [
@@ -191,6 +206,8 @@ function setupDefaultMocks() {
     });
     vi.mocked(useCart).mockReturnValue({
         items: [],
+        quoteToken: null,
+        setQuoteToken: vi.fn(),
         removeFromCart: vi.fn(),
         totalAmount: 0,
         clearCart: vi.fn(),
@@ -202,11 +219,104 @@ function setupDefaultMocks() {
 function setCartWithItems() {
     const cart = {
         items: mockCartItems,
+        quoteToken: null,
+        setQuoteToken: vi.fn(),
         removeFromCart: vi.fn(),
         totalAmount: 4000,
         clearCart: vi.fn(),
         addToCart: vi.fn(),
         itemCount: 2,
+    };
+    vi.mocked(useCart).mockReturnValue(cart);
+    return cart;
+}
+
+const mixedScopeItems: CartContextType['items'] = [
+    {
+        photoId: 'mixed-photo-a',
+        tier: 'original',
+        price: 1500,
+        galleryId: 'gallery-a',
+        galleryGroupId: 'group-a',
+    },
+    {
+        photoId: 'mixed-photo-b',
+        tier: 'original',
+        price: 2500,
+        galleryId: 'gallery-b',
+        galleryGroupId: 'group-b',
+    },
+];
+
+const mixedScopeTiers = [
+    {minQuantity: 0, priceCents: 2500},
+    {minQuantity: 2, priceCents: 2000},
+];
+
+const mixedVolumeLicensing: VolumeLicensingResult = {
+    tierIndex: 1,
+    isMaxTier: true,
+    pricePerItemCents: 2000,
+    totalCents: 4000,
+    nextTierCount: 0,
+    nextTierLabel: '',
+    tiers: mixedScopeTiers,
+    isVolumePricing: true,
+    groups: [
+        {
+            key: 'preset-a',
+            licensingMode: 'volume_licensing',
+            presetId: 'preset-a',
+            presetName: 'Preset A',
+            items: [mixedScopeItems[0]],
+            itemIds: ['mixed-photo-a'],
+            totalCents: 1500,
+            pricePerItemCents: 1500,
+            tiers: mixedScopeTiers,
+            tierIndex: 0,
+            isMaxTier: false,
+            nextTierCount: 0,
+            nextTierLabel: '',
+            isVolumePricing: true,
+            itemPriceCents: {'mixed-photo-a': 1500},
+        },
+        {
+            key: 'preset-b',
+            licensingMode: 'volume_licensing',
+            presetId: 'preset-b',
+            presetName: 'Preset B',
+            items: [mixedScopeItems[1]],
+            itemIds: ['mixed-photo-b'],
+            totalCents: 2500,
+            pricePerItemCents: 2500,
+            tiers: mixedScopeTiers,
+            tierIndex: 0,
+            isMaxTier: false,
+            nextTierCount: 0,
+            nextTierLabel: '',
+            isVolumePricing: true,
+            itemPriceCents: {'mixed-photo-b': 2500},
+        },
+    ],
+    groupedTotalCents: 4000,
+    volumeSubtotalCents: 4000,
+    volumeItemPrices: {
+        'mixed-photo-a': 1500,
+        'mixed-photo-b': 2500,
+    },
+};
+
+function setMixedScopeCart(): CartContextType {
+    const cart: CartContextType = {
+        items: mixedScopeItems,
+        quoteToken: null,
+        setQuoteToken: vi.fn(),
+        removeFromCart: vi.fn(),
+        totalAmount: 4000,
+        clearCart: vi.fn(),
+        addToCart: vi.fn(),
+        itemCount: mixedScopeItems.length,
+        volumeLicensing: mixedVolumeLicensing,
     };
     vi.mocked(useCart).mockReturnValue(cart);
     return cart;
@@ -239,6 +349,8 @@ function renderCartView() {
 describe('ClientCartView', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockSearchParams.value = '';
+        mockFormState.isDirty = false;
         sessionStorage.clear();
         vi.stubEnv('VITE_TURNSTILE_SITE_KEY', 'site-key-for-tests');
         setupDefaultMocks();
@@ -276,6 +388,8 @@ describe('ClientCartView', () => {
     it('renders item list and checkout form when items are present', () => {
         vi.mocked(useCart).mockReturnValue({
             items: mockCartItems,
+            quoteToken: null,
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             totalAmount: 4000,
             clearCart: vi.fn(),
@@ -294,6 +408,90 @@ describe('ClientCartView', () => {
 
         // Empty-cart message must be gone
         expect(screen.queryByText('Dein Warenkorb ist leer.')).not.toBeInTheDocument();
+    });
+
+    it('associates checkout controls with programmatic labels and required attributes', () => {
+        setCartWithItems();
+        renderCartView();
+
+        expect(screen.getByLabelText('Vor- & Nachname')).toHaveAttribute('required');
+        expect(screen.getByLabelText('Firma')).toBeInTheDocument();
+        expect(screen.getByLabelText('Straße & Hausnummer')).toHaveAttribute('required');
+        expect(screen.getByLabelText('PLZ')).toHaveAttribute('required');
+        expect(screen.getByLabelText('Ort')).toHaveAttribute('required');
+        expect(screen.getByLabelText('Land')).toBeDisabled();
+        expect(screen.getByRole('radio', {name: 'Kreditkarte (Stripe)'})).toHaveAttribute('required');
+        expect(screen.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i})).toHaveAttribute('required');
+        expect(screen.getByRole('checkbox', {name: /widerrufsrecht/i})).toHaveAttribute('required');
+    });
+
+    it('preserves dirty billing and consent fields during auth revalidation', () => {
+        const view = renderCartView();
+        expect(mockReset).toHaveBeenCalledTimes(1);
+
+        mockFormState.isDirty = true;
+        vi.mocked(useAuth).mockReturnValue({
+            user: {...mockUser},
+            isLoading: false,
+            isError: undefined,
+            login: vi.fn(),
+            register: vi.fn(),
+            logout: vi.fn(),
+            mutate: vi.fn(),
+        });
+
+        view.rerender(
+            <MemoryRouter>
+                <ClientCartView />
+            </MemoryRouter>,
+        );
+
+        expect(mockReset).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a stale quote decode response after the URL token changes', async () => {
+        const cart = setCartWithItems();
+        let resolveOld: (response: Response) => void = () => undefined;
+        let resolveNew: (response: Response) => void = () => undefined;
+        const oldResponse = new Promise<Response>((resolve) => {
+            resolveOld = resolve;
+        });
+        const newResponse = new Promise<Response>((resolve) => {
+            resolveNew = resolve;
+        });
+        const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) =>
+            input.toString().includes('old-token') ? oldResponse : newResponse
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        mockSearchParams.value = 'quote_token=old-token';
+        const view = renderCartView();
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+        mockSearchParams.value = 'quote_token=new-token';
+        view.rerender(
+            <MemoryRouter>
+                <ClientCartView />
+            </MemoryRouter>,
+        );
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+        resolveNew(new Response(JSON.stringify({photos: ['new-photo'], price: 1200}), {
+            status: 200,
+            headers: {'Content-Type': 'application/json'}
+        }));
+        await waitFor(() => expect(cart.setQuoteToken).toHaveBeenCalledWith('new-token'));
+
+        resolveOld(new Response(JSON.stringify({photos: ['old-photo'], price: 900}), {
+            status: 200,
+            headers: {'Content-Type': 'application/json'}
+        }));
+        await waitFor(() => expect(cart.clearCart).toHaveBeenCalledTimes(1));
+
+        expect(cart.setQuoteToken).toHaveBeenCalledTimes(1);
+        expect(cart.addToCart).toHaveBeenCalledWith(expect.objectContaining({photoId: 'new-photo'}));
+        expect(cart.addToCart).not.toHaveBeenCalledWith(expect.objectContaining({photoId: 'old-photo'}));
+        expect(fetchMock.mock.calls[0][1]?.signal).toMatchObject({aborted: true});
     });
 
     // ------------------------------------------------------------------
@@ -326,6 +524,8 @@ describe('ClientCartView', () => {
         // Provide cart items so the submit button is enabled
         vi.mocked(useCart).mockReturnValue({
             items: mockCartItems,
+            quoteToken: null,
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             totalAmount: 4000,
             clearCart: vi.fn(),
@@ -458,6 +658,8 @@ describe('ClientCartView', () => {
     it('renders AGB checkbox and withdrawal waiver', () => {
         vi.mocked(useCart).mockReturnValue({
             items: mockCartItems,
+            quoteToken: null,
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             totalAmount: 4000,
             clearCart: vi.fn(),
@@ -484,6 +686,8 @@ describe('ClientCartView', () => {
 
         vi.mocked(useCart).mockReturnValue({
             items: mockCartItems,
+            quoteToken: null,
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             totalAmount: 4000,
             clearCart: vi.fn(),
@@ -491,19 +695,16 @@ describe('ClientCartView', () => {
             itemCount: 2,
         });
 
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve({
+        vi.mocked(apiMutate)
+            .mockResolvedValueOnce({
                 valid: true,
                 coupon: { code: 'SAVE10', type: 'fixed', value: 1000 },
                 discount_cents: 1000,
-            }),
-        }));
-
-        vi.mocked(apiMutate).mockResolvedValue({
-            success: true,
-            invoice_number: 'INV-1',
-        });
+            })
+            .mockResolvedValueOnce({
+                success: true,
+                invoice_number: 'INV-1',
+            });
 
         renderCartView();
 
@@ -519,11 +720,287 @@ describe('ClientCartView', () => {
         );
 
         await waitFor(() => {
-            expect(apiMutate).toHaveBeenCalled();
+            expect(apiMutate).toHaveBeenCalledTimes(2);
         });
 
-        const payload = vi.mocked(apiMutate).mock.calls[0][2] as Record<string, unknown>;
+        const payload = vi.mocked(apiMutate).mock.calls[1][2] as Record<string, unknown>;
         expect(payload.coupon_code).toBe('SAVE10');
+    });
+
+    it('sends every mixed-cart gallery and group id during coupon validation', async () => {
+        const user = userEvent.setup();
+        setMixedScopeCart();
+        vi.mocked(apiMutate).mockResolvedValueOnce({
+            valid: true,
+            coupon: {code: 'MIXED10', type: 'fixed', value: 10},
+            discount_cents: 1000,
+        });
+
+        renderCartView();
+        await user.type(screen.getByLabelText('Rabattcode'), 'MIXED10');
+        await user.click(screen.getByRole('button', {name: 'Anwenden'}));
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(1));
+        const validationPayload = vi.mocked(apiMutate).mock.calls[0][2] as Record<string, unknown>;
+        expect(validationPayload).toEqual({
+            code: 'MIXED10',
+            gallery_id: ['gallery-a', 'gallery-b'],
+            meta_gallery_id: ['group-a', 'group-b'],
+        });
+    });
+
+    it('resets an applied coupon when a non-eligible cart item is added', async () => {
+        const user = userEvent.setup();
+        const cart = setMixedScopeCart();
+        const firstPricingGroup = mixedVolumeLicensing.groups?.[0];
+        if (!firstPricingGroup) throw new Error('Mixed-volume fixture is missing its first pricing group.');
+        const scopeOnlyItem: CartContextType['items'][number] = {
+            photoId: 'scope-only-photo',
+            tier: 'original',
+            price: 500,
+            galleryId: 'scope-gallery',
+            galleryGroupId: 'scope-group',
+        };
+        const scopePricingGroup = {
+            ...firstPricingGroup,
+            key: 'scope-group',
+            presetId: '',
+            presetName: null,
+            items: [scopeOnlyItem],
+            itemIds: [scopeOnlyItem.photoId],
+            totalCents: 500,
+            pricePerItemCents: null,
+            isVolumePricing: false,
+            itemPriceCents: {},
+        };
+        vi.mocked(apiMutate).mockResolvedValueOnce({
+            valid: true,
+            coupon: {code: 'SAVE10', type: 'fixed', value: 10},
+            discount_cents: 1000,
+        });
+
+        const view = renderCartView();
+        await user.type(screen.getByLabelText('Rabattcode'), 'SAVE10');
+        await user.click(screen.getByRole('button', {name: 'Anwenden'}));
+        expect(await screen.findByText('SAVE10')).toBeInTheDocument();
+
+        vi.mocked(useCart).mockReturnValue({
+            ...cart,
+            items: [...cart.items, scopeOnlyItem],
+            itemCount: cart.itemCount + 1,
+            totalAmount: 4500,
+            volumeLicensing: {
+                ...mixedVolumeLicensing,
+                groups: [...(mixedVolumeLicensing.groups ?? []), scopePricingGroup],
+                groupedTotalCents: 4500,
+            },
+        });
+        view.rerender(
+            <MemoryRouter>
+                <ClientCartView />
+            </MemoryRouter>,
+        );
+
+        expect(screen.queryByText('SAVE10')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Rabattcode')).toHaveValue('');
+    });
+
+    it('removes a displayed coupon and omits it from checkout after eligibility changes', async () => {
+        const user = userEvent.setup();
+        const cart = setMixedScopeCart();
+        vi.mocked(apiMutate)
+            .mockResolvedValueOnce({
+                valid: true,
+                coupon: {code: 'SAVE10', type: 'fixed', value: 10},
+                discount_cents: 1000,
+            })
+            .mockResolvedValueOnce({success: true, invoice_number: 'INV-NO-STALE-COUPON'});
+
+        const view = renderCartView();
+        await user.type(screen.getByLabelText('Rabattcode'), 'SAVE10');
+        await user.click(screen.getByRole('button', {name: 'Anwenden'}));
+        expect(await screen.findByText('SAVE10')).toBeInTheDocument();
+
+        vi.mocked(useCart).mockReturnValue({
+            ...cart,
+            volumeLicensing: {
+                ...mixedVolumeLicensing,
+                isVolumePricing: false,
+                volumeSubtotalCents: undefined,
+                groups: mixedVolumeLicensing.groups?.map(group => ({
+                    ...group,
+                    isVolumePricing: false,
+                })),
+            },
+        });
+        view.rerender(
+            <MemoryRouter>
+                <ClientCartView />
+            </MemoryRouter>,
+        );
+
+        expect(screen.queryByText('SAVE10')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('coupon-input')).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i}));
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(2));
+        const checkoutPayload = vi.mocked(apiMutate).mock.calls[1][2] as Record<string, unknown>;
+        expect(checkoutPayload.coupon_code).toBeNull();
+    });
+
+    it('clears an applied coupon when a non-eligible cart item changes', async () => {
+        const user = userEvent.setup();
+        const cart = setMixedScopeCart();
+        vi.mocked(apiMutate).mockResolvedValueOnce({
+            valid: true,
+            coupon: {code: 'SAVE10', type: 'fixed', value: 10},
+            discount_cents: 1000,
+        });
+
+        const view = renderCartView();
+        await user.type(screen.getByLabelText('Rabattcode'), 'SAVE10');
+        await user.click(screen.getByRole('button', {name: 'Anwenden'}));
+        expect(await screen.findByText('SAVE10')).toBeInTheDocument();
+
+        vi.mocked(useCart).mockReturnValue({
+            ...cart,
+            items: [
+                ...cart.items,
+                {
+                    photoId: 'scope-photo',
+                    tier: 'original',
+                    price: 500,
+                    galleryId: 'scope-gallery',
+                    galleryGroupId: 'scope-group',
+                },
+            ],
+        });
+        view.rerender(
+            <MemoryRouter>
+                <ClientCartView />
+            </MemoryRouter>,
+        );
+
+        expect(screen.queryByText('SAVE10')).not.toBeInTheDocument();
+    });
+
+    it('hides coupon entry for a scope-only cart', () => {
+        vi.mocked(useCart).mockReturnValue({
+            items: mockCartItems,
+            quoteToken: null,
+            setQuoteToken: vi.fn(),
+            removeFromCart: vi.fn(),
+            totalAmount: 4000,
+            clearCart: vi.fn(),
+            addToCart: vi.fn(),
+            itemCount: 2,
+            volumeLicensing: {
+                isVolumePricing: false,
+                tierIndex: 0,
+                isMaxTier: false,
+                pricePerItemCents: 3000,
+                totalCents: 0,
+                nextTierCount: 0,
+                nextTierLabel: '',
+                tiers: [],
+            },
+        });
+
+        renderCartView();
+
+        expect(screen.queryByTestId('coupon-input')).not.toBeInTheDocument();
+    });
+
+    it('uses a full discount for free checkout without opening Stripe Elements', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useCart).mockReturnValue({
+            items: mockCartItems,
+            quoteToken: null,
+            setQuoteToken: vi.fn(),
+            removeFromCart: vi.fn(),
+            totalAmount: 4000,
+            clearCart: vi.fn(),
+            addToCart: vi.fn(),
+            itemCount: 2,
+            volumeLicensing: {
+                isVolumePricing: true,
+                tierIndex: 0,
+                isMaxTier: true,
+                pricePerItemCents: 2000,
+                totalCents: 4000,
+                nextTierCount: 0,
+                nextTierLabel: '',
+                tiers: [{minQuantity: 0, priceCents: 2000}],
+                volumeSubtotalCents: 4000,
+                volumeItemPrices: {p1: 2000, p2: 2000},
+            },
+        });
+        vi.mocked(apiMutate)
+            .mockResolvedValueOnce({
+                valid: true,
+                coupon: {code: 'FREE100', type: 'percentage', value: 100},
+                discount_cents: 1000,
+            })
+            .mockResolvedValueOnce({success: true, invoice_number: 'INV-FREE'});
+
+        renderCartView();
+        await user.type(screen.getByLabelText('Rabattcode'), 'FREE100');
+        await user.click(screen.getByRole('button', {name: 'Anwenden'}));
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Kostenlos bestellen'})).toBeInTheDocument());
+
+        await user.click(screen.getByRole('button', {name: 'Kostenlos bestellen'}));
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(2));
+        const payload = vi.mocked(apiMutate).mock.calls[1][2] as Record<string, unknown>;
+        expect(payload.coupon_code).toBe('FREE100');
+        expect(screen.queryByTestId('stripe-checkout-form')).not.toBeInTheDocument();
+    });
+
+    it('does not offer or submit a coupon for a signed quote cart', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useCart).mockReturnValue({
+            ...setCartWithItems(),
+            quoteToken: 'header.payload.signature',
+            volumeLicensing: {
+                isVolumePricing: true,
+                tierIndex: 0,
+                isMaxTier: true,
+                pricePerItemCents: 2000,
+                totalCents: 4000,
+                nextTierCount: 0,
+                nextTierLabel: '',
+                tiers: [{minQuantity: 0, priceCents: 2000}],
+                volumeSubtotalCents: 4000,
+                volumeItemPrices: {p1: 2000, p2: 2000},
+            },
+        });
+        vi.mocked(apiMutate).mockResolvedValue({success: true, invoice_number: 'INV-QUOTE-NO-COUPON'});
+
+        renderCartView();
+        expect(screen.queryByTestId('coupon-input')).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i}));
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(1));
+        const payload = vi.mocked(apiMutate).mock.calls[0][2] as Record<string, unknown>;
+        expect(payload.quote_token).toBe('header.payload.signature');
+        expect(payload.coupon_code).toBeNull();
+    });
+
+    it('sends the persisted quote token with the restored offer prices', async () => {
+        const user = userEvent.setup();
+        const cart = setCartWithItems();
+        vi.mocked(useCart).mockReturnValue({
+            ...cart,
+            quoteToken: 'header.payload.signature',
+        });
+        vi.mocked(apiMutate).mockResolvedValue({success: true, invoice_number: 'INV-QUOTE'});
+
+        renderCartView();
+        await user.click(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i}));
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(1));
+        const payload = vi.mocked(apiMutate).mock.calls[0][2] as Record<string, unknown>;
+        expect(payload.quote_token).toBe('header.payload.signature');
+        expect(payload.items).toEqual(mockCartItems);
     });
 
     it.each([0, 429, 500])('keeps the checkout idempotency key after recoverable status %s', async (status) => {
@@ -694,6 +1171,8 @@ describe('ClientCartView', () => {
         const user = userEvent.setup();
         vi.mocked(useCart).mockReturnValue({
             items: [{...mockCartItems[0], isQuote: true, price: 0}],
+            quoteToken: null,
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             totalAmount: 0,
             clearCart: vi.fn(),

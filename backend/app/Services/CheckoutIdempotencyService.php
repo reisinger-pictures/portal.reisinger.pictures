@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\User;
+use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use App\Support\CheckoutKey;
 use Closure;
@@ -30,9 +31,7 @@ class CheckoutIdempotencyService
 
     private const IDENTITY_LOCK_TTL_MARGIN_SECONDS = 30;
 
-    public function __construct(private readonly StripePaymentService $stripePayment)
-    {
-    }
+    public function __construct(private readonly StripePaymentService $stripePayment) {}
 
     /**
      * @return array{key: string, fingerprint: string}
@@ -61,8 +60,9 @@ class CheckoutIdempotencyService
      */
     public function findPositiveStripeOrderByKey(User $user, string $key): ?Order
     {
-        return Order::with('invoiceSnapshot')
-            ->where('user_id', $user->getKey())
+        return Order::query()
+            ->ownedBy($user)
+            ->with('invoiceSnapshot')
             ->where('checkout_idempotency_key', $key)
             ->whereIn('status', ['pending_payment', 'paid'])
             ->where('is_quote_request', false)
@@ -83,8 +83,9 @@ class CheckoutIdempotencyService
         string $paymentMethod,
     ): ?Order {
         $brand = BrandRegistry::current()?->value;
-        $query = Order::with('invoiceSnapshot')
-            ->where('user_id', $user->getKey())
+        $query = Order::query()
+            ->ownedBy($user)
+            ->with('invoiceSnapshot')
             ->where('status', 'pending_payment')
             ->where('is_quote_request', false)
             ->where('total_amount', '>', 0)
@@ -176,8 +177,7 @@ class CheckoutIdempotencyService
         string $fingerprint,
         int $amountCents,
         ?Closure $creator,
-    ): ?JsonResponse
-    {
+    ): ?JsonResponse {
         if (! hash_equals((string) $order->checkout_fingerprint, $fingerprint)) {
             return $this->conflict('Dieser Checkout-Versuch wurde bereits mit anderen Daten verwendet.');
         }
@@ -328,9 +328,16 @@ class CheckoutIdempotencyService
      */
     private function withIdentityLocks(User $user, string $key, string $fingerprint, Closure $callback): mixed
     {
+        $actorIdentifier = ActorIdentity::lockIdentifier($user);
+        if ($actorIdentifier === null) {
+            return response()->json([
+                'error' => 'Der Checkout-Auftrag kann keinem Gast zugeordnet werden.',
+            ], 403);
+        }
+
         $lockKeys = [
-            CheckoutKey::user($user->getKey().'|'.$key, 'checkout-idempotency-key'),
-            CheckoutKey::user($user->getKey().'|'.$fingerprint, 'checkout-idempotency-fingerprint'),
+            CheckoutKey::user($actorIdentifier.'|'.$key, 'checkout-idempotency-key'),
+            CheckoutKey::user($actorIdentifier.'|'.$fingerprint, 'checkout-idempotency-fingerprint'),
         ];
         $lockKeys = array_values(array_unique($lockKeys));
         sort($lockKeys);
@@ -362,8 +369,9 @@ class CheckoutIdempotencyService
         string $fingerprint,
         bool $allowFingerprintFallback,
     ): ?Order {
-        $order = Order::with('invoiceSnapshot')
-            ->where('user_id', $user->getKey())
+        $order = Order::query()
+            ->ownedBy($user)
+            ->with('invoiceSnapshot')
             ->where('checkout_idempotency_key', $key)
             ->first();
         if ($order !== null) {
@@ -380,8 +388,9 @@ class CheckoutIdempotencyService
         // replaced long after the order was created. Keep the matching pending
         // order discoverable and let the remote PI timestamp/identity checks
         // decide reuse versus replacement.
-        return Order::with('invoiceSnapshot')
-            ->where('user_id', $user->getKey())
+        return Order::query()
+            ->ownedBy($user)
+            ->with('invoiceSnapshot')
             ->where('checkout_fingerprint', $fingerprint)
             ->where('status', 'pending_payment')
             ->latest('created_at')
@@ -409,8 +418,12 @@ class CheckoutIdempotencyService
             ->values()
             ->all();
 
+        $ownerIdentity = ActorIdentity::isRegistered($user)
+            ? ['user_id' => $user->getKey()]
+            : ['guest_id' => ActorIdentity::guestId($user)];
+
         $canonical = [
-            'user_id' => $user->getKey(),
+            ...$ownerIdentity,
             'brand' => BrandRegistry::current()?->value,
             'items' => $items,
             'billing_name' => $request->input('billing_name'),
@@ -494,6 +507,7 @@ class CheckoutIdempotencyService
                 if ($actualValue !== null && $actualValue !== (string) $expectedValue) {
                     return false;
                 }
+
                 continue;
             }
             if ($expectedValue === null || $actualValue === null || $actualValue !== (string) $expectedValue) {
@@ -679,6 +693,7 @@ class CheckoutIdempotencyService
                 if ($actual !== null && $actual !== (string) $expected) {
                     return false;
                 }
+
                 continue;
             }
             if ($expected === null || $actual === null || $actual !== (string) $expected) {
@@ -696,7 +711,7 @@ class CheckoutIdempotencyService
                 || strtolower($metadataCurrency) !== 'eur')) {
             return false;
         }
-        if ($metadataAmount !== null && (!ctype_digit($metadataAmount) || (int) $metadataAmount !== $amountCents)) {
+        if ($metadataAmount !== null && (! ctype_digit($metadataAmount) || (int) $metadataAmount !== $amountCents)) {
             return false;
         }
         if ($metadataCurrency !== null && strtolower($metadataCurrency) !== 'eur') {

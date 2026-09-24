@@ -3,81 +3,127 @@
 namespace Database\Seeders;
 
 use App\Enums\Brand;
-use Illuminate\Database\Seeder;
+use App\Enums\UserRole;
+use App\Models\Customer;
 use App\Models\GalleryGroup;
-use Illuminate\Support\Str;
+use App\Models\LicenseModifier;
+use App\Models\LicenseUseCase;
+use App\Models\Product;
+use App\Models\Role;
+use App\Models\TextSnippet;
+use App\Models\User;
+use App\Services\VolumePresetService;
+use App\Support\BrandRegistry;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
 
-        // Admin-User seeden, um Race-Conditions in parallelen E2E-Tests zu vermeiden
-        $adminUser = \App\Models\User::firstOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@example.com')],
-            ['name' => 'Florian Reisinger', 'password' => \Illuminate\Support\Facades\Hash::make(env('ADMIN_PASSWORD', 'admin'))]
+        $adminEmail = config('admin.email');
+        $adminPassword = config('admin.password');
+
+        if (! is_string($adminEmail) || trim($adminEmail) === '' || ! is_string($adminPassword) || trim($adminPassword) === '') {
+            throw new \RuntimeException('ADMIN_EMAIL und ADMIN_PASSWORD müssen für das Seeding gesetzt sein.');
+        }
+
+        // Admin-User seeden, um Race-Conditions in parallelen E2E-Tests zu vermeiden.
+        // Die Passwort-Rotation übernimmt anschließend der explizite admin:update-Schritt.
+        $adminUser = User::firstOrCreate(
+            ['email' => $adminEmail],
+            ['name' => 'Florian Reisinger', 'password' => Hash::make($adminPassword)]
         );
-        $roles = [\App\Enums\UserRole::SUPER_ADMIN->value, \App\Enums\UserRole::ADMIN->value, \App\Enums\UserRole::PHOTOGRAPHER->value, \App\Enums\UserRole::CLIENT->value, \App\Enums\UserRole::ORG_ADMIN->value, \App\Enums\UserRole::POWER_USER->value];
+
+        $roles = array_map(
+            static fn (UserRole $role): string => $role->value,
+            UserRole::cases()
+        );
         foreach ($roles as $roleName) {
-            \App\Models\Role::firstOrCreate(['name' => $roleName]);
+            Role::firstOrCreate(['name' => $roleName]);
         }
 
         // Admin-User erhält alle verfügbaren Rollen
-        $adminUser->roles()->sync(\App\Models\Role::pluck('id')->toArray());
+        $adminUser->roles()->sync(Role::pluck('id')->toArray());
+
+        $brand = BrandRegistry::currentOrDefault();
 
         // 1. Root-Gruppe "Privat" (strikt privat)
-        $privatGroup = GalleryGroup::firstOrCreate(
-            ['slug' => 'privat'],
-            ['name' => 'Privat', 'is_public' => false]
-        );
+        $this->seedGalleryGroup('privat', [
+            'name' => 'Privat',
+            'is_public' => false,
+        ], $brand);
 
         // 2. Root-Gruppe "Presse" (öffentlich)
-        $presseGroup = GalleryGroup::firstOrCreate(
-            ['slug' => 'presse'],
-            ['name' => 'Presse', 'is_public' => true]
-        );
+        $presseGroup = $this->seedGalleryGroup('presse', [
+            'name' => 'Presse',
+            'is_public' => true,
+        ], $brand);
 
         // 3. Untergruppen für Presse (Regionen)
-        $oberoesterreich = GalleryGroup::firstOrCreate(
-            ['slug' => 'oberoesterreich'],
-            ['name' => 'Oberösterreich', 'parent_id' => $presseGroup->id, 'is_public' => true]
-        );
+        $oberoesterreich = $this->seedGalleryGroup('oberoesterreich', [
+            'name' => 'Oberösterreich',
+            'parent_id' => $presseGroup->id,
+            'is_public' => true,
+        ], $brand);
 
-        $oesterreich = GalleryGroup::firstOrCreate(
-            ['slug' => 'oesterreich'],
-            ['name' => 'Österreich', 'parent_id' => $presseGroup->id, 'is_public' => true]
-        );
+        $oesterreich = $this->seedGalleryGroup('oesterreich', [
+            'name' => 'Österreich',
+            'parent_id' => $presseGroup->id,
+            'is_public' => true,
+        ], $brand);
 
-        $wien = GalleryGroup::firstOrCreate(
-            ['slug' => 'wien'],
-            ['name' => 'Wien', 'parent_id' => $presseGroup->id, 'is_public' => true]
-        );
+        $wien = $this->seedGalleryGroup('wien', [
+            'name' => 'Wien',
+            'parent_id' => $presseGroup->id,
+            'is_public' => true,
+        ], $brand);
 
         // 4. "Sport" als Meta-Galerien (GalleryGroup) anlegen
-        GalleryGroup::firstOrCreate(
-            ['slug' => 'sport-oberoesterreich'],
-            ['name' => 'Sport', 'parent_id' => $oberoesterreich->id, 'is_public' => true]
-        );
+        $this->seedGalleryGroup('sport-oberoesterreich', [
+            'name' => 'Sport',
+            'parent_id' => $oberoesterreich->id,
+            'is_public' => true,
+        ], $brand);
 
-        GalleryGroup::firstOrCreate(
-            ['slug' => 'sport-oesterreich'],
-            ['name' => 'Sport', 'parent_id' => $oesterreich->id, 'is_public' => true]
-        );
+        $this->seedGalleryGroup('sport-oesterreich', [
+            'name' => 'Sport',
+            'parent_id' => $oesterreich->id,
+            'is_public' => true,
+        ], $brand);
 
-        GalleryGroup::firstOrCreate(
-            ['slug' => 'sport-wien'],
-            ['name' => 'Sport', 'parent_id' => $wien->id, 'is_public' => true]
-        );
+        $this->seedGalleryGroup('sport-wien', [
+            'name' => 'Sport',
+            'parent_id' => $wien->id,
+            'is_public' => true,
+        ], $brand);
 
         // --- Per-brand catalog, settings, CRM seed ---
-        $this->seedCatalogForBrand(Brand::B2B);
+        $this->seedCatalogForBrand($brand);
 
         // --- Volume-Licensing-Presets (Standard-Preset je Brand) ---
-        app(\App\Services\VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B);
+        app(VolumePresetService::class)->ensureDefaultPresetForBrand($brand);
+    }
 
-        // Neu: Trigger den Location Import direkt im Seed
-        $this->command->info('Starte Smart Assistance Import...');
-        \Illuminate\Support\Facades\Artisan::call('app:import-locations', [], $this->command->getOutput());
+    /**
+     * Seed a known group for the active brand and repair legacy NULL brands
+     * without overwriting any other administrator-managed attributes.
+     */
+    private function seedGalleryGroup(string $slug, array $attributes, Brand $brand): GalleryGroup
+    {
+        $group = GalleryGroup::firstOrCreate(
+            ['slug' => $slug],
+            [...$attributes, 'brand' => $brand]
+        );
+
+        if ($group->brand === null) {
+            $group->brand = $brand;
+            $group->save();
+        }
+
+        return $group;
     }
 
     /**
@@ -91,38 +137,50 @@ class DatabaseSeeder extends Seeder
         $this->command->info("Seede Katalog/Settings für Brand '{$brandCode}'...");
 
         // --- Standard-Lizenzen & Preise (brand-scoped via the brand column) ---
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_web', 'brand' => $brandCode], ['value' => '7500']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_print', 'brand' => $brandCode], ['value' => '14500']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'price_original', 'brand' => $brandCode], ['value' => '45000']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_commercial', 'brand' => $brandCode], ['value' => '2.0']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_unlimited', 'brand' => $brandCode], ['value' => '1.5']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'mult_international', 'brand' => $brandCode], ['value' => '1.5']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_web', 'brand' => $brandCode], ['value' => 'Web & Social Media (PR & Redaktionell). Längste Kante max. 2560px.']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_print', 'brand' => $brandCode], ['value' => 'Print & Editorial (bis A4). Längste Kante max. 4000px.']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_original', 'brand' => $brandCode], ['value' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_national', 'brand' => $brandCode], ['value' => 'Nutzung nur im Inland (national).']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'term_territory_international', 'brand' => $brandCode], ['value' => 'Weltweite, uneingeschränkte räumliche Nutzung.']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_base_price', 'brand' => $brandCode], ['value' => '50']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_hourly_rate', 'brand' => $brandCode], ['value' => '80']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_images_per_hour', 'brand' => $brandCode], ['value' => '6']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_outdoor_images_per_hour', 'brand' => $brandCode], ['value' => '8']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'calc_flatrate_multiplier', 'brand' => $brandCode], ['value' => '1.2']);
-        // Per-image license base prices (used by SRP/Calculator). Values are stored in CENTS
-        // (the frontend CalculatorSettingsCard divides srp_* by 100 for Euro display).
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'base_price', 'brand' => $brandCode], ['value' => '8000']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'setup_fee', 'brand' => $brandCode], ['value' => '5000']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'privacy_fee', 'brand' => $brandCode], ['value' => '20000']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'extra_image_fee', 'brand' => $brandCode], ['value' => '1500']);
+        // Production restart seeding is insert-if-missing: values edited by an
+        // administrator are authoritative and must never be reset to defaults.
+        $settingDefaults = [
+            'price_web' => '7500',
+            'price_print' => '14500',
+            'price_original' => '45000',
+            'mult_commercial' => '2.0',
+            'mult_unlimited' => '1.5',
+            'mult_international' => '1.5',
+            'term_web' => 'Web & Social Media (PR & Redaktionell). Längste Kante max. 2560px.',
+            'term_print' => 'Print & Editorial (bis A4). Längste Kante max. 4000px.',
+            'term_original' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.',
+            'term_territory_national' => 'Nutzung nur im Inland (national).',
+            'term_territory_international' => 'Weltweite, uneingeschränkte räumliche Nutzung.',
+            'calc_base_price' => '50',
+            'calc_hourly_rate' => '80',
+            'calc_images_per_hour' => '6',
+            'calc_outdoor_images_per_hour' => '8',
+            'calc_flatrate_multiplier' => '1.2',
+            // Per-image license base prices are stored in cents.
+            'base_price' => '8000',
+            'setup_fee' => '5000',
+            'privacy_fee' => '20000',
+            'extra_image_fee' => '1500',
+            'bank_holder' => 'Florian Reisinger',
+            'company_street' => 'Robert-Stolz-Straße 8',
+            'company_zip' => '4020',
+            'company_city' => 'Linz',
+            'company_country' => 'Österreich',
+            'company_email' => 'admin@example.com',
+            'bank_iban' => 'DE96100110012179986174',
+            'bank_bic' => 'NTSBDEB1XXX',
+        ];
 
-        // Reale Impressums- und Bankdaten für den Checkout seeden
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_holder', 'brand' => $brandCode], ['value' => 'Florian Reisinger']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_street', 'brand' => $brandCode], ['value' => 'Robert-Stolz-Straße 8']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_zip', 'brand' => $brandCode], ['value' => '4020']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_city', 'brand' => $brandCode], ['value' => 'Linz']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_country', 'brand' => $brandCode], ['value' => 'Österreich']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'company_email', 'brand' => $brandCode], ['value' => 'admin@example.com']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_iban', 'brand' => $brandCode], ['value' => 'DE96100110012179986174']);
-        \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(['key' => 'bank_bic', 'brand' => $brandCode], ['value' => 'NTSBDEB1XXX']);
+        $settingRows = array_map(
+            static fn (string $key, string $value): array => [
+                'key' => $key,
+                'brand' => $brandCode,
+                'value' => $value,
+            ],
+            array_keys($settingDefaults),
+            array_values($settingDefaults)
+        );
+        DB::table('settings')->insertOrIgnore($settingRows);
 
         // --- Produkte & Katalog (Preise, Pakete, Rabatte) ---
         $products = [
@@ -154,7 +212,7 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($products as $product) {
-            \App\Models\Product::firstOrCreate(
+            Product::firstOrCreate(
                 ['name' => $product['name'], 'brand' => $brandCode],
                 array_merge($product, ['brand' => $brandCode])
             );
@@ -170,7 +228,7 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Werbung / Kampagne', 'description' => 'Kommerzielle Werbung & Kampagnen (Originalauflösung).', 'base_price' => 45000, 'flatrate_tier' => 'original', 'sort_order' => 40, 'is_commercial' => true],
         ];
         foreach ($useCases as $uc) {
-            \App\Models\LicenseUseCase::firstOrCreate(
+            LicenseUseCase::firstOrCreate(
                 ['name' => $uc['name'], 'brand' => $brandCode],
                 array_merge($uc, ['brand' => $brandCode])
             );
@@ -182,20 +240,20 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Eilzuschlag', 'description' => 'Express-Bearbeitung.', 'percent_surcharge' => 25.0, 'is_included_in_flatrate' => false, 'sort_order' => 30],
         ];
         foreach ($modifiers as $mod) {
-            \App\Models\LicenseModifier::firstOrCreate(
+            LicenseModifier::firstOrCreate(
                 ['name' => $mod['name'], 'brand' => $brandCode],
                 array_merge($mod, ['brand' => $brandCode])
             );
         }
 
         // --- CRM: placeholder customer + text snippet so the brand is not empty ---
-        \App\Models\Customer::firstOrCreate(
-            ['email' => 'beispiel-' . $brandCode . '@reisinger.pictures', 'brand' => $brandCode],
-            ['name' => 'Beispiel-Kunde (' . strtoupper($brandCode) . ')', 'company' => 'Reisinger Pictures', 'brand' => $brandCode]
+        Customer::firstOrCreate(
+            ['email' => 'beispiel-'.$brandCode.'@reisinger.pictures', 'brand' => $brandCode],
+            ['name' => 'Beispiel-Kunde ('.strtoupper($brandCode).')', 'company' => 'Reisinger Pictures', 'brand' => $brandCode]
         );
-        \App\Models\TextSnippet::firstOrCreate(
-            ['shortcut' => 'begr-' . $brandCode, 'brand' => $brandCode],
-            ['title' => 'Begrüßung (' . strtoupper($brandCode) . ')', 'content_html' => '<p>Hallo und willkommen!</p>', 'brand' => $brandCode]
+        TextSnippet::firstOrCreate(
+            ['shortcut' => 'begr-'.$brandCode, 'brand' => $brandCode],
+            ['title' => 'Begrüßung ('.strtoupper($brandCode).')', 'content_html' => '<p>Hallo und willkommen!</p>', 'brand' => $brandCode]
         );
     }
 }

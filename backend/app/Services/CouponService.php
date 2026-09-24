@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\Brand;
 use App\Models\Coupon;
 use App\Models\CouponUserUsage;
+use App\Models\Gallery;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -21,16 +22,16 @@ class CouponService
      *
      * @param  string  $code  Coupon code entered by the user.
      * @param  Brand  $brand  Current brand (SRP or B2B).
-     * @param  int|null  $galleryId  Gallery ID from the cart (null if mixed/unknown).
-     * @param  int|null  $metaGalleryId  Meta-gallery ID from the cart (null if mixed/unknown).
+     * @param  int|string|array<int, int|string>|null  $galleryId  Gallery ID(s) from the cart.
+     * @param  int|string|array<int, int|string>|null  $metaGalleryId  Meta-gallery ID(s) from the cart.
      * @param  int|string|null  $userId  Authenticated user ID (for per-account limit check). Accepts UUID strings.
      * @return array{0: Coupon|null, 1: string|null} [coupon, errorMessage]
      */
     public function findValidCoupon(
         string $code,
         Brand|string $brand,
-        int|string|null $galleryId = null,
-        int|string|null $metaGalleryId = null,
+        int|string|array|null $galleryId = null,
+        int|string|array|null $metaGalleryId = null,
         int|string|null $userId = null,
     ): array {
         /** @var Coupon|null $coupon */
@@ -62,22 +63,27 @@ class CouponService
             return [null, 'You have reached the usage limit for this coupon.'];
         }
 
-        // Check scope
+        // A scoped coupon is valid when any eligible cart item belongs to the
+        // scope. Scalar IDs remain supported for preview/API callers; checkout
+        // passes all item IDs so the result is not dependent on cart order.
+        $galleryIds = $this->normalizeScopeIds($galleryId);
+        $metaGalleryIds = $this->normalizeScopeIds($metaGalleryId);
+
         if ($coupon->scope_type === 'gallery' && $coupon->scope_id !== null) {
-            if ($galleryId === null || (string) $coupon->scope_id !== (string) $galleryId) {
+            if (! in_array((string) $coupon->scope_id, $galleryIds, true)) {
                 return [null, 'This coupon is not valid for your selected items.'];
             }
         }
 
         if ($coupon->scope_type === 'meta_gallery' && $coupon->scope_id !== null) {
-            if ($metaGalleryId === null || (string) $coupon->scope_id !== (string) $metaGalleryId) {
+            if (! in_array((string) $coupon->scope_id, $metaGalleryIds, true)) {
                 return [null, 'This coupon is not valid for your selected items.'];
             }
         }
 
         // photographer scope: coupon is valid for all galleries the photographer has access to
         if ($coupon->scope_type === 'photographer') {
-            if ($galleryId === null) {
+            if ($galleryIds === []) {
                 return [null, 'This coupon is not valid for your selected items.'];
             }
 
@@ -91,17 +97,23 @@ class CouponService
                 return [null, 'This coupon is not properly configured.'];
             }
 
-            // Check direct gallery access
-            if ($photographer->photographerGalleries()->where('galleries.id', $galleryId)->exists()) {
+            // Check direct gallery access for any gallery in the cart.
+            $directGalleryIds = $photographer->photographerGalleries()
+                ->whereIn('galleries.id', $galleryIds)
+                ->pluck('galleries.id')
+                ->map(fn (mixed $id): string => (string) $id)
+                ->all();
+            if ($directGalleryIds !== []) {
                 return [$coupon, null];
             }
 
-            // Check gallery group access
+            // Check gallery group access, including descendant groups, for any
+            // gallery in the cart rather than only the first cart item.
             $groupIds = $photographer->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
-            if (! empty($groupIds)) {
-                $galleryInGroup = DB::table('gallery_gallery_group')
-                    ->whereIn('gallery_group_id', $groupIds)
-                    ->where('gallery_id', $galleryId)
+            $allGroupIds = app(AuthorizationService::class)->getSubGroupIds($groupIds);
+            if (! empty($allGroupIds)) {
+                $galleryInGroup = Gallery::whereIn('id', $galleryIds)
+                    ->whereIn('gallery_group_id', $allGroupIds)
                     ->exists();
                 if ($galleryInGroup) {
                     return [$coupon, null];
@@ -198,7 +210,7 @@ class CouponService
      * Apply a valid coupon to the cart calculation.
      *
      * @param  Coupon  $coupon  The validated coupon.
-     * @param  array  $pricedItems  Items from PricingStrategy result (with 'priceCents', 'itemId').
+     * @param  array  $pricedItems  Items from PricingStrategy result (with 'priceCents', 'itemId'). Volume strategies supply the effective qualifying price here, while invoice item lines remain base-priced.
      * @param  int  $currentTotalCents  Total before coupon discount.
      * @return array{totalCents: int, discountCents: int, items: array}
      */
@@ -257,6 +269,32 @@ class CouponService
             'discountCents' => $discountCents,
             'items' => $items,
         ];
+    }
+
+    /**
+     * Normalize scalar or multi-item scope context to comparable string IDs.
+     *
+     * @param  int|string|array<int, int|string>|null  $scopeIds
+     * @return array<int, string>
+     */
+    private function normalizeScopeIds(int|string|array|null $scopeIds): array
+    {
+        if ($scopeIds === null) {
+            return [];
+        }
+
+        $values = is_array($scopeIds) ? $scopeIds : [$scopeIds];
+        $normalized = [];
+        foreach ($values as $value) {
+            if (is_int($value) || is_string($value)) {
+                $value = trim($value);
+                if ($value !== '') {
+                    $normalized[] = $value;
+                }
+            }
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     /**

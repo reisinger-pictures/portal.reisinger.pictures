@@ -16,10 +16,13 @@ interface CouponInputProps {
     /** Shared coupon state owned by the checkout view (single source of truth). */
     state: UseCouponResult;
     disabled?: boolean;
+    /** Current server-priced amount; falls back to the hook's legacy preview. */
+    displayedDiscount?: number | null;
 }
 
-export default function CouponInput({state, disabled = false}: CouponInputProps) {
+export default function CouponInput({state, disabled = false, displayedDiscount: displayedDiscountProp}: CouponInputProps) {
     const {couponCode, coupon, isValid, discount, isLoading, error, applyCoupon, removeCoupon} = state;
+    const displayedDiscount = displayedDiscountProp ?? discount;
     const [inputValue, setInputValue] = useState<string>('');
 
     const packageQuantity = coupon?.package_quantity ?? null;
@@ -52,9 +55,9 @@ export default function CouponInput({state, disabled = false}: CouponInputProps)
                     <div className="flex items-center gap-2 min-w-0">
                         <span className="badge badge-success badge-sm uppercase text-xs tracking-wider"><Trans>Aktiv</Trans></span>
                         <span className="font-mono font-bold truncate">{couponCode}</span>
-                        {typeof discount === 'number' && discount > 0 && (
-                            <span className="text-success font-semibold whitespace-nowrap">
-                                −{formatMoney(discount)}
+                        {typeof displayedDiscount === 'number' && displayedDiscount > 0 && (
+                            <span className="text-success font-semibold whitespace-nowrap" data-testid="coupon-discount">
+                                −{formatMoney(displayedDiscount)}
                             </span>
                         )}
                         {coupon?.type === 'photo_package' && packageQuantity != null && packagePriceText != null && (

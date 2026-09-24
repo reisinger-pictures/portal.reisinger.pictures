@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import ResponsiveImage from '../components/ResponsiveImage';
 import {useState} from 'react';
@@ -110,7 +111,7 @@ export default function ManagementDashboard() {
                     {children}
                 </ErrorBoundary>
             )}
-            header={({onMenuClick}) => (
+            header={({onMenuClick, isSidebarOpen, sidebarId}) => (
                 <>
                     {user?.ai_is_unconfigured && currentView !== 'settings' && (
                         <div className="m-4 md:m-6 mb-0 alert alert-warning shadow-sm">
@@ -139,8 +140,11 @@ export default function ManagementDashboard() {
                         className="p-4 md:p-6 bg-base-100 border-b border-base-300 sticky top-0 z-30 flex items-center gap-3">
                         <button type="button"
                                 className={`btn btn-square btn-ghost md:hidden shrink-0 ${isSearchFocused ? 'hidden' : ''}`}
+                                aria-label={t`Menü öffnen`}
+                                aria-expanded={isSidebarOpen}
+                                aria-controls={sidebarId}
                                 onClick={onMenuClick}>
-                            <span className="iconify mdi--menu text-2xl"></span>
+                            <span className="iconify mdi--menu text-2xl" aria-hidden="true"></span>
                         </button>
                         <Link to="/"
                               className={`md:hidden flex items-center gap-2 shrink-0 mr-1 ${isSearchFocused ? 'hidden' : ''}`}>

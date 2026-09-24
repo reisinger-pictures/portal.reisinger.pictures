@@ -14,7 +14,7 @@ export interface VolumeLicensingCardProps {
 export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensingCardProps) {
     const {items, addToCart} = useCart();
     const {showToast} = useUI();
-    const {pricePerItemCents, tierIndex, isMaxTier, nextTierCount, nextTierLabel, isVolumePricing, tiers} = useVolumeLicensing(items);
+    const {pricePerItemCents, tierIndex, isMaxTier, nextTierCount, nextTierLabel, isVolumePricing, tiers} = useVolumeLicensing(items, photo.gallery_id);
 
     const isInCart = items.some(i => i.photoId === photo.id);
 
@@ -29,6 +29,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             thumb_url: photo.thumb_url,
             tier: 'original',
             galleryId: photo.gallery_id,
+            galleryGroupId: photo.gallery?.gallery_group_id ?? undefined,
             price: pricePerItemCents,
         });
         showToast('success', 'In den Warenkorb gelegt');

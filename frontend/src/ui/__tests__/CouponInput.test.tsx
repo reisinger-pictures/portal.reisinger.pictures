@@ -104,6 +104,18 @@ describe('CouponInput', () => {
         expect(screen.getByText('Entfernen')).toBeInTheDocument();
     });
 
+    it('uses the current cart-priced discount instead of a stale sample amount', () => {
+        renderWithProviders(
+            <CouponInput
+                state={makeState({couponCode: 'SAVE10', isValid: true, discount: 1000})}
+                displayedDiscount={2500}
+            />,
+        );
+
+        expect(screen.getByTestId('coupon-discount')).toHaveTextContent('25.00 €');
+        expect(screen.queryByText('10.00 €')).not.toBeInTheDocument();
+    });
+
     it('shows invalid state with error message', () => {
         renderCouponInput(makeState({
             error: 'Rabattcode nicht gefunden.',

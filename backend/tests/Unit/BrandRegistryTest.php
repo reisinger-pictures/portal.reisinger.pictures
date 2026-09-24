@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Services\BrandSettingsService;
 use App\Support\BrandRegistry;
+use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -102,6 +103,32 @@ class BrandRegistryTest extends TestCase
             'total_amount' => 100,
         ]);
         $this->assertSame(Brand::B2B, BrandRegistry::resolveFromOrder($order));
+    }
+
+    public function test_current_id_preserves_a_non_enum_brand_context(): void
+    {
+        BrandRegistry::set(new BrandConfig(
+            id: 'srp',
+            name: 'Second Brand',
+            theme: 'srp',
+            portalName: 'Second Portal',
+            impressumUrl: null,
+            logoPath: null,
+            hostnames: ['srp.localhost'],
+        ));
+
+        $this->assertSame('srp', BrandRegistry::currentIdOrNull());
+        $this->assertTrue(BrandRegistry::resourceMatchesCurrent('srp'));
+        $this->assertFalse(BrandRegistry::resourceMatchesCurrent('rp'));
+        $this->assertFalse(BrandRegistry::resourceMatchesCurrent(null));
+    }
+
+    public function test_public_resource_match_fails_closed_without_context(): void
+    {
+        BrandRegistry::set(null);
+
+        $this->assertNull(BrandRegistry::currentIdOrNull());
+        $this->assertFalse(BrandRegistry::resourceMatchesCurrent('rp'));
     }
 
     public function test_enum_prefix(): void

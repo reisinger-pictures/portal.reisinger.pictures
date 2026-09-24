@@ -5,57 +5,73 @@ namespace App\Http\Controllers;
 use App\Http\Requests\GenerateInviteRequest;
 use App\Http\Requests\RedeemInviteRequest;
 use App\Http\Requests\SendInviteEmailRequest;
-use Illuminate\Http\Request;
+use App\Mail\GalleryInviteMail;
 use App\Models\Gallery;
 use App\Models\GalleryInvite;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use App\Services\AuthorizationService;
+use App\Support\BrandRegistry;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use App\Mail\GalleryInviteMail;
-use App\Support\BrandRegistry;
+use PHPOpenSourceSaver\JWTAuth\Factory;
+use PHPOpenSourceSaver\JWTAuth\JWTAuth;
 
 class InviteController extends Controller
 {
     public function generate(GenerateInviteRequest $request, $galleryId)
     {
         $gallery = Gallery::findOrFail($galleryId);
-        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
+        }
+        if (Gate::denies('manage', $gallery)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
 
         $validated = $request->validated();
         $token = Str::random(64);
-        
+
         GalleryInvite::create([
             'gallery_id' => $gallery->id,
             'token' => $token,
             'name' => $validated['name'] ?? null,
-            'can_edit_metadata' => $validated['can_edit_metadata'] ?? false
+            'can_edit_metadata' => $validated['can_edit_metadata'] ?? false,
         ]);
 
         return response()->json([
             'success' => true,
-            'link' => BrandRegistry::frontendUrl() . '/invite/' . $token
+            'link' => BrandRegistry::frontendUrl().'/invite/'.$token,
         ]);
     }
 
     public function sendEmail(SendInviteEmailRequest $request, $galleryId)
     {
         $gallery = Gallery::findOrFail($galleryId);
-        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
+        }
+        if (Gate::denies('manage', $gallery)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
 
         $validated = $request->validated();
-        
-        \Illuminate\Support\Facades\DB::transaction(function () use ($gallery, $validated) {
+
+        DB::transaction(function () use ($gallery, $validated) {
             $token = Str::random(64);
-            
+
             GalleryInvite::create([
                 'gallery_id' => $gallery->id,
                 'token' => $token,
-                'name' => $validated['name'] ?? null
+                'name' => $validated['name'] ?? null,
             ]);
 
-            $link = BrandRegistry::frontendUrl() . '/invite/' . $token;
+            $link = BrandRegistry::frontendUrl().'/invite/'.$token;
             Mail::to($validated['email'])->send(new GalleryInviteMail($gallery->name, $link));
         });
 
@@ -65,11 +81,14 @@ class InviteController extends Controller
     public function check($token)
     {
         $invite = GalleryInvite::where('token', $token)->with('gallery')->firstOrFail();
-        
+        if (! $invite->gallery || ! BrandRegistry::galleryTreeMatchesCurrent($invite->gallery)) {
+            return response()->json(['error' => 'Einladung nicht gefunden.'], 404);
+        }
+
         return response()->json([
             'gallery_name' => $invite->gallery->name,
-            'requires_password' => !empty($invite->gallery->password_hash),
-            'invite_name' => $invite->name
+            'requires_password' => ! empty($invite->gallery->password_hash),
+            'invite_name' => $invite->name,
         ]);
     }
 
@@ -77,64 +96,118 @@ class InviteController extends Controller
     {
         $validated = $request->validated();
 
-        $invite = \App\Models\GalleryInvite::where('token', $validated['token'])->with('gallery')->firstOrFail();
+        $invite = GalleryInvite::where('token', $validated['token'])->with('gallery')->firstOrFail();
         $gallery = $invite->gallery;
+        if (! $gallery || ! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+            return response()->json(['error' => 'Einladung nicht gefunden.'], 404);
+        }
 
-        if ($gallery->password_hash && !\Illuminate\Support\Facades\Hash::check($validated['password'] ?? null, $gallery->password_hash)) {
+        if ($gallery->password_hash && ! Hash::check($validated['password'] ?? null, $gallery->password_hash)) {
             return response()->json(['error' => 'Das Galerie-Passwort ist nicht korrekt.'], 403);
         }
 
-        $guard = \Illuminate\Support\Facades\Auth::guard('api');
+        $guard = Auth::guard('api');
         $currentUser = $guard->user();
-        if (!$currentUser && $request->hasCookie('rp_jwt')) {
+        if (! $currentUser && $request->hasCookie('rp_jwt')) {
             try {
                 $currentUser = $guard->setToken($request->cookie('rp_jwt'))->user();
-            } catch (\Exception $e) { 
+            } catch (\Exception $e) {
                 // Ignore invalid/expired token gracefully
             }
         }
 
-        $transientGalleries = [$gallery->id];
-        $transientMetaGalleries = $invite->can_edit_metadata ? [$gallery->id] : [];
+        if ($currentUser) {
+            $authorization = app(AuthorizationService::class);
+            if ($authorization->isReservedNullBrandActor($currentUser)) {
+                return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
+            }
+
+            if (! $authorization->isTransientGuest($currentUser)
+                && ! $authorization->sharesBrand($currentUser, $gallery->brand)) {
+                return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
+            }
+        }
+
+        $transientGalleries = [(string) $gallery->id];
+        $transientMetaGalleries = $invite->can_edit_metadata ? [(string) $gallery->id] : [];
 
         if ($currentUser) {
             $payload = $guard->payload();
-            $existing = $payload->get('transient_galleries');
-            if (!is_array($existing)) {
-                $existing = [];
+            $transientClaims = [
+                'transient_galleries' => $payload->get('transient_galleries'),
+                'transient_meta_galleries' => $payload->get('transient_meta_galleries'),
+            ];
+
+            foreach ([
+                'transient_invites',
+                'transient_invite_ids',
+            ] as $claim) {
+                if ($payload->hasKey($claim)) {
+                    $transientClaims[$claim] = $payload->get($claim);
+                }
             }
-            $merged = array_values(array_unique(array_merge($existing, $transientGalleries)));
-            
-            $existingMeta = $payload->get('transient_meta_galleries');
-            if (!is_array($existingMeta)) { $existingMeta = []; }
-            $mergedMeta = array_values(array_unique(array_merge($existingMeta, $transientMetaGalleries)));
-            
-            $token = $guard->claims(['transient_galleries' => $merged, 'transient_meta_galleries' => $mergedMeta])->login($currentUser);
+
+            $existingGalleries = is_array($transientClaims['transient_galleries'])
+                ? $transientClaims['transient_galleries']
+                : [];
+            $existingMetaGalleries = is_array($transientClaims['transient_meta_galleries'])
+                ? $transientClaims['transient_meta_galleries']
+                : [];
+            $transientClaims['transient_galleries'] = array_values(array_unique(array_merge(
+                $existingGalleries,
+                $transientGalleries
+            )));
+            $transientClaims['transient_meta_galleries'] = array_values(array_unique(array_merge(
+                $existingMetaGalleries,
+                $transientMetaGalleries
+            )));
+
+            $inviteId = (string) $invite->getKey();
+            $existingInvites = is_array($transientClaims['transient_invites'] ?? null)
+                ? $transientClaims['transient_invites']
+                : [];
+            $existingInvites[$inviteId] = [
+                'gallery_id' => (string) $gallery->getKey(),
+                'can_edit_metadata' => (bool) $invite->can_edit_metadata,
+            ];
+            $transientClaims['transient_invites'] = $existingInvites;
+            $transientClaims['transient_invite_ids'] = array_values(array_unique(array_merge(
+                is_array($transientClaims['transient_invite_ids'] ?? null)
+                    ? $transientClaims['transient_invite_ids']
+                    : [],
+                [$inviteId]
+            )));
+
+            // Sanitize before issuing a replacement token as well. This drops
+            // grants whose invite was revoked while the current JWT was alive.
+            $transientClaims = app(AuthorizationService::class)->sanitizeTransientClaims($transientClaims);
+            $token = $guard->claims($transientClaims)->login($currentUser);
+
             return $this->respondWithToken($token, ['full_path' => $gallery->full_path]);
         }
 
         // Anonymous Guest
         $guestName = $invite->name ?? $validated['name'] ?? 'Gast';
         $guestEmail = $validated['email'] ?? null;
-        $guestId = (string) \Illuminate\Support\Str::uuid();
+        $guestId = (string) Str::uuid();
 
         if ($guestEmail) {
-            $realUser = \App\Models\User::where('email', $guestEmail)->first();
+            $realUser = User::where('email', $guestEmail)->first();
             if ($realUser) {
                 return response()->json(['error' => 'Diese E-Mail ist bereits mit einem Passwort registriert. Bitte logge dich regulär ein.'], 403);
             }
         }
 
-        $factory = app(\PHPOpenSourceSaver\JWTAuth\Factory::class);
+        $factory = app(Factory::class);
         $payload = $factory->customClaims([
-            'sub' => 'guest_' . $guestId,
+            'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => $guestName,
             'guest_invite_id' => $invite->id,
             'transient_galleries' => $transientGalleries,
-            'transient_meta_galleries' => $transientMetaGalleries
+            'transient_meta_galleries' => $transientMetaGalleries,
         ])->make();
-        $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
+        $token = app(JWTAuth::class)->encode($payload)->get();
 
         return $this->respondWithToken($token, ['full_path' => $gallery->full_path]);
     }
@@ -142,29 +215,49 @@ class InviteController extends Controller
     public function index($galleryId)
     {
         $gallery = Gallery::findOrFail($galleryId);
-        if (\Illuminate\Support\Facades\Gate::denies('manage', $gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
+        }
+        if (Gate::denies('manage', $gallery)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
 
-        return response()->json(\App\Models\GalleryInvite::where('gallery_id', $galleryId)->orderBy('id', 'desc')->get());
+        return response()->json(GalleryInvite::where('gallery_id', $galleryId)->orderBy('id', 'desc')->get());
     }
 
     public function update(Request $request, $id)
     {
-        $invite = \App\Models\GalleryInvite::with('gallery')->findOrFail($id);
-        if (\Illuminate\Support\Facades\Gate::denies('manage', $invite->gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $invite = GalleryInvite::with('gallery')->findOrFail($id);
+        if (! $invite->gallery || ! BrandRegistry::galleryTreeMatchesCurrent($invite->gallery)) {
+            return response()->json(['error' => 'Einladung nicht gefunden.'], 404);
+        }
+        if (Gate::denies('manage', $invite->gallery)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
         $request->validate(['name' => 'nullable|string|max:255']);
         $invite->update(['name' => $request->name]);
+
         return response()->json(['success' => true]);
     }
 
     public function destroy($id)
     {
-        $invite = \App\Models\GalleryInvite::with('gallery')->findOrFail($id);
-        if (\Illuminate\Support\Facades\Gate::denies('manage', $invite->gallery)) return response()->json(['error' => 'Keine Berechtigung'], 403);
+        $invite = GalleryInvite::with('gallery')->findOrFail($id);
+        if (! $invite->gallery || ! BrandRegistry::galleryTreeMatchesCurrent($invite->gallery)) {
+            return response()->json(['error' => 'Einladung nicht gefunden.'], 404);
+        }
+        if (Gate::denies('manage', $invite->gallery)) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
 
-        \App\Models\GalleryInvite::destroy($id);
+        GalleryInvite::destroy($id);
 
-        $ttl = \Illuminate\Support\Facades\Auth::guard('api')->factory()->getTTL();
-        \Illuminate\Support\Facades\Cache::put('blacklisted_invite_' . $id, true, now()->addMinutes($ttl));
+        $ttl = Auth::guard('api')->factory()->getTTL();
+        $ttl = is_numeric($ttl) ? max(1, (int) $ttl) : 240;
+        // The same marker is checked for guest_invite_id and registered
+        // transient_invite_ids. It is intentionally independent of the token
+        // subject so one invite can be revoked for every issued session.
+        Cache::put('blacklisted_invite_'.$id, true, now()->addMinutes($ttl));
 
         return response()->json(['success' => true]);
     }

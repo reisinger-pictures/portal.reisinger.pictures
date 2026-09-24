@@ -21,6 +21,10 @@ Schedule::command('app:cleanup-derivatives')->dailyAt('05:00')->withoutOverlappi
 // Temp-Dateien (alte Skalierungs-Caches & Artefakte) bereinigen
 Schedule::command('app:cleanup-temp')->dailyAt('02:30')->withoutOverlapping()->onOneServer();
 
+// GeoNames- und Länderdaten einmal pro Woche aktualisieren. Der Import darf
+// weder den Seed-Gate blockieren noch bei jedem Container-Neustart laufen.
+Schedule::command('app:import-locations')->weeklyOn(1, '03:30')->withoutOverlapping()->onOneServer();
+
 // Stripe: cancel incomplete PaymentIntents abandoned by abandoned checkouts
 Schedule::command('stripe:cancel-stale-payment-intents')->hourly()->withoutOverlapping()->onOneServer();
 

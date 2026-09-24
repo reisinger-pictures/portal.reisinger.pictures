@@ -24,7 +24,8 @@ class BrandScopingOrderTest extends TestCase
     private function adminTokenForBrand(?string $brand): string
     {
         $user = User::factory()->create(['brand' => $brand]);
-        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+        $role = $brand === null ? UserRole::SUPER_ADMIN : UserRole::ADMIN;
+        $user->roles()->attach(Role::firstOrCreate(['name' => $role->value]));
 
         return auth('api')->login($user);
     }

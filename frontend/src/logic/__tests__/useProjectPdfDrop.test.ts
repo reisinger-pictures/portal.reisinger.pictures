@@ -16,11 +16,15 @@ function dropEvent(file: File): DragEvent {
     } as unknown as DragEvent;
 }
 
+function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
 function mockFetchResponse(response: unknown, ok = true) {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok,
-        json: () => Promise.resolve(response),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(response, ok ? 200 : 422)));
 }
 
 describe('useProjectPdfDrop', () => {

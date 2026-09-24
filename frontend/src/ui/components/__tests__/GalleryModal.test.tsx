@@ -22,10 +22,6 @@ vi.mock('../ModalDialogShell', () => ({
     ),
 }));
 
-vi.mock('../../../logic/useFocusTrap', () => ({
-    useFocusTrap: () => ({current: null}),
-}));
-
 function setupSwr() {
     vi.mocked(useSWR).mockImplementation(((key: unknown) => {
         if (key === '/api/management/orgs') {

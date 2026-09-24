@@ -6,8 +6,8 @@ namespace App\Enums;
  * Brand (White-Label) of the portal.
  *
  * Stored as a short code on multiple tables (users, galleries, gallery_groups,
- * orgs, orders, invoice_snapshots). `null` means explicitly cross-brand
- * (e.g. Super-Admin).
+ * orgs, orders, invoice_snapshots). On user records, `null` is reserved for an
+ * explicitly Super-Admin actor; transient guests are not cross-brand identities.
  */
 enum Brand: string
 {

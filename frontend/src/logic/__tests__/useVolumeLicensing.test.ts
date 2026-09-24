@@ -1,5 +1,13 @@
 import {describe, it, expect} from 'vitest';
-import {calculateVolumeTier, calculateVolumeTotal, DEFAULT_VOLUME_PRICING, tiersFromApi} from '../useVolumeLicensing';
+import {
+    calculateVolumeTier,
+    calculateVolumeTotal,
+    DEFAULT_VOLUME_PRICING,
+    descriptorFromTerms,
+    groupCartItemsByPricing,
+    sumPricingGroupTotals,
+    tiersFromApi,
+} from '../useVolumeLicensing';
 
 describe('calculateVolumeTier', () => {
     it('tier 0 for 0 items (edge: empty cart)', () => {
@@ -154,5 +162,70 @@ describe('tiersFromApi', () => {
     it('falls back to DEFAULT_VOLUME_PRICING when payload is empty', () => {
         expect(tiersFromApi(undefined)).toEqual(DEFAULT_VOLUME_PRICING.tiers);
         expect(tiersFromApi([])).toEqual(DEFAULT_VOLUME_PRICING.tiers);
+    });
+});
+
+describe('mixed cart pricing groups', () => {
+    const scope = descriptorFromTerms({pricing_strategy: 'scope_licensing'});
+    const presetA = descriptorFromTerms({
+        pricing_strategy: 'volume_licensing',
+        volume_pricing: {
+            preset_id: 'preset-a',
+            preset_name: 'Preset A',
+            tiers: [{min_quantity: 0, price_cents: 5000}, {min_quantity: 2, price_cents: 4000}],
+        },
+    });
+    const presetB = descriptorFromTerms({
+        pricing_strategy: 'volume_licensing',
+        volume_pricing: {
+            preset_id: 'preset-b',
+            preset_name: 'Preset B',
+            tiers: [{min_quantity: 0, price_cents: 7000}],
+        },
+    });
+
+    it('groups scope, custom preset, and another preset independently', () => {
+        const items = [
+            {photoId: 'scope-1', tier: 'web' as const, galleryId: 'scope-gallery', price: 500},
+            {photoId: 'a-1', tier: 'original' as const, galleryId: 'gallery-a', price: 0},
+            {photoId: 'a-2', tier: 'original' as const, galleryId: 'gallery-a', price: 0},
+            {photoId: 'b-1', tier: 'original' as const, galleryId: 'gallery-b', price: 0},
+        ];
+        const groups = groupCartItemsByPricing(items, item => {
+            if (item.galleryId === 'scope-gallery') return scope;
+            if (item.galleryId === 'gallery-b') return presetB;
+            return presetA;
+        });
+
+        expect(groups).toHaveLength(3);
+        expect(groups.map(group => [group.licensingMode, group.presetId, group.totalCents])).toEqual([
+            ['scope_licensing', 'default', 500],
+            ['volume_licensing', 'preset-a', 8000],
+            ['volume_licensing', 'preset-b', 7000],
+        ]);
+        expect(sumPricingGroupTotals(groups)).toBe(15500);
+    });
+
+    it('combines galleries that resolve to the same effective preset', () => {
+        const items = [
+            {photoId: 'a-1', tier: 'original' as const, galleryId: 'gallery-a', price: 0},
+            {photoId: 'b-1', tier: 'original' as const, galleryId: 'gallery-b', price: 0},
+        ];
+        const groups = groupCartItemsByPricing(items, () => presetA);
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].itemIds).toEqual(['a-1', 'b-1']);
+        expect(groups[0].totalCents).toBe(8000);
+    });
+
+    it('does not count quote items in a volume group', () => {
+        const items = [
+            {photoId: 'volume-1', tier: 'original' as const, galleryId: 'gallery-a', price: 0},
+            {photoId: 'quote-1', tier: 'original' as const, galleryId: 'gallery-a', price: 0, isQuote: true},
+        ];
+        const [group] = groupCartItemsByPricing(items, () => presetA);
+
+        expect(group.totalCents).toBe(5000);
+        expect(group.itemPriceCents).toEqual({'volume-1': 5000});
     });
 });

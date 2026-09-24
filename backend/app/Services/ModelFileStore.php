@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Ercsctt\FileEncryption\Facades\FileEncrypter;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -94,6 +95,7 @@ class ModelFileStore
         $disk = Storage::disk(self::DISK);
         $cutoff = now()->subMinutes($olderThanMinutes)->getTimestamp();
         $deleted = 0;
+        $remaining = [];
 
         foreach ($disk->allFiles($directory) as $file) {
             if (! str_contains(basename($file), '.plain-')) {
@@ -105,7 +107,19 @@ class ModelFileStore
             }
 
             $disk->delete($file);
-            $deleted++;
+            if ($disk->exists($file)) {
+                $remaining[] = $file;
+            } else {
+                $deleted++;
+            }
+        }
+
+        if ($remaining !== []) {
+            Log::error('model.file.temp_cleanup_failed', [
+                'path_count' => count($remaining),
+            ]);
+
+            throw new RuntimeException('Failed to remove one or more plaintext model files.');
         }
 
         return $deleted;
@@ -149,11 +163,36 @@ class ModelFileStore
     }
 
     /**
+     * Delete files and verify that the private disk no longer contains them.
+     *
+     * The local disk deliberately uses `throw => false`; a bare delete() call
+     * would therefore report success while retaining an encrypted PII file.
+     * Callers receive a real failure and can enqueue a retry.
+     *
      * @param  string|array<int, string>  $paths
      */
     public function delete(string|array $paths): void
     {
-        Storage::disk(self::DISK)->delete($paths);
+        $paths = $this->normalizePaths($paths);
+        if ($paths === []) {
+            return;
+        }
+
+        $disk = Storage::disk(self::DISK);
+        $disk->delete($paths);
+
+        $remaining = array_values(array_filter(
+            $paths,
+            static fn (string $path): bool => $disk->exists($path),
+        ));
+
+        if ($remaining !== []) {
+            Log::error('model.file.delete_failed', [
+                'path_count' => count($remaining),
+            ]);
+
+            throw new RuntimeException('Failed to remove one or more model files.');
+        }
     }
 
     private function absolutePath(string $path): string
@@ -165,6 +204,20 @@ class ModelFileStore
         }
 
         return $absolute;
+    }
+
+    /**
+     * @param  string|array<int, string>  $paths
+     * @return array<int, string>
+     */
+    private function normalizePaths(string|array $paths): array
+    {
+        $paths = is_array($paths) ? $paths : [$paths];
+
+        return array_values(array_unique(array_filter(
+            $paths,
+            static fn (mixed $path): bool => is_string($path) && $path !== '',
+        )));
     }
 
     private function buildPath(string $directory, ?string $extension): string

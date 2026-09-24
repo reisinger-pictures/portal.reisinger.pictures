@@ -70,4 +70,24 @@ test.describe('Route Guards & IDOR Boundaries', () => {
             await expect(loginButton).toHaveAccessibleName('Login');
         });
     });
+
+    test('Trailing-slash management routes render their canonical dashboard views', { tag: ['@regression', '@feature:auth'] }, async ({page, request}) => {
+        const helper = new E2ESessionHelper(request);
+        const admin = await helper.createIsolatedUser('admin');
+
+        try {
+            const auth = new AuthHelper(page);
+            await auth.login(admin.email, admin.password);
+
+            await page.goto('/galleries/');
+            await expect(page).toHaveURL(/\/galleries$/);
+            await expect(page.getByRole('main').getByRole('heading', {name: 'Galerien', exact: true})).toBeVisible({timeout: 15000});
+
+            await page.goto('/admin-orders/');
+            await expect(page).toHaveURL(/\/admin-orders$/);
+            await expect(page.getByRole('main').getByRole('heading', {name: 'Bestellungen & Anfragen', exact: true})).toBeVisible({timeout: 15000});
+        } finally {
+            await helper.teardown();
+        }
+    });
 });

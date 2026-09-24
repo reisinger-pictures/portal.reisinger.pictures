@@ -13,12 +13,18 @@
 - storage/framework/testing/**
 - storage/framework/views/**
 - storage/app/public/**
-- storage/app/private/temp/**
-- storage/app/private/watermark*
+# Runtime-private storage is deployment-owned, not code-owned. Exclude the
+# complete tree so source-only secrets are not uploaded and destination-only
+# private files (including model age proofs) are not deleted.
+- /storage/app/private/stripe_secret.txt
+- /storage/app/private/
+- /storage/app/private/**
 - out/**
 - bootstrap/cache/**
 - core
 - core/**
 # 🛑 Lokale SQLite-Datenbanken (Dev/E2E) nicht synchronisieren
+# The rooted rule is required because **/ does not match top-level files.
+- /*.sqlite*
 - **/*.sqlite*
 + **

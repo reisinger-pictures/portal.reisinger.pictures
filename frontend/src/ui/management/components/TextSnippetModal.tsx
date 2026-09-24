@@ -41,8 +41,13 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
     const watchContentHtml = useWatch({ control, name: 'content_html' });
 
     const onSubmit = async (data: SnippetFormValues) => {
-        await onSave(data);
-        onClose();
+        try {
+            await onSave(data);
+            onClose();
+        } catch {
+            // The parent reports the API error; keep the entered values and modal open.
+            return;
+        }
     };
 
     if (!isOpen) return null;

@@ -97,6 +97,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
             thumb_url: photo.thumb_url,
             tier: selectedUseCase.flatrate_tier as ResolutionTier,
             galleryId: photo.gallery_id,
+            galleryGroupId: photo.gallery?.gallery_group_id ?? undefined,
             useCaseId: selectedUseCase.id,
             useCaseName: selectedUseCase.name,
             modifierIds: selectedModifiers,

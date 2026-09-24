@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useState, useEffect, useRef, useTransition } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import HighlightText from './HighlightText';
 import { useSearch } from '../../logic/useSearch';
 
@@ -13,17 +13,51 @@ export interface SearchBarWithSuggestionsProps {
     onFocusChange?: (focused: boolean) => void;
 }
 
-export default function SearchBarWithSuggestions({
+interface SearchBarStateProps extends SearchBarWithSuggestionsProps {
+    initialQuery: string;
+    urlVersion: string;
+    onSubmitted: (query: string) => void;
+    onQueryChange: () => void;
+}
+
+interface SearchState {
+    version: string;
+    query: string;
+    debouncedQuery: string;
+}
+
+interface ClearIntent {
+    sourceVersion: string;
+    query: string;
+}
+
+function SearchBarState({
     placeholder = t`Suche in allen Galerien...`,
     minCharsForSuggestions = 1,
     autoFocus = false,
     clearOnSubmit = false,
     onFocusChange,
-}: SearchBarWithSuggestionsProps) {
-    const [searchParams] = useSearchParams();
-    const qParam = searchParams.get('q') || '';
-    const [searchQuery, setSearchQuery] = useState(qParam);
-    const [debouncedQuery, setDebouncedQuery] = useState(qParam);
+    initialQuery,
+    urlVersion,
+    onSubmitted,
+    onQueryChange,
+}: SearchBarStateProps) {
+    const [state, setState] = useState<SearchState>(() => ({
+        version: urlVersion,
+        query: initialQuery,
+        debouncedQuery: initialQuery,
+    }));
+    const isCurrentQuery = state.version === urlVersion;
+    const searchQuery = isCurrentQuery ? state.query : initialQuery;
+    const debouncedQuery = isCurrentQuery ? state.debouncedQuery : initialQuery;
+    const setSearchQuery = (query: string) => {
+        setState((current) => {
+            const base = current.version === urlVersion
+                ? current
+                : { version: urlVersion, query: initialQuery, debouncedQuery: initialQuery };
+            return { ...base, version: urlVersion, query };
+        });
+    };
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [, startTransition] = useTransition();
     const { results: searchResults } = useSearch(debouncedQuery, false, true);
@@ -33,19 +67,23 @@ export default function SearchBarWithSuggestions({
     useEffect(() => {
         const timer = setTimeout(() => {
             startTransition(() => {
-                setDebouncedQuery(searchQuery);
+                setState((current) => {
+                    const base = current.version === urlVersion
+                        ? current
+                        : { version: urlVersion, query: initialQuery, debouncedQuery: initialQuery };
+                    return { ...base, version: urlVersion, debouncedQuery: searchQuery };
+                });
             });
         }, 200);
         return () => clearTimeout(timer);
-    }, [searchQuery, startTransition]);
+    }, [initialQuery, searchQuery, startTransition, urlVersion]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (searchQuery.trim().length >= 1) {
-            navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-            if (clearOnSubmit) {
-                setSearchQuery('');
-            }
+        const submittedQuery = searchQuery.trim();
+        if (submittedQuery.length >= 1) {
+            onSubmitted(submittedQuery);
+            navigate(`/search?q=${encodeURIComponent(submittedQuery)}`);
             (document.activeElement as HTMLElement)?.blur();
         }
     };
@@ -66,6 +104,7 @@ export default function SearchBarWithSuggestions({
 
     const clearQuery = () => {
         if (clearOnSubmit) {
+            onQueryChange();
             setSearchQuery('');
         }
     };
@@ -78,7 +117,10 @@ export default function SearchBarWithSuggestions({
                     placeholder={placeholder}
                     className="input input-bordered join-item w-full bg-base-100"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                        onQueryChange();
+                        setSearchQuery(e.target.value);
+                    }}
                     onFocus={handleFocus}
                     onBlur={handleBlur}
                     autoFocus={autoFocus}
@@ -122,5 +164,42 @@ export default function SearchBarWithSuggestions({
                 </div>
             )}
         </form>
+    );
+}
+
+export default function SearchBarWithSuggestions(props: SearchBarWithSuggestionsProps) {
+    const location = useLocation();
+    const [searchParams] = useSearchParams();
+    const query = searchParams.get('q') || '';
+    const urlVersion = `${location.key || 'default'}:${query}`;
+    const [clearIntent, setClearIntent] = useState<ClearIntent | null>(null);
+    const shouldClearForNavigation = props.clearOnSubmit
+        && clearIntent !== null
+        && clearIntent.sourceVersion !== urlVersion
+        && clearIntent.query === query;
+    const initialQuery = shouldClearForNavigation ? '' : query;
+
+    const handleSubmitted = (submittedQuery: string) => {
+        if (props.clearOnSubmit) {
+            setClearIntent({ sourceVersion: urlVersion, query: submittedQuery });
+        }
+    };
+    const handleQueryChange = () => {
+        if (clearIntent) {
+            setClearIntent(null);
+        }
+    };
+
+    // The stateful form reads the current URL query during render. If the query
+    // changes (including browser back/forward), the old draft is ignored without
+    // replacing the input DOM node or using an effect-driven state update.
+    return (
+        <SearchBarState
+            {...props}
+            initialQuery={initialQuery}
+            urlVersion={urlVersion}
+            onSubmitted={handleSubmitted}
+            onQueryChange={handleQueryChange}
+        />
     );
 }

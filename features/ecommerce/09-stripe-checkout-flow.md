@@ -1,6 +1,8 @@
 # Stripe Checkout Flow — State Machine & Webhook Architecture
 
-> **Status:** Soll-Zustand.
+> **Status:** Current SOLL (reviewed 2026-09-24). Legacy `SRP` wording below is
+> retained only where it names an old compatibility key; the live pricing modes
+> are scope and volume licensing.
 > Describes the complete checkout lifecycle from cart to order fulfillment via Stripe Payment Intents.
 > References: `features/ecommerce/03-custom-quotes-and-stripe.md`, `features/security/card-testing-protection.md`, `features/infrastructure/16-srp-volume-pricing.md`, `features/infrastructure/17-pricing-strategy-pattern.md`.
 
@@ -44,16 +46,17 @@ paid → refunded (direct)
    - Bank details (holder, IBAN, street) must be configured — otherwise 400.
    - `purchase-upgrades` gate and `purchase-on-invoice` gate are enforced.
    - Digital goods require `withdrawal_waived` flag (except quote-only carts).
+   - Transient guest JWTs remain valid for invite/gallery access but are **not admitted to checkout** in this release. The checkout endpoint fails closed with `403` and `guest_checkout_unsupported`; no shadow `users` row, Stripe Customer, or ownerless order is created. Guest-owned order access is reserved for rows that carry a signed `orders.guest_id`; legacy rows with both owner fields null remain inaccessible to customer actors.
 4. `CheckoutService::processCheckout()` is called with the validated request, user, and payment method.
 
 ### 2.2 Checkout Service
 
 Order and invoice-snapshot creation run inside a `DB::transaction`. The positive-value immediate Stripe path additionally uses per-user checkout identity locks and a final row lock before the external Stripe call:
 
-1. **Item validation:** Each item is looked up (`Photo::with('gallery')`). If the gallery is non-public, `canAccessGallery()` is checked (403 on failure). For RP (scope licensing), `LicenseUseCase::find()` validates use-case existence and brand consistency (defense-in-depth).
-2. **Pricing:** If `quote_token` is present, `CheckoutService` verifies its signature and expiry, requires a positive token price, and uses that price as the server-authoritative total; client item prices are ignored and the standard pricing strategies are bypassed. Otherwise `PricingStrategy::calculateCart()` is called once with all items. The strategy is brand-injected via `AppServiceProvider`:
-   - **RP (ScopeLicensingStrategy):** Item-by-item pricing via `LicenseUseCase` + `LicenseModifier` surcharges.
-   - **SRP (VolumeLicensingStrategy):** Retroactive volume tier (`srp_tier_threshold1`/`srp_tier_threshold2`) with configurable per-tier prices.
+1. **Item validation:** Each item is looked up (`Photo::with('gallery')`). If the gallery is non-public, `canAccessGallery()` is checked (403 on failure). For scope licensing, `LicenseUseCase::find()` validates use-case existence and brand consistency (defense-in-depth).
+2. **Pricing:** If `quote_token` is present, `CheckoutService` verifies its signature and expiry, requires a positive token price, and uses that price as the server-authoritative total; client item prices are ignored and the standard pricing strategies are bypassed. Otherwise `PricingStrategy::calculateCart()` is called on the server-authoritative groups:
+   - **Scope licensing (`ScopeLicensingStrategy`):** item-by-item pricing via `LicenseUseCase` + `LicenseModifier` surcharges.
+   - **Volume licensing (`VolumeLicensingStrategy`):** retroactive tiers from the effective `VolumePreset`; gallery/preset overrides are grouped separately for mixed carts.
 3. **Order creation:** Order is created with the server-calculated `total_amount` and appropriate status. Coupon adjustments (`coupon_id`, `coupon_discount_cents`) are persisted when applicable.
 4. **Invoice snapshot:** An `InvoiceSnapshot` record freezes all customer details, line items, price breakdown, and the invoice number (generated via `InvoiceSequence::getNextInvoiceNumber` with `P-` or `L-` prefix). A quote offer's `rights_text` is stored as `customer_details.custom_conditions`.
 5. **Stripe PaymentIntent:** For a positive-value immediate Stripe checkout that needs a new or replacement generation, a `PaymentIntent` is created with the authoritative `amount` (in cents), `currency=eur`, mapped Stripe Customer, `receipt_email`, and server-owned order, user, checkout key, fingerprint, and generation metadata. The generation-aware Stripe **idempotency key** is `pi_{orderId}_{payment_intent_generation}`.
@@ -71,15 +74,19 @@ For an actionable response, the frontend uses `@stripe/react-stripe-js` to confi
 3. Only after those checks pass does a locked, conditional `pending_payment → paid` transition grant access. The Stripe fee is enriched from `latest_charge.balance_transaction.fee` when available.
 4. `InvoiceMail` is queued idempotently after the paid transition.
 
-### 2.5 RP vs SRP Differences
+### 2.5 Scope vs Volume Licensing Differences
 
-| Aspect | RP (Scope Licensing) | SRP (Volume Licensing) |
+The old RP/SRP labels are historical. The current strategies are selected per
+brand and may be overridden per gallery:
+
+| Aspect | Scope licensing | Volume licensing |
 |---|---|---|
 | Pricing strategy | `ScopeLicensingStrategy` | `VolumeLicensingStrategy` |
-| Per-item price | Based on `LicenseUseCase` + modifiers | Retroactive volume tier |
-| Catalog | Full license use-case/modifier catalog | No catalog — pure quantity-based |
-| `guardBrand()` | Active (defense-in-depth) | Inactive (no brand mismatch possible) |
-| Coupons | Not applicable | Supported via `CouponService` |
+| Per-item price | Based on `LicenseUseCase` + modifiers | Retroactive tier from `VolumePreset` |
+| Catalog | License use-case/modifier catalog | No license catalog; quantity/preset based |
+| `guardBrand()` | Active (defense-in-depth) | Gallery/brand preset resolution is scoped |
+| Coupons | Not applied by the strategy | Supported via `CouponService` |
+| Gallery override | `licensing_mode`/`volume_preset_id` may select the mode/preset | Same |
 
 ## 3. Webhook Event Handling
 

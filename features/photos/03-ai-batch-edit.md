@@ -1,10 +1,18 @@
 ---
 domain: photos
 topic: ai-batch-edit
-status: active
+status: historical
+superseded_by: photos/04-ai-server-side.md
 ---
 
-# Technical Concept: Local AI Batch Edit (LM Studio)
+# Historical Concept: Local AI Batch Edit (LM Studio)
+
+> **Historical / superseded (2026-06-29):** This describes the former
+> browser-only LM Studio workflow. It is not the current authorization, privacy,
+> or fallback contract. The current dual-mode server/LM-Studio architecture,
+> Boolean status semantics, and role gates are documented in
+> [`04-ai-server-side.md`](04-ai-server-side.md) and
+> [`../ai/01-ai-service-architecture.md`](../ai/01-ai-service-architecture.md).
 
 ## 1. Local AI Orchestration
 - The system leverages a local LLM (e.g., via LM Studio) accessible at `http://127.0.0.1:1234/v1`.
@@ -20,5 +28,5 @@ status: active
 - **Row-level State:** The UI manages generation and saving states per image row to allow partial batch processing without locking the entire table.
 
 ## Related
-- [IPTC Metadata Versioning](../photos/02-metadata-versioning.md) — AI-edited metadata follows the same versioning rules
-- [Search & Discovery](../search/01-search-and-discovery.md) — AI-detected locations are resolved via the search index
+- [IPTC Metadata Versioning](../photos/02-metadata-versioning.md) ï¿½ AI-edited metadata follows the same versioning rules
+- [Search & Discovery](../search/01-search-and-discovery.md) ï¿½ AI-detected locations are resolved via the search index

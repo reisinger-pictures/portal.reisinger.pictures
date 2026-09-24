@@ -2,10 +2,8 @@
 
 namespace Tests\Feature\Coupon;
 
-use App\Enums\UserRole;
 use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\Coupon;
-use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
@@ -44,9 +42,9 @@ class CouponCheckoutControllerTest extends TestCase
     //  validateCoupon Endpoint
     // ──────────────────────────────────────────────
 
-    public function test_validate_coupon_returns_valid(): void
+    public function test_validate_coupon_returns_public_summary_including_max_items(): void
     {
-        Coupon::factory()->percentage(10)->create([
+        Coupon::factory()->percentageWithMaxItems(10, 3)->create([
             'brand' => 'test-brand',
             'code' => 'VALID10',
             'active' => true,
@@ -55,7 +53,7 @@ class CouponCheckoutControllerTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [
                 'code' => 'VALID10',
             ]);
@@ -65,6 +63,7 @@ class CouponCheckoutControllerTest extends TestCase
         $response->assertJsonPath('coupon.code', 'VALID10');
         $response->assertJsonPath('coupon.type', 'percentage');
         $response->assertJsonPath('coupon.value', 10);
+        $response->assertJsonPath('coupon.max_items', 3);
         $response->assertJsonMissingPath('coupon.id');
         $response->assertJsonMissingPath('coupon.scope_type');
     }
@@ -74,7 +73,7 @@ class CouponCheckoutControllerTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [
                 'code' => 'NONEXISTENT',
             ]);
@@ -106,7 +105,7 @@ class CouponCheckoutControllerTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [
                 'code' => 'SCOPED',
                 'gallery_id' => 'test-gallery-uuid',
@@ -114,5 +113,45 @@ class CouponCheckoutControllerTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('valid', true);
+    }
+
+    public function test_validate_coupon_accepts_complete_mixed_gallery_and_group_scope(): void
+    {
+        Coupon::factory()->create([
+            'brand' => 'test-brand',
+            'code' => 'MIXED-SCOPE',
+            'scope_type' => 'meta_gallery',
+            'scope_id' => 'group-b',
+            'active' => true,
+        ]);
+
+        $user = User::factory()->create();
+        $token = auth('api')->login($user);
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/coupons/validate', [
+                'code' => 'MIXED-SCOPE',
+                'gallery_id' => ['gallery-a', 'gallery-b'],
+                'meta_gallery_id' => ['group-a', 'group-b'],
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('valid', true);
+    }
+
+    public function test_validate_coupon_rejects_non_string_members_in_scope_arrays(): void
+    {
+        $user = User::factory()->create();
+        $token = auth('api')->login($user);
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/coupons/validate', [
+                'code' => 'ANY',
+                'gallery_id' => ['gallery-a', 42],
+            ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonPath('valid', false);
+        $this->assertStringContainsString('gallery_id.1', (string) $response->json('error'));
     }
 }

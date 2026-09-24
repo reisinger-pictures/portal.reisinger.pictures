@@ -69,9 +69,9 @@ class BrandIsolationTest extends TestCase
         $this->assertTrue(app(AuthorizationService::class)->canManageGallery($admin, $gallery->id));
     }
 
-    public function test_cross_brand_admin_can_manage_any_brand_gallery(): void
+    public function test_cross_brand_super_admin_can_manage_any_brand_gallery(): void
     {
-        $admin = $this->roleUser(UserRole::ADMIN, null);
+        $admin = $this->roleUser(UserRole::SUPER_ADMIN, null);
         $gallery = Gallery::factory()->create(['brand' => 'srp']);
 
         $this->assertTrue(app(AuthorizationService::class)->canManageGallery($admin, $gallery->id));
@@ -257,10 +257,10 @@ class BrandIsolationTest extends TestCase
         $this->assertNull(Cache::get('gallery_tree_admin'));
     }
 
-    public function test_cross_brand_admin_tree_sees_all_brands_and_uses_global_key(): void
+    public function test_cross_brand_super_admin_tree_sees_all_brands_and_uses_global_key(): void
     {
         Cache::flush();
-        $admin = $this->roleUser(UserRole::ADMIN, null);
+        $admin = $this->roleUser(UserRole::SUPER_ADMIN, null);
         $foreignGroup = GalleryGroup::factory()->create(['brand' => 'srp']);
 
         $tree = app(GalleryTreeService::class)->getAdminTree($admin);
@@ -421,9 +421,9 @@ class BrandIsolationTest extends TestCase
         ]);
     }
 
-    public function test_cross_brand_admin_can_sync_foreign_brand_target_user(): void
+    public function test_cross_brand_super_admin_can_sync_foreign_brand_target_user(): void
     {
-        $admin = $this->roleUser(UserRole::ADMIN, null);
+        $admin = $this->roleUser(UserRole::SUPER_ADMIN, null);
         $gallery = Gallery::factory()->create(['brand' => 'srp']);
         $target = User::factory()->create(['brand' => 'srp']);
 

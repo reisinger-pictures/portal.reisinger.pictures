@@ -8,6 +8,13 @@
     --color-brand-messenger: #00C6FF;
 }
 
+/* Runtime brand colors are written to these variables by brandRegistry.
+   Keep deterministic first-paint values until the public config is available. */
+:root:not([data-theme]) {
+    --color-primary: #1E5631;
+    --color-secondary: #A4B494;
+}
+
 @plugin "@tailwindcss/typography";
 
 @plugin "daisyui/theme" {

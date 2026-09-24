@@ -35,7 +35,7 @@ export default function ManagementGalleryView() {
     const {tree, updateGallery, deleteGallery} = useProtectedGalleries();
     const {user} = useAuth();
     const {isAdmin, isPhotographer} = usePermissions();
-    const licensingMode = useLicensingMode();
+    const licensingMode = useLicensingMode(gallery?.id);
     const isVolumeLicensing = licensingMode === 'volume_licensing';
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab: 'bilder' | 'coupons' =

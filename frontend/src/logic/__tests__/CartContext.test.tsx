@@ -7,7 +7,9 @@ const mockContextValue = {
     items: [
         { photoId: 'p1', filename: 'Photo 1', tier: 'web' as const, price: 5000, useCaseId: 'uc1', useCaseName: 'Web-Nutzung', modifierIds: [], modifierNames: [] },
     ],
+    quoteToken: null,
     addToCart: vi.fn(),
+    setQuoteToken: vi.fn(),
     removeFromCart: vi.fn(),
     clearCart: vi.fn(),
     totalAmount: 5000,

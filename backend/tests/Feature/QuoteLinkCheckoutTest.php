@@ -53,10 +53,12 @@ class QuoteLinkCheckoutTest extends TestCase
         $photoIds = $photos->pluck('id')->toArray();
 
         $offerTokenService = app(OfferTokenService::class);
-        $token = $offerTokenService->issue([
-            'photos' => $photoIds,
-            'price' => 5000,
-        ], now()->addDays(7));
+        $token = $offerTokenService->issueQuote(
+            $photoIds,
+            5000,
+            brand: 'rp',
+            expiresAt: now()->addDays(7),
+        );
 
         $user = User::factory()->create();
 
@@ -70,7 +72,11 @@ class QuoteLinkCheckoutTest extends TestCase
                     'tier' => 'original',
                     'price' => 99999,
                 ], $photoIds),
-                ['quote_token' => $token]
+                [
+                    'quote_token' => $token,
+                    'total' => 1,
+                    'total_amount' => 1,
+                ]
             ),
             $user,
             'invoice'
@@ -81,6 +87,7 @@ class QuoteLinkCheckoutTest extends TestCase
         $order = Order::first();
         $this->assertNotNull($order);
         $this->assertSame(5000, $order->total_amount);
+        $this->assertSame('rp', $order->brand?->value);
     }
 
     public function test_expired_quote_token_returns_422(): void
@@ -89,10 +96,12 @@ class QuoteLinkCheckoutTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
         $offerTokenService = app(OfferTokenService::class);
-        $token = $offerTokenService->issue([
-            'photos' => [$photo->id],
-            'price' => 1000,
-        ], now()->subDay());
+        $token = $offerTokenService->issueQuote(
+            [$photo->id],
+            1000,
+            brand: 'rp',
+            expiresAt: now()->subDay(),
+        );
 
         $user = User::factory()->create();
 
@@ -134,11 +143,13 @@ class QuoteLinkCheckoutTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
         $offerTokenService = app(OfferTokenService::class);
-        $token = $offerTokenService->issue([
-            'photos' => [$photo->id],
-            'price' => 10000,
-            'rights_text' => 'Nutzung für Marketingkampagne in Österreich, Laufzeit 2 Jahre',
-        ], now()->addDays(7));
+        $token = $offerTokenService->issueQuote(
+            [$photo->id],
+            10000,
+            rightsText: 'Nutzung für Marketingkampagne in Österreich, Laufzeit 2 Jahre',
+            brand: 'rp',
+            expiresAt: now()->addDays(7),
+        );
 
         $user = User::factory()->create();
 

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\AIService;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -33,6 +34,13 @@ class AuthController extends Controller
 
         $user = User::where('email', $credentials['email'])->first();
         if ($user && $user->password && Hash::check($credentials['password'], $user->password)) {
+            $authorization = app(AuthorizationService::class);
+            if ($authorization->isReservedNullBrandActor($user)) {
+                return response()->json([
+                    'error' => 'Dieser Account ist für ein anderes Portal registriert.',
+                ], 403);
+            }
+
             // U-01: Brand-Mismatch check — cross-brand only for Super-Admin (brand=null).
             $userBrandValue = $user->brand instanceof Brand ? $user->brand->value : $user->brand;
             if ($user->brand !== null && $userBrandValue !== BrandRegistry::currentId()) {
@@ -68,10 +76,16 @@ class AuthController extends Controller
             $org = $domain ? Org::where('domain', $domain)->first() : null;
 
             if ($org) {
-                // Brand check: org brand must match the current request brand
-                $orgBrandValue = $org->brand instanceof Brand ? $org->brand->value : $org->brand;
-                if ($org->brand !== null && $orgBrandValue !== BrandRegistry::currentId()) {
-                    return response()->json(['error' => 'Registrierung für diese Domain ist auf diesem Portal nicht möglich.'], 403);
+                // Brand check: an org without a concrete current-host brand is
+                // legacy data and cannot be used as a registration authority.
+                if (! BrandRegistry::resourceMatchesCurrent($org->brand)) {
+                    // Throwing a response exception is intentional: returning a
+                    // response from a transaction commits everything written so far.
+                    // The user insert above must therefore be rolled back before the
+                    // 403 reaches the client.
+                    throw new HttpResponseException(response()->json([
+                        'error' => 'Registrierung für diese Domain ist auf diesem Portal nicht möglich.',
+                    ], 403));
                 }
 
                 // Evaluate auto_join_policy
@@ -142,6 +156,15 @@ class AuthController extends Controller
             return response()->json(['error' => 'Der Link ist ungültig oder abgelaufen.'], 400);
         }
 
+        // A legacy null-brand account is not a valid password-reset identity.
+        // Reject before changing the password or consuming the reset token.
+        $authorization = app(AuthorizationService::class);
+        if ($authorization->isReservedNullBrandActor($user)) {
+            return response()->json([
+                'error' => 'Dieser Account ist für ein anderes Portal registriert.',
+            ], 403);
+        }
+
         // U-01: Brand-Mismatch check — same as in login().
         $userBrandValue = $user->brand instanceof Brand ? $user->brand->value : $user->brand;
         if ($user->brand !== null && $userBrandValue !== BrandRegistry::currentId()) {
@@ -160,7 +183,8 @@ class AuthController extends Controller
         $emailParts = explode('@', $user->email);
         $domain = $emailParts[1] ?? null;
         $org = $domain ? Org::where('domain', $domain)->first() : null;
-        if ($org && $org->auto_join_policy === AutoJoinPolicy::IMMEDIATE && ! $user->org_id && ($org->brand === null || ($org->brand instanceof Brand ? $org->brand->value : $org->brand) === BrandRegistry::currentId())) {
+        $orgBrandMatches = $org && BrandRegistry::resourceMatchesCurrent($org->brand);
+        if ($org && $orgBrandMatches && $org->auto_join_policy === AutoJoinPolicy::IMMEDIATE && ! $user->org_id) {
             // Assign role from org's default_role_id, fallback to client
             $roleId = $org->default_role_id;
             if (! $roleId) {
@@ -219,6 +243,10 @@ class AuthController extends Controller
         $user = Auth::guard('api')->user();
         $svc = app(AuthorizationService::class);
 
+        if ($user && $svc->isReservedNullBrandActor($user)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         // Immer Galerien laden, da auch Admins und Fotografen spezifische Zuweisungen haben können
         $user->load(['galleries', 'roles', 'galleryGroups', 'photographerGalleries', 'photographerGalleryGroups']);
 
@@ -238,9 +266,16 @@ class AuthController extends Controller
             'metadata_copyright' => $user->metadata_copyright,
             'ftp_slug' => $user->ftp_slug,
             'flatrate_level' => $user->flatrate_level,
+            'billing_name' => $user->billing_name,
+            'billing_company' => $user->billing_company,
+            'billing_street' => $user->billing_street,
+            'billing_zip' => $user->billing_zip,
+            'billing_city' => $user->billing_city,
+            'can_edit_metadata' => (bool) $user->can_edit_metadata,
+            'can_purchase_upgrades' => (bool) $user->can_purchase_upgrades,
 
             'brand' => $user->brand instanceof Brand ? $user->brand->value : $user->brand,
-            'is_cross_brand' => $user->brand === null,
+            'is_cross_brand' => $svc->isTrustedCrossBrandActor($user),
 
             'is_super_admin' => $svc->isSuperAdmin($user),
             'is_admin' => $svc->isAdmin($user),
@@ -252,18 +287,37 @@ class AuthController extends Controller
             'roles' => $user->roles->pluck('name'),
             'missing_watermark' => $missingWatermark,
             'ai_is_unconfigured' => app(AIService::class)->isUnconfigured(),
-            'transient_galleries' => $user->transient_galleries ?? [],
-            'transient_meta_galleries' => $user->transient_meta_galleries ?? [],
+            'transient_galleries' => $svc->getActiveTransientGalleryIds($user),
+            'transient_meta_galleries' => $svc->getActiveTransientMetaGalleryIds($user),
             'my_galleries' => $user->galleries ?? [],
             'photographer_galleries' => $user->photographerGalleries ?? [],
             'photographer_gallery_groups' => $user->photographerGalleryGroups ?? [],
         ]);
     }
 
-    public function refresh()
+    public function refresh(Request $request)
     {
+        $refreshCookieName = (string) config('jwt.refresh_cookie_key_name', 'rp_jwt_refresh');
+        $refreshToken = $request->cookie($refreshCookieName);
+
+        if (! is_string($refreshToken) || $refreshToken === '') {
+            return response()->json(['error' => 'Token konnte nicht aktualisiert werden.'], 401);
+        }
+
         try {
-            $token = Auth::guard('api')->refresh();
+            // Resolve the subject before refreshing. The refresh endpoint is
+            // outside auth:api, so provider-level trust checks would otherwise
+            // be skipped for a legacy null-brand account.
+            $guard = Auth::guard('api')->setToken($refreshToken);
+            $user = $guard->user();
+            if (! $user || app(AuthorizationService::class)->isReservedNullBrandActor($user)) {
+                return response()->json(['error' => 'Token konnte nicht aktualisiert werden.'], 401);
+            }
+
+            // The access cookie is deliberately not used here. It is allowed to
+            // expire in the browser, while this httpOnly credential remains
+            // refreshable within the configured JWT refresh window.
+            $token = $guard->refresh();
 
             return $this->respondWithToken($token);
         } catch (\Exception $e) {
@@ -274,8 +328,11 @@ class AuthController extends Controller
     public function logout()
     {
         Auth::guard('api')->logout();
-        $cookie = cookie()->forget('rp_jwt');
+        $accessCookie = cookie()->forget((string) config('jwt.cookie_key_name', 'rp_jwt'), '/');
+        $refreshCookie = cookie()->forget((string) config('jwt.refresh_cookie_key_name', 'rp_jwt_refresh'), '/');
 
-        return response()->json(['message' => 'Successfully logged out'])->withCookie($cookie);
+        return response()->json(['message' => 'Successfully logged out'])
+            ->withCookie($accessCookie)
+            ->withCookie($refreshCookie);
     }
 }

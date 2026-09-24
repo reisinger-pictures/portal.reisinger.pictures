@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test-setup';
 import { MemoryRouter } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
@@ -58,14 +59,28 @@ vi.mock('../components/SidebarLoginForm', () => ({
 
 const mockUser = {
     id: 'u1',
+    guest_id: null,
     name: 'Test User',
     email: 'test@example.com',
+    billing_name: null,
+    billing_company: null,
+    billing_street: null,
+    billing_zip: null,
+    billing_city: null,
+    brand: null,
+    is_cross_brand: false,
     is_super_admin: false,
     is_admin: false,
     is_photographer: false,
+    is_org_admin: false,
+    is_power_user: false,
     is_pending: false,
     can_edit_metadata: false,
+    can_purchase_upgrades: false,
     roles: [],
+    transient_galleries: [],
+    transient_meta_galleries: [],
+    photographer_gallery_groups: [],
 };
 
 const defaultPermissions = {
@@ -123,7 +138,9 @@ describe('Sidebar', () => {
         });
         vi.mocked(useCart).mockReturnValue({
             items: [],
+            quoteToken: null,
             addToCart: vi.fn(),
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             clearCart: vi.fn(),
             totalAmount: 0,
@@ -165,7 +182,9 @@ describe('Sidebar', () => {
     it('shows a cart badge when itemCount is greater than 0', () => {
         vi.mocked(useCart).mockReturnValue({
             items: [],
+            quoteToken: null,
             addToCart: vi.fn(),
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             clearCart: vi.fn(),
             totalAmount: 0,
@@ -182,6 +201,29 @@ describe('Sidebar', () => {
         expect(screen.queryByText('0')).not.toBeInTheDocument();
         // The cart link itself is always rendered
         expect(screen.getByText('Warenkorb')).toBeInTheDocument();
+    });
+
+    it('exposes the cart as a keyboard-navigable link', async () => {
+        const onCloseMobile = vi.fn();
+        renderSidebar({ onCloseMobile });
+        const user = userEvent.setup();
+        const cartLink = screen.getByRole('link', { name: 'Warenkorb' });
+
+        expect(cartLink).toHaveAttribute('href', '/cart');
+        cartLink.focus();
+        await user.keyboard('{Enter}');
+
+        expect(onCloseMobile).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives the mobile close control an accessible name', () => {
+        const onCloseMobile = vi.fn();
+        renderSidebar({ onCloseMobile });
+
+        const closeButton = screen.getByRole('button', { name: 'Menü schließen' });
+        closeButton.click();
+
+        expect(onCloseMobile).toHaveBeenCalledTimes(1);
     });
 
     // ----------------------------------------------------------------------
@@ -208,6 +250,9 @@ describe('Sidebar', () => {
             expect(screen.getByText('Suche & Entdecken')).toBeInTheDocument();
             expect(screen.getByText('Mein Profil')).toBeInTheDocument();
             expect(screen.getByText('Einkäufe & Anfragen')).toBeInTheDocument();
+
+            const notificationsLink = screen.getByRole('link', { name: 'Benachrichtigungen' });
+            expect(notificationsLink).toHaveAttribute('href', '/notifications');
 
             // Logout button
             expect(screen.getByText('Abmelden')).toBeInTheDocument();

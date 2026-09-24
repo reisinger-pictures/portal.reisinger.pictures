@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import {test, expect, type APIRequestContext} from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
@@ -22,6 +22,18 @@ test.describe('Gallery-Scoped Coupons', () => {
         if (helper) await helper.teardown();
     });
 
+    const enableVolumePricing = async (request: APIRequestContext, galleryId: string) => {
+        const response = await request.put(`/api/management/galleries/${galleryId}`, {
+            data: {licensing_mode: 'volume_licensing', volume_preset_id: null},
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Cookie: helper.getAdminToken(),
+            },
+        });
+        if (!response.ok()) throw new Error(`Gallery volume-mode update failed: ${await response.text()}`);
+    };
+
     test('Gallery-scoped coupon applies to matching gallery', { tag: ['@feature:client:coupon'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         const upload = new UploadHelper(page);
@@ -32,6 +44,7 @@ test.describe('Gallery-Scoped Coupons', () => {
         const galleryName = `Gallery Coupon ${Math.random().toString(36).substring(2, 10)}`;
         const galleryId = await galleryHelper.createAndOpenDeliveryGallery(galleryName, 'Öffentlich (Für alle sichtbar)');
         if (!galleryId) throw new Error('Gallery ID not available');
+        await enableVolumePricing(request, galleryId);
         await upload.uploadSampleImage();
         await auth.logout('http://localhost:4321/');
 
@@ -76,10 +89,13 @@ test.describe('Gallery-Scoped Coupons', () => {
         const galleryAName = `Gallery A ${Math.random().toString(36).substring(2, 10)}`;
         const galleryAId = await galleryHelper.createAndOpenDeliveryGallery(galleryAName, 'Öffentlich (Für alle sichtbar)');
         if (!galleryAId) throw new Error('Gallery A ID not available');
+        await enableVolumePricing(request, galleryAId);
         await upload.uploadSampleImage();
 
         const galleryBName = `Gallery B ${Math.random().toString(36).substring(2, 10)}`;
-        await galleryHelper.createAndOpenDeliveryGallery(galleryBName, 'Öffentlich (Für alle sichtbar)');
+        const galleryBId = await galleryHelper.createAndOpenDeliveryGallery(galleryBName, 'Öffentlich (Für alle sichtbar)');
+        if (!galleryBId) throw new Error('Gallery B ID not available');
+        await enableVolumePricing(request, galleryBId);
         await upload.uploadSampleImage();
         await auth.logout('http://localhost:4321/');
 

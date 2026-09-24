@@ -182,6 +182,92 @@ test.describe('Digital Contracts Workflow', () => {
         expect(closeData.contract.status).toBe('closed');
     });
 
+    test('CR-FE-016: changing a contract token clears identity, consent and signed state', { tag: ['@regression', '@feature:contracts'] }, async ({ page, request }) => {
+        const headers = {
+            'Cookie': helper.getAdminToken(),
+            'Accept': 'application/json',
+        };
+        const joinTokens: string[] = [];
+
+        for (const label of ['First', 'Second']) {
+            const createRes = await request.post('/api/management/contracts', {
+                data: {
+                    available_roles: ['Model', 'Fotograf'],
+                    allow_multiple_roles_per_signer: false,
+                    terms_html: `<p>${label} token contract ${uniqueSuffix}</p>`,
+                    items: [],
+                    discounts: [],
+                },
+                headers,
+            });
+            expect(createRes.ok()).toBeTruthy();
+            const createData = await createRes.json();
+            const contractId = createData.contract.id;
+            helper.trackContract(contractId);
+
+            const openRes = await request.post(`/api/management/contracts/${contractId}/open`, { headers });
+            expect(openRes.ok()).toBeTruthy();
+            const openData = await openRes.json();
+            joinTokens.push(openData.join_link.split('/contracts/join/')[1]);
+        }
+
+        const firstJoinRes = await request.post(`/api/contracts/join/${joinTokens[0]}`, {
+            data: { name: 'First Signer', email: `first-${uniqueSuffix}@example.com`, roles: ['Model'] },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(firstJoinRes.ok()).toBeTruthy();
+        const firstJoinData = await firstJoinRes.json();
+
+        const secondJoinRes = await request.post(`/api/contracts/join/${joinTokens[1]}`, {
+            data: { name: 'Second Signer', email: `second-${uniqueSuffix}@example.com`, roles: ['Fotograf'] },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(secondJoinRes.ok()).toBeTruthy();
+        const secondJoinData = await secondJoinRes.json();
+
+        await page.goto(`/contracts/join/${joinTokens[0]}`);
+        const main = page.getByRole('main');
+        await expect(main.getByRole('heading', { name: 'Vertrag beitreten' })).toBeVisible({ timeout: 10000 });
+        await main.getByPlaceholder('z.B. Maria Muster').fill('Old Identity');
+        await main.getByPlaceholder('maria@beispiel.de').fill(`old-${uniqueSuffix}@example.com`);
+        await main.getByRole('button', { name: 'Model' }).click();
+        await main.getByRole('checkbox').check();
+
+        // Keep one mounted React Router instance so the next transition exercises
+        // token-scoped component state rather than a full-page reload.
+        await page.evaluate((path) => {
+            window.history.pushState(window.history.state, '', path);
+            window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+        }, `/contracts/join/${joinTokens[1]}`);
+
+        await expect(page).toHaveURL(new RegExp(`/contracts/join/${joinTokens[1]}$`));
+        await expect(main.getByRole('button', { name: 'Fotograf' })).toBeVisible({ timeout: 10000 });
+        await expect(main.getByPlaceholder('z.B. Maria Muster')).toHaveValue('');
+        await expect(main.getByPlaceholder('maria@beispiel.de')).toHaveValue('');
+        await expect(main.getByRole('checkbox')).not.toBeChecked();
+        await expect(main.getByRole('button', { name: 'Model' })).toHaveCount(0);
+        await expect(main.getByRole('button', { name: 'Vertraulich ansehen & unterschreiben' })).toBeDisabled();
+
+        await page.goto(`/contracts/sign/${firstJoinData.personal_token}`);
+        await expect(main.getByRole('heading', { name: 'Vertrag', exact: true })).toBeVisible({ timeout: 10000 });
+        await expect(main.getByText(`First token contract ${uniqueSuffix}`)).toBeVisible();
+        await main.getByRole('checkbox').check();
+        await main.getByRole('button', { name: 'Vertrag verbindlich abschließen' }).click();
+        await expect(main.getByRole('heading', { name: 'Vertrag unterschrieben!' })).toBeVisible({ timeout: 10000 });
+
+        await page.evaluate((path) => {
+            window.history.pushState(window.history.state, '', path);
+            window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+        }, `/contracts/sign/${secondJoinData.personal_token}`);
+
+        await expect(page).toHaveURL(new RegExp(`/contracts/sign/${secondJoinData.personal_token}$`));
+        await expect(main.getByText('Second Signer')).toBeVisible({ timeout: 10000 });
+        await expect(main.getByText(`Second token contract ${uniqueSuffix}`)).toBeVisible();
+        await expect(main.getByRole('heading', { name: 'Vertrag unterschrieben!' })).toHaveCount(0);
+        await expect(main.getByRole('checkbox')).not.toBeChecked();
+        await expect(main.getByRole('button', { name: 'Vertrag verbindlich abschließen' })).toBeDisabled();
+    });
+
     test('Admin edits active contract, signer is blocked from signing stale version', { tag: ['@feature:admin:contracts'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);

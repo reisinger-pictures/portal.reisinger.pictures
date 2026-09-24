@@ -238,6 +238,25 @@ class ModelProfileAccessTest extends TestCase
         $this->assertSame('Wien', $profile->customer->fresh()->city);
     }
 
+    public function test_public_update_synchronizes_customer_email_with_profile_snapshot(): void
+    {
+        $profile = $this->createModel();
+        $token = $this->issueToken($profile->customer);
+        $updatedEmail = 'anna.updated@example.com';
+
+        $this->postJson("/api/model-profil/{$token->token}", [
+            'answers' => $this->personAnswers($updatedEmail),
+        ])->assertOk();
+
+        $profile->refresh();
+
+        // The snapshot remains encrypted at rest, but its decrypted profile
+        // value and the canonical customer record must describe the same
+        // person. Lifecycle reminders and customer search read the latter.
+        $this->assertSame($updatedEmail, $profile->answersMap()['email']);
+        $this->assertSame($updatedEmail, $profile->customer->fresh()->email);
+    }
+
     public function test_public_update_rejects_invalid_answers(): void
     {
         $profile = $this->createModel();
@@ -351,6 +370,7 @@ class ModelProfileAccessTest extends TestCase
         });
 
         $answers = $this->personAnswers();
+        $answers['email'] = 'anna.failed@example.com';
         $answers['city'] = 'Graz';
 
         $this->post(
@@ -362,6 +382,7 @@ class ModelProfileAccessTest extends TestCase
         $profile->refresh();
         $this->assertSame($oldCatalogVersion, $profile->catalog_version);
         $this->assertSame($oldAnswers, $profile->answers);
+        $this->assertSame('anna@example.com', $profile->customer->fresh()->email);
         $this->assertSame($oldPath, $profile->age_proof_path);
 
         // Old file untouched, freshly stored proof cleaned up (exactly one file).

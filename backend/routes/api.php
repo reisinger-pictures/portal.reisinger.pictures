@@ -132,9 +132,15 @@ Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', 
 Route::get('/orders/quote-decode', [QuoteController::class, 'decodeQuoteLink'])->name('api.orders.quote-decode');
 Route::middleware('throttle:'.config('app.throttle_zip_download', 3).',1')->get('/galleries/{galleryId}/download-zip', [PhotoDownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
 
+// The refresh endpoint deliberately sits outside auth:api. Its dedicated
+// httpOnly refresh cookie remains valid after the short-lived access cookie
+// expires, while the protected routes below still require a live access token.
+Route::post('/auth/refresh', [AuthController::class, 'refresh'])
+    ->middleware('throttle:api')
+    ->name('api.auth.refresh');
+
 Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
-    Route::post('/auth/refresh', [AuthController::class, 'refresh'])->name('api.auth.refresh');
     Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
     Route::get('/me/models', [ModelProfileAccessController::class, 'mine'])->name('api.me.models');
     Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->name('api.auth.profile');

@@ -12,7 +12,13 @@ export default function PageLayout({ children, currentView }: PageLayoutProps) {
         <DashboardLayout
             currentView={currentView}
             mainClassName="bg-base-200"
-            header={({ onMenuClick }) => <GlobalSearchHeader onMenuClick={onMenuClick} />}
+            header={({ onMenuClick, isSidebarOpen, sidebarId }) => (
+                <GlobalSearchHeader
+                    onMenuClick={onMenuClick}
+                    isSidebarOpen={isSidebarOpen}
+                    sidebarId={sidebarId}
+                />
+            )}
         >
             {children}
         </DashboardLayout>

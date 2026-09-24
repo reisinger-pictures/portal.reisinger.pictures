@@ -2,15 +2,16 @@
 
 namespace Tests\Feature\Board;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\User;
-use App\Models\Role;
-use App\Models\Project;
 use App\Enums\Brand;
 use App\Enums\PaymentStatus;
 use App\Enums\ProjectStatus;
+use App\Models\Project;
+use App\Models\Role;
+use App\Models\User;
 use App\Support\BrandRegistry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Tests\TestCase;
 
 class ProjectBoardTest extends TestCase
 {
@@ -18,31 +19,35 @@ class ProjectBoardTest extends TestCase
 
     private function createSuperAdmin(): User
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => null]);
         $role = Role::firstOrCreate(['name' => 'super_admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function createAdmin(): User
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B->value]);
         $role = Role::firstOrCreate(['name' => 'admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function createPhotographer(): User
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B->value]);
         $role = Role::firstOrCreate(['name' => 'photographer']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function authHeaders(User $user): array
     {
         $token = auth('api')->login($user);
+
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }
 
@@ -354,7 +359,7 @@ class ProjectBoardTest extends TestCase
 
     public function test_unauthenticated_gets_401_on_all_endpoints(): void
     {
-        $id = (string) \Illuminate\Support\Str::uuid();
+        $id = (string) Str::uuid();
 
         $this->getJson('/api/management/projects')->assertStatus(401);
         $this->postJson('/api/management/projects', ['client_name' => 'X'])->assertStatus(401);

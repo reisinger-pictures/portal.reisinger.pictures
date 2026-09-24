@@ -35,61 +35,197 @@ class PayoutCalculationService
         $totalDownloads = 0;
         $photographerEarnings = [];
 
-        $userGalleryLogs = $logs->groupBy(function ($log) {
-            return $log->user_id.'_'.$log->gallery_id;
-        });
+        // Load every gallery/photo once. A gallery can contain photos from
+        // several photographers, and an order ZIP can span galleries, so
+        // ownership must not be collapsed to one gallery/user row.
+        $directGalleryIds = $logs->pluck('gallery_id')
+            ->filter()
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $payloadPhotoIds = [];
+        $payloadGalleryIds = [];
+        foreach ($logs as $log) {
+            $photoIds = $this->explicitPhotoIds($log, $log->item_type === 'full_zip');
+            if ($photoIds !== null) {
+                $payloadPhotoIds = array_merge($payloadPhotoIds, $photoIds);
+            }
 
-        // N+1 Fix: Load all required galleries and photographer IDs in one go
-        $galleryIds = $logs->pluck('gallery_id')->unique()->filter()->toArray();
-        $galleries = Gallery::whereIn('id', $galleryIds)->get()->keyBy('id');
-        $galleryPhotographers = Photo::whereIn('gallery_id', $galleryIds)
-            ->select('gallery_id', 'user_id')
-            ->groupBy('gallery_id', 'user_id')
+            $payload = $log->payload;
+            if (! is_array($payload) || ! isset($payload['gallery_ids']) || ! is_array($payload['gallery_ids'])) {
+                continue;
+            }
+            foreach ($payload['gallery_ids'] as $galleryId) {
+                if (is_string($galleryId) || is_int($galleryId)) {
+                    $galleryId = trim((string) $galleryId);
+                    if ($galleryId !== '') {
+                        $payloadGalleryIds[] = $galleryId;
+                    }
+                }
+            }
+        }
+
+        $payloadPhotoIds = array_values(array_unique($payloadPhotoIds));
+        $payloadGalleryIds = array_values(array_unique($payloadGalleryIds));
+        $initialGalleryIds = array_values(array_unique(array_merge($directGalleryIds, $payloadGalleryIds)));
+        if ($initialGalleryIds !== [] || $payloadPhotoIds !== []) {
+            $photos = Photo::withoutEagerLoads()
+                ->where(function ($query) use ($initialGalleryIds, $payloadPhotoIds): void {
+                    if ($initialGalleryIds !== []) {
+                        $query->whereIn('gallery_id', $initialGalleryIds);
+                    }
+                    if ($payloadPhotoIds !== []) {
+                        $query->orWhereIn('id', $payloadPhotoIds);
+                    }
+                })
+                ->select('id', 'gallery_id', 'user_id')
+                ->get();
+        } else {
+            $photos = collect();
+        }
+
+        $galleryIds = array_values(array_unique(array_merge(
+            $directGalleryIds,
+            $payloadGalleryIds,
+            $photos->pluck('gallery_id')
+                ->map(fn ($id): string => (string) $id)
+                ->all(),
+        )));
+        $galleries = Gallery::withoutEagerLoads()
+            ->whereIn('id', $galleryIds)
             ->get()
-            ->keyBy('gallery_id');
+            ->keyBy('id');
+        $photosById = $photos->keyBy('id');
+        $photosByGallery = $photos->groupBy(fn ($photo): string => (string) $photo->gallery_id);
 
-        foreach ($userGalleryLogs as $key => $galleryLogs) {
-            $galleryId = $galleryLogs->first()->gallery_id;
+        // A mixed-gallery order ZIP has no single gallery_id. Its explicit
+        // photo payload is reconciled independently; legacy ownerless rows are
+        // intentionally skipped rather than assigned to an arbitrary owner.
+        foreach ($logs->filter(fn ($log): bool => $log->gallery_id === null && $this->hasExplicitPhotoPayload($log)) as $log) {
+            $attribution = $this->calculateExplicitMixedLog($log, $photosById, $galleries);
+            $totalDownloads += $attribution['downloads'];
+            foreach ($attribution['shares'] as $photographerId => $shares) {
+                $totalShares = bcadd($totalShares, (string) $shares, 4);
+                $photographerEarnings[$photographerId] = bcadd(
+                    $photographerEarnings[$photographerId] ?? '0.0000',
+                    (string) $shares,
+                    4,
+                );
+            }
+        }
+
+        $userGalleryLogs = $logs->filter(fn ($log): bool => $log->gallery_id !== null)
+            ->groupBy(fn ($log): string => $log->user_id.'|'.$log->gallery_id);
+
+        foreach ($userGalleryLogs as $galleryLogs) {
+            $galleryId = (string) $galleryLogs->first()->gallery_id;
             $gallery = $galleries->get($galleryId);
 
             if (! $gallery || $gallery->effective_is_free_download) {
                 continue;
             }
 
-            $photographerId = $galleryPhotographers->get($galleryId)?->user_id;
-            if (! $photographerId) {
+            $galleryPhotos = $photosByGallery->get($galleryId) ?? collect();
+            $maxMultiplier = 1;
+            $zipLog = null;
+
+            foreach ($galleryLogs as $log) {
+                $multiplier = $this->getShareMultiplier($log->resolution_tier);
+                $maxMultiplier = max($maxMultiplier, $multiplier);
+
+                if (
+                    $log->item_type === 'full_zip'
+                    && (! $zipLog || (int) $log->photo_count > (int) $zipLog->photo_count)
+                ) {
+                    $zipLog = $log;
+                }
+            }
+
+            $attributedShares = [];
+            $attributedPhotoCount = 0;
+
+            if ($zipLog) {
+                $explicitOwnerPhotoCounts = $this->resolveExplicitPhotographerCounts(
+                    $zipLog,
+                    $photosById,
+                    $galleryId,
+                    true
+                );
+
+                if ($explicitOwnerPhotoCounts === null) {
+                    // Current ZIP logs may only contain a count. In that case the
+                    // full gallery archive is represented by the persisted photos,
+                    // so distribute the logged shares by their actual ownership.
+                    $ownerPhotoCounts = $galleryPhotos
+                        ->whereNotNull('user_id')
+                        ->countBy('user_id')
+                        ->all();
+                    $attributedPhotoCount = (int) $zipLog->photo_count;
+                } else {
+                    $ownerPhotoCounts = $explicitOwnerPhotoCounts;
+                    $attributedPhotoCount = array_sum($ownerPhotoCounts);
+                }
+
+                $logShares = bcmul((string) $attributedPhotoCount, (string) $maxMultiplier, 4);
+                $attributedShares = $this->allocateSharesByPhotoOwnership($ownerPhotoCounts, $logShares);
+            } else {
+                foreach ($galleryLogs as $log) {
+                    if ($log->item_type === 'full_zip') {
+                        continue;
+                    }
+
+                    $ownerPhotoCounts = $this->resolveExplicitPhotographerCounts(
+                        $log,
+                        $photosById,
+                        $galleryId,
+                        false
+                    );
+
+                    if ($ownerPhotoCounts === null) {
+                        $galleryPhotographerIds = $galleryPhotos
+                            ->pluck('user_id')
+                            ->filter()
+                            ->unique()
+                            ->values();
+
+                        // A single image can be attributed safely when every
+                        // possible owner in the gallery is the same person.
+                        if ($galleryPhotographerIds->count() !== 1) {
+                            continue;
+                        }
+
+                        $ownerPhotoCounts = [(string) $galleryPhotographerIds->first() => 1];
+                    }
+
+                    if (count($ownerPhotoCounts) !== 1) {
+                        continue;
+                    }
+
+                    $photoCount = (int) $log->photo_count;
+                    $photographerId = (string) array_key_first($ownerPhotoCounts);
+                    $attributedShares[$photographerId] = bcadd(
+                        $attributedShares[$photographerId] ?? '0.0000',
+                        (string) ($photoCount * $maxMultiplier),
+                        4
+                    );
+                    $attributedPhotoCount += $photoCount;
+                }
+            }
+
+            if ($attributedPhotoCount <= 0 || $attributedShares === []) {
                 continue;
             }
 
-            $maxMultiplier = 1;
-            $maxPhotoCount = 0;
-            $singleImageCount = 0;
-            $hasZip = false;
-
-            foreach ($galleryLogs as $log) {
-                $mult = $this->getShareMultiplier($log->resolution_tier);
-                if ($mult > $maxMultiplier) {
-                    $maxMultiplier = $mult;
-                }
-
-                if ($log->item_type === 'full_zip') {
-                    $hasZip = true;
-                    $maxPhotoCount = max($maxPhotoCount, $log->photo_count);
-                } else {
-                    $singleImageCount += $log->photo_count;
-                }
+            $totalDownloads += $attributedPhotoCount;
+            foreach ($attributedShares as $photographerId => $shares) {
+                $totalShares = bcadd($totalShares, (string) $shares, 4);
+                $photographerEarnings[$photographerId] = bcadd(
+                    $photographerEarnings[$photographerId] ?? '0.0000',
+                    (string) $shares,
+                    4
+                );
             }
-
-            $finalPhotoCount = $hasZip ? $maxPhotoCount : $singleImageCount;
-            $shares = bcmul((string) $finalPhotoCount, (string) $maxMultiplier, 4);
-
-            $totalShares = bcadd($totalShares, $shares, 4);
-            $totalDownloads += $finalPhotoCount;
-
-            if (! isset($photographerEarnings[$photographerId])) {
-                $photographerEarnings[$photographerId] = '0.0000';
-            }
-            $photographerEarnings[$photographerId] = bcadd($photographerEarnings[$photographerId], $shares, 4);
         }
 
         $pool->total_shares = $totalShares;
@@ -121,6 +257,208 @@ class PayoutCalculationService
         }
 
         return $pool;
+    }
+
+    /**
+     * Whether a log carries the explicit photo identity written by a current
+     * download path. Legacy logs without that key return false.
+     */
+    private function hasExplicitPhotoPayload(DownloadLog $log): bool
+    {
+        $payload = $log->payload;
+        if (! is_array($payload)) {
+            return false;
+        }
+
+        return $log->item_type === 'full_zip'
+            ? array_key_exists('photo_ids', $payload)
+            : array_key_exists('photo_id', $payload);
+    }
+
+    /**
+     * @return array<int, string>|null
+     */
+    private function explicitPhotoIds(DownloadLog $log, bool $isZip): ?array
+    {
+        $payload = $log->payload;
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        if ($isZip) {
+            if (! array_key_exists('photo_ids', $payload)) {
+                return null;
+            }
+            $values = is_array($payload['photo_ids']) ? $payload['photo_ids'] : [];
+        } else {
+            if (! array_key_exists('photo_id', $payload)) {
+                return null;
+            }
+            $values = [$payload['photo_id']];
+        }
+
+        $ids = [];
+        foreach (array_slice($values, 0, 500) as $photoId) {
+            if (! is_string($photoId) && ! is_int($photoId)) {
+                continue;
+            }
+
+            $photoId = trim((string) $photoId);
+            if ($photoId !== '' && ! in_array($photoId, $ids, true)) {
+                $ids[] = $photoId;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Reconcile one mixed-gallery order ZIP. The order log intentionally has
+     * no single gallery_id, but its bounded photo payload is authoritative for
+     * photographer attribution.
+     *
+     * @return array{downloads:int, shares:array<string, string>}
+     */
+    private function calculateExplicitMixedLog(DownloadLog $log, $photosById, $galleries): array
+    {
+        $photoIds = $this->explicitPhotoIds($log, $log->item_type === 'full_zip');
+        if ($photoIds === null || $photoIds === []) {
+            return ['downloads' => 0, 'shares' => []];
+        }
+
+        $payload = $log->payload;
+        $allowedGalleryIds = null;
+        if (array_key_exists('gallery_ids', $payload)) {
+            if (! is_array($payload['gallery_ids'])) {
+                return ['downloads' => 0, 'shares' => []];
+            }
+
+            $allowedGalleryIds = [];
+            foreach ($payload['gallery_ids'] as $galleryId) {
+                if (! is_string($galleryId) && ! is_int($galleryId)) {
+                    continue;
+                }
+                $galleryId = trim((string) $galleryId);
+                if ($galleryId !== '') {
+                    $allowedGalleryIds[] = $galleryId;
+                }
+            }
+            $allowedGalleryIds = array_values(array_unique($allowedGalleryIds));
+            if ($allowedGalleryIds === []) {
+                return ['downloads' => 0, 'shares' => []];
+            }
+        }
+
+        $ownerPhotoCounts = [];
+        foreach ($photoIds as $photoId) {
+            $photo = $photosById->get($photoId);
+            if (! $photo || ! $photo->user_id) {
+                continue;
+            }
+
+            $galleryId = (string) $photo->gallery_id;
+            if ($allowedGalleryIds !== null && ! in_array($galleryId, $allowedGalleryIds, true)) {
+                continue;
+            }
+
+            $gallery = $galleries->get($galleryId);
+            if (! $gallery || $gallery->effective_is_free_download) {
+                continue;
+            }
+
+            $photographerId = (string) $photo->user_id;
+            $ownerPhotoCounts[$photographerId] = ($ownerPhotoCounts[$photographerId] ?? 0) + 1;
+        }
+
+        $downloads = array_sum($ownerPhotoCounts);
+        if ($downloads === 0) {
+            return ['downloads' => 0, 'shares' => []];
+        }
+
+        $shares = bcmul((string) $downloads, (string) $this->getShareMultiplier($log->resolution_tier), 4);
+
+        return [
+            'downloads' => $downloads,
+            'shares' => $this->allocateSharesByPhotoOwnership($ownerPhotoCounts, $shares),
+        ];
+    }
+
+    /**
+     * Resolve explicit photo IDs from a download log to photographer counts.
+     * A null result means that the log has no usable IDs; an empty array means
+     * valid photos were listed but none of them has a photographer.
+     */
+    private function resolveExplicitPhotographerCounts(
+        DownloadLog $log,
+        $photosById,
+        string $galleryId,
+        bool $isZip
+    ): ?array {
+        $photoIds = $this->explicitPhotoIds($log, $isZip);
+        if ($photoIds === null) {
+            return null;
+        }
+
+        $validPhotos = [];
+        foreach ($photoIds as $photoId) {
+            $photo = $photosById->get($photoId);
+            if ($photo && (string) $photo->gallery_id === $galleryId) {
+                $validPhotos[] = $photo;
+            }
+        }
+
+        if ($validPhotos === []) {
+            // A present but unusable explicit payload is not a license to fall
+            // back to every photo in the gallery. Only a genuinely absent
+            // payload (null) uses the legacy single-owner/count fallback.
+            return [];
+        }
+
+        $ownerPhotoCounts = [];
+        foreach ($validPhotos as $photo) {
+            if (! $photo->user_id) {
+                continue;
+            }
+
+            $photographerId = (string) $photo->user_id;
+            $ownerPhotoCounts[$photographerId] = ($ownerPhotoCounts[$photographerId] ?? 0) + 1;
+        }
+
+        return $ownerPhotoCounts;
+    }
+
+    /**
+     * Split a ZIP's shares according to the number of downloaded photos owned
+     * by each photographer. The final owner receives the rounding remainder so
+     * the attributed shares always add up to the pool contribution exactly.
+     */
+    private function allocateSharesByPhotoOwnership(array $ownerPhotoCounts, string $totalShares): array
+    {
+        $totalPhotos = array_sum($ownerPhotoCounts);
+        if ($totalPhotos <= 0 || bccomp($totalShares, '0', 4) === 0) {
+            return [];
+        }
+
+        ksort($ownerPhotoCounts, SORT_STRING);
+        $photographerIds = array_keys($ownerPhotoCounts);
+        $lastPhotographerId = array_pop($photographerIds);
+
+        $allocatedShares = [];
+        $allocatedTotal = '0.0000';
+        foreach ($photographerIds as $photographerId) {
+            $ownerNumerator = bcmul(
+                $totalShares,
+                (string) $ownerPhotoCounts[$photographerId],
+                4
+            );
+            $shares = bcdiv($ownerNumerator, (string) $totalPhotos, 4);
+            $allocatedShares[$photographerId] = $shares;
+            $allocatedTotal = bcadd($allocatedTotal, $shares, 4);
+        }
+
+        $allocatedShares[$lastPhotographerId] = bcsub($totalShares, $allocatedTotal, 4);
+
+        return $allocatedShares;
     }
 
     public function calculatePowerUserDelta(int $month, int $year)

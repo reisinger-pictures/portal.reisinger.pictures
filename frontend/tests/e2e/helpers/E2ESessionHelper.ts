@@ -3,6 +3,44 @@ import path from 'node:path';
 import { APIRequestContext } from '@playwright/test';
 import { MailpitHelper } from './MailpitHelper';
 
+const e2eBrandSettings = {
+    accounting_email: 'brand-settings-e2e@example.com',
+    primary_color: '#123456',
+    secondary_color: '#654321',
+} as const;
+
+type VolumePresetResponse = {
+    id: string | number;
+    name: string;
+    is_default?: boolean;
+    tiers: Array<{
+        min_quantity: number;
+        price_cents: number;
+    }>;
+};
+
+type CouponDefinition = {
+    code: string;
+    type: string;
+    value?: number;
+    scope_type: string;
+    scope_id?: string;
+    active: boolean;
+    used_count?: number;
+    max_items?: number;
+    package_quantity?: number;
+    package_price_cents?: number;
+    expires_at?: string;
+};
+
+type CouponResponse = {
+    success?: boolean;
+    coupon?: {
+        id?: string | number;
+        code?: string;
+    };
+};
+
 export class E2ESessionHelper {
     private createdUserIds: string[] = [];
     private createdGalleryIds: string[] = [];
@@ -34,6 +72,33 @@ export class E2ESessionHelper {
 
     getAdminToken() {
         return this.adminToken || '';
+    }
+
+    private async putBrandSettings(payload: Record<string, string | null>) {
+        await this.ensureAdminLogin();
+        const response = await this.request.put('/api/management/brand-settings/rp', {
+            data: payload,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Cookie': this.adminToken!,
+            },
+        });
+        if (!response.ok()) {
+            throw new Error(`Brand settings update failed: ${response.status()} ${await response.text()}`);
+        }
+    }
+
+    async seedBrandSettings() {
+        await this.putBrandSettings(e2eBrandSettings);
+    }
+
+    async resetBrandSettings() {
+        await this.putBrandSettings({
+            accounting_email: null,
+            primary_color: null,
+            secondary_color: null,
+        });
     }
 
     async loginAs(email: string, password: string, _options?: { brand?: string }): Promise<string> {
@@ -325,28 +390,42 @@ export class E2ESessionHelper {
         await this.request.delete(`/api/management/customers/${id}`, { headers }).catch(() => undefined);
     }
 
-    async createVolumePreset(data: { name: string; tiers: Array<{ min_quantity: number; price_cents: number }> }) {
+    async createVolumePreset(data: { name: string; tiers: Array<{ min_quantity: number; price_cents: number }> }): Promise<VolumePresetResponse> {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
         const res = await this.request.post('/api/management/settings/volume-presets', { data, headers });
         if (!res.ok()) throw new Error(`Volume preset creation failed: ${await res.text()}`);
-        return res.json();
+        return res.json() as Promise<VolumePresetResponse>;
     }
 
-    async createCoupon(data: {
-        code: string;
-        type: string;
-        value: number;
-        scope_type: string;
-        scope_id?: string;
-        active: boolean;
-        used_count?: number;
-    }) {
+    async createCoupon(data: CouponDefinition): Promise<CouponResponse> {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
         const res = await this.request.post('/api/management/coupons', { data, headers });
         if (!res.ok()) throw new Error(`Coupon creation failed: ${await res.text()}`);
-        return res.json();
+        return res.json() as Promise<CouponResponse>;
+    }
+
+    async updateCoupon(id: string, data: Partial<CouponDefinition>): Promise<CouponResponse> {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const res = await this.request.put(`/api/management/coupons/${id}`, { data, headers });
+        if (!res.ok()) throw new Error(`Coupon update failed: ${await res.text()}`);
+        return res.json() as Promise<CouponResponse>;
+    }
+
+    async updateGalleryLicensing(
+        galleryId: string,
+        licensingMode: 'scope_licensing' | 'volume_licensing',
+        volumePresetId: string | number | null = null,
+    ) {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const res = await this.request.put(`/api/management/galleries/${galleryId}`, {
+            data: { licensing_mode: licensingMode, volume_preset_id: volumePresetId },
+            headers,
+        });
+        if (!res.ok()) throw new Error(`Gallery licensing update failed: ${await res.text()}`);
     }
 
     async seedBillingSettings() {

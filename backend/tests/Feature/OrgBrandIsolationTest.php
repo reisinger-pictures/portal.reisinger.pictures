@@ -11,8 +11,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Brand isolation for the org-management write endpoints (update, destroy,
- * syncUsers, syncGroups, generateCollectiveInvoice).
+ * Brand isolation for the org-management show and write endpoints (show, update,
+ * destroy, syncUsers, syncGroups, generateCollectiveInvoice).
  */
 class OrgBrandIsolationTest extends TestCase
 {
@@ -26,6 +26,93 @@ class OrgBrandIsolationTest extends TestCase
         $user->roles()->attach(Role::firstOrCreate(['name' => $role->value]));
 
         return auth('api')->login($user);
+    }
+
+    public function test_brand_bound_admin_cannot_view_brandless_org(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN, 'rp');
+        $org = Org::factory()->create([
+            'brand' => null,
+            'name' => 'Legacy Brandless Org',
+            'invoice_frequency' => 'immediate',
+        ]);
+        $member = User::factory()->create([
+            'brand' => 'rp',
+            'org_id' => $org->id,
+            'email' => 'legacy-org-member@example.test',
+        ]);
+        $group = GalleryGroup::factory()->create(['brand' => null, 'name' => 'Legacy Group']);
+        $org->users()->save($member);
+        $org->galleryGroups()->attach($group);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->getJson("/api/management/orgs/{$org->id}")
+            ->assertForbidden()
+            ->assertJsonMissing(['email' => $member->email]);
+    }
+
+    public function test_brand_bound_admin_cannot_update_brandless_org(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN, 'rp');
+        $org = Org::factory()->create([
+            'brand' => null,
+            'name' => 'Legacy Brandless Org',
+            'invoice_frequency' => 'immediate',
+        ]);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson("/api/management/orgs/{$org->id}", [
+                'name' => 'Hijacked Brandless Org',
+                'invoice_frequency' => 'monthly',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('orgs', [
+            'id' => $org->id,
+            'name' => 'Legacy Brandless Org',
+            'invoice_frequency' => 'immediate',
+        ]);
+    }
+
+    public function test_brand_bound_admin_cannot_delete_brandless_org(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN, 'rp');
+        $org = Org::factory()->create(['brand' => null]);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->deleteJson("/api/management/orgs/{$org->id}")
+            ->assertForbidden();
+
+        $this->assertModelExists($org);
+    }
+
+    public function test_brand_bound_admin_cannot_sync_users_on_brandless_org(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN, 'rp');
+        $org = Org::factory()->create(['brand' => null]);
+        $user = User::factory()->create(['brand' => 'rp']);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$user->id]])
+            ->assertForbidden();
+
+        $this->assertNull($user->fresh()->org_id);
+    }
+
+    public function test_brand_bound_admin_cannot_sync_groups_on_brandless_org(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN, 'rp');
+        $org = Org::factory()->create(['brand' => null]);
+        $group = GalleryGroup::factory()->create(['brand' => 'rp']);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson("/api/management/orgs/{$org->id}/groups", ['group_ids' => [$group->id]])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('gallery_group_org', [
+            'org_id' => $org->id,
+            'gallery_group_id' => $group->id,
+        ]);
     }
 
     public function test_brand_bound_admin_cannot_update_foreign_brand_org(): void
@@ -94,9 +181,9 @@ class OrgBrandIsolationTest extends TestCase
             ->assertStatus(403);
     }
 
-    public function test_cross_brand_admin_can_update_foreign_brand_org(): void
+    public function test_cross_brand_super_admin_can_update_foreign_brand_org(): void
     {
-        $token = $this->tokenFor(UserRole::ADMIN, null);
+        $token = $this->tokenFor(UserRole::SUPER_ADMIN, null);
         $org = Org::factory()->create(['brand' => self::OTHER_BRAND, 'name' => 'Foreign Org', 'invoice_frequency' => 'immediate']);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -122,16 +209,16 @@ class OrgBrandIsolationTest extends TestCase
         $this->assertNull($foreignUser->fresh()->org_id);
     }
 
-    public function test_sync_users_rejects_brand_bound_user_for_brandless_org(): void
+    public function test_sync_users_rejects_brandless_org_before_assignment(): void
     {
-        // MEDIUM finding: a brand-less org must not absorb brand-bound users.
-        $token = $this->tokenFor(UserRole::ADMIN, null);
+        // A legacy brand-less org is rejected before any relationship write.
+        $token = $this->tokenFor(UserRole::SUPER_ADMIN, null);
         $org = Org::create(['name' => 'Brandless Org', 'invoice_frequency' => 'immediate']);
         $brandBoundUser = User::factory()->create(['brand' => 'rp']);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$brandBoundUser->id]])
-            ->assertStatus(422);
+            ->assertForbidden();
 
         $this->assertNull($brandBoundUser->fresh()->org_id);
     }

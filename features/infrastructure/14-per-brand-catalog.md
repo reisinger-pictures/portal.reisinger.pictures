@@ -1,9 +1,11 @@
 # 14 — Per-Brand Catalog, CRM & Settings Isolation
 
-> **Spec (Soll-Zustand).** Source of truth for T-17 / U-03.
+> **Historical design record (2026-06-30).** This page preserves the former
+> multi-brand proposal. The current runtime brand contract is RP-only and is
+> documented in `21-brand-config-driven.md`; references to the removed second
+> brand below are historical, not current configuration or seed instructions.
 > Related: `11-brand-settings-separation.md`, `12-brand-registry-and-settings-fixes.md`,
 > `15-strict-user-brand-isolation.md` (planned).
-> Stand: 2026-06-30.
 
 ## 1. Goal
 
@@ -112,13 +114,15 @@ cross-brand price injection.
   `(key, brand)`. **A unique index `(key, brand)` is added via a follow-up migration if not
   already present** (T-17 may extend V019's index to a composite unique, or add a V020).
 
-## 5. DatabaseSeeder refactor
+## 5. DatabaseSeeder (current contract)
 
-Introduce `seedCatalogForBrand(Brand $brand, array $catalog): void` that seeds products,
-license_use_cases, license_modifiers, settings, customers, text_snippets for the given brand.
-Call it twice in `DatabaseSeeder::run()` — once for `Brand::B2B` (existing data) and once for
-`Brand::SRP` (placeholder = copy of rp; concrete SRP dataset arrives via T-18). Each row carries
-the brand explicitly.
+`DatabaseSeeder::run()` resolves `BrandRegistry::currentOrDefault()` and calls
+`seedCatalogForBrand($brand)` once for the currently configured brand. The current
+implementation imports `App\Enums\Brand` and `App\Support\BrandRegistry`; it
+does not call a second brand seeder or a removed model/enum case. Products,
+license use cases, modifiers, settings, customers, and text snippets each carry
+the resolved brand explicitly. The former two-brand instruction is historical
+and must not be reintroduced.
 
 ## 6. SettingsController
 

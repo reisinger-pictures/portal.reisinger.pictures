@@ -146,6 +146,41 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('neuer-slug-1', $updated->slug);
     }
 
+    public function test_update_group_synchronizes_org_pivot_and_explicit_null_clears_it(): void
+    {
+        $group = GalleryGroup::factory()->create([
+            'name' => 'Original',
+            'slug' => 'original',
+        ]);
+        $orgA = Org::factory()->create();
+        $orgB = Org::factory()->create();
+        $group->orgs()->attach($orgA->id);
+
+        $this->service->updateGroup($group, [
+            'name' => 'Original',
+            'org_id' => $orgB->id,
+        ]);
+
+        $this->assertDatabaseMissing('gallery_group_org', [
+            'gallery_group_id' => $group->id,
+            'org_id' => $orgA->id,
+        ]);
+        $this->assertDatabaseHas('gallery_group_org', [
+            'gallery_group_id' => $group->id,
+            'org_id' => $orgB->id,
+        ]);
+
+        $this->service->updateGroup($group, [
+            'name' => 'Original',
+            'org_id' => null,
+        ]);
+
+        $this->assertDatabaseMissing('gallery_group_org', [
+            'gallery_group_id' => $group->id,
+            'org_id' => $orgB->id,
+        ]);
+    }
+
     // ─── storeGallery() ─────────────────────────────────────────────
 
     public function test_store_gallery_creates_gallery_with_basic_data(): void
@@ -200,6 +235,63 @@ class GalleryServiceTest extends TestCase
         $this->assertFalse($gallery->is_public);
         $this->assertFalse($gallery->is_live);
         $this->assertSame('selection', $gallery->type);
+    }
+
+    public function test_store_gallery_selection_cannot_inherit_public_or_free_download_from_group(): void
+    {
+        $group = GalleryGroup::factory()->create([
+            'is_public' => true,
+            'is_free_download' => true,
+        ]);
+        $this->slugService->method('makeUnique')->willReturn('selection-inherited');
+
+        $gallery = $this->service->storeGallery([
+            'name' => 'Selection in permissive group',
+            'type' => 'selection',
+            'gallery_group_id' => $group->id,
+            'is_public' => true,
+            'is_free_download' => true,
+        ], null);
+
+        $this->assertFalse($gallery->is_public);
+        $this->assertFalse($gallery->is_free_download);
+        $this->assertFalse($gallery->effective_is_public);
+        $this->assertFalse($gallery->effective_is_free_download);
+    }
+
+    public function test_update_gallery_selection_cannot_set_public_or_free_download(): void
+    {
+        $gallery = Gallery::factory()->create([
+            'type' => 'selection',
+            'is_public' => false,
+            'is_free_download' => false,
+        ]);
+
+        $updated = $this->service->updateGallery($gallery, [
+            'is_public' => true,
+            'is_free_download' => true,
+            'is_live' => true,
+        ]);
+
+        $this->assertFalse($updated->is_public);
+        $this->assertFalse($updated->is_free_download);
+        $this->assertFalse($updated->is_live);
+    }
+
+    public function test_selection_model_boundary_blocks_direct_flag_updates(): void
+    {
+        $gallery = Gallery::factory()->create(['type' => 'selection']);
+
+        $gallery->update([
+            'is_public' => true,
+            'is_free_download' => true,
+            'is_live' => true,
+        ]);
+
+        $gallery->refresh();
+        $this->assertFalse($gallery->is_public);
+        $this->assertFalse($gallery->is_free_download);
+        $this->assertFalse($gallery->is_live);
     }
 
     public function test_store_gallery_assigns_photographer_via_sync(): void

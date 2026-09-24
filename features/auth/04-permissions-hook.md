@@ -48,4 +48,4 @@ showPayouts              → is_super_admin
 ## Related
 
 - [Roles & Access Management](01-roles-and-access.md)
-- [Frontend Brand & Org Isolation](../infrastructure/10-frontend-brand-Org-isolation.md)
+- [Frontend Brand & Org Isolation](../infrastructure/10-frontend-brand-tenant-isolation.md)

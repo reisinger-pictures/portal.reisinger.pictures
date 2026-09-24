@@ -3,14 +3,15 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Services\AuthorizationService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SyncGalleryAccessRequest extends FormRequest
 {
     /**
-     * Access syncing is only allowed for users of the actor's brand. A
-     * cross-brand actor (brand === null, e.g. Super-Admin) may manage access
-     * across brands. (P0-A12)
+     * Access syncing is only allowed for users of the actor's brand. Only a
+     * persisted Super-Admin with `brand === null` may manage access across
+     * brands; legacy null-brand actors fail closed. (P0-A12)
      */
     public function authorize(): bool
     {
@@ -19,7 +20,12 @@ class SyncGalleryAccessRequest extends FormRequest
             return false;
         }
 
-        if ($actor->brand === null) {
+        $authorization = app(AuthorizationService::class);
+        if ($authorization->isReservedNullBrandActor($actor) || $authorization->isTransientGuest($actor)) {
+            return false;
+        }
+
+        if ($authorization->isTrustedCrossBrandActor($actor)) {
             return true;
         }
 

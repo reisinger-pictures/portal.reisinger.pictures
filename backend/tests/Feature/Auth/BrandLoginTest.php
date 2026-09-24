@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Enums\Brand;
+use App\Enums\UserRole;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -17,6 +19,7 @@ class BrandLoginTest extends TestCase
             'password' => bcrypt('secret'),
             'brand' => null,
         ]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
         $response = $this->postJson('/api/auth/login', $this->credentials($user));
 

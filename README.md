@@ -2,8 +2,13 @@
 
 Moderne, zustandslose SaaS-Plattform für Fotografen zur Bildauswahl und Auslieferung mit integriertem E-Commerce und B2B-Mandantenverwaltung.
 
- - 🌟 **[Feature-Übersicht (Für Fotografen & Kunden ansehen)](Features.md)**
- - 📖 **[Technische Dokumentation & Konzepte ansehen (Für Entwickler)](features/README.md)**
+ - 🌟 **[Feature-Übersicht (Für Fotografen & Kunden ansehen)](features/README.md)**
+ - 📖 **[Technische Dokumentation & Konzepte ansehen (Für Entwickler)](features/tech/README.md)**
+
+[`Features.md`](Features.md) ist eine ältere Übersichtsseite; die kanonischen
+Einstiegspunkte für die aktuelle Dokumentation sind
+[`features/README.md`](features/README.md) und
+[`features/tech/README.md`](features/tech/README.md).
 
 ## 🚀 Hybrides Login-Verfahren
 
@@ -14,24 +19,68 @@ Das Portal unterscheidet strikt zwischen zwei Nutzertypen:
 
 ## Lokales Setup (Quickstart mit IntelliJ / PhpStorm)
 
-Das lokale Setup ist vollständig in VS Code / IntelliJ integriert. Öffne einfach den **Run & Debug** Tab.
+Die verfügbaren Run-Configs findest du im **Run & Debug** Tab. Es gibt keine
+kombinierte Config „Start Alles“: Der Backend-Dienst, die Docker-Services und
+der Vite-Server werden bewusst separat gestartet.
 
 ### 1. Der reguläre Start
-Wähle im Dropdown **`🚀 [Run] Start Alles (Docker + Frontend)`** und klicke auf Play.
-Das startet automatisch Meilisearch, Mailpit und deinen Vite-Dev-Server (Frontend auf **http://localhost:4321**). Die Datenbank läuft lokal als SQLite-Datei (`backend/database/database.sqlite`) — ein DB-Container wird nicht mehr benötigt.
+1. Starte **`🐳 [Run] Start Docker (Dev)`**. Das startet ausschließlich den lokalen
+   Meilisearch-Service auf Port `7700` (keine Datenbank und kein Mailpit).
+2. Starte das Backend über deine lokale PHP-Umgebung bzw. Laravel Herd
+   (`portal.test`).
+3. Starte **`⚡ [Run] Frontend: Start Frontend`**. Der Vite-Dev-Server läuft danach
+   auf **http://localhost:4321**.
+
+Mailpit ist ein optionaler, nativer Homebrew-Dienst und wird von keinem der
+beiden Docker-Run-Configs automatisch gestartet. Starte ihn bei Bedarf mit
+`brew services start mailpit` (SMTP `1025`, UI/API `8025`).
 
 ### 2. Einmaliges Setup (beim ersten Mal oder nach Pulls)
-Falls du das Projekt neu eingerichtet hast oder sich die Datenbankstruktur geändert hat:
-1. `⚙️ [Setup] Backend: Init (.env & Cache)`
-2. `🔑 [Setup] Backend: JWT Secret generieren`
-3. `💾 [Setup] Backend: DB Migration (Update)`
+1. Kopiere `backend/.env.example` nach `backend/.env` und trage die benötigten
+   Werte lokal ein. **Vor `composer setup` oder dem ersten Seed müssen mindestens
+   `ADMIN_EMAIL` und ein nicht leeres `ADMIN_PASSWORD` gesetzt sein.** Generiere
+   außerdem `JWT_SECRET` und `FILE_ENCRYPTION_KEY` nach den Hinweisen im Template.
+   Die Datei bleibt untracked; echte Secrets gehören nicht ins Repository.
+   Für den lokalen Foto-Speicher aus dem Template zuerst
+   `mkdir -p /tmp/portal-reisinger-photos` ausführen. Der Template-Wert
+   `PHOTO_STORAGE_PATH=/tmp/portal-reisinger-photos` ist ein absoluter,
+   beschreibbarer Local-Dev-Pfad; `/var/www/photos` bleibt ausschließlich der
+   Container-/Deployment-Pfad in `backend/.env.ci` und der Produktions-Compose.
+2. Installiere die Backend-Abhängigkeiten bei einem frischen Checkout mit
+   `composer install` im Verzeichnis `backend`. `composer setup` ist nur ein
+   Automationsschritt: Es kopiert eine fehlende `.env` nicht interaktiv, erzeugt
+   keine Admin-Zugangsdaten und ruft anschließend `migrate --force --seed` auf.
+   Mit leerem `ADMIN_PASSWORD` schlägt dieser Flow am Seeder fehl.
+3. Führe **`⚙️ [Setup] Backend: Init (Cache)`** aus. Diese Config führt nur
+   `php artisan optimize:clear` aus; sie erstellt weder `.env` noch Keys.
+4. Generiere die lokale Anwendungskennung mit `php artisan key:generate` und das
+   JWT-Secret mit **`⚙️ [Setup] Backend: JWT Secret generieren`**.
+5. Führe **`⚙️ [Setup] Backend: DB Migration (Update)`** aus. Die Config verwendet
+   `php artisan migrate --seed`; der Seed ist für den Bootstrap-Admin erforderlich.
 
-*(Tipp: Vergiss nicht, lokal sowohl `herd secure portal.test` als auch `herd secure portal-srp.test` auszuführen, falls du Laravel Herd nutzt!)*
+*(Bei Laravel Herd genügt für die aktuelle RP-Konfiguration
+`herd secure portal.test`; eine separate `portal-srp.test`-Domain ist nicht
+mehr Teil des aktuellen Brand-Setups.)*
 
 ### 3. Wartung & Herunterfahren
-* **Index aktualisieren:** Wenn du Probleme mit der Suche hast, führe `🔍 [Wartung] Meilisearch Sync & Import` aus.
-* **Feierabend:** Nutze `🛑 [Core] Stop Docker (Graceful)` um die Services sauber herunterzufahren.
-* **Achtung:** `🧨 [Gefahr] DB Reset & Seed` löscht deine gesamte lokale SQLite-Datenbank (`backend/database/database.sqlite`) unwiderruflich und baut sie neu auf!
+* **Index aktualisieren:** Wenn du Probleme mit der Suche hast, führe
+  **`🔧 [Wartung] Meilisearch Sync & Import`** aus.
+* **Feierabend:** Nutze **`🛑 [Core] Stop Docker (Dev)`**, um die lokalen
+  Docker-Services herunterzufahren. Für die Test-Services gibt es separat
+  **`🛑 [Core] Stop Docker (Test)`**.
+* **Achtung:** **`🧨 [Gefahr] DB Reset & Seed`** löscht deine gesamte lokale
+  SQLite-Datenbank (`backend/database/database.sqlite`) unwiderruflich und baut
+  sie mit `migrate:fresh --seed` neu auf.
+
+### Deployment-Sync (optional)
+
+Der Run-Config **`🚀 [Deploy] Sync Only`** führt `sync.sh` aus. Das Script
+verwendet `set -euo pipefail`: Der Backend-Sync (inklusive
+`rclone-backend-filter.txt`) und der Frontend-`dist`-Sync müssen beide
+erfolgreich abgeschlossen sein, bevor der Erfolg ausgegeben wird. Ein
+fehlgeschlagener `rclone`-Aufruf beendet den Vorgang mit einem Fehlerstatus.
+Der Sync ersetzt weder Migration noch Seed und ist kein Ersatz für den
+fail-closed Deployment-Start.
 
 ### macOS: exiftool & ImageMagick für Laravel Herd
 
@@ -50,7 +99,10 @@ sudo ln -s /opt/homebrew/bin/convert /usr/local/bin/convert
 Danach Laravel Herd einmal neu starten, damit PHP-FPM die Tools findet. Ohne diesen Schritt schlagen Bild-Uploads mit `422 "Die hochgeladene Datei ist kein gültiges oder lesbares Bild."` fehl (der serverseitige `exiftool`-MIME-Check läuft ins Leere).
 
 ### Login-Daten (Lokal)
-- **Dashboard:** `admin@example.com` / `admin` (bzw. lokale `ADMIN_EMAIL`/`ADMIN_PASSWORD` aus der `.env`)
+- **Dashboard:** Verwende die lokal gesetzten `ADMIN_EMAIL`/`ADMIN_PASSWORD` aus
+  `backend/.env`. `admin@example.com` steht nur als Beispiel im Template bzw. in
+  expliziten E2E-Fixtures; es gibt im aktuellen Runtime-Config keinen
+  Admin-Passwort-Fallback.
 - **Datenbank:** SQLite-Datei `backend/database/database.sqlite` (kein DB-Container; Einrichtung via `php artisan migrate:fresh --seed`)
 
 ### Stripe Webhooks (Lokal Testen)
@@ -58,13 +110,21 @@ Führe `stripe listen --forward-to localhost:8000/api/webhooks/stripe` aus und t
 
 ## Lokale E2E-Tests isoliert ausführen (eigene Backend-Instanz + SQLite-DB)
 
-Die Playwright-E2E-Suite nutzt lokal standardmäßig den laufenden Dev-Backend (`portal.test` / `backend/database/database.sqlite`) — Testdaten würden dort landen. Um die lokale Instanz unberührt zu lassen, gibt es einen **isolierten E2E-Backend** mit eigener SQLite-DB (`backend/database/database.e2e.sqlite`, gitignored) auf Port **8001**:
+Für die Playwright-E2E-Suite gibt es lokal einen **isolierten E2E-Backend**
+mit eigener SQLite-DB (`backend/database/database.e2e.sqlite`, gitignored) auf
+Port **8001**. So bleiben die Daten der Dev-Instanz (`portal.test` /
+`backend/database/database.sqlite`) unberührt:
 
-1. **Backend starten:** Run-Config `🐘 [Run] Start E2E Backend (isoliert)` (oder `bash scripts/e2e-up.sh`) — startet Test-Docker-Services (Meili 7701), generiert `backend/.env.e2e` aus deinem `.env`, migriert + seedet die E2E-DB und served auf `http://127.0.0.1:8001`.
+1. **Backend starten:** Run-Config `🐘 [Run] Start E2E Backend (isoliert)` (oder `bash scripts/e2e-up.sh`) — startet Test-Docker-Services (Meili 7701), generiert `backend/.env.e2e` aus deinem `.env`, migriert + seedet die E2E-DB, lädt die deterministischen Location-Fixtures in den Test-Suchindex und served auf `http://127.0.0.1:8001`.
 2. **Frontend mit Proxy:** Run-Config `⚡ [Run] Frontend: Start Frontend (E2E Proxy)` (oder `VITE_API_PROXY=http://127.0.0.1:8001 pnpm dev`).
 3. **Tests:** Run-Config `🧪 [Test] Frontend: Playwright (E2E isoliert)` (oder `pnpm test:e2e`).
 
 *Hinweis: Die Dev-Instanz (`portal.test`) bleibt davon völlig unberührt — die E2E-Daten liegen ausschließlich in der e2e-SQLite-DB und dem Test-Search-Container. Mails nutzen das native Homebrew-Mailpit (Ports 1025/8025) — kein Docker-Mailpit-Container.*
 
 ### Mailpit (lokal & Tests)
-Das native **Homebrew-Mailpit** (`brew install mailpit`, Service via `brew services start mailpit`) läuft auf Port **1025** (SMTP) und **8025** (HTTP-API, UI unter `http://localhost:8025`). Es wird lokal, in PHPUnit-Tests und E2E-Tests genutzt — **kein Docker-Mailpit-Container** mehr (aus `docker-compose.local.yml` / `docker-compose.test.yml` entfernt).
+Das native **Homebrew-Mailpit** (`brew install mailpit`, Service via
+`brew services start mailpit`) läuft lokal auf Port **1025** (SMTP) und **8025**
+(HTTP-API/UI unter `http://localhost:8025`) und wird für lokale PHPUnit-/E2E-
+Läufe genutzt. Die lokalen Compose-Dateien starten **keinen** Mailpit-
+Container; der CI-Workflow bringt seinen Mailpit-Service separat als Job-
+Service mit.

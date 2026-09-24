@@ -2,21 +2,26 @@
 
 namespace Tests\Feature\Contract;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\Brand;
 use App\Models\Contract;
 use App\Models\ContractSigner;
+use App\Models\InvoiceSnapshot;
+use App\Models\Order;
+use App\Models\Role;
 use App\Models\Setting;
-use App\Enums\Brand;
+use App\Models\User;
+use App\Services\ContractCloseService;
 use App\Support\BrandRegistry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\MailpitAssertions;
+use Tests\TestCase;
 
-#[\PHPUnit\Framework\Attributes\Group('mailpit')]
+#[Group('mailpit')]
 class ContractCloseTest extends TestCase
 {
-    use RefreshDatabase, MailpitAssertions;
+    use MailpitAssertions, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -33,12 +38,14 @@ class ContractCloseTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => 'super_admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function authHeaders(User $user): array
     {
         $token = auth('api')->login($user);
+
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }
 
@@ -109,6 +116,108 @@ class ContractCloseTest extends TestCase
             'brand' => 'rp',
             'total_gross' => 10000,
         ]);
+    }
+
+    public function test_close_scopes_billing_user_resolution_and_order_ownership_to_contract_brand(): void
+    {
+        Mail::fake();
+
+        $sameBrandUser = User::factory()->create([
+            'email' => 'contract-same-brand@example.com',
+            'brand' => Brand::B2B,
+        ]);
+        $foreignBrandUser = User::factory()->create([
+            'email' => 'contract-foreign-brand@example.com',
+            'brand' => 'srp',
+        ]);
+        $brandlessUser = User::factory()->create([
+            'email' => 'contract-brandless@example.com',
+            'brand' => null,
+        ]);
+
+        $billingCases = [
+            $sameBrandUser->email => $sameBrandUser->id,
+            $foreignBrandUser->email => null,
+            $brandlessUser->email => null,
+        ];
+
+        foreach (array_keys($billingCases) as $email) {
+            $contract = Contract::factory()->create([
+                'status' => 'active',
+                'brand' => Brand::B2B,
+                'items' => [
+                    ['type' => 'item', 'description' => 'Test', 'qty' => 1, 'price' => 10000],
+                ],
+                'discounts' => [],
+                'billing_details' => [
+                    'name' => 'Test Kunde',
+                    'email' => $email,
+                ],
+            ]);
+
+            app(ContractCloseService::class)->close($contract);
+        }
+
+        $orders = Order::query()->with('invoiceSnapshot')->get();
+        $this->assertCount(3, $orders);
+
+        $ordersByEmail = $orders->keyBy(function (Order $order): string {
+            $this->assertInstanceOf(InvoiceSnapshot::class, $order->invoiceSnapshot);
+
+            return (string) ($order->invoiceSnapshot->customer_details['email'] ?? '');
+        });
+
+        foreach ($billingCases as $email => $expectedUserId) {
+            $order = $ordersByEmail->get($email);
+            $this->assertNotNull($order);
+            $this->assertSame($expectedUserId, $order->user_id);
+            $this->assertSame(Brand::B2B->value, BrandRegistry::normalizeId($order->brand));
+            $this->assertInstanceOf(InvoiceSnapshot::class, $order->invoiceSnapshot);
+            $this->assertSame($order->id, $order->invoiceSnapshot->order_id);
+            $this->assertSame(Brand::B2B->value, BrandRegistry::normalizeId($order->invoiceSnapshot->brand));
+        }
+
+        $sameBrandOrder = $ordersByEmail->get($sameBrandUser->email);
+        $foreignBrandOrder = $ordersByEmail->get($foreignBrandUser->email);
+        $brandlessOrder = $ordersByEmail->get($brandlessUser->email);
+        $this->assertNotNull($sameBrandOrder);
+        $this->assertNotNull($foreignBrandOrder);
+        $this->assertNotNull($brandlessOrder);
+
+        // Invoice and ZIP controllers both resolve orders through this owner
+        // predicate; an external billing identity must not become a wildcard.
+        $this->assertTrue(
+            Order::query()->ownedBy($sameBrandUser)->whereKey($sameBrandOrder->id)->exists()
+        );
+        foreach ([$foreignBrandUser, $brandlessUser] as $user) {
+            $this->assertFalse(
+                Order::query()->ownedBy($user)->whereKey($sameBrandOrder->id)->exists()
+            );
+        }
+        foreach ([$sameBrandUser, $foreignBrandUser, $brandlessUser] as $user) {
+            $this->assertFalse(
+                Order::query()->ownedBy($user)->whereKey($foreignBrandOrder->id)->exists()
+            );
+            $this->assertFalse(
+                Order::query()->ownedBy($user)->whereKey($brandlessOrder->id)->exists()
+            );
+        }
+
+        $this->actingAs($sameBrandUser, 'api')
+            ->getJson("/api/orders/{$sameBrandOrder->id}/invoice")
+            ->assertOk();
+        foreach ([$foreignBrandUser, $brandlessUser] as $user) {
+            $this->actingAs($user, 'api')
+                ->getJson("/api/orders/{$sameBrandOrder->id}/invoice")
+                ->assertNotFound();
+        }
+        foreach ([$sameBrandUser, $foreignBrandUser, $brandlessUser] as $user) {
+            foreach ([$foreignBrandOrder, $brandlessOrder] as $order) {
+                $this->actingAs($user, 'api')
+                    ->getJson("/api/orders/{$order->id}/invoice")
+                    ->assertNotFound();
+            }
+        }
     }
 
     public function test_close_without_items_does_not_create_invoice(): void

@@ -7,6 +7,8 @@ use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Role;
+use App\Models\User;
+use App\Services\AuthorizationService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,7 +33,7 @@ class UpdateUserRequest extends FormRequest
             'can_edit_metadata' => 'boolean',
             'flatrate_level' => 'nullable|string|in:none,web,print,original',
             'can_purchase_upgrades' => 'boolean',
-            'brand' => ['nullable', 'string', Rule::in(array_keys(config('brands', [])))]
+            'brand' => ['nullable', 'string', Rule::in(array_keys(config('brands', [])))],
         ];
     }
 
@@ -40,6 +42,14 @@ class UpdateUserRequest extends FormRequest
         return [
             function () {
                 $actor = $this->user();
+                if ($actor && app(AuthorizationService::class)->isReservedNullBrandActor($actor)) {
+                    $this->validator->errors()->add(
+                        'brand',
+                        'Dieser Account darf keine brandenübergreifende Verwaltung ausführen.'
+                    );
+
+                    return;
+                }
                 $actorBrand = $this->brandValue($actor);
 
                 // Brand isolation: a brand-bound actor may only reference galleries /
@@ -57,15 +67,22 @@ class UpdateUserRequest extends FormRequest
                     }
                 }
 
-                // Only validate brand when role_ids is present (updating roles).
-                if (!$this->has('role_ids')) {
+                // Validate role/brand consistency when roles or the brand are being
+                // changed. Without role_ids, use the target's current roles so an
+                // explicit brand=null cannot bypass the reserved cross-brand state.
+                if (! $this->has('role_ids') && ! $this->has('brand')) {
                     return;
                 }
 
-                $validated = $this->validated();
-                $selectedRoleNames = Role::whereIn('id', $validated['role_ids'] ?? [])
-                    ->pluck('name')
-                    ->all();
+                $selectedRoleNames = $this->has('role_ids')
+                    ? Role::whereIn('id', $this->validated()['role_ids'] ?? [])->pluck('name')->all()
+                    : User::find($this->route('id'))?->roles()->pluck('name')->all();
+
+                // A missing target is handled by the controller's 404 response.
+                if ($selectedRoleNames === null) {
+                    return;
+                }
+
                 $isSuperAdmin = in_array(UserRole::SUPER_ADMIN->value, $selectedRoleNames, true);
 
                 if ($isSuperAdmin) {
@@ -86,7 +103,7 @@ class UpdateUserRequest extends FormRequest
                         );
                     }
                 }
-            }
+            },
         ];
     }
 

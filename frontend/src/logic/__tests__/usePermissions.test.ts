@@ -1,18 +1,32 @@
 import { describe, it, expect } from 'vitest';
 import { computePermissions } from '../usePermissions';
-import type { User } from '../useAuth';
+import type { AuthMeUser } from '../useAuth';
 
-function user(overrides: Partial<User> = {}): User {
+function user(overrides: Partial<AuthMeUser> = {}): AuthMeUser {
     return {
         id: 'u1',
+        guest_id: null,
         name: 'Test',
         email: 'test@example.com',
+        billing_name: null,
+        billing_company: null,
+        billing_street: null,
+        billing_zip: null,
+        billing_city: null,
+        brand: null,
+        is_cross_brand: false,
         is_super_admin: false,
         is_admin: false,
         is_photographer: false,
+        is_org_admin: false,
+        is_power_user: false,
         is_pending: false,
         can_edit_metadata: false,
+        can_purchase_upgrades: false,
         roles: [],
+        transient_galleries: [],
+        transient_meta_galleries: [],
+        photographer_gallery_groups: [],
         ...overrides,
     };
 }

@@ -11,6 +11,7 @@ use App\Models\Customer;
 use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
+use App\Models\ModelRegistrationInvite;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ModelFileStore;
@@ -136,6 +137,27 @@ class ModelProfileLifecycleExpiryTest extends TestCase
                 fn (array $context) => $context['reason'] === 'expired' && $context['customer_id'] === $customer->id
             ))
             ->once();
+    }
+
+    public function test_expiry_run_removes_linked_registration_invites(): void
+    {
+        $model = $this->modelWithFiles(15);
+        $customer = $model['customer'];
+        $inviter = User::factory()->create(['brand' => 'rp']);
+        $invite = ModelRegistrationInvite::create([
+            'token' => bin2hex(random_bytes(32)),
+            'email' => 'expired-invite@example.com',
+            'label' => 'Expired model invitation',
+            'brand' => 'rp',
+            'invited_by' => $inviter->id,
+            'expires_at' => now()->addDays(7),
+            'used_at' => now(),
+            'customer_id' => $customer->id,
+        ]);
+
+        $this->artisan('app:process-model-lifecycle')->assertSuccessful();
+
+        $this->assertDatabaseMissing('model_registration_invites', ['id' => $invite->id]);
     }
 
     public function test_active_profile_is_not_deleted_by_expiry_run(): void

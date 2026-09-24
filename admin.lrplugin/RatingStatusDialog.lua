@@ -6,10 +6,14 @@ local LrTasks = import 'LrTasks'
 local LrApplication = import 'LrApplication'
 local Api = require "Api"
 
-return function(galleryId, galleryName, jwt, onSyncComplete)
+return function(galleryId, galleryName, jwt, onSyncComplete, requestApi)
     LrFunctionContext.callWithContext("RatingStatusContext", function(context)
         local f = LrView.osFactory()
         local props = LrBinding.makePropertyTable(context)
+        local function apiRequest(endpoint, method, payload)
+            if requestApi then return requestApi(endpoint, method, payload) end
+            return Api.call(endpoint, method, payload, jwt)
+        end
 
         props.loading = true
         props.loaded = false
@@ -51,8 +55,8 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
         -- Runs inside an async task: LrHttp must never be called while the
         -- dialog is being constructed, or Lightroom freezes.
         local function loadData()
-            local dataExport, statusExport = Api.call("/api/management/galleries/" .. galleryId .. "/export", "GET", nil, jwt)
-            local dataStatus, statusStatus = Api.call("/api/management/galleries/" .. galleryId .. "/rating-status", "GET", nil, jwt)
+            local dataExport, statusExport = apiRequest("/api/management/galleries/" .. galleryId .. "/export", "GET", nil)
+            local dataStatus, statusStatus = apiRequest("/api/management/galleries/" .. galleryId .. "/rating-status", "GET", nil)
 
             if statusExport == 200 and statusStatus == 200 and dataExport and dataStatus then
                 props.ratings = dataExport
@@ -74,7 +78,7 @@ return function(galleryId, galleryName, jwt, onSyncComplete)
 
         local function runSync()
             local catalog = LrApplication.activeCatalog()
-            local resData, stat = Api.call("/api/management/galleries/" .. galleryId .. "/export", "GET", nil, jwt)
+            local resData, stat = apiRequest("/api/management/galleries/" .. galleryId .. "/export", "GET", nil)
             if stat ~= 200 or not resData then
                 LrDialogs.message(Api.getTitle("Fehler"), "Bewertungen konnten nicht geladen werden.", "critical")
                 return

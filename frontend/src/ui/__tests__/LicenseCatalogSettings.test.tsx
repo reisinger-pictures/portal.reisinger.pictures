@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import LicenseCatalogSettings from '../management/components/LicenseCatalogSettings';
@@ -202,5 +202,127 @@ describe('LicenseCatalogSettings', () => {
             }),
         );
         expect(showToast).toHaveBeenCalledWith('success', 'Zuschlag hinzugefügt');
+    });
+
+    it('resets a use-case draft after cancel and SWR revalidation', async () => {
+        const user = userEvent.setup();
+        const { rerender } = renderWithProviders(<LicenseCatalogSettings />);
+        const row = screen.getByText('Web-Nutzung', { exact: true }).closest('tr');
+        if (!row) throw new Error('Use-case row not found');
+
+        await user.click(row.querySelector('button') as HTMLButtonElement);
+        const titleInput = screen.getByDisplayValue('Web-Nutzung');
+        await user.clear(titleInput);
+        await user.type(titleInput, 'Lokaler Entwurf');
+        await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+        await user.click(row.querySelector('button') as HTMLButtonElement);
+        expect(screen.getByDisplayValue('Web-Nutzung')).toBeInTheDocument();
+
+        const updatedCatalog = {
+            ...mockCatalog,
+            use_cases: mockCatalog.use_cases.map((useCase) => useCase.id === 'uc1'
+                ? { ...useCase, name: 'Server-aktualisiert', base_price: 700000 }
+                : useCase),
+        };
+        vi.mocked(useLicenseCatalog).mockReturnValue({
+            catalog: updatedCatalog,
+            isLoading: false,
+            createUseCase: vi.fn(),
+            updateUseCase: vi.fn(),
+            deleteUseCase: vi.fn(),
+            createModifier: vi.fn(),
+            updateModifier: vi.fn(),
+            deleteModifier: vi.fn(),
+        });
+        rerender(<LicenseCatalogSettings />);
+
+        await waitFor(() => {
+            expect(screen.getByDisplayValue('Server-aktualisiert')).toBeInTheDocument();
+        });
+    });
+
+    it('resets a modifier draft when its SWR row changes', async () => {
+        const user = userEvent.setup();
+        const { rerender } = renderWithProviders(<LicenseCatalogSettings />);
+        const row = screen.getByText('Titelseite', { exact: true }).closest('tr');
+        if (!row) throw new Error('Modifier row not found');
+
+        await user.click(row.querySelector('button') as HTMLButtonElement);
+        const titleInput = screen.getByDisplayValue('Titelseite');
+        await user.clear(titleInput);
+        await user.type(titleInput, 'Ungespeicherter Titel');
+        await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+        const updatedCatalog = {
+            ...mockCatalog,
+            modifiers: mockCatalog.modifiers.map((modifier) => modifier.id === 'm1'
+                ? { ...modifier, name: 'Aktualisierter Zuschlag', percent_surcharge: 75 }
+                : modifier),
+        };
+        vi.mocked(useLicenseCatalog).mockReturnValue({
+            catalog: updatedCatalog,
+            isLoading: false,
+            createUseCase: vi.fn(),
+            updateUseCase: vi.fn(),
+            deleteUseCase: vi.fn(),
+            createModifier: vi.fn(),
+            updateModifier: vi.fn(),
+            deleteModifier: vi.fn(),
+        });
+        rerender(<LicenseCatalogSettings />);
+
+        const updatedRow = screen.getByText('Aktualisierter Zuschlag', { exact: true }).closest('tr');
+        if (!updatedRow) throw new Error('Updated modifier row not found');
+        await user.click(updatedRow.querySelector('button') as HTMLButtonElement);
+        await waitFor(() => {
+            expect(screen.getByDisplayValue('Aktualisierter Zuschlag')).toBeInTheDocument();
+        });
+    });
+
+    it('refreshes an active modifier editor when its SWR row changes', async () => {
+        const user = userEvent.setup();
+        const { rerender } = renderWithProviders(<LicenseCatalogSettings />);
+        const row = screen.getByText('Titelseite', { exact: true }).closest('tr');
+        if (!row) throw new Error('Modifier row not found');
+
+        const editButton = row.querySelector('button');
+        if (!editButton) throw new Error('Modifier edit button not found');
+        await user.click(editButton);
+
+        const titleInput = screen.getByDisplayValue('Titelseite');
+        await user.clear(titleInput);
+        await user.type(titleInput, 'Ungespeicherter Titel');
+        expect(titleInput).toHaveValue('Ungespeicherter Titel');
+
+        const updatedCatalog = {
+            ...mockCatalog,
+            modifiers: mockCatalog.modifiers.map((modifier) => modifier.id === 'm1'
+                ? { ...modifier, name: 'Server-aktualisierter Titel', percent_surcharge: 75 }
+                : modifier),
+        };
+        vi.mocked(useLicenseCatalog).mockReturnValue({
+            catalog: updatedCatalog,
+            isLoading: false,
+            createUseCase: vi.fn(),
+            updateUseCase: vi.fn(),
+            deleteUseCase: vi.fn(),
+            createModifier: vi.fn(),
+            updateModifier: vi.fn(),
+            deleteModifier: vi.fn(),
+        });
+        rerender(<LicenseCatalogSettings />);
+
+        await waitFor(() => {
+            const refreshedTitleInput = screen.getByDisplayValue('Server-aktualisierter Titel');
+            const activeRow = refreshedTitleInput.closest('tr');
+            const percentageInput = activeRow?.querySelector('input[type="number"]');
+            if (!percentageInput) throw new Error('Active modifier editor not found');
+
+            expect(refreshedTitleInput).toHaveValue('Server-aktualisierter Titel');
+            expect(percentageInput).toHaveValue(75);
+        });
+        expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+        expect(screen.queryByDisplayValue('Ungespeicherter Titel')).not.toBeInTheDocument();
     });
 });

@@ -22,6 +22,9 @@ class MailController extends Controller
     {
         $request->validate(['subject' => 'required|string', 'body' => 'required|string']);
         $gallery = Gallery::with('galleryGroup')->findOrFail($galleryId);
+        if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
+        }
 
         // Authorization: only users who may manage this gallery can send a custom email for it.
         if (Gate::denies('manage', $gallery)) {
@@ -82,6 +85,9 @@ class MailController extends Controller
         $user = auth('api')->user();
         if (! $user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+        if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
         }
 
         // IDOR guard: only users who can access the gallery may trigger the rating-finished notification.

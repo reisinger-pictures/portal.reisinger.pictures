@@ -8,11 +8,11 @@ status: active
 
 ## 1. Portainer & Docker Stack
 - The project is deployed as a Docker stack via **Portainer**.
-- **Automated Init:** The initialization logic is embedded directly into the `command` block of the `backend` container. It waits for the database to be ready, generates missing application keys (`APP_KEY`, `JWT_SECRET`), and runs `php artisan migrate --force` before starting the background workers and PHP-FPM. 
+- **Automated Init:** The initialization logic is embedded directly into the `command` block of the `backend` container. It waits for the database and search services to be ready, then performs the fail-closed migration/seed gate below before starting background workers and PHP-FPM. Missing application keys are **not** generated implicitly during production startup; the container refuses to start without them.
 
 ## 2. Environment Variables
 - All configuration is managed via Portainer environment variables, overriding the `.env` file.
-- Key variables include database credentials (`DB_ROOT_PASSWORD`), Meilisearch keys (`MEILI_MASTER_KEY`), and SMTP settings (e.g., Gmail App Passwords).
+- Key variables include database credentials (`DB_ROOT_PASSWORD`), Meilisearch keys (`MEILI_MASTER_KEY`), and SMTP settings (production currently uses ZeptoMail; the legacy Gmail transport remains only as a code fallback).
 
 ## 3. Frontend & Routing
 - The frontend is built statically (`pnpm build`) and served **directly by Caddy** (kein nginx-Container mehr, seit 2026-07-31).
@@ -22,7 +22,7 @@ status: active
 - **CSP & X-Frame-Options** werden im Caddyfile gesetzt (Block `portal.reisinger.pictures`). Das Brand-Favicon-Script ist eine statische Datei unter `/brand-favicon-rewrite.js` (siehe `frontend/public/brand-favicon-rewrite.js`), die über `script-src 'self'` abgedeckt ist — der früher nötige `sha256`-Hash des Inline-Scripts kann aus dem Caddyfile entfernt werden. Der Header wird nur noch geändert, wenn sich die übrige CSP-Policy ändert.
 
 ## 4. Caddy + PHP-FPM Architektur (Apache abgelöst)
-- **Basis-Image:** `ghcr.io/reisi007/portal-base:8.5` (Spezial-Image, gebaut per Cron aus diesem Repo — siehe `.github/workflows/base-image.yml`)
+- **Basis-Image:** `ghcr.io/reisi007/portal-base:8.5` (Spezial-Image, gebaut per Cron aus diesem Repo — siehe `.github/workflows/base-image.yml`). Der Veröffentlichungs-/Freshness-Status des GHCR-Digests bleibt eine Release-/Betriebsprüfung.
 - **Webserver:** PHP-FPM statt Apache – Caddy spricht via FastCGI-Protokoll mit dem Backend
 - **File Delivery:** `X-Accel-Redirect` statt `X-Sendfile` – Caddy fängt den Header via `handle_response` ab und serviert Dateien direkt von der Festplatte
 - **Pfad-Mapping:** Der `PROXY_DELIVERY_HEADER` ist fest auf `X-Accel-Redirect` gesetzt. Der Pfad `/var/www/photos/...` wird in Caddy via `handle_path` auf das gemountete Volume `/srv/photos` umgeschrieben
@@ -39,8 +39,18 @@ status: active
 - **Integration:** Dieser wird als Volume nach `/var/www/ftp` gemountet. Die Umgebungsvariable `FTP_STORAGE_PATH` weist Laravel an, diesen Pfad für die FTP-Inbox zu nutzen.
 
 ## 7. Automatisierte Admin-Provisionierung
-- **Kommando:** `php artisan admin:update`
-- **Logik:** Synchronisiert beim Start des `backend-init`-Containers den Admin-Nutzer basierend auf den ENV-Variablen `ADMIN_EMAIL` und `ADMIN_PASSWORD`. Dies stellt sicher, dass ein Login auch ohne initiale Datenbank-Seeds sofort möglich ist.
+- **Kommando:** `php artisan admin:update` ist ein **erforderlicher letzter
+  Schritt** im Backend-Start und wird nicht als ungeschützter Nachlauf
+  ausgeführt.
+- **Fail-closed Sequenz:** Nach den Env-/Identitäts-/Pfad-Guards aus §9 führt der
+  Start `php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1`
+  aus. Ein Fehler bei Migration, Seed **oder** Admin-Provisionierung beendet den
+  Compose-Start, bevor `queue:work`, Scheduler oder PHP-FPM gestartet werden.
+- **Credentials:** `ADMIN_EMAIL` und `ADMIN_PASSWORD` müssen gesetzt sein; es
+  gibt keinen Runtime-Fallback. `DatabaseSeeder` legt den Bootstrap-Admin mit
+  `firstOrCreate` an. `admin:update` legt ihn bei Bedarf an und rotiert das
+  Passwort eines bestehenden Accounts aus denselben Env-Werten; ein fehlender
+  Wert lässt das Command fehlschlagen.
 
 ## 8. Secrets, Environment & Debug Defaults
 
@@ -50,20 +60,36 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
 |---|---|---|
 | `APP_KEY` | `config/app.php` | `env('APP_KEY')` |
 | `JWT_SECRET` | `config/jwt.php` | `env('JWT_SECRET')` |
+| `FILE_ENCRYPTION_KEY` | File-Encryption config/provider | `env('FILE_ENCRYPTION_KEY')`, separate from `APP_KEY` |
 | `STRIPE_KEY` / `STRIPE_SECRET` / `STRIPE_WEBHOOK_SECRET` | `config/services.php` | `env(...)`, no `production ? null :` guard |
 | `DB_PASSWORD` | `config/database.php` | `env('DB_PASSWORD')` |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `config/admin.php` | `env(...)`, required, no fallback |
 
-- **Fail closed:** Missing `APP_KEY`/`JWT_SECRET` aborts the production start (see §9). Blank env values are treated as unset — never silently replaced.
-- **Debug mode:** `APP_DEBUG` defaults to **`false`** (`config/app.php`) and MUST stay `false` in production. Verbose error pages are a local-dev-only opt-in (`.env.example` ships `APP_DEBUG=true`); `docker-compose.yml` defaults to `${APP_DEBUG:-false}`.
+- **Fail closed:** Missing `APP_KEY`/`JWT_SECRET`/`FILE_ENCRYPTION_KEY`/`ADMIN_EMAIL`/`ADMIN_PASSWORD` aborts the production start (see §9). Blank env values are treated as unset — never silently replaced.
+- **Debug mode:** `APP_DEBUG` defaults to **`false`** (`config/app.php`) and MUST stay `false` in production. Verbose error pages are a local-dev-only opt-in (`.env.example` ships `APP_DEBUG=true`); `deployment/docker-compose.yml` defaults to `${APP_DEBUG:-false}`.
 - **Production secrets are machine-local:** `backend/.env.production` (and `deployment/.env.production`) is **untracked/gitignored**. Only key names and placeholder templates live in the repo — real values (DB, SMTP/ZeptoMail, Stripe live keys) are provided per host via Portainer env / the local env file. Never commit or quote secret values.
 
 ## 9. Produktion-Sicherheits-Gatekeeper
-- **Validierung:** Der `backend`-Container verweigert den Start in 'production', wenn `APP_KEY` oder `JWT_SECRET` nicht gesetzt sind (leer). Die Prüfung erfolgt generisch ohne hartcodierte Schlüsselwerte, um eine erneute Exposition über das Repository zu vermeiden.
+- **Identitäts-Guard:** Der `backend`-Container verweigert den Start, wenn er
+  nicht als UID:GID `1000:1000` läuft.
+- **Credential-/Pfad-Guard:** Er verweigert den Start bei leerem
+  `APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, `ADMIN_EMAIL`,
+  `ADMIN_PASSWORD` oder `PHOTO_STORAGE_PATH`. `PHOTO_STORAGE_PATH` muss ein
+  absoluter Pfad sein. `/var/www/html`, der konfigurierte Storage-Pfad und
+  `/var/www/ftp` müssen existieren, schreibbar sein und `stat` muss für sie
+  `1000:1000` liefern. Die Prüfung erfolgt generisch ohne hartcodierte
+  Schlüsselwerte.
+- **Migrations-/Seed-/Admin-Gate:** Erst nach diesen Guards führt der Start
+  `php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1`
+  aus. Ein Fehler in **einem** dieser Schritte verhindert `queue:work`, den
+  Scheduler und PHP-FPM. `admin:update` ist damit Teil desselben
+  fail-closed Gates; ein fehlgeschlagener Admin-Schritt darf nicht als
+  erfolgreicher Deployment-Start durchrutschen.
 
 
 ## 10. Meilisearch Upgrade — Deployment Procedure
 
-Wenn das `search`-Image in `docker-compose.yml` auf eine neue Major/Minor-Version gehoben wird (z.B. v1.42 → v1.48):
+Wenn das `search`-Image in `deployment/docker-compose.yml` auf eine neue Major/Minor-Version gehoben wird (z.B. v1.42 → v1.48):
 
 ```bash
 # 1. Vor dem Deploy: Alte Suchdaten löschen (optional, aber empfohlen)

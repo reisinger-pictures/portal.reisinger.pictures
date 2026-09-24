@@ -2,14 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
+use App\Models\GalleryInvite;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
-use App\Models\Role;
 use App\Models\Org;
+use App\Models\Photo;
+use App\Models\Role;
 use App\Models\User;
+use App\Services\AuthorizationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -29,14 +33,33 @@ class UserPermissionLogicTest extends TestCase
     {
         $roleModel = Role::firstOrCreate(['name' => $role->value]);
         $user->roles()->syncWithoutDetaching([$roleModel->id]);
+        if ($role === UserRole::SUPER_ADMIN) {
+            $user->forceFill(['brand' => null])->save();
+        }
+
         return $roleModel;
     }
 
     private function makeGuest(array $transientGalleries = []): User
     {
         $user = User::factory()->create();
-        $user->guest_id = 'guest-' . $user->id;
+        $user->guest_id = 'guest-'.$user->id;
         $user->transient_galleries = $transientGalleries;
+        $user->transient_invites = [];
+        $user->transient_invite_ids = [];
+
+        foreach ($transientGalleries as $galleryId) {
+            $invite = GalleryInvite::create([
+                'gallery_id' => $galleryId,
+                'token' => 'permission-logic-'.uniqid(),
+            ]);
+            $user->transient_invites[(string) $invite->id] = [
+                'gallery_ids' => [(string) $galleryId],
+                'meta_gallery_ids' => [],
+            ];
+            $user->transient_invite_ids[] = (string) $invite->id;
+        }
+
         return $user;
     }
 
@@ -323,7 +346,7 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_get_sub_group_ids_empty_input_returns_empty_array(): void
     {
-        $service = new \App\Services\AuthorizationService();
+        $service = new AuthorizationService;
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
@@ -332,7 +355,7 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_get_sub_group_ids_single_id_returns_self(): void
     {
-        $service = new \App\Services\AuthorizationService();
+        $service = new AuthorizationService;
         $group = GalleryGroup::factory()->create();
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
@@ -344,7 +367,7 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_get_sub_group_ids_with_nonexistent_id_returns_empty(): void
     {
-        $service = new \App\Services\AuthorizationService();
+        $service = new AuthorizationService;
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
@@ -355,7 +378,7 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_get_sub_group_ids_recursive_deep_chain(): void
     {
-        $service = new \App\Services\AuthorizationService();
+        $service = new AuthorizationService;
         $g1 = GalleryGroup::factory()->create();
         $g2 = GalleryGroup::factory()->create(['parent_id' => $g1->id]);
         $g3 = GalleryGroup::factory()->create(['parent_id' => $g2->id]);
@@ -375,7 +398,7 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_handles_large_uuid_list(): void
     {
-        $service = new \App\Services\AuthorizationService();
+        $service = new AuthorizationService;
         // 50 separate Gruppen testen.
         $root1 = GalleryGroup::factory()->create();
         $root2 = GalleryGroup::factory()->create();
@@ -404,7 +427,7 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_with_quote_in_id_uses_bound_parameters(): void
     {
-        $service = new \App\Services\AuthorizationService();
+        $service = new AuthorizationService;
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
@@ -419,11 +442,11 @@ class UserPermissionLogicTest extends TestCase
      */
     public function test_get_sub_group_ids_empty_after_filter_returns_empty_array(): void
     {
-        $service = new \App\Services\AuthorizationService();
+        $service = new AuthorizationService;
         $method = new \ReflectionMethod($service, 'getSubGroupIds');
         $method->setAccessible(true);
 
-        $result = $method->invoke($service, array_values(array_filter([], fn($id) => $id !== null)));
+        $result = $method->invoke($service, array_values(array_filter([], fn ($id) => $id !== null)));
 
         $this->assertSame([], $result);
     }
@@ -616,6 +639,22 @@ class UserPermissionLogicTest extends TestCase
     // 5. hasPurchasedPhoto()
     // =====================================================================
 
+    private function createVisiblePhoto(): Photo
+    {
+        $gallery = Gallery::withoutSyncingToSearch(fn (): Gallery => Gallery::factory()->create([
+            'brand' => Brand::B2B,
+            'type' => 'delivery',
+            'gallery_group_id' => null,
+            'is_public' => false,
+            'is_hidden' => false,
+        ]));
+
+        return Photo::withoutSyncingToSearch(fn (): Photo => Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'is_hidden' => false,
+        ]));
+    }
+
     private function createOrderWithItem(User $user, string $photoId, string $tier, string $status = 'paid', bool $isQuote = false): Order
     {
         $order = Order::create([
@@ -635,13 +674,14 @@ class UserPermissionLogicTest extends TestCase
             'total_gross' => 1200,
             'tax_rate' => 20.00,
         ]);
+
         return $order;
     }
 
     public function test_has_purchased_photo_paid_original_returns_true_for_web_request(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-1';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'original', 'paid');
 
         $this->assertTrue($user->hasPurchasedPhoto($photoId, 'web'));
@@ -650,7 +690,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_web_tier_satisfies_web_request(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-2';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'web', 'paid');
 
         $this->assertTrue($user->hasPurchasedPhoto($photoId, 'web'));
@@ -659,7 +699,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_web_tier_does_not_satisfy_original_request(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-3';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'web', 'paid');
 
         $this->assertFalse($user->hasPurchasedPhoto($photoId, 'original'));
@@ -668,7 +708,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_print_tier_does_not_satisfy_original_request(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-4';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'print', 'paid');
 
         $this->assertFalse($user->hasPurchasedPhoto($photoId, 'original'));
@@ -677,7 +717,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_print_tier_satisfies_print_request(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-5';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'print', 'paid');
 
         $this->assertTrue($user->hasPurchasedPhoto($photoId, 'print'));
@@ -686,7 +726,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_original_tier_satisfies_original_request(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-6';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'original', 'paid');
 
         $this->assertTrue($user->hasPurchasedPhoto($photoId, 'original'));
@@ -695,7 +735,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_disputed_order_is_excluded(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-disputed';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'original', 'disputed');
 
         $this->assertFalse($user->hasPurchasedPhoto($photoId, 'web'));
@@ -704,7 +744,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_refunded_order_is_excluded(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-refunded';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'original', 'refunded');
 
         $this->assertFalse($user->hasPurchasedPhoto($photoId, 'web'));
@@ -713,7 +753,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_cancelled_order_is_excluded(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-cancelled';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'original', 'cancelled');
 
         $this->assertFalse($user->hasPurchasedPhoto($photoId, 'web'));
@@ -723,7 +763,7 @@ class UserPermissionLogicTest extends TestCase
     {
         // is_quote_request=true UND status=pending → muss ausgeschlossen werden
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-pending-quote';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'original', 'pending', true);
 
         $this->assertFalse($user->hasPurchasedPhoto($photoId, 'web'));
@@ -733,7 +773,7 @@ class UserPermissionLogicTest extends TestCase
     {
         // is_quote_request=true ABER status!=pending (z.B. paid) → inkludiert
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-approved-quote';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'original', 'paid', true);
 
         $this->assertTrue($user->hasPurchasedPhoto($photoId, 'web'));
@@ -742,7 +782,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_unknown_tier_defaults_to_rank_zero(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-unknown-tier';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'weird-tier', 'paid');
 
         // itemRank = 0 → kein Match für requestedTier web (rank 1)
@@ -752,7 +792,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_unknown_requested_tier_defaults_to_original(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-uuid-unknown-req';
+        $photoId = $this->createVisiblePhoto()->id;
         $this->createOrderWithItem($user, $photoId, 'web', 'paid');
 
         // reqRank defaultet zu 3 (original) → web (rank 1) reicht nicht
@@ -762,7 +802,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_without_snapshot_is_skipped(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-no-snapshot';
+        $photoId = $this->createVisiblePhoto()->id;
         $order = Order::create([
             'user_id' => $user->id,
             'status' => 'paid',
@@ -777,7 +817,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_missing_items_key_is_skipped(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-missing-items';
+        $photoId = $this->createVisiblePhoto()->id;
         $order = Order::create([
             'user_id' => $user->id,
             'status' => 'paid',
@@ -801,7 +841,7 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_item_missing_tier_key_is_rank_zero(): void
     {
         $user = User::factory()->create();
-        $photoId = 'photo-missing-tier';
+        $photoId = $this->createVisiblePhoto()->id;
         $order = Order::create([
             'user_id' => $user->id,
             'status' => 'paid',
@@ -826,21 +866,25 @@ class UserPermissionLogicTest extends TestCase
     public function test_has_purchased_photo_different_photo_id_does_not_match(): void
     {
         $user = User::factory()->create();
-        $this->createOrderWithItem($user, 'other-photo-id', 'original', 'paid');
+        $purchasedPhoto = $this->createVisiblePhoto();
+        $requestedPhoto = $this->createVisiblePhoto();
+        $this->createOrderWithItem($user, $purchasedPhoto->id, 'original', 'paid');
 
-        $this->assertFalse($user->hasPurchasedPhoto('my-photo-id', 'web'));
+        $this->assertFalse($user->hasPurchasedPhoto($requestedPhoto->id, 'web'));
     }
 
     public function test_has_purchased_photo_no_orders_returns_false(): void
     {
         $user = User::factory()->create();
+        $photoId = $this->createVisiblePhoto()->id;
 
-        $this->assertFalse($user->hasPurchasedPhoto('any-photo', 'web'));
+        $this->assertFalse($user->hasPurchasedPhoto($photoId, 'web'));
     }
 
     public function test_has_purchased_photo_item_missing_photo_id_key_is_skipped(): void
     {
         $user = User::factory()->create();
+        $photoId = $this->createVisiblePhoto()->id;
         $order = Order::create([
             'user_id' => $user->id,
             'status' => 'paid',
@@ -859,7 +903,7 @@ class UserPermissionLogicTest extends TestCase
             'tax_rate' => 20.00,
         ]);
 
-        $this->assertFalse($user->hasPurchasedPhoto('any-photo', 'web'));
+        $this->assertFalse($user->hasPurchasedPhoto($photoId, 'web'));
     }
 
     // =====================================================================
@@ -908,7 +952,7 @@ class UserPermissionLogicTest extends TestCase
 
     public function test_is_org_admin_attribute_returns_true_for_role(): void
     {
-        $org = \App\Models\Org::factory()->create();
+        $org = Org::factory()->create();
         $user = User::factory()->create(['org_id' => $org->id]);
         $this->assignRole($user, UserRole::ORG_ADMIN);
 

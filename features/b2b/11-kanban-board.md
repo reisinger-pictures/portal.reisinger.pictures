@@ -1,7 +1,7 @@
 # Kanban-Board (Projekte & Bildbearbeitung) — SOLL-Zustands-Dokumentation
 
 Status: SOLL (Target State)
-Stand: 2026-08-02
+Stand: 2026-09-24
 Autor: Florian Reisinger (Senior Architekt)
 
 Diese Datei ist die verbindliche Referenz für die Implementierung des Kanban-Features. Backend und Frontend müssen exakt gegen diese Definition alignen.
@@ -30,8 +30,11 @@ Die Boards visualisieren den Fortschritt von eingehender Anfrage bis zur Auslief
 
 ### Owner-Modell
 
-- `created_by` = Ersteller beim Anlegen; wird **automatisch** auf den aktuellen User gesetzt (nicht client-wählbar).
+- `owner_id` = Ersteller beim Anlegen; wird **automatisch** auf den aktuellen User gesetzt (nicht client-wählbar).
 - Optionales `assignee_id` für Reassign / Zuweisung.
+- Die Position ist owner-scoped: Reindex-/Cleanup-Operationen verändern nur die
+  Status-Spalte des betroffenen Eigentümers und niemals die Positionen eines
+  fremden Eigentümers.
 
 ### Sichtbarkeits-Query (Backend)
 
@@ -45,9 +48,21 @@ Die Boards visualisieren den Fortschritt von eingehender Anfrage bis zur Auslief
 
 ---
 
-## 3. Datenmodell (Migration V025, konsolidiert)
+## 3. Datenmodell (historische V025–V027; V038 Frontier)
 
-Drei Tabellen (siehe §1 AGENTS.md / Migrations-Policy; die Nicht-Produktions-Migrationen ≥ V025 werden vor dem Deployment zu EINER konsolidierten Migration zusammengefasst). Alle Tabellen nutzen `UUID`-Primärschlüssel (`HasUuids`), `foreignUuid`-Fremdschlüssel und eine `brand`-Spalte `string(4)` mit Index. Die Status-Enums (inkl. `storniert` / `abgebrochen`) sind in V025 erweitert.
+`V025__consolidated_after_v024.php` is the historical migration that creates
+the board tables (`photo_jobs`, `projects`, `workflow_logs`, and
+`lightroom_catalogs`). `V026` adds the board notes and removes the obsolete
+`is_private` flag; `V027` migrates the photo-job workflow to the current status
+values in §4. These migrations are historical/deployed inputs and are not
+rewritten. The current repository frontier is `V038` (V037 Guest-Ownership,
+V036 Card-Testing); every new schema change is a separate `V039+` migration.
+No already deployed migration (`V001`–`V035`) may be amended.
+
+The board tables use UUID primary keys (`HasUuids`), `foreignUuid` foreign keys,
+and an indexed `brand` column (`string(4)`). The current status enums, including
+`storniert` and `abgebrochen`, are the result of the V025 schema plus the V027
+photo-job status migration.
 
 ### 3.1. `projects`
 
@@ -65,10 +80,11 @@ Drei Tabellen (siehe §1 AGENTS.md / Migrations-Policy; die Nicht-Produktions-Mi
 | `payment_status` | enum(`open\|partly_paid\|paid`) | |
 | `status` | enum(`ProjectStatus`) | inkl. terminal `storniert` |
 | `position` | int | Spalten-Position/Reihenfolge |
+| `notes` | text, nullable | interne Notiz |
 | `linked_photo_job_id` | foreignUuid → photo_jobs, nullable | Verknüpfung zur Produktion (Handoff, §5.1) |
 | `created_at`, `updated_at` | timestamps | |
 
-### 2. `photo_jobs`
+### 3.2 `photo_jobs`
 
 | Feld | Typ | Hinweis |
 |---|---|---|
@@ -81,16 +97,16 @@ Drei Tabellen (siehe §1 AGENTS.md / Migrations-Policy; die Nicht-Produktions-Mi
 | `total_count` | int | Gesamtanzahl Bilder |
 | `selected_count` | int | selektierte Anzahl |
 | `target_gallery_id` | foreignUuid → galleries, nullable | Ziel-Galerie |
-| `is_private` | boolean | |
+| `notes` | text, nullable | interne Notiz |
 | `status` | enum(`PhotoJobStatus`) | inkl. terminal `abgebrochen` |
 | `position` | int | |
 | `created_at`, `updated_at` | timestamps | |
 
-### 3. `workflow_logs`
+### 3.3 `workflow_logs`
 
 | Feld | Typ | Hinweis |
 |---|---|---|
-| `id` | uuid PK | `HasUuids` |
+| `id` | integer PK (auto-increment) | Workflow-Log-ID |
 | `item_type` | enum(`project` \| `photo_job`) | polimorphe Referenz |
 | `item_id` | uuid | **ohne** FK-Constraint |
 | `from_status` | string | Quell-Status |
@@ -164,7 +180,7 @@ Route-Basis `/api/management/projects` (nur `admin` / `super_admin`):
 | Methode | Pfad | Body / Verhalten | Status |
 |---|---|---|---|
 | GET | `/projects` | → `{ "projects": [] }` (visibilty-scoped, §2) | 200 |
-| POST | `/projects` | `owner` = current User, `brand` via `BrandRegistry`, `status` = `anfrage`, `position` = Ende (max+1) | 201 |
+| POST | `/projects` | `owner` = current User, `brand` via `BrandRegistry`, `status` = `anfrage`, `position` = dichtes Ende der owner-scoped Spalte (`0..n-1`) | 201 |
 | PUT | `/projects/{id}` | Update | 200 |
 | PATCH | `/projects/{id}/move` | body `{ status, position }`; **neu ≠ alt-status** → schreibt `workflow_logs` | 200 |
 | POST | `/projects/{id}/handoff` | **nur `super_admin`**; erzeugt `photo_job` und setzt `linked_photo_job_id` (§5.1) | 201 / 403 / 422 |
@@ -184,14 +200,14 @@ Route-Basis `/api/management/photo-jobs` (nur `super_admin` / `photographer`):
 
 ### Middleware & Scoping
 
-- **ManagementMiddleware** muss um Präfix `api/management/photo-jobs*` für `photographer` erweitert werden (Zugriff auf Produktions-Endpoints öffnen).
+- **ManagementMiddleware / Gates:** Die Produktions-Endpoints unter `api/management/photo-jobs*` sind für `photographer` zugänglich; die Sichtbarkeit bleibt zusätzlich auf den jeweiligen Owner/Assignee-Scope begrenzt.
 - Sichtbarkeits-Scoping: wie §6 (Owner nein → alle; sonst `owner_id`/`assignee_id`).
 
 ### 5.1 Projekt → Bildbearbeitung-Übernahme (Handoff)
 
 `POST /api/management/projects/{id}/handoff` — **nur `super_admin`**.
 
-- Erzeugt einen `photo_job`: `brand` = Project-Brand, `owner_id` = aktueller User, `title` = `client_name`, `status` = `PhotoJobStatus::initial()` (`importiert`), `position` = `max+1` (brand-weit).
+- Erzeugt einen `photo_job`: `brand` = Project-Brand, `owner_id` = aktueller User, `title` = `client_name`, `status` = `PhotoJobStatus::initial()` (`importiert`), `position` = dichtes Ende der owner-scoped Spalte.
 - Setzt `project.linked_photo_job_id` auf die neue Photo-Job-ID.
 - Ist bereits ein `linked_photo_job_id` gesetzt → **422** (`already_handed_off`, kein Doppel-Handoff).
 - Antwort: `{ "photo_job": {...} }` (201).
@@ -203,10 +219,10 @@ Route-Basis `/api/management/photo-jobs` (nur `super_admin` / `photographer`):
 
 ### View & Routing
 
-- Zwei Views:
-  - `ui/management/ManagementProjectsBoard.tsx` → Route `/admin-projects`
-  - `ui/photographer/PhotographerProductionBoard.tsx` → Route `/production`
-- Routing via `App.tsx`: lazy-loaded + `ProtectedRoute` mit `requiredFeature: 'b2b'`; Weiche in `ManagementDashboard` über `currentView`.
+- Zwei Board-Ansichten:
+  - `ui/management/ManagementProjectsBoard.tsx` → `/admin-projects` bzw. eingebettet unter `/boards?tab=projects`
+  - `ui/photographer/PhotographerProductionBoard.tsx` → eingebettet unter `/boards?tab=production`
+- Routing via `App.tsx`: lazy-loaded + `ProtectedRoute` mit `requiredFeature: 'b2b'`; die Board-Seite wählt den Tab über die URL, die ältere Projekt-View bleibt unter `/admin-projects` erreichbar.
 
 ### Sidebar
 
@@ -264,6 +280,8 @@ Abgeschlossene oder abgebrochene Items werden **automatisch hart gelöscht**, um
 - Löschung ist **hart** (kein Soft-Delete), mit `Log::info`-Eintrag pro Item + Konsolen-Zählung.
 - Nur Items in den gelisteten Status sind betroffen — aktive Items bleiben unabhängig vom Alter erhalten.
 - **Referenzschutz (Handoff):** `photo_jobs`, die von einem noch existierenden Projekt via `linked_photo_job_id` referenziert werden (§5.1), werden **übersprungen** — die Handoff-Referenz schützt den Job vor hartem Löschen, auch wenn er bereits `exportiert`/`abgebrochen` ist und die Grace überschritten hat. Erst wenn das referenzierende Projekt selbst (z.B. via Cleanup oder manuell) gelöscht wurde, ist der Job wieder ein Kandidat.
+- **Positions-Cleanup:** Nach jeder Löschung werden die betroffenen owner-scoped Statusspalten unter dem Board-Lock auf `0..n-1` reindexiert. Projekte aller Brands werden vor Photo-Jobs geprüft, damit eine freigegebene Cross-Brand-Handoff-Referenz im selben Lauf konsistent berücksichtigt wird.
+- **Semantik von `updated_at`:** Ein position-only Move speichert die verschobene Karte mit einem normalen Model-Save und aktualisiert damit `updated_at`; die Cleanup-Grace misst daher die letzte Board-Mutation, nicht ausschließlich den letzten Statuswechsel. Reindex-Schreibvorgänge auf nicht betroffenen Karten verwenden dagegen `saveQuietly` und verändern deren Zeitstempel nicht. Eine business-age-treue Reihenfolge-Semantik wäre eine separate Vertragsentscheidung.
 - Brand-Isolation gilt: Es werden Items aller Brands bereinigt (Command ist nicht user-/brand-gebunden).
 
 > **Wichtig für Datenkonsistenz:** Terminale Status (`storniert`, `abgebrochen`) UND Endstatus (`bezahlt`, `exportiert`) sind deshalb **nicht** für längere Retrospektiven verfügbar. `workflow_logs` bleiben als Historie erhalten (§9).
@@ -307,8 +325,25 @@ Die gesammelten `workflow_logs` ermöglichen langfristig:
 
 ## 10. Konventionen & Achtung (verbindlich)
 
-- **Feld-Label-Policy** (§3 AGENTS.md): Pflichtfelder tragen `required`; der `*` wird via `index.css` angehängt; `(Optional)` ist verboten.
+- **Feld-Label-Policy** (siehe `frontend/AGENTS.md`): Pflichtfelder tragen `required`; der `*` wird via `index.css` angehängt; `(Optional)` ist verboten.
 - **Kein `any` / `@ts-ignore` / `eslint-disable`**.
 - **Keine Tailwind-Dynamic-Classes** (z.B. `btn-${color}`), statischer Tailwind-Only-Einsatz.
 - **Kein `.style`-Attribut** für statische Werte (nur dynamische Laufzeitwerte).
 - **DnD:** File-Drop (Invoice/Upload) bleibt **native `dataTransfer`** — wird **nicht** mit `@dnd-kit/react` gelöst.
+
+## 11. Verification boundary
+
+Diese Datei definiert den SOLL-Vertrag, nicht den Abschlussstatus der
+Implementierung. Der aktuelle E2E-Abdeckungs- und Rest-Task-Stand gehört in
+`AGENTS.todo.md`; ein grüner Teil-Lauf (beispielsweise `@smoke`) ist keine
+Aussage, dass alle Board-Pfade oder Rollen vollständig verifiziert sind.
+
+Die vorhandenen Board-Specs (`frontend/tests/e2e/admin/projects-board.spec.ts`
+und `frontend/tests/e2e/photographer/production-board.spec.ts`) verwenden wegen
+ihres gemeinsamen dirty Board-Zustands einen seriellen Testmodus. Zusätzlich
+laufen `project-clear-fields` und `brand-settings` seriell, während
+`billing-details` wegen der globalen Settings im dedizierten CI-Shard isoliert
+wird. Die Tests erzeugen und räumen ihre eigenen Fixtures dennoch in
+`beforeEach`/`afterEach` auf. Neue Tests dürfen diese Ausnahme nicht als
+Abhängigkeit zwischen Tests verstehen; die vollständige Auswahl steht in
+`features/e2e-test-strategy.md`.

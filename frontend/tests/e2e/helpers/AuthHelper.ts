@@ -12,10 +12,12 @@ export class AuthHelper {
         await this.page.goto(loginUrl ?? '/');
 
         await expect(this.page.getByTestId('app-loader').first()).toBeHidden({ timeout: 15000 });
-        await expect(this.page.locator('main').first()).toBeVisible({ timeout: 15000 });
+        await expect(this.page.getByRole('main').first()).toBeVisible({ timeout: 15000 });
 
-        const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('svg') }).first();
-        const emailInput = this.page.locator('input[placeholder="E-Mail Adresse"]').first();
+        const menuBtn = this.page.getByRole('button', { name: 'Menü öffnen' }).first();
+        const sidebar = this.page.getByRole('complementary');
+        const emailInput = sidebar.getByRole('textbox', { name: 'E-Mail Adresse' }).first();
+        const passwordInput = sidebar.getByLabel('Passwort', { exact: true }).first();
         const backdrop = this.page.locator('div.fixed.inset-0').first();
 
         if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
@@ -29,12 +31,12 @@ export class AuthHelper {
 
         if (await emailInput.isVisible()) {
             await emailInput.fill(email);
-            await this.page.fill('input[placeholder="Passwort"]', password);
+            await passwordInput.fill(password);
 
             const loginPromise = this.network.waitForLogin();
             const mePromise = this.network.waitForMe();
 
-            await this.page.getByRole('button', { name: 'Login' }).first().scrollIntoViewIfNeeded();
+            await sidebar.getByRole('button', { name: 'Login', exact: true }).first().scrollIntoViewIfNeeded();
             await this.page.keyboard.press('Enter');
             await loginPromise;
             await mePromise;
@@ -53,9 +55,10 @@ export class AuthHelper {
         await this.page.goto(logoutUrl ?? '/');
         await expect(this.page.locator('.loading-spinner.loading-lg').first()).toBeHidden({ timeout: 5000 });
 
-        const emailInput = this.page.getByPlaceholder('E-Mail Adresse').first();
+        const sidebar = this.page.getByRole('complementary');
+        const emailInput = sidebar.getByRole('textbox', { name: 'E-Mail Adresse' }).first();
         await expect(async () => {
-            const menuBtn = this.page.locator('header button').filter({ has: this.page.locator('svg') }).first();
+            const menuBtn = this.page.getByRole('button', { name: 'Menü öffnen' }).first();
             const backdrop = this.page.locator('div.fixed.inset-0').first();
             
             if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {

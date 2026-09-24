@@ -1,4 +1,4 @@
-import { useAuth, User } from './useAuth';
+import { useAuth, type AuthMeUser } from './useAuth';
 
 export interface Permissions {
     isStaff: boolean;
@@ -17,7 +17,7 @@ export interface Permissions {
     showPayouts: boolean;
 }
 
-export function computePermissions(user: User | null | undefined): Permissions {
+export function computePermissions(user: AuthMeUser | null | undefined): Permissions {
     const isSuperAdmin = !!user?.is_super_admin;
     const isAdmin = !!user?.is_admin;
     const isPhotographer = !!user?.is_photographer;

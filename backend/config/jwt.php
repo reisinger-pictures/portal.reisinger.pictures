@@ -1,5 +1,8 @@
 <?php
 
+use PHPOpenSourceSaver\JWTAuth\Providers\Auth\Illuminate;
+use PHPOpenSourceSaver\JWTAuth\Providers\JWT\Lcobucci;
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -168,8 +171,16 @@ return [
     */
 
     'persistent_claims' => [
-        // 'foo',
-        // 'bar',
+        // Guest identity and invite provenance must survive a refresh. Without
+        // these claims, a refreshed token would either lose its invite link or
+        // silently turn transient grants into unscoped arrays.
+        'guest_id',
+        'guest_name',
+        'guest_invite_id',
+        'transient_galleries',
+        'transient_meta_galleries',
+        'transient_invites',
+        'transient_invite_ids',
     ],
 
     /*
@@ -277,6 +288,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Refresh Cookie Key Name
+    |--------------------------------------------------------------------------
+    |
+    | The refresh credential is kept in a separate httpOnly cookie so an
+    | expired access cookie does not prevent silent session renewal.
+    |
+    */
+
+    'refresh_cookie_key_name' => env('JWT_REFRESH_COOKIE', 'rp_jwt_refresh'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Providers
     |--------------------------------------------------------------------------
     |
@@ -294,7 +317,7 @@ return [
         |
         */
 
-        'jwt' => PHPOpenSourceSaver\JWTAuth\Providers\JWT\Lcobucci::class,
+        'jwt' => Lcobucci::class,
 
         /*
         |--------------------------------------------------------------------------
@@ -305,7 +328,7 @@ return [
         |
         */
 
-        'auth' => PHPOpenSourceSaver\JWTAuth\Providers\Auth\Illuminate::class,
+        'auth' => Illuminate::class,
 
         /*
         |--------------------------------------------------------------------------

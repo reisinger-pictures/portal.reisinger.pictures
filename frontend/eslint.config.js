@@ -31,8 +31,20 @@ export default tseslint.config(
     },
   },
   {
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['tests/e2e/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
     rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_' },
+      ],
       'no-restricted-syntax': [
         'error',
         {

@@ -43,7 +43,7 @@ export default function PhotoDetailView() {
     const [prevPhotoId, setPrevPhotoId] = useState<string | undefined>(undefined);
     const [aiContext, setAiContext] = useState('');
     const [isAiGenerating, setIsAiGenerating] = useState(false);
-    const licensingMode = useLicensingMode();
+    const licensingMode = useLicensingMode(data?.photo.gallery_id);
 
     const photoId = data?.photo?.id;
     if (photoId && photoId !== prevPhotoId) {

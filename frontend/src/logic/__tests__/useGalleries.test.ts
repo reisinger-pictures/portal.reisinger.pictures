@@ -57,4 +57,15 @@ describe('useProtectedGalleries group org assignment', () => {
             expect.objectContaining({org_id: 'org-2'}),
         );
     });
+
+    it('does not synthesize org_id when an update omits the organisation field', async () => {
+        const {result} = renderHook(() => useProtectedGalleries());
+
+        await act(async () => {
+            await result.current.updateGroup('g-1', 'Ordner', 'ordner', true, null, {is_hidden: true});
+        });
+
+        const updatePayload = vi.mocked(apiMutate).mock.calls[0][2];
+        expect(updatePayload).not.toHaveProperty('org_id');
+    });
 });

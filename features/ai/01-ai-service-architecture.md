@@ -8,18 +8,30 @@ The AI subsystem generates photo metadata (title, description, keywords, locatio
 
 ## 2. Three-State Machine
 
-The system has exactly three states, controlled by `AI_ENABLED` env var (boolean via Laravel's DotEnv parser):
+The system has exactly three effective states. `AI_ENABLED` is read as a
+truthy/falsey environment value (normally the booleans `true`/`false`):
 
 ```
-AI_ENABLED=false        → isDisabled()     → Feature hidden entirely, no admin banner
-AI_ENABLED=true         → isUnconfigured() → Admin banner "please configure" shown (when api_key missing)
-AI_ENABLED=true + key   → isAvailable()    → Normal operation
+AI_ENABLED=falsey                         → disabled       → hidden, no admin banner
+AI_ENABLED=true + AI_TYPE=lmstudio        → available      → key is not required
+AI_ENABLED=true + non-lmstudio + no key   → unconfigured   → admin warning banner
+AI_ENABLED=true + non-lmstudio + key      → available      → normal operation
 ```
 
-- Laravel's `env('AI_ENABLED', false)` returns boolean `false`/`true` from `.env` file.
-- `AI_TYPE` selects the provider: `openai` (default), `anthropic`, or `lmstudio`.
-- LM Studio bypasses the api_key check: `isAvailable()` returns `true` if `AI_TYPE=lmstudio` regardless of key.
-- Admin banner (`isUnconfigured`) only appears when AI is neither disabled nor fully configured.
+- `AIService::isDisabled()` uses the resolved config value, not a literal
+  `DISABLED` string.
+- `AI_TYPE` selects `openai` (default), `anthropic`, or `lmstudio`.
+- `AI_TYPE=lmstudio` is available without `AI_API_KEY`; this is the only
+  provider-specific exception to the key requirement.
+- `isUnconfigured()` is currently a raw helper: it reports an enabled service
+  with an empty key, including an `lmstudio` configuration. After the disabled
+  check, the status endpoint gives `isAvailable()` precedence over the
+  unconfigured label, so LM Studio is still reported as `status=available` even
+  when that helper is true. This helper nuance does not create a fourth
+  effective state.
+- The `/api/ai/status` `enabled` field reports effective availability
+  (`isAvailable()`), while `status` disambiguates `disabled`, `unconfigured`,
+  and `available`.
 
 ## 3. Generation Methods – Zwei Flows, eine Engine
 
@@ -76,10 +88,14 @@ AIGalleryDefaultsModal → useAI.generateMetadataFromText(text_input, global_con
 
 ### 3.3 Local Mode (LM Studio)
 
-- Falls back when server AI is unavailable/unconfigured.
-- URL from `localStorage.lmstudio_url` or `VITE_LMSTUDIO_URL` env or `http://127.0.0.1:1234`.
-- Vision only (same prompt structure as server mode).
-- Model ID resolved via `GET {localUrl}/v1/models`.
+- The browser probes LM Studio only when the server status is **unconfigured** or
+  the status request fails. An explicit `status=disabled` is authoritative and
+  never falls back to LM Studio.
+- URL from `localStorage.lmstudio_url` or `VITE_LMSTUDIO_URL` env or
+  `http://127.0.0.1:1234`; the configured URL is restricted to localhost HTTP.
+- Vision only (same prompt structure as server mode). The text-only flow always
+  uses the server endpoint and has no local-mode branch.
+- Model ID is resolved via `GET {localUrl}/v1/models`.
 
 ## 4. Frontend Architecture
 
@@ -90,7 +106,7 @@ interface UseAIReturn {
   isAvailable: boolean;
   mode: 'server' | 'local' | 'unavailable';
   modelId: string | null;
-  generateMetadata(photoId, globalContext, specificContext, signal?): Promise<AIResponse>;
+  generateMetadata(photoId, globalContext, specificContext, signal?, sessionId?): Promise<AIResponse>;
   generateMetadataFromText(textInput, globalContext?): Promise<AIResponse>;
   updateBaseUrl(url: string): void;
 }
@@ -99,18 +115,23 @@ interface UseAIReturn {
 **`GET /api/ai/status` response** now includes a `status` field to disambiguate disabled vs unconfigured:
 
 ```json
-{ "enabled": false, "status": "disabled",     "model": null }
-{ "enabled": false, "status": "unconfigured",  "model": null }
-{ "enabled": true,  "status": "available",    "model": "gpt-4o" }
+{ "enabled": false, "status": "disabled",     "type": "openai", "model": "gpt-4o" }
+{ "enabled": false, "status": "unconfigured",  "type": "openai", "model": "gpt-4o" }
+{ "enabled": true,  "status": "available",    "type": "openai", "model": "gpt-4o" }
 ```
 
-**Mode resolution** (on mount, via useEffect):
-1. Call `GET /api/ai/status`
-2. If `status === 'available'` → `mode='server'`, `isAvailable=true`, done
-3. If `status === 'disabled'` → `mode='unavailable'`, `isAvailable=false`, **NO** LM Studio fallback (intentionally off)
-4. Else (status = unconfigured or HTTP error) → try LM Studio fallback:
-   - `GET {localUrl}/v1/models` → if model found → `mode='local'`, `isAvailable=true`
-   - Else `mode='unavailable'`, `isAvailable=false`
+**Mode resolution** (on mount, via `useEffect`):
+1. Call `GET /api/ai/status`.
+2. `status === 'disabled'` → `mode='unavailable'`, `isAvailable=false`, and
+   **no** LM Studio probe (an explicit disable is authoritative).
+3. Effective `enabled === true` (normally `status === 'available'`) →
+   `mode='server'`, `isAvailable=true`.
+4. `status === 'unconfigured'` or a status-request/HTTP error → probe
+   `GET {localUrl}/v1/models`; a returned model selects `mode='local'`.
+5. No usable server or local model → `mode='unavailable'`, `isAvailable=false`.
+
+The status endpoint's `enabled` value is the effective server availability,
+not merely the raw `AI_ENABLED` setting.
 
 **Zod validation** (`aiResponseSchema`): All responses are validated client-side.
 
@@ -175,7 +196,7 @@ class AIProviderFactory
 
 | Route | Method | Auth | Description |
 |---|---|---|---|---|
-| `GET /api/ai/status` | `status()` | auth:api | Returns `{enabled, status, model}` |
+| `GET /api/ai/status` | `status()` | auth:api | Returns `{enabled, status, type, model}` |
 | `POST /api/ai/generate-metadata` | `generateMetadata()` | auth:api + Gate | Photo vision analysis; returns 503 if disabled/unconfigured |
 | `POST /api/ai/generate-metadata-text` | `generateMetadataText()` | auth:api | Text-only metadata; returns 503 if disabled/unconfigured |
 
@@ -183,9 +204,9 @@ class AIProviderFactory
 
 | Method | Type | Depends on |
 |---|---|---|
-| `isDisabled()` | state | `AI_ENABLED === 'DISABLED'` |
-| `isUnconfigured()` | state | `!isDisabled() && !isAvailable()` |
-| `isAvailable()` | state | `AI_ENABLED truthy && api_key present` |
+| `isDisabled()` | state | resolved `config('services.ai.enabled')` is falsey |
+| `isUnconfigured()` | raw state helper | enabled with an empty `AI_API_KEY`; for `AI_TYPE=lmstudio`, the status endpoint still reports `available` because the availability check wins after the disabled check |
+| `isAvailable()` | effective state | enabled and (`AI_TYPE=lmstudio` or a non-empty `AI_API_KEY`) |
 | `generateMetadata(Photo, context, sessionId?)` | vision | Photo file on disk, `loadAndCompressImage` |
 | `generateMetadataFromText(string, sessionId?)` | text | None |
 | `loadAndCompressImage(Photo)` | helper | GD library, `Storage::disk('photos')` |
@@ -229,7 +250,7 @@ AIBatchEditModal (handleGenerateAll → crypto.randomUUID())
 ```php
 // config/services.php
 'ai' => [
-    'enabled'        => env('AI_ENABLED', false),           // boolean (true|false)
+    'enabled'        => env('AI_ENABLED', false),           // falsey disables; true enables
     'type'           => env('AI_TYPE', 'openai'),            // openai|anthropic|lmstudio
     'base_url'       => env('AI_BASE_URL', 'https://api.openai.com/v1'),
     'api_key'        => env('AI_API_KEY'),

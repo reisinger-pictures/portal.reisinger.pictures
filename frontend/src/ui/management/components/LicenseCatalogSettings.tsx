@@ -6,9 +6,54 @@ import EditableTableRow from './EditableTableRow';
 
 interface UseCaseRowProps { uc: LicenseUseCase; onSave: (id: string, data: Partial<LicenseUseCase>) => Promise<void>; onDelete: (id: string) => void }
 
+function toUseCaseDraft(uc: LicenseUseCase): Partial<LicenseUseCase> {
+    return { ...uc, base_price: uc.base_price / 100, is_commercial: uc.is_commercial || false };
+}
+
+function toModifierDraft(mod: LicenseModifier): Partial<LicenseModifier> {
+    return { ...mod };
+}
+
+function getUseCaseDraftVersion(uc: LicenseUseCase): string {
+    return JSON.stringify([
+        uc.id,
+        uc.name,
+        uc.description,
+        uc.base_price,
+        uc.flatrate_tier,
+        uc.sort_order,
+        uc.is_commercial ?? false,
+    ]);
+}
+
+function getModifierDraftVersion(mod: LicenseModifier): string {
+    return JSON.stringify([
+        mod.id,
+        mod.name,
+        mod.description,
+        mod.percent_surcharge,
+        mod.is_included_in_flatrate,
+        mod.sort_order,
+    ]);
+}
+
+interface UseCaseDraftState {
+    version: string;
+    data: Partial<LicenseUseCase>;
+}
+
 function UseCaseRow({ uc, onSave, onDelete }: UseCaseRowProps) {
     const [isEditing, setIsEditing] = useState(false);
-    const [data, setData] = useState<Partial<LicenseUseCase>>({ ...uc, base_price: uc.base_price / 100, is_commercial: uc.is_commercial || false });
+    const version = getUseCaseDraftVersion(uc);
+    const [draft, setDraft] = useState<UseCaseDraftState>(() => ({
+        version,
+        data: toUseCaseDraft(uc),
+    }));
+    // Ignore a draft created for an older SWR snapshot without closing the editor.
+    const data = draft.version === version ? draft.data : toUseCaseDraft(uc);
+    const setData = (nextData: Partial<LicenseUseCase>) => {
+        setDraft({ version, data: nextData });
+    };
     const { showToast } = useUI();
 
     const handleSave = async () => {
@@ -24,8 +69,14 @@ function UseCaseRow({ uc, onSave, onDelete }: UseCaseRowProps) {
     return (
         <EditableTableRow
             isEditing={isEditing}
-            onStartEdit={() => setIsEditing(true)}
-            onCancel={() => setIsEditing(false)}
+            onStartEdit={() => {
+                setData(toUseCaseDraft(uc));
+                setIsEditing(true);
+            }}
+            onCancel={() => {
+                setData(toUseCaseDraft(uc));
+                setIsEditing(false);
+            }}
             onSave={handleSave}
             onDelete={() => onDelete(uc.id)}
             renderView={() => (
@@ -74,9 +125,23 @@ function UseCaseRow({ uc, onSave, onDelete }: UseCaseRowProps) {
 
 interface ModifierRowProps { mod: LicenseModifier; onSave: (id: string, data: Partial<LicenseModifier>) => Promise<void>; onDelete: (id: string) => void }
 
+interface ModifierDraftState {
+    version: string;
+    data: Partial<LicenseModifier>;
+}
+
 function ModifierRow({ mod, onSave, onDelete }: ModifierRowProps) {
     const [isEditing, setIsEditing] = useState(false);
-    const [data, setData] = useState<Partial<LicenseModifier>>({ ...mod });
+    const version = getModifierDraftVersion(mod);
+    const [draft, setDraft] = useState<ModifierDraftState>(() => ({
+        version,
+        data: toModifierDraft(mod),
+    }));
+    // Ignore a draft created for an older SWR snapshot without closing the editor.
+    const data = draft.version === version ? draft.data : toModifierDraft(mod);
+    const setData = (nextData: Partial<LicenseModifier>) => {
+        setDraft({ version, data: nextData });
+    };
     const { showToast } = useUI();
 
     const handleSave = async () => {
@@ -92,8 +157,14 @@ function ModifierRow({ mod, onSave, onDelete }: ModifierRowProps) {
     return (
         <EditableTableRow
             isEditing={isEditing}
-            onStartEdit={() => setIsEditing(true)}
-            onCancel={() => setIsEditing(false)}
+            onStartEdit={() => {
+                setData(toModifierDraft(mod));
+                setIsEditing(true);
+            }}
+            onCancel={() => {
+                setData(toModifierDraft(mod));
+                setIsEditing(false);
+            }}
             onSave={handleSave}
             onDelete={() => onDelete(mod.id)}
             renderView={() => (

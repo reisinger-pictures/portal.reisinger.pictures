@@ -2,16 +2,17 @@
 
 namespace Tests\Feature\Board;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\User;
-use App\Models\Role;
-use App\Models\Project;
-use App\Models\PhotoJob;
 use App\Enums\Brand;
-use App\Enums\ProjectStatus;
 use App\Enums\PhotoJobStatus;
+use App\Enums\ProjectStatus;
+use App\Models\PhotoJob;
+use App\Models\Project;
+use App\Models\Role;
+use App\Models\User;
 use App\Support\BrandRegistry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Tests\TestCase;
 
 class ProjectHandoffTest extends TestCase
 {
@@ -22,28 +23,32 @@ class ProjectHandoffTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => 'super_admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function createAdmin(): User
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B->value]);
         $role = Role::firstOrCreate(['name' => 'admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function createPhotographer(): User
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B->value]);
         $role = Role::firstOrCreate(['name' => 'photographer']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function authHeaders(User $user): array
     {
         $token = auth('api')->login($user);
+
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }
 
@@ -77,17 +82,45 @@ class ProjectHandoffTest extends TestCase
         $this->assertDatabaseHas('projects', ['id' => $project->id, 'linked_photo_job_id' => $photoJobId]);
     }
 
-    public function test_handoff_sets_next_position_per_brand(): void
+    public function test_handoff_normalizes_existing_positions_and_appends_densely(): void
     {
         $superAdmin = $this->createSuperAdmin();
         $headers = $this->authHeaders($superAdmin);
-        PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $superAdmin->id, 'position' => 4]);
+        $existing = PhotoJob::factory()->create(['brand' => Brand::B2B, 'owner_id' => $superAdmin->id, 'position' => 4]);
         $project = Project::factory()->create(['brand' => Brand::B2B, 'owner_id' => $superAdmin->id]);
 
         $response = $this->withHeaders($headers)->postJson("/api/management/projects/{$project->id}/handoff");
 
         $response->assertStatus(201);
-        $response->assertJsonPath('photo_job.position', 5);
+        $response->assertJsonPath('photo_job.position', 1);
+        $this->assertDatabaseHas('photo_jobs', ['id' => $existing->id, 'position' => 0]);
+        $this->assertSame(
+            [0, 1],
+            PhotoJob::query()->where('brand', Brand::B2B->value)->orderBy('position')->pluck('position')->map(static fn ($position): int => (int) $position)->all(),
+        );
+    }
+
+    public function test_handoff_does_not_renumber_another_owner_s_photo_jobs(): void
+    {
+        $superAdmin = $this->createSuperAdmin();
+        $otherOwner = User::factory()->create(['brand' => Brand::B2B->value]);
+        $otherJob = PhotoJob::factory()->create([
+            'brand' => Brand::B2B,
+            'owner_id' => $otherOwner->id,
+            'assignee_id' => $superAdmin->id,
+            'position' => 7,
+        ]);
+        $project = Project::factory()->create([
+            'brand' => Brand::B2B,
+            'owner_id' => $superAdmin->id,
+        ]);
+
+        $response = $this->withHeaders($this->authHeaders($superAdmin))
+            ->postJson("/api/management/projects/{$project->id}/handoff");
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('photo_job.position', 0);
+        $this->assertDatabaseHas('photo_jobs', ['id' => $otherJob->id, 'position' => 7]);
     }
 
     public function test_handoff_does_not_change_project_status(): void
@@ -149,9 +182,21 @@ class ProjectHandoffTest extends TestCase
         $this->assertDatabaseHas('projects', ['id' => $otherBrandProject->id, 'linked_photo_job_id' => null]);
     }
 
+    public function test_handoff_rejects_a_null_brand_project(): void
+    {
+        $superAdmin = $this->createSuperAdmin();
+        $project = Project::factory()->create(['brand' => null]);
+
+        $this->withHeaders($this->authHeaders($superAdmin))
+            ->postJson("/api/management/projects/{$project->id}/handoff")
+            ->assertStatus(404);
+
+        $this->assertDatabaseMissing('photo_jobs', ['title' => $project->client_name]);
+    }
+
     public function test_unauthenticated_gets_401_on_handoff(): void
     {
-        $id = (string) \Illuminate\Support\Str::uuid();
+        $id = (string) Str::uuid();
 
         $this->postJson("/api/management/projects/{$id}/handoff")->assertStatus(401);
     }

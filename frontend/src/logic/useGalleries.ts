@@ -6,6 +6,12 @@ import {usePermissions} from './usePermissions';
 // Re-export the canonical `Gallery` type so existing imports from this module keep working.
 export type {Gallery};
 
+/** Organization assignments returned by the gallery-group resource. */
+export interface GalleryGroupOrg {
+    id: string;
+    name: string;
+}
+
 export interface GalleryGroup {
     id: string;
     name: string;
@@ -20,8 +26,8 @@ export interface GalleryGroup {
     effective_is_free_download?: boolean;
     children?: GalleryGroup[];
     galleries?: Gallery[];
-    org_id?: string | null;
-    orgs?: Array<{ id: string; name: string }>;
+    /** All organization assignments; the update payload may still be scalar org_id. */
+    orgs?: GalleryGroupOrg[];
 }
 
 export interface GalleryTreeResponse {

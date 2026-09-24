@@ -24,7 +24,7 @@ class Gallery extends Model
         'default_location', 'default_city', 'default_state', 'default_country', 'default_iso_country',
         'org_ids', 'brand', 'licensing_mode', 'effective_licensing_mode',
         'volume_preset_id',
-        'expires_at', 'created_at', 'full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers',
+        'expires_at', 'created_at', 'full_path', 'effective_is_public', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'photos', 'galleryGroup', 'is_editorial_only', 'is_hidden', 'is_free_download', 'restricted_photographers',
     ];
 
     protected $fillable = [
@@ -69,7 +69,7 @@ class Gallery extends Model
         'restricted_photographers' => 'boolean',
     ];
 
-    protected $appends = ['full_path', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'org_ids', 'effective_licensing_mode'];
+    protected $appends = ['full_path', 'effective_is_public', 'effective_is_editorial_only', 'effective_is_hidden', 'effective_is_free_download', 'org_ids', 'effective_licensing_mode'];
 
     public function getEffectiveLicensingModeAttribute(): string
     {
@@ -86,6 +86,20 @@ class Gallery extends Model
             ->value('value') ?? 'scope_licensing';
     }
 
+    /**
+     * Selection galleries are private rating surfaces by definition.  Keep the
+     * effective value safe even if a legacy row or a direct query-builder
+     * update managed to set the persisted flag to true.
+     */
+    public function getEffectiveIsPublicAttribute(): bool
+    {
+        if ($this->isSelection()) {
+            return false;
+        }
+
+        return (bool) $this->is_public;
+    }
+
     public function getEffectiveIsEditorialOnlyAttribute(): bool
     {
         return $this->is_editorial_only || ($this->galleryGroup ? $this->galleryGroup->effective_is_editorial_only : false);
@@ -93,6 +107,10 @@ class Gallery extends Model
 
     public function getEffectiveIsFreeDownloadAttribute(): bool
     {
+        if ($this->isSelection()) {
+            return false;
+        }
+
         return $this->is_free_download || ($this->galleryGroup ? $this->galleryGroup->effective_is_free_download : false);
     }
 
@@ -135,6 +153,17 @@ class Gallery extends Model
 
     protected static function booted()
     {
+        static::saving(function (self $gallery) {
+            if ($gallery->isSelection()) {
+                // Keep the invariant at the model boundary as well as in the
+                // service layer.  This also covers direct model updates made by
+                // maintenance commands and future controllers.
+                $gallery->is_live = false;
+                $gallery->is_public = false;
+                $gallery->is_free_download = false;
+            }
+        });
+
         static::saved(function (self $gallery) {
             DB::afterCommit(function () {
                 app(GalleryTreeService::class)->clearCache();
@@ -149,6 +178,11 @@ class Gallery extends Model
             });
             Cache::forget('unrestricted_photographer_gallery_ids');
         });
+    }
+
+    public function isSelection(): bool
+    {
+        return $this->type === 'selection';
     }
 
     public function photos()

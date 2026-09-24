@@ -1,7 +1,7 @@
 # Strict User Brand Isolation — Login Rejection + Staff Brand-Bound (U-01, U-02)
 
 > **Status:** `active` — verbindlicher Soll-Zustand.
-> Erstellt 2026-07-01; ersetzt Policy A (A-01) aus `10-frontend-brand-Org-isolation.md`.
+> Erstellt 2026-07-01; ersetzt Policy A (A-01) aus `10-frontend-brand-tenant-isolation.md`.
 >
 > **Verknüpfte Tasks:** U-01 (Login Brand-Mismatch Rejection), U-02 (Staff brand-bound),
 > `AGENTS.todo.md` Entscheidungen E-01, E-02, E-03 (2026-06-30, User).
@@ -99,12 +99,29 @@ User-Update-Request
 
 ## 6. Abgrenzung
 
-- Die `AccessControlService::getAllowedGalleryIds()`-Logik (`brand=null` = cross-brand,
-  `brand!=null` = brand-scoped) **ändert sich nicht** — nur die Policy, WELCHE User
-  `brand=null` haben dürfen.
+- Die `AuthorizationService::getAllowedGalleryIds()`-Logik behandelt `brand=null`
+  nur für einen vertrauenswürdigen, persistierten `super_admin` als cross-brand;
+  Legacy-Null-Brand-User und nicht-verifizierte Gast-Claims fallen auf eine leere
+  bzw. invite-spezifische Grant-Menge zurück.
 - Photographer-Doppelrolle (E-02): Ein Fotograf, der für beide Brands arbeitet, erhält
   **zwei separate Accounts** pro Brand. Kein Sonderfall-Code.
 - Historische Rechnungen (E-03): Alle existierenden Bestellungen/Rechnungen sind `'rp'`.
+
+## 6.1 Reserved-Null Trust Boundary (2026-09-24)
+
+- `brand = null` is a reserved **user-actor** state: only a persisted user with the
+  explicit `super_admin` role may use it for cross-brand authorization. A legacy
+  null-brand non-Super-Admin is denied at login, refresh, authorization, and
+  management boundaries.
+- A role-only promotion to `super_admin` is an atomic transition; the role pivot
+  and `brand = null` update are persisted in the same transaction.
+- Invites for legacy brandless organizations are rejected before user creation or
+  mutation. New invite-created accounts receive the concrete invite/current-host
+  brand; they are never silently persisted with `brand = null`.
+- Transient guest JWTs are invite capabilities, not registered cross-brand
+  identities. A guest grant is valid only while its invite is active and its
+  complete gallery tree matches the current host; metadata permission is read
+  from the live invite rather than trusted from the JWT array.
 
 ## 7. Decision Log
 
@@ -113,4 +130,4 @@ User-Update-Request
 | 2026-06-30 | **E-01 (Login-Portal-Bindung):** Brand-Mismatch → Abweisung, Super-Admin ausgenommen. |
 | 2026-06-30 | **E-02 (Photographen-Doppelrolle):** Getrennte Accounts pro Brand. |
 | 2026-06-30 | **E-03 (Historische Rechnungen):** Alle `'rp'`. |
-| 2026-07-01 | **U-01/U-02 implementiert.** Policy A (A-01) aus `10-frontend-brand-Org-isolation.md` ist superseded. |
+| 2026-07-01 | **U-01/U-02 implementiert.** Policy A (A-01) aus `10-frontend-brand-tenant-isolation.md` ist superseded. |

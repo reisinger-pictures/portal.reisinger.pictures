@@ -27,6 +27,9 @@ class UserController extends Controller
     {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
+        if ($user && $svc->isReservedNullBrandActor($user)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
         $query = User::with(['roles', 'galleryGroups', 'galleries', 'photographerGalleries', 'photographerGalleryGroups']);
 
         if (! $svc->isAdmin($user)) {
@@ -52,6 +55,9 @@ class UserController extends Controller
     {
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
+        if ($user && $svc->isReservedNullBrandActor($user)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
         $query = Role::query();
         if (! $user || ! $svc->isSuperAdmin($user)) {
             $query->where('name', '!=', UserRole::SUPER_ADMIN->value);
@@ -64,6 +70,9 @@ class UserController extends Controller
     {
         $svc = app(AuthorizationService::class);
         $currentUser = auth('api')->user();
+        if ($currentUser && $svc->isReservedNullBrandActor($currentUser)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
 
         // Org Admin: scope to their org
         $managerOrg = null;
@@ -71,6 +80,9 @@ class UserController extends Controller
             $managerOrg = Org::find($currentUser->org_id);
             if (! $managerOrg) {
                 return response()->json(['error' => 'Customer Manager hat keine Organisation.'], 422);
+            }
+            if ($this->brandValue($managerOrg) === null) {
+                return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
             }
         }
 
@@ -170,39 +182,46 @@ class UserController extends Controller
         }
 
         $validated = $request->validated();
+        $roleIds = $request->input('role_ids');
+        $selectedRoleNames = $request->has('role_ids')
+            ? Role::whereIn('id', $roleIds ?? [])->pluck('name')->all()
+            : $user->roles()->pluck('name')->all();
+        $isSuperAdminSelection = in_array(UserRole::SUPER_ADMIN->value, $selectedRoleNames, true);
 
-        if ($request->has('role_ids')) {
-            $user->roles()->sync($request->role_ids);
-        }
-        if ($request->has('gallery_group_ids')) {
-            $user->galleryGroups()->sync($request->gallery_group_ids);
-        }
-        if ($request->has('gallery_ids')) {
-            $user->galleries()->sync($request->gallery_ids);
+        $updates = [];
+        foreach ([
+            'can_edit_metadata',
+            'flatrate_level',
+            'can_purchase_upgrades',
+        ] as $field) {
+            if ($request->has($field)) {
+                $updates[$field] = $validated[$field] ?? $request->input($field);
+            }
         }
 
-        if ($request->has('can_edit_metadata')) {
-            $user->update(['can_edit_metadata' => $request->can_edit_metadata]);
+        // Role-only promotion is a single state transition. Do not leave a
+        // newly-created Super-Admin with its previous brand merely because the
+        // request omitted the optional `brand` field.
+        if ($request->has('brand') || ($request->has('role_ids') && $isSuperAdminSelection)) {
+            $updates['brand'] = $isSuperAdminSelection ? null : $request->input('brand');
         }
-        if ($request->has('flatrate_level')) {
-            $user->update(['flatrate_level' => $request->flatrate_level]);
-        }
-        if ($request->has('can_purchase_upgrades')) {
-            $user->update(['can_purchase_upgrades' => $request->can_purchase_upgrades]);
-        }
-        if ($request->has('brand')) {
-            // U-02: Staff is brand-bound (reversal of Policy A). Only Super-Admin keeps
-            // brand=null (cross-brand). All other roles (admin, photographer, etc.) are
-            // brand-bound to 'rp' or 'srp'.
-            // If role_ids is provided, use the request roles; otherwise check the user's
-            // current roles (e.g. when only the brand field is being updated).
-            $selectedRoleNames = $request->has('role_ids')
-                ? Role::whereIn('id', $request->role_ids ?? [])->pluck('name')->all()
-                : $user->roles()->pluck('name')->all();
-            $isSuperAdmin = in_array(UserRole::SUPER_ADMIN->value, $selectedRoleNames, true);
 
-            $user->update(['brand' => $isSuperAdmin ? null : $request->brand]);
-        }
+        DB::transaction(function () use ($request, $user, $roleIds, $updates) {
+            if ($request->has('role_ids')) {
+                $user->roles()->sync($roleIds ?? []);
+            }
+            if ($request->has('gallery_group_ids')) {
+                $user->galleryGroups()->sync($request->input('gallery_group_ids', []));
+            }
+            if ($request->has('gallery_ids')) {
+                $user->galleries()->sync($request->input('gallery_ids', []));
+            }
+
+            if ($updates !== []) {
+                $user->fill($updates);
+                $user->save();
+            }
+        });
 
         return response()->json(['success' => true]);
     }

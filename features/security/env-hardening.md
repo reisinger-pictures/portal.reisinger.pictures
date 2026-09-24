@@ -1,6 +1,6 @@
 # Environment File & Secret Hardening
 
-## Status: Active (2026-07-21)
+## Status: Active (reviewed 2026-09-24)
 
 ## Motivation
 
@@ -23,33 +23,59 @@ zu tracken und damit das korrekte Ignore-Pattern im Root-`.gitignore`
 
 ### Admin-Identität (S5b, 2026-08-13)
 
-Die Super-Admin-Identität ist **vollständig env-getrieben** (`ADMIN_EMAIL`), mit generischem Fallback `admin@example.com`. Es gibt **keine hartcodierte persönliche E-Mail** mehr im Quellcode (vorher `florian@reisinger.pictures` als magische `brand=null`-Identität in `AuthController`, `DatabaseSeeder`, `E2ETestUserSeeder`, `V004`, `V018` und `company_email`-Setting). Prod setzt die reale Admin-E-Mail ausschließlich über Portainer/`.env`.
+Die aktuelle Runtime-Admin-Konfiguration ist vollständig env-getrieben:
+`backend/config/admin.php` liest `ADMIN_EMAIL` und `ADMIN_PASSWORD` ohne
+Runtime-Fallback. `admin@example.com` darf nur als expliziter Wert in
+lokalen/CI-/E2E-Fixtures oder im `.env.example` vorkommen; es ist kein aktueller
+Produktionsdefault. Es gibt keine hartcodierte persönliche E-Mail im aktuellen
+Runtime-Code. Historische Migrations-Fixtures können einen generischen Wert
+enthalten, sind aber kein Config-Fallback für Seeder oder `admin:update`.
+Produktion setzt die reale E-Mail und das Passwort ausschließlich über
+Portainer/`.env`.
 
 ### Getrackte Dateien (committed)
 
-Nur noch Template-Dateien mit Platzhaltern sind committed:
+Die ausdrücklich erlaubten Dateien sind nicht alle Starter-Templates:
 
-| Datei                             | Zweck                                                  |
+| Datei                             | Klassifizierung und Zweck                              |
 | --------------------------------- | ------------------------------------------------------ |
-| `backend/.env.example`            | Vollständiges Dev-Template (APP, DB, Mail, Scout, Stripe, AI, JWT) |
+| `backend/.env.example`            | Dev-Template mit Platzhaltern (APP, DB, Mail, Scout, Stripe, AI, JWT, File Encryption) |
+| `backend/.env.ci`                 | **CI-only Fixture**: wird von den Workflows als `.env` verwendet; enthält Test-/Platzhalterwerte, keine Produktionskonfiguration und kein Developer-Setup |
+| `backend/.env.encrypted`          | **Verschlüsselter Blob/Backup**, kein Template und keine Starterlaubnis; nicht ungeprüft kopieren, entschlüsseln oder in einen lokalen `.env` übernehmen |
 | `frontend/.env.example`           | Frontend-Default-Template (`VITE_STRIPE_PUBLIC_KEY` Platzhalter) |
 | `frontend/.env.local.example`     | Frontend-Local-Dev-Template (override `.env`)          |
 
+Die beiden Backend-Dateien `.env.ci` und `.env.encrypted` sind bewusste
+Allowlist-Ausnahmen im Root-`.gitignore`; ihre Existenz bedeutet **nicht**, dass
+sie als lokales Entwicklungs- oder Produktions-Setup verwendet werden dürfen.
+
 ### Ungetrackte Dateien (lokal auf Disk, NICHT committed)
 
-Diese Dateien enthalten reale Secrets und stehen nur auf der lokalen Disk bzw.
-werden im Deployment injiziert:
+Diese Dateien können reale Secrets enthalten und stehen nur auf der lokalen Disk
+bzw. werden im Deployment injiziert:
 
 - `backend/.env`, `backend/.env.local`, `backend/.env.production` etc.
 - `frontend/.env`, `frontend/.env.local`
 - `backend/storage/*.key`
 
+`.env.ci` und `.env.encrypted` sind davon ausgenommen: Beide sind tracked, aber
+mit der jeweils oben beschriebenen CI-/Backup-Klassifizierung.
+
 ### Test-Fixtures
 
-`backend/phpunit.xml` enthält localhost Test-Credentials (`127.0.0.1:3307`,
-`portal_user/admin`, `test_meili_secret`, Mail-Port 1025). Diese sind bewusst
-als Fixtures akzeptiert (keine Third-Party-Secrets, nur lokal erreichbare
-Services). Siehe `AGENTS.md` §7 Risk Register.
+**Kanonischer PHPUnit-Testbetrieb:** `backend/phpunit.xml` setzt
+`DB_CONNECTION=sqlite` und `DB_DATABASE=:memory:`. Die dort gesetzten
+localhost-Service-Fixtures (`127.0.0.1:7701`, `test_meili_secret`, Mail-Port
+`1025` usw.) sind Test-Konfiguration und keine MySQL/MariaDB-Datenbank.
+
+`backend/.env.ci` ist ein **getracktes CI-Setup** und enthält in seinem
+allgemeinen Abschnitt MariaDB-Werte für den separaten E2E-Servicebetrieb. Der
+Backend-/PHPUnit-CI-Job kopiert die Datei als `.env`, überschreibt aber die
+Datenbank für PHPUnit durch `phpunit.xml` auf SQLite `:memory:`; der E2E-Job
+passt die Werte separat auf seine MariaDB-/Meilisearch-/Mailpit-Service-Namen
+an. Die alten `127.0.0.1:3307`-/MariaDB-Angaben dürfen daher nicht als
+PHPUnit-Standard beschrieben werden. Siehe `AGENTS.md` §8 (Security Risk
+Register).
 
 ### Code-Fallbacks
 
@@ -76,8 +102,9 @@ Such-/Filterfelder (`gender`, `customer.city`, `birthdate`) bleiben plaintext.
   scheitert am GCM-Auth-Tag (`DecryptException`). Altdaten lassen sich bei Bedarf
   mit `php artisan file:decrypt`/`file:encrypt` re-encrypten.
 - **Tests:** `phpunit.xml` setzt einen deterministischen, nicht-geheimen
-  Test-Key; `backend/.env.ci` einen CI-Key. `backend/.env.example` enthält nur
-  den leeren Platzhalter.
+  Test-Key; `backend/.env.ci` enthält einen separaten CI-Test-Key. Diese beiden
+  Dateien sind Test-Fixtures, keine Produktionsschlüssel. `backend/.env.example`
+  enthält nur den leeren Platzhalter.
 - **Metadata-Stripping:** Raster-Bilder (jpg/png/webp) werden vor dem
   Verschlüsseln per GD re-encodiert (EXIF/GPS entfernt); PDF/Unbekannt bleiben
   unverändert (aber weiterhin verschlüsselt).
@@ -104,15 +131,41 @@ frontend/.env*
 
 ### Backend
 
+`PHOTO_STORAGE_PATH` muss eine nicht leere absolute Laufzeit sein. Das lokale
+Template `backend/.env.example` verwendet dafür den dokumentierten Pfad
+`/tmp/portal-reisinger-photos`; vor dem ersten lokalen Backend-Start
+muss das Verzeichnis mit `mkdir -p /tmp/portal-reisinger-photos`
+angelegt werden. `backend/.env.ci` und die Produktions-Compose behalten
+unverändert `/var/www/photos` als Container-/Deployment-Pfad. `.env.ci` bleibt
+davon unabhängig ein CI-only Fixture.
+
+`composer setup` ist **kein Konfigurations-Wizard**. Auf einem frischen Checkout
+kopiert das Script `.env.example` nur, wenn `.env` fehlt, generiert einen
+Application Key und führt anschließend `php artisan migrate --force --seed` aus.
+Leeres `ADMIN_PASSWORD` (wie in der Vorlage) lässt den Seeder fehlschlagen; das
+Script fragt nicht nach Zugangsdaten und erzeugt keinen JWT- oder
+File-Encryption-Key. Deshalb zuerst die `.env` vollständig konfigurieren:
+
 ```bash
 cd backend
 cp .env.example .env
+# In .env mindestens setzen:
+# ADMIN_EMAIL=<lokale Admin-Adresse>
+# ADMIN_PASSWORD=<nicht leeres lokales Passwort>
+# Danach die übrigen benötigten JWT-, File-Encryption-, DB-, Mail- und Stripe-Werte.
 php artisan key:generate
 php artisan jwt:secret
-# STRIPE_*, DB_*, MAIL_* in .env eintragen
-php artisan migrate --force
-php artisan db:seed   # legt Admin via ADMIN_EMAIL an (siehe AGENTS.md §6)
+# Generate FILE_ENCRYPTION_KEY and paste the output into .env:
+php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
+composer setup
+# Alternativ nach expliziter Konfiguration:
+# composer install && php artisan migrate --force --seed
 ```
+
+Der Seed ist Teil des Setup-Vertrags und provisionsiert den Bootstrap-Admin
+über `ADMIN_EMAIL`/`ADMIN_PASSWORD` (siehe `backend/AGENTS.md`, „Database Setup
+Policy“). `.env.ci` und `.env.encrypted` sind keine Ersatzkopien für diese lokale
+Konfiguration.
 
 ### Frontend
 
@@ -133,12 +186,18 @@ pnpm install
   APP_KEY/JWT_SECRET-Fallbacks und `SuperSecret123!` durch `*_REDACTED` ersetzt.
   Verifikation via `git log -S` (alle Patterns leer). Force-Push erforderlich.
   Backup: `portal-backup-20260721-155854.bundle`.
-- **`phpunit.xml`-Credentials:** localhost Fixtures, akzeptiert.
+- **Tracked Test-/Backup-Dateien:** `backend/.env.ci` ist ausschließlich ein
+  CI-Fixture; `backend/.env.encrypted` ist ein verschlüsselter Blob und darf
+  nicht als `.env`-Vorlage oder als Beweis für sichere lokale Secrets verwendet
+  werden. Ihre getrackte Präsenz ist kein Freibrief zum Kopieren/Entschlüsseln.
+- **`phpunit.xml`-Credentials:** SQLite-`:memory:` plus localhost-Service-Fixtures,
+  akzeptiert. Die MariaDB-Werte in `.env.ci` gehören zum separaten E2E-Service-
+  betrieb und sind nicht der PHPUnit-Test-DB-Vertrag.
 - **Stripe-abhängige Checkout/Payout-Tests (2026-07-31):** `OrderCheckoutTest`
   (2 Tests), `PayoutSystemTest` (1 Test) und `Coupon/CheckoutCouponRevalidationTest`
   (3 Tests) benötigen einen **echten** Stripe-Test-Secret-Key, da sie ausgehende
   `PaymentIntent`-Calls an die Stripe-API auslösen. Mit Platzhalter
-  `sk_test_<your_stripe_secret_key>` (`.env:59`) schlagen sie mit HTTP 401
+  `sk_test_<your_stripe_secret_key>` (im `backend/.env.example`) schlagen sie mit HTTP 401
   fehl. Ein Mock ist nur über Container-Binding (`StripePaymentService`/`CheckoutService`)
   möglich — payment-kritisch, außerhalb des Email-Template-Scopes. **Akzeptiert,**
   bis ein gültiger `STRIPE_SECRET` in der lokalen `.env` hinterlegt oder die
@@ -146,7 +205,7 @@ pnpm install
   71 vorbestehende Fehler auf 6 reduziert (Rest vorbestehend, Root Cause
   `BrandConfig::__construct` fehlende Parameter-Defaults — gefixt).
 - **C1/C2 (`APP_KEY`/`JWT_SECRET` Fallbacks):** ✅ RESOLVED (2026-07-21) — Schlüssel rotiert.
-  Deployment-Guard in `docker-compose.yml` prüft nun generisch auf leere Werte
+  Deployment-Guard in `deployment/docker-compose.yml` prüft nun generisch auf leere Werte
   statt auf konkrete Strings — keine erneute Exposition über das Repository möglich.
   Seit 2026-09-19 prüft derselbe Guard zusätzlich `FILE_ENCRYPTION_KEY`
   (fail-closed, siehe „File Encryption at Rest").
@@ -157,6 +216,6 @@ pnpm install
 # 1. Secret-Scan über getrackte Dateien (muss leer sein)
 git grep -nE 'sk_test_[0-9A-Za-z]{20,}|sk_live_|pk_live_[0-9A-Za-z]{20,}' -- ':!*.md' ':!features/'
 
-# 2. Nur *.example-Dateien getrackt
-git ls-files | grep -E '(^|/)\.env'   # erwartet: backend/.env.example, frontend/.env.example, frontend/.env.local.example
+# 2. Getrackte Env-Dateien klassifizieren (nicht ungeprüft als Starter verwenden)
+git ls-files | grep -E '(^|/)\.env'   # enthält neben *.example auch backend/.env.ci und backend/.env.encrypted
 ```

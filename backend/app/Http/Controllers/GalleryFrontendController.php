@@ -8,8 +8,8 @@ use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Photo;
-use App\Models\Rating;
 use App\Services\AuthorizationService;
+use App\Services\RatingService;
 use App\Support\BrandRegistry;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -20,28 +20,28 @@ class GalleryFrontendController extends Controller
     public function show($slug)
     {
         $gallery = Gallery::where('slug', $slug)->firstOrFail();
-        $currentBrand = BrandRegistry::current();
-        if ($currentBrand !== null && $gallery->brand !== null && $gallery->brand !== $currentBrand) {
+        if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
             return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
         }
+
+        // A gallery hidden by its own flag or by an ancestor group is not a
+        // public payload.  Use the effective accessor so the gallery and its
+        // complete group tree share one visibility predicate.
+        if ($gallery->effective_is_hidden) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
+        }
+
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 
         $isExpired = $gallery->expires_at && Carbon::parse($gallery->expires_at)->isPast();
-        $canManage = false;
-        if ($user) {
-            if ($svc->isSuperAdmin($user) || $svc->isAdmin($user)) {
-                $canManage = true;
-            } elseif ($svc->isPhotographer($user) && $svc->canPhotographerAccessGallery($user, $gallery->id)) {
-                $canManage = true;
-            }
-        }
+        $canManage = $user && $svc->canManageGallery($user, $gallery->id);
 
         if ($isExpired && ! $canManage) {
             return response()->json(['error' => 'Galerie abgelaufen.'], 403);
         }
 
-        if (! $gallery->is_public) {
+        if (! $gallery->effective_is_public) {
             if (! $user) {
                 return response()->json(['error' => 'Unauthenticated'], 401);
             }
@@ -50,7 +50,17 @@ class GalleryFrontendController extends Controller
             }
         }
 
-        $photos = $gallery->photos()->paginate(50);
+        // Exclude own-hidden photos in SQL so pagination metadata does not
+        // disclose hidden records.  The effective check below remains the
+        // authoritative inherited gallery/group visibility decision.
+        $photos = $gallery->photos()
+            ->where('is_hidden', false)
+            ->paginate(50);
+        $photos->setCollection(
+            $photos->getCollection()
+                ->filter(fn (Photo $photo): bool => ! $photo->effective_is_hidden)
+                ->values()
+        );
 
         $photoIds = $photos->getCollection()->pluck('id')->toArray();
         $ratings = collect();
@@ -83,6 +93,9 @@ class GalleryFrontendController extends Controller
         while ($groupId) {
             $group = GalleryGroup::find($groupId);
             if ($group) {
+                if (! BrandRegistry::resourceMatchesCurrent($group->brand)) {
+                    return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
+                }
                 array_unshift($breadcrumbs, ['name' => $group->name, 'full_path' => 'meta/'.$group->id, 'type' => 'group']);
                 $groupId = $group->parent_id;
             } else {
@@ -107,12 +120,19 @@ class GalleryFrontendController extends Controller
 
     public function rate(Request $request, $photoId)
     {
+        $photo = Photo::with('gallery')->findOrFail($photoId);
+        if (! $photo->gallery || ! BrandRegistry::galleryTreeMatchesCurrent($photo->gallery)) {
+            return response()->json(['error' => 'Foto nicht gefunden.'], 404);
+        }
+        if ($photo->effective_is_hidden) {
+            return response()->json(['error' => 'Foto nicht gefunden.'], 404);
+        }
+
         $request->validate([
             'rating' => 'required|integer|min:0|max:5',
             'comment' => 'nullable|string|max:2000',
         ]);
 
-        $photo = Photo::with('gallery')->findOrFail($photoId);
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 
@@ -124,28 +144,36 @@ class GalleryFrontendController extends Controller
         }
 
         $isExpired = $photo->gallery->expires_at && Carbon::parse($photo->gallery->expires_at)->isPast();
-        $canManage = $user && ($svc->isAdmin($user) || ($svc->isPhotographer($user) && $svc->canAccessGallery($user, $photo->gallery_id)));
+        $canManage = $user && $svc->canManageGallery($user, $photo->gallery_id);
 
         if ($isExpired && ! $canManage) {
             return response()->json(['error' => 'Galerie abgelaufen.'], 403);
         }
 
-        if (! $photo->gallery->is_public) {
+        if (! $photo->gallery->effective_is_public) {
             if (! $svc->canAccessGallery($user, $photo->gallery_id)) {
                 return response()->json(['error' => 'Kein Zugriff auf dieses Foto.'], 403);
             }
         }
 
-        if ($user->id) {
-            Rating::updateOrCreate(
-                ['photo_id' => $photo->id, 'user_id' => $user->id],
-                ['rating' => $request->rating, 'comment' => $request->comment ?? '']
+        $userId = $user->getKey() !== null ? (string) $user->getKey() : null;
+        $guestId = $userId === null ? $user->guest_id : null;
+
+        if ($userId === null && (! is_string($guestId) || trim($guestId) === '')) {
+            return response()->json(['error' => 'Ungültige Gastidentität.'], 422);
+        }
+
+        try {
+            app(RatingService::class)->upsertForActor(
+                $photo,
+                $userId,
+                $guestId,
+                (int) $request->rating,
+                $request->comment,
+                $user->name,
             );
-        } else {
-            Rating::updateOrCreate(
-                ['photo_id' => $photo->id, 'guest_id' => $user->guest_id],
-                ['rating' => $request->rating, 'comment' => $request->comment ?? '', 'guest_name' => $user->name]
-            );
+        } catch (\InvalidArgumentException) {
+            return response()->json(['error' => 'Ungültige Gastidentität.'], 422);
         }
 
         return response()->json(['success' => true]);

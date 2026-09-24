@@ -1,5 +1,15 @@
 <?php
 
+$photoStoragePath = env('PHOTO_STORAGE_PATH', base_path('../photos'));
+
+/*
+ * Keep the local default absolute, but never let an explicitly configured
+ * empty or relative value silently resolve against the process directory.
+ */
+if (! is_string($photoStoragePath) || trim($photoStoragePath) === '' || ! str_starts_with($photoStoragePath, '/')) {
+    throw new InvalidArgumentException('PHOTO_STORAGE_PATH must be a non-empty absolute path.');
+}
+
 return [
 
     /*
@@ -32,7 +42,7 @@ return [
 
         'photos' => [
             'driver' => 'local',
-            'root' => env('PHOTO_STORAGE_PATH', base_path('../photos')),
+            'root' => $photoStoragePath,
             'throw' => false,
         ],
 

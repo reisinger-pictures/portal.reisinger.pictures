@@ -10,7 +10,8 @@
 #   1. Test-Services starten  (docker-compose.test.yml: Meili 7701)
 #   2. backend/.env.e2e generieren (aus backend/.env, Secrets werden übernommen)
 #   3. Eigene SQLite-DB anlegen + migrieren + seeden (env=e2e)
-#   4. php artisan serve auf http://127.0.0.1:8001 (env=e2e, --no-reload)
+#   4. Deterministische E2E-Location-Fixtures laden + Scout-Index aktualisieren
+#   5. php artisan serve auf http://127.0.0.1:8001 (env=e2e, --no-reload)
 #
 # Mail: natives Homebrew-Mailpit (127.0.0.1:1025 SMTP / 8025 API), KEIN Container.
 #
@@ -99,7 +100,19 @@ touch "$E2E_DB"
 log "Migriere + seede E2E-DB (env=e2e) ..."
 ( cd "$BACKEND" && env APP_ENV=local CI=true php artisan migrate:fresh --seed --env=e2e )
 
-# --- 4. Backend isoliert starten --------------------------------------------
+# --- 4. Deterministische Location-Fixtures + Suchindex ----------------------
+# Der Basiseeder bleibt offline. Nur die explizite E2E-DB erhält die kleine,
+# versionierte Fixture; der Produktionsimport bleibt im woechentlichen Scheduler.
+log "Lade E2E-Location-Fixtures und aktualisiere den Test-Suchindex ..."
+(
+  cd "$BACKEND"
+  php artisan db:seed --class=E2ELocationSeeder --force --env=e2e
+  php artisan scout:flush 'App\Models\Location' --env=e2e
+  php artisan scout:sync-index-settings --env=e2e
+  php artisan scout:import 'App\Models\Location' --env=e2e
+)
+
+# --- 5. Backend isoliert starten --------------------------------------------
 log "Starte E2E-Backend auf http://127.0.0.1:${PORT} (STRG+C = Stopp)"
 log "Frontend (separat):   VITE_API_PROXY=http://127.0.0.1:${PORT} pnpm dev"
 log "E2E-Tests:            pnpm test:e2e (Mailpit 8025 = Helper-Default)"

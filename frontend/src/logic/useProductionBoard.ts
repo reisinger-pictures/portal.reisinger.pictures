@@ -25,7 +25,7 @@ export interface PhotoJobInput {
     total_count?: number;
     selected_count?: number;
     target_gallery_id?: string | null;
-    assignee_id?: string;
+    assignee_id?: string | null;
     notes?: string | null;
 }
 

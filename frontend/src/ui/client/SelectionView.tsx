@@ -45,6 +45,15 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
         latestDataRef.current = { photos: filteredPhotos, ratePhoto };
     }, [filteredPhotos, ratePhoto]);
 
+    const handleRatePhoto = async (photoId: string, rating: number, comment: string) => {
+        try {
+            await latestDataRef.current.ratePhoto(photoId, rating, comment);
+        } catch (error) {
+            if (typeof error === 'object' && error !== null && 'status' in error && error.status === 0) return;
+            showToast('error', error instanceof Error ? error.message : t`Bewertung konnte nicht gespeichert werden.`);
+        }
+    };
+
     const [currentPhotoId, setCurrentPhotoId] = useState<string | null>(null);
     const currentPhotoInLightbox = currentPhotoId ? filteredPhotos.find((p: Photo) => p.id === currentPhotoId) : null;
 
@@ -88,7 +97,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
             lightbox.on('destroy', () => setCurrentPhotoId(null));
 
             const handleKeyDown = (e: KeyboardEvent) => {
-                if (!lightbox?.pswp?.isOpen) return;
+                if (!user || !lightbox?.pswp?.isOpen) return;
                 if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
                 const key = parseInt(e.key, 10);
@@ -96,13 +105,15 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
                     const currPhotoId = lightbox.pswp!.currSlide?.data?.element?.dataset.photoId;
                     if (currPhotoId) {
                         const photo = latestDataRef.current.photos.find((p: Photo) => p.id === currPhotoId);
-                        ratePhoto(currPhotoId, key, photo?.comment || '');
+                        handleRatePhoto(currPhotoId, key, photo?.comment || '');
                         lightbox.pswp!.next();
                     }
                 }
             };
-            
-            lightbox.on('beforeOpen', () => document.addEventListener('keydown', handleKeyDown));
+
+            lightbox.on('beforeOpen', () => {
+                if (user) document.addEventListener('keydown', handleKeyDown);
+            });
             lightbox.on('close', () => document.removeEventListener('keydown', handleKeyDown));
             lightbox.on('destroy', () => document.removeEventListener('keydown', handleKeyDown));
         }
@@ -166,7 +177,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
                                className="pswp-item block relative aspect-square">
                                 <ResponsiveImage src={photo.thumb_url} srcSet={photo.srcset} containerClassName="absolute inset-0 w-full h-full rounded" className="select object-cover w-full h-full select-none hover:scale-105 transition-transform duration-500" draggable={false} alt={photo.title || t`Bild`} />
                             </a>
-                            {user ? <GridPhotoActions photo={photo} ratePhoto={ratePhoto} /> : <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3"></div>}
+                            {user ? <GridPhotoActions photo={photo} ratePhoto={handleRatePhoto} /> : <div className="card-body p-4 bg-base-100 flex flex-col items-center gap-3"></div>}
                         </div>
                     ))}
                 </div>
@@ -180,7 +191,7 @@ export default function SelectionView({ galleryData }: SelectionViewProps) {
 
             {currentPhotoInLightbox && document.getElementById('rating-portal-anchor') && (
                 createPortal(
-                    <DaisyUIRatingBridge photo={currentPhotoInLightbox} ratePhoto={galleryData.ratePhoto} />,
+                    <DaisyUIRatingBridge photo={currentPhotoInLightbox} ratePhoto={handleRatePhoto} />,
                     document.getElementById('rating-portal-anchor')!
                 )
             )}

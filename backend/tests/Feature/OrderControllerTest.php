@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
@@ -113,7 +114,7 @@ class OrderControllerTest extends TestCase
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
         $token = auth('api')->login($admin);
 
-        Order::factory()->count(3)->create();
+        Order::factory()->count(3)->create(['brand' => Brand::B2B]);
 
         $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
             ->getJson('/api/management/orders');
@@ -149,7 +150,10 @@ class OrderControllerTest extends TestCase
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
         $token = auth('api')->login($admin);
 
-        $order = Order::factory()->create(['status' => 'pending']);
+        $order = Order::factory()->create([
+            'brand' => Brand::B2B,
+            'status' => 'pending',
+        ]);
 
         $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
             ->putJson("/api/management/orders/{$order->id}/status", [

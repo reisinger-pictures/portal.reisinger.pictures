@@ -91,13 +91,11 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
             email: data.email || '',
             phone: data.phone || null,
             package: data.package || null,
-            price_cents: priceEur != null ? Math.round(priceEur * 100) : undefined,
+            price_cents: priceEur != null ? Math.round(priceEur * 100) : null,
             payment_status: data.payment_status || 'open',
+            assignee_id: data.assignee_id || null,
             notes: data.notes || null,
         };
-        if (data.assignee_id) {
-            input.assignee_id = data.assignee_id;
-        }
         const payload: ProjectInput & { status?: string } = { ...input, status: data.status || undefined };
         try {
             await onSave(payload);

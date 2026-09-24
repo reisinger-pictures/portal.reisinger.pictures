@@ -9,7 +9,6 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
 
 class CouponAdminControllerTest extends TestCase
@@ -42,8 +41,9 @@ class CouponAdminControllerTest extends TestCase
 
     private function superAdminToken(): string
     {
-        $superAdmin = User::factory()->create();
+        $superAdmin = User::factory()->create(['brand' => null]);
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+
         return auth('api')->login($superAdmin);
     }
 

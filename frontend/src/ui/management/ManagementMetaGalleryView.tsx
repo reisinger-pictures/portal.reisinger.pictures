@@ -6,7 +6,7 @@ import {useRef, useState} from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams, useSearchParams} from 'react-router-dom';
 import {flattenGroups} from '../../logic/utils';
-import {GalleryGroup, useProtectedGalleries} from '../../logic/useGalleries';
+import {useProtectedGalleries} from '../../logic/useGalleries';
 import {usePermissions} from '../../logic/usePermissions';
 import {useMetaGallery} from '../../logic/useMetaGallery';
 import {useLicensingMode} from '../../logic/useLicensingMode';
@@ -19,8 +19,6 @@ export default function ManagementMetaGalleryView() {
     const {id} = useParams<{ id: string }>();
     const navigate = useNavigate();
     const {isAdmin} = usePermissions();
-    const licensingMode = useLicensingMode();
-    const isVolumeLicensing = licensingMode === 'volume_licensing';
     const {tree, updateGroup, deleteGroup} = useProtectedGalleries();
     const {
         group,
@@ -33,6 +31,11 @@ export default function ManagementMetaGalleryView() {
         isReachingEnd,
         mutate
     } = useMetaGallery(id);
+    // A meta gallery aggregates photos from child galleries. Use the first
+    // displayed photo's actual gallery ID; the group ID is not a Gallery UUID
+    // and must not be sent to the gallery-specific license-terms endpoint.
+    const licensingMode = useLicensingMode(photos[0]?.gallery_id);
+    const isVolumeLicensing = licensingMode === 'volume_licensing';
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab: 'bilder' | 'coupons' =
         isVolumeLicensing && searchParams.get('tab') === 'coupons' ? 'coupons' : 'bilder';
@@ -157,12 +160,14 @@ export default function ManagementMetaGalleryView() {
                     isGroupModalOpen={isGroupEditModalOpen} setGroupModalOpen={setGroupEditModalOpen}
                     isGalleryModalOpen={false} setGalleryModalOpen={() => {
                 }}
-                    editingGroup={group as unknown as GalleryGroup}
+                    editingGroup={group}
                     onCreateGroup={async () => {
                     }} onCreateGallery={async () => {
                 }}
-                    onUpdateGroup={async (id, name, slug, isPub, parentId) => {
-                        await updateGroup(id, name, slug, isPub, parentId);
+                    onUpdateGroup={async (id, name, slug, isPub, parentId, extraOpts) => {
+                        // Keep the modal's org_id semantics intact on this route:
+                        // omitted preserves assignments, explicit null clears them.
+                        await updateGroup(id, name, slug, isPub, parentId, extraOpts);
                         mutate();
                     }}
                     onUpdateGallery={async () => {

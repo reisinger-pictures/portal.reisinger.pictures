@@ -51,7 +51,7 @@ const mockPhoto = {
     height: 600,
     rating: 0,
     comment: '',
-    gallery: { id: 'g1', name: 'Gallery', slug: 'g1', full_path: 'g1', type: 'delivery' as const, is_live: false, is_public: true, effective_is_free_download: false },
+    gallery: { id: 'g1', name: 'Gallery', slug: 'g1', full_path: 'g1', type: 'delivery' as const, is_live: false, is_public: true, gallery_group_id: 'group-a', effective_is_free_download: false },
 };
 
 const mockCatalog = {
@@ -65,7 +65,32 @@ const mockCatalog = {
 };
 
 const defaultAuth = {
-    user: { id: 'u1', name: 'Test', email: 'test@test.com', is_super_admin: false, is_admin: false, is_photographer: false, is_pending: false, can_edit_metadata: false, roles: ['power_user'], flatrate_level: 'web' as const },
+    user: {
+        id: 'u1',
+        guest_id: null,
+        name: 'Test',
+        email: 'test@test.com',
+        billing_name: null,
+        billing_company: null,
+        billing_street: null,
+        billing_zip: null,
+        billing_city: null,
+        brand: null,
+        is_cross_brand: false,
+        is_super_admin: false,
+        is_admin: false,
+        is_photographer: false,
+        is_org_admin: false,
+        is_power_user: false,
+        is_pending: false,
+        can_edit_metadata: false,
+        can_purchase_upgrades: false,
+        roles: ['power_user'],
+        flatrate_level: 'web' as const,
+        transient_galleries: [],
+        transient_meta_galleries: [],
+        photographer_gallery_groups: [],
+    },
     isLoading: false,
     isError: undefined,
     login: vi.fn(),
@@ -118,7 +143,9 @@ describe('LicenseSelectorCard', () => {
 
         vi.mocked(useCart).mockReturnValue({
             items: [],
+            quoteToken: null,
             addToCart: vi.fn(),
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             clearCart: vi.fn(),
             totalAmount: 0,
@@ -183,12 +210,14 @@ describe('LicenseSelectorCard', () => {
 
         vi.mocked(useAuth).mockReturnValue({
             ...defaultAuth,
-            user: { id: 'u1', name: 'Test', email: 'test@test.com', is_super_admin: false, is_admin: false, is_photographer: false, is_pending: false, can_edit_metadata: false, roles: ['power_user'], flatrate_level: 'none' as const },
+            user: {...defaultAuth.user, flatrate_level: 'none' as const},
         });
 
         vi.mocked(useCart).mockReturnValue({
             items: [],
+            quoteToken: null,
             addToCart,
+            setQuoteToken: vi.fn(),
             removeFromCart: vi.fn(),
             clearCart: vi.fn(),
             totalAmount: 0,
@@ -203,6 +232,8 @@ describe('LicenseSelectorCard', () => {
         expect(addToCart).toHaveBeenCalledWith(
             expect.objectContaining({
                 photoId: 'p1',
+                galleryId: 'g1',
+                galleryGroupId: 'group-a',
                 useCaseId: 'uc1',
             }),
         );
@@ -240,7 +271,7 @@ describe('LicenseSelectorCard', () => {
     it('hides Sonderanfrage section for blocked clients', () => {
         vi.mocked(useAuth).mockReturnValue({
             ...defaultAuth,
-            user: { id: 'u1', name: 'Test', email: 'test@test.com', is_super_admin: false, is_admin: false, is_photographer: false, is_pending: false, can_edit_metadata: false, roles: ['client'], flatrate_level: 'web' as const },
+            user: {...defaultAuth.user, roles: ['client']},
         });
 
         renderCard();

@@ -6,11 +6,16 @@ use Illuminate\Support\Facades\Http;
 
 trait MailpitAssertions
 {
-    private const MAILPIT_API = 'http://127.0.0.1:8025/api/v1';
+    private const DEFAULT_MAILPIT_API_URL = 'http://127.0.0.1:8025/api/v1';
+
+    private function mailpitApiUrl(): string
+    {
+        return rtrim((string) (env('MAILPIT_API_URL') ?: self::DEFAULT_MAILPIT_API_URL), '/');
+    }
 
     protected function getMailpitMessages(): array
     {
-        return Http::get(self::MAILPIT_API . '/messages')->json('messages', []);
+        return Http::get($this->mailpitApiUrl().'/messages')->json('messages', []);
     }
 
     protected function getMailpitMessageByEmail(string $email): ?array
@@ -20,7 +25,7 @@ trait MailpitAssertions
         foreach ($messages as $msg) {
             foreach ($msg['To'] ?? [] as $recipient) {
                 if (($recipient['Address'] ?? '') === $email) {
-                    return Http::get(self::MAILPIT_API . "/message/{$msg['ID']}")->json();
+                    return Http::get($this->mailpitApiUrl()."/message/{$msg['ID']}")->json();
                 }
             }
         }
@@ -30,7 +35,8 @@ trait MailpitAssertions
 
     protected function getMailpitMessagesByRecipient(string $email): array
     {
-        $response = Http::get(self::MAILPIT_API . '/search', ['query' => "to:{$email}"]);
+        $response = Http::get($this->mailpitApiUrl().'/search', ['query' => "to:{$email}"]);
+
         return $response->json('messages', []);
     }
 
@@ -42,7 +48,7 @@ trait MailpitAssertions
         $this->assertGreaterThanOrEqual(
             $expectedCount,
             count($matched),
-            "Expected at least {$expectedCount} mail(s) to {$email} in Mailpit, found " . count($matched)
+            "Expected at least {$expectedCount} mail(s) to {$email} in Mailpit, found ".count($matched)
         );
     }
 
@@ -62,7 +68,7 @@ trait MailpitAssertions
             $this->assertContains(
                 $expectedFilename,
                 $filenames,
-                "Attachment '{$expectedFilename}' not found in mail to {$email}. Available: " . implode(', ', $filenames)
+                "Attachment '{$expectedFilename}' not found in mail to {$email}. Available: ".implode(', ', $filenames)
             );
         }
 

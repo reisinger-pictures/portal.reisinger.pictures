@@ -1,8 +1,11 @@
 <?php
+
 namespace Tests\Feature;
 
 use App\Enums\Brand;
+use App\Enums\UserRole;
 use App\Models\Gallery;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -27,11 +30,12 @@ class BrandScopingTest extends TestCase
     }
 
     /**
-     * T-09 P3: a cross-brand user (brand = null, e.g. Super-Admin) sees galleries of all brands.
+     * T-09 P3: a cross-brand Super-Admin (brand = null) sees galleries of all brands.
      */
-    public function test_cross_brand_user_sees_all_brand_galleries(): void
+    public function test_cross_brand_super_admin_sees_all_brand_galleries(): void
     {
         $user = User::factory()->create(['brand' => null]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
         $b2bGallery = Gallery::factory()->create(['brand' => Brand::B2B->value]);
         $user->galleries()->attach($b2bGallery->id);
@@ -67,9 +71,10 @@ class BrandScopingTest extends TestCase
         $response->assertJsonPath('is_cross_brand', false);
     }
 
-    public function test_me_endpoint_reports_cross_brand_for_null_brand_user(): void
+    public function test_me_endpoint_reports_cross_brand_for_null_brand_super_admin(): void
     {
         $user = User::factory()->create(['brand' => null]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
         $response = $this->actingAs($user, 'api')->getJson('/api/auth/me');
         $response->assertOk();

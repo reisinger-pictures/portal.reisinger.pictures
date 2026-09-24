@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useAI } from '../useAI';
+import { getCompressedBase64 } from '../utils/ImageHelper';
+
+function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
 
 describe('useAI — Mode Resolution', () => {
     beforeEach(() => {
@@ -15,29 +23,24 @@ describe('useAI — Mode Resolution', () => {
     });
 
     function mockStatus(status: string, enabled: boolean, model?: string) {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve({ enabled, status, model: model ?? null }),
-        }));
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+            jsonResponse({ enabled, status, model: model ?? null }),
+        ));
     }
 
     function mockStatusDisabled() {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve({ enabled: false, status: 'disabled' }),
-        }));
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+            jsonResponse({ enabled: false, status: 'disabled' }),
+        ));
     }
 
     function mockLmStudio(_url: string, success = true) {
         vi.stubGlobal('fetch', success
             ? vi.fn()
-                .mockResolvedValueOnce({ ok: false }) // status fails
-                .mockResolvedValueOnce({
-                    ok: true,
-                    json: () => Promise.resolve({ data: [{ id: 'lm-model' }] }),
-                })
+                .mockResolvedValueOnce(new Response(null, {status: 503})) // status fails
+                .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'lm-model' }] }))
             : vi.fn()
-                .mockResolvedValueOnce({ ok: false })
+                .mockResolvedValueOnce(new Response(null, {status: 503}))
                 .mockRejectedValueOnce(new Error('LM Studio unreachable')),
         );
     }
@@ -86,6 +89,20 @@ describe('useAI — Mode Resolution', () => {
         expect(result.current.modelId).toBeNull();
     });
 
+    it('rejects a non-2xx LM Studio model response even when its JSON contains a model', async () => {
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce(new Response(null, {status: 503}))
+            .mockResolvedValueOnce(jsonResponse({data: [{id: 'must-not-be-used'}]}, 503))
+        );
+
+        const { result } = renderHook(() => useAI());
+
+        await waitFor(() => expect(result.current.isAvailable).toBe(false));
+        expect(result.current.mode).toBe('unavailable');
+        expect(result.current.modelId).toBeNull();
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
     it('custom lmstudio_url from localStorage used as fallback', async () => {
         localStorage.setItem('lmstudio_url', 'http://custom:4321');
         mockLmStudio('http://custom:4321', true);
@@ -113,17 +130,11 @@ describe('useAI — generateMetadata server mode', () => {
     function mockGenerateMetadata(response: unknown, ok = true) {
         vi.stubGlobal('fetch', ok
             ? vi.fn()
-                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-                .mockResolvedValueOnce({
-                    ok: true,
-                    json: () => Promise.resolve(response),
-                })
+                .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+                .mockResolvedValueOnce(jsonResponse(response))
             : vi.fn()
-                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-                .mockResolvedValueOnce({
-                    ok: false,
-                    json: () => Promise.resolve({ error: 'AI API Error: 502' }),
-                })
+                .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+                .mockResolvedValueOnce(jsonResponse({ error: 'AI API Error: 502' }, 502))
         );
     }
 
@@ -164,6 +175,32 @@ describe('useAI — generateMetadata server mode', () => {
         });
     });
 
+    it('refreshes an expired access session and retries server AI generation', async () => {
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+            .mockResolvedValueOnce(new Response(null, {status: 401}))
+            .mockResolvedValueOnce(new Response(JSON.stringify({success: true}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'},
+            }))
+            .mockResolvedValueOnce(jsonResponse({title: 'After refresh', description: 'Desc'})),
+        );
+
+        const {result} = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+
+        const data = await result.current.generateMetadata('photo-1', 'Context', 'Specific');
+        expect(data.title).toBe('After refresh');
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(fetch).toHaveBeenNthCalledWith(1, '/api/ai/status', expect.anything());
+        expect(fetch).toHaveBeenNthCalledWith(2, '/api/ai/generate-metadata', expect.anything());
+        expect(fetch).toHaveBeenNthCalledWith(3, '/api/auth/refresh', expect.objectContaining({
+            method: 'POST',
+            credentials: 'include',
+        }));
+        expect(fetch).toHaveBeenNthCalledWith(4, '/api/ai/generate-metadata', expect.anything());
+    });
+
     it('returns parsed AIResponse on success', async () => {
         const mockResponse = { title: 'AI Title', description: 'AI Desc', keywords: 'k1, k2', location: 'Vienna', detected_city: 'Vienna' };
         mockGenerateMetadata(mockResponse);
@@ -187,11 +224,8 @@ describe('useAI — generateMetadata server mode', () => {
 
     it('throws on invalid response (Zod validation fails)', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve(null),
-            })
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+            .mockResolvedValueOnce(jsonResponse(null))
         );
 
         const { result } = renderHook(() => useAI());
@@ -203,7 +237,7 @@ describe('useAI — generateMetadata server mode', () => {
 
     it('aborted request throws AbortError', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
         );
 
         const { result } = renderHook(() => useAI());
@@ -232,15 +266,15 @@ describe('useAI — generateMetadata local mode', () => {
     });
 
     function makePhotoFetch(photoResponse: unknown, lmResponse: unknown) {
-        const blob = new Blob(['fake-image'], { type: 'image/jpeg' });
         return vi.fn()
-            .mockResolvedValueOnce({ ok: false }) // status
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: [{ id: 'local-model' }] }) }) // LM models
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(photoResponse), blob: () => Promise.resolve(blob) }) // photo context
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(lmResponse) }); // LM chat
+            .mockResolvedValueOnce(new Response(null, {status: 503})) // status
+            .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'local-model' }] })) // LM models
+            .mockResolvedValueOnce(jsonResponse(photoResponse)) // photo context
+            .mockResolvedValueOnce(jsonResponse(lmResponse)); // LM chat
     }
 
     beforeEach(() => {
+        vi.mocked(getCompressedBase64).mockClear();
         vi.stubGlobal('URL.createObjectURL', vi.fn(() => 'blob:test'));
     });
 
@@ -261,6 +295,21 @@ describe('useAI — generateMetadata local mode', () => {
         expect(data.title).toBe('LM Title');
     });
 
+    it('forwards the generation signal to local image retrieval', async () => {
+        vi.stubGlobal('fetch', makePhotoFetch(
+            { photo: { url: '/photos/test.jpg' } },
+            { choices: [{ message: { content: '{"title":"LM Title"}' } }] },
+        ));
+
+        const { result } = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+
+        const controller = new AbortController();
+        await result.current.generateMetadata('photo-1', '', '', controller.signal);
+
+        expect(getCompressedBase64).toHaveBeenCalledWith('/photos/test.jpg', 2048, controller.signal);
+    });
+
     it('returns parsed AIResponse on success', async () => {
         vi.stubGlobal('fetch', makePhotoFetch(
             { photo: { url: '/photos/test.jpg' } },
@@ -277,12 +326,11 @@ describe('useAI — generateMetadata local mode', () => {
     });
 
     it('throws on LM Studio HTTP error', async () => {
-        const blob = new Blob(['fake-image'], { type: 'image/jpeg' });
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: false }) // status
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: [{ id: 'local-model' }] }) }) // LM models
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ photo: { url: '/photos/test.jpg' } }), blob: () => Promise.resolve(blob) }) // photo
-            .mockResolvedValueOnce({ ok: false }) // LM chat fails
+            .mockResolvedValueOnce(new Response(null, {status: 503})) // status
+            .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'local-model' }] })) // LM models
+            .mockResolvedValueOnce(jsonResponse({ photo: { url: '/photos/test.jpg' } })) // photo
+            .mockResolvedValueOnce(new Response(null, {status: 502})) // LM chat fails
         );
 
         const { result } = renderHook(() => useAI());
@@ -321,11 +369,8 @@ describe('useAI — generateMetadataFromText', () => {
 
     it('calls /api/ai/generate-metadata-text with text_input and global_context', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-            .mockResolvedValue({
-                ok: true,
-                json: () => Promise.resolve({ title: 'Text Title', description: 'Text Desc', keywords: 'kw', location: '' }),
-            }),
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+            .mockResolvedValue(jsonResponse({ title: 'Text Title', description: 'Text Desc', keywords: 'kw', location: '' })),
         );
 
         const { result } = renderHook(() => useAI());
@@ -338,11 +383,25 @@ describe('useAI — generateMetadataFromText', () => {
         expect(body).toEqual({ text_input: 'A photo', global_context: 'Context' });
     });
 
+    it('forwards the cancellation signal to text generation', async () => {
+        const controller = new AbortController();
+        vi.stubGlobal('fetch', vi.fn()
+            .mockResolvedValueOnce(jsonResponse({enabled: true, status: 'available', model: 'gpt-4o'}))
+            .mockResolvedValueOnce(jsonResponse({title: 'Text Title'}))
+        );
+
+        const {result} = renderHook(() => useAI());
+        await waitFor(() => expect(result.current.isAvailable).toBe(true));
+        await result.current.generateMetadataFromText('A photo', '', controller.signal);
+
+        const textCall = vi.mocked(fetch).mock.calls.find(([url]) => url === '/api/ai/generate-metadata-text');
+        expect(textCall?.[1]?.signal).toBe(controller.signal);
+    });
+
     it('returns parsed AIResponse on success', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve({ title: 'Result', description: 'Desc', keywords: 'k1, k2', location: 'Paris', detected_city: 'Paris' }),
-        }));
+        vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
+            jsonResponse({ title: 'Result', description: 'Desc', keywords: 'k1, k2', location: 'Paris', detected_city: 'Paris' }),
+        ));
 
         const { result } = renderHook(() => useAI());
         const data = await result.current.generateMetadataFromText('Test', '');
@@ -354,29 +413,23 @@ describe('useAI — generateMetadataFromText', () => {
     });
 
     it('throws on HTTP error', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: false,
-            json: () => Promise.resolve({ error: 'AI Error' }),
-        }));
+        vi.stubGlobal('fetch', vi.fn().mockImplementation(() => jsonResponse({ error: 'AI Error' }, 502)));
 
         const { result } = renderHook(() => useAI());
         await expect(result.current.generateMetadataFromText('Test', ''))
             .rejects.toThrow(/AI Error/);
     });
 
-    it('throws on network failure', async () => {
+    it('normalises a network failure through the shared API pipeline', async () => {
         vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network failure')));
 
         const { result } = renderHook(() => useAI());
         await expect(result.current.generateMetadataFromText('Test', ''))
-            .rejects.toThrow(/Network failure/);
+            .rejects.toThrow('Netzwerkfehler');
     });
 
     it('throws on empty response (null/undefined)', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve(null),
-        }));
+        vi.stubGlobal('fetch', vi.fn().mockImplementation(() => jsonResponse(null)));
 
         const { result } = renderHook(() => useAI());
         await expect(result.current.generateMetadataFromText('Test', ''))
@@ -384,10 +437,10 @@ describe('useAI — generateMetadataFromText', () => {
     });
 
     it('throws on non-JSON response', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: () => Promise.reject(new Error('Unexpected token < in JSON at position 0')),
-        }));
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>', {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+        })));
 
         const { result } = renderHook(() => useAI());
         await expect(result.current.generateMetadataFromText('Test', ''))
@@ -452,7 +505,7 @@ describe('useAI — generateMetadata edge cases', () => {
 
     it('network failure during server mode throws', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
             .mockRejectedValueOnce(new Error('Network failure')),
         );
 
@@ -460,16 +513,13 @@ describe('useAI — generateMetadata edge cases', () => {
         await waitFor(() => expect(result.current.isAvailable).toBe(true));
 
         await expect(result.current.generateMetadata('photo-1', '', ''))
-            .rejects.toThrow('Network failure');
+            .rejects.toThrow('Netzwerkfehler');
     });
 
     it('empty object response from server returns empty fields', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({}),
-            }),
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+            .mockResolvedValueOnce(jsonResponse({})),
         );
 
         const { result } = renderHook(() => useAI());
@@ -482,7 +532,7 @@ describe('useAI — generateMetadata edge cases', () => {
 
     it('abort signal causes AbortError', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) }),
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' })),
         );
 
         const { result } = renderHook(() => useAI());
@@ -514,11 +564,8 @@ describe('useAI — getLmStudioUrl fallback', () => {
     it('falls back to default URL when localStorage has invalid URL', async () => {
         localStorage.setItem('lmstudio_url', 'invalid-url');
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: false })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({ data: [{ id: 'fallback-model' }] }),
-            }),
+            .mockResolvedValueOnce(new Response(null, {status: 503}))
+            .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'fallback-model' }] })),
         );
 
         const { result } = renderHook(() => useAI());
@@ -530,11 +577,8 @@ describe('useAI — getLmStudioUrl fallback', () => {
     it('falls back to default URL when localStorage has https URL', async () => {
         localStorage.setItem('lmstudio_url', 'https://127.0.0.1:1234');
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: false })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({ data: [{ id: 'model-from-default' }] }),
-            }),
+            .mockResolvedValueOnce(new Response(null, {status: 503}))
+            .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'model-from-default' }] })),
         );
 
         const { result } = renderHook(() => useAI());

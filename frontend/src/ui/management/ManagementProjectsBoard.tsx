@@ -144,7 +144,7 @@ export default function ManagementProjectsBoard({ embedded = false }: Management
             {item.phone && <div className="text-xs opacity-60">{item.phone}</div>}
             {item.package && <div className="text-xs opacity-70">{item.package}</div>}
             <div className="flex flex-wrap items-center gap-1 mt-1">
-                {item.price_cents > 0 && <span className="font-bold text-sm">{formatMoney(item.price_cents)}</span>}
+                {item.price_cents != null && item.price_cents > 0 && <span className="font-bold text-sm">{formatMoney(item.price_cents)}</span>}
                 {paymentBadge(item.payment_status)}
             </div>
             {item.notes && (

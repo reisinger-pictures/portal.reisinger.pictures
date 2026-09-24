@@ -1,7 +1,7 @@
 # Lightroom Plugin — admin.lrplugin
 
-**Stand:** 2026-07-18  
-**Version:** 1.1.1  
+**Stand:** 2026-09-24
+**Version:** 1.1.1 (source hardening; no backend/frontend changes)
 **Brand:** RP-only (portal.reisinger.pictures)
 
 ## Übersicht
@@ -24,6 +24,7 @@ admin.lrplugin/
 ├── Utils.lua                — slugify, flattenGroups, flattenGalleries
 ├── PluginInfoProvider.lua   — Plugin-Settings-Tab (URL, Login)
 └── json.lua                 — JSON-Parser (Lightroom 8+ kompatibel)
+└── tests/                  — Lua-/Static-Regressions-Harness (ohne Lightroom-Runtime)
 ```
 
 ## Unterstützte Features
@@ -51,8 +52,21 @@ admin.lrplugin/
 | lr_uUID im Upload | ✅ | Backend ersetzt via UUID |
 | replace=1 Flag | ✅ 1.1.1 | Immer gesendet |
 | Retry bei 5xx/Curl-Fehlern | ✅ 1.1.1 | 1× nach 2s Sleep |
-| Temp-Dir Cleanup | ✅ 1.1.1 | Bei errorCount==0 |
-| Log-Datei (upload_log.txt) | ✅ | Im Temp-Ordner |
+| Temp-/Rendition-Cleanup | ✅ 1.1.1 + hardening | Nur frisch gerenderte, erfolgreich hochgeladene Pfade werden gelöscht; keine pauschale Verzeichnis-Löschung |
+| Abbruch-/Fehlerstatus | ✅ hardening | Fehlgeschlagenes oder abgebrochenes `waitForRender` wird nie als frischer Upload akzeptiert |
+| Log-Datei (upload_log.txt) | ✅ | Im run-spezifischen Temp-Ordner |
+
+### Long-running manager sessions
+
+Authenticated calls from the manager and its gallery, group, invite and rating dialogs use one bounded session holder. A `401` triggers at most one renewal through the existing `Api.login` protected credential-store fallback; the renewed JWT is then used for one retry. A failed or exhausted renewal is surfaced as an expired-session message and no password is retained in the session object. Uploads keep the same bound and remain idempotent through `replace=1`.
+
+### Group hierarchy safety
+
+`Utils.flattenGroupChoices()` rejects malformed cycles with a visited set. When editing a meta-gallery, the edited group and its complete descendant subtree are removed from the parent choices; root choices and unrelated child groups remain available. The gallery group picker uses the same cycle-safe flattening without excluding its current valid group.
+
+### Regression harness
+
+The plugin has no Lua runtime in the repository container. Run `admin.lrplugin/tests/run.sh` from the repository root. It uses `tests/regression.lua` when `lua` is available; otherwise it runs the no-dependency `tests/static_regression.py` structural Lua check plus the malformed group-tree fixture assertions.
 
 ### Selection-Workflow (Rating Sync)
 
@@ -101,3 +115,4 @@ admin.lrplugin/
 | 1.0.0 | — | Initial release |
 | 1.1.0 | — | Meta-Galerien, Einladungen, Delivery, SRP |
 | 1.1.1 | 2026-07-18 | Brand-Konsolidierung (RP-only), Upload-Robustheit (replace=1, Retry, Temp-Cleanup), Rating-Status-Dialog, Pick-Flag bei Ø≥4 |
+| 1.1.1 hardening | 2026-09-24 | Failed/cancelled renditions fail closed, fresh-path-only cleanup, bounded JWT renewal, cycle-safe group choices; static regression harness |

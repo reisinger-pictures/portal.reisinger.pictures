@@ -4,24 +4,27 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Enums\Brand;
 use App\Models\User;
+use App\Services\AuthorizationService;
 
 /**
  * Shared brand-isolation helpers for management controllers / requests.
  *
- * Trust model (see AGENTS.md / features): the cross-brand actor
- * (`brand === null`, e.g. `super_admin`) may act across brands. Every
- * brand-bound actor (`brand !== null`, including `admin`) is isolated to
- * resources of their own brand; a resource without a brand (`null`) counts as
- * foreign for a brand-bound actor.
+ * Trust model (see AGENTS.md / features): only a persisted Super-Admin with
+ * `brand === null` may act across brands. A legacy registered null-brand
+ * account is invalid, while a transient guest is handled separately through
+ * active invite provenance. Every brand-bound actor (`brand !== null`,
+ * including `admin`) is isolated to resources of their own brand; a resource
+ * without a brand (`null`) counts as foreign for a brand-bound actor.
  */
 trait EnforcesBrandIsolation
 {
     /**
      * Normalize a model's `brand` attribute (the AsBrand cast may return either a
      * Brand enum or a plain string for values not covered by the enum) to its raw
-     * string value. `null` means cross-brand / no brand.
+     * string value. `null` is a no-brand value; it is only cross-brand for a
+     * trusted persisted Super-Admin after the trust check below.
      */
-    protected function brandValue(object|null $model): ?string
+    protected function brandValue(?object $model): ?string
     {
         if ($model === null) {
             return null;
@@ -36,24 +39,37 @@ trait EnforcesBrandIsolation
     }
 
     /**
-     * A cross-brand actor (brand = null) is allowed to act across all brands.
+     * Only a persisted Super-Admin with a null brand is cross-brand. In
+     * particular, a null-brand ordinary user and a transient guest must never
+     * be treated as an all-brand actor by a shared controller.
      */
     protected function isCrossBrand(?User $user): bool
     {
-        return $this->brandValue($user) === null;
+        return $user !== null
+            && app(AuthorizationService::class)->isTrustedCrossBrandActor($user);
     }
 
     /**
-     * True when a brand-bound actor targets a resource of a different brand
-     * (including a brand-less resource). Always false for a cross-brand actor.
+     * True when an actor may not act on the resource's brand. Invalid legacy
+     * null-brand actors fail closed, even when their role predicate would have
+     * been true before the reserved-state check.
      */
     protected function isBrandMismatch(?User $actor, object $resource): bool
     {
-        $actorBrand = $this->brandValue($actor);
-        if ($actorBrand === null) {
+        if ($actor === null) {
+            return true;
+        }
+
+        $authorization = app(AuthorizationService::class);
+        if ($authorization->isReservedNullBrandActor($actor)
+            || $authorization->isTransientGuest($actor)) {
+            return true;
+        }
+
+        if ($this->isCrossBrand($actor)) {
             return false;
         }
 
-        return $actorBrand !== $this->brandValue($resource);
+        return $this->brandValue($actor) !== $this->brandValue($resource);
     }
 }

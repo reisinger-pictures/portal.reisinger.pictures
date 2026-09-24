@@ -86,9 +86,9 @@ class UserBrandIsolationTest extends TestCase
         $this->assertModelExists($target);
     }
 
-    public function test_cross_brand_admin_can_update_foreign_brand_user(): void
+    public function test_cross_brand_super_admin_can_update_foreign_brand_user(): void
     {
-        $token = $this->tokenFor(UserRole::ADMIN, null);
+        $token = $this->tokenFor(UserRole::SUPER_ADMIN, null);
         $target = User::factory()->create(['brand' => self::OTHER_BRAND, 'flatrate_level' => 'none']);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])

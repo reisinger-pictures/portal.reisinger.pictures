@@ -3,6 +3,7 @@ domain: photos
 topic: ai-server-side
 status: active
 supersedes: photos/03-ai-batch-edit.md
+reviewed: 2026-09-24
 ---
 
 # Technical Concept: Server-Side AI Metadata Generation (OpenAI-compatible)
@@ -10,7 +11,9 @@ supersedes: photos/03-ai-batch-edit.md
 ## 1. Architecture Overview
 The system replaces the pure client-side LM Studio approach with a dual-mode architecture:
 - **Server mode (preferred):** PHP Backend (`AIService`) calls OpenAI-compatible APIs. Images are loaded server-side from disk — no Base64 transfer over the network.
-- **Local fallback:** If the server-side endpoint is unavailable or misconfigured, the frontend falls back to direct browser-to-LM-Studio communication (preserving the original `03-ai-batch-edit` workflow).
+- **Local fallback:** If the server-side status is unconfigured or the status
+  request fails, the frontend may use direct browser-to-LM-Studio vision calls.
+  An explicit disabled status never falls back.
 
 ## 2. Configuration
 
@@ -27,13 +30,18 @@ The system replaces the pure client-side LM Studio approach with a dual-mode arc
 
 ### State model (centralised in `App\Services\AIService`)
 
-`AIService` exposes three mutually-exclusive state helpers that the whole app reads from:
+`AIService` exposes three effective status states. `AI_ENABLED` is falsey when
+disabled; `AI_TYPE=lmstudio` is the one provider that does not need
+`AI_API_KEY`:
 
-| Helper | Meaning | UI effect |
-|--------|---------|-----------|
-| `isDisabled()` | `AI_ENABLED` is falsy (`false`, empty) | AI buttons hidden, **no warning banner** |
-| `isUnconfigured()` | `AI_ENABLED=true` but `AI_API_KEY` missing (except `type=lmstudio`) | AI buttons hidden, **admin warning banner shown** |
-| `isAvailable()` | `AI_ENABLED=true` **and** (`type=lmstudio` **or** `AI_API_KEY` non-empty) | AI buttons enabled, no banner |
+| Helper | Meaning | UI/status effect |
+|--------|---------|-------------------|
+| `isDisabled()` | resolved `AI_ENABLED` config is falsey | AI buttons hidden, **no warning banner** |
+| `isUnconfigured()` | raw helper for an enabled service with an empty `AI_API_KEY`; it can also be true for LM Studio | After the disabled check, the status endpoint gives `isAvailable()` precedence, so an available LM Studio configuration is reported as `available`, not `unconfigured` |
+| `isAvailable()` | enabled and (`type=lmstudio` **or** `AI_API_KEY` non-empty) | AI buttons enabled, no banner |
+
+The three status values are the effective contract. The raw
+`isUnconfigured()` helper is not itself a mutually exclusive fourth state.
 
 ### `AI_ENABLED=false` (default, disabled)
 
@@ -98,12 +106,19 @@ Access is gated via the `updateMetadata` PhotoPolicy Gate:
 
 ## 5. Frontend (`useAI.ts`)
 The `useAI` hook (replaces the old `useLMStudio`) implements the dual-mode strategy:
-1. On mount, checks `/api/ai/status`
-2. If server-side is available → mode `'server'` (preferred)
-3. If not, falls back to LM Studio → mode `'local'`
-4. If neither is available → mode `'unavailable'`
+1. On mount, checks `/api/ai/status`.
+2. If `status === 'disabled'`, it selects `unavailable` and does **not** probe
+   LM Studio; an explicit disable is authoritative.
+3. If the endpoint reports effective `enabled === true` (normally
+   `status === 'available'`), it selects `server`.
+4. If the status is `unconfigured` or the status request fails, it probes
+   `/v1/models` at the configured localhost LM Studio URL and selects `local`
+   when a model is found.
+5. If neither path yields a model, it selects `unavailable`.
 
-The `AIBatchEditModal` component uses this hook and displays a mode indicator badge.
+The local branch is vision-only. `AIGalleryDefaultsModal` always calls the
+server text endpoint and has no LM Studio fallback. The `AIBatchEditModal`
+component uses this hook and displays a mode indicator badge.
 
 ## 6. Versioning (Audit Trail)
 Every metadata update (regardless of role) creates a `PhotoMetadataVersion` snapshot of the previous state. This replaces the previous behavior where only client edits were versioned. See `features/photos/02-metadata-versioning.md`.
@@ -111,5 +126,5 @@ Every metadata update (regardless of role) creates a `PhotoMetadataVersion` snap
 ## 7. Related Documents
 - `features/photos/03-ai-batch-edit.md` — deprecated local-only approach
 - `features/photos/02-metadata-versioning.md` — versioning for all roles
-- `features/ecommerce/01-licensing-and-cart.md` — metadata in licensing context
+- [Licensing and downloads](../ecommerce/02-licensing-and-downloads.md) — metadata in licensing context
 - `features/infrastructure/09-brand-context-queue-cli.md` — brand context patterns

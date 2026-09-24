@@ -8,13 +8,20 @@ import PageLayout from './components/PageLayout';
 import { apiMutate } from '../api';
 import { useAuth } from '../logic/useAuth';
 
+interface OrgInviteLookupResponse {
+    org_name: string;
+    email: string;
+}
+
 export default function OrgInviteView() {
-    const { token } = useParams<{ token: string }>();
+    const { token: routeToken } = useParams<{ token: string }>();
+    const token = routeToken ?? null;
     const navigate = useNavigate();
     const { mutate } = useSWRConfig();
     const { user, isLoading: authLoading } = useAuth();
 
     const [loading, setLoading] = useState(true);
+    const [resolvedToken, setResolvedToken] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [orgName, setOrgName] = useState('');
     const [email, setEmail] = useState('');
@@ -26,20 +33,47 @@ export default function OrgInviteView() {
     const [acceptPrivacy, setAcceptPrivacy] = useState(false);
 
     useEffect(() => {
-        fetch('/api/org-invites/' + token, { headers: { 'Accept': 'application/json' } })
-            .then(res => {
+        if (!token) return;
+
+        // The invite lookup is public; only the redeem mutation is session-aware.
+        const requestToken = token;
+        const controller = new AbortController();
+        let cancelled = false;
+
+        const loadInvite = async () => {
+            try {
+                const res = await fetch('/api/org-invites/' + requestToken, {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (cancelled || controller.signal.aborted) return;
                 if (!res.ok) throw new Error(t`Dieser Einladungslink ist ungültig oder abgelaufen.`);
-                return res.json();
-            })
-            .then(data => {
+                const data = await res.json() as OrgInviteLookupResponse;
+                if (cancelled || controller.signal.aborted) return;
                 setOrgName(data.org_name);
                 setEmail(data.email);
+                setResolvedToken(requestToken);
+                setConfirmed(false);
+                setIsSubmitting(false);
+                setError('');
                 setLoading(false);
-            })
-            .catch(err => {
+            } catch (err: unknown) {
+                if (cancelled || controller.signal.aborted) return;
+                setOrgName('');
+                setEmail('');
+                setResolvedToken(requestToken);
+                setConfirmed(false);
+                setIsSubmitting(false);
                 setError(err instanceof Error ? err.message : String(err));
                 setLoading(false);
-            });
+            }
+        };
+
+        void loadInvite();
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
     }, [token]);
 
     const handleJoin = async () => {
@@ -66,7 +100,17 @@ export default function OrgInviteView() {
         }
     };
 
-    if (loading || authLoading) {
+    if (!token) {
+        return (
+            <PageLayout>
+                <div className="flex h-full items-center justify-center p-4">
+                    <ErrorMessage message={t`Dieser Einladungslink ist ungültig oder abgelaufen.`} className="max-w-md shadow-lg mx-auto"/>
+                </div>
+            </PageLayout>
+        );
+    }
+
+    if (loading || authLoading || resolvedToken !== token) {
         return (
             <PageLayout>
                 <div className="flex h-full items-center justify-center">

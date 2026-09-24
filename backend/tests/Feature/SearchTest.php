@@ -2,27 +2,33 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
+use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\Photo;
-use App\Models\User;
 use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Meilisearch\Client;
 use Meilisearch\Contracts\TasksQuery;
+use Tests\TestCase;
 
-class SearchTest extends TestCase {
+class SearchTest extends TestCase
+{
     use RefreshDatabase;
 
-    protected function setUp(): void {
+    protected function setUp(): void
+    {
         parent::setUp();
-        \Illuminate\Support\Facades\Artisan::call('scout:flush', ['model' => Photo::class]);
-        \Illuminate\Support\Facades\Artisan::call('scout:flush', ['model' => Gallery::class]);
-        \Illuminate\Support\Facades\Artisan::call('scout:sync-index-settings');
+        Artisan::call('scout:flush', ['model' => Photo::class]);
+        Artisan::call('scout:flush', ['model' => Gallery::class]);
+        Artisan::call('scout:sync-index-settings');
     }
 
-    protected function waitForSearchIndex() {
-        $client = app(\Meilisearch\Client::class);
-        $query = (new TasksQuery())->setStatuses(['enqueued', 'processing']);
+    protected function waitForSearchIndex()
+    {
+        $client = app(Client::class);
+        $query = (new TasksQuery)->setStatuses(['enqueued', 'processing']);
         $tasks = $client->getTasks($query);
 
         foreach ($tasks as $task) {
@@ -32,8 +38,9 @@ class SearchTest extends TestCase {
         }
     }
 
-    public function test_search_discovery_returns_public_galleries() {
-        Gallery::factory()->create(['is_public' => true, 'name' => 'Public Wedding', 'brand' => 'rp']);
+    public function test_search_discovery_returns_public_galleries()
+    {
+        Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'name' => 'Public Wedding', 'brand' => 'rp']);
         Gallery::factory()->create(['is_public' => false, 'name' => 'Private Secret', 'brand' => 'rp']);
 
         $response = $this->getJson('/api/search?q=');
@@ -41,7 +48,8 @@ class SearchTest extends TestCase {
         $this->assertCount(1, $response->json('galleries'));
     }
 
-    public function test_search_filters_photos_by_metadata() {
+    public function test_search_filters_photos_by_metadata()
+    {
         $gallery = Gallery::factory()->create(['is_public' => true, 'type' => 'delivery', 'brand' => 'rp']);
         Photo::factory()->create([
             'gallery_id' => $gallery->id,
@@ -55,24 +63,26 @@ class SearchTest extends TestCase {
         $this->assertCount(1, $response->json('photos'));
     }
 
-    public function test_search_respects_role_based_filtering() {
+    public function test_search_respects_role_based_filtering()
+    {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
         Gallery::factory()->create(['is_public' => false, 'name' => 'Secret Admin Stuff', 'brand' => 'rp']);
-        Gallery::factory()->create(['is_public' => true, 'name' => 'Public Showcase', 'brand' => 'rp']);
+        Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'name' => 'Public Showcase', 'brand' => 'rp']);
 
         $this->waitForSearchIndex();
 
         $adminToken = auth('api')->login($admin);
         $response = $this->withHeaders(['Authorization' => "Bearer $adminToken"])->getJson('/api/search?q=');
-        
+
         $this->assertCount(1, $response->json('galleries'));
     }
 
-    public function test_client_can_find_photos_from_authorized_private_gallery() {
+    public function test_client_can_find_photos_from_authorized_private_gallery()
+    {
         $client = User::factory()->create();
-        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
+        $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
 
         $privateGallery = Gallery::factory()->create(['is_public' => false, 'type' => 'delivery', 'brand' => 'rp']);
         $client->galleries()->attach($privateGallery);
@@ -86,9 +96,10 @@ class SearchTest extends TestCase {
         $this->assertCount(1, $response->json('photos'));
     }
 
-    public function test_photographer_can_find_photos_from_own_gallery_but_not_others() {
+    public function test_photographer_can_find_photos_from_own_gallery_but_not_others()
+    {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
         $ownGallery = Gallery::factory()->create(['is_public' => false, 'type' => 'delivery', 'brand' => 'rp']);
         $photog->galleries()->attach($ownGallery);
@@ -107,7 +118,8 @@ class SearchTest extends TestCase {
      * Ergebnis liefern wie der korrekte Begriff. Legitimiert die typoTolerance-Settings
      * in config/scout.php (minWordSizeForTypos oneTypo=4).
      */
-    public function test_search_is_typo_tolerant_for_photos() {
+    public function test_search_is_typo_tolerant_for_photos()
+    {
         $gallery = Gallery::factory()->create(['is_public' => true, 'type' => 'delivery', 'brand' => 'rp']);
         Photo::factory()->create([
             'gallery_id' => $gallery->id,

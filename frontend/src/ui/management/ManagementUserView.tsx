@@ -34,8 +34,9 @@ export default function ManagementUserView() {
         try {
             await updateUser(id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, brand, canPurchaseUpgrades);
             showToast('success', t`Nutzerrechte gespeichert.`);
-        } catch {
+        } catch (error: unknown) {
             showToast('error', t`Fehler beim Speichern der Rechte.`);
+            throw error;
         }
         setEditingUser(null);
     };

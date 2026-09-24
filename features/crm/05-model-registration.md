@@ -1,6 +1,11 @@
 # Model-Registrierung über Einladungslink (CRM)
 
-**Status:** SOLL (implementiert, Backend). Migration **V033**.
+**Status:** Current SOLL / implemented (reviewed 2026-09-24). The base
+registration schema is **V033**; **V034** adds encrypted profile storage,
+person photos, lifecycle state, and profile-access tokens; **V035** makes the
+act-manager reference nullable for succession. The complete current contract is
+in [`06-model-profile-iteration.md`](06-model-profile-iteration.md) and
+[`07-model-contact-sheet-export.md`](07-model-contact-sheet-export.md).
 
 Ein Admin lädt eine Managerperson mit einem Einmal-Token ein. **Primärflow ist
 der kopierbare Magic Link** (z. B. für WhatsApp); der E-Mail-Versand ist ein
@@ -35,12 +40,14 @@ Erfolgsmail.
 | `id` | uuid PK | |
 | `customer_id` | uuid unique FK | cascade delete. |
 | `catalog_version` | string(20) | z. B. `v1`. |
-| `answers` | json | Snapshot `{scope,key,label,type,value}` (person-scope). |
+| `answers` | text | Laravel `encrypted:array` snapshot `{scope,key,label,type,value}` (person-scope; ciphertext, not JSON text). |
 | `gender` | string(20) nullable | `female\|male\|diverse\|null`. |
-| `age_proof_required` | boolean | Snapshot der Kategorie-Auswertung. |
-| `age_proof_path` | string nullable | Pfad auf privater `local`-Disk. |
+| `age_proof_required` | boolean | Bei jedem aktuellen Submit/Update `true`. |
+| `age_proof_path` | string nullable | Pfad zu einer verschlüsselten Datei auf privater `local`-Disk. |
 | `age_proof_uploaded_at` | timestamp nullable | |
 | `submitted_at` | timestamp | |
+| `last_confirmed_at` | timestamp nullable | Lifecycle-Anker; V034. |
+| `last_reminder_stage`/`last_reminder_at` | string/timestamp nullable | Idempotente T+12/13/14-Reminder; V034. |
 | `created_at`/`updated_at` | timestamps | |
 
 ### `acts`
@@ -49,7 +56,7 @@ Erfolgsmail.
 |---|---|---|
 | `id` | uuid PK | |
 | `brand` | string(20) | Brand-Isolation. |
-| `manager_customer_id` | uuid FK `customers` | Managerperson. |
+| `manager_customer_id` | uuid nullable FK `customers` | Managerperson; V035 uses `nullOnDelete` so succession can run before deletion. |
 | `act_type` | string(20) | `single\|couple\|group` — **abgeleitet** aus `person_count`. |
 | `catalog_version` | string(20) | |
 | `answers` | json nullable | Act-Snapshot. |
@@ -67,6 +74,20 @@ Erfolgsmail.
 Name/Notiz zur Einladung, z. B. „Maria Muster / IG"), `brand`, `invited_by`
 (FK `users`), `expires_at`, `used_at` nullable, `act_id` nullable, `customer_id`
 nullable, `created_at`. (`updated_at` = null.)
+
+### `model_photos` (V034)
+
+`id`, `customer_id`/`model_profile_id` (FKs), `path` (random filename on the
+encrypted private `local` disk), `original_name`, `mime_type`, `size_bytes`,
+`visibility` (`public|internal`, default `internal`), `is_primary`, `position`,
+timestamps. At most five photos are accepted per person. A primary photo must
+be `public`; the owner can clear the primary flag.
+
+### `model_access_tokens` (V034)
+
+`id`, `customer_id` (FK), `token` (unique, 64 characters), `expires_at`
+(24-hour TTL), `last_used_at`, `revoked_at`, `created_by`, timestamps. Issuing a
+new link revokes the customer's previous active link.
 
 ## Fragenkatalog (`App\Services\ModelQuestionnaire`)
 
@@ -115,12 +136,20 @@ persons[<i>][create_account]     Portal-Konto-Checkbox (optional). Akzeptierte
                                  FILTER_VALIDATE_BOOLEAN). Fehlend/"false" ⇒ kein Konto.
 persons[<i>][age_proof]          Datei (jpg/jpeg/png/webp/pdf, max 10 MB)
                                  Pflicht für jede Person (immer)
+persons[<i>][photos][<j>][file]          Foto (jpg/jpeg/png/webp, max 10 MB)
+persons[<i>][photos][<j>][visibility]   public|internal, Default internal
+persons[<i>][photos][<j>][is_primary]  Boolean; ein Primary muss public sein
 act[answers][act_notes]          Act-Notizen
 manager_index                    Index der Managerperson (default 0)
 ```
 
+`persons[i][photos]` ist auf maximal 5 Einträge begrenzt (server-autoritativ;
+422-Feld-Key `persons.<i>.photos`). Nicht-sequelle Foto-Indizes sind erlaubt;
+Metadaten und Datei werden über denselben Index verknüpft.
+
 Validierungsfehler kommen mit präfixierten Keys zurück, z. B.
-`persons.0.answers.last_name`, `persons.1.age_proof`.
+`persons.0.answers.last_name`, `persons.1.age_proof`,
+`persons.0.photos`, `persons.0.photos.0.is_primary`.
 
 ### Management (auth + `management`-Middleware, Gate `isAdmin`)
 
@@ -164,7 +193,8 @@ Admin-Liste liefert pro Model u. a. `display_name`, `birthdate`, `age`,
   Manager-Scope gegen die aktuellen Werte aus.
 - **Multipart-Submit** über `buildRegistrationFormData()` (`apiUpload` in
   `src/api.ts`): Booleans als `"1"`/`"0"`, Multiselect als `key[]`,
-  Datei als `persons[i][age_proof]`, `manager_index` als String.
+  Altersnachweis als `persons[i][age_proof]`, Fotos als
+  `persons[i][photos][j][file|visibility|is_primary]`, `manager_index` als String.
 - **Fehlerzustände:** 404 (unbekannt), 410 (verbraucht/abgelaufen) und
   409 (Race) führen **sowohl bei `check` (GET) als auch beim `submit` (POST)
   auf dieselbe Fehlerseite** — das Formular wird dann nicht mehr angeboten.
@@ -226,8 +256,10 @@ als Gast öffnen).
   64-Zeichen-Secret mit 7 Tagen TTL und Einmal-Nutzung.
 - **Keine Account-Enumeration:** Portal-Konten entstehen nur per expliziter Checkbox;
   ein vorhandener fremd-brand Account wird nicht verknüpft.
-- Altersnachweise liegen auf der **privaten `local`-Disk** (`storage/app/private`),
-  Download nur über den auth-gated Endpunkt. Kein `public`-Storage.
+- Altersnachweise und Personen-Fotos liegen **verschlüsselt** auf der privaten
+  `local`-Disk (`storage/app/private`), Download nur über auth-gated Endpunkte.
+  `model_profiles.answers` wird als Laravel `encrypted:array` gespeichert. Kein
+  `public`-Storage.
 - Customer-Dedupe per E-Mail **innerhalb der Marke**; fremd-brand Kunden werden nicht
   wiederverwendet.
 - **Erfolgs-/Aktivierungsmails nutzen den Invite-Brand** (nicht den Request-Host),
@@ -246,7 +278,10 @@ als Gast öffnen).
 
 - **Löschkonzept Altersnachweise** (Aufbewahrungsfrist, automatische Löschung nach
   Verifikation) — vor Go-live festlegen.
-- Profilaktualisierung: v1 nur Admin; später durch den Inhaber des Portal-Kontos.
+- Profilaktualisierung: **umgesetzt** über den 24h-Profile-Magic-Link
+  (`GET/POST /api/model-profil/{token}`) und `GET /api/me/models`; der Owner
+  darf Answers, Altersnachweis (bei Bedarf) sowie Sichtbarkeit/Primary-Flag
+  bestehender Fotos aktualisieren. Management-Admin-CRUD bleibt separat.
 - Bestätigungs-/Bestätigungslink je Person (fremde personenbezogene Daten) als
   rechtlicher Ausbau.
 - Formular-Performance bei sehr vielen Personen (clientseitiges Sanity-Limit).

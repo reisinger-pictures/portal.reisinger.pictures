@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CheckoutRequest;
 use App\Services\CheckoutService;
 use App\Services\SettingResolver;
-use App\Http\Requests\CheckoutRequest;
+use App\Support\ActorIdentity;
 use Illuminate\Support\Facades\Gate;
 
 class CheckoutController extends Controller
@@ -12,6 +13,12 @@ class CheckoutController extends Controller
     public function checkout(CheckoutRequest $request, CheckoutService $checkoutService, SettingResolver $resolver)
     {
         $user = auth('api')->user();
+        if (! ActorIdentity::isRegistered($user)) {
+            return response()->json([
+                'error' => 'Der Checkout ist für Gäste derzeit nicht verfügbar. Bitte melde dich mit einem Portal-Konto an.',
+                'guest_checkout_unsupported' => true,
+            ], 403);
+        }
 
         $holder = $resolver->get('bank_holder');
         $iban = $resolver->get('bank_iban');
@@ -31,8 +38,8 @@ class CheckoutController extends Controller
             return response()->json(['error' => 'Kauf auf Rechnung nicht erlaubt.'], 403);
         }
 
-        $hasQuotesOnly = collect($request->items)->every(fn($i) => isset($i['isQuote']) && $i['isQuote']);
-        if (!$hasQuotesOnly && !$request->withdrawal_waived) {
+        $hasQuotesOnly = collect($request->items)->every(fn ($i) => isset($i['isQuote']) && $i['isQuote']);
+        if (! $hasQuotesOnly && ! $request->withdrawal_waived) {
             return response()->json(['error' => 'Sie müssen auf Ihr Widerrufsrecht verzichten, um digitale Bilddaten zu kaufen.'], 422);
         }
 

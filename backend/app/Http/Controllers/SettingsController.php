@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Brand;
 use App\Http\Requests\StoreBrandSettingsRequest;
 use App\Models\Gallery;
 use App\Services\BrandSettingsService;
@@ -192,11 +191,15 @@ class SettingsController extends Controller
         if ($galleryId !== null) {
             $gallery = Gallery::find($galleryId);
             if ($gallery !== null) {
-                // Cross-brand leak guard: a gallery of another brand must never
-                // influence this brand's licensing mode / volume pricing.
-                // Legacy null-brand galleries are still accepted.
-                $galleryBrand = $gallery->brand instanceof Brand ? $gallery->brand->value : $gallery->brand;
-                if ($galleryBrand !== null && $galleryBrand !== BrandRegistry::currentId()) {
+                $galleryBrand = BrandRegistry::normalizeId($gallery->brand);
+                $parentTreeMatches = $gallery->gallery_group_id === null
+                    || BrandRegistry::galleryGroupTreeMatchesCurrent($gallery->galleryGroup()->first());
+
+                // Keep the established legacy-null gallery fallback for the
+                // gallery's own brand, but never let a foreign/null parent
+                // influence this host's licensing terms or volume preset.
+                if (($galleryBrand !== null && ! BrandRegistry::resourceMatchesCurrent($galleryBrand))
+                    || ! $parentTreeMatches) {
                     $gallery = null;
                 } else {
                     $pricingStrategy = $gallery->effective_licensing_mode;

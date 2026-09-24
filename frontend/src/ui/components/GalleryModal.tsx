@@ -4,7 +4,6 @@ import { useUI } from './UIContext';
 import { useEffect } from 'react';
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useFocusTrap } from '../../logic/useFocusTrap';
 import { useForm, useWatch } from 'react-hook-form';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
@@ -140,8 +139,6 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         }
     };
 
-    const modalRef = useFocusTrap<HTMLDialogElement>(isOpen && !isLoading);
-
     if (!isOpen) return null;
     if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
@@ -154,7 +151,6 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
             editing={!!editingGallery}
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
-            modalRef={modalRef}
             maxWidth="2xl"
             secondaryAction={!editingGallery ? (
                 <button type="button" className="btn btn-xs btn-outline" onClick={() => { onClose(); onOpenGroupModal(); }}>

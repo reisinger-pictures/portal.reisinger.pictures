@@ -1,5 +1,7 @@
+import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { type ReactNode, type RefObject, useRef } from 'react';
+import { type KeyboardEvent, type ReactNode, type RefObject, useId } from 'react';
+import { useFocusTrap } from '../../logic/useFocusTrap';
 
 interface ModalDialogShellProps {
     title: ReactNode;
@@ -29,17 +31,43 @@ export default function ModalDialogShell({
     children,
 }: ModalDialogShellProps) {
     const widthClass = maxWidth === '2xl' ? 'max-w-2xl' : '';
-    const fallbackRef = useRef<HTMLDialogElement | null>(null);
-    const resolvedRef: RefObject<HTMLDialogElement | null> = modalRef ?? fallbackRef;
+    const titleId = useId();
+    const internalRef = useFocusTrap<HTMLDialogElement>(true, { containerRef: modalRef });
+    const resolvedRef = modalRef ?? internalRef;
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        onClose();
+    };
 
     return (
-        <dialog ref={resolvedRef} className="modal modal-open">
+        <dialog
+            ref={resolvedRef}
+            open
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            className="modal modal-open"
+            onKeyDown={handleKeyDown}
+            onCancel={(event) => {
+                event.preventDefault();
+                onClose();
+            }}
+        >
             <div className={`modal-box relative ${widthClass}`}>
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
+                <button
+                    type="button"
+                    className="btn btn-circle btn-ghost absolute right-2 top-2"
+                    onClick={onClose}
+                    aria-label={t`Schließen`}
+                >
+                    <span aria-hidden="true">✕</span>
+                </button>
 
                 <div className="flex justify-between items-center mb-6 mr-8">
-                    <h3 className="font-bold text-xl flex items-center gap-2">
-                        {icon && <span className={`iconify ${icon} text-primary`}></span>}
+                    <h3 id={titleId} className="font-bold text-xl flex items-center gap-2">
+                        {icon && <span className={`iconify ${icon} text-primary`} aria-hidden="true"></span>}
                         {title}
                     </h3>
                     {secondaryAction}
@@ -61,7 +89,7 @@ export default function ModalDialogShell({
                     </div>
                 </form>
             </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
+            <div className="modal-backdrop" aria-hidden="true" onClick={onClose}></div>
         </dialog>
     );
 }

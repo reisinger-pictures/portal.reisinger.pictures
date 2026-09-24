@@ -64,6 +64,9 @@ class StripePaymentService
         if ($order === null) {
             throw new \RuntimeException('Stripe PaymentIntent order does not exist.');
         }
+        if (is_string($order->guest_id) && trim($order->guest_id) !== '') {
+            throw new \RuntimeException('Stripe checkout for transient guests is not supported.');
+        }
         $context = $this->resolveIntentContext(
             $orderId,
             $generation,

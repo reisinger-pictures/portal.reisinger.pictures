@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\AsBrand;
 use App\Enums\Brand;
+use App\Observers\CustomerObserver;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -79,6 +80,30 @@ class Customer extends Model
     public function scopeModels(Builder $query): Builder
     {
         return $query->where($query->getQuery()->from.'.is_model', true);
+    }
+
+    /**
+     * Delete the customer without making Scout an in-transaction side effect.
+     * CustomerObserver schedules the ID-only removal after the commit.
+     */
+    public function delete()
+    {
+        try {
+            $result = self::withoutSyncingToSearch(function () {
+                return parent::delete();
+            });
+
+            if ($result !== true) {
+                CustomerObserver::clearDeletionStateFor($this);
+            }
+
+            return $result;
+        } catch (\Throwable $exception) {
+            // A deleting/deleted listener may abort after the observer has
+            // captured paths. Never leave that process-local state behind.
+            CustomerObserver::clearDeletionStateFor($this);
+            throw $exception;
+        }
     }
 
     public function toSearchableArray()

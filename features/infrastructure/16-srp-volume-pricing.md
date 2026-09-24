@@ -2,12 +2,14 @@
 
 > **Status:** Historical (2026-07-14). Beschreibt das mengenbasierte Volumen-Preismodell, das
 > ursprünglich für das SRP-Portal konzipiert wurde.
-> **Wichtig:** Das SRP-Portal und der `Brand::SRP`-Enum-Case wurden in Commit `1831116` entfernt.
-> Die Volume-Pricing-Logik lebt als `VolumeLicensingStrategy` weiter (siehe
-> `features/infrastructure/17-pricing-strategy-pattern.md`), ist aber nun ein **generisches**
-> Preismodell, das pro Brand oder (geplant, F2) pro Gallery aktiviert werden kann — nicht mehr
-> SRP-exklusiv.
-> Verknüpft: `AGENTS.todo.md` F5.
+> **Wichtig:** Das SRP-Portal und der `Brand::SRP`-Enum-Case wurden in einem
+> historischen Implementierungsschritt entfernt; die frühere Referenz ist in
+> diesem Checkout nicht als Commit verfügbar.
+> Die Volume-Pricing-Logik lebt als generische `VolumeLicensingStrategy` weiter
+> (siehe `17-pricing-strategy-pattern.md`) und kann pro Brand **oder pro Gallery**
+> aktiviert werden. F2 und die Preset-Zuordnung sind umgesetzt; die alten
+> Flach-Settings werden nur noch als Legacy-Migrationsquelle gelesen.
+> Verknüpft: `17-pricing-strategy-pattern.md` und `27-volume-licensing-presets.md`; die frühere `AGENTS.todo.md`-F5-Referenz ist historisch.
 > Erstellt 2026-07-01, Update 2026-07-14.
 
 ## 1. Kontext
@@ -39,9 +41,12 @@ Die Preisermittlung erfolgt **retroaktiv** über die Gesamtanzahl der Nicht-Quot
 - count ≥ threshold1 und < threshold2 (default 20) → Tier-2-Preis pro Bild
 - count ≥ threshold2 → Tier-3-Preis pro Bild
 
-### 2.2 Konfiguration via Settings-Tabelle
+### 2.2 Konfiguration via Settings-Tabelle (historischer Pfad)
 
-Die Preise und Schwellenwerte sind konfigurierbar über die `settings`-Tabelle mit SRP-Brand:
+Die folgenden Flach-Settings waren der ursprüngliche SRP-Konfigurationspfad.
+`VolumePresetService` liest sie beim ersten Erzeugen eines Brand-Defaults einmal
+als Legacy-Migrationsquelle; der aktuelle Konfigurationsvertrag sind die Preset-
+Tabellen aus V029 (siehe `27-volume-licensing-presets.md`).
 
 | Key                              | Typ   | Default | Beschreibung                    |
 |----------------------------------|-------|---------|---------------------------------|
@@ -77,4 +82,7 @@ Wenn die Settings nicht gesetzt sind, werden die Hardcoded-Defaults verwendet:
 - Dieses Dokument beschreibt nur das **Backend**-Preismodell.
 - Das Frontend (Warenkorb-Anzeige, Preis-Berechnung clientseitig) ist nicht Teil dieses Dokuments.
 - Die Architektur (Strategy-Pattern) wird in `features/infrastructure/17-pricing-strategy-pattern.md` beschrieben.
-- Dieses Dokument ist **historical** — die aktuelle Implementierung verwendet die generic `VolumeLicensingStrategy` (siehe `17-pricing-strategy-pattern.md`). Die Konfigurations-Keys (`srp_price_per_image_tier*`) wurden noch nicht umbenannt; das ist ein geplanter Cleanup, wenn SRP-Referenzen vollständig getilgt werden.
+- Dieses Dokument ist **historical**. Die aktuelle Implementierung verwendet
+  `VolumeLicensingStrategy` mit V029-Presets und optionalem Gallery-Override;
+  die `srp_*`-Keys sind Legacy und werden nicht als neuer Konfigurationsvertrag
+  verwendet.

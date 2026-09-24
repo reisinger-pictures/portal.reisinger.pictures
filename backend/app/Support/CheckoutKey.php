@@ -16,7 +16,7 @@ final class CheckoutKey
     public static function user(User|int|string|null $user, string $namespace = 'default'): string
     {
         $identifier = $user instanceof User
-            ? (string) $user->getAuthIdentifier()
+            ? ActorIdentity::cacheIdentifier($user)
             : (string) ($user ?? 'unknown');
 
         return $namespace.':user:'.self::digest($identifier);

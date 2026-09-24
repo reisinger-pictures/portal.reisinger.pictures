@@ -51,7 +51,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         if (isOpen) {
             reset({
                 name: editingGroup?.name || '',
-                org_id: editingGroup?.org_id || '',
+                org_id: editingGroup?.orgs?.[0]?.id || '',
                 slug: editingGroup?.slug || '',
                 is_free_download: !!editingGroup?.is_free_download,
                 is_editorial_only: !!editingGroup?.is_editorial_only,
@@ -68,9 +68,16 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         const extraOpts: GalleryGroupExtraOpts = {
             is_free_download: data.is_free_download,
             is_editorial_only: data.is_editorial_only,
-            is_hidden: data.is_hidden,
-            org_id: data.org_id ? data.org_id : null
+            is_hidden: data.is_hidden
         };
+
+        // The update endpoint distinguishes an omitted org_id (preserve all
+        // current pivot assignments) from an explicit null (clear them). Only
+        // send the field when the user actually changed the select; a derived
+        // value from the tree could otherwise clear unrelated organisations.
+        if (!editingGroup || dirtyFields.org_id) {
+            extraOpts.org_id = data.org_id || null;
+        }
 
         try {
             if (editingGroup) {

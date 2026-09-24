@@ -29,7 +29,7 @@ test.describe('Stripe Checkout Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    const navigateToStripeIframe = async (page: Page) => {
+    const navigateToCheckout = async (page: Page) => {
         const auth = new AuthHelper(page);
         const modal = new ModalHelper(page);
         const form = new FormHelper(page, modal);
@@ -100,8 +100,14 @@ test.describe('Stripe Checkout Workflow', () => {
         const checkoutData = await checkoutRes.json();
         const orderId: string = checkoutData.order_id;
 
-        await expect(page.locator('h2:has-text("Zahlung abschließen")')).toBeVisible({timeout: 15000});
+        const main = page.getByRole('main');
+        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
 
+        return {form, orderId};
+    };
+
+    const navigateToStripeIframe = async (page: Page) => {
+        const {form, orderId} = await navigateToCheckout(page);
         const stripeFrames = await StripeHelper.resolveStripeIframes(page);
 
         return {stripeFrame: stripeFrames.stripeFrame, form, orderId};
@@ -140,10 +146,35 @@ test.describe('Stripe Checkout Workflow', () => {
         }).toPass({timeout: 15000});
     });
 
-    test('Positive Flow: Handles successful payment via Visa', { tag: ['@smoke', '@feature:client:checkout'] }, async ({page}) => {
+    test('Stripe loader exhaustion exposes retry and invoice fallback', { tag: ['@regression', '@feature:client:checkout'] }, async ({page}) => {
+        test.setTimeout(120000);
+        let stripeScriptRequests = 0;
+        await page.route('https://js.stripe.com/**', async route => {
+            stripeScriptRequests += 1;
+            await route.abort('failed');
+        });
+
+        const {orderId} = await navigateToCheckout(page);
+        const main = page.getByRole('main');
+        const loaderAlert = main.getByRole('alert').filter({
+            hasText: 'Sicherer Zahlungsdienst nicht verfügbar'
+        });
+        const retryButton = main.getByRole('button', {name: 'Erneut versuchen'});
+
+        await expect(loaderAlert).toBeVisible();
+        await expect(main.getByRole('link', {name: 'Rechnung als PDF öffnen'}))
+            .toHaveAttribute('href', `/api/orders/${orderId}/invoice`);
+        expect(stripeScriptRequests).toBeGreaterThanOrEqual(2);
+
+        const attemptsBeforeRetry = stripeScriptRequests;
+        await retryButton.click();
+        await expect.poll(() => stripeScriptRequests).toBeGreaterThan(attemptsBeforeRetry);
+        await expect(loaderAlert).toBeVisible();
+    });
+
+    test('Positive Flow: completes after successful payment and real order polling', { tag: ['@smoke', '@feature:client:checkout'] }, async ({page, request}) => {
         test.setTimeout(120000); // Erhöhtes Timeout für Multi-User Flow
         const {orderId} = await navigateToStripeIframe(page);
-        await StripeHelper.installPaidOrderStatusFixture(page, orderId);
 
         await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa);
         await expect(page.getByRole('button', {name: 'Jetzt bezahlen'})).toBeEnabled({ timeout: 10000 });
@@ -162,12 +193,26 @@ test.describe('Stripe Checkout Workflow', () => {
         }, { timeout: 60000 });
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
+        // The disposable E2E stack does not guarantee webhook delivery. Move
+        // the real order through the management API so the browser still polls
+        // the actual backend order resource; polling/refresh itself is covered
+        // by the StripeCheckoutForm Vitest regression.
+        const paidResponse = await request.put(`/api/management/orders/${orderId}/status`, {
+            data: {status: 'paid'},
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Cookie: helper.getAdminToken(),
+            },
+        });
+        expect(paidResponse.ok(), await paidResponse.text()).toBeTruthy();
+
         // Stripe confirmation precedes the server-authoritative paid state.
         // Wait for the authenticated status poll before checking the success toast.
         await paidOrderResponsePromise;
-        await expect(page.locator('.toast')).toContainText(/Zahlung erfolgreich/i, { timeout: 15000 });
+        await expect(page.getByRole('alert').filter({hasText: /Zahlung erfolgreich/i})).toBeVisible({timeout: 15000});
 
         await expect(page).toHaveURL(/.*\/orders/, {timeout: 15000});
-        await expect(page.locator('h1:has-text("Meine Einkäufe & Lizenzen")')).toBeVisible();
+        await expect(page.getByRole('main').getByRole('heading', {name: 'Meine Einkäufe & Lizenzen'})).toBeVisible();
     });
 });

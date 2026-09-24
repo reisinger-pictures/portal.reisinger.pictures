@@ -31,6 +31,7 @@ export default function UserPermissionsModal({
     const [flatrateLevel, setFlatrateLevel] = useState<string>(user.flatrate_level || 'none');
     const [brand, setBrand] = useState<string | null>(user.brand ?? null);
     const [canPurchaseUpgrades, setCanPurchaseUpgrades] = useState<boolean>(user.can_purchase_upgrades ?? false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const selectedRoleNames = (roles ?? [])
         .filter(r => selRoles.includes(r.id))
@@ -63,8 +64,18 @@ export default function UserPermissionsModal({
         }
     };
 
-    const handleSave = () => {
-        onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand, canPurchaseUpgrades);
+    const handleSave = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            await onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand, canPurchaseUpgrades);
+        } catch {
+            // The parent reports the API error; retain the selected permissions.
+            setIsSaving(false);
+            return;
+        }
+        setIsSaving(false);
+        onClose();
     };
 
     const userNameEdit = user.name;
@@ -174,7 +185,7 @@ export default function UserPermissionsModal({
 
                 <div className="modal-action col-span-full mt-6">
                     <button className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                    <button className="btn btn-primary" onClick={handleSave}><Trans>Speichern</Trans></button>
+                    <button className="btn btn-primary" type="button" disabled={isSaving} onClick={handleSave}><Trans>Speichern</Trans></button>
                 </div>
             </div>
             <div className="modal-backdrop"></div>

@@ -10,16 +10,19 @@ use App\Support\BrandRegistry;
  * Shared admin gate + brand context for model-registration management endpoints.
  *
  * The gate is `AuthorizationService::isAdmin` (Admin or Super-Admin). A
- * brand-bound admin always operates in their own brand; a cross-brand admin
- * (brand = null) operates in the current request brand.
+ * brand-bound admin always operates in their own brand; only a persisted
+ * Super-Admin with `brand = null` may operate in the current request brand.
  */
 trait AdminOnly
 {
     protected function authorizeAdmin(): void
     {
         $user = auth('api')->user();
+        $authorization = app(AuthorizationService::class);
 
-        if (! $user || ! app(AuthorizationService::class)->isAdmin($user)) {
+        if (! $user
+            || $authorization->isReservedNullBrandActor($user)
+            || ! $authorization->isAdmin($user)) {
             abort(response()->json(['error' => 'Keine Berechtigung.'], 403));
         }
     }

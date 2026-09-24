@@ -6,11 +6,16 @@ local LrFunctionContext = import 'LrFunctionContext'
 local LrTasks = import 'LrTasks'
 local Api = require "Api"
 local Utils = require "Utils"
+local json = require "json"
 
-return function(mode, editingGallery, treeData, jwt, onSuccess)
+return function(mode, editingGallery, treeData, jwt, onSuccess, requestApi)
     LrFunctionContext.callWithContext("GalleryDialogContext", function(context)
         local f = LrView.osFactory()
         local props = LrBinding.makePropertyTable(context)
+        local function apiRequest(endpoint, method, payload)
+            if requestApi then return requestApi(endpoint, method, payload) end
+            return Api.call(endpoint, method, payload, jwt)
+        end
 
         props.gName = editingGallery and editingGallery.name or ""
         props.gSlug = editingGallery and editingGallery.slug or ""
@@ -55,7 +60,9 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
         end)
 
         local groupItems = { { title = "-- Keine (Root Ebene) --", value = "" } }
-        for _, g in ipairs(Utils.flattenGroups(treeData.groups)) do table.insert(groupItems, g) end
+        -- A gallery may select any group; use the cycle-safe flattening helper
+        -- so a malformed server tree cannot recurse forever in the dialog.
+        for _, g in ipairs(Utils.flattenGroupChoices(treeData.groups, nil)) do table.insert(groupItems, g) end
 
         local rows = { spacing = f:control_spacing() }
 
@@ -178,9 +185,19 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
                 }
                 
                 if props.gPassword ~= "" then payload.password = props.gPassword end
-                if props.gExpiresAt ~= "" then payload.expires_at = props.gExpiresAt end
 
-                -- Metadaten-Settings integrieren (Laravel konvertiert leere Strings in Datenbank-NULLs)
+                -- On update, an empty field is an explicit request to clear
+                -- the stored expiry.  On create, leaving the field empty keeps
+                -- the field omitted (the normal "no expiry" default).
+                local expiresAt = props.gExpiresAt or ""
+                if editingGallery then
+                    payload.expires_at = expiresAt ~= "" and expiresAt or json.null
+                elseif expiresAt ~= "" then
+                    payload.expires_at = expiresAt
+                end
+
+                -- Include the delivery metadata settings; empty text values are
+                -- normalized by the API as before.
                 if mode == "delivery" then
                     payload.is_free_download = props.gFreeDownload
                     payload.is_editorial_only = props.gEditorialOnly
@@ -200,7 +217,7 @@ return function(mode, editingGallery, treeData, jwt, onSuccess)
                 local endpoint = editingGallery and ("/api/management/galleries/" .. editingGallery.id) or "/api/management/galleries"
                 local apiMethod = editingGallery and "PUT" or "POST"
                 
-                local data, status = Api.call(endpoint, apiMethod, payload, jwt)
+                local data, status = apiRequest(endpoint, apiMethod, payload)
                 if status == 200 then
                     if onSuccess then onSuccess() end
                 else
