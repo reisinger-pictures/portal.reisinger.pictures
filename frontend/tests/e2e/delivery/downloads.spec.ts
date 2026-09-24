@@ -1,3 +1,5 @@
+import {readFileSync} from 'node:fs';
+import path from 'path';
 import {APIRequestContext, expect, Page, test} from '@playwright/test';
 import {AuthHelper} from '../helpers/AuthHelper';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
@@ -5,6 +7,29 @@ import {SidebarHelper} from '../helpers/SidebarHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 import {FormHelper} from '../helpers/FormHelper';
+
+const watermarkAsset = readFileSync(path.resolve(process.cwd(), 'public/brands/rp/logo-email-64.png'));
+
+async function ensureDeliveryWatermarkAsset(request: APIRequestContext, adminToken: string): Promise<void> {
+    // Non-staff ZIP downloads intentionally require a watermark raster. The
+    // fresh CI photos volume is empty, so install a checked-in PNG through the
+    // real management API instead of weakening the fail-closed download path.
+    const response = await request.post('/api/management/settings/watermark', {
+        multipart: {
+            bucket_500: {
+                name: 'master_500.png',
+                mimeType: 'image/png',
+                buffer: watermarkAsset,
+            },
+        },
+        headers: {
+            Accept: 'application/json',
+            Cookie: adminToken,
+        },
+    });
+    const body = await response.text();
+    expect(response.ok(), body).toBeTruthy();
+}
 
 test.describe('Download Triggers UI & Flatrate Restrictions', () => {
     let helper: E2ESessionHelper;
@@ -60,7 +85,8 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
 
         const resData = await modal.submitModal('Speichern');
         const galleryId = resData?.gallery?.id;
-        if (galleryId) helper.trackGallery(galleryId);
+        if (!galleryId) throw new Error('Delivery gallery was created without an id');
+        helper.trackGallery(galleryId);
 
         const link = page.locator('main').locator('a').filter({hasText: galleryName}).first();
         await expect(link).toBeVisible({timeout: 15000});
@@ -70,16 +96,19 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         await upload.uploadSampleImage();
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 10000 });
 
-        await request.post(`/api/management/galleries/${galleryId}/sync-access`, {
+        const syncAccessResponse = await request.post(`/api/management/galleries/${galleryId}/sync-access`, {
             data: {user_id: clientUser.id, action: 'attach'},
             headers: {'Cookie': adminToken, 'Accept': 'application/json'}
         });
+        const syncAccessBody = await syncAccessResponse.text();
+        expect(syncAccessResponse.ok(), syncAccessBody).toBeTruthy();
 
         await auth.logout();
         return galleryName;
     }
 
     test('Test 1: ZIP Download dropdown restricts options and downloads correctly', { tag: ['@feature:delivery:download'] }, async ({page, request}) => {
+        await ensureDeliveryWatermarkAsset(request, helper.getAdminToken());
         const galleryName = await setupGalleryAndAssign(page, request, 'print');
         const auth = new AuthHelper(page);
 
@@ -113,11 +142,22 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         // target="_blank" entfernen, damit das Playwright Download-Event nativ fängt
         await zipLink.evaluate(node => node.removeAttribute('target'));
 
-        const [download] = await Promise.all([
-            page.waitForEvent('download', {timeout: 30000}),
-            zipLink.click()
-        ]);
+        const downloadPromise = page.waitForEvent('download', {timeout: 30000}).catch(() => null);
+        const responsePromise = page.waitForResponse(response =>
+            response.url().includes('/api/galleries/') &&
+            response.url().includes('/download-zip') &&
+            response.request().method() === 'GET',
+        );
+        await zipLink.click();
 
+        const response = await responsePromise;
+        if (!response.ok()) {
+            throw new Error(`ZIP download failed with ${response.status()}: ${await response.text()}`);
+        }
+        expect(response.headers()['content-disposition']).toContain('attachment');
+
+        const download = await downloadPromise;
+        if (!download) throw new Error('ZIP response succeeded without a browser download event');
         expect(download.suggestedFilename()).toMatch(/\.zip$/i);
     });
 

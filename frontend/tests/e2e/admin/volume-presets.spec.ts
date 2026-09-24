@@ -93,9 +93,21 @@ test.describe('Volume-Licensing Presets Admin Workflow', () => {
                     is_public: true,
                     licensing_mode: licensingMode,
                 },
+                headers: {
+                    Accept: 'application/json',
+                    Referer: 'http://localhost:4321/',
+                },
             });
             expect(response.ok(), await response.text()).toBeTruthy();
-            const body = await response.json() as { gallery?: { id?: string } };
+            const body = await response.json() as {
+                gallery?: {
+                    id?: string;
+                    name?: string;
+                    effective_licensing_mode?: string;
+                };
+            };
+            expect(body.gallery?.name).toBe(name);
+            expect(body.gallery?.effective_licensing_mode).toBe(licensingMode);
             const id = body.gallery?.id;
             if (!id) throw new Error(`Gallery ${name} was created without an id`);
             helper.trackGallery(id);
@@ -105,6 +117,11 @@ test.describe('Volume-Licensing Presets Admin Workflow', () => {
         const volumeGalleryId = await createGallery(`E2E Volume Override ${suffix}`, 'volume_licensing');
         const scopeGalleryId = await createGallery(`E2E Scope Override ${suffix}`, 'scope_licensing');
 
+        // DashboardLayout has already populated the SWR gallery tree before
+        // the API fixtures were created. Reload so the fresh brand-scoped tree
+        // is fetched before looking for the gallery link.
+        await page.reload();
+        await expect(page.getByRole('main')).toBeVisible();
         await sidebar.navigateTo('Galerien');
         const main = page.getByRole('main');
         let termsRequest = page.waitForRequest(request => {
@@ -112,7 +129,11 @@ test.describe('Volume-Licensing Presets Admin Workflow', () => {
             return url.pathname === '/api/settings/license-terms'
                 && url.searchParams.get('gallery_id') === volumeGalleryId;
         });
-        await main.getByRole('link').filter({ hasText: `E2E Volume Override ${suffix}` }).first().click();
+        const volumeGalleryLink = main.getByRole('link', {
+            name: new RegExp(`E2E Volume Override ${suffix}`),
+        });
+        await expect(volumeGalleryLink).toBeVisible();
+        await volumeGalleryLink.click();
         await termsRequest;
         await expect(main.getByRole('tab', { name: 'Coupons' })).toBeVisible();
 
@@ -127,7 +148,11 @@ test.describe('Volume-Licensing Presets Admin Workflow', () => {
             return url.pathname === '/api/settings/license-terms'
                 && url.searchParams.get('gallery_id') === scopeGalleryId;
         });
-        await main.getByRole('link').filter({ hasText: `E2E Scope Override ${suffix}` }).first().click();
+        const scopeGalleryLink = main.getByRole('link', {
+            name: new RegExp(`E2E Scope Override ${suffix}`),
+        });
+        await expect(scopeGalleryLink).toBeVisible();
+        await scopeGalleryLink.click();
         await termsRequest;
         await expect(main.getByRole('tab', { name: 'Coupons' })).toHaveCount(0);
     });

@@ -45,6 +45,9 @@ return new class extends Migration
             // the foreign-key column user_id (SQLSTATE 1901). The owner invariant
             // is still enforced below for direct SQL writes, independently of
             // the Eloquent model guard.
+            // DDL auto-commits in MySQL/MariaDB. Drop each trigger before
+            // creating it so a retry can recover from a partial trigger run.
+            DB::statement('DROP TRIGGER IF EXISTS orders_owner_not_both_insert');
             DB::statement(<<<'SQL'
                 CREATE TRIGGER orders_owner_not_both_insert
                 BEFORE INSERT ON orders
@@ -56,6 +59,7 @@ return new class extends Migration
                     END IF;
                 END
             SQL);
+            DB::statement('DROP TRIGGER IF EXISTS orders_owner_not_both_update');
             DB::statement(<<<'SQL'
                 CREATE TRIGGER orders_owner_not_both_update
                 BEFORE UPDATE ON orders

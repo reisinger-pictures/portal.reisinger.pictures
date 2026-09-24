@@ -12,6 +12,7 @@ status: active
   2. The system prompts for an email address (if not already known via a personal link).
   3. The system sends a *personal* Magic Link to that email.
   4. Clicking the emailed Magic Link seamlessly logs the user into the frontend via a redirect.
+- Gallery invite tokens are **revocable access grants, not one-time registration tokens**: redeeming one does not consume the `GalleryInvite` record, so the same link can be redeemed again until it is explicitly revoked. The one-time-token contract belongs to the separate CRM model-registration flow.
 
 ## 2. Implicit Rights (Transient Tokens)
 - We DO NOT create "dummy users" or background user records in the database just because an invite link was clicked.

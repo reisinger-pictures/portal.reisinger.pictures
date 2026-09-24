@@ -25,21 +25,20 @@ export class GalleryHelper {
 
         await this.page.reload();
         await this.page.waitForLoadState('networkidle');
-        const galLink = this.page.locator('main').locator('a').filter({ hasText: name }).first();
-        const galAny = this.page.locator('main').getByText(name).first();
-        await expect(async () => {
-            if (await galLink.isVisible().catch(() => false)) {
-                await galLink.scrollIntoViewIfNeeded();
-                await galLink.evaluate(el => (el as HTMLElement).click());
-            } else {
-                await expect(galAny).toBeVisible({ timeout: 2000 });
-                await galAny.scrollIntoViewIfNeeded();
-                await galAny.evaluate(el => (el as HTMLElement).click());
-            }
-        }).toPass({ timeout: 15000 });
-
-        await expect(this.page.getByRole('heading', { name })).toBeVisible();
+        await this.openGallery(name);
         return res?.gallery?.id;
+    }
+
+    async openGallery(name: string): Promise<void> {
+        const main = this.page.getByRole('main');
+        // SWR can replace the structure tree while navigation is settling.
+        // Locator.click() re-resolves the link after a render; element-handle
+        // scrolling/evaluate clicks can race with that replacement.
+        const galleryLink = main.getByRole('link', { name, exact: false }).first();
+
+        await expect(galleryLink).toBeVisible({ timeout: 15000 });
+        await galleryLink.click();
+        await expect(main.getByRole('heading', { name, exact: false }).first()).toBeVisible({ timeout: 15000 });
     }
 
     async setPhotographerTeamAccess(status: 'Erben' | 'Offen' | 'Restriktiv') {

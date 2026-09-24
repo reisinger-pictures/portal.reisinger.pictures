@@ -8,6 +8,7 @@ use App\Models\ContractSigner;
 use App\Services\ContractTemplateService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -159,11 +160,13 @@ class ContractTemplateServiceTest extends TestCase
         $transactionLevelsAtInsert = [];
         $instanceTransactionLevels = [];
         $rowsVisibleAtInsert = null;
+        $lockObservedAtInsert = false;
         $baseTransactionLevel = DB::connection()->transactionLevel();
+        $lockKey = Contract::joinLockKey($template->getKey(), '  RACE-SIGNER@example.com  ');
 
         $this->assertSame(
             Contract::joinLockKey($template->getKey(), 'race-signer@example.com'),
-            Contract::joinLockKey($template->getKey(), '  RACE-SIGNER@example.com  '),
+            $lockKey,
         );
 
         Contract::creating(function (Contract $contract) use ($template, &$instanceTransactionLevels): void {
@@ -174,12 +177,13 @@ class ContractTemplateServiceTest extends TestCase
             $instanceTransactionLevels[] = DB::connection()->transactionLevel();
         });
 
-        ContractSigner::creating(function (ContractSigner $signer) use ($template, &$transactionLevelsAtInsert, &$rowsVisibleAtInsert): void {
+        ContractSigner::creating(function (ContractSigner $signer) use ($template, $lockKey, &$transactionLevelsAtInsert, &$rowsVisibleAtInsert, &$lockObservedAtInsert): void {
             if ($signer->email !== 'race-signer@example.com') {
                 return;
             }
 
             $transactionLevelsAtInsert[] = DB::connection()->transactionLevel();
+            $lockObservedAtInsert = Cache::lock($lockKey)->isLocked();
             $rowsVisibleAtInsert = ContractSigner::query()
                 ->whereHas('contract', function ($query) use ($template): void {
                     $query->where('template_id', $template->getKey());
@@ -207,6 +211,8 @@ class ContractTemplateServiceTest extends TestCase
         $this->assertNull($second['signer']);
         $this->assertNotEmpty($transactionLevelsAtInsert);
         $this->assertGreaterThan($baseTransactionLevel, min($transactionLevelsAtInsert));
+        $this->assertTrue($lockObservedAtInsert);
+        $this->assertFalse(Cache::lock($lockKey)->isLocked());
         $this->assertNotEmpty($instanceTransactionLevels);
         $this->assertGreaterThan($baseTransactionLevel, min($instanceTransactionLevels));
         $this->assertSame(0, $rowsVisibleAtInsert);

@@ -80,9 +80,12 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           running-workflow-name: automerge
           wait-interval: 60
+          # Match only the check-run names emitted by the repository's CI jobs
+          # (including all seven E2E matrix entries), not image workflows.
+          check-regexp: '^(CI security contract|Backend \(PHPUnit\)|Frontend \(Lint, Build, Vitest\)|E2E \(Playwright\) — (Desktop \([1-3]/3\)|Mobile \([1-3]/3\)|serial \(isolated suites\)))$'
           allowed-conclusions: success
-          # Fail closed if no checks are discoverable; do not let a duplicate
-          # stale run hide a failed check for the same name.
+          # fail-on-no-checks is effective only when check-name or check-regexp
+          # is set; the anchored filter above makes an empty check set fail closed.
           fail-on-no-checks: true
           wait-for-duplicates: true
 

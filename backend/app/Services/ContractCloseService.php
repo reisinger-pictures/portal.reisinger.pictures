@@ -14,7 +14,14 @@ use Illuminate\Support\Facades\Mail;
 
 class ContractCloseService
 {
-    public function close(Contract $contract): void
+    /**
+     * Calculate the authoritative contract total from its immutable JSON
+     * snapshot. Item and fixed-discount prices are cents; percentage-discount
+     * prices are basis points (10% = 1000). Discounts are applied in stored
+     * order against the running subtotal and the final amount cannot be
+     * negative.
+     */
+    public function calculateTotal(Contract $contract): int
     {
         $items = $contract->items ?? [];
         $discounts = $contract->discounts ?? [];
@@ -34,7 +41,12 @@ class ContractCloseService
             }
         }
 
-        $totalGross = max(0, $subtotal);
+        return (int) max(0, $subtotal);
+    }
+
+    public function close(Contract $contract): void
+    {
+        $totalGross = $this->calculateTotal($contract);
 
         $orderId = null;
         $invoiceNumber = null;

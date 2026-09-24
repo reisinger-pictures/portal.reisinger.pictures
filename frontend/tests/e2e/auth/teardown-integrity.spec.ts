@@ -1,4 +1,5 @@
 import {expect, test} from '@playwright/test';
+import {extractCookieHeader} from '../helpers/E2ECookieJar';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {UserDetailed} from '../../../src/logic/useUsers';
 
@@ -12,7 +13,9 @@ test.describe('Teardown Integrity Validation', () => {
             data: {email: 'admin@example.com', password: 'admin'},
             headers: {'Accept': 'application/json'}
         });
-        const adminToken = loginRes.headers()['set-cookie'];
+        expect(loginRes.ok()).toBeTruthy();
+        const adminToken = extractCookieHeader(loginRes);
+        if (!adminToken) throw new Error('Admin login response did not contain an auth cookie');
 
         // Verifizieren, dass der Test-User VOR dem Teardown existiert
         let usersRes = await request.get('/api/management/users', {

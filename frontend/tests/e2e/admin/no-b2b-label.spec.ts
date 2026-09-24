@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { extractCookieHeader } from '../helpers/E2ECookieJar';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
@@ -14,9 +15,9 @@ test.describe('E5: Kein B2B-Label sichtbar für Org-Admin', () => {
             data: { email: 'admin@example.com', password: 'admin' },
             headers: { 'Accept': 'application/json' }
         });
-        const cookies = loginRes.headers()['set-cookie'];
-        const match = cookies?.match(/rp_jwt=([^;]+)/);
-        adminToken = match ? `rp_jwt=${match[1]}` : (cookies || '');
+        if (!loginRes.ok()) throw new Error(`Admin login failed: ${await loginRes.text()}`);
+        adminToken = extractCookieHeader(loginRes);
+        if (!adminToken) throw new Error('Admin login response did not contain an auth cookie');
     });
 
     test.afterEach(async () => {
@@ -51,14 +52,18 @@ test.describe('E5: Kein B2B-Label sichtbar für Org-Admin', () => {
         helper.trackUser(userId);
 
         const rolesRes = await request.get('/api/management/roles', { headers });
-        const roles = await rolesRes.json();
-        const orgAdminRoleId = roles.find((r: { name: string; id: string }) => r.name === 'org_admin')?.id;
-        if (!orgAdminRoleId) throw new Error('org_admin role not found');
+        if (!rolesRes.ok()) throw new Error(`Role lookup failed. Status: ${rolesRes.status()} Body: ${await rolesRes.text()}`);
+        const roles = await rolesRes.json() as Array<{ name: string; id: string }>;
+        const orgAdminRole = roles.find((role) => role.name === 'org_admin');
+        if (!orgAdminRole) throw new Error('org_admin role not found');
 
-        await request.put(`/api/management/users/${userId}`, {
-            data: { role_ids: [orgAdminRoleId], gallery_ids: [], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
+        const updateUserRes = await request.put(`/api/management/users/${userId}`, {
+            data: { role_ids: [orgAdminRole.id], gallery_ids: [], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
             headers
         });
+        if (!updateUserRes.ok()) {
+            throw new Error(`Failed to configure user ${email}. Status: ${updateUserRes.status()} Body: ${await updateUserRes.text()}`);
+        }
 
         await request.put(`/api/management/orgs/${orgId}/users`, {
             data: { user_ids: [userId] },

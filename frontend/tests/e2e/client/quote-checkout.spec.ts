@@ -59,6 +59,7 @@ test.describe('Quote Checkout Workflow', () => {
 
         // Galerie dem Buyer zuweisen (power_user-Rolle)
         const rolesRes = await request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken } });
+        expect(rolesRes.ok()).toBeTruthy();
         const rolesData = await rolesRes.json();
         const roles = Array.isArray(rolesData) ? rolesData : (rolesData.data || []);
         const powerUserRoleId = roles.find((r: { name: string }) => r.name === 'power_user')?.id;

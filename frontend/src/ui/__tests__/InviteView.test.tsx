@@ -3,7 +3,7 @@ import {screen, waitFor} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
 import {renderWithProviders} from '../../test-setup';
 import InviteView from '../InviteView';
-import {useAuth} from '../../logic/useAuth';
+import {useAuth, type AuthMeUser} from '../../logic/useAuth';
 import {apiMutate} from '../../api';
 
 const {mockToken, mockNavigate, mockMutate} = vi.hoisted(() => ({
@@ -53,24 +53,96 @@ function deferredResponse() {
     return {promise, resolve};
 }
 
+function authState(user: AuthMeUser | undefined) {
+    return {
+        user,
+        isLoading: false,
+        isError: undefined,
+        login: vi.fn(),
+        register: vi.fn(),
+        logout: vi.fn(),
+        mutate: vi.fn(),
+    };
+}
+
 describe('InviteView invite lookup', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockNavigate.mockReset();
+        mockMutate.mockReset();
         mockToken.value = 'invite-token';
-        vi.mocked(useAuth).mockReturnValue({
-            user: undefined,
-            isLoading: false,
-            isError: undefined,
-            login: vi.fn(),
-            register: vi.fn(),
-            logout: vi.fn(),
-            mutate: vi.fn(),
-        });
+        vi.mocked(useAuth).mockReturnValue(authState(undefined));
         vi.mocked(apiMutate).mockResolvedValue(undefined);
     });
 
     afterEach(() => {
         vi.unstubAllGlobals();
+    });
+
+    it('does not auto-redeem a public invite for a transient guest', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+            gallery_name: 'Gast Galerie',
+            requires_password: false,
+            invite_name: '',
+        }), {status: 200, headers: {'Content-Type': 'application/json'}}));
+        vi.stubGlobal('fetch', fetchMock);
+        vi.mocked(useAuth).mockReturnValue(authState(undefined));
+
+        const view = renderInvite();
+        await waitFor(() => expect(screen.getByText('Gast Galerie')).toBeInTheDocument());
+
+        // A successful anonymous redemption changes /api/auth/me to a guest,
+        // but that must not trigger a second automatic redemption.
+        vi.mocked(useAuth).mockReturnValue(authState({
+            id: 'guest-1',
+            guest_id: 'guest-1',
+        } as AuthMeUser));
+        view.rerender(
+            <MemoryRouter>
+                <InviteView/>
+            </MemoryRouter>,
+        );
+        await waitFor(() => expect(apiMutate).not.toHaveBeenCalled());
+    });
+
+    it('navigates after a registered user redemption even when auth revalidation rerenders the view', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+            gallery_name: 'Registrierte Galerie',
+            requires_password: false,
+            invite_name: '',
+        }), {status: 200, headers: {'Content-Type': 'application/json'}}));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const registeredUser = {
+            id: 'photographer-1',
+            guest_id: null,
+        } as AuthMeUser;
+        vi.mocked(useAuth).mockReturnValue(authState(registeredUser));
+        vi.mocked(apiMutate).mockResolvedValue({full_path: 'galleries/registered-gallery'});
+
+        let resolveMutate: () => void = () => undefined;
+        vi.mocked(mockMutate).mockImplementation(() => new Promise<void>((resolve) => {
+            resolveMutate = resolve;
+        }));
+
+        const view = renderInvite();
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
+
+        // SWR revalidation returns a fresh object for the same identity. The
+        // primitive identity dependencies must not cancel a successful redeem.
+        vi.mocked(useAuth).mockReturnValue(authState({...registeredUser} as AuthMeUser));
+        view.rerender(
+            <MemoryRouter>
+                <InviteView/>
+            </MemoryRouter>,
+        );
+        resolveMutate();
+
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(
+            '/galleries/registered-gallery',
+            {replace: true},
+        ));
     });
 
     it('ignores an older lookup after the invite token changes', async () => {

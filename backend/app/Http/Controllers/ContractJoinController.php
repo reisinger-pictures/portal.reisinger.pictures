@@ -176,6 +176,7 @@ class ContractJoinController extends Controller
                         'terms_html' => $lockedContract->terms_html,
                         'items' => $lockedContract->items,
                         'discounts' => $lockedContract->discounts,
+                        'total' => $this->contractCloseService->calculateTotal($lockedContract),
                         'billing_details' => $lockedContract->billing_details,
                         'available_roles' => $lockedContract->available_roles,
                         'content_version' => $lockedContract->content_version,
@@ -522,6 +523,14 @@ class ContractJoinController extends Controller
      */
     private function validateJoinRequest(Request $request, Contract $contract): array
     {
+        $email = $request->input('email');
+        if (is_string($email)) {
+            // Laravel's e-mail validator deliberately rejects surrounding
+            // whitespace. Join identity is explicitly whitespace-insensitive,
+            // so trim before validation on both the initial and locked retry.
+            $request->merge(['email' => trim($email)]);
+        }
+
         return $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',

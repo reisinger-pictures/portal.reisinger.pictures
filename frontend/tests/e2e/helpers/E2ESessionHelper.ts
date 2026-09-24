@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { APIRequestContext } from '@playwright/test';
+import { APIRequestContext, type APIResponse } from '@playwright/test';
+import { E2ECookieJar, extractCookieHeader } from './E2ECookieJar';
 import { MailpitHelper } from './MailpitHelper';
 
 const e2eBrandSettings = {
@@ -55,8 +56,14 @@ export class E2ESessionHelper {
     private createdModelInviteIds: string[] = [];
     private createdModelCustomerIds: string[] = [];
     private adminToken: string | null = null;
+    private adminCookies = new E2ECookieJar();
 
     constructor(private request: APIRequestContext) {}
+
+    private rememberAdminCookies(response: APIResponse) {
+        this.adminCookies.update(response);
+        this.adminToken = this.adminCookies.toCookieHeader();
+    }
 
     private async ensureAdminLogin() {
         if (this.adminToken) return;
@@ -65,9 +72,10 @@ export class E2ESessionHelper {
             headers: { 'Accept': 'application/json' }
         });
         if (!loginRes.ok()) throw new Error('Admin login failed: ' + await loginRes.text());
-        const cookies = loginRes.headers()['set-cookie'];
-        const match = cookies?.match(/rp_jwt=([^;]+)/);
-        this.adminToken = match ? `rp_jwt=${match[1]}` : (cookies || '');
+
+        this.adminCookies = new E2ECookieJar();
+        this.rememberAdminCookies(loginRes);
+        if (!this.adminToken) throw new Error('Admin login response did not contain an auth cookie');
     }
 
     getAdminToken() {
@@ -84,6 +92,7 @@ export class E2ESessionHelper {
                 'Cookie': this.adminToken!,
             },
         });
+        this.rememberAdminCookies(response);
         if (!response.ok()) {
             throw new Error(`Brand settings update failed: ${response.status()} ${await response.text()}`);
         }
@@ -107,9 +116,9 @@ export class E2ESessionHelper {
             headers: { 'Accept': 'application/json' },
         });
         if (!loginRes.ok()) throw new Error(`Login failed for ${email}: ${await loginRes.text()}`);
-        const cookies = loginRes.headers()['set-cookie'];
-        const match = cookies?.match(/rp_jwt=([^;]+)/);
-        return match ? `rp_jwt=${match[1]}` : (cookies || '');
+        const cookieHeader = extractCookieHeader(loginRes);
+        if (!cookieHeader) throw new Error(`Login response for ${email} did not contain an auth cookie`);
+        return cookieHeader;
     }
 
     async createIsolatedUser(roleName: 'admin' | 'photographer' | 'client' | 'power_user' | 'customer_manager' | 'super_admin', options?: { assignGalleryId?: string, wantsNotifications?: boolean, brand?: string }) {
@@ -124,6 +133,7 @@ export class E2ESessionHelper {
             data: { name: `E2E ${roleName}`, email },
             headers
         });
+        this.rememberAdminCookies(createRes);
         if (!createRes.ok()) throw new Error(`Failed to create user ${email}. Status: ${createRes.status()} Body: ${await createRes.text()}`);
         const createData = await createRes.json();
         const userId = createData.user?.id;
@@ -131,13 +141,19 @@ export class E2ESessionHelper {
         this.createdUserIds.push(userId);
 
         const rolesRes = await this.request.get('/api/management/roles', { headers });
-        const roles = await rolesRes.json();
-        const roleId = roles.find((r: { name: string; id: string }) => r.name === roleName).id;
+        this.rememberAdminCookies(rolesRes);
+        if (!rolesRes.ok()) {
+            throw new Error(`Role lookup failed. Status: ${rolesRes.status()} Body: ${await rolesRes.text()}`);
+        }
+        const roles = await rolesRes.json() as Array<{ name: string; id: string }>;
+        const role = roles.find((candidate) => candidate.name === roleName);
+        if (!role) throw new Error(`Role ${roleName} was not returned by /api/management/roles`);
+        const roleId = role.id;
 
         // U-02: non-super-admin users must have a brand assigned. Super-admin is cross-brand.
         const brand = options?.brand ?? (roleName === 'super_admin' ? null : 'rp');
 
-        await this.request.put(`/api/management/users/${userId}`, {
+        const updateUserRes = await this.request.put(`/api/management/users/${userId}`, {
             data: {
                 role_ids: [roleId],
                 gallery_ids: options?.assignGalleryId ? [options.assignGalleryId] : [],
@@ -147,6 +163,10 @@ export class E2ESessionHelper {
             },
             headers
         });
+        this.rememberAdminCookies(updateUserRes);
+        if (!updateUserRes.ok()) {
+            throw new Error(`Failed to configure user ${email}. Status: ${updateUserRes.status()} Body: ${await updateUserRes.text()}`);
+        }
 
         const refererBrand = 'http://localhost:4321/';
         const mailpit = new MailpitHelper(this.request);
@@ -156,12 +176,13 @@ export class E2ESessionHelper {
             headers: { ...headers, 'Referer': refererBrand },
         });
         if (!resetRes.ok()) throw new Error(`Password reset failed for ${email}. Token: ${token}. Response: ${await resetRes.text()}`);
-        const userCookies = resetRes.headers()['set-cookie'];
+        const userCookies = extractCookieHeader(resetRes);
+        if (!userCookies) throw new Error(`Password reset response for ${email} did not contain an auth cookie`);
 
         if (options?.assignGalleryId && options?.wantsNotifications) {
             await this.request.post(`/api/galleries/${options.assignGalleryId}/opt-in`, {
                 data: { wants_notifications: true },
-                headers: { 'Accept': 'application/json', 'Cookie': userCookies! }
+                headers: { 'Accept': 'application/json', 'Cookie': userCookies }
             });
         }
 
@@ -193,6 +214,7 @@ export class E2ESessionHelper {
         if (input.email) data.email = input.email;
         if (input.label) data.label = input.label;
         const res = await this.request.post('/api/management/model-invites', { data, headers });
+        this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Model invite creation failed: ${await res.text()}`);
         const body = await res.json();
         if (body?.invite?.id) this.trackModelInvite(body.invite.id);
@@ -279,6 +301,7 @@ export class E2ESessionHelper {
         const listRes = await this.request.get('/api/management/models?q=' + encodeURIComponent(firstName), {
             headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
         });
+        this.rememberAdminCookies(listRes);
         if (listRes.ok()) {
             const list = await listRes.json() as Array<{ customer_id: string }>;
             if (list[0]?.customer_id) {
@@ -298,6 +321,7 @@ export class E2ESessionHelper {
         const listRes = await this.request.get('/api/management/models?q=' + encodeURIComponent(firstName), {
             headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
         });
+        this.rememberAdminCookies(listRes);
         if (!listRes.ok()) return null;
         const list = await listRes.json() as Array<{ customer_id: string }>;
         const customerId = list[0]?.customer_id ?? null;
@@ -379,6 +403,7 @@ export class E2ESessionHelper {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
         const res = await this.request.post(`/api/management/models/${customerId}/access-link`, { data: {}, headers });
+        this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Model access link creation failed: ${await res.text()}`);
         return res.json() as Promise<{ link: string; expires_at: string | null }>;
     }
@@ -387,13 +412,15 @@ export class E2ESessionHelper {
     async deleteModelCustomer(id: string) {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
-        await this.request.delete(`/api/management/customers/${id}`, { headers }).catch(() => undefined);
+        const response = await this.request.delete(`/api/management/customers/${id}`, { headers }).catch(() => null);
+        if (response) this.rememberAdminCookies(response);
     }
 
     async createVolumePreset(data: { name: string; tiers: Array<{ min_quantity: number; price_cents: number }> }): Promise<VolumePresetResponse> {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
         const res = await this.request.post('/api/management/settings/volume-presets', { data, headers });
+        this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Volume preset creation failed: ${await res.text()}`);
         return res.json() as Promise<VolumePresetResponse>;
     }
@@ -402,6 +429,7 @@ export class E2ESessionHelper {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
         const res = await this.request.post('/api/management/coupons', { data, headers });
+        this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Coupon creation failed: ${await res.text()}`);
         return res.json() as Promise<CouponResponse>;
     }
@@ -410,6 +438,7 @@ export class E2ESessionHelper {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
         const res = await this.request.put(`/api/management/coupons/${id}`, { data, headers });
+        this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Coupon update failed: ${await res.text()}`);
         return res.json() as Promise<CouponResponse>;
     }
@@ -425,13 +454,14 @@ export class E2ESessionHelper {
             data: { licensing_mode: licensingMode, volume_preset_id: volumePresetId },
             headers,
         });
+        this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Gallery licensing update failed: ${await res.text()}`);
     }
 
     async seedBillingSettings() {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
-        await this.request.put('/api/management/settings/billing-details', {
+        const response = await this.request.put('/api/management/settings/billing-details', {
             data: {
                 bank_holder: 'Reisinger Pictures GmbH',
                 bank_iban: 'AT123456789012345678',
@@ -443,13 +473,18 @@ export class E2ESessionHelper {
             },
             headers
         });
+        this.rememberAdminCookies(response);
     }
 
     private async deleteResources(ids: string[], endpoint: string, label: string) {
         const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
         for (const id of ids) {
-            await this.request.delete(`${endpoint}/${id}`, { headers })
-                .catch((err) => console.warn(`Cleanup: Failed to delete ${label} ${id}`, err));
+            const response = await this.request.delete(`${endpoint}/${id}`, { headers })
+                .catch((err) => {
+                    console.warn(`Cleanup: Failed to delete ${label} ${id}`, err);
+                    return null;
+                });
+            if (response) this.rememberAdminCookies(response);
         }
     }
 

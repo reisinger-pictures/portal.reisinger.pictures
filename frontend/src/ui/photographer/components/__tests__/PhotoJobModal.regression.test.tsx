@@ -125,4 +125,23 @@ describe('PhotoJobModal board save regression', () => {
             assignee_id: null,
         }));
     });
+
+    it('keeps the current assignee selectable when the user list is unavailable', async () => {
+        vi.mocked(useUsers).mockReturnValue({ users: undefined });
+        renderWithProviders(
+            <PhotoJobModal
+                isOpen
+                onClose={vi.fn()}
+                defaultStatus="importiert"
+                statusOptions={statusOptions}
+                editing={editingJob}
+                onSave={vi.fn()}
+            />,
+        );
+
+        const assigneeSelect = getSelect('Zuständig');
+        await waitFor(() => expect(assigneeSelect).toHaveValue(assignee.id));
+        expect(within(assigneeSelect).getByRole('option', { name: assignee.name })).toBeInTheDocument();
+        expect(within(assigneeSelect).getAllByRole('option')).toHaveLength(2);
+    });
 });

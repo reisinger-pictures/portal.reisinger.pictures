@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useSearchParams } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { renderWithProviders } from '../../../test-setup';
 import SearchBarWithSuggestions from '../SearchBarWithSuggestions';
 
@@ -26,6 +26,33 @@ function SearchHarness() {
                 Query entfernen
             </button>
             <SearchBarWithSuggestions />
+        </>
+    );
+}
+
+function SearchRouteHarness() {
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    return (
+        <>
+            <output aria-label="Aktuelle Such-URL">{`${location.pathname}${location.search}`}</output>
+            <button type="button" onClick={() => navigate('/search?q=first-query')}>
+                Erste Suche
+            </button>
+            <button type="button" onClick={() => navigate('/search?q=second-query')}>
+                Zweite Suche
+            </button>
+            <button type="button" onClick={() => navigate(-1)}>
+                Eine Suche zurück
+            </button>
+            <button type="button" onClick={() => navigate(1)}>
+                Eine Suche vorwärts
+            </button>
+            <Routes>
+                <Route path="/" element={<SearchBarWithSuggestions />} />
+                <Route path="/search" element={<SearchBarWithSuggestions />} />
+            </Routes>
         </>
     );
 }
@@ -70,6 +97,57 @@ describe('SearchBarWithSuggestions', () => {
 
         await user.click(screen.getByRole('button', { name: 'Query wiederholen' }));
         await waitFor(() => expect(input).toHaveValue('initial-query'));
+    });
+
+    it('keeps the mounted input synchronized with same-route back/forward navigation', async () => {
+        const user = userEvent.setup();
+
+        renderWithProviders(
+            <MemoryRouter initialEntries={['/']}>
+                <SearchRouteHarness />
+            </MemoryRouter>,
+        );
+
+        const getInput = () => screen.getByRole('textbox', { name: 'Suche' });
+        const getUrl = () => screen.getByRole('status', { name: 'Aktuelle Such-URL' });
+
+        expect(getInput()).toHaveAccessibleName('Suche');
+        expect(getInput()).toHaveValue('');
+        expect(getUrl()).toHaveTextContent('/');
+
+        await user.click(screen.getByRole('button', { name: 'Erste Suche' }));
+        await waitFor(() => {
+            expect(getUrl()).toHaveTextContent('/search?q=first-query');
+            expect(getInput()).toHaveValue('first-query');
+        });
+
+        const input = getInput();
+        const mountMarker = 'mounted-search-input';
+        input.setAttribute('data-mount-marker', mountMarker);
+
+        await user.click(screen.getByRole('button', { name: 'Zweite Suche' }));
+        await waitFor(() => {
+            expect(getUrl()).toHaveTextContent('/search?q=second-query');
+            expect(getInput()).toBe(input);
+            expect(getInput()).toHaveAttribute('data-mount-marker', mountMarker);
+            expect(getInput()).toHaveValue('second-query');
+        });
+
+        await user.click(screen.getByRole('button', { name: 'Eine Suche zurück' }));
+        await waitFor(() => {
+            expect(getUrl()).toHaveTextContent('/search?q=first-query');
+            expect(getInput()).toBe(input);
+            expect(getInput()).toHaveAttribute('data-mount-marker', mountMarker);
+            expect(getInput()).toHaveValue('first-query');
+        });
+
+        await user.click(screen.getByRole('button', { name: 'Eine Suche vorwärts' }));
+        await waitFor(() => {
+            expect(getUrl()).toHaveTextContent('/search?q=second-query');
+            expect(getInput()).toBe(input);
+            expect(getInput()).toHaveAttribute('data-mount-marker', mountMarker);
+            expect(getInput()).toHaveValue('second-query');
+        });
     });
 
     it('clears the input when the q parameter is removed', async () => {

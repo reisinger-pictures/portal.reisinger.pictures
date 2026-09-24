@@ -43,6 +43,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
     const canEdit = isSuperAdmin;
 
     const schema = createBrandSettingsSchema();
+    const accountingEmailId = `brand-settings-${brand.id}-accounting-email`;
 
     const {
         register,
@@ -149,8 +150,8 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 </div>
 
                 <div className="form-control md:col-span-2">
-                    <label className="label"><span className="label-text font-bold">Buchhaltungs-E-Mail</span></label>
-                    <input type="email" className="input input-bordered" placeholder="buchhaltung@reisinger.pictures"
+                    <label className="label" htmlFor={accountingEmailId}><span className="label-text font-bold">Buchhaltungs-E-Mail</span></label>
+                    <input id={accountingEmailId} type="email" className="input input-bordered" placeholder="buchhaltung@reisinger.pictures"
                            disabled={!canEdit} {...register('accounting_email')} />
                     {errors.accounting_email &&
                         <span className="text-error text-xs mt-1">{errors.accounting_email.message}</span>}

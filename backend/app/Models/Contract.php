@@ -179,9 +179,13 @@ class Contract extends Model
      */
     public static function databaseNow(): Carbon
     {
-        $row = DB::selectOne('SELECT CURRENT_TIMESTAMP AS current_time');
+        // MariaDB 11.4 treats CURRENT_TIME as a reserved word, so it cannot
+        // be used as an unquoted result alias. Keep this read portable across
+        // MariaDB and SQLite; otherwise every public join/check path fails
+        // with a 500 before validation or persistence runs.
+        $row = DB::selectOne('SELECT CURRENT_TIMESTAMP AS contract_database_now');
 
-        return Carbon::parse($row->current_time, 'UTC');
+        return Carbon::parse($row->contract_database_now, 'UTC');
     }
 
     public function isPubliclyAvailableAtDatabaseTime(): bool

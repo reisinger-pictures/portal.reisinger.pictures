@@ -1,8 +1,8 @@
-import {describe, it, expect} from 'vitest';
+import {describe, it, expect, vi} from 'vitest';
 import {renderHook, act} from '@testing-library/react';
 import {useInvoiceDraft, isEmptyRow} from '../useInvoiceDraft';
 import {UIContext} from '../../ui/components/UIContext';
-import type {ReactNode} from 'react';
+import {StrictMode, type ReactNode} from 'react';
 import type {UIContextType} from '../../ui/components/UIContext';
 import type {InvoiceItem, InvoiceDiscount} from '../../api';
 
@@ -13,10 +13,10 @@ const noopToast: UIContextType = {
     setUnsavedChanges: () => {},
 };
 
-function createWrapper() {
+function createWrapper(value: UIContextType = noopToast) {
     return function Wrapper({children}: {children: ReactNode}) {
         return (
-            <UIContext.Provider value={noopToast}>
+            <UIContext.Provider value={value}>
                 {children}
             </UIContext.Provider>
         );
@@ -143,6 +143,22 @@ describe('loadExtractedData', () => {
         // All were empty → single empty fallback row
         expect(result.current.items).toHaveLength(1);
         expect(isEmptyRow(result.current.items[0])).toBe(true);
+    });
+
+    it('keeps dirty-state updates outside the item state updater', () => {
+        const setUnsavedChanges = vi.fn();
+        const value: UIContextType = {...noopToast, setUnsavedChanges};
+        const wrapper = ({children}: {children: ReactNode}) => (
+            <StrictMode>
+                <UIContext.Provider value={value}>{children}</UIContext.Provider>
+            </StrictMode>
+        );
+        const {result} = renderHook(() => useInvoiceDraft('invoice'), {wrapper});
+
+        act(() => { result.current.addItem(); });
+        act(() => { result.current.moveItemDown(0); });
+
+        expect(setUnsavedChanges).toHaveBeenCalledTimes(1);
     });
 
     it('preserves discounts passed as data', () => {
