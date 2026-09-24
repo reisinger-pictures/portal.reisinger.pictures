@@ -34,12 +34,18 @@ export default function SidebarLoginForm() {
         <div className="p-6 border-b border-base-300 bg-base-100">
             <h3 className="font-bold mb-3 flex items-center gap-2"><span className="iconify mdi--login"></span> <Trans>Anmelden</Trans></h3>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
-                <div>
-                    <input type="email" required placeholder={t`E-Mail Adresse`} {...register('email')} className={`input input-bordered w-full ${errors.email ? 'input-error' : ''}`}/>
+                <div className="form-control">
+                    <label className="label py-1" htmlFor="sidebar-login-email">
+                        <span className="label-text text-sm font-bold"><Trans>E-Mail Adresse</Trans></span>
+                    </label>
+                    <input id="sidebar-login-email" type="email" required placeholder={t`E-Mail Adresse`} {...register('email')} className={`input input-bordered w-full ${errors.email ? 'input-error' : ''}`}/>
                     {errors.email && <p className="text-sm text-error mt-1">{errors.email.message}</p>}
                 </div>
-                <div>
-                    <input type="password" required placeholder={t`Passwort`} {...register('password')} className={`input input-bordered w-full ${errors.password ? 'input-error' : ''}`}/>
+                <div className="form-control">
+                    <label className="label py-1" htmlFor="sidebar-login-password">
+                        <span className="label-text text-sm font-bold"><Trans>Passwort</Trans></span>
+                    </label>
+                    <input id="sidebar-login-password" type="password" required placeholder={t`Passwort`} {...register('password')} className={`input input-bordered w-full ${errors.password ? 'input-error' : ''}`}/>
                 </div>
                 {authError && <p className="text-sm text-error font-semibold leading-tight">{authError}</p>}
                 <button type="submit" className="btn btn-primary w-full mt-2" disabled={isSubmitting}>

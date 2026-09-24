@@ -20,8 +20,10 @@ use App\Services\AuthorizationService;
 use App\Services\GalleryService;
 use App\Services\GalleryTreeService;
 use App\Services\RatingService;
+use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
 class GalleryController extends Controller
@@ -53,6 +55,7 @@ class GalleryController extends Controller
     {
         $data = $request->validated();
         $group = $this->galleryService->storeGroup($data);
+        $group->load('orgs');
 
         return response()->json(['success' => true, 'group' => new GalleryGroupResource($group)]);
     }
@@ -62,8 +65,11 @@ class GalleryController extends Controller
      */
     public function updateGroup(UpdateGroupRequest $request, $id)
     {
-        $group = GalleryGroup::findOrFail($id);
+        $group = GalleryGroup::with('orgs')->findOrFail($id);
         $group = $this->galleryService->updateGroup($group, $request->validated());
+        // sync() does not refresh an already eager-loaded relation. Reload it
+        // so the resource always reflects the pivot after an explicit change.
+        $group->load('orgs');
 
         return response()->json(['success' => true, 'group' => new GalleryGroupResource($group)]);
     }
@@ -156,22 +162,47 @@ class GalleryController extends Controller
      */
     public function showGroup($id)
     {
-        $group = GalleryGroup::with('children')->findOrFail($id);
+        $group = GalleryGroup::with(['children', 'orgs'])->findOrFail($id);
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 
-        if (! $user || ! $svc->sharesBrand($user, $group->brand)) {
+        // A brand-bound actor must not use a current-brand child to bypass a
+        // foreign/null parent.  Cross-brand Super-Admins intentionally retain
+        // their documented all-brand management access.
+        if (! $user
+            || ! $svc->sharesBrand($user, $group->brand)
+            || ($user->brand !== null && ! BrandRegistry::galleryGroupTreeMatchesBrand($group, $user->brand))) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
+        $userBrand = BrandRegistry::normalizeId($user?->brand);
+        if ($userBrand !== null) {
+            $group->setRelation(
+                'children',
+                $this->filterGroupChildrenForBrand($group->children, $userBrand),
+            );
         }
 
         $groupIds = $this->galleryTreeService->getAllSubgroupIds($group);
         $groupIds[] = $group->id;
 
-        $galleryQuery = Gallery::whereIn('gallery_group_id', $groupIds);
+        $galleryQuery = Gallery::query()->with('galleryGroup');
+        $galleryQuery->whereIn('gallery_group_id', $groupIds);
         if ($user->brand !== null) {
             $galleryQuery->where('brand', $user->brand);
         }
-        $galleryIds = $galleryQuery->pluck('id')->toArray();
+
+        // Do not let an own-brand gallery under a foreign descendant leak into
+        // the management group response.  The same helper is also used by the
+        // public boundaries, keeping the invariant centralized.
+        $galleryIds = $galleryQuery->get()
+            ->filter(function (Gallery $gallery) use ($user): bool {
+                return $user->brand === null
+                    || BrandRegistry::galleryTreeMatchesBrand($gallery, $user->brand);
+            })
+            ->pluck('id')
+            ->values()
+            ->all();
 
         if (! $svc->isAdmin($user)) {
             $allowedGalleryIds = $user->getAllowedGalleryIds();
@@ -188,6 +219,43 @@ class GalleryController extends Controller
             'last_page' => $photos->lastPage(),
             'total' => $photos->total(),
         ]);
+    }
+
+    /**
+     * Remove foreign/null descendants before a management group resource is
+     * serialized.  Photo filtering alone is insufficient because the resource
+     * also exposes the nested group structure.
+     *
+     * @param  Collection<int, GalleryGroup>  $groups
+     * @return Collection<int, GalleryGroup>
+     */
+    private function filterGroupChildrenForBrand(Collection $groups, string $brand): Collection
+    {
+        return $groups
+            ->map(function (GalleryGroup $group) use ($brand): ?GalleryGroup {
+                if (! BrandRegistry::galleryGroupTreeMatchesBrand($group, $brand)) {
+                    return null;
+                }
+
+                if ($group->relationLoaded('children')) {
+                    $group->setRelation(
+                        'children',
+                        $this->filterGroupChildrenForBrand($group->getRelation('children'), $brand),
+                    );
+                }
+                if ($group->relationLoaded('galleries')) {
+                    $group->setRelation(
+                        'galleries',
+                        $group->getRelation('galleries')
+                            ->filter(fn (Gallery $gallery): bool => BrandRegistry::galleryTreeMatchesBrand($gallery, $brand))
+                            ->values(),
+                    );
+                }
+
+                return $group;
+            })
+            ->filter()
+            ->values();
     }
 
     public function syncAccess(SyncGalleryAccessRequest $request, $id): JsonResponse

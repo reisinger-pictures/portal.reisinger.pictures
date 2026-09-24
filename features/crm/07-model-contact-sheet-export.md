@@ -1,6 +1,9 @@
 # 07 — Model Contact Sheet Export (PDF)
 
-> SOLL-Zustand (Stand 2026-09-19). Umsetzung: Phase 1+2 (Einzelprofil intern/extern). Phase 3 (Bulk) + Phase 4 (signierter Extern-Link) = Future.
+> **Current SOLL / implemented (reviewed 2026-09-24).** Phase 1+2 (Einzelprofil
+> intern/extern) ist umgesetzt und nutzt die verschlüsselten Dateien aus
+> `features/crm/06-model-profile-iteration.md`. Phase 3 (Bulk) + Phase 4
+> (signierter Extern-Link) bleiben Future.
 > Plan: `~/.opencode/plan/pdf-contact-sheet-export.md`.
 
 ## 1. API-Vertrag

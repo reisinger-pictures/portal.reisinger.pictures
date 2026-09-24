@@ -19,10 +19,10 @@ class BrandScopingGalleryValidationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function photographerTokenForBrand(?string $brand): string
+    private function tokenFor(UserRole $role, ?string $brand): string
     {
         $user = User::factory()->create(['brand' => $brand]);
-        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => $role->value]));
 
         return auth('api')->login($user);
     }
@@ -42,7 +42,7 @@ class BrandScopingGalleryValidationTest extends TestCase
 
     public function test_create_rejects_gallery_group_from_other_brand(): void
     {
-        $token = $this->photographerTokenForBrand('srp');
+        $token = $this->tokenFor(UserRole::PHOTOGRAPHER, 'srp');
         $foreignGroup = GalleryGroup::factory()->create(['brand' => 'rp']);
 
         $response = $this->withHeaders($this->bearer($token))
@@ -54,7 +54,7 @@ class BrandScopingGalleryValidationTest extends TestCase
 
     public function test_create_accepts_gallery_group_from_same_brand(): void
     {
-        $token = $this->photographerTokenForBrand('srp');
+        $token = $this->tokenFor(UserRole::PHOTOGRAPHER, 'srp');
         $ownGroup = GalleryGroup::factory()->create(['brand' => 'srp']);
 
         $response = $this->withHeaders($this->bearer($token))
@@ -65,7 +65,7 @@ class BrandScopingGalleryValidationTest extends TestCase
 
     public function test_create_rejects_org_from_other_brand(): void
     {
-        $token = $this->photographerTokenForBrand('srp');
+        $token = $this->tokenFor(UserRole::PHOTOGRAPHER, 'srp');
         $foreignOrg = Org::factory()->create(['brand' => 'rp']);
 
         $response = $this->withHeaders($this->bearer($token))
@@ -77,7 +77,7 @@ class BrandScopingGalleryValidationTest extends TestCase
 
     public function test_create_accepts_org_from_same_brand(): void
     {
-        $token = $this->photographerTokenForBrand('srp');
+        $token = $this->tokenFor(UserRole::PHOTOGRAPHER, 'srp');
         $ownOrg = Org::factory()->create(['brand' => 'srp']);
 
         $response = $this->withHeaders($this->bearer($token))
@@ -88,7 +88,7 @@ class BrandScopingGalleryValidationTest extends TestCase
 
     public function test_cross_brand_user_can_reference_any_brand_group(): void
     {
-        $token = $this->photographerTokenForBrand(null);
+        $token = $this->tokenFor(UserRole::SUPER_ADMIN, null);
         $foreignGroup = GalleryGroup::factory()->create(['brand' => 'rp']);
 
         $response = $this->withHeaders($this->bearer($token))

@@ -41,6 +41,25 @@ msgstr "[Name des Fotografen / Unternehmens]"
 msgid "[PLZ, Ort]"
 msgstr "[PLZ, Ort]"
 
+#. placeholder {0}: group.nextTierCount
+#. placeholder {1}: group.nextTierLabel
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "{0, plural, one {Noch # Bild} other {Noch # Bilder}} bis {1}"
+#~ msgstr "{0, plural, one {Noch # Bild} other {Noch # Bilder}} bis {1}"
+
+#. placeholder {0}: group.items.filter(item => !item.isQuote).length
+#. placeholder {1}: formatMoney(group.pricePerItemCents ?? 0)
+#. placeholder {2}: group.tierIndex
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "{0} Bilder × {1} (Tier {2})"
+#~ msgstr "{0} Bilder × {1} (Tier {2})"
+
+#. placeholder {0}: formatMoney(groupPrice)
+#. placeholder {1}: group.tierIndex
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "{0} pro Bild (Tier {1})"
+#~ msgstr "{0} pro Bild (Tier {1})"
+
 #: src/ui/management/components/GalleryCouponsTab.tsx
 msgid "{couponsLength} Coupon{couponsPlural} für diese Galerie"
 msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie"
@@ -54,8 +73,16 @@ msgid "{galleryCount} Downloads"
 msgstr "{galleryCount} Downloads"
 
 #: src/ui/client/components/CartItemList.tsx
-msgid "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
-msgstr "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
+#~ msgid "{groupNextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {groupNextTierLabel}"
+#~ msgstr "{groupNextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {groupNextTierLabel}"
+
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "{groupPriceText} pro Bild (Tier {groupTierIndex})"
+#~ msgstr "{groupPriceText} pro Bild (Tier {groupTierIndex})"
+
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
+#~ msgstr "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "{nextCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {nextLabel}"
@@ -68,6 +95,14 @@ msgstr "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum
 #: src/ui/client/components/CouponInput.tsx
 msgid "{packageQuantity} Fotos für {packagePriceText}"
 msgstr "{packageQuantity} Fotos für {packagePriceText}"
+
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "{payableCount} Bilder"
+#~ msgstr "{payableCount} Bilder"
+
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "{payableItemCount} Bilder"
+#~ msgstr "{payableItemCount} Bilder"
 
 #: src/logic/useVolumeLicensing.ts
 msgid "{price}€ pro Bild"
@@ -823,8 +858,17 @@ msgid "Benachrichtigt bei neuen Galerien in diesem Ordner."
 msgstr "Benachrichtigt bei neuen Galerien in diesem Ordner."
 
 #: src/ui/client/ClientNotificationsView.tsx
+#: src/ui/components/Sidebar.tsx
 msgid "Benachrichtigungen"
 msgstr "Benachrichtigungen"
+
+#: src/ui/client/ClientNotificationsView.tsx
+msgid "Benachrichtigungen für Galerie {galleryName}"
+msgstr "Benachrichtigungen für Galerie {galleryName}"
+
+#: src/ui/client/ClientNotificationsView.tsx
+msgid "Benachrichtigungen für Ordner {groupName}"
+msgstr "Benachrichtigungen für Ordner {groupName}"
 
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Benutzer / Gast"
@@ -948,6 +992,10 @@ msgstr "Betrag in €"
 #: src/ui/management/components/EmailComposerModal.tsx
 msgid "Betreff"
 msgstr "Betreff"
+
+#: src/ui/client/SelectionView.tsx
+msgid "Bewertung konnte nicht gespeichert werden."
+msgstr "Bewertung konnte nicht gespeichert werden."
 
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Bewertungen & Status"
@@ -1958,6 +2006,7 @@ msgstr "Erlaubt Kunden mit der Rolle \"Metadaten bearbeiten\" das Ändern von IP
 msgid "Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
 msgstr "Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
 
+#: src/ui/client/components/StripeCheckoutForm.tsx
 #: src/ui/components/ErrorBoundary.tsx
 #: src/ui/components/ErrorMessage.tsx
 msgid "Erneut versuchen"
@@ -2021,8 +2070,8 @@ msgid "Favoriten"
 msgstr "Favoriten"
 
 #: src/logic/useInvoiceDraft.ts
-msgid "Fehler"
-msgstr "Fehler"
+#~ msgid "Fehler"
+#~ msgstr "Fehler"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Fehler bei der Berechnung"
@@ -2042,16 +2091,16 @@ msgstr "Fehler beim Absenden."
 
 #: src/logic/usePdfExtraction.ts
 #: src/logic/useProjectPdfDrop.ts
-msgid "Fehler beim Auslesen."
-msgstr "Fehler beim Auslesen."
+#~ msgid "Fehler beim Auslesen."
+#~ msgstr "Fehler beim Auslesen."
 
 #: src/ui/OrgInviteView.tsx
 msgid "Fehler beim Beitreten."
 msgstr "Fehler beim Beitreten."
 
 #: src/ui/InviteView.tsx
-msgid "Fehler beim Beitritt."
-msgstr "Fehler beim Beitritt."
+#~ msgid "Fehler beim Beitritt."
+#~ msgstr "Fehler beim Beitritt."
 
 #: src/ui/ModelProfileAccessView.tsx
 msgid "Fehler beim Bestätigen."
@@ -3622,6 +3671,16 @@ msgstr "Mengenrabatt Staffel"
 msgid "Mengenrabatt-Staffeln"
 msgstr "Mengenrabatt-Staffeln"
 
+#: src/ui/client/ClientDashboard.tsx
+#: src/ui/components/GlobalSearchHeader.tsx
+#: src/ui/management/ManagementDashboard.tsx
+msgid "Menü öffnen"
+msgstr "Menü öffnen"
+
+#: src/ui/components/Sidebar.tsx
+msgid "Menü schließen"
+msgstr "Menü schließen"
+
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Meta-Galerie"
 msgstr "Meta-Galerie"
@@ -4668,6 +4727,10 @@ msgstr "Qualität"
 msgid "Qualität wählen"
 msgstr "Qualität wählen"
 
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "Rabatt"
+#~ msgstr "Rabatt"
+
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 msgid "Rabatt hinzufügen"
 msgstr "Rabatt hinzufügen"
@@ -4705,6 +4768,10 @@ msgstr "Rechnung"
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Rechnung als PDF herunterladen"
 msgstr "Rechnung als PDF herunterladen"
+
+#: src/ui/client/components/StripeCheckoutForm.tsx
+msgid "Rechnung als PDF öffnen"
+msgstr "Rechnung als PDF öffnen"
 
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Rechnungs-Rhythmus"
@@ -4747,6 +4814,10 @@ msgstr "Registrierung absenden"
 #: src/ui/ModelRegistrationView.tsx
 msgid "Registrierung erfolgreich"
 msgstr "Registrierung erfolgreich"
+
+#: src/ui/InviteView.tsx
+msgid "Registrierung erfolgreich. Bitte bestätige deine E-Mail."
+msgstr "Registrierung erfolgreich. Bitte bestätige deine E-Mail."
 
 #: src/logic/useAuth.ts
 msgid "Registrierung fehlgeschlagen"
@@ -4806,6 +4877,7 @@ msgstr "Schlagwörter"
 msgid "Schliessen"
 msgstr "Schliessen"
 
+#: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/InviteModal.tsx
 #: src/ui/management/components/ModelDetailModal.tsx
@@ -4869,6 +4941,14 @@ msgstr "Shares gesamt:"
 #: src/ui/components/Sidebar.tsx
 msgid "Shop-Bestellungen"
 msgstr "Shop-Bestellungen"
+
+#: src/ui/client/components/StripeCheckoutForm.tsx
+msgid "Sicherer Zahlungsdienst nicht verfügbar"
+msgstr "Sicherer Zahlungsdienst nicht verfügbar"
+
+#: src/ui/client/components/StripeCheckoutForm.tsx
+msgid "Sicherer Zahlungsdienst wird geladen..."
+msgstr "Sicherer Zahlungsdienst wird geladen..."
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Sicherheitsprüfung"
@@ -5110,6 +5190,10 @@ msgstr "Streitbeilegung"
 #: src/ui/Privacy.tsx
 msgid "Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor für die sofortige Kartenzahlung. Die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale werden für die Zahlungsabwicklung, 3D-Secure und die Betrugs- und Risikoerkennung genutzt. Die weitere Verarbeitung durch Stripe richtet sich nach den Datenschutzhinweisen von Stripe."
 msgstr "Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor für die sofortige Kartenzahlung. Die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale werden für die Zahlungsabwicklung, 3D-Secure und die Betrugs- und Risikoerkennung genutzt. Die weitere Verarbeitung durch Stripe richtet sich nach den Datenschutzhinweisen von Stripe."
+
+#: src/ui/client/components/StripeCheckoutForm.tsx
+msgid "Stripe konnte nicht geladen werden. Bitte versuche es erneut oder öffne die Rechnung als Ausweichoption."
+msgstr "Stripe konnte nicht geladen werden. Bitte versuche es erneut oder öffne die Rechnung als Ausweichoption."
 
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Stufe abwählen"
@@ -5676,9 +5760,18 @@ msgstr "Volume-Preset"
 msgid "Volume-Pricing"
 msgstr "Volume-Pricing"
 
+#. placeholder {0}: volumeGroup.tierIndex
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "Volumenpreis (Tier {0})"
+#~ msgstr "Volumenpreis (Tier {0})"
+
 #: src/ui/client/components/CartItemList.tsx
 msgid "Volumenpreis (Tier {tierNum})"
 msgstr "Volumenpreis (Tier {tierNum})"
+
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "Volumenpreis (Tier {volumeTierIndex})"
+#~ msgstr "Volumenpreis (Tier {volumeTierIndex})"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Vor- & Nachname"

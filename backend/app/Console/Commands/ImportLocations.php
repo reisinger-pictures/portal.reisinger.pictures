@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Location;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -15,6 +16,22 @@ class ImportLocations extends Command
     protected $description = 'Lädt GeoNames Daten (AT PLZ & Länder) herunter und pusht sie nach Meilisearch';
 
     public function handle(): int
+    {
+        $lock = Cache::lock('portal:import-locations', 3600);
+        if (! $lock->get()) {
+            $this->info('Location-Import läuft bereits; überspringe diesen Lauf.');
+
+            return self::SUCCESS;
+        }
+
+        try {
+            return $this->importLocations();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function importLocations(): int
     {
         $this->info('Starte Import der Location-Daten für Smart Assistance...');
 

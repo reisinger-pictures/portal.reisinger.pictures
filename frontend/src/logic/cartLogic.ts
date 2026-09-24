@@ -1,6 +1,6 @@
 import {z} from 'zod';
-import {CartItem} from './CartContext';
-import {calculateVolumeTotal} from './useVolumeLicensing';
+import type {CartItem, VolumeLicensingResult} from './CartContext';
+import {calculateVolumeTotal, type VolumePricingConfig} from './useVolumeLicensing';
 
 export const cartItemSchema = z.object({
     photoId: z.string(),
@@ -8,6 +8,7 @@ export const cartItemSchema = z.object({
     thumb_url: z.string().optional(),
     tier: z.enum(['web', 'print', 'original']),
     galleryId: z.string().optional(),
+    galleryGroupId: z.string().optional(),
     useCaseId: z.string().optional(),
     useCaseName: z.string().optional(),
     modifierIds: z.array(z.string()).optional(),
@@ -18,6 +19,30 @@ export const cartItemSchema = z.object({
 });
 
 export const cartSchema = z.array(cartItemSchema);
+
+// Quote links contain a signed offer token (not a payment/client secret). The
+// browser may keep it with the cart so a reload does not lose the authoritative
+// offer price. Validate it before accepting anything from localStorage and keep
+// the payload deliberately small and printable.
+const isPrintableQuoteToken = (value: string): boolean => {
+    if (value.trim() !== value) return false;
+    for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code < 32 || code === 127) return false;
+    }
+    return true;
+};
+
+const quoteTokenSchema = z.string()
+    .min(1)
+    .max(16_384)
+    .refine(isPrintableQuoteToken);
+
+const persistedCartSchema = z.object({
+    version: z.literal(1),
+    items: cartSchema,
+    quoteToken: quoteTokenSchema.nullable(),
+}).strict();
 
 /** Ersetzt ein Item mit gleicher photoId, hängt sonst an (verhaltensgleich zu CartProvider.addToCart). */
 export function addToCartPure(prev: CartItem[], item: CartItem): CartItem[] {
@@ -34,16 +59,37 @@ export function removeFromCartPure(prev: CartItem[], photoId: string): CartItem[
 }
 
 /**
- * Summe der Preise aller Nicht-Quote-Items (isQuote falsy → zählt).
+ * Calculates the server-consistent cart total.
  *
- * Licensing-mode-aware: when `useVolumePricing` is true, the total is computed
- * via retroactive volume pricing (all items at the same volume tier price).
- * Otherwise the legacy per-item summation is used.
+ * A `VolumeLicensingResult` carries the already grouped server inputs. Passing
+ * it is the only safe way to total a mixed cart: the legacy boolean mode is
+ * retained for callers that do not have pricing metadata yet. A signed quote
+ * token bypasses both strategies and uses the immutable per-item offer values.
  */
-export function calculateTotalAmount(items: CartItem[], useVolumePricing = false): number {
-    if (useVolumePricing) {
+export function calculateTotalAmount(
+    items: CartItem[],
+    pricing: boolean | VolumeLicensingResult | VolumePricingConfig = false,
+    quoteToken: string | null = null,
+): number {
+    if (quoteToken !== null) {
+        return items.reduce((sum, item) => sum + (item.isQuote ? 0 : item.price), 0);
+    }
+
+    if (typeof pricing === 'object' && pricing !== null) {
+        if ('groupedTotalCents' in pricing && pricing.groupedTotalCents !== undefined) {
+            return pricing.groupedTotalCents;
+        }
+        if ('isVolumePricing' in pricing) {
+            if (pricing.isVolumePricing) return pricing.totalCents;
+        } else {
+            return calculateVolumeTotal(items, pricing);
+        }
+    }
+
+    if (pricing === true) {
         return calculateVolumeTotal(items);
     }
+
     return items.reduce((sum, item) => sum + (item.isQuote ? 0 : item.price), 0);
 }
 
@@ -52,6 +98,10 @@ export type CartLoadError = 'none' | 'invalid-json' | 'schema';
 export interface CartLoadResult {
     items: CartItem[];
     error: CartLoadError;
+}
+
+export interface CartStateLoadResult extends CartLoadResult {
+    quoteToken: string | null;
 }
 
 /**
@@ -69,35 +119,76 @@ export function splitTotalEvenly(totalCents: number, count: number): number[] {
     return Array.from({length: count}, (_, index) => base + (index < remainder ? 1 : 0));
 }
 
-/**
- * Reine Lade-Logik (aus CartProvider extrahiert, verhaltensgleich): validiert den gespeicherten
- * Cart-Inhalt via Zod. Schema-Mismatch → console.warn (wie im Original).
- */
-export function loadCartItems(saved: string | null): CartLoadResult {
-    if (!saved) return {items: [], error: 'none'};
+function parseCartState(saved: string | null): CartStateLoadResult {
+    if (!saved) return {items: [], quoteToken: null, error: 'none'};
+
     let parsed: unknown;
     try {
         parsed = JSON.parse(saved);
     } catch {
-        return {items: [], error: 'invalid-json'};
+        return {items: [], quoteToken: null, error: 'invalid-json'};
     }
-    const validation = cartSchema.safeParse(parsed);
-    if (validation.success) return {items: validation.data, error: 'none'};
+
+    const persisted = persistedCartSchema.safeParse(parsed);
+    if (persisted.success) {
+        return {
+            items: persisted.data.items,
+            // A token without its bound photo set is stale. Never resurrect a
+            // quote token together with an empty cart.
+            quoteToken: persisted.data.items.length > 0 ? persisted.data.quoteToken : null,
+            error: 'none',
+        };
+    }
+
+    // Carts written before quote-token metadata used a bare array. Keep that
+    // format readable, but never accept an arbitrary object as cart data.
+    const legacy = cartSchema.safeParse(parsed);
+    if (legacy.success) return {items: legacy.data, quoteToken: null, error: 'none'};
+
     if (import.meta.env.DEV) {
-        console.warn('LocalStorage Cart Mismatch:', validation.error);
+        console.warn('LocalStorage Cart Mismatch:', persisted.error);
     }
-    return {items: [], error: 'schema'};
+    return {items: [], quoteToken: null, error: 'schema'};
 }
 
 /**
- * Reine Persistenz-Logik (aus CartProvider extrahiert, verhaltensgleich): schreibt den Cart
- * nur dann nach localStorage, wenn er nicht leer ist oder ein alter Cart existiert.
- * Gibt true bei Erfolg zurück, false bei einem Storage-Fehler.
+ * Loads and validates both the cart items and the optional signed quote token.
+ * The strict envelope rejects unknown fields, including payment client secrets.
  */
-export function persistCartItems(key: string, items: CartItem[]): boolean {
+export function loadCartState(saved: string | null): CartStateLoadResult {
+    return parseCartState(saved);
+}
+
+/**
+ * Backwards-compatible item-only view used by callers that do not need quote
+ * metadata. Legacy array carts still return the same result shape as before.
+ */
+export function loadCartItems(saved: string | null): CartLoadResult {
+    const result = parseCartState(saved);
+    return {items: result.items, error: result.error};
+}
+
+/**
+ * Persists only the validated cart shape. Normal carts retain the legacy array
+ * format; quote carts use a versioned envelope containing the signed offer
+ * token. Payment client secrets are neither part of the input nor serialized.
+ */
+export function persistCartItems(key: string, items: CartItem[], quoteToken: string | null = null): boolean {
+    const validatedItems = cartSchema.safeParse(items);
+    if (!validatedItems.success) return false;
+    if (quoteToken !== null && !quoteTokenSchema.safeParse(quoteToken).success) return false;
+
     try {
-        if (items.length > 0 || localStorage.getItem(key)) {
-            localStorage.setItem(key, JSON.stringify(items));
+        const effectiveQuoteToken = validatedItems.data.length > 0 ? quoteToken : null;
+        if (validatedItems.data.length > 0 || localStorage.getItem(key)) {
+            const serialized = effectiveQuoteToken === null
+                ? JSON.stringify(validatedItems.data)
+                : JSON.stringify({
+                    version: 1,
+                    items: validatedItems.data,
+                    quoteToken: effectiveQuoteToken,
+                });
+            localStorage.setItem(key, serialized);
         }
         return true;
     } catch {

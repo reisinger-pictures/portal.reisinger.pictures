@@ -5,10 +5,14 @@ local LrFunctionContext = import 'LrFunctionContext'
 local LrTasks = import 'LrTasks'
 local Api = require "Api"
 
-return function(galleryId, jwt)
+return function(galleryId, jwt, requestApi)
     LrFunctionContext.callWithContext("InviteManagerContext", function(context)
         local f = LrView.osFactory()
         local props = LrBinding.makePropertyTable(context)
+        local function apiRequest(endpoint, method, payload)
+            if requestApi then return requestApi(endpoint, method, payload) end
+            return Api.call(endpoint, method, payload, jwt)
+        end
         
         props.newInviteName = ""
         props.linkType = "mass"
@@ -19,7 +23,7 @@ return function(galleryId, jwt)
 
         local function loadInvites()
             LrTasks.startAsyncTask(function()
-                local data, status = Api.call("/api/management/galleries/" .. galleryId .. "/invites", "GET", nil, jwt)
+                local data, status = apiRequest("/api/management/galleries/" .. galleryId .. "/invites", "GET", nil)
                 if status == 200 and data then
                     local items = {}
                     for _, inv in ipairs(data) do
@@ -70,7 +74,7 @@ return function(galleryId, jwt)
                                 LrTasks.startAsyncTask(function()
                                     local payload = {}
                                     if props.linkType == "personal" and props.newInviteName ~= "" then payload.name = props.newInviteName end
-                                    local resData, stat = Api.call("/api/management/galleries/" .. galleryId .. "/invites", "POST", payload, jwt)
+                                    local resData, stat = apiRequest("/api/management/galleries/" .. galleryId .. "/invites", "POST", payload)
                                     if stat == 200 and resData and resData.link then
                                         props.generatedLink = resData.link
                                         props.newInviteName = ""
@@ -99,7 +103,7 @@ return function(galleryId, jwt)
                                 local confirm = LrDialogs.confirm(Api.getTitle("Widerrufen?"), "Link wird sofort ungültig.", "Widerrufen", "Abbrechen")
                                 if confirm == "ok" then
                                     LrTasks.startAsyncTask(function()
-                                        local _, stat = Api.call("/api/management/invites/" .. props.selectedInviteId, "DELETE", nil, jwt)
+                                        local _, stat = apiRequest("/api/management/invites/" .. props.selectedInviteId, "DELETE", nil)
                                         if stat == 200 then props.selectedInviteLink = ""; loadInvites() end
                                     end)
                                 end

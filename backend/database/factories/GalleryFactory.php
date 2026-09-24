@@ -14,13 +14,16 @@ class GalleryFactory extends Factory
     public function definition(): array
     {
         $name = $this->faker->words(3, true);
-        $type = $this->faker->randomElement(['selection', 'delivery']);
-        
+        // Keep the generic fixture deterministic.  Tests that need a
+        // selection surface must opt in explicitly; otherwise a random
+        // selection row can violate the private-only invariant by accident.
+        $type = 'delivery';
+
         return [
             'brand' => Brand::B2B,
             'gallery_group_id' => null,
             'name' => ucfirst($name),
-            'slug' => Str::slug($name) . '-' . $this->faker->unique()->numberBetween(1, 1000),
+            'slug' => Str::slug($name).'-'.$this->faker->unique()->numberBetween(1, 1000),
             'type' => $type,
             'is_live' => $type === 'delivery' ? $this->faker->boolean(20) : false,
             'is_public' => $type === 'delivery' ? $this->faker->boolean(50) : false,

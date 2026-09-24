@@ -7,7 +7,9 @@ use App\Models\Order;
 use App\Services\CheckoutRiskService;
 use App\Services\PaymentIntentReconciliationService;
 use App\Services\StripePaymentService;
+use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +21,9 @@ use Stripe\Webhook;
 class WebhookController extends Controller
 {
     private const WEBHOOK_EVENT_CLAIM_TTL_SECONDS = 120;
+
     private const WEBHOOK_EVENT_DEDUPE_TTL_DAYS = 7;
+
     private const WEBHOOK_MISSING_ID_COALESCE_SECONDS = 300;
 
     private StripePaymentService $stripePayment;
@@ -101,11 +105,17 @@ class WebhookController extends Controller
             }
 
             $order = Order::where('stripe_payment_intent_id', $piId)->first();
-            if ($order && $order->status !== 'disputed') {
-                $order->update(['status' => 'disputed']);
+            $disputedOrder = $order === null
+                ? null
+                : $this->transitionTerminalPaymentStatus($order, 'disputed');
+            if ($order !== null) {
+                // A late event may be ignored, but any stale positive cache is
+                // still unsafe to retain for a negative payment signal.
                 $this->clearPurchasedCache($order);
+            }
+            if ($disputedOrder !== null) {
                 Mail::to(BrandRegistry::configOrDefault()->accountingEmail ?? 'accounting@reisinger.pictures')
-                    ->send(new CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$order->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
+                    ->send(new CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$disputedOrder->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
             }
         } elseif ($eventType === 'charge.refunded') {
             $charge = $this->eventObject($event);
@@ -133,8 +143,12 @@ class WebhookController extends Controller
             }
 
             $order = Order::where('stripe_payment_intent_id', $piId)->first();
-            if ($order && $order->status !== 'refunded') {
-                $order->update(['status' => 'refunded']);
+            $refundedOrder = $order === null
+                ? null
+                : $this->transitionTerminalPaymentStatus($order, 'refunded');
+            if ($order !== null) {
+                // Keep the cache fail-closed even when the terminal-state guard
+                // intentionally leaves a pending/cancelled/refunded row unchanged.
                 $this->clearPurchasedCache($order);
             }
         }
@@ -142,7 +156,7 @@ class WebhookController extends Controller
         return response()->json(['status' => 'success']);
     }
 
-    private function handlePaymentIntentSucceeded(object $event): \Illuminate\Http\JsonResponse
+    private function handlePaymentIntentSucceeded(object $event): JsonResponse
     {
         $paymentIntent = $this->eventObject($event);
         $eventId = $this->eventId($event);
@@ -183,7 +197,7 @@ class WebhookController extends Controller
                 $order,
                 $orderId,
                 $paymentIntent,
-            ): \Illuminate\Http\JsonResponse {
+            ): JsonResponse {
                 return $this->reconciliationResponse(
                     $this->paymentReconciliation->reconcileSucceededWithMissingLink($order, $paymentIntent),
                     $eventId,
@@ -232,7 +246,7 @@ class WebhookController extends Controller
             $order,
             $orderId,
             $paymentIntent,
-        ): \Illuminate\Http\JsonResponse {
+        ): JsonResponse {
             return $this->reconciliationResponse(
                 $this->paymentReconciliation->reconcileSucceeded($order, $paymentIntent),
                 $eventId,
@@ -241,7 +255,7 @@ class WebhookController extends Controller
         });
     }
 
-    private function reconciliationResponse(array $result, ?string $eventId, string $orderId): \Illuminate\Http\JsonResponse
+    private function reconciliationResponse(array $result, ?string $eventId, string $orderId): JsonResponse
     {
         if (in_array($result['status'], ['paid', 'already_paid'], true)) {
             return response()->json(['status' => 'success']);
@@ -262,7 +276,7 @@ class WebhookController extends Controller
         return response()->json(['status' => 'ignored', 'reason' => $reason]);
     }
 
-    private function recordPaymentFailure(object $event): \Illuminate\Http\JsonResponse
+    private function recordPaymentFailure(object $event): JsonResponse
     {
         $paymentIntent = $this->eventObject($event);
         $eventId = $this->eventId($event);
@@ -311,7 +325,7 @@ class WebhookController extends Controller
             $eventId,
             $order,
             $paymentIntent,
-        ): \Illuminate\Http\JsonResponse {
+        ): JsonResponse {
             $updatedOrder = DB::transaction(function () use ($eventId, $order, $paymentIntent): ?Order {
                 $lockedOrder = Order::query()
                     ->with('user')
@@ -364,9 +378,9 @@ class WebhookController extends Controller
      * claim prevents concurrent duplicates without permanently swallowing a
      * retry after a transient failure.
      *
-     * @param  \Closure(): \Illuminate\Http\JsonResponse  $callback
+     * @param  \Closure(): JsonResponse  $callback
      */
-    private function withWebhookEventClaim(string $key, \Closure $callback): \Illuminate\Http\JsonResponse
+    private function withWebhookEventClaim(string $key, \Closure $callback): JsonResponse
     {
         try {
             $state = $this->claimWebhookEvent($key);
@@ -443,6 +457,7 @@ class WebhookController extends Controller
         }
 
         $current = Cache::get($key);
+
         return $this->isProcessedWebhookMarker($current) ? 'processed' : 'in_progress';
     }
 
@@ -632,6 +647,65 @@ class WebhookController extends Controller
         return $amount > 0 && $amountRefunded >= $amount;
     }
 
+    /**
+     * Apply only documented payment-terminal transitions under a row lock.
+     *
+     * `refunded` and `cancelled` are terminal for dispute/refund events, and
+     * neither event may turn a pending quote or pending payment into a
+     * negative-access state. A dispute may follow a settled status, and a full
+     * refund may follow either a settled status or `disputed` (paid → disputed
+     * → refunded). The conditional update also prevents a late event from
+     * winning a concurrent status transition.
+     */
+    private function transitionTerminalPaymentStatus(Order $order, string $targetStatus): ?Order
+    {
+        $allowedSourceStatuses = match ($targetStatus) {
+            'disputed' => [
+                'paid',
+                'invoice_created',
+                'overdue',
+                'delivery_note',
+                'archived_in_collective',
+            ],
+            'refunded' => [
+                'paid',
+                'invoice_created',
+                'overdue',
+                'delivery_note',
+                'archived_in_collective',
+                'disputed',
+            ],
+            default => [],
+        };
+
+        if ($allowedSourceStatuses === []) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($order, $targetStatus, $allowedSourceStatuses): ?Order {
+            $lockedOrder = Order::query()
+                ->with('invoiceSnapshot')
+                ->lockForUpdate()
+                ->find($order->getKey());
+            if ($lockedOrder === null
+                || ! in_array($lockedOrder->status, $allowedSourceStatuses, true)) {
+                return null;
+            }
+
+            $updated = Order::query()
+                ->whereKey($lockedOrder->getKey())
+                ->where('status', $lockedOrder->status)
+                ->update(['status' => $targetStatus]);
+            if ($updated !== 1) {
+                return null;
+            }
+
+            $lockedOrder->status = $targetStatus;
+
+            return $lockedOrder;
+        });
+    }
+
     private function clearPurchasedCache(Order $order): void
     {
         $snapshot = $order->invoiceSnapshot;
@@ -640,12 +714,28 @@ class WebhookController extends Controller
         }
 
         $items = $snapshot->customer_details['items'] ?? [];
+        if (! is_array($items)) {
+            return;
+        }
+
         foreach ($items as $item) {
-            if (! isset($item['photoId'])) {
+            if (! is_array($item) || ! isset($item['photoId'])) {
                 continue;
             }
+            if (! is_string($item['photoId']) && ! is_int($item['photoId'])) {
+                continue;
+            }
+
+            $photoId = trim((string) $item['photoId']);
+            if ($photoId === '') {
+                continue;
+            }
+
             foreach (['web', 'print', 'original'] as $tier) {
-                Cache::forget("user.{$order->user_id}.purchased.{$item['photoId']}.{$tier}");
+                $cacheKey = ActorIdentity::purchaseCacheKeyForOrder($order, $photoId, $tier);
+                if ($cacheKey !== null) {
+                    Cache::forget($cacheKey);
+                }
             }
         }
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\CouponService;
+use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,10 +20,20 @@ class CouponCheckoutController extends Controller
 
     public function validateCoupon(Request $request): JsonResponse
     {
+        $galleryIds = $request->input('gallery_id');
+        $metaGalleryIds = $request->input('meta_gallery_id');
+        $scopeRules = static function (mixed $scopeIds): array {
+            return is_array($scopeIds)
+                ? ['nullable', 'array', 'max:100']
+                : ['nullable', 'string', 'max:36'];
+        };
+
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|max:50',
-            'gallery_id' => 'nullable|string',
-            'meta_gallery_id' => 'nullable|string',
+            'gallery_id' => $scopeRules($galleryIds),
+            'gallery_id.*' => 'string|max:36',
+            'meta_gallery_id' => $scopeRules($metaGalleryIds),
+            'meta_gallery_id.*' => 'string|max:36',
         ]);
 
         if ($validator->fails()) {
@@ -30,7 +41,9 @@ class CouponCheckoutController extends Controller
         }
 
         $brandId = BrandRegistry::currentId();
-        $userId = auth()->id();
+        // Guests deliberately have no account-scoped coupon entitlement. Use
+        // the canonical actor identity instead of a raw null auth identifier.
+        $userId = ActorIdentity::registeredId(auth('api')->user());
 
         [$coupon, $error] = $this->couponService->findValidCoupon(
             $request->input('code'),
@@ -54,6 +67,7 @@ class CouponCheckoutController extends Controller
                 'code' => $coupon->code,
                 'type' => $coupon->type,
                 'value' => $coupon->value,
+                'max_items' => $coupon->max_items,
                 'package_quantity' => $coupon->package_quantity,
                 'package_price_cents' => $coupon->package_price_cents,
             ],

@@ -3,16 +3,17 @@
 namespace App\Services;
 
 use App\Enums\Brand;
-use App\Models\User;
-use App\Models\Gallery;
 use App\Models\DownloadLog;
+use App\Models\Gallery;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class StatsCalculationService
 {
     /**
      * Normalize a brand (enum or raw string) to its stored string value.
-     * `null` means cross-brand (e.g. super_admin) — no scoping.
+     * `null` is unscoped only for a trusted persisted Super-Admin; the actor
+     * guard in getStatsForUser() rejects legacy null-brand users.
      */
     private function normalizeBrand(mixed $brand): ?string
     {
@@ -24,7 +25,8 @@ class StatsCalculationService
     }
 
     /**
-     * All gallery IDs belonging to a brand. Empty for cross-brand users.
+     * All gallery IDs belonging to a brand. Empty for a trusted cross-brand
+     * Super-Admin.
      *
      * @return array<string>
      */
@@ -45,14 +47,14 @@ class StatsCalculationService
         $mapped = [];
         foreach ($rawDomainStats as $stat) {
             $domain = $stat->domain === 'invite.local' ? 'Benannte Invite Links' : $stat->domain;
-            if (!isset($mapped[$domain])) {
+            if (! isset($mapped[$domain])) {
                 $mapped[$domain] = ['domain' => $domain, 'count' => 0];
             }
             $mapped[$domain]['count'] += $stat->count;
         }
 
         $domainStats = array_values($mapped);
-        usort($domainStats, function($a, $b) {
+        usort($domainStats, function ($a, $b) {
             return $b['count'] <=> $a['count'];
         });
 
@@ -63,15 +65,17 @@ class StatsCalculationService
      * Get statistics for admin users.
      *
      * A brand-bound admin only sees galleries/downloads of their own brand;
-     * a cross-brand admin (brand = null) sees all brands.
+     * a trusted null-brand Super-Admin sees all brands.
      */
     public function getAdminStats(?string $tier = null, ?string $brand = null): array
     {
         $brand = $this->normalizeBrand($brand);
         $brandGalleryIds = $this->galleryIdsForBrand($brand);
 
-        $tierFilterDb = function($query) use ($tier) {
-            if ($tier) $query->where('download_logs.resolution_tier', $tier);
+        $tierFilterDb = function ($query) use ($tier) {
+            if ($tier) {
+                $query->where('download_logs.resolution_tier', $tier);
+            }
         };
 
         $galleriesCount = $brand === null ? Gallery::count() : count($brandGalleryIds);
@@ -87,9 +91,9 @@ class StatsCalculationService
 
         $guestDownloads = DownloadLog::whereNull('user_id')
             ->when($brand !== null, fn ($q) => $q->whereIn('gallery_id', $brandGalleryIds))
-            ->where($tier ? function($q) use ($tier) {
+            ->where($tier ? function ($q) use ($tier) {
                 $q->where('resolution_tier', $tier);
-            } : function() {})
+            } : function () {})
             ->count();
 
         $rawDomainStats = DB::table('download_logs')
@@ -117,7 +121,7 @@ class StatsCalculationService
             'total_downloads' => $totalDownloads,
             'domain_stats' => $domainStats,
             'guest_downloads' => $guestDownloads,
-            'top_galleries' => $topGalleries
+            'top_galleries' => $topGalleries,
         ];
     }
 
@@ -125,7 +129,7 @@ class StatsCalculationService
      * Get statistics for org admin users.
      *
      * A brand-bound org admin only counts downloads of their own brand's
-     * galleries; cross-brand org admins (brand = null) see all brands.
+     * galleries; a trusted null-brand Super-Admin sees all brands.
      */
     public function getOrgAdminStats(User $user, ?string $tier = null, ?string $brand = null): array
     {
@@ -134,8 +138,10 @@ class StatsCalculationService
 
         $orgUserIds = User::where('org_id', $user->org_id)->pluck('id')->toArray();
 
-        $tierFilterDb = function($query) use ($tier) {
-            if ($tier) $query->where('download_logs.resolution_tier', $tier);
+        $tierFilterDb = function ($query) use ($tier) {
+            if ($tier) {
+                $query->where('download_logs.resolution_tier', $tier);
+            }
         };
 
         $totalDownloads = DownloadLog::whereIn('user_id', $orgUserIds)
@@ -180,15 +186,15 @@ class StatsCalculationService
             'total_downloads' => $totalDownloads,
             'domain_stats' => $domainStats,
             'guest_downloads' => $guestDownloads,
-            'top_galleries' => $topGalleries
+            'top_galleries' => $topGalleries,
         ];
     }
 
     /**
      * Get statistics for regular users (photographers).
      *
-     * A brand-bound user only counts galleries of their own brand; cross-brand
-     * users (brand = null) keep their full gallery set.
+     * A brand-bound user only counts galleries of their own brand; a trusted
+     * null-brand Super-Admin keeps the full gallery set.
      */
     public function getUserStats(User $user, ?string $tier = null, ?string $brand = null): array
     {
@@ -205,8 +211,10 @@ class StatsCalculationService
 
         $galleriesCount = count($galleryIds);
 
-        $tierFilterDb = function($query) use ($tier) {
-            if ($tier) $query->where('download_logs.resolution_tier', $tier);
+        $tierFilterDb = function ($query) use ($tier) {
+            if ($tier) {
+                $query->where('download_logs.resolution_tier', $tier);
+            }
         };
 
         $totalDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)
@@ -221,9 +229,9 @@ class StatsCalculationService
 
         $guestDownloads = DownloadLog::whereIn('gallery_id', $galleryIds)
             ->whereNull('user_id')
-            ->where($tier ? function($q) use ($tier) {
+            ->where($tier ? function ($q) use ($tier) {
                 $q->where('resolution_tier', $tier);
-            } : function() {})
+            } : function () {})
             ->count();
 
         $rawDomainStats = DB::table('download_logs')
@@ -251,7 +259,7 @@ class StatsCalculationService
             'total_downloads' => $totalDownloads,
             'domain_stats' => $domainStats,
             'guest_downloads' => $guestDownloads,
-            'top_galleries' => $topGalleries
+            'top_galleries' => $topGalleries,
         ];
     }
 
@@ -260,6 +268,14 @@ class StatsCalculationService
      */
     public function getStatsForUser(User $user, ?string $tier = null): array
     {
+        $authorization = app(AuthorizationService::class);
+        if ($authorization->isReservedNullBrandActor($user) || $authorization->isTransientGuest($user)) {
+            // Keep this service fail-closed as well as its controller/middleware.
+            // A non-null sentinel brand intersects the user's gallery set with
+            // no real galleries instead of interpreting NULL as cross-brand.
+            return $this->getUserStats($user, $tier, '__reserved_null_brand_actor__');
+        }
+
         $brand = $this->normalizeBrand($user->brand);
 
         if ($user->is_admin) {

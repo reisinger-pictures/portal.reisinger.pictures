@@ -9,39 +9,6 @@ export interface ResolvedStripeFrames {
 }
 
 export class StripeHelper {
-    /**
-     * Test-only simulation of the signed-webhook reconciliation delay.
-     *
-     * Install this only after checkout has returned the exact order ID. The
-     * route intercepts only that order's normalized path and GET requests;
-     * every other request is passed through to the normal network stack.
-     */
-    static async installPaidOrderStatusFixture(page: Page, orderId: string): Promise<void> {
-        const orderPath = `/api/orders/${orderId}`;
-        const normalizePath = (pathname: string): string => pathname.replace(/\/+$/, '') || '/';
-        let pollCount = 0;
-
-        await page.route(
-            // URL.pathname already excludes query/hash; tolerate only trailing slashes.
-            url => normalizePath(url.pathname) === orderPath,
-            async route => {
-                const request = route.request();
-                if (request.method() !== 'GET') {
-                    await route.fallback();
-                    return;
-                }
-
-                const status = pollCount === 0 ? 'pending_payment' : 'paid';
-                pollCount += 1;
-                await route.fulfill({
-                    status: 200,
-                    contentType: 'application/json',
-                    body: JSON.stringify({id: orderId, order_id: orderId, status})
-                });
-            }
-        );
-    }
-
     static async resolveStripeIframes(page: Page): Promise<ResolvedStripeFrames> {
         const stripeFrame = page.frameLocator(
             'iframe[title*="payment" i], iframe[title*="secure" i], iframe[title*="sichere" i]'

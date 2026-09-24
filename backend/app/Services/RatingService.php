@@ -4,11 +4,112 @@ namespace App\Services;
 
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Models\Rating;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class RatingService
 {
+    /**
+     * Insert or update one rating for an explicit actor identity.
+     *
+     * The actor lock serializes the normal request path. The V038 unique index
+     * remains the durable guard when two application nodes do not share a
+     * cache backend: a losing insert is retried and then updates the row that
+     * won the database race.
+     */
+    public function upsertForActor(
+        Photo $photo,
+        ?string $userId,
+        ?string $guestId,
+        int $rating,
+        ?string $comment = null,
+        ?string $guestName = null,
+    ): Rating {
+        $actorKey = Rating::actorKeyFor($userId, $guestId);
+        if ($actorKey === null) {
+            throw new \InvalidArgumentException('Eine Bewertung benötigt genau eine gültige Actor-Identität.');
+        }
+
+        $lockKey = 'rating:'.$photo->getKey().':'.hash('sha256', $actorKey);
+
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            try {
+                /** @var Rating $saved */
+                $saved = Cache::lock($lockKey, 10)->block(5, function () use (
+                    $photo,
+                    $userId,
+                    $guestId,
+                    $rating,
+                    $comment,
+                    $guestName,
+                    $actorKey,
+                ): Rating {
+                    return DB::transaction(function () use (
+                        $photo,
+                        $userId,
+                        $guestId,
+                        $rating,
+                        $comment,
+                        $guestName,
+                        $actorKey,
+                    ): Rating {
+                        $existing = Rating::query()
+                            ->where('photo_id', $photo->getKey())
+                            ->where('actor_key', $actorKey)
+                            ->orderBy('id')
+                            ->lockForUpdate()
+                            ->first();
+
+                        // A V038 migration backfills identifiable legacy rows,
+                        // but this fallback keeps the mutation safe if a row
+                        // predates the backfill or was inserted directly.
+                        if ($existing === null) {
+                            $legacyQuery = Rating::query()
+                                ->where('photo_id', $photo->getKey());
+
+                            if ($userId !== null) {
+                                $legacyQuery
+                                    ->where('user_id', $userId)
+                                    ->whereNull('guest_id');
+                            } else {
+                                $legacyQuery
+                                    ->whereNull('user_id')
+                                    ->where('guest_id', $guestId);
+                            }
+
+                            $existing = $legacyQuery
+                                ->orderBy('id')
+                                ->lockForUpdate()
+                                ->first();
+                        }
+
+                        $saved = $existing ?? new Rating;
+                        $saved->photo_id = $photo->getKey();
+                        $saved->user_id = $userId;
+                        $saved->guest_id = $guestId;
+                        $saved->guest_name = $guestId === null ? null : $guestName;
+                        $saved->rating = $rating;
+                        $saved->comment = $comment ?? '';
+                        $saved->save();
+
+                        return $saved;
+                    }, 3);
+                });
+
+                return $saved;
+            } catch (UniqueConstraintViolationException $exception) {
+                if ($attempt === 2) {
+                    throw $exception;
+                }
+            }
+        }
+
+        throw new \LogicException('Die Bewertung konnte nicht atomar gespeichert werden.');
+    }
+
     /**
      * Get the rating status (users and guests) for a gallery.
      */

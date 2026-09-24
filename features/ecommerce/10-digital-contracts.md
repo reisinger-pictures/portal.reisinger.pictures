@@ -22,6 +22,19 @@ Verträge sind nicht mehr strikt 1:1, sondern 1:n (Vertrag zu Unterzeichnern).
 * **Multiple Roles:** Ein Flag `allow_multiple_roles_per_signer` steuert, ob eine Person (z.B. Model & Visagist in Personalunion) mehrere Rollen gleichzeitig annehmen darf.
 * **Join-Link vs. Direct-Link:** Unterzeichner können entweder vom Fotografen explizit eingeladen werden (Direct-Link) oder über einen generischen Join-Link selbst beitreten, ihre Daten angeben, eine Rolle wählen und unterschreiben (ideal für Fotowalks/Gruppen-TFP).
 
+### Deadline Inheritance and Telemetry Semantics
+
+* Öffentliche Join-, Content- und Signaturpfade prüfen `status`, `expires_at` und `closes_at` anhand der Datenbankzeit. Create-/Sign-Transaktionen serialisieren den Contract-/Template-Zugriff per Row-Lock; Signaturen verwenden zusätzlich ein bedingtes Database-Time-Update.
+* Neue Template-Instanzen übernehmen die Deadline-Werte ihres Templates. Legacy-Instanzen mit `NULL`-Deadlines lösen ihre effektive Deadline dynamisch vom Template auf. Das Template ist dabei eine harte Obergrenze; bestehende Zeilen werden nicht per Mass-Update backfilled.
+* `POST /api/contracts/sign/{personalToken}/page-exit` ist Telemetrie, kein Signatur- oder Autorisierungs-Gate. Ein gültiger persönlicher Token mit verknüpftem Contract wird auch nach Close/Signatur akzeptiert; der Audit-Action-Wert ist `page_exit`. Ungültige Tokens liefern `404`.
+
+### Join-Identität und aktuelle Schema-Grenze
+
+* Für direkte Verträge und Template-Beitritte wird die E-Mail vor Lock, Duplikatsprüfung und Insert über `Str::lower(trim(...))` normalisiert. Direktverträge und Templates verwenden denselben stabilen `contract-join:{scope-id}:{sha256(normalized-email)}`-Cache-Lock; innerhalb der Transaktion wird zusätzlich der jeweilige Contract-/Template-Row-Lock gehalten.
+* Die Duplikatsprüfung und alle Join-Instance-/Signer-Writes liegen in derselben DB-Transaktion. Bei einem Konflikt wird ausschließlich ein generischer 409 ohne `personal_token`, Name oder Rollen zurückgegeben; bei Insert-/Deadline-Fehlern wird der gesamte Instance/Signer-Write zurückgerollt.
+* Das bestehende V021-Schema besitzt **keine** normalisierte E-Mail-Spalte und keinen Unique-Index auf `(contract_id, email)` oder auf die Template-Scope-Identität. `LOWER(TRIM(email))` schützt den aktuellen Anwendungs- und Legacy-Lese-/Joinpfad, ist aber keine dauerhafte DB-Eindeutigkeit. Ein Writer außerhalb dieses Pfades oder eine andere Cache-Domain kann weiterhin eine Legacy-Dublette erzeugen. Der aktuelle Check/Insert ist deshalb transaktional serialisiert, aber kein einzelnes portables SQL-Conditional-INSERT.
+* Eine dauerhafte DB-Invariante bleibt deshalb offen und erfordert eine separate, spätere Schema-Entscheidung (normalisierte Spalte plus Backfill/Duplikatbereinigung und Unique-Index). CR-DATA-018 wird durch diese Änderung nicht geschlossen; diese Änderung fügt bewusst keine Migration hinzu.
+
 ## 3. Database Schema
 * **`contracts`**: `id` (UUID), `status` (draft, active, closed, cancelled), `billing_details` (JSON - falls der Vertrag kostenpflichtig ist, gibt es *einen* Rechnungsempfänger), `items` & `discounts` (JSON), `terms_html` (Text), `available_roles` (JSON Array), `allow_multiple_roles_per_signer` (Boolean), `join_token` (String, für öffentliche Invites), `closes_at` (Nullable Timestamp, Auto-Ende), `content_version` (Integer, default 0 — wird bei Bearbeitung im active-Status inkrementiert), `created_at`, `updated_at`.
 * **`contract_signers`**: `id` (UUID), `contract_id` (FK UUID), `name`, `email`, `roles` (JSON Array), `personal_token` (String), `status` (invited, joined, signed), `signed_at` (Nullable Timestamp), `created_at`, `updated_at`.

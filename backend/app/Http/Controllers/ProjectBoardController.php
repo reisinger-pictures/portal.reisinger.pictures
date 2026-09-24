@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Brand;
 use App\Enums\PaymentStatus;
 use App\Enums\PhotoJobStatus;
 use App\Enums\ProjectStatus;
@@ -11,14 +10,20 @@ use App\Models\Project;
 use App\Models\User;
 use App\Models\WorkflowLog;
 use App\Services\AuthorizationService;
+use App\Services\BoardPositionService;
+use App\Services\BoardScopeService;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class ProjectBoardController extends Controller
 {
+    public function __construct(
+        private readonly BoardScopeService $boardScope,
+        private readonly BoardPositionService $boardPositions,
+    ) {}
+
     /** Gate: nur Admin / Super-Admin. */
     private function authorizeUser(User $user): void
     {
@@ -26,21 +31,25 @@ class ProjectBoardController extends Controller
         if (! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user)) {
             abort(403, 'Forbidden');
         }
+
+        $this->boardScope->assertActorBrand($user);
     }
 
     private function scopedQuery(User $user): Builder
     {
-        $query = Project::query()
-            ->where('brand', BrandRegistry::currentOrDefault());
+        return $this->boardScope->projects($user);
+    }
 
-        if (! app(AuthorizationService::class)->isSuperAdmin($user)) {
-            $query->where(function ($q) use ($user) {
-                $q->where('owner_id', $user->id)
-                    ->orWhere('assignee_id', $user->id);
-            });
-        }
-
-        return $query;
+    /**
+     * Positions are maintained in the item owner's column. Visibility of an
+     * assigned item does not grant a caller permission to renumber every
+     * owner's board in the same brand.
+     */
+    private function positionQuery(User $user, mixed $ownerId = null): Builder
+    {
+        return Project::query()
+            ->forBrand($this->boardScope->brand())
+            ->where('owner_id', $ownerId ?? $user->getKey());
     }
 
     public function index(Request $request)
@@ -75,16 +84,28 @@ class ProjectBoardController extends Controller
             'payment_status' => 'string|in:'.implode(',', array_column(PaymentStatus::cases(), 'value')),
         ]);
 
+        $brand = $this->boardScope->brand();
+        $this->boardScope->validateRelationships($user, $validated, $brand);
         $status = $validated['status'] ?? ProjectStatus::initial()->value;
-        $maxPosition = $this->scopedQuery($user)->where('status', $status)->max('position') ?? -1;
 
-        $project = $this->scopedQuery($user)->create(array_merge($validated, [
-            'brand' => BrandRegistry::currentOrDefault(),
-            'owner_id' => $user->id,
-            'status' => $status,
-            'payment_status' => $validated['payment_status'] ?? PaymentStatus::OPEN->value,
-            'position' => $maxPosition + 1,
-        ]));
+        $project = $this->boardPositions->transaction(
+            $brand,
+            ['projects', 'photo_jobs'],
+            function () use ($user, $validated, $status, $brand): Project {
+                $this->boardScope->validateRelationships($user, $validated, $brand);
+
+                $columnQuery = $this->positionQuery($user);
+                $position = $this->boardPositions->appendPosition($columnQuery, $status);
+
+                return $this->scopedQuery($user)->create(array_merge($validated, [
+                    'brand' => $brand,
+                    'owner_id' => $user->id,
+                    'status' => $status,
+                    'payment_status' => $validated['payment_status'] ?? PaymentStatus::OPEN->value,
+                    'position' => $position,
+                ]));
+            }
+        );
 
         return response()->json(['project' => $project->load(['owner', 'assignee'])], 201);
     }
@@ -94,6 +115,8 @@ class ProjectBoardController extends Controller
         $user = Auth::guard('api')->user();
         $this->authorizeUser($user);
 
+        // Resolve the item before validating relationship IDs so an item outside
+        // the actor's brand/visibility scope remains a 404, not a data oracle.
         $project = $this->scopedQuery($user)->findOrFail($id);
 
         $validated = $request->validate([
@@ -109,28 +132,49 @@ class ProjectBoardController extends Controller
             'payment_status' => 'sometimes|string|in:'.implode(',', array_column(PaymentStatus::cases(), 'value')),
         ]);
 
-        $oldStatus = $project->status;
-        $newStatus = $validated['status'] ?? $oldStatus;
+        $brand = $this->boardScope->brand();
+        $this->boardScope->validateRelationships($user, $validated, $brand, (string) $project->getKey());
 
-        if ($newStatus !== $oldStatus) {
-            DB::transaction(function () use ($user, $project, $oldStatus, $newStatus, $validated) {
-                $targetCount = $this->scopedQuery($user)
-                    ->where('status', $newStatus)
-                    ->where('id', '!=', $project->id)
-                    ->count();
+        $updated = $this->boardPositions->transaction(
+            $brand,
+            ['projects', 'photo_jobs'],
+            function () use ($user, $project, $validated): Project {
+                $fresh = $this->scopedQuery($user)->findOrFail($project->getKey());
+                $this->boardScope->validateRelationships(
+                    $user,
+                    $validated,
+                    $this->boardScope->brand(),
+                    (string) $fresh->getKey(),
+                );
 
-                $project->fill($validated);
-                $project->position = $targetCount;
-                $project->save();
+                $oldStatus = (string) $fresh->status;
+                $newStatus = $validated['status'] ?? $oldStatus;
+                $attributes = $validated;
+                unset($attributes['status']);
 
-                $this->reindexColumn($user, $oldStatus);
-                $this->reindexColumn($user, $newStatus, $project->id, $targetCount);
-            });
-        } else {
-            $project->fill($validated)->save();
-        }
+                $fresh->fill($attributes);
+                $positionQuery = $this->positionQuery($user, $fresh->owner_id);
 
-        return response()->json(['project' => $project->load('owner', 'assignee')]);
+                if ($newStatus !== $oldStatus) {
+                    $this->boardPositions->positionItem(
+                        $positionQuery,
+                        $fresh,
+                        $newStatus,
+                        null,
+                    );
+                } else {
+                    $fresh->save();
+                    $this->boardPositions->reindexColumn(
+                        $positionQuery,
+                        $newStatus,
+                    );
+                }
+
+                return $fresh;
+            }
+        );
+
+        return response()->json(['project' => $updated->load('owner', 'assignee')]);
     }
 
     public function move(Request $request, $id)
@@ -138,78 +182,44 @@ class ProjectBoardController extends Controller
         $user = Auth::guard('api')->user();
         $this->authorizeUser($user);
 
-        $project = $this->scopedQuery($user)->findOrFail($id);
+        $this->scopedQuery($user)->findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|string|in:anfrage,angebot,beauftragt,rechnung,bezahlt,storniert',
+            'status' => 'required|string|in:'.implode(',', array_column(ProjectStatus::cases(), 'value')),
             'position' => 'required|integer|min:0',
         ]);
 
-        $oldStatus = $project->status;
-        $newStatus = $validated['status'];
+        $brand = $this->boardScope->brand();
+        $moved = $this->boardPositions->transaction(
+            $brand,
+            ['projects', 'photo_jobs'],
+            function () use ($user, $id, $validated): Project {
+                $project = $this->scopedQuery($user)->findOrFail($id);
+                $oldStatus = (string) $project->status;
+                $newStatus = $validated['status'];
 
-        DB::transaction(function () use ($user, $project, $oldStatus, $newStatus, $validated) {
-            $targetCount = $this->scopedQuery($user)
-                ->where('status', $newStatus)
-                ->where('id', '!=', $project->id)
-                ->count();
+                $this->boardPositions->positionItem(
+                    $this->positionQuery($user, $project->owner_id),
+                    $project,
+                    $newStatus,
+                    (int) $validated['position'],
+                );
 
-            $effectivePosition = min((int) $validated['position'], $targetCount);
+                if ($oldStatus !== $newStatus) {
+                    WorkflowLog::create([
+                        'item_type' => 'project',
+                        'item_id' => $project->id,
+                        'from_status' => $oldStatus,
+                        'to_status' => $newStatus,
+                        'user_id' => $user->id,
+                    ]);
+                }
 
-            $project->status = $newStatus;
-            $project->position = $effectivePosition;
-            $project->save();
-
-            if ($oldStatus !== $newStatus) {
-                $this->reindexColumn($user, $oldStatus);
+                return $project;
             }
+        );
 
-            $this->reindexColumn($user, $newStatus, $project->id, $effectivePosition);
-
-            if ($oldStatus !== $newStatus) {
-                WorkflowLog::create([
-                    'item_type' => 'project',
-                    'item_id' => $project->id,
-                    'from_status' => $oldStatus,
-                    'to_status' => $newStatus,
-                    'user_id' => $user->id,
-                ]);
-            }
-        });
-
-        return response()->json(['project' => $project->load('owner', 'assignee')]);
-    }
-
-    /**
-     * Renumber one status column so positions are dense (0..n-1) and the order
-     * is stable. If a pinned item id is given, that item is forced to the
-     * pinned position and all other items keep their relative stable order.
-     */
-    private function reindexColumn(User $user, string $status, ?string $pinnedItemId = null, ?int $pinnedPosition = null): void
-    {
-        $query = $this->scopedQuery($user)->where('status', $status);
-
-        if ($pinnedItemId !== null) {
-            $query->where('id', '!=', $pinnedItemId);
-        }
-
-        $items = $query
-            ->orderBy('position')
-            ->orderBy('created_at')
-            ->orderBy('updated_at')
-            ->get();
-
-        $position = 0;
-        foreach ($items as $item) {
-            if ($pinnedItemId !== null && $position === $pinnedPosition) {
-                $position++;
-            }
-            if ((int) $item->position !== $position) {
-                $item->position = $position;
-                $item->save();
-            }
-            $position++;
-        }
+        return response()->json(['project' => $moved->load('owner', 'assignee')]);
     }
 
     public function handoff(Request $request, $id)
@@ -218,28 +228,50 @@ class ProjectBoardController extends Controller
         if (! app(AuthorizationService::class)->isSuperAdmin($user)) {
             abort(403, 'Forbidden');
         }
+        $this->boardScope->assertActorBrand($user);
 
-        $project = $this->scopedQuery($user)->findOrFail($id);
+        $brand = $this->boardScope->brand();
+        $photoJob = $this->boardPositions->transaction(
+            $brand,
+            ['projects', 'photo_jobs'],
+            function () use ($user, $id): PhotoJob {
+                $project = $this->scopedQuery($user)
+                    ->lockForUpdate()
+                    ->findOrFail($id);
 
-        if ($project->linked_photo_job_id) {
-            abort(422, 'already_handed_off');
-        }
+                // The project row is locked above, so two concurrent handoffs
+                // cannot both observe an empty linked_photo_job_id.
+                if ($project->linked_photo_job_id !== null) {
+                    abort(422, 'already_handed_off');
+                }
 
-        $projectBrand = $project->brand instanceof Brand ? $project->brand->value : (string) $project->brand;
-        $maxPosition = PhotoJob::query()
-            ->where('brand', $projectBrand)
-            ->max('position') ?? -1;
+                $projectBrand = BrandRegistry::normalizeId($project->brand);
+                if ($projectBrand === null) {
+                    abort(404);
+                }
 
-        $photoJob = PhotoJob::create([
-            'brand' => $projectBrand,
-            'owner_id' => $user->id,
-            'title' => $project->client_name,
-            'status' => PhotoJobStatus::initial()->value,
-            'position' => $maxPosition + 1,
-        ]);
+                $photoJobQuery = PhotoJob::query()
+                    ->forBrand($projectBrand)
+                    ->where('owner_id', $user->getKey());
+                $position = $this->boardPositions->appendPosition(
+                    $photoJobQuery,
+                    PhotoJobStatus::initial()->value,
+                );
 
-        $project->linked_photo_job_id = $photoJob->id;
-        $project->save();
+                $photoJob = PhotoJob::create([
+                    'brand' => $projectBrand,
+                    'owner_id' => $user->id,
+                    'title' => $project->client_name,
+                    'status' => PhotoJobStatus::initial()->value,
+                    'position' => $position,
+                ]);
+
+                $project->linked_photo_job_id = $photoJob->id;
+                $project->save();
+
+                return $photoJob;
+            }
+        );
 
         return response()->json(['photo_job' => $photoJob->load('owner', 'assignee')], 201);
     }
@@ -249,8 +281,21 @@ class ProjectBoardController extends Controller
         $user = Auth::guard('api')->user();
         $this->authorizeUser($user);
 
-        $project = $this->scopedQuery($user)->findOrFail($id);
-        $project->delete();
+        $this->boardPositions->transaction(
+            $this->boardScope->brand(),
+            ['projects', 'photo_jobs'],
+            function () use ($user, $id): void {
+                $project = $this->scopedQuery($user)->findOrFail($id);
+                $status = (string) $project->status;
+                $ownerId = $project->owner_id;
+                $project->delete();
+
+                $this->boardPositions->reindexColumn(
+                    $this->positionQuery($user, $ownerId),
+                    $status,
+                );
+            }
+        );
 
         return response()->json(['success' => true]);
     }

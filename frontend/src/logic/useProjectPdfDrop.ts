@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { t } from "@lingui/core/macro";
 import { useUI } from '../ui/components/UIContext';
-import { ExtractedData } from './usePdfExtraction';
+import { apiUpload } from '../api';
+import { ExtractedData, OfferExtractionResponse } from './usePdfExtraction';
 
 export function useProjectPdfDrop(onExtracted: (data: ExtractedData) => void) {
     const { showToast } = useUI();
@@ -13,14 +14,7 @@ export function useProjectPdfDrop(onExtracted: (data: ExtractedData) => void) {
         fd.append('pdf', file);
         setIsExtracting(true);
         try {
-            const res = await fetch('/api/management/invoices/extract-offer', {
-                method: 'POST',
-                body: fd,
-                headers: { 'Accept': 'application/json' },
-                credentials: 'include',
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || t`Fehler beim Auslesen.`);
+            const data = await apiUpload<OfferExtractionResponse>('/api/management/invoices/extract-offer', fd);
             onExtracted({
                 customer_name: data.customer_name || '',
                 customer_company: data.customer_company || '',

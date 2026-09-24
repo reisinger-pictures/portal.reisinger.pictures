@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
-use App\Enums\Brand;
 use App\Mail\ContractClosedMail;
 use App\Models\Contract;
 use App\Models\InvoiceSequence;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
+use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -39,15 +39,14 @@ class ContractCloseService
         $orderId = null;
         $invoiceNumber = null;
 
-        if ($totalGross > 0 && !empty($contract->billing_details)) {
+        if ($totalGross > 0 && ! empty($contract->billing_details)) {
             DB::transaction(function () use ($contract, $totalGross, &$orderId, &$invoiceNumber) {
                 $brand = $contract->brand ?? BrandRegistry::currentOrDefault();
 
-                $userId = null;
-                if (!empty($contract->billing_details['email'])) {
-                    $billingUser = \App\Models\User::where('email', $contract->billing_details['email'])->first();
-                    $userId = $billingUser?->id;
-                }
+                $userId = $this->resolveBillingUserId(
+                    $contract->billing_details['email'] ?? null,
+                    $contract->brand ?? BrandRegistry::currentIdOrNull(),
+                );
 
                 $order = Order::create([
                     'user_id' => $userId,
@@ -78,7 +77,7 @@ class ContractCloseService
 
         $recipients = $contract->signers->pluck('email')->unique()->toArray();
 
-        if (!empty($contract->billing_details['email'])) {
+        if (! empty($contract->billing_details['email'])) {
             $recipients[] = $contract->billing_details['email'];
         }
 
@@ -87,5 +86,20 @@ class ContractCloseService
         foreach ($recipients as $recipient) {
             Mail::to($recipient)->queue(new ContractClosedMail($contract));
         }
+    }
+
+    private function resolveBillingUserId(mixed $email, mixed $brand): ?string
+    {
+        $email = is_string($email) ? trim($email) : null;
+        $brandId = BrandRegistry::normalizeId($brand);
+
+        if ($email === null || $email === '' || $brandId === null) {
+            return null;
+        }
+
+        return User::query()
+            ->where('email', $email)
+            ->where('brand', $brandId)
+            ->value('id');
     }
 }

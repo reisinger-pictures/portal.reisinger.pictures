@@ -124,6 +124,7 @@ class CouponAdminController extends Controller
             $validated['active'] = true;
         }
 
+        $this->authorizeCouponScope($validated);
         $coupon = Coupon::create($validated);
 
         return response()->json(['success' => true, 'coupon' => new CouponResource($coupon)], 201);
@@ -147,6 +148,7 @@ class CouponAdminController extends Controller
             $validated['active'] = true;
         }
 
+        $this->authorizeCouponScope($validated, $coupon);
         $coupon->update($validated);
 
         return response()->json(['success' => true, 'coupon' => new CouponResource($coupon)]);
@@ -321,6 +323,75 @@ class CouponAdminController extends Controller
     // ──────────────────────────────────────────────
     //  Helpers
     // ──────────────────────────────────────────────
+
+    /**
+     * Authorize the effective gallery/group scope of a generic coupon write.
+     *
+     * The specialized gallery/group endpoints already perform this check, but
+     * the generic CRUD endpoints must not become a bypass for photographers.
+     * On partial updates, validate the resulting scope rather than only fields
+     * present in the request so an existing invalid scope cannot be edited
+     * around the ownership guard.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function authorizeCouponScope(array $validated, ?Coupon $coupon = null): void
+    {
+        $scopeType = $coupon !== null && ! array_key_exists('scope_type', $validated)
+            ? (string) $coupon->scope_type
+            : ($validated['scope_type'] ?? null);
+        $scopeId = $coupon !== null && ! array_key_exists('scope_id', $validated)
+            ? $coupon->scope_id
+            : ($validated['scope_id'] ?? null);
+
+        if (! in_array($scopeType, ['gallery', 'meta_gallery'], true)) {
+            return;
+        }
+
+        if (! is_string($scopeId) && ! is_int($scopeId)) {
+            abort(422, 'Invalid coupon scope.');
+        }
+
+        $scopeId = trim((string) $scopeId);
+        if ($scopeId === '') {
+            abort(422, 'Invalid coupon scope.');
+        }
+
+        $user = auth()->user();
+        $authorization = app(AuthorizationService::class);
+        $crossBrandSuperAdmin = $user instanceof User
+            && $user->brand === null
+            && $authorization->isSuperAdmin($user);
+        $expectedBrand = $crossBrandSuperAdmin
+            ? null
+            : ($user instanceof User && $user->brand !== null ? $user->brand : BrandRegistry::currentId());
+
+        if ($scopeType === 'gallery') {
+            $gallery = Gallery::find($scopeId);
+            if ($gallery === null) {
+                abort(404, 'Gallery not found.');
+            }
+            if (! $crossBrandSuperAdmin
+                && ($expectedBrand === null || ! BrandRegistry::galleryTreeMatchesBrand($gallery, $expectedBrand))) {
+                abort(403, 'Forbidden');
+            }
+
+            $this->authorizeGalleryManage($gallery);
+
+            return;
+        }
+
+        $group = GalleryGroup::find($scopeId);
+        if ($group === null) {
+            abort(404, 'Gallery group not found.');
+        }
+        if (! $crossBrandSuperAdmin
+            && ($expectedBrand === null || ! BrandRegistry::galleryGroupTreeMatchesBrand($group, $expectedBrand))) {
+            abort(403, 'Forbidden');
+        }
+
+        $this->authorizeGroupManage($group);
+    }
 
     private function findAndVerifyGallery(string $galleryId): Gallery
     {

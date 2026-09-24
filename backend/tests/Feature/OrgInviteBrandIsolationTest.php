@@ -115,10 +115,10 @@ class OrgInviteBrandIsolationTest extends TestCase
         $this->assertSame('rp', $actor->getRawOriginal('brand'));
     }
 
-    public function test_cross_brand_actor_can_redeem_invite(): void
+    public function test_cross_brand_super_admin_can_redeem_invite(): void
     {
         $org = $this->orgWithInvite('rp', 'cross-brand-invite', 'invited@example.com');
-        $actor = $this->login(UserRole::ADMIN, null);
+        $actor = $this->login(UserRole::SUPER_ADMIN, null);
         $token = auth('api')->login($actor);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])

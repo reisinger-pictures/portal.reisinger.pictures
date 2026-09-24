@@ -9,9 +9,13 @@ status: approved-soll
 ## Status
 
 **Approved SOLL architecture (2026-09-23).** This document is the
-implementation contract for the checkout/card-testing defense; implementation
-status and verification remain tracked in `AGENTS.todo.md`. The existing
-checkout flow in
+implementation contract for the checkout/card-testing defense. V036 and the
+implementation sources are present in the current tree; V036 remains the
+separate Card-Testing migration, while V038 is the current repository frontier
+(V037 is the preceding Guest-Ownership migration). Operational rollout, final
+review, and any current-tree verification remain tracked in `AGENTS.todo.md`; CI
+references in that board are historical evidence, not a claim about every
+uncommitted change. The existing checkout flow in
 [`features/ecommerce/09-stripe-checkout-flow.md`](../ecommerce/09-stripe-checkout-flow.md)
 remains the reference for order states and Stripe integration; the rules below
 take precedence where they add idempotency, identity, or abuse controls.
@@ -48,11 +52,12 @@ Radar or 3DS and does not attempt to make a client-side signal authoritative.
 - Adding a second ad-hoc checkout limiter to the existing application
   throttles. Checkout limits are a dedicated, separately configurable defense.
 
-## 2. Data model — one new, separate V036 migration
+## 2. Data model — separate V036 Card-Testing migration
 
-All schema changes for this feature belong in the new migration
+All schema changes for this feature belong in the separate migration
 `backend/database/migrations/V036__card_testing_defenses.php`. Do not amend
-V035 or an already deployed migration. V036 is a separate migration and must be
+V035 or an already deployed migration. V036 remains the Card-Testing migration
+(current repository frontier: V038; new changes start at V039) and must be
 followed by the normal seed step in development/CI (`migrate --seed` or
 `migrate:fresh --seed`).
 

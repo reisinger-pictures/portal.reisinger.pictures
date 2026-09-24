@@ -24,7 +24,7 @@ class CheckoutRiskService
      */
     public function assertCheckoutQuotaAllowed(Request $request, User $user): void
     {
-        $userKey = CheckoutKey::user($user->getAuthIdentifier(), 'checkout-quota');
+        $userKey = CheckoutKey::user($user, 'checkout-quota');
         $ipHourKey = CheckoutKey::ip($request->ip(), 'checkout-quota-hour');
         $ipDayKey = CheckoutKey::ip($request->ip(), 'checkout-quota-day');
 
@@ -67,7 +67,7 @@ class CheckoutRiskService
 
         try {
             $window = $this->failureWindowSeconds();
-            RateLimiter::hit(CheckoutKey::user($user->getAuthIdentifier(), 'checkout-failure'), $window);
+            RateLimiter::hit(CheckoutKey::user($user, 'checkout-failure'), $window);
 
             $customerIp = trim((string) ($order->ip_address ?? ''));
             if ($customerIp !== '') {
@@ -130,7 +130,7 @@ class CheckoutRiskService
 
     private function userAttemptKey(User $user): string
     {
-        return CheckoutKey::user($user->getAuthIdentifier(), 'checkout-risk-attempt');
+        return CheckoutKey::user($user, 'checkout-risk-attempt');
     }
 
     private function ipAttemptKey(Request $request): string
@@ -145,7 +145,7 @@ class CheckoutRiskService
             $ipThreshold = max(1, (int) config('app.turnstile_failure_ip_threshold_per_hour', 5));
 
             return (int) RateLimiter::attempts(
-                CheckoutKey::user($user->getAuthIdentifier(), 'checkout-failure')
+                CheckoutKey::user($user, 'checkout-failure')
             ) >= $userThreshold
                 || (int) RateLimiter::attempts(
                     CheckoutKey::ip($request->ip(), 'checkout-failure')

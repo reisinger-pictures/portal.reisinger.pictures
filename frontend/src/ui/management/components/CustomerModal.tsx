@@ -55,8 +55,13 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
     const watchCountry = useWatch({ control, name: 'country' });
 
     const onSubmit = async (data: CustomerFormValues) => {
-        await onSave(data);
-        onClose();
+        try {
+            await onSave(data);
+            onClose();
+        } catch {
+            // The parent reports the API error; keep the entered values and modal open.
+            return;
+        }
     };
 
     if (!isOpen) return null;

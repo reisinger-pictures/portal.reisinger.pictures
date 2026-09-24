@@ -6,6 +6,8 @@ import {
     removeFromCartPure,
     calculateTotalAmount,
     loadCartItems,
+    loadCartState,
+    persistCartItems,
     splitTotalEvenly,
 } from '../cartLogic';
 import {CartItem} from '../CartContext';
@@ -112,6 +114,13 @@ describe('calculateTotalAmount', () => {
     it('volume: empty cart returns 0', () => {
         expect(calculateTotalAmount([], true)).toBe(0);
     });
+
+    it('uses an explicitly supplied custom volume config', () => {
+        const items = Array.from({length: 3}, (_, index) => item({photoId: `custom-${index}`}));
+        expect(calculateTotalAmount(items, {
+            tiers: [{minQuantity: 0, priceCents: 7000}, {minQuantity: 3, priceCents: 5000}],
+        })).toBe(15000);
+    });
 });
 
 describe('cartSchema', () => {
@@ -121,6 +130,19 @@ describe('cartSchema', () => {
 
     it('accepts all optionals omitted', () => {
         expect(cartSchema.safeParse([{photoId: '1', tier: 'print', price: 0}]).success).toBe(true);
+    });
+
+    it('retains the gallery group id used for coupon scope validation', () => {
+        const result = cartItemSchema.safeParse({
+            photoId: '1',
+            tier: 'original',
+            price: 1000,
+            galleryId: 'gallery-a',
+            galleryGroupId: 'group-a',
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) expect(result.data.galleryGroupId).toBe('group-a');
     });
 
     it('rejects a missing required photoId', () => {
@@ -167,6 +189,65 @@ describe('loadCartItems', () => {
         expect(result.error).toBe('none');
         expect(result.items).toHaveLength(1);
         expect(result.items[0].photoId).toBe('1');
+    });
+});
+
+describe('quote-aware cart persistence', () => {
+    const key = 'cart-logic-test-key';
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        localStorage.removeItem(key);
+    });
+
+    it('round-trips a validated quote token together with the exact offer prices', () => {
+        const storedItems = [item({price: 75000}), item({photoId: 'p2', price: 75000})];
+        const quoteToken = 'header.payload.signature';
+
+        expect(persistCartItems(key, storedItems, quoteToken)).toBe(true);
+        const raw = localStorage.getItem(key);
+        expect(raw).not.toBeNull();
+        expect(loadCartState(raw)).toEqual({
+            items: storedItems,
+            quoteToken,
+            error: 'none',
+        });
+    });
+
+    it('rejects an envelope containing payment client secrets', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const unsafe = JSON.stringify({
+            version: 1,
+            items: [item()],
+            quoteToken: 'header.payload.signature',
+            client_secret: 'cs_must_not_persist',
+        });
+
+        expect(loadCartState(unsafe)).toEqual({items: [], quoteToken: null, error: 'schema'});
+        expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('strips unknown item fields before serializing the quote cart', () => {
+        const unsafeItem = {...item(), client_secret: 'cs_must_not_persist'} as unknown as CartItem;
+
+        expect(persistCartItems(key, [unsafeItem], 'header.payload.signature')).toBe(true);
+        const raw = localStorage.getItem(key);
+        expect(raw).not.toContain('client_secret');
+        expect(raw).not.toContain('cs_must_not_persist');
+        expect(loadCartState(raw).items[0]).toEqual(item());
+    });
+
+    it('does not resurrect a quote token for an empty persisted cart', () => {
+        const stored = JSON.stringify({version: 1, items: [], quoteToken: 'header.payload.signature'});
+
+        expect(loadCartState(stored)).toEqual({items: [], quoteToken: null, error: 'none'});
+    });
+
+    it('clears quote metadata when persisting an empty cart', () => {
+        localStorage.setItem(key, JSON.stringify({version: 1, items: [item()], quoteToken: 'header.payload.signature'}));
+
+        expect(persistCartItems(key, [], 'header.payload.signature')).toBe(true);
+        expect(loadCartState(localStorage.getItem(key))).toEqual({items: [], quoteToken: null, error: 'none'});
     });
 });
 

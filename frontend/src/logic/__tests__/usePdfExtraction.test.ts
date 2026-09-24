@@ -8,11 +8,15 @@ vi.mock('../../ui/components/UIContext', () => ({
     })),
 }));
 
+function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
 function mockFetch(response: unknown, ok = true) {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok,
-        json: () => Promise.resolve(response),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(response, ok ? 200 : 500)));
 }
 
 function mockFetchNetworkError() {
@@ -128,10 +132,7 @@ describe('usePdfExtraction', () => {
         expect(result.current.isExtracting).toBe(true);
 
         await act(async () => {
-            resolveFetch!({
-                ok: true,
-                json: () => Promise.resolve({ items: [] }),
-            });
+            resolveFetch!(jsonResponse({ items: [] }));
             await promise!;
         });
 

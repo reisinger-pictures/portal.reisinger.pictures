@@ -2,9 +2,15 @@
 
 namespace App\Models;
 
+use App\Casts\AsBrand;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class Contract extends Model
 {
@@ -26,7 +32,7 @@ class Contract extends Model
         'closes_at' => 'datetime',
         'expires_at' => 'datetime',
         'content_version' => 'integer',
-        'brand' => \App\Casts\AsBrand::class,
+        'brand' => AsBrand::class,
     ];
 
     public function signers()
@@ -57,6 +63,174 @@ class Contract extends Model
     public function scopeInstances($query)
     {
         return $query->where('type', 'contract')->whereNotNull('template_id');
+    }
+
+    /**
+     * Normalize the identity used by the unauthenticated join paths.
+     *
+     * The database has no normalized-email column, so the public join
+     * writers must use the same canonical value before checking or writing a
+     * signer. Keep this in the model so direct-contract and template paths
+     * cannot drift into different lock identities.
+     */
+    public static function normalizeSignerEmail(string $email): string
+    {
+        return Str::lower(trim($email));
+    }
+
+    /**
+     * Return the stable cache-lock identity for a join scope.
+     *
+     * A direct contract uses its own ID; a template uses the template ID for
+     * every instance it creates. UUID IDs are globally unique, so the scope
+     * ID is sufficient for both paths. The same prefix is intentionally used
+     * by the controller and the template service.
+     */
+    public static function joinLockKey(string $scopeId, string $email): string
+    {
+        return 'contract-join:'.$scopeId.':'.hash('sha256', self::normalizeSignerEmail($email));
+    }
+
+    /**
+     * Return the deadline that actually applies to a public contract path.
+     *
+     * New template instances snapshot both deadlines. Older instances may
+     * still have null columns, so the template deadline is used as a
+     * compatibility fallback. When both rows contain a deadline, the earlier
+     * one wins: an instance can never outlive its template. This is computed
+     * on read and never mass-updates legacy rows.
+     */
+    public function effectiveDeadline(string $attribute): ?CarbonInterface
+    {
+        $ownDeadline = $this->getAttribute($attribute);
+
+        if ($this->template_id === null) {
+            return $ownDeadline;
+        }
+
+        $template = $this->template;
+        if ($template === null || $template->type !== 'template') {
+            return $ownDeadline;
+        }
+
+        $templateDeadline = $template->getAttribute($attribute);
+        if ($ownDeadline === null) {
+            return $templateDeadline;
+        }
+
+        if ($templateDeadline === null) {
+            return $ownDeadline;
+        }
+
+        return $ownDeadline->lessThan($templateDeadline) ? $ownDeadline : $templateDeadline;
+    }
+
+    public function effectiveExpiresAt(): ?CarbonInterface
+    {
+        return $this->effectiveDeadline('expires_at');
+    }
+
+    public function effectiveClosesAt(): ?CarbonInterface
+    {
+        return $this->effectiveDeadline('closes_at');
+    }
+
+    /**
+     * Apply the same effective-deadline contract in SQL using the database
+     * clock. The scope is intentionally conservative: a template-linked row
+     * is valid only while both its own and its parent's non-null deadlines
+     * are still in the future.
+     */
+    public function scopePubliclyAvailableAtDatabaseTime($query)
+    {
+        $databaseNow = DB::raw('CURRENT_TIMESTAMP');
+
+        $query->where('status', 'active')
+            ->where(function (Builder $query) use ($databaseNow): void {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', $databaseNow);
+            })
+            ->where(function (Builder $query) use ($databaseNow): void {
+                $query->whereNull('closes_at')
+                    ->orWhere('closes_at', '>', $databaseNow);
+            })
+            ->where(function (Builder $query) use ($databaseNow): void {
+                $query->whereNull('template_id')
+                    ->orWhereHas('template', function (Builder $template) use ($databaseNow): void {
+                        $template->where('type', 'template')
+                            ->where(function (Builder $template) use ($databaseNow): void {
+                                $template->whereNull('expires_at')
+                                    ->orWhere('expires_at', '>', $databaseNow);
+                            })
+                            ->where(function (Builder $template) use ($databaseNow): void {
+                                $template->whereNull('closes_at')
+                                    ->orWhere('closes_at', '>', $databaseNow);
+                            });
+                    });
+            });
+
+        return $query;
+    }
+
+    /**
+     * Read the database clock once for a locked operation. PHP's application
+     * clock remains appropriate for ordinary UI checks, but create/sign
+     * transactions use this value at the point where the row is locked.
+     */
+    public static function databaseNow(): Carbon
+    {
+        $row = DB::selectOne('SELECT CURRENT_TIMESTAMP AS current_time');
+
+        return Carbon::parse($row->current_time, 'UTC');
+    }
+
+    public function isPubliclyAvailableAtDatabaseTime(): bool
+    {
+        return static::query()
+            ->whereKey($this->getKey())
+            ->publiclyAvailableAtDatabaseTime()
+            ->exists();
+    }
+
+    /**
+     * Return the reason why a public contract path is unavailable, if any.
+     *
+     * Both deadline columns are deliberately evaluated here so the join,
+     * content, and signature endpoints cannot drift apart. A deadline is
+     * inclusive: at the configured timestamp the public path is already
+     * closed. Parent status is intentionally not inherited: closing a template
+     * stops new instances, while already-created instances remain governed by
+     * their own effective deadlines.
+     */
+    public function publicAvailabilityError(?CarbonInterface $at = null): ?string
+    {
+        if ($this->status !== 'active') {
+            return 'Dieser Vertrag nimmt keine Unterschriften mehr an';
+        }
+
+        if ($this->template_id !== null) {
+            $template = $this->template;
+            if ($template === null || $template->type !== 'template') {
+                return 'Dieser Vertrag nimmt keine Unterschriften mehr an';
+            }
+        }
+
+        $at ??= now();
+
+        if (($expiresAt = $this->effectiveExpiresAt()) !== null && ! $expiresAt->isAfter($at)) {
+            return 'Der Vertragslink ist abgelaufen';
+        }
+
+        if (($closesAt = $this->effectiveClosesAt()) !== null && ! $closesAt->isAfter($at)) {
+            return 'Die Signaturphase ist beendet';
+        }
+
+        return null;
+    }
+
+    public function isPubliclyAvailable(): bool
+    {
+        return $this->publicAvailabilityError() === null;
     }
 
     public function isTemplate(): bool

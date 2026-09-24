@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Contract;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Enums\Brand;
 use App\Models\Contract;
 use App\Models\ContractSigner;
-use App\Enums\Brand;
 use App\Support\BrandRegistry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
 
 class ContractJoinTest extends TestCase
 {
@@ -53,6 +54,41 @@ class ContractJoinTest extends TestCase
 
         $response = $this->getJson('/api/contracts/join/closed-token');
         $response->assertStatus(410);
+    }
+
+    public function test_410_for_contract_after_closes_at_on_check(): void
+    {
+        Contract::factory()->create([
+            'status' => 'active',
+            'join_token' => 'closed-at-check',
+            'closes_at' => now()->subMinute(),
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->getJson('/api/contracts/join/closed-at-check');
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Die Signaturphase ist beendet');
+    }
+
+    public function test_410_for_contract_after_closes_at_on_join(): void
+    {
+        Contract::factory()->create([
+            'status' => 'active',
+            'join_token' => 'closed-at-join',
+            'closes_at' => now()->subMinute(),
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->postJson('/api/contracts/join/closed-at-join', [
+            'name' => 'Test',
+            'email' => 'test@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Die Signaturphase ist beendet');
     }
 
     public function test_join_contract_returns_personal_token(): void
@@ -196,6 +232,37 @@ class ContractJoinTest extends TestCase
         ]);
     }
 
+    public function test_repeated_signature_requests_create_one_signature_path(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'single-signature-path',
+            'status' => 'joined',
+        ]);
+
+        $first = $this->postJson('/api/contracts/sign/single-signature-path', [
+            'accept_contract' => true,
+            'content_version' => $contract->content_version,
+        ]);
+        $first->assertStatus(200);
+
+        $second = $this->postJson('/api/contracts/sign/single-signature-path', [
+            'accept_contract' => true,
+            'content_version' => $contract->content_version,
+        ]);
+        $second->assertStatus(409);
+
+        $this->assertDatabaseCount('contract_audit_logs', 1);
+        $this->assertDatabaseHas('contract_audit_logs', [
+            'contract_signer_id' => ContractSigner::where('personal_token', 'single-signature-path')->value('id'),
+            'action' => 'signed',
+        ]);
+    }
+
     public function test_cannot_sign_twice(): void
     {
         $contract = Contract::factory()->create(['status' => 'active', 'brand' => Brand::B2B]);
@@ -226,6 +293,270 @@ class ContractJoinTest extends TestCase
             'content_version' => $contract->content_version,
         ]);
         $response->assertStatus(410);
+    }
+
+    public function test_contract_content_rejects_expired_contract(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'expires_at' => now()->subMinute(),
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'expired-content',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->getJson('/api/contracts/sign/expired-content');
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Der Vertragslink ist abgelaufen');
+    }
+
+    public function test_sign_rejects_expired_contract(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'expires_at' => now()->subMinute(),
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'expired-sign',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->postJson('/api/contracts/sign/expired-sign', [
+            'accept_contract' => true,
+            'content_version' => $contract->content_version,
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Der Vertragslink ist abgelaufen');
+        $this->assertDatabaseHas('contract_signers', [
+            'personal_token' => 'expired-sign',
+            'status' => 'joined',
+        ]);
+    }
+
+    public function test_contract_content_rejects_contract_after_closes_at(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'closes_at' => now()->subMinute(),
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'closed-at-content',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->getJson('/api/contracts/sign/closed-at-content');
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Die Signaturphase ist beendet');
+    }
+
+    public function test_sign_rejects_contract_after_closes_at(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'closes_at' => now()->subMinute(),
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'closed-at-sign',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->postJson('/api/contracts/sign/closed-at-sign', [
+            'accept_contract' => true,
+            'content_version' => $contract->content_version,
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Die Signaturphase ist beendet');
+        $this->assertDatabaseHas('contract_signers', [
+            'personal_token' => 'closed-at-sign',
+            'status' => 'joined',
+        ]);
+    }
+
+    public function test_standard_join_rejects_expiry_crossed_while_contract_is_locked(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'join_token' => 'join-expiry-crossing',
+            'expires_at' => now()->addHour(),
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+
+        $this->crossDeadlineWhenLocked($contract, 'expires_at');
+
+        $response = $this->postJson('/api/contracts/join/join-expiry-crossing', [
+            'name' => 'Crossing Signer',
+            'email' => 'crossing@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Der Vertragslink ist abgelaufen');
+        $this->assertDatabaseCount('contract_signers', 0);
+    }
+
+    public function test_standard_join_rolls_back_when_deadline_crosses_during_signer_insert(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'join_token' => 'join-expiry-during-insert',
+            'expires_at' => now()->addHour(),
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+        $crossed = false;
+
+        ContractSigner::creating(function () use ($contract, &$crossed): void {
+            if ($crossed) {
+                return;
+            }
+
+            $crossed = true;
+            DB::table('contracts')
+                ->where('id', $contract->getKey())
+                ->update([
+                    'expires_at' => DB::raw('CURRENT_TIMESTAMP'),
+                ]);
+        });
+
+        $response = $this->postJson('/api/contracts/join/join-expiry-during-insert', [
+            'name' => 'Insert Crossing Signer',
+            'email' => 'insert-crossing@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Der Vertragslink ist abgelaufen');
+        $this->assertDatabaseCount('contract_signers', 0);
+    }
+
+    public function test_template_join_rolls_back_instance_when_deadline_crosses_during_signer_insert(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'join_token' => 'template-expiry-during-insert',
+            'expires_at' => now()->addHour(),
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+        $crossed = false;
+
+        ContractSigner::creating(function () use ($template, &$crossed): void {
+            if ($crossed) {
+                return;
+            }
+
+            $crossed = true;
+            DB::table('contracts')
+                ->where('id', $template->getKey())
+                ->update([
+                    'expires_at' => DB::raw('CURRENT_TIMESTAMP'),
+                ]);
+        });
+
+        $response = $this->postJson('/api/contracts/join/template-expiry-during-insert', [
+            'name' => 'Template Insert Crossing Signer',
+            'email' => 'template-insert-crossing@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Der Vertragslink ist abgelaufen');
+        $this->assertDatabaseCount('contracts', 1);
+        $this->assertDatabaseCount('contract_signers', 0);
+    }
+
+    public function test_template_join_rejects_expiry_crossed_while_template_is_locked(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'join_token' => 'template-expiry-crossing',
+            'expires_at' => now()->addHour(),
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+
+        $this->crossDeadlineWhenLocked($template, 'expires_at');
+
+        $response = $this->postJson('/api/contracts/join/template-expiry-crossing', [
+            'name' => 'Template Crossing Signer',
+            'email' => 'template-crossing@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Der Vertragslink ist abgelaufen');
+        $this->assertDatabaseCount('contracts', 1);
+        $this->assertDatabaseCount('contract_signers', 0);
+    }
+
+    public function test_sign_rejects_close_deadline_crossed_while_contract_is_locked(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'closes_at' => now()->addHour(),
+            'brand' => Brand::B2B,
+        ]);
+        $signer = ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'sign-expiry-crossing',
+            'status' => 'joined',
+        ]);
+
+        $this->crossDeadlineWhenLocked($contract, 'closes_at');
+
+        $response = $this->postJson('/api/contracts/sign/sign-expiry-crossing', [
+            'accept_contract' => true,
+            'content_version' => $contract->content_version,
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Die Signaturphase ist beendet');
+        $this->assertDatabaseHas('contract_signers', [
+            'id' => $signer->id,
+            'status' => 'joined',
+            'signed_at' => null,
+        ]);
+    }
+
+    public function test_contract_content_rechecks_deadline_after_locked_read(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'closes_at' => now()->addHour(),
+            'brand' => Brand::B2B,
+        ]);
+        $signer = ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'content-expiry-crossing',
+            'status' => 'joined',
+        ]);
+
+        $this->crossDeadlineWhenLocked($contract, 'closes_at');
+
+        $response = $this->getJson('/api/contracts/sign/content-expiry-crossing');
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Die Signaturphase ist beendet');
+        $this->assertDatabaseMissing('contract_audit_logs', [
+            'contract_signer_id' => $signer->id,
+            'action' => 'heartbeat',
+        ]);
     }
 
     public function test_duplicate_signed_email_rejected(): void
@@ -340,13 +671,39 @@ class ContractJoinTest extends TestCase
         ]);
     }
 
+    public function test_page_exit_remains_valid_telemetry_after_contract_is_closed(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'closed',
+            'closes_at' => now()->subMinute(),
+            'brand' => Brand::B2B,
+        ]);
+        $signer = ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'exit-after-close',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->postJson('/api/contracts/sign/exit-after-close/page-exit');
+
+        $response->assertStatus(204);
+        $this->assertDatabaseHas('contract_audit_logs', [
+            'contract_signer_id' => $signer->id,
+            'action' => 'page_exit',
+        ]);
+        $this->assertDatabaseHas('contract_signers', [
+            'id' => $signer->id,
+            'status' => 'joined',
+        ]);
+    }
+
     public function test_page_exit_404_for_invalid_token(): void
     {
         $response = $this->postJson('/api/contracts/sign/invalid-token/page-exit');
         $response->assertStatus(404);
     }
 
-    public function test_repeated_join_with_same_email_returns_existing_token(): void
+    public function test_repeated_join_with_same_email_fails_closed_without_disclosing_token(): void
     {
         $contract = Contract::factory()->create([
             'status' => 'active',
@@ -365,13 +722,48 @@ class ContractJoinTest extends TestCase
 
         $second = $this->postJson('/api/contracts/join/rejoin', [
             'name' => 'Anna Test',
-            'email' => 'anna@example.com',
+            'email' => 'ANNA@EXAMPLE.COM',
             'roles' => ['Model'],
         ]);
-        $second->assertStatus(200);
-        $this->assertEquals($firstToken, $second->json('personal_token'));
+        $second->assertStatus(409);
+        $this->assertArrayNotHasKey('personal_token', $second->json());
+        $this->assertArrayNotHasKey('name', $second->json());
+        $this->assertArrayNotHasKey('roles', $second->json());
+        $this->assertNotSame($firstToken, $second->json('personal_token'));
 
         $this->assertEquals(1, ContractSigner::where('email', 'anna@example.com')->count());
+        $this->assertDatabaseCount('contract_audit_logs', 1);
+    }
+
+    public function test_standard_join_rejects_legacy_mixed_case_email_without_disclosure(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'join_token' => 'legacy-normalized-email',
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+        $existingSigner = ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'email' => '  Legacy-Signer@Example.COM  ',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->postJson('/api/contracts/join/legacy-normalized-email', [
+            'name' => 'Different Name',
+            'email' => 'legacy-signer@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $response->assertStatus(409);
+        $this->assertArrayNotHasKey('personal_token', $response->json());
+        $this->assertArrayNotHasKey('name', $response->json());
+        $this->assertArrayNotHasKey('roles', $response->json());
+        $this->assertDatabaseHas('contract_signers', [
+            'id' => $existingSigner->id,
+            'email' => '  Legacy-Signer@Example.COM  ',
+        ]);
+        $this->assertDatabaseCount('contract_signers', 1);
     }
 
     public function test_repeated_heartbeat_no_error(): void
@@ -430,6 +822,47 @@ class ContractJoinTest extends TestCase
             'email' => 'max@example.com',
             'status' => 'joined',
         ]);
+    }
+
+    public function test_repeated_template_join_with_same_email_fails_closed_without_disclosing_token(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'join_token' => 'tpl-rejoin',
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+
+        $first = $this->postJson('/api/contracts/join/tpl-rejoin', [
+            'name' => 'Max Mustermann',
+            'email' => 'max-rejoin@example.com',
+            'roles' => ['Model'],
+        ]);
+        $first->assertStatus(201);
+        $firstToken = $first->json('personal_token');
+
+        $second = $this->postJson('/api/contracts/join/tpl-rejoin', [
+            'name' => 'Max Mustermann',
+            'email' => 'MAX-REJOIN@EXAMPLE.COM',
+            'roles' => ['Model'],
+        ]);
+        $second->assertStatus(409);
+        $this->assertArrayNotHasKey('personal_token', $second->json());
+        $this->assertArrayNotHasKey('name', $second->json());
+        $this->assertArrayNotHasKey('roles', $second->json());
+        $this->assertNotSame($firstToken, $second->json('personal_token'));
+
+        $this->assertDatabaseCount('contracts', 2);
+        $this->assertDatabaseCount('contract_signers', 1);
+        $this->assertSame(1, ContractSigner::query()
+            ->whereRaw('LOWER(TRIM(email)) = ?', ['max-rejoin@example.com'])
+            ->count());
+        $this->assertDatabaseHas('contracts', [
+            'template_id' => $template->id,
+            'type' => 'contract',
+        ]);
+        $this->assertDatabaseCount('contract_audit_logs', 1);
     }
 
     public function test_template_join_copies_template_data(): void
@@ -491,6 +924,89 @@ class ContractJoinTest extends TestCase
         $response->assertStatus(410);
     }
 
+    public function test_legacy_template_instance_with_null_expiry_is_blocked_by_expired_parent(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'expires_at' => now()->subMinute(),
+            'closes_at' => null,
+            'brand' => Brand::B2B,
+        ]);
+        $instance = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => $template->id,
+            'status' => 'active',
+            'expires_at' => null,
+            'closes_at' => null,
+            'brand' => Brand::B2B,
+        ]);
+        $signer = ContractSigner::factory()->create([
+            'contract_id' => $instance->id,
+            'personal_token' => 'legacy-parent-expired',
+            'status' => 'joined',
+        ]);
+
+        $content = $this->getJson('/api/contracts/sign/legacy-parent-expired');
+        $content->assertStatus(410);
+        $content->assertJsonPath('error', 'Der Vertragslink ist abgelaufen');
+
+        $signature = $this->postJson('/api/contracts/sign/legacy-parent-expired', [
+            'accept_contract' => true,
+            'content_version' => $instance->content_version,
+        ]);
+        $signature->assertStatus(410);
+        $signature->assertJsonPath('error', 'Der Vertragslink ist abgelaufen');
+
+        $this->assertDatabaseHas('contract_signers', [
+            'id' => $signer->id,
+            'status' => 'joined',
+            'signed_at' => null,
+        ]);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $instance->id,
+            'expires_at' => null,
+            'closes_at' => null,
+        ]);
+    }
+
+    public function test_legacy_template_instance_with_null_close_deadline_is_blocked_by_parent(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'expires_at' => now()->addHour(),
+            'closes_at' => now()->subMinute(),
+            'brand' => Brand::B2B,
+        ]);
+        $instance = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => $template->id,
+            'status' => 'active',
+            'expires_at' => null,
+            'closes_at' => null,
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $instance->id,
+            'personal_token' => 'legacy-parent-closed',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->postJson('/api/contracts/sign/legacy-parent-closed', [
+            'accept_contract' => true,
+            'content_version' => $instance->content_version,
+        ]);
+
+        $response->assertStatus(410);
+        $response->assertJsonPath('error', 'Die Signaturphase ist beendet');
+        $this->assertDatabaseHas('contracts', [
+            'id' => $instance->id,
+            'expires_at' => null,
+            'closes_at' => null,
+        ]);
+    }
+
     public function test_template_sign_auto_closes_instance(): void
     {
         Mail::fake();
@@ -550,5 +1066,29 @@ class ContractJoinTest extends TestCase
             'id' => $contract->id,
             'status' => 'active',
         ]);
+    }
+
+    /**
+     * Simulate a concurrent deadline writer exactly when the operation enters
+     * its locked-read boundary, without sleeping or relying on wall-clock races.
+     */
+    private function crossDeadlineWhenLocked(Contract $contract, string $column): void
+    {
+        $crossed = false;
+
+        Contract::retrieved(function (Contract $loadedContract) use ($contract, $column, &$crossed): void {
+            if ($crossed
+                || DB::connection()->transactionLevel() < 1
+                || $loadedContract->getKey() !== $contract->getKey()) {
+                return;
+            }
+
+            $crossed = true;
+            DB::table('contracts')
+                ->where('id', $contract->getKey())
+                ->update([
+                    $column => DB::raw('CURRENT_TIMESTAMP'),
+                ]);
+        });
     }
 }

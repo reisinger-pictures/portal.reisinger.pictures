@@ -6,6 +6,8 @@ use App\Enums\Brand;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
+use App\Support\BrandRegistry;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class GalleryTreeService
@@ -15,13 +17,18 @@ class GalleryTreeService
      *
      * Brand isolation: a brand-bound user (brand != null) only gets a tree
      * containing their own brand's groups and galleries, cached under a
-     * brand-specific key. Cross-brand users (brand === null, e.g. Super-Admin)
-     * get the full tree across all brands, cached under the global
+     * brand-specific key. Only a persisted Super-Admin with `brand === null`
+     * gets the full tree across all brands, cached under the global
      * `gallery_tree_admin` key (intended).
      */
     public function getAdminTree(User $user, ?string $filterType = null, ?string $orgId = null): array
     {
-        $brand = $user->brand === null
+        $authorization = app(AuthorizationService::class);
+        if ($authorization->isTransientGuest($user) || $authorization->isReservedNullBrandActor($user)) {
+            return [];
+        }
+
+        $brand = $authorization->isTrustedCrossBrandActor($user)
             ? null
             : ($user->brand instanceof Brand ? $user->brand->value : (string) $user->brand);
 
@@ -30,7 +37,7 @@ class GalleryTreeService
         $buildTree = function () use ($brand) {
             $groupQuery = GalleryGroup::query()
                 ->whereNull('parent_id')
-                ->with(['children', 'children.galleries.galleryGroup.parent', 'galleries.galleryGroup.parent', 'orgs']);
+                ->with(['children', 'children.orgs', 'children.galleries.galleryGroup.parent', 'galleries.galleryGroup.parent', 'orgs']);
             $galleryQuery = Gallery::query()
                 ->whereNull('gallery_group_id')
                 ->with('galleryGroup.parent');
@@ -40,9 +47,23 @@ class GalleryTreeService
                 $galleryQuery->where('brand', $brand);
             }
 
+            $groups = $groupQuery->get();
+            $rootGalleries = $galleryQuery->get();
+
+            // A brand-bound management tree must not expose a child/group or
+            // gallery whose parent chain is foreign or brand-less.  The SQL
+            // brand predicates above only cover the row on the root query;
+            // eager-loaded descendants still need the same invariant.
+            if ($brand !== null) {
+                $groups = $this->filterGroupsByBrand($groups, $brand);
+                $rootGalleries = $rootGalleries
+                    ->filter(fn (Gallery $gallery): bool => BrandRegistry::galleryTreeMatchesBrand($gallery, $brand))
+                    ->values();
+            }
+
             return [
-                'groups' => $groupQuery->get()->toArray(),
-                'root_galleries' => $galleryQuery->get()->toArray(),
+                'groups' => $groups->toArray(),
+                'root_galleries' => $rootGalleries->toArray(),
             ];
         };
         $tree = Cache::rememberForever($cacheKey, $buildTree);
@@ -64,6 +85,39 @@ class GalleryTreeService
         }
 
         return $treeArray;
+    }
+
+    /**
+     * Recursively remove descendants whose complete group chain is not valid
+     * for the brand-bound management tree.  This deliberately runs while the
+     * cache is being built, before permission/type/org filters are applied.
+     *
+     * @param  Collection<int, GalleryGroup>  $groups
+     * @return Collection<int, GalleryGroup>
+     */
+    private function filterGroupsByBrand(Collection $groups, string $brand): Collection
+    {
+        return $groups
+            ->map(function (GalleryGroup $group) use ($brand): ?GalleryGroup {
+                if (! BrandRegistry::galleryGroupTreeMatchesBrand($group, $brand)) {
+                    return null;
+                }
+
+                $group->setRelation(
+                    'children',
+                    $this->filterGroupsByBrand($group->getRelation('children'), $brand),
+                );
+                $group->setRelation(
+                    'galleries',
+                    $group->getRelation('galleries')
+                        ->filter(fn (Gallery $gallery): bool => BrandRegistry::galleryTreeMatchesBrand($gallery, $brand))
+                        ->values(),
+                );
+
+                return $group;
+            })
+            ->filter()
+            ->values();
     }
 
     private function filterGroupsRecursive(array $groups, callable $galleryPredicate, ?callable $groupPredicate = null): array

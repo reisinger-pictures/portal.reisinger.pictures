@@ -59,16 +59,26 @@ class GalleryService
             $slug = $this->slugService->makeUnique($slug, 'gallery_groups');
         }
 
-        $group->update([
-            'name' => $data['name'],
-            'slug' => $slug,
-            'parent_id' => $data['parent_id'] ?? null,
-            'is_public' => $data['is_public'] ?? null,
-            'is_free_download' => $data['is_free_download'] ?? false,
-            'is_editorial_only' => $data['is_editorial_only'] ?? false,
-            'is_hidden' => $data['is_hidden'] ?? false,
-            'restricted_photographers' => $data['restricted_photographers'] ?? null,
-        ]);
+        DB::transaction(function () use ($group, $data, $slug) {
+            $group->update([
+                'name' => $data['name'],
+                'slug' => $slug,
+                'parent_id' => $data['parent_id'] ?? null,
+                'is_public' => $data['is_public'] ?? null,
+                'is_free_download' => $data['is_free_download'] ?? false,
+                'is_editorial_only' => $data['is_editorial_only'] ?? false,
+                'is_hidden' => $data['is_hidden'] ?? false,
+                'restricted_photographers' => $data['restricted_photographers'] ?? null,
+            ]);
+
+            // The group/org relationship lives in the pivot. `org_id` is an
+            // optional field, so only synchronize when the caller sent it;
+            // omitting it preserves the current assignment while an explicit
+            // null clears the stale pivot row.
+            if (array_key_exists('org_id', $data)) {
+                $group->orgs()->sync(! empty($data['org_id']) ? [$data['org_id']] : []);
+            }
+        });
 
         return $group;
     }
@@ -83,24 +93,29 @@ class GalleryService
             'galleries'
         );
 
-        $isPublic = $data['is_public'] ?? false;
+        $isSelection = ($data['type'] ?? null) === 'selection';
+        $isPublic = $isSelection ? false : ($data['is_public'] ?? false);
+        $isFreeDownload = $isSelection ? false : ($data['is_free_download'] ?? false);
 
         if (! empty($data['gallery_group_id'])) {
             $group = GalleryGroup::find($data['gallery_group_id']);
             if ($group && ! is_null($group->is_public)) {
-                $isPublic = $group->is_public;
+                $isPublic = $isSelection ? false : $group->is_public;
             }
         }
 
-        if (($data['type'] ?? null) === 'selection') {
+        if ($isSelection) {
+            // A free-download group must not turn a selection gallery into an
+            // unrestricted original-download surface.
             $isPublic = false;
+            $isFreeDownload = false;
         }
 
         $expiresAt = $this->parseExpiresAt($data['expires_at'] ?? null);
 
         $this->assertPresetForBrand($data['volume_preset_id'] ?? null);
 
-        return DB::transaction(function () use ($data, $slug, $isPublic, $user, $expiresAt) {
+        return DB::transaction(function () use ($data, $slug, $isPublic, $isFreeDownload, $user, $expiresAt) {
             $gallery = Gallery::create([
                 'name' => $data['name'],
                 'slug' => $slug,
@@ -108,7 +123,7 @@ class GalleryService
                 'brand' => BrandRegistry::currentOrDefault()->value,
                 'is_live' => ($data['type'] ?? null) === 'selection' ? false : ($data['is_live'] ?? false),
                 'is_public' => $isPublic,
-                'is_free_download' => $data['is_free_download'] ?? false,
+                'is_free_download' => $isFreeDownload,
                 'is_editorial_only' => $data['is_editorial_only'] ?? false,
                 'is_hidden' => $data['is_hidden'] ?? false,
                 'restricted_photographers' => $data['restricted_photographers'] ?? null,
@@ -167,9 +182,11 @@ class GalleryService
         }
         unset($data['password']);
 
-        if (isset($data['type']) && $data['type'] === 'selection') {
+        $effectiveType = $data['type'] ?? $gallery->type;
+        if ($effectiveType === 'selection') {
             $data['is_live'] = false;
             $data['is_public'] = false;
+            $data['is_free_download'] = false;
         }
 
         foreach (['is_free_download', 'is_editorial_only', 'is_hidden'] as $field) {

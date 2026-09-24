@@ -2,7 +2,7 @@
 
 > **Status:** Beschreibt die Begriffe, Beziehungen und Abgrenzung von Brand und Org.
 > Verknüpft: `features/infrastructure/06-multi-domain-branding.md`,
-> `features/infrastructure/07-lightroom-multi-Org-gap.md`.
+> `features/infrastructure/07-lightroom-multi-tenant-gap.md`.
 
 ## 1. Zwei unterschiedliche Konzepte
 

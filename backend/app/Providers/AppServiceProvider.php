@@ -14,6 +14,7 @@ use App\Pricing\VolumeLicensingStrategy;
 use App\Services\AuthorizationService;
 use App\Services\CouponService;
 use App\Services\VolumePresetService;
+use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use App\Support\CheckoutKey;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -91,11 +92,19 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('purchase-upgrades', function ($user) {
             $svc = app(AuthorizationService::class);
+            if ($svc->isReservedNullBrandActor($user) || $svc->isTransientGuest($user)) {
+                return false;
+            }
 
             return ! $svc->isClient($user) || $svc->isPrivileged($user);
         });
 
         Gate::define('purchase-on-invoice', function ($user) {
+            $svc = app(AuthorizationService::class);
+            if ($svc->isReservedNullBrandActor($user) || $svc->isTransientGuest($user)) {
+                return false;
+            }
+
             $user->loadMissing('roles');
             $roleNames = $user->roles->pluck('name')->all();
             $isClient = in_array(UserRole::CLIENT->value, $roleNames);
@@ -118,16 +127,19 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('app.throttle_api', 120))->by($request->user('api')?->getKey() ?? $request->ip())
-        );
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('app.throttle_api', 120))->by(
+            $request->user('api')
+                ? ActorIdentity::cacheIdentifier($request->user('api'))
+                : $request->ip()
+        ));
 
         RateLimiter::for('checkout', function (Request $request): array {
-            $userId = $request->user('api')?->getAuthIdentifier();
+            $user = $request->user('api');
             $ip = $request->ip();
 
             return [
                 Limit::perHour(max(1, (int) config('app.checkout_throttle_user_per_hour', 5)))
-                    ->by(CheckoutKey::user($userId, 'checkout-quota')),
+                    ->by($user ? CheckoutKey::user($user, 'checkout-quota') : CheckoutKey::ip($ip, 'checkout-quota')),
                 Limit::perHour(max(1, (int) config('app.checkout_throttle_ip_per_hour', 10)))
                     ->by(CheckoutKey::ip($ip, 'checkout-quota-hour')),
                 Limit::perDay(max(1, (int) config('app.checkout_throttle_ip_per_day', 30)))
@@ -135,8 +147,11 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
-        RateLimiter::for('coupon-validate', fn (Request $request) => Limit::perMinute(10)->by($request->user('api')?->getKey() ?? $request->ip())
-        );
+        RateLimiter::for('coupon-validate', fn (Request $request) => Limit::perMinute(10)->by(
+            $request->user('api')
+                ? ActorIdentity::cacheIdentifier($request->user('api'))
+                : $request->ip()
+        ));
 
         // Dedicated bucket for the public model-registration endpoints. A named
         // limiter gets its own cache key (md5(name.key)) instead of sharing the
@@ -159,8 +174,9 @@ class AppServiceProvider extends ServiceProvider
             BrandRegistry::clearCache();
         });
 
-        // DSGVO general safety net: any Customer deletion also removes the
-        // encrypted age proof / person photo files from the private disk.
+        // DSGVO general safety net: any Customer deletion also queues the
+        // encrypted age proof / person photo cleanup and Scout removal after
+        // the database commit.
         Customer::observe(CustomerObserver::class);
     }
 }

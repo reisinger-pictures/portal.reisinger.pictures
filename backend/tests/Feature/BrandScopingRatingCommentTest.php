@@ -18,7 +18,7 @@ class BrandScopingRatingCommentTest extends TestCase
 
     private function tokenForGallery(Gallery $gallery): string
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => 'rp']);
         $user->galleries()->attach($gallery->id);
 
         return auth('api')->login($user);

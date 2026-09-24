@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use App\Casts\AsBrand;
+use App\Support\ActorIdentity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Order extends Model
 {
@@ -20,6 +23,7 @@ class Order extends Model
 
     protected $fillable = [
         'user_id',
+        'guest_id',
         'status',
         'brand',
         'total_amount',
@@ -41,6 +45,7 @@ class Order extends Model
     ];
 
     protected $casts = [
+        'guest_id' => 'string',
         'total_amount' => 'integer',
         'stripe_fee_cents' => 'integer',
         'coupon_discount_cents' => 'integer',
@@ -58,9 +63,23 @@ class Order extends Model
         return $this->belongsTo(Coupon::class);
     }
 
+    /**
+     * The single owner predicate for customer-facing order queries.
+     *
+     * A null users.id is never used as a wildcard: registered actors match
+     * user_id only, transient guests match guest_id only, and legacy
+     * both-null rows match neither.
+     */
+    public function scopeOwnedBy(Builder $query, ?User $actor): Builder
+    {
+        return ActorIdentity::scopeOrders($query, $actor);
+    }
+
     protected static function booted()
     {
         static::saving(function ($order) {
+            ActorIdentity::assertOrderOwnerInvariant($order->user_id, $order->guest_id);
+
             $allowedStatuses = ['pending', 'invoice_created', 'pending_payment', 'paid', 'overdue', 'cancelled', 'disputed', 'refunded', 'delivery_note', 'archived_in_collective'];
             if (! in_array($order->status, $allowedStatuses)) {
                 throw new \InvalidArgumentException("Ungültiger Bestellstatus: {$order->status}");
@@ -76,5 +95,10 @@ class Order extends Model
     public function invoiceSnapshot()
     {
         return $this->hasOne(InvoiceSnapshot::class);
+    }
+
+    public function downloadLogs(): HasMany
+    {
+        return $this->hasMany(DownloadLog::class);
     }
 }

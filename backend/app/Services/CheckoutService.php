@@ -13,9 +13,12 @@ use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
 use App\Models\Order;
 use App\Models\Photo;
+use App\Models\Setting;
+use App\Models\User;
 use App\Models\VolumePreset;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
+use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -68,7 +71,38 @@ class CheckoutService
     public function processCheckout($request, $user, $paymentMethod)
     {
         try {
+            // A transient guest has no durable account, billing identity, or
+            // Stripe Customer mapping. Do not turn one into a shadow user or
+            // let the old null-user path create an ownerless checkout. Guest
+            // Stripe checkout remains explicitly unsupported until that flow
+            // has a verified, guest-safe payment/receipt contract.
+            if (! $user instanceof User || ! ActorIdentity::isRegistered($user)) {
+                return response()->json([
+                    'error' => 'Der Checkout ist für Gäste derzeit nicht verfügbar. Bitte melde dich mit einem Portal-Konto an.',
+                    'guest_checkout_unsupported' => true,
+                ], 403);
+            }
+
+            $quoteToken = $request->input('quote_token');
+            $quoteTokenPayload = null;
+            $quotePhotos = [];
+
+            if ($quoteToken !== null) {
+                [$quoteTokenPayload, $quotePhotos] = $this->resolveQuoteToken(
+                    $quoteToken,
+                    $user,
+                    $request->input('items', []),
+                );
+            }
+
             [$strategyItems, $isQuoteRequest] = $this->validateItems($request->items, $user);
+
+            // A signed quote is a fixed-price purchase, never a reactive quote
+            // request. Do not let a client-supplied isQuote flag downgrade the
+            // flow and bypass the withdrawal/download safeguards.
+            if ($quoteTokenPayload !== null) {
+                $isQuoteRequest = false;
+            }
 
             // Server-seitige Durchsetzung des Widerrufsverzichts (WI-A):
             // Nur echte Käufe – inkl. des quote_token-Flows – benötigen eine
@@ -140,6 +174,7 @@ class CheckoutService
                             $user,
                             $persistedAmount,
                             $identity,
+                            $quoteTokenPayload,
                         ): JsonResponse {
                             if ($order === null) {
                                 return response()->json([
@@ -167,6 +202,7 @@ class CheckoutService
                                 true,
                                 $identity['key'],
                                 $identity['fingerprint'],
+                                $quoteTokenPayload,
                             );
                         },
                         ! $exactKeyMatch,
@@ -174,43 +210,51 @@ class CheckoutService
                 }
             }
 
-            $quoteToken = $request->input('quote_token');
-
             $appliedCoupon = null;
 
-            if ($quoteToken !== null) {
-                $offerTokenService = app(OfferTokenService::class);
-                $tokenPayload = $offerTokenService->verify($quoteToken);
-                if ($tokenPayload === null) {
-                    throw new HttpResponseException(
-                        response()->json(['error' => 'Angebot ist abgelaufen oder ungültig.'], 422)
-                    );
-                }
-
-                $totalNetCents = (int) $tokenPayload['price'];
+            if ($quoteTokenPayload !== null) {
+                $totalNetCents = $quoteTokenPayload['price'];
                 $couponDiscountCents = 0;
 
-                $lineItems = $this->buildQuoteLineItems($tokenPayload);
-                $customConditions = $tokenPayload['rights_text'] ?? null;
+                $lineItems = $this->buildQuoteLineItems($quoteTokenPayload, $quotePhotos);
+                $customConditions = $quoteTokenPayload['rights_text'] ?? null;
             } else {
                 $couponCode = $request->input('coupon_code');
 
                 $groups = $this->groupItemsByLicensingMode($strategyItems);
-
-                $hasVolumeGroup = collect(array_keys($groups))->contains(fn ($key) => str_starts_with($key, 'volume_licensing'));
+                $volumeCouponItems = $this->collectVolumeCouponItems($groups);
+                $hasVolumeGroup = $volumeCouponItems !== [];
 
                 if ($hasVolumeGroup || count($groups) > 1) {
-                    if ($hasVolumeGroup && $couponCode !== null) {
-                        $appliedCoupon = $this->resolveCoupon($couponCode, $request->items, $user);
-                    }
+                    $pricingResult = $this->calculateMultiStrategyCart($groups, $user);
 
-                    $pricingResult = $this->calculateMultiStrategyCart($groups, $user, $hasVolumeGroup ? $couponCode : null);
+                    // Validate once against every volume item. The discount is
+                    // applied below to the aggregate volume subtotal, never
+                    // once per pricing group. A zero-value volume subtotal has
+                    // no real discount to consume.
+                    if ($hasVolumeGroup
+                        && $couponCode !== null
+                        && (int) ($pricingResult['coupon_subtotal_cents'] ?? 0) > 0) {
+                        $appliedCoupon = $this->resolveCoupon($couponCode, $volumeCouponItems, $user);
+                        if ($appliedCoupon !== null) {
+                            $pricingResult = $this->applyCartCoupon($pricingResult, $appliedCoupon);
+                        }
+                    }
                 } else {
-                    if ($this->strategy->supportsCoupons() && $couponCode !== null) {
-                        $appliedCoupon = $this->resolveCoupon($couponCode, $request->items, $user);
+                    // A single scope group may use the injected strategy for
+                    // compatibility with callers/tests. Never let the injected
+                    // volume strategy override an explicit gallery scope mode.
+                    $scopeStrategy = $this->scopeStrategy();
+                    $supportsCoupons = $scopeStrategy->supportsCoupons();
+                    if ($supportsCoupons && $couponCode !== null) {
+                        $appliedCoupon = $this->resolveCoupon($couponCode, $strategyItems, $user);
                     }
 
-                    $pricingResult = $this->strategy->calculateCart($strategyItems, $user, $this->strategy->supportsCoupons() ? $couponCode : null);
+                    $pricingResult = $scopeStrategy->calculateCart(
+                        $strategyItems,
+                        $user,
+                        $supportsCoupons ? $couponCode : null,
+                    );
                 }
 
                 $totalNetCents = $pricingResult['totalCents'];
@@ -284,11 +328,23 @@ class CheckoutService
                         $withdrawalWaived,
                         $identity['key'],
                         $identity['fingerprint'],
+                        $quoteTokenPayload,
                     ),
                 );
             }
 
-            $order = DB::transaction(function () use ($request, $user, $paymentMethod, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived) {
+            $order = DB::transaction(function () use ($request, $user, $paymentMethod, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived, $quoteTokenPayload) {
+                if ($quoteTokenPayload !== null) {
+                    // Re-read and re-authorize immediately before persistence. A
+                    // gallery assignment, brand, expiry, or hidden state may have
+                    // changed since the initial token validation above.
+                    $this->assertQuotePhotosAuthorized(
+                        $user,
+                        $quoteTokenPayload['photos'],
+                        $quoteTokenPayload['brand'],
+                    );
+                }
+
                 $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
 
                 $appliedCouponId = null;
@@ -330,6 +386,178 @@ class CheckoutService
         }
     }
 
+    /**
+     * Resolve, bind, and authorize a quote token before any checkout work.
+     *
+     * @return array{0: array<string, mixed>, 1: array<string, Photo>}
+     */
+    private function resolveQuoteToken(mixed $token, $user, mixed $requestItems): array
+    {
+        if (! is_string($token) || trim($token) === '') {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot ist abgelaufen oder ungültig.'], 422)
+            );
+        }
+
+        $currentBrand = BrandRegistry::currentIdOrNull();
+        if ($currentBrand === null) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot ist abgelaufen oder ungültig.'], 422)
+            );
+        }
+
+        $payload = app(OfferTokenService::class)->verifyQuote(
+            $token,
+            $currentBrand,
+            requirePositivePrice: false,
+        );
+        if ($payload === null) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot ist abgelaufen oder ungültig.'], 422)
+            );
+        }
+        if ($payload['price'] < 1) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot ist ungültig.'], 422)
+            );
+        }
+
+        $this->assertQuoteItemsMatch($payload['photos'], $requestItems);
+        $photos = $this->assertQuotePhotosAuthorized($user, $payload['photos'], $payload['brand']);
+
+        return [$payload, $photos];
+    }
+
+    /**
+     * The signed offer is the source of truth for the item identity. A client
+     * may not substitute a public placeholder for a private token photo (or
+     * add/remove photos) while retaining the offer's price.
+     *
+     * @param  array<int, string>  $tokenPhotoIds
+     */
+    private function assertQuoteItemsMatch(array $tokenPhotoIds, mixed $requestItems): void
+    {
+        if (! is_array($requestItems) || $requestItems === []) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot und Warenkorb stimmen nicht überein.'], 422)
+            );
+        }
+
+        $requestPhotoIds = [];
+        foreach ($requestItems as $item) {
+            if (! is_array($item) || ! isset($item['photoId']) || ! is_string($item['photoId']) || trim($item['photoId']) === '') {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Angebot und Warenkorb stimmen nicht überein.'], 422)
+                );
+            }
+
+            $isQuote = filter_var($item['isQuote'] ?? false, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($isQuote === true) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Angebot und Warenkorb stimmen nicht überein.'], 422)
+                );
+            }
+
+            $requestPhotoIds[] = $item['photoId'];
+        }
+
+        if (count($requestPhotoIds) !== count($tokenPhotoIds)
+            || count(array_unique($requestPhotoIds)) !== count($requestPhotoIds)
+            || count(array_unique($tokenPhotoIds)) !== count($tokenPhotoIds)) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot und Warenkorb stimmen nicht überein.'], 422)
+            );
+        }
+
+        $sortedTokenIds = $tokenPhotoIds;
+        $sortedRequestIds = $requestPhotoIds;
+        sort($sortedTokenIds);
+        sort($sortedRequestIds);
+        if ($sortedTokenIds !== $sortedRequestIds) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot und Warenkorb stimmen nicht überein.'], 422)
+            );
+        }
+    }
+
+    /**
+     * Re-read the token targets and enforce the same access/deliverability
+     * rules immediately before a quote order is persisted.
+     *
+     * @param  array<int, string>  $photoIds
+     * @return array<string, Photo>
+     */
+    private function assertQuotePhotosAuthorized($user, array $photoIds, string $expectedBrand): array
+    {
+        $activeBrand = BrandRegistry::currentIdOrNull();
+        $expectedBrand = trim($expectedBrand);
+        if ($activeBrand === null || $activeBrand === '' || $expectedBrand === '' || ! hash_equals($activeBrand, $expectedBrand)) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot gehört zu einer anderen Marke.'], 422)
+            );
+        }
+
+        $ids = [];
+        foreach ($photoIds as $photoId) {
+            if (! is_string($photoId) || trim($photoId) === '' || strlen($photoId) > 255) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Angebot ist ungültig.'], 422)
+                );
+            }
+            $ids[] = $photoId;
+        }
+
+        if ($ids === [] || count($ids) > 500 || count(array_unique($ids)) !== count($ids)) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot ist ungültig.'], 422)
+            );
+        }
+
+        $photos = Photo::with('gallery')
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy(fn (Photo $photo): string => (string) $photo->getKey());
+
+        if ($photos->count() !== count($ids)) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'Angebot enthält ein nicht verfügbares Foto.'], 422)
+            );
+        }
+
+        foreach ($ids as $photoId) {
+            /** @var Photo $photo */
+            $photo = $photos->get($photoId);
+            $gallery = $photo->gallery;
+            if ($gallery === null || ! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Angebot enthält ein nicht verfügbares Foto.'], 422)
+                );
+            }
+            if ($gallery->isSelection()) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Auswahl-Galerien können nicht angeboten werden.'], 422)
+                );
+            }
+            if ($photo->effective_is_hidden || $gallery->effective_is_hidden) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Angebot enthält ein nicht lieferbares Foto.'], 422)
+                );
+            }
+            if ($gallery->expires_at !== null && $gallery->expires_at->isPast()) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Angebot enthält ein nicht lieferbares Foto.'], 422)
+                );
+            }
+            if (! $gallery->effective_is_public && ($user === null || ! $user->canAccessGallery((string) $gallery->getKey()))) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Zugriff verweigert'], 403)
+                );
+            }
+        }
+
+        return $photos->all();
+    }
+
     private function validateItems(array $items, $user): array
     {
         $strategyItems = [];
@@ -337,7 +565,16 @@ class CheckoutService
 
         foreach ($items as $item) {
             $photo = Photo::with('gallery')->findOrFail($item['photoId']);
-            if (! $photo->gallery->is_public && ! $user->canAccessGallery($photo->gallery_id)) {
+            $gallery = $photo->gallery;
+            if (! $gallery instanceof Gallery || ! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+                throw new HttpResponseException(response()->json(['error' => 'Foto nicht gefunden.'], 404));
+            }
+            if ($gallery->isSelection()) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Auswahl-Galerien können nicht bezahlt werden.'], 422)
+                );
+            }
+            if (! $gallery->effective_is_public && ! $user->canAccessGallery($photo->gallery_id)) {
                 throw new HttpResponseException(response()->json(['error' => 'Zugriff verweigert'], 403));
             }
 
@@ -390,9 +627,26 @@ class CheckoutService
     private function groupItemsByLicensingMode(array $strategyItems): array
     {
         $groups = [];
+        $injectedVolumeFallback = $this->strategy instanceof VolumeLicensingStrategy
+            && ! Setting::query()
+                ->where('key', 'pricing_strategy')
+                ->where('brand', BrandRegistry::currentIdOrNull() ?? BrandRegistry::currentOrDefault()->value)
+                ->exists();
+
         foreach ($strategyItems as $item) {
             $gallery = Gallery::find($item['gallery_id']);
             $mode = $gallery ? $gallery->effective_licensing_mode : 'scope_licensing';
+
+            // A manually injected volume strategy remains the fallback for
+            // legacy callers that have not yet created the brand setting. An
+            // explicit gallery override, or an existing brand setting, always
+            // wins over that compatibility fallback.
+            if ($mode === 'scope_licensing'
+                && $gallery?->licensing_mode === null
+                && $injectedVolumeFallback) {
+                $mode = 'volume_licensing';
+            }
+
             $presetKey = $mode === 'volume_licensing'
                 ? ($gallery?->volume_preset_id ?: 'default')
                 : 'default';
@@ -402,38 +656,119 @@ class CheckoutService
         return $groups;
     }
 
-    private function calculateMultiStrategyCart(array $groups, $user, ?string $couponCode): array
+    /**
+     * Return the non-quote items from volume groups. Coupons are validated and
+     * applied against this complete eligible set, not against the first item
+     * of a cart or each pricing group independently.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function collectVolumeCouponItems(array $groups): array
+    {
+        $items = [];
+        foreach ($groups as $groupKey => $groupItems) {
+            if (! str_starts_with((string) $groupKey, 'volume_licensing')) {
+                continue;
+            }
+
+            foreach ($groupItems as $item) {
+                if (empty($item['is_quote'])) {
+                    $items[] = $item;
+                }
+            }
+        }
+
+        return $items;
+    }
+
+    private function scopeStrategy(): PricingStrategy
+    {
+        // The service binding follows the brand default. A gallery-level
+        // scope override must not inherit that injected volume strategy.
+        if ($this->strategy instanceof VolumeLicensingStrategy) {
+            return new ScopeLicensingStrategy;
+        }
+
+        return $this->strategy;
+    }
+
+    private function strategyForGroup(string $mode, string $presetKey): PricingStrategy
+    {
+        if ($mode !== 'volume_licensing') {
+            return $this->scopeStrategy();
+        }
+
+        $presetService = app(VolumePresetService::class);
+        $preset = $presetKey === 'default'
+            ? $presetService->resolveDefaultForBrand(BrandRegistry::currentOrDefault())
+            : VolumePreset::findOrFail($presetKey);
+
+        return new VolumeLicensingStrategy($preset, $this->couponService);
+    }
+
+    /**
+     * Calculate all effective pricing groups without applying a coupon. The
+     * caller applies one validated coupon to the combined volume subtotal.
+     */
+    private function calculateMultiStrategyCart(array $groups, $user): array
     {
         $allItems = [];
         $totalCents = 0;
         $discountCents = 0;
         $couponId = null;
+        $couponType = null;
         $allTierBreakdown = [];
+        $volumePricedItems = [];
+        $volumeSubtotalCents = 0;
+        $volumeItemCount = 0;
 
         foreach ($groups as $groupKey => $groupItems) {
             [$mode, $presetKey] = explode('|', $groupKey, 2);
-
-            if ($mode === 'volume_licensing') {
-                $presetService = app(VolumePresetService::class);
-                $preset = $presetKey === 'default'
-                    ? $presetService->resolveDefaultForBrand(BrandRegistry::currentOrDefault())
-                    : VolumePreset::findOrFail($presetKey);
-                $strategy = new VolumeLicensingStrategy($preset, $this->couponService);
-            } else {
-                $strategy = new ScopeLicensingStrategy;
-            }
-
-            $groupCouponCode = $strategy->supportsCoupons() ? $couponCode : null;
-            $result = $strategy->calculateCart($groupItems, $user, $groupCouponCode);
+            $strategy = $this->strategyForGroup($mode, $presetKey);
+            $result = $strategy->calculateCart($groupItems, $user, null);
 
             $allItems = array_merge($allItems, $result['items']);
-            $totalCents += $result['totalCents'];
+            $totalCents += (int) $result['totalCents'];
             $discountCents += (int) ($result['discountCents'] ?? 0);
             if (! empty($result['couponId'])) {
                 $couponId = $result['couponId'];
             }
+            if (! empty($result['couponType'])) {
+                $couponType = $result['couponType'];
+            }
             if (! empty($result['tier_breakdown'])) {
                 $allTierBreakdown = array_merge($allTierBreakdown, $result['tier_breakdown']);
+            }
+
+            if ($mode !== 'volume_licensing') {
+                continue;
+            }
+
+            $volumeSubtotalCents += (int) $result['totalCents'];
+            if (array_key_exists('coupon_items', $result) && is_array($result['coupon_items'])) {
+                foreach ($result['coupon_items'] as $couponItem) {
+                    $volumePricedItems[] = $couponItem;
+                    $volumeItemCount++;
+                }
+
+                continue;
+            }
+
+            // Compatibility fallback for injected strategy implementations that
+            // predate the explicit effective-price coupon representation.
+            $quoteItemIds = [];
+            foreach ($groupItems as $groupItem) {
+                if (! empty($groupItem['is_quote'])) {
+                    $quoteItemIds[(string) ($groupItem['id'] ?? '')] = true;
+                }
+            }
+            foreach ($result['items'] as $pricedItem) {
+                if (isset($quoteItemIds[(string) $pricedItem['itemId']])) {
+                    continue;
+                }
+
+                $volumePricedItems[] = $pricedItem;
+                $volumeItemCount++;
             }
         }
 
@@ -442,8 +777,36 @@ class CheckoutService
             'totalCents' => $totalCents,
             'discountCents' => $discountCents,
             'couponId' => $couponId,
+            'couponType' => $couponType,
             'tier_breakdown' => $allTierBreakdown,
+            'coupon_items' => $volumePricedItems,
+            'coupon_subtotal_cents' => $volumeSubtotalCents,
+            'coupon_item_count' => $volumeItemCount,
         ];
+    }
+
+    private function applyCartCoupon(array $pricingResult, Coupon $coupon): array
+    {
+        $couponItems = $pricingResult['coupon_items'] ?? [];
+        $couponSubtotalCents = (int) ($pricingResult['coupon_subtotal_cents'] ?? 0);
+        if ($couponItems === [] || $couponSubtotalCents <= 0) {
+            return $pricingResult;
+        }
+
+        $applied = $this->couponService->applyCoupon(
+            $coupon,
+            $couponItems,
+            $couponSubtotalCents,
+        );
+
+        $pricingResult['totalCents'] = (int) $pricingResult['totalCents']
+            - $couponSubtotalCents
+            + (int) $applied['totalCents'];
+        $pricingResult['discountCents'] = (int) $applied['discountCents'];
+        $pricingResult['couponId'] = $coupon->id;
+        $pricingResult['couponType'] = $coupon->type;
+
+        return $pricingResult;
     }
 
     private function resolveCoupon(?string $couponCode, array $items, $user): ?Coupon
@@ -457,21 +820,41 @@ class CheckoutService
             return null;
         }
 
-        $galleryId = null;
-        $metaGalleryId = null;
+        $photoIds = [];
         foreach ($items as $item) {
-            if (empty($item['isQuote'])) {
-                $photo = Photo::with('gallery')->find($item['photoId'] ?? 0);
-                if ($photo && $photo->gallery) {
-                    $galleryId = $photo->gallery_id;
-                    $metaGalleryId = $photo->gallery->gallery_group_id ?? null;
-                    break;
+            $isQuote = $item['is_quote'] ?? $item['isQuote'] ?? false;
+            if ($isQuote) {
+                continue;
+            }
+
+            $photoId = $item['photoId'] ?? $item['id'] ?? null;
+            if ($photoId !== null && $photoId !== '') {
+                $photoIds[] = $photoId;
+            }
+        }
+
+        $galleryIds = [];
+        $metaGalleryIds = [];
+        if ($photoIds !== []) {
+            $photos = Photo::with('gallery')
+                ->whereIn('id', array_values(array_unique($photoIds)))
+                ->get();
+            foreach ($photos as $photo) {
+                if ($photo->gallery_id !== null) {
+                    $galleryIds[] = (string) $photo->gallery_id;
+                }
+                if ($photo->gallery?->gallery_group_id !== null) {
+                    $metaGalleryIds[] = (string) $photo->gallery->gallery_group_id;
                 }
             }
         }
 
-        [$validCoupon, $couponError] = $this->couponService->findValidCoupon(
-            $couponCode, $brand, $galleryId, $metaGalleryId, $user->id,
+        [$validCoupon] = $this->couponService->findValidCoupon(
+            $couponCode,
+            $brand,
+            array_values(array_unique($galleryIds)),
+            array_values(array_unique($metaGalleryIds)),
+            $user->getKey(),
         );
         if ($validCoupon === null) {
             throw new HttpResponseException(response()->json(['error' => 'Der Rabattcode ist nicht mehr gültig.'], 422));
@@ -511,17 +894,22 @@ class CheckoutService
         $couponDiscountCents = (int) ($pricingResult['discountCents'] ?? 0);
         $couponType = $pricingResult['couponType'] ?? null;
         if ($couponDiscountCents > 0 && $couponType !== null) {
-            $nonQuoteItems = array_filter($lineItems, fn ($li) => empty($li['isQuote']));
-            $nonQuoteCount = count($nonQuoteItems);
-            if ($nonQuoteCount > 0) {
-                $perImageCents = (int) round($couponDiscountCents / $nonQuoteCount);
+            $couponItemCount = (int) ($pricingResult['coupon_item_count'] ?? 0);
+            if ($couponItemCount <= 0) {
+                $couponItemCount = count(array_filter(
+                    $lineItems,
+                    fn (array $lineItem): bool => ! empty($lineItem['photoId']) && empty($lineItem['isQuote']),
+                ));
+            }
+            if ($couponItemCount > 0) {
+                $perImageCents = (int) round($couponDiscountCents / $couponItemCount);
                 $lineItems[] = [
                     'type' => 'discount_coupon',
                     'filename' => 'Coupon-Rabatt',
-                    'notes' => sprintf('%d × %s €', $nonQuoteCount, number_format($perImageCents / 100, 2, ',', '.')),
+                    'notes' => sprintf('%d × %s €', $couponItemCount, number_format($perImageCents / 100, 2, ',', '.')),
                     'price' => $perImageCents,
                     'row_total' => -$couponDiscountCents,
-                    'qty' => $nonQuoteCount,
+                    'qty' => $couponItemCount,
                 ];
             }
         }
@@ -547,9 +935,10 @@ class CheckoutService
         $orderStatus = $isQuoteRequest ? 'pending' : ($isLieferschein ? 'delivery_note' : ($paymentMethod === 'invoice' ? 'invoice_created' : 'pending_payment'));
 
         $orderData = [
-            'user_id' => $user->id,
+            'user_id' => ActorIdentity::registeredId($user),
+            'guest_id' => ActorIdentity::guestId($user),
             'status' => $orderStatus,
-            'brand' => BrandRegistry::current()?->value,
+            'brand' => BrandRegistry::current()?->value ?? BrandRegistry::currentId(),
             'total_amount' => $totalNetCents,
             'is_quote_request' => $isQuoteRequest,
             'payment_intent_generation' => $paymentIntentGeneration,
@@ -591,6 +980,7 @@ class CheckoutService
         bool $withdrawalWaived,
         string $checkoutIdempotencyKey,
         string $checkoutFingerprint,
+        ?array $quoteTokenPayload = null,
     ): JsonResponse {
         $order = $existingOrder;
         if ($order !== null) {
@@ -607,8 +997,30 @@ class CheckoutService
             $checkoutFingerprint = $persistedFingerprint;
         }
 
+        if ($order === null && $quoteTokenPayload !== null) {
+            // A lost-key recovery can race with the idempotency transition. If
+            // this call has to create the order, rebuild its immutable line
+            // items from the signed token instead of accepting the empty arrays
+            // used by the replay-only path above.
+            $quotePhotos = $this->assertQuotePhotosAuthorized(
+                $user,
+                $quoteTokenPayload['photos'],
+                $quoteTokenPayload['brand'],
+            );
+            $lineItems = $this->buildQuoteLineItems($quoteTokenPayload, $quotePhotos);
+            $customConditions = $quoteTokenPayload['rights_text'] ?? null;
+        }
+
         if ($order === null) {
-            $order = DB::transaction(function () use ($request, $user, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived, $checkoutIdempotencyKey, $checkoutFingerprint) {
+            $order = DB::transaction(function () use ($request, $user, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived, $checkoutIdempotencyKey, $checkoutFingerprint, $quoteTokenPayload) {
+                if ($quoteTokenPayload !== null) {
+                    $this->assertQuotePhotosAuthorized(
+                        $user,
+                        $quoteTokenPayload['photos'],
+                        $quoteTokenPayload['brand'],
+                    );
+                }
+
                 $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
 
                 $appliedCouponId = null;
@@ -739,8 +1151,7 @@ class CheckoutService
         int $totalNetCents,
         ?string $checkoutIdempotencyKey = null,
         ?string $checkoutFingerprint = null,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $this->checkoutKillSwitch->assertEnabled();
 
         try {
@@ -992,24 +1403,36 @@ class CheckoutService
         return $value !== '' ? $value : null;
     }
 
-    private function buildQuoteLineItems(array $tokenPayload): array
+    /**
+     * @param  array<string, Photo>  $photos
+     */
+    private function buildQuoteLineItems(array $tokenPayload, array $photos): array
     {
-        $photoIds = $tokenPayload['photos'] ?? [];
-        $totalPrice = (int) ($tokenPayload['price'] ?? 0);
+        $photoIds = array_values($tokenPayload['photos']);
+        $totalPrice = $tokenPayload['price'];
         $count = count($photoIds);
-        $perItemCents = $count > 0 ? (int) round($totalPrice / $count) : 0;
+        $baseItemCents = intdiv($totalPrice, $count);
+        $remainderCents = $totalPrice % $count;
 
         $lineItems = [];
-        foreach ($photoIds as $photoId) {
-            $photo = Photo::find($photoId);
+        foreach ($photoIds as $index => $photoId) {
+            $photo = $photos[$photoId] ?? null;
+            if (! $photo instanceof Photo) {
+                throw new HttpResponseException(
+                    response()->json(['error' => 'Angebot enthält ein nicht verfügbares Foto.'], 422)
+                );
+            }
+
             $lineItems[] = [
                 'photoId' => $photoId,
-                'filename' => $photo ? ($photo->title ?: 'Bild '.substr($photo->id, 0, 8)) : 'Unbekannt',
+                'filename' => $photo->title ?: 'Bild '.substr((string) $photo->getKey(), 0, 8),
                 'tier' => 'original',
                 'useCaseId' => null,
                 'useCaseName' => 'Angebot (Festpreis)',
                 'modifierNames' => [],
-                'price' => $perItemCents,
+                // Allocate the remainder to the final line so the immutable
+                // snapshot always sums exactly to the signed total.
+                'price' => $baseItemCents + ($index === $count - 1 ? $remainderCents : 0),
                 'isQuote' => false,
                 'notes' => null,
             ];
@@ -1088,8 +1511,16 @@ class CheckoutService
      */
     private function respondForSettledFreeOrder(Order $order, $user): JsonResponse
     {
-        if ($order->status === 'pending_payment') {
-            $order->update(['status' => 'paid']);
+        $settled = Order::query()
+            ->whereKey($order->getKey())
+            ->whereIn('status', ['pending_payment', 'invoice_created'])
+            ->update(['status' => 'paid']);
+        if ($settled === 1) {
+            $order->status = 'paid';
+        } else {
+            // A concurrent admin transition (for example to cancelled or
+            // delivery_note) wins; never reopen that terminal/collective state.
+            $order->refresh();
         }
 
         $snapshot = $order->invoiceSnapshot;

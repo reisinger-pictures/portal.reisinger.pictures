@@ -94,4 +94,15 @@ describe('ResetPassword', () => {
             });
         });
     });
+
+    it('surfaces a non-OK best-effort logout without blocking the reset form', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, {status: 500})));
+
+        renderResetPassword();
+
+        await waitFor(() => {
+            expect(screen.getByText('Session konnte nicht zurückgesetzt werden.')).toBeInTheDocument();
+        });
+        expect(screen.getByRole('button', {name: 'Passwort speichern & Anmelden'})).toBeEnabled();
+    });
 });

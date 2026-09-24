@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useSWRConfig } from 'swr';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -36,6 +37,7 @@ function effectiveToFormValues(effective: BrandSetting['effective']): BrandSetti
 function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
     "use no memo";
     const { updateBrandSettings } = useBrandSettings();
+    const { mutate: revalidateBrandConfig } = useSWRConfig();
     const { showToast } = useUI();
     const { isSuperAdmin } = usePermissions();
     const canEdit = isSuperAdmin;
@@ -74,6 +76,13 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
 
         try {
             await updateBrandSettings(brand.id, payload);
+            // The public config is consumed by every branded surface. Revalidate
+            // it after the management write so CSS variables update immediately.
+            try {
+                await revalidateBrandConfig('/api/settings/brand-config');
+            } catch {
+                // The write succeeded; a later mount/reload can retry this cache.
+            }
             showToast('success', 'Markeneinstellungen gespeichert.');
         } catch {
             showToast('error', 'Fehler beim Speichern der Markeneinstellungen.');
@@ -95,6 +104,11 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
         };
         try {
             await updateBrandSettings(brand.id, payload);
+            try {
+                await revalidateBrandConfig('/api/settings/brand-config');
+            } catch {
+                // The reset succeeded; the public cache can retry on the next load.
+            }
             showToast('success', 'Markeneinstellungen auf Standard zurückgesetzt.');
         } catch {
             showToast('error', 'Fehler beim Zurücksetzen der Markeneinstellungen.');
@@ -161,6 +175,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Primärfarbe (Hex)</span></label>
                     <input type="text" className="input input-bordered font-mono" placeholder="#1E5631"
+                           aria-label="Primärfarbe (Hex)" required
                            disabled={!canEdit} {...register('primary_color')} />
                     {errors.primary_color &&
                         <span className="text-error text-xs mt-1">{errors.primary_color.message}</span>}
@@ -169,6 +184,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Sekundärfarbe (Hex)</span></label>
                     <input type="text" className="input input-bordered font-mono" placeholder="#A4B494"
+                           aria-label="Sekundärfarbe (Hex)" required
                            disabled={!canEdit} {...register('secondary_color')} />
                     {errors.secondary_color &&
                         <span className="text-error text-xs mt-1">{errors.secondary_color.message}</span>}

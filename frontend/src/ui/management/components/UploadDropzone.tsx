@@ -1,6 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
+import { apiUpload } from '../../../api';
 import { useUI } from '../../components/UIContext';
 
 interface Props {
@@ -26,12 +27,8 @@ export default function UploadDropzone({ galleryId, onUploadComplete }: Props) {
             formData.append('replace', replaceExisting ? '1' : '0');
             formData.append('file', file);
             try {
-                const res = await fetch('/api/management/upload', {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json' },
-                    body: formData
-                });
-                if (res.ok) successCount++;
+                await apiUpload<{ success?: boolean }>('/api/management/upload', formData);
+                successCount++;
             } catch (err) {
                 console.error(err);
             }

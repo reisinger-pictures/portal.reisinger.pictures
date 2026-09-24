@@ -34,8 +34,24 @@ function calcContractTotal(items: ContractItem[], discounts: ContractDiscount[])
     return Math.max(0, subtotal);
 }
 
+function ContractLoadingView() {
+    return <PageLayout>
+        <div className="flex h-full items-center justify-center"><span
+            className="loading loading-spinner loading-lg text-primary"></span></div>
+    </PageLayout>;
+}
+
 export default function ContractSignView() {
     const { token } = useParams<{ token: string }>();
+
+    if (!token) return <ContractLoadingView />;
+
+    // A personal token identifies a separate consent/signing scope. Remounting
+    // this boundary prevents any state or in-flight result from crossing tokens.
+    return <ContractSignTokenView key={token} token={token} />;
+}
+
+function ContractSignTokenView({ token }: { token: string }) {
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(true);
@@ -49,14 +65,20 @@ export default function ContractSignView() {
     const pageExitSent = useRef(false);
 
     useEffect(() => {
-        if (!token) return;
+        let active = true;
         fetchSignContract(token)
             .then(result => {
+                if (!active) return;
                 setData(result);
                 setContentVersion(result.contract.content_version);
                 setLoading(false);
             })
-            .catch(err => { setError(err.message); setLoading(false); });
+            .catch((err: unknown) => {
+                if (!active) return;
+                setError(err instanceof Error ? err.message : String(err));
+                setLoading(false);
+            });
+        return () => { active = false; };
     }, [token]);
 
     const handleStale = () => setIsStale(true);
@@ -91,10 +113,7 @@ export default function ContractSignView() {
         }
     };
 
-    if (loading) return <PageLayout>
-        <div className="flex h-full items-center justify-center"><span
-            className="loading loading-spinner loading-lg text-primary"></span></div>
-    </PageLayout>;
+    if (loading) return <ContractLoadingView />;
 
     if (error && !data) return (
         <PageLayout>

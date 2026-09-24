@@ -47,6 +47,10 @@ E2E (Playwright):
 - Nur spezifisches Feature, z. B. checkout: `cd frontend && npx playwright test --grep @feature:checkout`
 - Nur fehlgeschlagene wiederholen: `cd frontend && npx playwright test --last-failed`
 
+Jeder neue E2E-Test benötigt mindestens einen funktionalen Tag (`@smoke`,
+`@regression` oder `@feature:<name>`); `@mobile` ist nur ein zusätzlicher
+Device-Tag und ersetzt keinen funktionalen Tag.
+
 E2E Workflow:
 
 1. Nach jedem Code-Change: `pnpm test:e2e:smoke`
@@ -57,7 +61,7 @@ E2E Workflow:
    - Fehlerursache (wenn bekannt)
    - `flaky` tag im Commit/PR
 
-Bug-Fixing: Bei fehlschlagenden E2E-Tests `npx playwright test --last-failed` wiederholt ausführen, bis alle grün sind.
+Bug-Fixing: Einen fokussierten Fehlschlag mit `npx playwright test --last-failed` wiederholen. Pro fehlschlagendem Test sind maximal drei Fix-Versuche erlaubt; nach dem dritten erfolglosen Versuch die Ursachenanalyse an den Benutzer zurückgeben und nicht weiterloopen.
 
 E2E Timeout Policy (STRICT):
 

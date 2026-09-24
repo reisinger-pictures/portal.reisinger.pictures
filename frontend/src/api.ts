@@ -1,5 +1,56 @@
-let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
+
+const REFRESH_ENDPOINT = '/api/auth/refresh';
+/**
+ * Auth bootstrap/termination requests are the only generic-helper exceptions.
+ * Retrying them from their own 401 would recurse into refresh (or create a
+ * pointless second login/logout attempt); `useAuth.logout` owns its one-shot
+ * refresh explicitly.
+ */
+const AUTH_ENDPOINTS_WITHOUT_REFRESH = new Set([
+    '/api/auth/refresh',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/logout',
+    '/api/auth/reset-password',
+]);
+
+/**
+ * Keep auth-flow classification independent of query strings and trailing
+ * slashes. The browser owns the refresh credential; it must only be sent by
+ * the browser with `credentials: 'include'` and is never inspected by JS.
+ */
+const normalizedApiPath = (url: string): string => {
+    try {
+        return new URL(url, 'http://localhost').pathname.replace(/\/+$/, '') || '/';
+    } catch {
+        return url.split(/[?#]/, 1)[0]?.replace(/\/+$/, '') || '/';
+    }
+};
+
+const shouldAttemptRefresh = (url: string): boolean =>
+    !AUTH_ENDPOINTS_WITHOUT_REFRESH.has(normalizedApiPath(url));
+
+/**
+ * Fetch rejects with an AbortError when a caller cancels a request.  It is a
+ * control-flow signal, not a transport failure, so API helpers must rethrow it
+ * unchanged instead of normalising it into the generic network error.
+ */
+const isAbortError = (error: unknown): boolean =>
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError';
+
+const NETWORK_ERROR_MESSAGE = 'Netzwerkfehler: Keine Verbindung zum Server.';
+
+/**
+ * A signal can be aborted while a fetch mock (or a cached response) resolves
+ * successfully. Check the signal at the boundaries so a cancelled caller is
+ * never allowed to continue into refresh, retry, or response parsing.
+ */
+const throwIfAborted = (signal: AbortSignal | undefined): void => {
+    if (!signal?.aborted) return;
+    if (signal.reason !== undefined) throw signal.reason;
+    throw new DOMException('The operation was aborted.', 'AbortError');
+};
 
 export type GlobalErrorCallback = (status: number, message: string) => void;
 export interface ApiError extends Error {
@@ -10,13 +61,12 @@ let globalErrorCallback: GlobalErrorCallback | null = null;
 export const setGlobalErrorCallback = (cb: GlobalErrorCallback | null) => { globalErrorCallback = cb; };
 
 
-const refreshToken = async (): Promise<boolean> => {
-    if (isRefreshing && refreshPromise) return refreshPromise;
+export const refreshAuthSession = (): Promise<boolean> => {
+    if (refreshPromise) return refreshPromise;
 
-    isRefreshing = true;
-    refreshPromise = (async () => {
+    const request = (async (): Promise<boolean> => {
         try {
-            const res = await fetch('/api/auth/refresh', {
+            const res = await fetch(REFRESH_ENDPOINT, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
@@ -26,15 +76,72 @@ const refreshToken = async (): Promise<boolean> => {
             });
 
             return res.ok;
-        } catch {
+        } catch (error) {
+            if (isAbortError(error)) throw error;
             return false;
-        } finally {
-            isRefreshing = false;
-            refreshPromise = null;
         }
     })();
 
-    return refreshPromise;
+    refreshPromise = request;
+    // The refresh is single-flight. Cleanup is registered after assigning the
+    // promise so even a synchronously throwing fetch mock cannot leave stale
+    // state behind.  The rejection callback is intentional: preserving an
+    // AbortError must not create an unhandled rejection in the bookkeeping
+    // promise.
+    const clearRefreshPromise = () => {
+        if (refreshPromise === request) {
+            refreshPromise = null;
+        }
+    };
+    void request.then(clearRefreshPromise, clearRefreshPromise);
+
+    return request;
+};
+
+/**
+ * All authenticated request helpers use this boundary for their initial and
+ * retry fetches. Keeping the conversion in one place prevents a raw transport
+ * exception (especially on a retry) from bypassing the global error channel.
+ * AbortError is deliberately rethrown by identity: it is control flow, not a
+ * transport failure.
+ */
+const fetchWithNetworkErrorHandling = async (url: string, init: RequestInit): Promise<Response> => {
+    throwIfAborted(init.signal ?? undefined);
+    try {
+        return await fetch(url, init);
+    } catch (error) {
+        if (isAbortError(error)) throw error;
+        if (init.signal?.aborted) throwIfAborted(init.signal);
+        const networkError = new Error(NETWORK_ERROR_MESSAGE) as ApiError;
+        networkError.status = 0;
+        globalErrorCallback?.(0, networkError.message);
+        throw networkError;
+    }
+};
+
+/**
+ * Run a request and, at most once, refresh an expired portal session and
+ * replay it. The refresh is intentionally shared without inheriting a
+ * caller's AbortSignal: cancelling one request must not cancel refreshes used
+ * by other callers. The caller's signal is checked before and after the shared
+ * refresh so that caller is stopped at the correct boundary.
+ */
+const fetchWithRefresh = async (url: string, init: RequestInit): Promise<Response> => {
+    const signal = init.signal ?? undefined;
+    let res = await fetchWithNetworkErrorHandling(url, init);
+
+    if (res.status === 401 && shouldAttemptRefresh(url)) {
+        throwIfAborted(signal);
+        const success = await refreshAuthSession();
+        throwIfAborted(signal);
+        if (success) {
+            res = await fetchWithNetworkErrorHandling(url, init);
+            throwIfAborted(signal);
+        }
+    }
+
+    throwIfAborted(signal);
+    return res;
 };
 
 const getHeaders = (): Record<string, string> => ({
@@ -51,7 +158,10 @@ const handleApiError = async (res: Response) => {
         try {
             errorInfo = await res.json();
             errorMsg = errorInfo.error || errorInfo.message || errorMsg;
-        } catch (parseError) { errorInfo = { parseError: String(parseError) }; }
+        } catch (parseError) {
+            if (isAbortError(parseError)) throw parseError;
+            errorInfo = { parseError: String(parseError) };
+        }
     } else {
         try {
             const text = await res.text();
@@ -62,7 +172,10 @@ const handleApiError = async (res: Response) => {
                 errorMsg = text.substring(0, 150);
             }
             errorInfo = { text };
-        } catch (parseError) { errorInfo = { parseError: String(parseError) }; }
+        } catch (parseError) {
+            if (isAbortError(parseError)) throw parseError;
+            errorInfo = { parseError: String(parseError) };
+        }
     }
     
     const error = new Error(errorMsg) as ApiError;
@@ -72,22 +185,17 @@ const handleApiError = async (res: Response) => {
     throw error;
 };
 
-export const fetcher = async <T>(url: string): Promise<T> => {
-    let res: Response;
-    try {
-        res = await fetch(url, { headers: getHeaders(), credentials: 'include' });
-    } catch {
-        const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as ApiError;
-        error.status = 0;
-        throw error;
-    }
+export interface ApiRequestOptions {
+    signal?: AbortSignal;
+}
 
-    if (res.status === 401 && !url.includes('/api/auth/')) {
-        const success = await refreshToken();
-        if (success) {
-            res = await fetch(url, { headers: getHeaders(), credentials: 'include' });
-        }
-    }
+export const fetcher = async <T>(url: string, options: ApiRequestOptions = {}): Promise<T> => {
+    const requestOptions: RequestInit = {
+        headers: getHeaders(),
+        credentials: 'include',
+        ...(options.signal ? { signal: options.signal } : {})
+    };
+    const res = await fetchWithRefresh(url, requestOptions);
 
     if (!res.ok) {
         await handleApiError(res);
@@ -110,34 +218,18 @@ export const fetcher = async <T>(url: string): Promise<T> => {
  * Multipart counterpart of `apiMutate`. Sends a `FormData` body without a
  * `Content-Type` header so the browser can set the multipart boundary.
  * Reuses the same 401-refresh and error-normalisation paths as `fetcher`.
+ * The typed FormData contract keeps the body replayable for the one retry;
+ * callers must not substitute a one-shot stream here.
  */
-export const apiUpload = async <T>(url: string, body: FormData): Promise<T> => {
-    let res: Response;
-    try {
-        res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Accept': 'application/json' },
-            credentials: 'include',
-            body
-        });
-    } catch {
-        const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as ApiError;
-        error.status = 0;
-        if (globalErrorCallback) globalErrorCallback(0, error.message);
-        throw error;
-    }
-
-    if (res.status === 401 && !url.includes('/api/auth/')) {
-        const success = await refreshToken();
-        if (success) {
-            res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Accept': 'application/json' },
-                credentials: 'include',
-                body
-            });
-        }
-    }
+export const apiUpload = async <T>(url: string, body: FormData, options: ApiRequestOptions = {}): Promise<T> => {
+    const requestOptions: RequestInit = {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include',
+        body,
+        ...(options.signal ? { signal: options.signal } : {})
+    };
+    const res = await fetchWithRefresh(url, requestOptions);
 
     if (!res.ok) {
         await handleApiError(res);
@@ -156,7 +248,7 @@ export const apiUpload = async <T>(url: string, body: FormData): Promise<T> => {
     throw new Error('Server hat kein valides JSON zurückgegeben.');
 };
 
-export interface ApiMutateOptions {
+export interface ApiMutateOptions extends ApiRequestOptions {
     headers?: Record<string, string>;
 }
 
@@ -170,24 +262,10 @@ export const apiMutate = async <T>(
         method,
         headers: {...getHeaders(), ...options.headers},
         credentials: 'include',
-        body: body ? JSON.stringify(body) : undefined
+        body: body ? JSON.stringify(body) : undefined,
+        ...(options.signal ? { signal: options.signal } : {})
     };
-    let res: Response;
-    try {
-        res = await fetch(url, requestOptions);
-    } catch {
-        const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as ApiError;
-        error.status = 0;
-        if (globalErrorCallback) globalErrorCallback(0, error.message);
-        throw error;
-    }
-
-    if (res.status === 401 && !url.includes('/api/auth/')) {
-        const success = await refreshToken();
-        if (success) {
-            res = await fetch(url, requestOptions);
-        }
-    }
+    const res = await fetchWithRefresh(url, requestOptions);
 
     if (!res.ok) {
         await handleApiError(res);
@@ -233,29 +311,35 @@ export function filenameFromContentDisposition(header: string | null): string | 
     return simple ? simple[1].trim() : null;
 }
 
+export interface ApiDownloadOptions extends ApiRequestOptions {
+    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    headers?: Record<string, string>;
+    body?: BodyInit | null;
+}
+
 /**
  * Authenticated binary download (e.g. PDF streams). Unlike `fetcher`, it
  * returns the raw `Blob` plus the server-provided filename and reuses the same
- * 401-refresh and error-normalisation paths.
+ * 401-refresh and error-normalisation paths. The optional method/body keeps
+ * binary generation endpoints on that same pipeline without weakening the
+ * JSON-only `apiMutate` contract.
  */
-export const apiDownload = async (url: string): Promise<DownloadedFile> => {
-    const headers = { 'Accept': 'application/pdf, application/octet-stream' };
+export const apiDownload = async (
+    url: string,
+    options: ApiDownloadOptions = {}
+): Promise<DownloadedFile> => {
+    const requestOptions: RequestInit = {
+        headers: {
+            'Accept': 'application/pdf, application/octet-stream',
+            ...options.headers
+        },
+        credentials: 'include',
+        ...(options.method ? { method: options.method } : {}),
+        ...(options.body !== undefined ? { body: options.body } : {}),
+        ...(options.signal ? { signal: options.signal } : {})
+    };
 
-    let res: Response;
-    try {
-        res = await fetch(url, { headers, credentials: 'include' });
-    } catch {
-        const error = new Error('Netzwerkfehler: Keine Verbindung zum Server.') as ApiError;
-        error.status = 0;
-        throw error;
-    }
-
-    if (res.status === 401 && !url.includes('/api/auth/')) {
-        const success = await refreshToken();
-        if (success) {
-            res = await fetch(url, { headers, credentials: 'include' });
-        }
-    }
+    const res = await fetchWithRefresh(url, requestOptions);
 
     if (!res.ok) {
         await handleApiError(res);
@@ -320,6 +404,7 @@ export interface VolumePreset {
 // Use `UserDetailed` (logic/useUsers) for the management endpoint's richer shape.
 export interface User {
     id: string;
+    guest_id?: string | null;
     name: string;
     email: string;
     billing_name?: string | null;
@@ -329,21 +414,43 @@ export interface User {
     billing_city?: string | null;
     metadata_copyright?: string | null;
     ftp_slug?: string | null;
+    brand?: string | null;
+    is_cross_brand?: boolean;
     is_super_admin: boolean;
     is_admin: boolean;
     is_photographer: boolean;
+    is_org_admin?: boolean;
+    is_power_user?: boolean;
     is_pending: boolean;
     can_edit_metadata: boolean;
     flatrate_level?: 'none' | 'web' | 'print' | 'original';
     can_purchase_upgrades?: boolean;
-    is_org_admin?: boolean;
-    is_power_user?: boolean;
     roles: string[];
     missing_watermark?: boolean;
     ai_is_unconfigured?: boolean;
+    transient_galleries?: string[];
     transient_meta_galleries?: string[];
     my_galleries?: Gallery[];
     photographer_galleries?: Gallery[];
+    photographer_gallery_groups?: Array<{ id: string; name: string }>;
+}
+
+/** Fields guaranteed by the `/api/auth/me` contract. */
+export interface AuthMeUser extends User {
+    guest_id: string | null;
+    billing_name: string | null;
+    billing_company: string | null;
+    billing_street: string | null;
+    billing_zip: string | null;
+    billing_city: string | null;
+    brand: string | null;
+    is_cross_brand: boolean;
+    is_org_admin: boolean;
+    is_power_user: boolean;
+    can_purchase_upgrades: boolean;
+    transient_galleries: string[];
+    transient_meta_galleries: string[];
+    photographer_gallery_groups: Array<{ id: string; name: string }>;
 }
 export interface TextSnippet { id: string; title: string; shortcut?: string | null; content_html: string; }
 export interface OrderItem { id?: string; order_id?: string; photo_id?: string; tier: string; price: number; use_case_id?: string; qty?: number; filename?: string; notes?: string; row_total?: number; type?: string; description?: string; calculated_percentage?: number; }

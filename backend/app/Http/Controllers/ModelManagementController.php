@@ -9,7 +9,9 @@ use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
 use App\Services\AuthorizationService;
 use App\Services\ModelContactSheetService;
+use App\Services\ModelFileCleanupService;
 use App\Services\ModelFileStore;
+use App\Services\ModelPhotoPrimaryService;
 use App\Services\ModelProfileEraser;
 use App\Services\ModelQuestionnaire;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,8 +46,10 @@ class ModelManagementController extends Controller
 
     public function __construct(
         private readonly ModelFileStore $fileStore,
+        private readonly ModelFileCleanupService $fileCleanup,
         private readonly ModelQuestionnaire $questionnaire,
         private readonly ModelContactSheetService $contactSheetService,
+        private readonly ModelPhotoPrimaryService $photoPrimary,
     ) {}
 
     public function index(Request $request)
@@ -265,16 +269,17 @@ class ModelManagementController extends Controller
         $profile = ModelProfile::query()->forBrand($brand)->findOrFail($id);
         $photo = $this->resolvePhoto($profile, $photoId, requireFile: false);
 
-        // Delete the row first, then the file: a failed file delete leaves an
-        // orphan (recoverable) rather than a DB row without a file.
-        $path = $photo->path;
-        $photo->delete();
-        $this->fileStore->delete($path);
-
-        // Deleting the primary photo clears the flag (no auto-promotion, §2.4).
-        if ($photo->is_primary) {
-            ModelPhoto::where('model_profile_id', $profile->id)->update(['is_primary' => false]);
-        }
+        // Delete the row and clear its primary flag under the same profile
+        // lock. The service aborts before this point when a model event
+        // cancels/fails deletion, so the encrypted file is never removed for a
+        // row that was not deleted. File cleanup is queued only after commit and
+        // is retryable when the private disk is temporarily unavailable.
+        $deletedPhoto = $this->photoPrimary->deletePhoto($profile, $photo->id);
+        $this->fileCleanup->afterCommit(
+            $deletedPhoto->path,
+            'model_photo_delete',
+            $profile->customer_id,
+        );
 
         return response()->json(['success' => true]);
     }
@@ -294,10 +299,9 @@ class ModelManagementController extends Controller
             ]);
         }
 
-        ModelPhoto::where('model_profile_id', $profile->id)->update(['is_primary' => false]);
-        $photo->forceFill(['is_primary' => true])->save();
+        $primaryPhoto = $this->photoPrimary->promote($profile, $photo->id);
 
-        return response()->json(['success' => true, 'primary_photo_id' => $photo->id]);
+        return response()->json(['success' => true, 'primary_photo_id' => $primaryPhoto->id]);
     }
 
     /**

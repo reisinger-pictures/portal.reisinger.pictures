@@ -55,6 +55,19 @@ describe('apiDownload', () => {
         expect(result.filename).toBe('model-1-internal-20260919.pdf');
     });
 
+    it('forwards an AbortSignal to the download request', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(pdfResponse('photo.jpg'));
+        const signal = new AbortController().signal;
+        vi.stubGlobal('fetch', fetchMock);
+
+        await apiDownload('/api/photos/1/image', { signal });
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            '/api/photos/1/image',
+            expect.objectContaining({ signal, credentials: 'include' }),
+        );
+    });
+
     it('normalises a 422 response into a thrown ApiError', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(422, { message: 'Ungültige Variante.' })));
 

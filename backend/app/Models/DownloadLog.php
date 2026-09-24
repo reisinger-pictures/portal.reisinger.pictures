@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DownloadLog extends Model
 {
@@ -23,7 +24,7 @@ class DownloadLog extends Model
         'resolution_tier',
         'user_agent',
         'payload',
-        'photo_count'
+        'photo_count',
     ];
 
     protected $casts = [
@@ -31,8 +32,18 @@ class DownloadLog extends Model
         'guest_id' => 'string',
     ];
 
-    public function gallery()
+    public function gallery(): BelongsTo
     {
         return $this->belongsTo(Gallery::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 }

@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: mariadb:11.4
+    image: mariadb:11.4@sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b
     container_name: portal_db
     restart: unless-stopped
     logging:
@@ -25,7 +25,7 @@ services:
       - portal_internal
 
   search:
-    image: getmeili/meilisearch:v1.48.3
+    image: getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29
     container_name: portal_search
     restart: unless-stopped
     logging:
@@ -46,14 +46,16 @@ services:
       - portal_internal
 
   composer_init:
-    image: composer:latest
+    image: composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b
+    user: "1000:1000"
     container_name: portal_composer
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/app:Z
     command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
 
   backend:
-    image: ghcr.io/reisi007/portal-base:8.5
+    image: ghcr.io/reisi007/portal-base:8.5@sha256:484410448bdff80c2571778e69e3ec264a0033baf22b0534eaac12331f6940ba
+    user: "1000:1000"
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
@@ -157,18 +159,30 @@ services:
       start_period: 40s
     command: >
       sh -c "
-      if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ] || [ -z \"$${FILE_ENCRYPTION_KEY}\" ]; then
-        echo 'FATAL: APP_KEY, JWT_SECRET oder FILE_ENCRYPTION_KEY ist nicht gesetzt. Start verweigert (fail-closed)!';
+      if [ \"$$(id -u)\" -ne 1000 ] || [ \"$$(id -g)\" -ne 1000 ]; then
+        echo 'FATAL: Backend muss als UID:GID 1000:1000 laufen. Start verweigert (fail-closed)!';
         exit 1;
       fi;
+      if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ] || [ -z \"$${FILE_ENCRYPTION_KEY}\" ] || [ -z \"$${ADMIN_EMAIL}\" ] || [ -z \"$${ADMIN_PASSWORD}\" ] || [ -z \"$${PHOTO_STORAGE_PATH}\" ]; then
+        echo 'FATAL: APP_KEY, JWT_SECRET, FILE_ENCRYPTION_KEY, ADMIN_EMAIL, ADMIN_PASSWORD oder PHOTO_STORAGE_PATH ist nicht gesetzt. Start verweigert (fail-closed)!';
+        exit 1;
+      fi;
+      case \"$${PHOTO_STORAGE_PATH}\" in
+        /*) ;;
+        *) echo 'FATAL: PHOTO_STORAGE_PATH muss ein absoluter Mount-Pfad sein. Start verweigert!'; exit 1;;
+      esac;
+      for path in /var/www/html \"$${PHOTO_STORAGE_PATH}\" /var/www/ftp; do
+        if [ ! -d \"$${path}\" ] || [ ! -w \"$${path}\" ] || [ \"$$(stat -c '%u:%g' \"$${path}\")\" != '1000:1000' ]; then
+          echo \"FATAL: Runtime-Pfad $$path fehlt, ist nicht schreibbar oder gehört nicht UID:GID 1000:1000. Start verweigert!\";
+          exit 1;
+        fi;
+      done;
       php artisan cache:clear;
       php artisan optimize;
-      php artisan migrate --force && php artisan db:seed --force || exit 1;
+      php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1;
       php artisan scout:sync-index-settings;
       php artisan queue:restart;
-      php artisan admin:update;
       echo 'Starte Hintergrund-Prozesse...';
-      php artisan app:import-locations &
       php artisan queue:work --tries=3 &
       (while true; do php artisan schedule:run >> /dev/null 2>&1; sleep 60; done) &
       echo 'Starte PHP-FPM...';

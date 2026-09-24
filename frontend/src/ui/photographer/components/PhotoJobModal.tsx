@@ -91,19 +91,17 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
     if (!isOpen) return null;
 
     const onSubmit = async (data: PhotoJobFormValues) => {
-        const total = data.total_count === undefined || data.total_count === '' ? undefined : Number(data.total_count);
-        const selected = data.selected_count === undefined || data.selected_count === '' ? undefined : Number(data.selected_count);
+        const total = data.total_count === undefined || data.total_count === '' ? 0 : Number(data.total_count);
+        const selected = data.selected_count === undefined || data.selected_count === '' ? 0 : Number(data.selected_count);
         const input: PhotoJobInput = {
             title: data.title,
             lightroom_catalog: data.lightroom_catalog || null,
             total_count: total,
             selected_count: selected,
             target_gallery_id: data.target_gallery_id || null,
+            assignee_id: data.assignee_id || null,
             notes: data.notes || null,
         };
-        if (data.assignee_id) {
-            input.assignee_id = data.assignee_id;
-        }
         const payload: PhotoJobInput & { status?: string } = { ...input, status: data.status || undefined };
         try {
             await onSave(payload);

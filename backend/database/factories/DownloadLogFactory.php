@@ -24,12 +24,10 @@ class DownloadLogFactory extends Factory
             'photo_count' => $itemType === 'full_zip'
                 ? $this->faker->numberBetween(2, 50)
                 : 1,
-            'payload' => $itemType === 'full_zip'
-                ? ['photo_ids' => $this->faker->randomElements(
-                      array_map(fn () => $this->faker->uuid(), range(1, 5)),
-                      $this->faker->numberBetween(2, 5),
-                  )]
-                : ['photo_id' => $this->faker->uuid()],
+            // A factory row without an explicit server-written payload models
+            // a legacy log. Tests that need attribution provide real photo IDs
+            // through the payload instead of receiving synthetic UUIDs.
+            'payload' => null,
         ];
     }
 

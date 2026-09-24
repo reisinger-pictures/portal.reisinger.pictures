@@ -17,6 +17,27 @@ local GalleryDialog = require "GalleryDialog"
 local InviteDialog = require "InviteDialog"
 local RatingStatusDialog = require "RatingStatusDialog"
 
+-- A fresh directory per invocation prevents a previous export from colliding
+-- with this run's renditions.  The counter also separates invocations within
+-- the same Lightroom process/second.
+local uploadRunCounter = 0
+
+local function makeUploadDirectory(tempPath, galleryId)
+    uploadRunCounter = uploadRunCounter + 1
+    local root = LrPathUtils.child(tempPath, "Reisinger_Uploads_" .. tostring(galleryId))
+    local runSuffix = tostring(os.time()) .. "-" .. tostring(uploadRunCounter)
+    local candidate = LrPathUtils.child(root, runSuffix)
+
+    -- A Lightroom restart resets the in-process counter.  Never reuse a
+    -- directory that survived such a restart (or an interrupted export).
+    local collision = 0
+    while LrFileUtils.exists(candidate) do
+        collision = collision + 1
+        candidate = LrPathUtils.child(root, runSuffix .. "-" .. tostring(collision))
+    end
+    return candidate
+end
+
 return function(mode, baseUrl)
     LrTasks.startAsyncTask(function()
         Api.setBaseUrl(baseUrl)
@@ -25,6 +46,7 @@ return function(mode, baseUrl)
         local photoCount = #targetPhotos
 
         local jwt = nil
+        local session = nil
         local prefs = import 'LrPrefs'.prefsForPlugin()
         -- Move any plaintext password from an older plugin version into the
         -- OS-protected credential store, then try a silent login with the
@@ -99,7 +121,15 @@ return function(mode, baseUrl)
             jwt, lastErr, lastDetail = Api.login(credEmail, credPassword)
             if jwt then
                 Api.storePassword(credPassword)
-                local isAllowed, userData, roleStatus = Api.checkRole(jwt)
+                -- Do not keep a plaintext password in the long-lived manager
+                -- closure; renewal must use the protected Api.login fallback.
+                credPassword = nil
+                if not session then
+                    session = Api.createSession(jwt, credEmail, function()
+                        return Api.login(credEmail)
+                    end)
+                end
+                local isAllowed, userData, roleStatus = Api.checkRole(session)
                 if isAllowed then
                     break
                 elseif roleStatus == 200 then
@@ -116,10 +146,27 @@ return function(mode, baseUrl)
             end
         end
 
+        -- The session was created after the successful login.  Keep only its
+        -- mutable JWT; the protected-store fallback in Api.login is the only
+        -- credential source used when a long manager session receives a 401.
+        local sessionExpiredNotified = false
+        local function requestApi(endpoint, method, payload)
+            local data, status = Api.callWithSession(session, endpoint, method, payload)
+            if status == 401 and not sessionExpiredNotified then
+                sessionExpiredNotified = true
+                LrDialogs.message(
+                    Api.getTitle("Sitzung abgelaufen"),
+                    "Deine Anmeldung konnte nicht automatisch erneuert werden. Bitte den Manager schließen, neu starten und erneut anmelden.",
+                    "critical"
+                )
+            end
+            return data, status
+        end
+
         -- 2. Daten laden
         local treeData = nil
         local function reloadTree()
-            local data, status = Api.call("/api/management/galleries?filter_type=" .. mode, "GET", nil, jwt)
+            local data, status = requestApi("/api/management/galleries?filter_type=" .. mode, "GET", nil)
             if status == 200 and data then
                 treeData = data
                 return true
@@ -202,14 +249,14 @@ return function(mode, baseUrl)
             })
             table.insert(uiElements, f:row {
                 f:spacer { width = 130 },
-                f:push_button { title = "+ Neu...", action = function() MetaGalleryDialog(nil, treeData, jwt, handleReload) end },
+                f:push_button { title = "+ Neu...", action = function() MetaGalleryDialog(nil, treeData, session, handleReload, requestApi) end },
                 f:push_button { 
                     title = "Bearbeiten...", 
                     enabled = LrView.bind{key="hasGroup", bind_to_object=props}, 
                     action = function() 
                         local selected = nil
                         for _, g in ipairs(props.groupItems) do if g.value == props.selectedGroupId then selected = g.raw break end end
-                        if selected then MetaGalleryDialog(selected, treeData, jwt, handleReload) end
+                        if selected then MetaGalleryDialog(selected, treeData, session, handleReload, requestApi) end
                     end 
                 },
                 f:push_button { 
@@ -218,7 +265,7 @@ return function(mode, baseUrl)
                         local confirm = LrDialogs.confirm(Api.getTitle("Meta-Galerie löschen?"), "Alle Unterordner und Galerien werden in die Root-Ebene verschoben.", "Löschen", "Abbrechen")
                         if confirm == "ok" then
                             LrTasks.startAsyncTask(function()
-                                local _, stat = Api.call("/api/management/gallery-groups/" .. props.selectedGroupId, "DELETE", nil, jwt)
+                                local _, stat = requestApi("/api/management/gallery-groups/" .. props.selectedGroupId, "DELETE", nil)
                                 if stat == 200 then handleReload() end
                             end)
                         end
@@ -238,24 +285,24 @@ return function(mode, baseUrl)
             
             table.insert(uiElements, f:row {
                 f:spacer { width = 130 },
-                f:push_button { title = "+ Neu...", action = function() GalleryDialog(mode, nil, treeData, jwt, handleReload) end },
+                f:push_button { title = "+ Neu...", action = function() GalleryDialog(mode, nil, treeData, session, handleReload, requestApi) end },
                 f:push_button { 
                     title = "Bearbeiten...", 
                     enabled = LrView.bind{key="hasGallery", bind_to_object=props}, 
                     action = function() 
                         local selected = nil
                         for _, g in ipairs(props.galleries) do if g.value == props.selectedGalleryId then selected = g.raw break end end
-                        if selected then GalleryDialog(mode, selected, treeData, jwt, handleReload) end
+                        if selected then GalleryDialog(mode, selected, treeData, session, handleReload, requestApi) end
                     end 
                 },
-                f:push_button { title = "Einladungs-Links...", enabled = LrView.bind{key="hasGallery", bind_to_object=props}, action = function() InviteDialog(props.selectedGalleryId, jwt) end },
+                f:push_button { title = "Einladungs-Links...", enabled = LrView.bind{key="hasGallery", bind_to_object=props}, action = function() InviteDialog(props.selectedGalleryId, session, requestApi) end },
                 f:push_button { 
                     title = "- Löschen...", enabled = LrView.bind{key="hasGallery", bind_to_object=props}, 
                     action = function()
                         local confirm = LrDialogs.confirm(Api.getTitle("Galerie löschen?"), "Bilder, Personen und Bewertungen werden unwiderruflich gelöscht.", "Löschen", "Abbrechen")
                         if confirm == "ok" then
                             LrTasks.startAsyncTask(function()
-                                local _, stat = Api.call("/api/management/galleries/" .. props.selectedGalleryId, "DELETE", nil, jwt)
+                                local _, stat = requestApi("/api/management/galleries/" .. props.selectedGalleryId, "DELETE", nil)
                                 if stat == 200 then handleReload() end
                             end)
                         end
@@ -286,7 +333,7 @@ return function(mode, baseUrl)
                                 end
                             end
                             local galName = selectedGal and selectedGal.name or "Galerie"
-                            RatingStatusDialog(props.selectedGalleryId, galName, jwt, handleReload)
+                            RatingStatusDialog(props.selectedGalleryId, galName, session, handleReload, requestApi)
                         end
                     }
                 })
@@ -307,8 +354,12 @@ return function(mode, baseUrl)
 
                 LrTasks.startAsyncTask(function()
                     local tempPath = LrPathUtils.getStandardFilePath('temp')
-                    local galleryUploadDir = LrPathUtils.child(tempPath, "Reisinger_Uploads_" .. props.selectedGalleryId)
-                    LrFileUtils.createAllDirectories(galleryUploadDir)
+                    local galleryUploadDir = makeUploadDirectory(tempPath, props.selectedGalleryId)
+                    local directoryCreated = LrFileUtils.createAllDirectories(galleryUploadDir)
+                    if directoryCreated == false then
+                        LrDialogs.message(Api.getTitle("Fehler"), "Das temporäre Upload-Verzeichnis konnte nicht erstellt werden. Upload abgebrochen.", "critical")
+                        return
+                    end
                     
                     local logFilePath = LrPathUtils.child(galleryUploadDir, "upload_log.txt")
                     local function logMsg(msg)
@@ -324,7 +375,7 @@ return function(mode, baseUrl)
                     logMsg("Anzahl Bilder: " .. tostring(photoCount))
 
                     if mode == "delivery" and props.convertToDelivery then
-                        local _, convertStatus = Api.call("/api/management/galleries/" .. props.selectedGalleryId, "PUT", { is_live = false }, jwt)
+                        local _, convertStatus = requestApi("/api/management/galleries/" .. props.selectedGalleryId, "PUT", { is_live = false })
                         if convertStatus ~= 200 then
                             logMsg("Live-Modus konnte nicht beendet werden (HTTP " .. tostring(convertStatus) .. "). Upload abgebrochen.")
                             LrDialogs.message(Api.getTitle("Fehler"), "Der Live-Modus konnte nicht beendet werden. Upload abgebrochen.", "critical")
@@ -342,82 +393,117 @@ return function(mode, baseUrl)
                         exportSettings.LR_size_doConstrain = false; exportSettings.LR_minimizeEmbeddedMetadata = false; exportSettings.LR_removeLocationMetadata = false
                     end
 
-                    exportSettings.LR_collisionHandling = "skip"
+                    -- A fresh export directory plus overwrite semantics keeps
+                    -- Lightroom from treating a previous run as a valid
+                    -- collision.  Failed renders are never reused below.
+                    exportSettings.LR_collisionHandling = "overwrite"
 
-                    local session = LrExportSession({ photosToExport = targetPhotos, exportSettings = exportSettings })
+                    local exportSession = LrExportSession({ photosToExport = targetPhotos, exportSettings = exportSettings })
                     local i = 0
                     local errorCount = 0
+                    local uploadedCount = 0
                     local sessionExpired = false
+                    local cancelled = false
                     
-                    for _, rendition in session:renditions() do
-                        if progress and progress:isCanceled() then 
+                    for _, rendition in exportSession:renditions() do
+                        if progress and progress:isCanceled() then
+                            cancelled = true
                             logMsg("Upload durch Benutzer abgebrochen.")
-                            break 
+                            break
                         end
                         i = i + 1
-                        
-                        local path = rendition.destinationPath
-                        local success = false
-                        
-                        logMsg("--- Bild " .. i .. " ---")
-                        if path then logMsg("Geplanter Zielpfad: " .. path) end
 
-                        logMsg("Warte auf Lightroom-Render...")
-                        local ok, pathOrMessage = rendition:waitForRender()
-                        if ok then
-                            path = pathOrMessage
-                            success = true
-                            logMsg("Render erfolgreich: " .. tostring(path))
-                        else
-                            -- Lightroom hat wg. 'skip' nicht gerendert oder es gab einen Fehler
-                            if path and LrFileUtils.exists(path) then
-                                logMsg("Render durch LR übersprungen (Datei existiert), nutze existierende Datei: " .. tostring(path))
-                                success = true
-                            else
-                                logMsg("Render fehlgeschlagen oder Datei fehlt: " .. tostring(pathOrMessage))
+                        local path = rendition.destinationPath
+                        local stalePath = false
+                        if path then
+                            stalePath = LrFileUtils.exists(path)
+                            if stalePath then
+                                -- A path surviving a previous run is never an
+                                -- upload candidate.  Remove it before rendering;
+                                -- if removal fails, fail closed below.
+                                LrFileUtils.delete(path)
+                                stalePath = LrFileUtils.exists(path)
+                                if stalePath then
+                                    logMsg("Vorherige Rendition konnte nicht entfernt werden; sie wird nicht verwendet.")
+                                end
                             end
                         end
 
-                        if success and path then
-                            local filename = LrPathUtils.leafName(path)
+                        logMsg("--- Bild " .. i .. " ---")
+                        if path then logMsg("Geplanter Zielpfad: " .. tostring(path)) end
+
+                        logMsg("Warte auf Lightroom-Render...")
+                        local renderOk, pathOrMessage = rendition:waitForRender()
+
+                        -- A cancellation can arrive while Lightroom is rendering.
+                        -- Never turn that cancelled wait into an upload.
+                        if progress and progress:isCanceled() then
+                            cancelled = true
+                            logMsg("Render durch Benutzer abgebrochen; keine Datei wird verwendet.")
+                            break
+                        end
+
+                        -- Only an explicit successful wait may produce an upload
+                        -- candidate.  In particular, never fall back to an old
+                        -- destinationPath when waitForRender failed.
+                        local renderedPath = pathOrMessage
+                        if renderedPath == nil or renderedPath == "" then renderedPath = path end
+                        if renderOk ~= true or type(renderedPath) ~= "string" or renderedPath == ""
+                            or stalePath or not LrFileUtils.exists(renderedPath) then
+                            renderedPath = nil
+                            logMsg("Render fehlgeschlagen oder abgebrochen; vorhandene Datei wird nicht verwendet: " .. tostring(pathOrMessage))
+                        else
+                            logMsg("Render erfolgreich: " .. tostring(renderedPath))
+                        end
+
+                        if renderedPath then
+                            if progress and progress:isCanceled() then
+                                cancelled = true
+                                logMsg("Upload durch Benutzer abgebrochen.")
+                                break
+                            end
+                            local filename = LrPathUtils.leafName(renderedPath)
                             local lrUuid = rendition.photo:getRawMetadata("uuid")
                             if progress then progress:setCaption("Upload " .. i .. "/" .. photoCount .. ": " .. filename) end
 
                             logMsg("Starte Upload für UUID: " .. tostring(lrUuid) .. " (Backend generiert nun UUID-Filenames)")
-                            
+
                             local formFields = {
                                 { name = "gallery_id", value = tostring(props.selectedGalleryId) },
                                 { name = "lr_uuid",    value = lrUuid },
                                 { name = "replace",    value = "1" },
-                                { name = "file",       fileName = filename, filePath = path, contentType = "image/jpeg" }
+                                { name = "file",       fileName = filename, filePath = renderedPath, contentType = "image/jpeg" }
                             }
 
-                            local resBody, status, uploadErr = Api.uploadMultipart("/api/management/upload", formFields, jwt)
-
+                            local _, status, uploadErr = Api.uploadWithSession(session, "/api/management/upload", formFields)
                             logMsg("HTTP Status: " .. tostring(status))
-
-                            if status == 401 then
-                                -- The JWT expired (TTL 240 min). Re-login silently
-                                -- with the saved credentials and retry the upload
-                                -- once; `replace = 1` makes the retry idempotent.
-                                logMsg("Sitzung abgelaufen (HTTP 401). Erneute Anmeldung wird versucht...")
-                                local newJwt = Api.login(credEmail)
-                                if newJwt then
-                                    jwt = newJwt
-                                    logMsg("Erneut angemeldet. Wiederhole Upload.")
-                                    resBody, status, uploadErr = Api.uploadMultipart("/api/management/upload", formFields, jwt)
-                                    logMsg("HTTP Status (2. Versuch): " .. tostring(status))
-                                end
-                            end
 
                             if status == 401 then
                                 sessionExpired = true
                                 logMsg("Sitzung abgelaufen (HTTP 401). Upload abgebrochen.")
                                 break
-                            elseif status == 200 then 
-                                logMsg("Upload erfolgreich. Lösche lokale Datei.")
-                                LrFileUtils.delete(path) 
-                            else 
+                            elseif status >= 200 and status < 300 then
+                                uploadedCount = uploadedCount + 1
+                                -- Delete only a path that this run explicitly
+                                -- rendered and successfully uploaded.  Failed
+                                -- render candidates are retained for diagnosis.
+                                LrFileUtils.delete(renderedPath)
+                                if LrFileUtils.exists(renderedPath) then
+                                    logMsg("Upload erfolgreich, lokale Datei konnte nicht gelöscht werden.")
+                                else
+                                    logMsg("Upload erfolgreich. Frische lokale Datei gelöscht.")
+                                end
+                                if progress and progress:isCanceled() then
+                                    cancelled = true
+                                    logMsg("Upload nach erfolgreicher Annahme abgebrochen.")
+                                    break
+                                end
+                            else
+                                if progress and progress:isCanceled() then
+                                    cancelled = true
+                                    logMsg("Upload nach Benutzerabbruch nicht erneut gestartet.")
+                                    break
+                                end
                                 errorCount = errorCount + 1
                                 local errDetail = uploadErr or ("HTTP " .. tostring(status))
                                 logMsg("UPLOAD FEHLER: " .. tostring(errDetail))
@@ -436,33 +522,43 @@ return function(mode, baseUrl)
                                 end)
                             end
                         else
-                            logMsg("Überspringe Upload, success=false oder path=nil")
+                            logMsg("Überspringe Upload, da kein erfolgreich gerendertes Rendition-Ergebnis vorliegt.")
                             errorCount = errorCount + 1
                         end
                         if progress then progress:setPortionComplete(i, photoCount) end
                     end
+                    if progress and progress:isCanceled() then cancelled = true end
                     if progress then progress:done() end
 
                     if sessionExpired then
-                        LrDialogs.message(Api.getTitle("Sitzung abgelaufen"), "Deine Anmeldung ist abgelaufen. Bitte den Manager schließen, neu starten und erneut anmelden.", "critical")
+                        logMsg("=== UPLOAD SCHLEIFE BEENDET (Sitzung abgelaufen) ===")
+                        if not sessionExpiredNotified then
+                            sessionExpiredNotified = true
+                            LrDialogs.message(Api.getTitle("Sitzung abgelaufen"), "Deine Anmeldung ist abgelaufen. Bitte den Manager schließen, neu starten und erneut anmelden.", "critical")
+                        end
                         return
                     end
 
-                    -- Temp-Dir aufräumen bei komplett erfolgreichem Upload
-                    if errorCount == 0 then
-                        local rmOk, rmErr = LrFileUtils.delete(galleryUploadDir)
-                        if not rmOk then logMsg("Konnte Temp-Dir nicht löschen: " .. tostring(rmErr)) end
+                    if cancelled then
+                        logMsg("Upload durch Benutzer abgebrochen. Hochgeladen: " .. tostring(uploadedCount) .. "/" .. tostring(photoCount))
+                        LrDialogs.message(
+                            Api.getTitle("Upload abgebrochen"),
+                            "Der Upload wurde abgebrochen. " .. tostring(uploadedCount) .. " von " .. tostring(photoCount) .. " Bildern wurden bereits hochgeladen; lokale Renditionsdateien wurden nicht pauschal gelöscht.",
+                            "warning"
+                        )
+                        return
                     end
-                    
+
+                    local failedCount = math.max(0, math.min(photoCount, math.max(errorCount, photoCount - uploadedCount)))
                     local selectedGalPath = ""
                     for _, g in ipairs(props.galleries) do
                         if g.value == props.selectedGalleryId and g.raw then
-                            selectedGalPath = g.raw.full_path
+                            selectedGalPath = g.raw.full_path or ""
                             break
                         end
                     end
 
-                    if errorCount == 0 then
+                    if errorCount == 0 and uploadedCount == photoCount then
                         local confirm = LrDialogs.confirm(
                             Api.getTitle("Upload abgeschlossen!"), 
                             "Alle Bilder (" .. photoCount .. ") wurden erfolgreich hochgeladen.\n\nMöchtest du die Galerie jetzt im Web-Portal öffnen, um sie zu überprüfen und Kunden zu benachrichtigen?", 
@@ -477,11 +573,21 @@ return function(mode, baseUrl)
                     else
                         LrDialogs.message(
                             Api.getTitle("Upload mit Fehlern abgeschlossen"), 
-                            errorCount .. " von " .. photoCount .. " Bildern konnten nicht hochgeladen werden.\n\nBitte prüfe die aufgetretenen Fehlermeldungen oder die Log-Datei im Temp-Ordner.", 
+                            failedCount .. " von " .. photoCount .. " Bildern konnten nicht hochgeladen werden.\n\nBitte prüfe die aufgetretenen Fehlermeldungen oder die Log-Datei im Temp-Ordner.",
                             "warning"
                         )
                     end
                     logMsg("=== UPLOAD SCHLEIFE BEENDET ===")
+
+                    if errorCount == 0 and uploadedCount == photoCount then
+                        LrFileUtils.delete(galleryUploadDir)
+                        if LrFileUtils.exists(galleryUploadDir) then
+                            -- The directory is disposable after a complete
+                            -- upload; retain the diagnostic message in the UI
+                            -- log when the SDK reports a cleanup failure.
+                            logMsg("Konnte Temp-Verzeichnis nicht löschen.")
+                        end
+                    end
                 end)
             end
         end)

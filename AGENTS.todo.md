@@ -1,8 +1,253 @@
 # Task Board — Portal Reisinger Pictures
 
-> Stand: 2026-09-19. **Nur offene TODOs + erledigte Referenz-Blöcke.** Architekturentscheidungen in `features/`.
+> Stand: 2026-09-24. **Nur offene TODOs + erledigte Referenz-Blöcke.** Architekturentscheidungen in `features/`.
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
+
+---
+
+## 🔍 VOLLSTÄNDIGER HEAD-AUDIT (2026-09-24)
+
+> Scope: vollständiger tracked Codebestand bei `HEAD=72f55da` (1.127 Dateien; 531 PHP, 376 TS/TSX, 78 E2E-Specs), nicht nur der letzte Diff. Der Working Tree war zu Auditbeginn sauber. Die Prüfung läuft als unabhängiger Full-Repository-Audit; Befunde werden erst nach Verifikation gegen Implementierung, Call-Path und bestehende Tests als Probleme dokumentiert.
+
+**Review- und Remediation-Tracking**
+- [x] Verifizierte Befunde mit Datei/Zeile, realistischem Trigger, Schweregrad und Regressionstest in diesem Block dokumentieren.
+- [x] Jeden bestätigten Backend-Befund mit PHPUnit-Regression beheben; keinen Fix ohne Testnachweis dokumentieren.
+- [x] Jeden bestätigten Frontend-Logikbefund mit Vitest-Regression beheben; UI-/Routing-Befunde zusätzlich mit getaggter Playwright-Abdeckung versehen.
+- [x] Gesamtverifikation durch separate Subagenten: vollständige PHPUnit-Suite, Vitest, `pnpm lint:fix`, `pnpm build` und `@smoke`-E2E (soweit die lokale Umgebung sie ausführt).
+
+**Post-Audit-Entscheidungen (2026-09-24; in diesem Commit noch nicht implementiert)**
+- **CR-PAY-010:** vollständige serverseitige Idempotency-Key-Unterstützung für Invoice/Free/Quote ist als nächster Umsetzungsschritt ausgewählt.
+- **CR-FE-030:** Meta-Gallery-Lizenzierung soll pro Child/Gallery-Gruppe aufgelöst werden; Tests und API/UI-Vertrag folgen in einem Folge-Change.
+- **CR-CRM-008:** dauerhaft retrybarer Dispatch-/Outbox-Fallback für CRM-Dateisystem-/Scout-Cleanup ist ausgewählt; eine erforderliche Schema-Migration benötigt eine separate V039+-Entscheidung.
+- **CR-DATA-018/CR-BE-018:** die V039+-Question zur Contract-E-Mail-Uniqueness blieb unbeantwortet; daher keine neue Migration in diesem Commit.
+
+**Test-Coverage-Audit der neuen Änderungen (2026-09-24; angefordert)**
+- [x] Ein unabhängiger Subagent prüft für jede neue Remediation (Backend, Frontend, Plugin, Contract/Payment/Media) ob die Regressionstests den tatsächlichen Fehler, die Fehlerklasse und die relevanten Erfolgs-/Nebenpfade abdecken.
+- [x] Findings in mindestens einem konkret implementierbaren Subtask umsetzen; für Backend PHPUnit, Frontend Vitest, UI/Routing Playwright und Plugin den vorhandenen Harness verwenden.
+- [x] Nach der Überarbeitung fokussierte Tests, Full-Gates und `git diff --check` erneut ausführen und die Review-Range im Task Board aktualisieren.
+- **Frontend-Full-Gate 2026-09-24:** `pnpm test:run` **111 Testdateien / 890 Tests, 0 Fehler**; `pnpm lint:fix`, `pnpm lint:e2e`, `pnpm build` (TypeScript/i18n/Vite) und Plugin-Harness sind grün. Der erste 120-s-Lauf war nur ein Tool-Timeout; der Lauf mit erweitertem Timeout ist vollständig abgeschlossen.
+- **Review-Range:** `72f55da...HEAD` (Basis vor diesem Remediation-Commit; nach dem Push durch den späteren Reviewer auflösen)
+- **Backend-Full-Gate 2026-09-24:** Der offizielle `ghcr.io/reisi007/portal-base:8.5`-Containerlauf mit `--network host` und erreichbaren Meilisearch-/Mailpit-Diensten ist **PASS: 1.969 Tests, 0 Fehler, 6.276 Assertions** (1.962 Warnungen nur wegen fehlender lokaler `backend/.env`). Ein vorheriger Hostlauf war wegen der nicht erreichbaren Port-Forwardings umgebungsbedingt fehlgeschlagen und ist kein Code-Failure.
+
+**Bestätigte Findings aus dem unabhängigen Coverage-Audit (umgesetzt/verified; Umgebungs- und Folgeblocker separat)**
+- **CR-FE-040 (P1, implemented/verified):** Das Entfernen eines einzelnen Items aus einem signierten Multi-Photo-Quote invalidiert den Token; der verbleibende Warenkorb wird ohne Quote-Metadaten persistiert und nicht mit veraltetem Token remounted. Regression: `CartProvider.test.tsx` (Multi-Photo-Quote, Persistenz/Remount), fokussiert 45 Tests grün; unabhängiger Verifier bestätigt den ursprünglichen Trigger.
+- **CR-PAY-012 (P1, implemented/verified):** `POST /api/coupons/validate` returns the public `max_items` contract; the percentage preview now honors the server's cheapest-item limit. Regression: `CouponCheckoutControllerTest` (6 tests/19 assertions) plus `useCoupon` max-items Vitest.
+- **CR-FE-047 (P1/P2, implemented/verified):** `useCoupon` resets atomically on eligibility, quote and complete-cart identity changes, ignores stale in-flight responses (including A→B→A), and the keyed `CouponInput` clears its local draft. Regression: 113 focused frontend tests across CartProvider/useCoupon/ClientCartView/cartLogic/CouponInput/LicenseSelector/VolumeLicensing, including non-eligible-item mutation.
+- **CR-FE-048 (P2, implemented/verified):** Mixed carts retain `galleryGroupId` and send bounded, complete gallery/meta-gallery scope arrays to validation. Regression: mixed-scope controller contract plus ClientCartView/useCoupon request tests.
+- **CR-TEST-013 (P2, implemented/verified):** Internal `/api/*` intercepts were removed from coupon/cart, delivery-metadata and AI-config E2E specs; real API fixtures/flows replace them. `pnpm lint:e2e`, targeted Playwright collection (26 tests across five specs) and the moved Vitest coverage pass; the only remaining route interception is the permitted external Stripe.js provider boundary.
+- **CR-TEST-014 (P2, implemented/verified):** `admin.lrplugin/tests/run.sh` registriert `manager_upload_regression.lua`; der Harness-Contract-Test prüft die Lua-Dispatch-Reihenfolge, und der Static-Fallback weist ausdrücklich aus, dass ohne Lua-/Lightroom-Laufzeit keine Live-Ausführung erfolgt. `bash admin.lrplugin/tests/run.sh` ist grün.
+
+**Befund CR-DOC-001 (P2, behoben)**
+- Die Modul-Anweisungen nannten V027/V029 als letzte deploy-bereite Migration, obwohl zum damaligen Auditzeitpunkt V036 die Repository-Frontier war (V035 war laut Deployment-Status zuletzt deployed). Das konnte Agenten dazu verleiten, die falsche Migration zu erweitern und Deployment-/Seed-Anweisungen zu übernehmen. Die damalige Korrektur auf V036 ist inzwischen durch die aktuelle Repository-Frontier V038 (V037 Guest-Ownership, V036 Card-Testing) überholt; `AGENTS.md`/`backend/AGENTS.md` wurden entsprechend auf V038 mit V035 als zuletzt aufgezeichnetem Deployment-Stand und V039+ für neue Migrationen aktualisiert. Keine Produktionsmigration geändert.
+
+**Weitere verifizierte Dokumentationsbefunde (umgesetzt 2026-09-24; Dokumentations-only)**
+
+- [x] **CR-DOC-002 (P1):** Root-Kommandos auf `pnpm lint:fix && pnpm build` vereinheitlicht; `tsc -b` ist nur als optionale Zusatzdiagnose ausgewiesen.
+- [x] **CR-DOC-003 (P2):** Security-Register-/Seed-Verweise und veraltete M-/L-IDs auf aktuelle Abschnitte/Task-IDs korrigiert.
+- [x] **CR-DOC-004 (P2):** N1, P0-A/P0-B und der Baseline-Lauf an den tatsächlichen Status angeglichen; der **initiale lokale** Backend-Baseline-Lauf bleibt als umgebungsbedingt fehlgeschlagen sichtbar, während der spätere Setup-Recovery-Lauf als historischer Verifikationsdatensatz getrennt ausgewiesen ist. Historische Commit- und Deployment-Hinweise sind als solche gekennzeichnet.
+- [x] **CR-DOC-005 (P1):** Getrackte Allowlist klassifiziert, PHPUnit auf SQLite `:memory:` korrigiert und `.env.ci`/`.env.encrypted` ausdrücklich als CI-/Backup-Artefakte statt Starter-Templates beschrieben.
+- [x] **CR-DOC-006 (P2):** Fail-closed Sequenz `migrate --force && db:seed --force || exit 1` in der Deployment-SOLL dokumentiert.
+- [x] **CR-DOC-007 (P1):** CRM-Status, Encryption, Owner-Update und Foto-Wire-Contract auf den implementierten V033–V035-Stand gebracht.
+- [x] **CR-DOC-008 (P2):** AI-Status/Fallback und Pricing-/Legacy-Dokumente auf den aktuellen Boolean-, LM-Studio-, Preset- und Strategy-Vertrag gebracht.
+
+**Abgrenzung:** Für diese reine Dokumentations-Remediation werden keine
+neuen Test- oder Verifikationsaussagen erstellt. Die allgemeine
+Review-/Baseline-Tracking-Liste bleibt von den offenen Code-/Infra-Befunden
+getrennt.
+
+**Historischer Setup-Recovery-Verifikationslauf (2026-09-24, separater Verifikations-Subagent)**
+- `frontend/pnpm run test:run`: **PASS**, 84 Dateien / 759 Tests; `pnpm lint:fix`: **PASS** ohne tracked Änderungen; `pnpm build`: **PASS**; PHP-Syntax: **PASS** (556/556); `git diff --check`: **PASS**.
+- **Historischer Recovery-Lauf:** `backend/php artisan test`: **PASS nach Setup-Recovery**, 1.718 Warnungen / 7 passed / 4.936 Assertions, 66,49 s. Zuvor **FAIL**, 695 failed / 1.023 Warnungen / 7 passed (2.876 Assertions). Debugging-Analyse: Die ursprünglichen Logs zeigten `Connection refused` zu Meilisearch `127.0.0.1:7701` und Mailpit `127.0.0.1:1025`; nach lokaler CI-Image-/Fallback-Bereitstellung und Installation der fehlenden Host-Pakete `php8.5-gd` sowie ExifTool lief die Suite vollständig grün. Dies war ein Setup-/Umgebungsfehler, keine Code-Regression; die geänderte Umgebung ist nicht tracked und ist nicht der Status des aktuellen Checkouts.
+- **Aktueller Full-Suite-Lauf (2026-09-24, final):** Im GD/ExifTool-Image `ghcr.io/reisi007/portal-base:8.5` mit frischem `TEST_TOKEN=finalcontract`, Meilisearch und Mailpit im gemeinsamen Docker-Netz: **1.964 Tests / 6.241 Assertions, 0 Fehler** (81,98 s). PHP-Syntax, gezieltes Pint und `git diff --check` sind ebenfalls grün.
+
+**Weitere verifizierte Dokumentations-/Infra-Befunde (009–016 Dokumentations-/Config-Konsistenz umgesetzt; 017–025 Dokumentations-only abgeschlossen)**
+- [x] **CR-DOC-009 (P1, Dokumentation/Policy):** AD-1 ist als superseded/retracted markiert; Test-/Secret-Credentials und App-Key-Fallbacks sind ausdrücklich nicht committed, und die sichere Fixture-/Mock-Regel steht im Architectural-Decision-Record.
+- [x] **CR-DOC-010 (P1, Dokumentation):** Historische V001/V024–V030- und Brand-Migrationsverweise sind als historisch markiert; V038 ist die aktuelle Repository-Frontier, V037 ist die vorhergehende Guest-Ownership-Migration, V036 bleibt Card-Testing, und neue Schemaänderungen starten als separate V039+; V035 ist der zuletzt aufgezeichnete Deployment-Stand.
+- [x] **CR-DOC-011 (P1, Dokumentation):** Die Deployment-SOLL beschreibt die fail-closed UID-/Credential-/Pfad-Guards, `migrate --force && db:seed --force && admin:update || exit 1` und ZeptoMail; Live-Deployment bleibt ausdrücklich Betriebsprüfung.
+- [x] **CR-DOC-012 (P1, Script-/Config-Remediation):** `sync.sh` nutzt `set -euo pipefail`; beide rclone-Synchronisationen müssen erfolgreich sein, bevor der Erfolg ausgegeben wird. Dies ist eine Script-/Config-Änderung, kein reiner Docs-Fix.
+- [x] **CR-DOC-013 (P1, Run-Config-/Composer-Remediation):** Das Migration-Run-Config und `composer setup` führen `migrate --seed` aus; der Seed-Vertrag ist damit in der Konfiguration verankert. Keine Application-Testaussage.
+- [x] **CR-DOC-014 (P2, Dokumentation):** README-Quickstart nennt die realen Run-Configs, startet Mailpit nicht mehr fälschlich als Docker-Service und beschreibt `Backend: Init (Cache)` sowie den separaten Setup-/Seed-Schritt korrekt.
+- [x] **CR-DOC-015 (P1, Workflow-/Security-Konfiguration):** Die CI-E2E-Jobs laden keine Playwright-Reports, `test-results`, Traces, Screenshots oder Videos hoch; die verbleibenden Rollout-/Freshness-Nachweise werden nicht behauptet. Dies ist eine Workflow-Konfigurationsänderung, kein reiner Docs-Fix.
+- [x] **CR-DOC-016 (P2, Dokumentation/Policy):** Die E2E-Dokumente verwenden das singuläre Playwright-`tag`-Format, verlangen mindestens einen funktionalen Tag, verbieten LocalStorage-Injektion und spiegeln die aktuelle Sieben-Einträge-Matrix samt vollständiger serieller Auswahl wider.
+- [x] **CR-DOC-017 (P2):** CodeGraph-Doku und Hook Guard beschreiben nun Optionalität, `Not initialized`, den directory-only Guard und den fails-open Sync korrekt; keine aktive Index-/Freshness-Garantie behauptet. Reine Dokumentationskorrektur, keine neuen Testaussagen.
+- [x] **CR-DOC-018 (P2):** Card-Testing-Status als implementiert/historisch verifiziert, aber Rollout und Final Review offen; CI/Commit-Referenzen als historische Evidenz markiert und Turnstile-Fail-Closed auf den aktiven/konfigurierten Zustand präzisiert. Reine Dokumentationskorrektur, keine neuen Testaussagen.
+- [x] **CR-DOC-019 (P2):** Backend-/Root-Verweis auf den Security Risk Register zeigt konsistent auf §8; E2E-Wiederholung ist auf drei Fix-Versuche begrenzt; die React-Compiler-/Memoization-Policy ist in Root-/Frontend-/Feature-Doku angeglichen. Reine Dokumentationskorrektur, keine neuen Testaussagen.
+- [x] **CR-DOC-020 (P1, verifier follow-up):** Deployment-SOLL dokumentiert `admin:update` als required fail-closed chain step sowie UID/GID-, Credential-, absoluten Storage- und Ownership-Guards. Reine Dokumentationskorrektur, keine neuen Testaussagen.
+- [x] **CR-DOC-021 (P1, verifier follow-up):** Fresh-`composer setup`-Flow mit vorausgesetzter `.env`-, `ADMIN_EMAIL`/`ADMIN_PASSWORD`- und Seed-Konfiguration beschrieben. Reine Dokumentationskorrektur, keine neuen Testaussagen.
+- [x] **CR-DOC-022 (P2, verifier follow-up):** README verweist auf `features/README.md` und `features/tech/README.md`; `Features.md` ist als legacy Overview gekennzeichnet. Reine Dokumentationskorrektur, keine neuen Testaussagen.
+- [x] **CR-DOC-023 (P1, verifier follow-up):** Historische P0-A/P0-B-, Baseline-, Sync-/Root- und Location-Statusblöcke im Task Board als historisch, offen oder aktuell einzuordnen; keine Application-Tests aus dieser Doku-Remediation abgeleitet. Reine Dokumentationskorrektur.
+- [x] **CR-DOC-024 (P2, verifier follow-up):** Feature- und Tech-E2E-Doku verwenden dieselbe explizite Policy: interne `/api/*`-Route-Mocks sind verboten; nur dokumentierte externe Provider-/Widget-Grenzen dürfen stubbed werden. Bestehende interne Intercept-Tests bleiben als separate Testqualitäts-/Refactoring-Befunde offen; dieser Docs-only-Pass ändert keine Tests. Reine Dokumentationskorrektur, keine neuen Testaussagen.
+- [x] **CR-DOC-025 (P2):** Composer-Image-Referenz, aktueller Seeder-Contract und `admin@example`-Runtime-Fallback-Referenz korrigiert. Reine Dokumentationskorrektur, keine neuen Testaussagen.
+
+**Provisorisches Code-Finding (unabhängige Verifikation abgeschlossen)**
+- **CR-CODE-001 (bestätigt als CR-BE-003):** Der Scratch-Probe wurde unabhängig bestätigt: Quote-Link signiert beliebige IDs und der Checkout/ZIP-Pfad kann ein privates Ziel ausliefern. Keine separate Implementierung; Remediation und Regression laufen unter CR-BE-003.
+- **CR-CODE-002 (P1 decision, kein bestätigter Bug unter aktuellem Vertrag):** Die Probe beobachtete, dass `InvoiceService` offene Delivery-Notizen nach Nutzer-/Org-Reassignment über die aktuelle Org-Mitgliedschaft auswählt/archiviert. Unabhängige Verifikation bestätigt dieses Verhalten, aber die vorhandenen Features/Tests definieren aktuelle Org-Mitgliedschaft als Vertrag. **Keine Codeänderung**, solange kein Business-Entscheid für purchase-time org ownership vorliegt; bei gewünschter historischer Zuordnung ist eine separate SOLL-/Migrationsentscheidung nötig.
+
+**Verifizierte Frontend-Befunde (READ-ONLY-Audit, Fix pending)**
+- **CR-FE-001 (P1, implemented/verified):** Quote-Token und validierte Cart-Persistenz werden über `CartProvider`/`cartLogic`版本iert gespeichert; CartProvider- und CartView-Regressionen decke Reload/Navigation, Token-Bindung und stale-token Übergänge ab. Full-Vitest grün.
+- **CR-FE-002 (P1, implemented/verified):** `ClientOrdersView` bietet ZIP nur für download-eligible Status an; Regression für `pending_payment` ist grün.
+- **CR-FE-003 (P1, implemented/verified):** Management-Order-Statusoptionen entsprechen dem Backend-Vertrag; ManagementOrdersView-Regressionen sind grün.
+- **CR-FE-004 (P1, implemented/verified):** Rating-Optimistic-State wird bei Fehlern zurückgerollt, Gast-Tastaturrating ist gesperrt und der Auth-Flow nutzt den vorgesehenen Root-Redirect;useGallery/Selection-Regressionen sind grün.
+- **CR-FE-005 (P2, implemented/verified):** Auth-Revalidierung überschreibt dirty Billing-/Consent-Felder nicht; CartView-Regressionen und Full-Vitest sind grün.
+- **CR-FE-006 (P2, implemented/verified):** `ProtectedRoute` normalizes trailing-slash management routes before rendering; direct `/galleries/` and `/admin-orders/` regression tests are green.
+- **CR-FE-007 (P2, implemented/verified):** Cart and mobile close controls use real links/buttons with accessible names; keyboard/ARIA regressions are green.
+- **CR-FE-008 (P2, implemented/partial):** `ModalDialogShell` now provides a named dialog, Escape/cancel handling and shared focus-trap behavior; broader legacy modal/nested-focus coverage remains partial.
+- **CR-FE-009 (P2, implemented/verified):** Checkout/login/notification controls expose programmatic labels/names and the notifications route is linked from the sidebar; semantic-locator regressions are green.
+- **CR-FE-010 (P2, implemented/verified):** Network helpers now preserve/assert response failures, rating flows check `response.ok()`, and cart persistence has a post-reload checkout regression.
+- **CR-TEST-002 (shared-worktree verification, final snapshot):** Backend `php artisan test` **1.964/1.964 (6.241 Assertions)**; Full-Vitest **109 Dateien/876 Tests**; `pnpm lint:fix`, `pnpm lint:e2e`, `pnpm check:i18n`, `pnpm build`, PHP-Syntax, Pint, `git diff --check` und der Lightroom-Static-Harness (`admin.lrplugin/tests/run.sh`) sind grün. Lua/Lightroom-Live-Runtime bleibt nicht verfügbar.
+- **CR-FE-011 (P1):** Access-cookie expiry prevents `/api/auth/refresh` because the refresh route is behind `auth:api`; idle sessions cannot recover. Separate refresh credential/handler and add PHPUnit/Playwright idle-session regression.
+- **CR-FE-012 (P1, implemented/verified):** Frontend gruppiert Mixed Carts nach effektivem `(mode, preset)` und summiert serverseitig konsistente Gruppen; Pricing-/Cart-Regressionen sind grün.
+- **CR-FE-013 (P1, implemented/verified):** Angezeigte Galerie-ID wird in PhotoDetail-/Management-Lizenz-UI durchgereicht; Komponenten- und Override-Regressionen sind grün.
+- **CR-FE-014 (P1, implemented/verified):** Coupon-UI/Preview/Cart-Totals nutzen den tatsächlichen Server-Pricing-Pfad; Mode-/Percentage-/Fixed-/100%-Regressionen sind grün.
+- **CR-FE-015 (P1, implemented/verified):** Stripe-/Coupon-Polling läuft über den zentralen Refresh/Retry-Pfad; 401→Refresh→Success-Regressionen sind grün.
+- **CR-FE-016 (P1, implemented/verified):** Contract sign/join token boundaries remount by token and guard stale async responses; mutable-token Vitest regressions are green.
+- **CR-FE-017 (P1, implemented/verified):** Customer/product/snippet/permissions modals retain entered state on rejected saves and expose loading protection; focused modal regressions are green.
+- **CR-FE-018 (P1, implemented/verified):** Project/board form transformations now send explicit nulls for cleared assignee/price/count fields; regression coverage is green.
+- **CR-FE-019 (P2):** Stripe loader failure silently disables payment with no retry/error/invoice fallback. Add loader-failure component and tagged checkout tests.
+- **CR-FE-020 (P2, implemented; E2E pending):** Search URL synchronization now has a same-route back/forward regression with a mounted-input marker; tagged execution remains blocked by the E2E harness.
+- **CR-FE-021 (P2, implemented/verified):** Create-user and license-catalog editors reset/version their drafts on reopen and SWR snapshot changes; rerender/reopen unit regressions are green.
+- **CR-FE-022 (P2, implemented/verified):** Brand primary/secondary colors are applied through `BrandRegistry` CSS variables and revalidated after settings writes; unit coverage is green and tagged reload coverage is present but blocked with E2E.
+- **CR-FE-023 (P2, implemented/partial):** Management/global menu openers now expose `aria-expanded`/`aria-controls` and unit coverage is green; the remaining gallery opt-in mobile-tag coverage is still open.
+- **CR-FE-024 (P2, implemented/partial):** Modal shell focus handling is centralized and covered by `ModalDialogShell` tests; nested GalleryModal/document-listener race coverage remains a follow-up.
+- **CR-FE-025 (P2, implemented/verified):** Login/auth E2E helpers use semantic role/name locators and accessible controls; lint/list checks pass, browser execution remains environment-blocked.
+- **CR-FE-026 (P1, implemented/verified):** `CartProvider` groups effective `(mode,preset)` pricing, excludes quote items from tiers, persists quote state and uses server-consistent totals; mixed-cart unit/pricing regressions are green.
+- **CR-FE-027 (P1, verifier caveat):** Separate access/refresh cookie names currently carry the same JWT value; if refresh credential independence is required, issue distinct signed tokens/claims and test rotation/replay. This needs an explicit auth-contract decision.
+- **CR-FE-028 (P1, implemented/verified):** Authenticated raw-fetch paths now use the centralized refresh/retry/error pipeline; external LM Studio remains an explicit provider boundary. Focused API/AI/upload regressions are green.
+- **CR-FE-029 (P2, implemented/verified):** `useAuth` now fetches/propagates `AuthMeUser` through SWR while retaining the broader `User` re-export only for non-auth consumers; type fixtures and tests are green.
+- **CR-FE-030 (P2, decision selected 2026-09-24):** Meta-gallery licensing must resolve per child/gallery group rather than the first child; implement grouped descriptors/UI totals and mixed-child Vitest plus tagged E2E coverage.
+- **CR-FE-031 (P2, implemented/verified):** Volume summaries count only non-quote items for tier thresholds and display totals; mixed quote/non-quote unit regressions are green.
+- **CR-FE-032 (P1, implemented/verified):** Logout clears protected SWR state without revalidation and `useAuth.isLoading` no longer remains true after user/error are absent; hook/UI regressions are green.
+- **CR-FE-033 (P2, implemented/verified):** The SWR auth fetcher is typed as `AuthMeUser`; fixtures and hook tests enforce the `/api/auth/me` contract.
+- **CR-FE-034 (P2, E2E policy):** `management-save-regression.spec.ts` mocks the internal customers CRUD endpoint despite the repository rule against internal-route mocks; move rejection coverage to component/integration tests or implement real backend setup.
+- **CR-FE-035 (P2, implemented/verified):** `pnpm lint:e2e` successfully parses the tagged E2E suite with the TypeScript-aware configuration.
+- **CR-FE-036 (P2, implemented; E2E pending):** Same-route back/forward search coverage with a mounted-input marker is present; execution is blocked by the E2E harness.
+- **CR-FE-037 (P2, implemented/verified):** License-catalog modifier editor has an active-edit SWR rerender regression; draft versioning prevents stale values.
+- **CR-FE-038 (P2, implemented; E2E pending):** Brand-settings E2E is serial, resets global settings, skips the mobile mutation and uses semantic locators; browser execution remains blocked.
+- **CR-FE-039 (P2, implemented/verified):** The shared-worktree `GalleryModal` reference race is resolved; repeated full Vitest runs are green (109 files/876 tests).
+- **CR-TEST-005 (P2, E2E fixture):** Quote cart E2E specs submit fake `mocked-photo-*` IDs, but current quote validation requires real photos; replace with API-created real fixtures before treating tagged E2E as evidence.
+- **CR-TEST-006 (P1, behoben):** `pnpm lint:fix`, `pnpm lint:e2e` und der Full-Vitest-Lauf sind grün; die previous Lingui/Coupon-Erwartungsfehler sind reconciled.
+- **CR-TEST-010 (P1, behoben):** Full-Vitest (109 Dateien/876 Tests) ist grün; Pricing-/Coupon-Erwartungen und Mixed-Cart-Totale sind konsistent.
+- **CR-TEST-011 (P2, i18n blocker, behoben):** `Rabatt` and registration-success messages are extracted/compiled; `check:i18n`, focused lint and build pass.
+- **CR-FE-041 (P2, adjacent i18n gap):** CartItemList still contains raw user-facing German strings for group image/tier summary and discount explanation that the Lingui guard cannot detect. Wrap/translate them and rerun catalog checks.
+- **CR-FE-042 (P1, implemented/verified):** `RatingStatusModal`, `useGallery`-Mutationen und Upload-/AI-Portalpfade nutzen den zentralen Refresh/Retry- und Response-Fehlerpfad; externe LM-Studio-Aufrufe bleiben als explizite Provider-Grenze ohne Portal-Cookie. Fokussierte 96 Vitest-Tests grün; Full-Vitest aktuell 109 Dateien/876 Tests grün.
+- **CR-FE-043 (P2, implemented/verified):** `AbortError` bleibt in `fetcher`/`apiMutate`/`apiUpload`/`apiDownload` erhalten und `ImageHelper` reicht `AbortSignal` bis zum Download durch; Abort-Regressionen sind grün.
+- **CR-FE-044 (P2, exact auth type):** `AuthMeUser` still marks several backend-guaranteed fields optional; decide whether the frontend contract should be an exact mirror and tighten fixtures/types.
+- **CR-FE-045 (P1, implemented/verified):** Central API retry paths now normalize network failures/callbacks and preserve AbortError; canceled callers stop before/after shared refresh. Quote/invite/org lookup effects have stale-response/abort guards; reset logout checks non-OK responses. Focused fetch/invite/cart/reset tests (96) and full Vitest (109/876) are green.
+- **CR-FE-046 (P1, implemented/verified):** LM Studio model discovery rejects non-2xx JSON responses, keeping external provider fallback fail-closed; signal-aware AI regressions are green.
+- **CR-MEDIA-001 (P1, implemented/verified):** Stale unwatermarked file-delivery/ZIP derivatives are deterministically rebuilt and provenance-checked; `MediaVerifierFollowUpsTest` is green.
+- **CR-MEDIA-002 (P1, implemented/verified):** Management tree, group show, settings and authorization paths enforce the complete gallery/group brand tree; focused parent-brand tests are green.
+- **CR-MEDIA-003 (P2, implemented/verified):** Parent-group brand mismatch coverage now includes invite/finish-rating, sitemap and legacy ZIP/selection boundaries; focused tests are green.
+- **CR-MEDIA-004 (P1, implemented/verified):** Selection stale ZIP, legacy order ZIP, quote-decode and watermarked-preview regressions are present and green.
+- **CR-MEDIA-005 (P2, implemented/verified):** `MediaVerifierFollowUpsTest.php`, `InviteRevocationTest.php`, and `PublicMediaBrandIsolationTest.php` are present in the staged change set; release hygiene is closed.
+- **CR-MEDIA-006 (P1, implemented/verified):** `MediaVisibilityService` reloads current photo/gallery/group state and filters generic ZIP/single delivery plus public gallery/search projections; hidden/inherited-hidden regressions pass (15 tests/79 assertions in the focused public-media suite) with no bytes or DownloadLog records.
+- **CR-MEDIA-007 (P1, implemented/verified):** `sendQuote()` atomically claims `pending -> cancelled` before mail; status-race and sequential duplicate regressions pass in `QuoteControllerSecurityTest` (10 tests/27 assertions), with queued-mail semantics asserted correctly.
+- **CR-MEDIA-008 (P1, implemented/verified):** PhotoDownload/FileDelivery reauthorize current order, ownership, brand tree, expiry, access, entitlement and photo state after derivative preparation and immediately before ZIP/single/direct bytes. Late refund/dispute/access-revocation regressions cover ZIP, single and direct media.
+- **CR-MEDIA-009 (P2, implemented/verified):** Late single-download failures remove prepared `base_scale_*` and `dl_*.jpg` derivatives without deleting the persistent source; `MediaLateAuthorizationTest` asserts no temp residue, response bytes or successful log.
+- **CR-BE-020 (P2, implemented/verified):** Explizite `null`-Photo-Job-Counts werden auf Request- und Modellebene abgewiesen; Store/Update/Move/Handoff/Cleanup-Regressionen sind grün.
+- **CR-TEST-003 (P2, coverage gap):** No real idle-session Playwright test expires the access cookie while retaining the refresh cookie; add a tagged browser regression when the local stack is available.
+- **CR-TEST-004 (P2, environment/setup blocker):** Drei tagged-Smoke-Versuche wurden nach dem Frontend-Fix durchgeführt: (1) Host `pnpm test:e2e:smoke` — Chromium fehlt und `::1:4321` ist nicht erreichbar; (2) `portal-e2e`-Image mit pnpm — Modulinstallation brach wegen No-TTY/Store-Mismatch ab; (3) Browser-Image mit direktem Vite/Playwright und konfigurierbarem Mailpit — 2 passed, 10 failed, 50 did-not-run, 1 Setup-Error. Die Admin-Login-Hilfe schlug im frisch geseedeten E2E-Backend weiterhin mit `Ungültige Zugangsdaten` fehl; ein direkter Curl-Login war zwischenzeitlich 200, die Testdaten wurden während des Laufs inkonsistent. Nach drei Versuchen gemäß E2E-Regel keine weitere Retry-Schleife; tagged Smoke in CI mit dem offiziellen `scripts/e2e-up.sh`/Compose-Harness wiederholen.
+
+**Verifizierte Backend-Security-Befunde (READ-ONLY-Audit, Fix pending)**
+- **CR-BE-001 (P1, implemented; verified):** V037 guest ownership and centralized actor scoping are implemented and independently verified: 229 focused tests / 948 assertions plus the corrected real-photo ZIP regression (8/45) passed, V036 untouched, no backfill/sentinel, legacy rows inaccessible, guests denied model/account access and unsupported checkout fails closed. Pint for the new regression passes; remaining baseline style/test blockers are tracked separately.
+- **Migrationsentscheidung (2026-09-24; aktualisiert nach V038-Fortschritt):** V035 ist der zuletzt aufgezeichnete deployte Stand; V036 bleibt die Card-Testing-Migration, V037 die Gast-Ownership-Migration und V038 die aktuelle Repository-Frontier. Neue Änderungen müssen als separate V039+-Migrationen erfolgen; bestehende Migrationen werden nicht nachträglich geändert.
+- **CR-BE-002 (P1, implemented/verified):** Repeated unauthenticated contract joins now fail closed with no personal_token/name/role disclosure; focused contract tests and independent verification pass.
+- **CR-BE-003 (P1, implemented/verified):** Quote issuance, brand/existence/access checks, exact token/item binding, server price, revoked-access rejection and settled order ZIP reauthorization (including hidden/expiry/private access) are implemented. Focused quote/order fulfillment tests pass; public-media and generic delivery visibility are covered under CR-MEDIA-006.
+- **CR-TEST-001 (behoben):** `resolveQuoteToken()` is defined, legacy fake-ID fixtures were replaced, and focused quote tests pass; the independent quote verifier found only the fulfillment gap above.
+- **CR-BE-004 (P1, implemented/verified):** Fresh missing/invalid watermark assets fail closed, provenance markers reject stale derivatives, and file/ZIP/parent-brand follow-up regressions pass in the GD/ExifTool container.
+- **CR-BE-005 (P2, implemented/verified):** Contract personal-token paths enforce status/expires_at/closes_at consistently with DB-time predicates; the `page-exit` route is telemetry-only and parent legacy deadline behaviors pass focused tests.
+- **CR-BE-006 (P2, implemented/verified):** Foreign-brand registration rolls back inserted user/reset state; auth/me contract also passes independently.
+- **CR-BE-007 (P1, implemented/verified for audited surfaces):** Public media/download/context/rating, dual-role upload and JWT host binding enforce current brand/reserved-null rules; two-brand/null-brand regressions are green. A second brand still requires deployment-level live verification.
+- **CR-BE-008 (P1, implemented/verified):** `ContractCloseService` resolves billing users only within the contract brand; foreign/brandless users leave the generated order unowned, while order/invoice brand and ownership remain scoped. `ContractCloseTest`: 4 tests/56 assertions.
+- **CR-BE-009 (P2, implemented/verified):** Org controller/invite and project/photo-job relationship paths enforce brand/access scope; 49 focused org/board relationship tests (114 assertions) are green.
+- **CR-BE-010 (P2, review integrity):** Existing P0-B7 contract-token and P0-A13 watermark entries are not actually fixed; prior “FIXED & VERIFIED” labels and the unsafe existing test must be corrected rather than treated as closed.
+- **CR-BE-011 (P1, implemented/verified):** Reserved-null trust boundaries now fail closed for role-only promotion, existing null-brand non-super-admins, login/reset/refresh, management/gallery authorization and brandless org invites; transient guests retain only active current-host invite access. `ReservedNullBrandTrustBoundaryTest`: 9 tests/25 assertions.
+- **CR-BE-012 (P2, implemented/verified):** `OrgController::show` and all write/sync/invoice guards reject brandless organizations for brand-bound actors; focused org suites are green.
+- **CR-BE-015 (P1, implemented/verified):** Role-only promotion to `super_admin` normalizes an existing brand to null atomically; trust-boundary regression is green.
+- **CR-BE-021 (P1, implemented/verified):** `ImageProcessor::isSafeWatermarkedOutput()` requires watermark provenance/effective derivative proof; stale re-encoded cache regression and file/ZIP rebuild tests are green.
+- **CR-BE-022 (P1, implemented/verified):** Parent/group brand validation is centralized across media/download/rating/management paths; current-brand-under-foreign/null-parent regressions are green.
+- **CR-BE-023 (P1, implemented/verified):** `MailController` invite/rating paths enforce host/resource brand before side effects; focused regressions are green.
+- **CR-CRM-010 (P1, implemented/verified):** Selection no-public/no-original rules are enforced through checkout, quote validation, ZIP delivery, flat-rate media and sitemap; focused selection regressions are green.
+- **CR-TEST-012 (P2, E2E readiness):** `e2e-up.sh` location flow works against a disposable service, but cold-start readiness of a freshly started Meilisearch container is not explicitly awaited/tested. Add a bounded readiness wait and CI check.
+- **CR-TEST-008 (P2, V037 DoD, behoben):** `GuestOrderIsolationTest.php` import/FQCN Pint violations were corrected; targeted Pint, syntax and `php artisan test --filter GuestOrderIsolationTest` pass.
+- **CR-TEST-009 (P1, V037 follow-up, behoben):** Der Gast-ZIP-404 wurde reproduziert und auf eine ungültige Test-Fixture mit synthetischer, nicht persistierter Photo-ID zurückgeführt; Ownership/Brand/Snapshot waren korrekt. Testfixture auf reales `rp`-Gallery/Photo/Sample-Image umgestellt, Cross-Guest-Denial auf null Download-Logs verschärft; `GuestOrderIsolationTest` nun 8 Tests/45 Assertions und verwandte ZIP-Suites 27/83 grün, Pint/Syntax/Diff grün.
+- **CR-BE-016 (P1, implemented/verified):** Existing/otherwise-created `brand = null` non-Super-Admins are rejected by shared authorization/login/reset/refresh boundaries; guest invite semantics remain scoped.
+- **CR-BE-017 (P1, implemented/verified):** Brandless organization invite redemption is rejected without creating a null-brand non-Super-Admin; regression is green.
+- **CR-BE-018 (P1, contract verifier follow-up, partial):** Direct and template join paths now share one stable normalized-email lock identity, lock the scope row, and keep duplicate check/insert plus instance creation in one transaction. The sequential transaction regression proves a mixed-case retry cannot create a second signer/instance, but this is not a single SQL conditional INSERT or a real multi-connection race; keep open pending a durable DB strategy.
+- **CR-BE-019 (P1, contract verifier follow-up, implemented):** Parent legacy deadlines use the earlier effective deadline; the `page-exit` route is explicitly telemetry-only (valid personal token, no contract data/signature mutation, accepted after closure), with audit action `page_exit`. Focused contract tests pass.
+- **CR-DATA-018 (P1, contract verifier follow-up, open):** The current V021 schema has no normalized-email column or durable unique `(contract_id/template, normalized email)` constraint. Application cache/row locks and `LOWER(TRIM(email))` protect supported writers, and the real sequential/transaction regression covers normalized duplicates, but bypass writers or a different cache domain can still insert duplicates. A separate migration decision (backfill, legacy cleanup, normalized column, unique index) remains required; no migration is added here and this finding is not closed.
+- [x] **Contract-join PHPUnit TODO (CR-BE-018/CR-DATA-018):** Add and run sequential transaction regressions for mixed-case/whitespace normalized direct and template joins; assert one signer/instance and no personal-token/name/role disclosure on the conflict.
+- [ ] **Contract-join verification TODO:** Run a real multi-connection race and make the separate normalized-email/legacy-cleanup/unique-index decision before closing the remaining findings. The current SQLite `:memory:` environment cannot provide that race.
+- **Contract suite environment note (2026-09-24):** An earlier broader contract run reached 75 warnings but two unrelated `ContractCloseTest` cases failed because the configured Mailpit SMTP endpoint `127.0.0.1:1025` refused connections; the join/template/availability tests pass independently. No mail or rating/V036/V037/V038 files were changed for this task.
+
+**Verifizierte Infrastruktur-/Plugin-Befunde (READ-ONLY-Audit, Fix pending)**
+- **CR-INF-001 (P0/P1; implemented/verified):** `sync.sh`/`rclone-backend-filter.txt` protect private storage and Stripe secrets, propagate failures, and real/fake rclone regressions verify ordinary sync plus private/root-SQLite preservation.
+- **CR-INF-002 (P1, implemented/verified):** Production `db:seed` preserves existing settings via `insertOrIgnore`; custom-value regression passes.
+- **CR-INF-003 (P1; historischer Befund, Verifikation offen)** Ein fehlendes `ADMIN_PASSWORD` fiel zuvor auf `admin` zurück, und `admin:update` rotierte ein bestehendes Passwort nicht. Die aktuelle Config/Seeder/Command-Kette ist env-only, fail-closed und rotiert das konfigurierte Passwort; ein aktueller Deployment-Nachweis bleibt offen.
+- [x] **CR-INF-004 (P1, implemented/static-verified):** `ManagerCore.lua` now uses a run-specific export directory, accepts only an explicit successful `waitForRender()` whose returned path is new and exists, treats cancellation during the wait as cancellation, requires every rendition to upload before reporting success, and deletes only that fresh uploaded path (never the whole temp directory). Regression/static harness: `admin.lrplugin/tests/run.sh` (**PASS**; Lua runtime unavailable, structural/fixture fallback used).
+- **CR-INF-005 (P2):** Empty gallery expiry in `GalleryDialog.lua` is omitted and cannot clear an existing backend expiry; distinguish omitted vs explicit null.
+- **CR-INF-006 (P2):** `/api/auth/me` omits `can_edit_metadata` and saved billing fields required by frontend prefill/permissions; add backend contract and frontend regression tests.
+- **CR-INF-007 (P2; historischer Befund, Verifikation offen)** Frisch geseedete Gallery-Gruppen hatten zuvor `brand = NULL`. Der aktuelle `DatabaseSeeder` setzt die aufgelöste Brand und repariert Legacy-NULL-Gruppen; ein aktueller Fresh-Seed-/Tree-Nachweis bleibt offen.
+- **CR-INF-008 (P2; historischer Befund, Verifikation offen)** Der Location-Import lief zuvor synchron im Seed-Gate und zusätzlich als Hintergrundcommand. Das aktuelle Working Tree ruft `app:import-locations` nicht im Backend-Boot auf; `routes/console.php` plant ihn wöchentlich, mit Lock und transaktionalem Refresh. Live-Scheduler-/Failure-Isolation-Nachweis bleibt offen.
+- **CR-INF-009 (P2; historischer Befund, Verifikation offen)** Ein leeres `PHOTO_STORAGE_PATH` konnte zuvor den Filesystem-Default überschreiben. Der aktuelle Compose-Guard verlangt einen nicht leeren absoluten Pfad und prüft das Mount-Ownership; der Deployment-Nachweis bleibt offen.
+- [x] **CR-INF-010 (P2, implemented/static-verified):** `Api.createSession`/`Api.callWithSession`/`Api.uploadWithSession` provide one bounded renewal per manager invocation using only the existing `Api.login` protected-store fallback. ManagerCore routes gallery, group, invite and rating operations through the session-aware request, retains no password in the session, and surfaces a clear re-auth message after exhaustion. Regression/static harness: `admin.lrplugin/tests/run.sh` (**PASS**).
+- [x] **CR-INF-011 (P2, implemented/static-verified):** `Utils.flattenGroupChoices()` uses a visited set for malformed cycles and removes the edited group plus its entire descendant subtree from `MetaGalleryDialog` parent choices; `GalleryDialog` uses the same cycle-safe flattening while retaining normal child choices. Fixture: `admin.lrplugin/tests/fixtures/group_tree.lua`; harness: `admin.lrplugin/tests/run.sh` (**PASS**). Server-side 4xx handling remains outside this plugin-only scope.
+- **CR-INF-012 (P2; historischer Befund, Verifikation offen)** Privileged CLI-/Queue-/Scheduler-Container liefen zuvor als root mit schreibbaren Bind-Mounts. Das aktuelle Working Tree setzt `USER www-data`/UID:GID `1000:1000` und prüft Ownership; der Live-Runtime-Nachweis bleibt offen.
+- **CR-INF-013 (P2; historischer Befund, Verifikation offen)** CI-/Runtime-Images und Actions verwendeten zuvor mutable Tags. Das aktuelle Working Tree enthält Digest-/SHA-Pins; ein aktueller Supply-Chain-Policy-Check bleibt offen.
+- **CR-INF-014 (P2, implemented/verified):** Root and nested SQLite exclusions are ordered before catch-all; real/fake rclone tests verify root files are neither uploaded nor deleted and private storage remains protected.
+- **CR-INF-015 (P1, implemented/verified):** Fresh E2E databases load the checked-in `backend/database/fixtures/e2e-locations.json` through explicit `E2ELocationSeeder`; CI and `scripts/e2e-up.sh` flush/sync/import the Location Scout index afterward. `DatabaseSeeder` remains network-free, production startup contains no location import, and weekly lock/scheduler behavior remains. Focused/live disposable Meilisearch tests, policy checks and scripts pass.
+- **CR-INF-016 (P2, implemented/verified):** Direct Laravel config rejects empty/relative `PHOTO_STORAGE_PATH`; the runtime policy test checks the pinned container's stdout/stderr behavior and passes (6 tests/107 assertions). Local-template portability is covered under CR-INF-020.
+- **CR-INF-017 (P1 release follow-up, open):** Pinned GHCR `portal-base`/`portal-e2e` images are stale and still run as root/UID 33 despite source Dockerfiles using UID 1000; rebuild/re-publish and update digests after verifying image metadata.
+- **CR-INF-018 (P2, source-fixed/release-partial):** Local/test Compose images and E2E Dockerfile Node download are digest/version/checksum pinned and policy-covered, but the published GHCR digests are stale and the frontend CI setup-node job still uses mutable `node-version: 26`. Rebuild/update images and pin that job before closure.
+- **CR-INF-019 (P2 release hygiene, implemented/verified):** The previously deferred hardening/regression paths are included in the final staged change set; the final review must verify the complete `git diff --cached --name-status` before push.
+- [x] **CR-INF-020 (P2, configuration/template, implemented/verified 2026-09-24):** `backend/.env.example` now uses the documented writable local path `/tmp/portal-reisinger-photos` with `mkdir -p` setup guidance. `backend/.env.ci` and the production Compose path remain unchanged at `/var/www/photos`; no deployment semantics changed. Infrastructure policy verification passed without migration changes.
+
+**Verifizierte Backend-Datenintegritäts-Befunde (READ-ONLY-Audit, Fix pending)**
+- **CR-DATA-001 (P1, implemented/verified):** Coupon group scope now uses `galleries.gallery_group_id` and recursively expands assigned parent/child groups consistently with AuthorizationService; 66 coupon tests/166 assertions, nested/direct/brand checks, targeted Pint/syntax/diff pass.
+- **CR-DATA-002 (P1, implemented/verified):** `ImageController` replacement closure now captures `$originalName`; the null-title/wrong-replacement regression is green in `ImageUploadTest`.
+- **CR-DATA-003 (P1, implemented/verified):** FTP import reads/writes/processes before source cleanup, checks storage/processing failures and removes the inbox file only after DB success; `FtpImportTest` is green.
+- **CR-DATA-004 (P1, implemented/verified):** Payout attribution uses actual bounded photo IDs and handles mixed galleries/photographers; `PayoutCalculationServiceTest` plus order fulfillment are green.
+- **CR-DATA-005 (P1, application-locked/DB invariant open):** Cache/row locks make known repeated/concurrent join/sign writers produce one signer/instance/audit transition, but no durable normalized-email unique constraint or real multi-connection race regression exists; see CR-DATA-018.
+- **CR-DATA-006 (P1, implemented/verified):** Gemeinsamer `ModelPhotoPrimaryService`-Pfad deckt Admin-/Owner-Promotion, Registrierungs-Resubmission, Cleanup und Löschabbruch mit Lock/Transaktion ab. Unabhängige Verifikation: 11/11 Primary-Tests (57 Assertions), 42/42 Owner-Suites, 8/8 Cleanup-Tests; targeted Pint/syntax/diff grün. SQLite-Sequenztests und 30-s-Cache-Lease bleiben als Anwendungs-/Race-Limit dokumentiert.
+- **CR-DATA-007 (P1, implemented/verified):** `GalleryService::updateGroup` synchronizes `org_id` only when supplied, preserving omitted assignments and clearing explicit null; `GalleryServiceTest` is green.
+- **CR-DATA-008 (P1, implemented/verified):** Metadata revert records the pre-revert state and acting user in `PhotoMetadataVersion`; `PhotoMetadataTest` is green.
+- **CR-DATA-009 (P1, implemented/verified):** Public rating mutation enforces current host/brand tree before any rating write; two-brand/null-brand no-mutation regressions are green.
+- **CR-DATA-010 (P2, implemented/verified V038):** Gast-Bewertungen besitzen nun den portablen `actor_key` mit DB-Unique-Invariante, Upsert-Lock und Retry; V038 ist die separate autorisierte Migration (V036/V037 unverändert). `RatingUniquenessTest` deckt Schema/Ownerless-Legacy, deterministische Legacy-Normalisierung, Gast-Deduplizierung und User/Guest-Isolation ab (4 Tests/25 Assertions, `SCOUT_DRIVER=null`); SQLite `migrate:fresh --seed`, V038-`up()`-Idempotenz, Pint, Syntax und Diff-Check sind grün. MariaDB 11.4 bestätigt nullable-Unique-Semantik und V038-Rerun/Deduplizierung; der vollständige MariaDB-Migrationslauf bleibt durch den bestehenden V037-Check-Constraint-Fehler (`user_id` in CHECK, Error 1901) blockiert, ohne V037 zu ändern.
+- **CR-DATA-011 (P2, implemented/verified):** Order/single/gallery ZIP audit records persist bounded actual `photo_ids`/`gallery_ids` (and order linkage where applicable); `OrderDownloadFulfillmentTest` passes.
+- **CR-DATA-012 (P2, implemented/verified):** `CleanupDerivatives` verifies adapter deletion and reports failure/nonzero exit when a derivative remains; `StorageCommandsTest` is green.
+- **CR-DATA-013 (P2, implemented/verified):** Board-Mutationen verwenden Brand-/Owner-sichtbare Cache- und DB-Locks, dichte Reindexierung und owner-scoped Cleanup; 124 Board-Tests/463 Assertions sind grün. Cleanup reindexiert exakt gelöschte Owner/Status-Paare (inkl. Null-Brand); direkte SQL-Writers/echte Multi-Process-Race bleiben als Anwendungsgrenze dokumentiert.
+- **CR-DATA-014 (P1, implemented/verified):** Recursive descendant-group coupon scope is fixed and independently verified (parent→child regression, 66 coupon tests/166 assertions, nested/direct/brand checks, targeted Pint/syntax/diff).
+- **CR-DATA-015 (P1, implemented/verified):** Real single/gallery/order ZIP logs now persist bounded actual photo IDs; `PayoutCalculationServiceTest` and order fulfillment suite pass (42 tests/109 assertions combined), including multi-photographer attribution.
+- **CR-DATA-016 (P2, implemented/verified):** `GalleryService::updateGroup` distinguishes omitted/null `org_id`, and `GalleryGroupModal` forwards `extraOpts`/prefills from `orgs`; focused modal/data-contract regressions are green.
+- **CR-DATA-017 (P2, implemented/verified):** Mixed-gallery order logs carry bounded actual photo/gallery ID payloads and payout attribution; mixed-order regression is green in the 42-test/109-assertion focused fulfillment/payout run.
+- **CR-DATA-019 (P2, implemented/verified):** `GalleryGroupResource` serializes minimal loaded `orgs` (`id`,`name`) and management queries eager-load the relation; `GalleryGroupDataContractTest` passes without exposing domain/brand.
+
+**Verifizierte Checkout-/Payment-Befunde (READ-ONLY-Audit; Status inline)**
+- **CR-PAY-001 (P1, implemented/verified):** Generic coupon CRUD autorisiert effektive Gallery-/Group-Scopes; No-Write-403-Tests decken Foreign/Assigned/Update ab.
+- **CR-PAY-002 (P1, implemented/verified 2026-09-24):** Volume pricing now persists the supported `original` entitlement tier; the focused original-resolution order-ZIP regression passes.
+- **CR-PAY-003 (P1, implemented/verified 2026-09-24):** Effective gallery mode wins over the injected brand-default strategy; explicit `scope_licensing` remains scope-priced and does not consume coupons.
+- **CR-PAY-004 (P1, implemented/verified):** `used_count` ist clientseitig unveränderlich; Max-Use-/Delete-Guard-Regressionen sind grün.
+- **CR-PAY-005 (P1, implemented/verified 2026-09-24):** Mixed volume groups are priced first, scoped validation considers all non-quote volume items, and one coupon is applied once to the combined effective volume subtotal. Fixed, percentage-with-`max_items`, percentage-without-max, scoped-second-gallery, photo-package and mixed scope/volume regressions are green; coupon `max_items`/`photo_package` use effective qualifying-tier prices while invoice lines retain base prices plus the tier breakdown.
+- **CR-PAY-006 (P1, implemented/verified):** Manuelle Order-Statuswechsel löschen Owner/Photo/Tier-Purchase-Caches; Regression und bestehende OrderController-Suite (15/29) sind grün.
+- Verification: `PaymentPricingRegressionTest` **11/11 (53 assertions)**; focused pricing/checkout/coupon run including `PaymentFindingsRegressionTest` **141/141 (374 assertions)**; targeted Pint, PHP syntax, and diff checks pass. No migration files were changed. The broader checkout run remains environment/shared-worktree dependent (Mailpit/Meilisearch and the concurrent brand-isolation changes), so no full-suite green claim is made here.
+- **CR-PAY-007 (P2, implemented/verified):** Cart pricing groups carry the effective custom preset/tier and server-consistent item prices; component/cart regressions are green.
+- **CR-PAY-008 (P2, implemented/verified):** Coupon UI uses the current server-priced cart discount (with an explicit legacy fallback only when no server amount exists); `CouponInput` regression is green.
+- **CR-PAY-009 (P2, implemented/verified):** Zero-value invoice orders are conditionally settled to `paid`; delivery-note flow remains unchanged; regression is grün.
+- **CR-PAY-010 (P1/P2, decision selected 2026-09-24):** Non-immediate checkout paths (Invoice/Free/Quote) must fully honor browser `Idempotency-Key`; implement server-side request claims/idempotent responses and PHPUnit regressions for duplicate success, replay-after-failure and terminal-order conflicts. Immediate Stripe idempotency remains covered.
+- **CR-PAY-011 (P1, implemented/verified):** Signed dispute/refund events use row-locked conditional terminal transitions; refunded/pending/cancelled states cannot regress, disputed→refunded remains allowed, and signed webhook regressions are grün.
+- **CR-PAY-013 (P1, provisional):** Collective invoice attribution follows current org membership rather than order-time membership; this is the same scenario as CR-CODE-002 and needs an explicit accounting contract before implementation.
+- **CR-PAY-014 (P2, follow-up):** `PurchaseService` intentionally keeps legacy purchase-cache writes/invalidation for compatibility but no longer trusts positive cache values for final authorization; remove the write-only cache in a separate cleanup if no external consumer remains.
+
+**Verifizierte CRM-/Model-Flow-Befunde (READ-ONLY-Audit, Fix pending)**
+- **CR-CRM-001 (P1, implemented/verified):** Invite revocation clears transient claims/blacklists across registered-user refresh/redeem paths; `InviteRevocationTest` and related auth tests are green.
+- **CR-CRM-002 (P1, implemented/verified):** Selection galleries are forced non-public/non-free at create/update/model boundaries; inherited-group and delivery-boundary regressions are green.
+- **CR-CRM-003 (P2, implemented/verified):** Model email updates synchronize canonical `customers.email` and encrypted profile snapshot; owner/admin/rollback regressions are green.
+- **CR-CRM-004 (P2, implemented/verified):** Hard erase/expiry removes linked and customerless memberless-act registration invites in the same transaction; regression is green.
+- **CR-CRM-005 (P1, implemented/verified):** Public media/download/context/rating, invite and contract-closure brand boundaries have two-brand/null-brand regressions; purchase-time organization attribution remains the separate CR-PAY-013 product decision.
+- **CR-CRM-006 (P1, implemented/verified):** Scout indexing/removal is deferred until commit; rollback and post-save failure regressions are green.
+- **CR-CRM-007 (P1, implemented/verified):** File manifests are captured at the locked delete boundary and cleanup is queued after commit; authoritative-path regression is green.
+- **CR-CRM-008 (P1, decision selected 2026-09-24):** File/Scout cleanup must remain retryable even when dispatch itself fails; design and implement a durable dispatch/outbox fallback with retry/audit tests. If this requires a schema migration, pause for a separate V039+ migration decision before editing migrations.
+- **CR-CRM-009 (P2, implemented/verified):** Independent customerless memberless-act invite cleanup regression is green.
 
 ---
 
@@ -11,8 +256,8 @@
 > Plan: `~/.opencode/plan/model-registrierung.md` · SOLL: `features/crm/05-model-registration.md` + `features/crm/06-model-profile-iteration.md`.
 > Admin lädt eine Managerperson per kopierbarem Magic-Link ein (Mail optional); diese registriert login-frei einen **Act** mit 1..n Personen (je Person = CRM-Customer + ModelProfile). Altersnachweis **immer Pflicht**. Fragenkatalog **Code-first + Answers-Snapshot**.
 > **Status:** deployed (Commit `3db7437`, push + Redeploy done). Backend **1577** PHPUnit, Frontend **706** Vitest, Lint/Build grün, **12** Feature-E2E.
-> **Nachtrag 2026-09-19 (uncommitted):** Profil-Update-Mail + Contact-Sheet-Export (Backend+Frontend) + E2E-Ausbau. Backend **1587** PHPUnit, Frontend **722** Vitest, E2E-Grep (`model-registration|model-access|model-export`) **22** passed — alles READY-verifiziert.
-> **Nachtrag 2 (2026-09-19):** N1 (Manager-Transfer + Nachfolge + V035) + N2 (Inaktive nur Super-Admin, 403 fail-closed). Backend **1596**, Vitest **726**, E2E-Grep **28/28** — READY-verifiziert.
+> **Nachtrag 2026-09-19 (committed in `6137d3a`):** Profil-Update-Mail + Contact-Sheet-Export (Backend+Frontend) + E2E-Ausbau. Backend **1587** PHPUnit, Frontend **722** Vitest, E2E-Grep (`model-registration|model-access|model-export`) **22** passed — alles READY-verifiziert.
+> **Nachtrag 2 (2026-09-19, committed in `e5d20f0`):** N1 (Manager-Transfer + Nachfolge + V035) + N2 (Inaktive nur Super-Admin, 403 fail-closed). Backend **1596**, Vitest **726**, E2E-Grep **28/28** — READY-verifiziert.
 
 **Backend (PHPUnit) — implementiert & verifiziert**
 - [x] V033-Migration (`customers.user_id`/`is_model`, `model_profiles`, `acts`, `act_members`, `model_registration_invites`) + V034 (Fotos/Tokens/Lifecycle)
@@ -35,8 +280,8 @@
 - [x] UI-Review Screenshot-Loop: Harness + Captures (desktop/mobile, filled/empty), Findings F1–F4 gefixt, APPROVED
 
 **Offen (User-Entscheidungen / Nachträge)**
-- [ ] **N1 — Manager-Act-Kaskade (entschieden + umgesetzt 2026-09-19).** Manager-Transfer im Self-Service (`POST /api/model-profil/{token}/transfer-manager`, nur Manager darf abgeben) + Auto-Nachfolge (bei Manager-Löschung wird das erste Restmitglied Manager, `ModelProfileEraser::reassignManagedActs`) + V035 (`manager_customer_id` nullable + `nullOnDelete`). READY-verifiziert (1596 PHPUnit, 726 Vitest, 28 E2E).
-- [x] **N2 — Sichtbarkeit inaktiver Modelle: nur Super-Admin** (User-Entscheidung 2026-09-19). Backend: `ModelManagementController::index` liefert `lifecycle_status=inactive|all` für Nicht-Super-Admins **403 (fail-closed, konsistent mit dem DSGVO-Destroy-Gate)**; Default ohne Param bleibt für alle `active`, unbekannte Werte fallen auf `active` zurück. Frontend: Status-Optionen „Inaktiv"/„Alle" nur für Super-Admins (`lifecycleFilterValues`); ein deep-gelinkter/tampered 403 wird mit Toast + Reset auf „Aktiv" abgefangen. Tests: PHPUnit `ModelProfileLifecycleExpiryTest` (Super-Admin 200 / Admin 403 / Default active / ungültig→active), Vitest `useModelRegistration.test.ts`, E2E `crm/model-lifecycle-filter.spec.ts`. Verifikation: PHPUnit **1589 passed**, Vitest **724 passed**, Lint/Build grün, E2E-Grep `model-registration|model-access` **24 passed** (`--workers=1`). Kein Commit/Push.
+- [x] **N1 — Manager-Act-Kaskade (entschieden + umgesetzt 2026-09-19).** Manager-Transfer im Self-Service (`POST /api/model-profil/{token}/transfer-manager`, nur Manager darf abgeben) + Auto-Nachfolge (bei Manager-Löschung wird das erste Restmitglied Manager, `ModelProfileEraser::reassignManagedActs`) + V035 (`manager_customer_id` nullable + `nullOnDelete`). READY-verifiziert (1596 PHPUnit, 726 Vitest, 28 E2E).
+- [x] **N2 — Sichtbarkeit inaktiver Modelle: nur Super-Admin** (User-Entscheidung 2026-09-19). Backend: `ModelManagementController::index` liefert `lifecycle_status=inactive|all` für Nicht-Super-Admins **403 (fail-closed, konsistent mit dem DSGVO-Destroy-Gate)**; Default ohne Param bleibt für alle `active`, unbekannte Werte fallen auf `active` zurück. Frontend: Status-Optionen „Inaktiv"/„Alle" nur für Super-Admins (`lifecycleFilterValues`); ein deep-gelinkter/tampered 403 wird mit Toast + Reset auf „Aktiv" abgefangen. Tests: PHPUnit `ModelProfileLifecycleExpiryTest` (Super-Admin 200 / Admin 403 / Default active / ungültig→active), Vitest `useModelRegistration.test.ts`, E2E `crm/model-lifecycle-filter.spec.ts`. Verifikation: PHPUnit **1589 passed**, Vitest **724 passed**, Lint/Build grün, E2E-Grep `model-registration|model-access` **24 passed** (`--workers=1`). Commit: `e5d20f0`.
 - [x] E2E-Ausbau Runde 2 (Slider/Schwelle, Deeplink, Foto-Management/Primary-Clear, Delete-Cancel) — erledigt 2026-09-19 (Details unten)
 - [ ] Age-Proof-Positivfall (Re-Upload **ohne** vorhandenen Proof) — durch die UI nicht erzeugbar, siehe Analyse unten (produktionsseitig auf `age_proof_path`-NULL beschränkt)
 - [x] Profil-Update-Mail an Einladenden (`ModelProfileUpdatedMail`, Inviter via Act→Invite, stiller Skip ohne Invite, Multi-Act-Auflösung) — umgesetzt + READY-verifiziert 2026-09-19
@@ -59,7 +304,7 @@
 ## ✅ ERLEDIGT (2026-09-19) — E2E-Ausbau Runde 2 (Model-Registrierung/-Zugang)
 
 > Auftrag: Lücken der Runde-2-Features mit **echten Nutzer-Interaktionen** schließen (semantische, gescopte Locators, Tags, kein `page.goto`-SPA-Missbrauch, keine localStorage-Injektion).
-> **Verifikation:** `pnpm vitest run` **706 passed**, `pnpm lint:fix` 0, `pnpm build` grün; `npx playwright test --grep "@feature:model-registration|@feature:model-access" --workers=1` **20 passed** (Desktop + Mobile). Kein Commit/Push, keine Backend-Änderung.
+> **Historischer Verifikationsstand:** `pnpm vitest run` **706 passed**, `pnpm lint:fix` 0, `pnpm build` grün; `npx playwright test --grep "@feature:model-registration|@feature:model-access" --workers=1` **20 passed** (Desktop + Mobile). Dieser Lauf betraf die E2E-Erweiterung; Backend-Code blieb unverändert.
 
 **Neue/geänderte Tests**
 - [x] `frontend/tests/e2e/crm/model-filters.spec.ts` (**neu**): Bereitschafts-Kategorie-Chip → `willingness_<kat>=<level>`; Stufe wechseln (Slider) → Param ändert sich; Stufe abwählen → Param weg, Kategorie bleibt; Reload → Filter bleibt; `?model=<id>`-Deeplink → Detail-Dialog offen, Schließen entfernt Param.
@@ -83,48 +328,60 @@
 ## 🟢 CODE REVIEW (2026-09-12) — Full-Main-Audit (9 Subareas) — FIXED & VERIFIED
 
 > Methodik: 9 read-only Subagenten über Backend (Auth/Security, Checkout/Payments, Controllers/Requests, Modelle/Data, AI/Mail/Jobs), Frontend (Logic, UI), Infra/CI, Lua/Tests. Fixes durch **separate** Implementer-Subagenten, nie der Reviewer.
-> **Status (2026-09-12):** Alle P0- und die meisten P1-Findings umgesetzt + getestet. **Verifikation:** Backend `php artisan test` **1392 passed / 0 failed (3452 Assertions)**; Frontend `pnpm test:run` **628 passed**, `pnpm lint` 0, `pnpm build` grün.
+> **Status (2026-09-12):** Alle P0- und die meisten P1-Findings umgesetzt + getestet. **Verifikation:** Backend `php artisan test` **1392 passed / 0 failed (3452 Assertions)**; Frontend `pnpm test:run` **628 passed**, `pnpm lint:fix` 0, `pnpm build` grün.
 > **Entscheidungen (User):** Brand-Isolation **strikt** (nur `brand=null` = cross-brand, z. B. erster/Super-Admin; brand-gebundene Admins isoliert); **100%-Coupon → freie Orders erlaubt** (kein Stripe-Call bei 0, Status `paid`, Download frei); **Teil-Refund behält Zugriff** (nur Voll-Refund entzieht); **kein VAT** (Kleinunternehmer/§6 UStG bzw. Reverse-Charge → aktuelles Verhalten korrekt); `.env.production` **bleibt machine-local/untracked** (`APP_DEBUG=false` gesetzt); **keine Playwright-Trace-/Report-Uploads auf PRs**; **Lua-Passwort verschlüsselt** via `LrPasswords` (OS-Keychain, Klartext migriert + entfernt); **Contract-Signer-Magic-Link = by design** (Signer haben kein Konto).
-> **Offen (Rest):** P2-Tests/Doku (E2E-Tags/localStorage/Kanban-Flakiness), SHA-Pinning von Actions/Images, `Photo::$fillable 'id'` (bewusst **nicht** gefixt: `ImageController` schreibt Datei unter vorab generierter ID → Kopplung), `PricingService::calculateItemPriceCents` (bewusst behalten, öffentliche Preview-API + 20 Tests), gleich-brand Group-Ownership (Produktentscheidung), Frontend-Low-Hygiene (F10–F12 teils).
+> **Offen (Rest):** P2-Tests/Doku (E2E-Tags/serielle Suite-Isolation/Kanban-Flakiness), SHA-Pinning von Actions/Images, `Photo::$fillable 'id'` (bewusst **nicht** gefixt: `ImageController` schreibt Datei unter vorab generierter ID → Kopplung), `PricingService::calculateItemPriceCents` (bewusst behalten, öffentliche Preview-API + 20 Tests), gleich-brand Group-Ownership (Produktentscheidung), Frontend-Low-Hygiene (F10–F12 teils).
 > **Regeln:** Jeder Fix braucht einen Regressionstest (DoD, Bugfix = mind. 1 Test). Backend-Fix gilt nur mit grünem `php artisan test`; Frontend mit `pnpm test:run` + `lint:fix` + `build`.
 > Priorität: **P0** = Security/Geld (kritisch/hoch), **P1** = funktionale Bugs, **P2** = Härtung/Hygiene.
 
-### P0-A — Brand-Isolation (Kernursache, Backend) — ✅ FIXED (1350→1392 Tests grün)
+### P0-A — Brand-Isolation (Kernursache, Backend) — 🟡 HISTORISCHER FIX-STAND (nicht aktueller Auditabschluss)
 
-- [ ] **P0-A1 (CRITICAL)** `AuthorizationService::canPhotographerAccessGallery()` / `canManageGallery()` brand-scopen — `backend/app/Services/AuthorizationService.php:192-249`. Ohne das umgehen brand-gebundene Admins/Photographen via `Gallery::find()` jede Brand-Isolation (Gallery-Update/Delete, Photo-Delete, Invite, Upload). Konsequenz auf `GalleryPolicy`/`PhotoPolicy`/Controller prüfen.
-- [ ] **P0-A2 (CRITICAL)** `GalleryController::updateGroup()`/`deleteGroup()` autorisieren + branden — `backend/app/Http/Controllers/GalleryController.php:63-80`, `GroupRequest.php:9-12` (`authorize()` = `true`); `parent_id`/`org_id` brand-validieren. Jeder Photograph kann fremde Gruppen umhängen/löschen.
-- [ ] **P0-A3 (HIGH)** `GalleryController::showGroup()` brand-filtern — `:151-177` (kein Brand-Filter, Admin-Permission-Intersection übersprungen).
-- [ ] **P0-A4 (HIGH)** `GalleryTreeService::getAdminTree()` brand-/permission-scopen + brand-spezifischer Cache-Key — `backend/app/Services/GalleryTreeService.php:15-44` (globales `gallery_tree_admin`, `$unrestrictedGroups` ohne Brand).
-- [ ] **P0-A5 (HIGH)** `UserController::update()`/`destroy()` brand-isolieren; Rollen-Eskalation `org_admin` → `admin` über `role_ids` schließen — `backend/app/Http/Controllers/UserController.php:122-200`, `UpdateUserRequest.php:17-29`.
-- [ ] **P0-A6 (HIGH)** `MailController::sendCustom()` mit `Gate::manage` absichern — `backend/app/Http/Controllers/MailController.php:19-54` (jeder Photograph kann beliebige Mails an fremde Galerien senden).
-- [ ] **P0-A7 (HIGH)** `OrgController` Schreib-Endpunkte (update/destroy/syncUsers/syncGroups/generateCollectiveInvoice) brand-guarden; `group_ids`/`user_id` validieren — `backend/app/Http/Controllers/OrgController.php:87-243`.
-- [ ] **P0-A8 (HIGH)** `StatsController::logs()`/`index()` brand-scopen — `backend/app/Http/Controllers/StatsController.php:29-51`, `StatsCalculationService.php:37-77`.
-- [ ] **P0-A9 (MEDIUM)** `OrderController::indexAdmin()`/`updateStatus()` brand-scopen — `backend/app/Http/Controllers/OrderController.php:21-33`.
-- [ ] **P0-A10 (MEDIUM)** `SettingsController::getLicenseTerms()` Gallery-Lookup brand-scopen — `:184-189`.
-- [ ] **P0-A11 (MEDIUM)** `GalleryRequest`/`StoreGalleryRequest`/`GroupRequest`: `gallery_group_id`/`org_ids`/`parent_id` brand-konsistent validieren — `GalleryRequest.php:15,24-25`, `StoreGalleryRequest.php:18,27-28`, `GroupRequest.php:19,25`.
-- [ ] **P0-A12 (MEDIUM)** `GalleryController` Sync-Access-Endpunkte: Ziel-User brand-scopen (IDOR-Pivot) — `:179-226`, `SyncGalleryAccessRequest.php:17`.
-- [ ] **P0-A13 (MEDIUM)** `FileDeliveryController`: Original-Leak bei `is_public` + `restricted_photographers` schließen — `:35,54-72`.
-- [ ] **P0-A14 (MEDIUM)** `AuthController`: Reset-/Aktivierungs-Token-TTL durchsetzen, Login-Input validieren, Admin-Enumeration vermeiden — `:28-31,114-128`.
-- [ ] **P0-A15 (LOW)** `NotificationController` Guest-`user_id = null`-Pivot — `:43-57`; `PhotoDownloadController` Tier-Fallback `?? 3` — `:164-166,197`; `PurchaseService` Cache-Invalidierung manueller Statuswechsel — `:20-53`; `ContractController` Brand-Scope-Konsistenz; `GalleryFrontendController::rate()` Kommentar-`max`; `StoreBrandSettingsRequest` `from_name`-Regel; Watermark-SVG inline ohne CSP; `SitemapController` `is_hidden`; Test-Routen nur `local/testing`.
+> Die Einträge unten dokumentieren die **behobenen und verifizierten Findings**;
+> die Checkboxen `[x]` stehen für Fix + Verifikation, nicht für eine offene
+> Restarbeit. Dieser Block ist ein historischer Snapshot vom 2026-09-12; der
+> aktuelle 2026-09-24-Audit reopeniert P0-A13 unter CR-BE-010 und leitet daraus
+> keinen aktuellen Fixabschluss ab.
 
-### P0-B — Checkout/Payments (Geld) — ✅ FIXED (B16: VAT = no VAT, dokumentiert)
+- [x] **P0-A1 (CRITICAL)** `AuthorizationService::canPhotographerAccessGallery()` / `canManageGallery()` brand-scopen — `backend/app/Services/AuthorizationService.php:192-249`. Ohne das umgehen brand-gebundene Admins/Photographen via `Gallery::find()` jede Brand-Isolation (Gallery-Update/Delete, Photo-Delete, Invite, Upload). Konsequenz auf `GalleryPolicy`/`PhotoPolicy`/Controller prüfen.
+- [x] **P0-A2 (CRITICAL)** `GalleryController::updateGroup()`/`deleteGroup()` autorisieren + branden — `backend/app/Http/Controllers/GalleryController.php:63-80`, `GroupRequest.php:9-12` (`authorize()` = `true`); `parent_id`/`org_id` brand-validieren. Jeder Photograph kann fremde Gruppen umhängen/löschen.
+- [x] **P0-A3 (HIGH)** `GalleryController::showGroup()` brand-filtern — `:151-177` (kein Brand-Filter, Admin-Permission-Intersection übersprungen).
+- [x] **P0-A4 (HIGH)** `GalleryTreeService::getAdminTree()` brand-/permission-scopen + brand-spezifischer Cache-Key — `backend/app/Services/GalleryTreeService.php:15-44` (globales `gallery_tree_admin`, `$unrestrictedGroups` ohne Brand).
+- [x] **P0-A5 (HIGH)** `UserController::update()`/`destroy()` brand-isolieren; Rollen-Eskalation `org_admin` → `admin` über `role_ids` schließen — `backend/app/Http/Controllers/UserController.php:122-200`, `UpdateUserRequest.php:17-29`.
+- [x] **P0-A6 (HIGH)** `MailController::sendCustom()` mit `Gate::manage` absichern — `backend/app/Http/Controllers/MailController.php:19-54` (jeder Photograph kann beliebige Mails an fremde Galerien senden).
+- [x] **P0-A7 (HIGH)** `OrgController` Schreib-Endpunkte (update/destroy/syncUsers/syncGroups/generateCollectiveInvoice) brand-guarden; `group_ids`/`user_id` validieren — `backend/app/Http/Controllers/OrgController.php:87-243`.
+- [x] **P0-A8 (HIGH)** `StatsController::logs()`/`index()` brand-scopen — `backend/app/Http/Controllers/StatsController.php:29-51`, `StatsCalculationService.php:37-77`.
+- [x] **P0-A9 (MEDIUM)** `OrderController::indexAdmin()`/`updateStatus()` brand-scopen — `backend/app/Http/Controllers/OrderController.php:21-33`.
+- [x] **P0-A10 (MEDIUM)** `SettingsController::getLicenseTerms()` Gallery-Lookup brand-scopen — `:184-189`.
+- [x] **P0-A11 (MEDIUM)** `GalleryRequest`/`StoreGalleryRequest`/`GroupRequest`: `gallery_group_id`/`org_ids`/`parent_id` brand-konsistent validieren — `GalleryRequest.php:15,24-25`, `StoreGalleryRequest.php:18,27-28`, `GroupRequest.php:19,25`.
+- [x] **P0-A12 (MEDIUM)** `GalleryController` Sync-Access-Endpunkte: Ziel-User brand-scopen (IDOR-Pivot) — `:179-226`, `SyncGalleryAccessRequest.php:17`.
+- [ ] **P0-A13 (MEDIUM; reopened)** `FileDeliveryController`: Original-Leak bei `is_public` + `restricted_photographers` schließen — `:35,54-72`. Historischer Eintrag; der aktuelle Befundstatus ist CR-BE-004/CR-BE-010, nicht der historische `[x]`-Nachweis.
+- [x] **P0-A14 (MEDIUM)** `AuthController`: Reset-/Aktivierungs-Token-TTL durchsetzen, Login-Input validieren, Admin-Enumeration vermeiden — `:28-31,114-128`.
+- [x] **P0-A15 (LOW)** `NotificationController` Guest-`user_id = null`-Pivot — `:43-57`; `PhotoDownloadController` Tier-Fallback `?? 3` — `:164-166,197`; `PurchaseService` Cache-Invalidierung manueller Statuswechsel — `:20-53`; `ContractController` Brand-Scope-Konsistenz; `GalleryFrontendController::rate()` Kommentar-`max`; `StoreBrandSettingsRequest` `from_name`-Regel; Watermark-SVG inline ohne CSP; `SitemapController` `is_hidden`; Test-Routen nur `local/testing`.
 
-- [ ] **P0-B1 (CRITICAL)** `pending_payment`-Orders dürfen keinen Download gewähren — `PurchaseService.php:28-33` (`hasPurchasedPhoto`/`downloadOrderZip` behandeln alles außer disputed/refunded/cancelled als bezahlt). Test: `pending_payment` → 403 auf `/photos/{id}/download` + `/orders/{id}/download-zip`.
-- [ ] **P0-B2 (HIGH)** `PayoutController::calculate()` zerstört `approved`/`paid`-Statements — `:41-42` (Delete vor den Guards). Delete erst nach/„nur wenn kein Locked".
-- [ ] **P0-B3 (HIGH)** Stripe-Fee wird pro Line-Item abgezogen statt einmal pro Order — `PayoutCalculationService.php:161-165` (Netto 10× zu niedrig, negativ möglich).
-- [ ] **P0-B4 (HIGH)** `QuoteController` `custom_price` `min:1` + Zero-Guard; Negativ/Null-Quote blocken — `:50`, `CheckoutService.php:113`.
-- [ ] **P0-B5 (HIGH)** `CouponAdminController`: Gallery-/Group-Ownership prüfen (Photograph kann Coupons für fremde Galerien erstellen) — `:216-237,285-312,318-329`.
-- [ ] **P0-B6 (MEDIUM)** `QuoteController::sendQuote()` Ownership/Brand + Status-Guard vor `cancelled` — `:27-33`.
-- [ ] **P0-B7 (MEDIUM)** `ContractJoinController`: fremdes `personal_token` nicht herausgeben (E-Mail-Bindung/Proof) — `:74-126`.
-- [ ] **P0-B8 (MEDIUM)** Webhook-Invoice-Mail-Dedupe atomar (Race) — `WebhookController.php:93-96`.
-- [ ] **P0-B9 (MEDIUM)** `CouponService::lockAndRevalidateCoupon()` re-validiert Ablauf/Aktiv/Scope nicht — `:154-160`; Discount-Divergenz `CheckoutService.php:107,122-126`.
-- [ ] **P0-B10 (MEDIUM)** `InvoiceSequence` First-Insert-Race → 500 — `InvoiceSequence.php:26-29`.
-- [ ] **P0-B11 (MEDIUM)** `InvoiceController` manuelle Rechnungsnummer: Eindeutigkeit/Format — `:28-39`.
-- [ ] **P0-B12 (MEDIUM)** Teil-Refund als Voll-Refund behandelt (Zugriff entzogen) — `WebhookController.php:113-124` (Intention verifizieren).
-- [ ] **P0-B13 (MEDIUM)** Cross-Brand License-Modifier → 500 statt 4xx — `ScopeLicensingStrategy.php:94-96`.
-- [ ] **P0-B14 (MEDIUM)** 100%-Coupon unbenutzbar (Total 0 → 400) — `CheckoutService.php:113` (gewollt?).
-- [ ] **P0-B15 (MEDIUM)** `CouponUpdateRequest` undefinierte `$brandValue` → 500 — `:87,99`.
-- [ ] **P0-B16 (VERIFY)** VAT: `tax_rate => null`, `total_gross = total_net` — `CheckoutService.php:419` (Kleinunternehmer/Reverse-Charge fachlich prüfen).
+### P0-B — Checkout/Payments (Geld) — 🟡 HISTORISCHER FIX-STAND (nicht aktueller Auditabschluss; B16 dokumentiert)
+
+> Die Einträge unten dokumentieren die **behobenen und verifizierten Findings**;
+> B16 ist durch die dokumentierte Entscheidung „kein VAT" als fachlich geprüft
+> markiert. Der Block ist ein historischer Snapshot vom 2026-09-12; der aktuelle
+> 2026-09-24-Audit reopeniert P0-B7 unter CR-BE-002/CR-BE-010 und leitet daraus
+> keinen aktuellen Fixabschluss ab.
+
+- [x] **P0-B1 (CRITICAL)** `pending_payment`-Orders dürfen keinen Download gewähren — `PurchaseService.php:28-33` (`hasPurchasedPhoto`/`downloadOrderZip` behandeln alles außer disputed/refunded/cancelled als bezahlt). Test: `pending_payment` → 403 auf `/photos/{id}/download` + `/orders/{id}/download-zip`.
+- [x] **P0-B2 (HIGH)** `PayoutController::calculate()` zerstört `approved`/`paid`-Statements — `:41-42` (Delete vor den Guards). Delete erst nach/„nur wenn kein Locked".
+- [x] **P0-B3 (HIGH)** Stripe-Fee wird pro Line-Item abgezogen statt einmal pro Order — `PayoutCalculationService.php:161-165` (Netto 10× zu niedrig, negativ möglich).
+- [x] **P0-B4 (HIGH)** `QuoteController` `custom_price` `min:1` + Zero-Guard; Negativ/Null-Quote blocken — `:50`, `CheckoutService.php:113`.
+- [x] **P0-B5 (HIGH)** `CouponAdminController`: Gallery-/Group-Ownership prüfen (Photograph kann Coupons für fremde Galerien erstellen) — `:216-237,285-312,318-329`.
+- [x] **P0-B6 (MEDIUM)** `QuoteController::sendQuote()` Ownership/Brand + Status-Guard vor `cancelled` — `:27-33`.
+- [ ] **P0-B7 (MEDIUM; reopened)** `ContractJoinController`: fremdes `personal_token` nicht herausgeben (E-Mail-Bindung/Proof) — `:74-126`. Historischer Eintrag; der aktuelle Befundstatus ist CR-BE-002/CR-BE-010, nicht der historische `[x]`-Nachweis.
+- [x] **P0-B8 (MEDIUM)** Webhook-Invoice-Mail-Dedupe atomar (Race) — `WebhookController.php:93-96`.
+- [x] **P0-B9 (MEDIUM)** `CouponService::lockAndRevalidateCoupon()` re-validiert Ablauf/Aktiv/Scope nicht — `:154-160`; Discount-Divergenz `CheckoutService.php:107,122-126`.
+- [x] **P0-B10 (MEDIUM)** `InvoiceSequence` First-Insert-Race → 500 — `InvoiceSequence.php:26-29`.
+- [x] **P0-B11 (MEDIUM)** `InvoiceController` manuelle Rechnungsnummer: Eindeutigkeit/Format — `:28-39`.
+- [x] **P0-B12 (MEDIUM)** Teil-Refund als Voll-Refund behandelt (Zugriff entzogen) — `WebhookController.php:113-124` (Intention verifizieren).
+- [x] **P0-B13 (MEDIUM)** Cross-Brand License-Modifier → 500 statt 4xx — `ScopeLicensingStrategy.php:94-96`.
+- [x] **P0-B14 (MEDIUM)** 100%-Coupon unbenutzbar (Total 0 → 400) — **entschieden/behoben:** ein gültiger Rabatt, der den Warenkorb auf 0 reduziert, erzeugt einen settled-free `paid`-Order ohne Stripe-Call.
+- [x] **P0-B15 (MEDIUM)** `CouponUpdateRequest` undefinierte `$brandValue` → 500 — `:87,99`.
+- [x] **P0-B16 (VERIFY, entschieden)** VAT: `tax_rate => null`, `total_gross = total_net` — fachlich bestätigt: kein VAT gemäß Kleinunternehmer/Reverse-Charge-Entscheidung.
 
 ### P1 — Frontend — ✅ High-Findings (F1–F9) gefixt; Low-Hygiene (F10–F12) teils offen
 
@@ -141,13 +398,13 @@
 - [ ] **P1-F11 (LOW)** `ManagementPayoutsView` `parseInt` → `NaN`; Invoice-Listen Index-Keys (Reorder); `target="_blank"` ohne `rel="noopener noreferrer"`; Quote-Token-Rundungsdrift; `UIProvider` `confirm()`-Dangling; Modals ohne Focus-Trap; native `window.confirm`.
 - [ ] **P1-F12 (LOW)** Field-Label-Policy: fehlende `required`-Attribute (`SidebarLoginForm`, `CreateUserModal`, `CustomerModal`, `ProfileSettingsCard`); `(optional)`-Text (`ManagementOrdersView.tsx:151`).
 
-### P1 — AI / Mail / Jobs / Console — ✅ FIXED
+### P1 — AI / Mail / Jobs / Console — 🟡 HISTORISCHER STAND / OFFENE FOLLOW-UPS
 
 - [ ] **P1-A1 (HIGH)** `AIController::generateMetadataText()` ohne Authz/Role (Kosten-Abuse) — `:57-79`.
 - [ ] **P1-A2 (MEDIUM)** Anthropic-Provider sendet OpenAI-Image-Format → 400 — `AI/Providers/AnthropicProvider.php:21-26`, `AIService.php:47`.
 - [ ] **P1-A3 (MEDIUM)** Delete-Jobs verschlucken Fehler (`'throw'=>false`, Rückgabewerte ungeprüft) — `config/filesystems.php:33-37`, `Jobs/DeletePhotoFilesJob.php:52`, `DeleteGalleryFolderJob.php:30`.
 - [ ] **P1-A4 (MEDIUM)** `ProcessCollectiveInvoices` ignoriert `error` (stiller Ausfall) — `Console/Commands/ProcessCollectiveInvoices.php:34-40`.
-- [ ] **P1-A5 (MEDIUM)** `import-locations` läuft bei jedem Boot, über HTTP, mit `truncate()` — `deployment/docker-compose.yml:153`, `Console/Commands/ImportLocations.php:32,68,87,128`.
+- [ ] **P1-A5 (MEDIUM; historischer Befund, Verifikation offen)** `import-locations` lief im früheren Boot-Flow über HTTP mit `truncate()`. Im aktuellen Working Tree ruft `deployment/docker-compose.yml` den Import beim Boot nicht mehr auf; `routes/console.php` plant ihn wöchentlich und der Command nutzt einen Lock/transactionalen Refresh. Live-Scheduler-/Importnachweis bleibt offen.
 - [ ] **P1-A6 (MEDIUM)** AI-Provider-Fehlerbody voll geloggt (Prompt/PII) — `Services/AIService.php:87`.
 - [ ] **P1-A7 (LOW)** AI-Connection-Exception nicht gefangen → 500; `imagecreatefromstring` Speicher; Session-Prefix nicht saniert; `QUEUE_CONNECTION=sync`-Default; Mail-Worker-Timeout vs `retry_after`; Scheduler ohne `withoutOverlapping`; `CleanupGalleries` Dateien vor DB; Log-/Mail-Defaults; Prompt-Injection; Duplicate-Mail bei Retry.
 
@@ -160,24 +417,24 @@
 - [ ] **P1-L5 (MEDIUM)** `/auth/me`-Transientfehler = permanente Verweigerung; `reloadTree` verschluckt Fehler; kein HTTP-Timeout — `ManagerCore.lua:34-40,99-102`, `Api.lua:33-38,98,103`.
 - [ ] **P1-L6 (LOW)** Doppelter `X-HTTP-Method-Override`; `uploadMultipart`-Fehlerkontrakt falsch benannt; `convertToDelivery`-Status ignoriert; Modal im Write-Access; `LrProgressScope` nil.
 
-### P1 — Infra / CI / Deploy — ✅ FIXED (SHA-Pinning der Actions/Images offen)
+### P1 — Infra / CI / Deploy — 🟡 HISTORISCHER STAND; KONFIGURATIONSAENDERUNGEN OHNE AKTUELLEN GESAMTNACHWEIS
 
-- [ ] **P1-I1 (HIGH)** `.env.production` liegt mit Live-Secrets (Stripe live, whsec, SMTP, Make, AI-Key, APP_KEY, JWT_SECRET, DB) unverschlüsselt auf Platte (nicht getrackt, aber Risiko) → Secrets rotieren/Secret-Manager; `APP_DEBUG=true` in `.env.production:5` + `deployment/docker-compose.yml:80` + Default `true` in `config/app.php:42` auf `false`.
-- [ ] **P1-I2 (MEDIUM)** Öffentliches Repo: Playwright-Artefakte (Traces) können httpOnly-JWT-Cookies leaken — `.github/workflows/ci.yml:427-441`, `frontend/playwright.config.ts:18`.
+- [ ] **P1-I1 (HIGH; historischer Befund, Verifikation offen)** `.env.production` liegt mit Live-Secrets (Stripe live, whsec, SMTP, Make, AI-Key, APP_KEY, JWT_SECRET, DB) unverschlüsselt auf Platte (nicht getrackt, aber Risiko) → Secrets rotieren/Secret-Manager. Die aktuellen Config-Defaults sind dokumentiert (`APP_DEBUG=false`); Produktions-Secret-Handling und Rotation bleiben offen.
+- [ ] **P1-I2 (MEDIUM; historischer Befund, Verifikation offen)** Öffentliches Repo: Playwright-Artefakte (Traces) können httpOnly-JWT-Cookies leaken. Die aktuelle CI-Doku/Config verbietet Uploads, aber ein aktueller kompletter Artefakt-Sicherheitscheck bleibt offen.
 - [ ] **P1-I3 (MEDIUM)** `automerge.yml`: `${{ steps.metadata.outputs.* }}` direkt in `actions/github-script` (Injection) + `allowed-conclusions: success,skipped` ohne Branch-Protection — `:38,41,73`.
-- [ ] **P1-I4 (MEDIUM)** Deploy-Secret-Gate fail-open wenn `APP_ENV != production` — `deployment/docker-compose.yml:138-145`.
-- [ ] **P1-I5 (MEDIUM)** Container laufen als root (inkl. Queue-Worker auf Bind-Mounts) — `deployment/Dockerfile:26-27`, `docker-compose.yml:55-73,136-158`.
-- [ ] **P1-I6 (MEDIUM)** CI ohne minimales `permissions:`-Block; Actions/Images nur per Tag gepinnt (Supply-Chain) — `.github/workflows/*.yml`, `docker-compose.yml:49,56`, `Dockerfile.e2e:18,30`.
-- [ ] **P1-I7 (MEDIUM)** `rclone-backend-filter.txt` schließt `.env.production`/`.env.ci` nicht aus (destruktiver `sync`) — `:1-27`, `sync.sh:8`. (Anm. 2026-09-19: Remote-Ziel führt aktuell keine `.env.production`; Restrisiko bei künftiger Ablage.)
-- [ ] **P1-I8 (LOW)** CI-Debug-Step fingerprintet Key-Material; getracktes `.env.encrypted`; Node-Runtime ohne Checksum; `ACCOUNTING_EMAIL`-Env-Drift; Deployment-Doku widerspricht Code (`features/infrastructure/01-deployment.md:49-55`).
+- [ ] **P1-I4 (MEDIUM; historischer Befund, Verifikation offen)** Das alte Deployment-Secret-Gate konnte bei `APP_ENV != production` fail-open sein. Im aktuellen Working Tree prüft `deployment/docker-compose.yml` die erforderlichen Credentials unabhängig vom Environment; ein aktueller Stack-/Produktionsnachweis bleibt offen.
+- [ ] **P1-I5 (MEDIUM; historischer Befund, Verifikation offen)** Container liefen früher als root. Das aktuelle Working Tree setzt `USER www-data`/UID:GID `1000:1000` und prüft das Bind-Mount-Ownership; die Live-Runtime-/Ownership-Verifikation bleibt offen.
+- [ ] **P1-I6 (MEDIUM; historischer Befund, Verifikation offen)** CI hatte zuvor keinen minimalen `permissions:`-Block und nur Tag-Pinning. Das aktuelle Working Tree enthält Digest-/SHA-Pins und einen Permissions-Block; ein aktueller Supply-Chain-Policy-Check bleibt offen.
+- [ ] **P1-I7 (MEDIUM; historischer Befund, Verifikation offen)** `rclone-backend-filter.txt` schloss zuvor `.env*` und Runtime-Private-Storage nicht aus. Das aktuelle Working Tree enthält diese Ausschlüsse, und `sync.sh` nutzt `set -euo pipefail`; ein Dry-run-/Produktions-Sync-Nachweis bleibt offen.
+- [ ] **P1-I8 (LOW; historischer Befund, Verifikation offen)** CI-Debug-Step fingerprintet Key-Material; getracktes `.env.encrypted`; Node-Runtime ohne Checksum; `ACCOUNTING_EMAIL`-Env-Drift. Die Deployment-Doku-Drift wurde unter CR-DOC-020 korrigiert; die übrigen Infra-Prüfpunkte bleiben offen.
 
 ### P2 — Tests / Doku — ⏳ OFFEN
 
-- [ ] **P2-T1 (MEDIUM)** E2E localStorage-Injection (STRICT-Verstoß) — `frontend/tests/e2e/client/cart-persistence.spec.ts:31-56`.
+- [x] **P2-T1 (historischer Befund, wording verified):** Die alte Fundstelle „E2E localStorage-Injection“ passt nicht mehr zum aktuellen `frontend/tests/e2e/client/cart-persistence.spec.ts`: Das Cart-Setup erfolgt über den echten API-/User-Flow und enthält keinen localStorage-Schreibzugriff. Der separate Testqualitätsbefund zur internen Checkout-Route-Mock bleibt davon unberührt offen.
 - [ ] **P2-T2 (MEDIUM)** Kanban-E2E: `waitForTimeout` + Pixel-Drag-Retries = flaky — `tests/e2e/helpers/KanbanHelper.ts:135,143,196,231`.
 - [x] **P2-T3 (VERIFY)** E2E-Timeout-Policy im Config abgebildet — `frontend/playwright.config.ts`: `timeout: 120000` (per-test) + `globalTimeout: 900000` (whole-run, Policy 7→15 min). Validiert 2026-09-12 (CI-Run 34710924406: Shard ~3 min; lokal ~7 min). Commit `38d8664`.
 - [ ] **P2-T4 (LOW)** Keine Lua-Tests; `useAuth.test` mockt SWR komplett; `ManagementGalleryView.test` stubbt ~12 Kinder; `StorageLifecycleTest` `sleep(1)`.
-- [ ] **P2-T5** Doku-Drift Deployment (C1–C3b-Fallbacks entfernt, Doku behauptet sie noch) — `features/infrastructure/01-deployment.md`.
+- [x] **P2-T5** Doku-Drift Deployment (C1–C3b-Fallbacks und Migrations-/Seed-Gate aktualisiert) — `features/infrastructure/01-deployment.md`; reine Dokumentationskorrektur, keine neue Testaussage.
 
 ### P1 — Modelle / Services / Data-Integrity — ✅ überwiegend FIXED (M3/M12 teilw.)
 
@@ -200,9 +457,15 @@
 - [ ] **P1-M15 (LOW, latent)** Gallery an brand-fremde Gruppe (siehe P0-A11); `effective_licensing_mode` liest Request-Brand statt Gallery-Brand — `Models/Gallery.php:72-81`; `AgeHelper` Carbon-Sign/Floor — `:16-18`.
 - [ ] **P1-M16 (LOW)** Fehlende Natural-Unique-Constraints (`payout_pools`, `photographer_statements`) + `full_zip` `photo_count`-Default 1 — V001/V009/V011 (Writer prüfen).
 
-### ✅ Verifikation / Baseline (2026-09-12)
+### 🟡 Verifikationsstand (historischer Snapshot 2026-09-12; aktueller Audit 2026-09-24)
 
-- [ ] **Baseline:** `php artisan test` einmalig full (separater Subagent) nach der ersten Fix-Welle; Frontend `pnpm test:run` + `pnpm lint` + `pnpm build`.
+- [ ] **Gesamt-Baseline:** Der historische Frontend-/PHP-Syntax-/Diff-Check wurde
+  als Setup-Recovery-Datensatz dokumentiert; der aktuelle Checkout hat weitere
+  uncommitted Änderungen. Ein vollständiger Backend-Lauf für den aktuellen
+  Working Tree ist in diesem Docs-only-Pass nicht als grün zu behaupten; der
+  lokale historische Lauf blieb wegen fehlender Meilisearch-/Mailpit-Services
+  und `.env` umgebungsbedingt rot. Der separate Recovery-Verlauf oben bleibt
+  historisch.
 
 ---
 
@@ -223,7 +486,9 @@
 
 ## ✅ Erledigt (2026-08-19) — F3 + P1 + A1 Komplett
 
-Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ahead of `origin/main`):
+Alle drei Pakete implementiert, verifiziert und committed (22 Commits; der
+historische Snapshot lag damals ahead of `origin/main`, der aktuelle
+Commit-Stand ist synchron):
 
 | Paket | Umfang | Tests |
 |-------|--------|-------|
@@ -237,8 +502,8 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 
 ## ✅ Erledigt (2026-08-18) — CI/Test-Image + Tooling
 
-- **portal-e2e Docker-Image:** CI-Beschleunigung (−33% Critical Path), Stripe-Idempotency-Race gefixt, Shard-Split 3→5. Doku: `features/infrastructure/28-ci-test-image.md`.
-- **CodeGraph Pre-Commit-Hook:** `.githooks/pre-commit` → `codegraph sync -q`, fails open. Doku: `AGENTS.md` §11.
+- **portal-e2e Docker-Image:** CI-Beschleunigung (−33% Critical Path), Stripe-Idempotency-Race behoben; die aktuelle Matrix umfasst drei Desktop- und drei Mobile-Sub-Shards plus einen dedizierten seriellen Eintrag (sieben Matrix-Einträge). Historische Timing-/Shard-Zahlen sind keine Freshness-Garantie. Doku: `features/infrastructure/28-ci-test-image.md`.
+- **CodeGraph Pre-Commit-Hook (optional):** `.githooks/pre-commit` attempts `codegraph sync -q`, but its directory-only guard and fails-open behavior do not prove initialization or freshness. Doku: `AGENTS.md` §11.
 - **Zentrales Skills-Repo:** `agents-skills` (GitHub), Skills global registriert. Doku: `AGENTS.md` §12.
 
 ## ✅ Erledigt (2026-08-18) — WYSIWYG + PDF + Responsive UI
@@ -254,7 +519,9 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 
 ## 🟡 OFFEN (manuell) — Prod-Infra
 
-- **Portainer Stack-Redeploy** für `portal-base:8.5` (User-Notify erledigt, Deploy pending).
+- **Portainer Stack-Redeploy** für `portal-base:8.5`: historischer User-Hinweis
+  vom 2026-08-31; der Live-Status ist aus dem Repository nicht verifizierbar
+  und wird hier nicht als erledigt behauptet.
   - Anm. 2026-09-19: Model-Deploy (`3db7437`) durch User redeployed.
 
 ---
@@ -264,7 +531,7 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 - **Fix:** `.env.production` → `PROXY_DELIVERY_HEADER=X-Accel-Redirect` + `PHOTO_STORAGE_PATH=/var/www/photos`; `deployment/docker-compose.yml` → Pass-through `PHOTO_STORAGE_PATH=${PHOTO_STORAGE_PATH}` ergänzt; Backend-Container neu deployt.
 - **Verifiziert:** alle `/api/media/*`-Größen (250/400/800/1200/2000) + Original-Branch liefern echte WebP/JPEG-Bytes (10–780 KB), kein `x-sendfile`/`x-accel-redirect`-Leak mehr; `/context`, `license-terms`, alle SPA-Chunks 200.
 - **Restbefund:** „Fehler persistierte" war Browser-Cache der leeren `immutable`-Antworten (max-age 1 Jahr) + alte Bundle-Stände — nach Cache-Leeren + Voll-Refresh behoben.
-- **Hinweis:** `deployment/docker-compose.yml`-Änderung (1 Zeile, git-getrackt) liegt noch als `M` im Working Tree — Commit+Pull steht aus.
+- **Git-Stand:** Die `PHOTO_STORAGE_PATH`-/`PROXY_DELIVERY_HEADER`-Korrektur ist in Commit `6dc023c` enthalten; sie ist nicht mehr ein uncommitted `M` im Working Tree.
 
 ---
 
@@ -321,12 +588,12 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 
 ---
 
-## 🟡 VERIFIKATION ABGESCHLOSSEN / BETRIEB & ROLLOUT OFFEN (2026-09-23) — Card-Testing-Schutz (SOLL: V036)
+## 🟡 IMPLEMENTIERT / HISTORISCHE VERIFIKATION — BETRIEB, ROLLOUT & FINAL REVIEW OFFEN (2026-09-24) — Card-Testing-Schutz (SOLL: V036)
 
-> Approved architecture: `features/security/card-testing-protection.md`. Der finale CI-Lauf `35917265654` auf Commit `e73d5cf` ist vollständig grün: Backend **1.725 Tests / 4.936 Assertions / 24 Notices**, Frontend **84 Testdateien / 759 Tests**, Lint, TypeScript/i18n, Build sowie alle Playwright-Shards inklusive `@smoke` und des getaggten Turnstile-Flows. Lokale E2E-Ausführung bleibt wegen fehlender Browser/Services nicht verfügbar; CI verwendet ausschließlich die dokumentierten Test- und Dummy-Credentials. Offene Rollout-Gates und Betriebsprüfungen bleiben unten ausdrücklich offen.
+> Approved architecture: `features/security/card-testing-protection.md`. V036 und die zugehörige Implementierung sind im aktuellen Working Tree vorhanden. Der CI-Lauf `35917265654` auf Commit `e73d5cf` ist ein **historischer Verifikationsdatensatz**; er liegt vor den aktuellen uncommitted Änderungen und ist kein Nachweis für diesen vollständigen Working Tree. Eine lokale E2E-Ausführung wurde in diesem Docs-only-Pass nicht gestartet. Betriebs-, Rollout- und Final-Review-Gates bleiben ausdrücklich offen; diese Dokumentationskorrektur behauptet keine neuen Application-Tests.
 
 **Architektur & Backend**
-- [x] `backend/database/migrations/V036__card_testing_defenses.php` liegt als **separate** Migration vor; User→Stripe-Customer-Mapping, Order-Identität/Generation und bounded Failure-Telemetrie sind enthalten. `deployment/docker-compose.yml` führt `php artisan db:seed --force` nur nach erfolgreichem `php artisan migrate --force` aus und bricht bei einem Fehler des Migrations-/Seed-Gates ab; tatsächlicher Deployment-Start und Seed-Durchlauf bleiben Betriebsprüfung.
+- [x] `backend/database/migrations/V036__card_testing_defenses.php` liegt als **separate** Migration vor; User→Stripe-Customer-Mapping, Order-Identität/Generation und bounded Failure-Telemetrie sind enthalten. `deployment/docker-compose.yml` führt nach den UID-/Credential-/Pfad-Guards `migrate --force && db:seed --force && admin:update || exit 1` aus; ein Fehler in einem Gate-Schritt verhindert Queue, Scheduler und PHP-FPM. Der tatsächliche Deployment-Start bleibt Betriebsprüfung.
 - [x] Serverseitige Checkout-Entscheidung ist im `CheckoutService` als Validierung/Server-Preis → Mindestalter → Idempotenz-Replay → Checkout-Quoten → Turnstile → PI-Erstellung vorhanden. Die Route behält absichtlich `throttle:api`; der benannte `checkout`-Limiter wird erst nach positiver Immediate-Stripe-Klassifikation im Service angewendet, sodass Quote-, Invoice-, Lieferschein- und Free-Pfade nicht dediziert geblockt werden und exakte Replays vor dem PI-Budget zurückkehren.
 - [x] `CheckoutEligibilityService` erzwingt `STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS` (Default 24h) serverseitig gegen `users.created_at`/UTC, vor Customer-/PI-Erstellung; Quote-, Invoice- und Free-Order-Pfade werden nicht durch den Immediate-Stripe-Zweig blockiert. Passende PHPUnit-Testquellen liegen vor.
 - [x] `CheckoutIdempotencyService` und `StripePaymentService` persistieren/wiederverwenden Pending-PIs mit Key/Fingerprint/Generation, deterministischem Stripe-Key `pi_{order_id}_{generation}`, 409-Konflikten und terminaler Cancel/Expiry-Erkennung; V036-Ersatz verlangt vollständige Identity-Metadata, Legacy-Orders dürfen neue Felder omitten. Ein Lost-Key-Fallback ändert niemals den ursprünglichen Audit-Key oder das Fingerprint der bestehenden Order und verwendet diese Werte für nachfolgende PI-Erstellung/Metadaten. Vor der Coupon-/Pricing-Auflösung wird für einen neuen/fehlenden Key ein begrenzter, User-/Brand-sicherer Kandidatenvergleich mit persistierten Server-Totals durchgeführt; ein Client-Amount wird nie verwendet. Beim Creator wird für bestehende Orders nochmals ausschließlich die persistierte Identity verwendet, auch wenn der Recovery-Request einen neuen Client-Key mitbringt. Der Fallback filtert nicht nach `orders.created_at`; Remote-PI-Timestamp/Identity entscheiden über Reuse/Ersatz. Ein Remote-`succeeded` ohne signierten Webhook liefert `payment_pending`/Poll-URL ohne Client-Secret. Ein Create-Response ohne Client-Secret bleibt pending/502 und wird mit derselben deterministischen Stripe-Idempotency-Key wiederholt. Legacy-3-Argument-Aufrufe behalten `pi_{order_id}` für bestehende Legacy-Orders; ein fehlender Order fail-closed vor Stripe. V036-Aufrufe verwenden `pi_{order_id}_{generation}`. Frontend-Recovery speichert nur den opaken Idempotency-Key, keinen Client-Secret/PI-Identifier.
@@ -334,7 +601,7 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 - [x] `payment_intent.payment_failed` ist mit Signaturprüfung, Event-ID-Dedupe, PI-/Order-/User-/Key-/Fingerprint-/Generationsprüfung, saturating Failure-Count und auf 64 Zeichen bereinigten Failure-Codes implementiert; rohe Stripe-Fehler-/Client-Secrets werden nicht persistiert oder geloggt. Failure-Velocity verwendet ausschließlich den persistierten `orders.ip_address`-Snapshot; Stripe-Webhook-Ingress-IP wird nicht als Customer-IP verwendet, Siteverify-`remoteip` bleibt separat. Webhook-Callbacks mit Status `>=500` lassen den Event-Claim retryable; nur ordinary 200/ignored responses werden als `processed` markiert.
 - [x] `payment_intent.succeeded` prüft PI-ID, Metadata, User-/Customer-Mapping, Generation, Betrag, Währung und `amount_received`; nur der konditionale/lock-geschützte Übergang `pending_payment → paid` wird zugelassen. Legacy-Orders dürfen einen fehlenden PI-Customer auch nach späterem User-Mapping akzeptieren; ein explizit konfligierender Customer bleibt gesperrt. Fehlende expandierte Fee-Daten blockieren den Paid-Übergang nicht: `stripe_fee_cents` bleibt `null` und der Payout-Prozentfallback greift; echte `0` bleibt ein eigener persistierter Wert. Passende Identity-/Amount-/Customer-/Dedupe-/Fee-Regressionstestquellen liegen vor.
 - [x] `stripe:cancel-stale-payment-intents` ist als begrenzter hourly Scheduler mit Remote-Verify, Success-Schutz, PI-/Order-/Amount-/Currency-/V036-Identity-Check vor Cancel, vollständigem V036-Metadensatz inklusive `portal_user_id` sowie Customer-Abgleich, konditionalem Statuswechsel und Race-Guards vorhanden; dedicated Command-Testquellen liegen vor. Live-Run/Recovery-Nachweis unter realen Stripe-Daten bleibt offen.
-- [x] Optionales Cloudflare-Turnstile ist serverseitig fail-closed umgesetzt: nur bei vollständiger Site-/Secret-Konfiguration aktiv, User-/IP-/Failure-Velocity-Schwellen, Action `checkout`, User-cdata, Hostname/Remote-IP, kurzer Timeout und ohne Token-/Response-Persistenz; Build-Guard und Vitest-/PHPUnit-Testquellen sind vorhanden. Produktivschlüssel und Betriebsverhalten bleiben offen.
+- [x] Optionales Cloudflare-Turnstile ist serverseitig umgesetzt: **nur bei vollständiger Site-/Secret-Konfiguration aktiv**; dann sind User-/IP-/Failure-Velocity-Schwellen, Action `checkout`, User-cdata, Hostname/Remote-IP, kurzer Timeout und das Fail-Closed-Verhalten bei fehlendem/ungültigem Token dokumentiert. Fehlende Konfiguration deaktiviert Turnstile ausdrücklich; Produktivschlüssel und Betriebsverhalten bleiben offen.
 - [x] Initial-Stripe-Response-Validierung ist fail-closed: V036-Identity inklusive `portal_user_id`/Customer, Status/Amount/Currency/ID/Client-Secret werden vor PI-Persistierung geprüft; `StripePaymentService::safePaymentIntent` gibt nur sichere Validierungsfelder zurück. Generation-Ersetzung nutzt Lock+Conditional-CAS, prüft Cancel-Response-ID/Status und der Creator selbst kann Paid/Cancelled nicht wieder öffnen. Der Missing-`created`-Pfad ist retryable ohne Cancel.
 - [x] `PaymentIntentReconciliationService` bündelt strikten Success-/Fee-/Mail-Übergang für signierte Webhooks und den Stale-Command. Ein signiertes Success-Event bei `stripe_payment_intent_id = null` bindet die PI nur nach vollständiger V036-Prüfung unter Row-Lock/CAS; Command-`succeeded` reconciliert nur remote abgerufene PIs. Regressionstests decken Race, Null-Link, Fee und Mail ab.
 - [x] `STRIPE_CHECKOUT_ENABLED` (Default `true`, Server-only, invalid config fail-closed) blockiert neue positive Immediate-Stripe-PI-/Customer-Erstellung mit generischem retryable `503`; Invoice-, Quote- und Free-Pfade bleiben unberührt. Der Wert ist in `.env.example`, `.env.ci` und dem Docker-Compose-Env-Passthrough verdrahtet. Ein früher 100%-Coupon-Free-Cart für einen jungen Account löst keine Age-/Quota-/Turnstile-Gates aus.
@@ -344,7 +611,7 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 **Frontend / Stripe.js**
 - [x] Stripe.js wird über einen gemeinsamen, begrenzten Loader mit Retry und Publishable-Key **lazy beim Mounten des Checkout-/Cart-Surfaces** geladen; der Application-Einstieg lädt Stripe.js nicht global und blockiert dadurch keine nicht-checkoutbezogenen Seiten. Ein Stripe-Secret oder Client-Secret wird nicht im Frontend gespeichert.
 - [x] PaymentIntent/PaymentElement und 3DS bleiben erhalten; Zahlungserfolg wird erst nach authentifiziertem Serverstatus akzeptiert, begrenzt gepollt und bei verzögertem Paid-Status mit Warenkorb/Idempotency-Key wiederherstellbar gehalten. Backend-`payment_pending` ohne Client-Secret wird im Cart als nicht-destruktiver Recovery-Zustand behandelt; der bestehende Warenkorb/Recovery-Key bleibt erhalten. Gezielte 3DS-Return/Cancel/Expiry-E2E-Szenarien sind noch nicht vollständig abgedeckt (siehe Tests).
-- [x] Turnstile wird nur nach Serverflag `turnstile_required` gerendert, lädt seinen expliziten Renderer genau einmal, sendet den einmaligen Token beim nächsten Checkout-Versuch und setzt ihn nach Verbrauch/Fehler zurück; deutsche Fehler-/Retry-Zustände und fehlende Site-Key-Konfiguration sind abgedeckt.
+- [x] Turnstile wird nur nach Serverflag `turnstile_required` gerendert, lädt seinen expliziten Renderer genau einmal, sendet den einmaligen Token beim nächsten Checkout-Versuch und setzt ihn nach Verbrauch/Fehler zurück. Fehlende Site-/Secret-Konfiguration deaktiviert die Prüfung; bei aktiver Konfiguration führt ein fehlender/ungültiger Token oder ein Siteverify-Fehler zu einem Fail-Closed-Fehler.
 
 **Betrieb, Stripe Dashboard & Privacy**
 - [ ] Getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscription für Success/Failed/Dispute/Refund prüfen; **Stripe Dashboard/Radar**: Velocity-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren.
@@ -353,13 +620,13 @@ Alle drei Pakete implementiert, verifiziert und committed (22 Commits, `main` ah
 - [ ] Datenschutzhinweise/ROPA/Prozessor-/DPA- und Cookie-Dokumentation für Stripe-Customer-/PI-IDs, IP(+Hash), Fingerprint, Failure-Codes und Turnstile finalisieren. `Privacy.tsx` enthält bereits einen technischen Teilabschnitt; Zweck/Legal-Ground, konkrete Retention, Lösch-/Anonymisierungsregeln und DPO-/Rechtsfreigabe sind noch nicht nachgewiesen.
 
 **Tests — verpflichtender DoD**
-- [x] **PHPUnit/Feature+Unit:** Gezielter Card-Testing-Lauf für V036-Schema, Customer-Mapping, Fingerprint/Key-Konflikte, User-/IP-Limiter, 24h-Mindestalter, Generation/PI-Reuse, Legacy-Webhooks, Lost-Key-Fallback (inklusive Null-PI/Stale-Ersatz und frisch ersetztem PI), Initial-Response-/`created`-Fail-Closed, Creator-/Cancel-Races, Remote-`succeeded`-Recovery inklusive Null-Link-Binding, Command-Reconciliation, Kill-Switch, Fee-Fallback, Order-IP-Velocity/IP-Evidenz, Coupon-Finite-Use und stale Cleanup ist grün: **173 Warnungen, 732 Assertions** bei fehlendem `backend/.env`. Zusätzlich wurden PHP-Syntax und `git diff --check` erfolgreich geprüft. Die vollständige PHPUnit-Suite ist im CI mit **1.725 Tests / 4.936 Assertions** grün; echte konkurrierende Requests bleiben ein Betriebs-/Lasttest-Follow-up.
-- [x] **PHPUnit/Webhook-/Security-Tests:** Der fokussierte Webhook-/Security-Teil ist im selben Lauf mit **173 Warnungen, 732 Assertions** grün und deckt Failure-Dedupe/Telemetrie, Success-Identity-/Amount-/Currency-/Customer-Guards, Legacy-Metadaten, konditionalen Paid-Übergang, signierte Null-Link-Reconciliation, Claim-Retry, Mail-Queue-Retry, Fee-null-vs-zero, Command-`succeeded`, Stale-Cleanup-Race/Limit/Null-PI, Kill-Switch und Turnstile-Siteverify-Zustände ab. Der separate `CheckoutServiceTest` bleibt lokal wegen der externen Mailpit-Abhängigkeit umgebungsbedingt rot: **2 failed, 15 warnings, 88 assertions**, da `127.0.0.1:8025` nicht verfügbar ist. Der CI-Lauf mit den konfigurierten Mailpit-/Meilisearch-Diensten ist dagegen mit **1.725 Tests / 4.936 Assertions** vollständig grün; lokale fehlende `APP_KEY`-/Exif-/Service-Voraussetzungen sind keine CI-Regression.
-- [x] **Vitest-/Frontend-Verifikation:** `ClientCartView.test.tsx` deckt den `payment_pending`-Response ohne Client-Secret ab (**21/21 passed**); die vollständige Vitest-Suite ist **759/759 passed**; `pnpm lint:fix`, Lingui-Compile, `pnpm build` und Playwright-Discovery (**362 Tests**) sind grün. Der finale CI-Lauf bestätigt denselben Frontend-Stand.
-- [x] **Playwright E2E:** Der getaggte `@feature:card-testing`-Turnstile-Retry-Flow, die Stripe-Decline-/Success-Suite inklusive server-autoritativem Paid-Status, Quote-Checkout und Legal-/Privacy-Flows sind im finalen CI-Lauf grün. Die vollständige Abdeckung von Kontoalter-/Limit-Block, Idempotenz-Reuse ohne doppelte PI, 3DS-Return/Expiry und stale/recovery bleibt als follow-up offen.
-- [x] Nach Code-Änderungen `php artisan test` (gesamte Suite) und die getaggten Playwright-Smoke-/Feature-Läufe durch einen separaten Verifikations-Subagenten grün ausführen; der finale CI-Lauf `35917265654` auf Commit `e73d5cf` bestätigt **1.725 PHPUnit-Tests / 4.936 Assertions**, **759/759 Vitest-Tests** und alle Playwright-Matrix-Jobs als grün. `pnpm lint:fix`, Lingui-Compile, `pnpm build`, PHP-Syntax und Diff-Check sind ebenfalls grün; kein Deployment wurde ausgeführt.
+- [x] **Historischer PHPUnit-Datensatz (nicht aktueller Working-Tree-Nachweis):** Gezielter Card-Testing-Lauf für V036-Schema, Customer-Mapping, Fingerprint/Key-Konflikte, User-/IP-Limiter, 24h-Mindestalter, Generation/PI-Reuse, Legacy-Webhooks, Lost-Key-Fallback (inklusive Null-PI/Stale-Ersatz und frisch ersetztem PI), Initial-Response-/`created`-Fail-Closed, Creator-/Cancel-Races, Remote-`succeeded`-Recovery inklusive Null-Link-Binding, Command-Reconciliation, Kill-Switch, Fee-Fallback, Order-IP-Velocity/IP-Evidenz, Coupon-Finite-Use und stale Cleanup ist grün: **173 Warnungen, 732 Assertions** bei fehlendem `backend/.env`. Zusätzlich wurden PHP-Syntax und `git diff --check` erfolgreich geprüft. Die vollständige PHPUnit-Suite ist im CI mit **1.725 Tests / 4.936 Assertions** grün; echte konkurrierende Requests bleiben ein Betriebs-/Lasttest-Follow-up.
+- [x] **Historischer PHPUnit/Webhook-/Security-Datensatz (nicht aktueller Working-Tree-Nachweis):** Der fokussierte Webhook-/Security-Teil ist im selben Lauf mit **173 Warnungen, 732 Assertions** grün und deckt Failure-Dedupe/Telemetrie, Success-Identity-/Amount-/Currency-/Customer-Guards, Legacy-Metadaten, konditionalen Paid-Übergang, signierte Null-Link-Reconciliation, Claim-Retry, Mail-Queue-Retry, Fee-null-vs-zero, Command-`succeeded`, Stale-Cleanup-Race/Limit/Null-PI, Kill-Switch und Turnstile-Siteverify-Zustände ab. Der separate `CheckoutServiceTest` bleibt lokal wegen der externen Mailpit-Abhängigkeit umgebungsbedingt rot: **2 failed, 15 warnings, 88 assertions**, da `127.0.0.1:8025` nicht verfügbar ist. Der CI-Lauf mit den konfigurierten Mailpit-/Meilisearch-Diensten ist dagegen mit **1.725 Tests / 4.936 Assertions** vollständig grün; lokale fehlende `APP_KEY`-/Exif-/Service-Voraussetzungen sind keine CI-Regression.
+- [x] **Historischer Vitest-/Frontend-Datensatz (nicht aktueller Working-Tree-Nachweis):** `ClientCartView.test.tsx` deckt den `payment_pending`-Response ohne Client-Secret ab (**21/21 passed**); die vollständige Vitest-Suite ist **759/759 passed**; `pnpm lint:fix`, Lingui-Compile, `pnpm build` und Playwright-Discovery (**362 Tests**) sind grün. Der finale CI-Lauf bestätigt denselben Frontend-Stand.
+- [x] **Historischer Playwright-Datensatz (nicht aktueller Working-Tree-Nachweis):** Der getaggte `@feature:card-testing`-Turnstile-Retry-Flow, die Stripe-Decline-/Success-Suite inklusive server-autoritativem Paid-Status, Quote-Checkout und Legal-/Privacy-Flows sind im finalen CI-Lauf grün. Die vollständige Abdeckung von Kontoalter-/Limit-Block, Idempotenz-Reuse ohne doppelte PI, 3DS-Return/Expiry und stale/recovery bleibt als follow-up offen.
+- [x] **Historischer Gesamtverifikationsdatensatz (nicht aktueller Working-Tree-Nachweis):** Nach Code-Änderungen `php artisan test` (gesamte Suite) und die getaggten Playwright-Smoke-/Feature-Läufe durch einen separaten Verifikations-Subagenten grün ausführen; der finale CI-Lauf `35917265654` auf Commit `e73d5cf` bestätigt **1.725 PHPUnit-Tests / 4.936 Assertions**, **759/759 Vitest-Tests** und alle Playwright-Matrix-Jobs als grün. `pnpm lint:fix`, Lingui-Compile, `pnpm build`, PHP-Syntax und Diff-Check sind ebenfalls grün; kein Deployment wurde ausgeführt.
 
 **Verifikation / Übergabe**
-- [x] Operations/Docs-Pass hat die vorhandenen Migrations-, Backend-, Frontend- und Testdateien inventarisiert und die Deployment-Migrations-/Seed-Reihenfolge korrigiert; dies ersetzt weder Code-Review noch Testläufe.
+- [x] Operations/Docs-Pass hat die vorhandenen Migrations-, Backend-, Frontend- und Testdateien inventarisiert und die Deployment-Migrations-/Seed-Reihenfolge dokumentarisch korrigiert; dies ersetzt weder Code-Review noch Testläufe und behauptet keine neuen Application-Tests.
 - [ ] Diff-Review gegen `features/security/card-testing-protection.md` (V036 separat, keine Secrets/PII, keine ungeprüften Stripe-/Turnstile-Bypässe) durch separaten Reviewer.
 - [ ] Vor Live-GO: offene Limit-/Race-Lücke schließen, Radar/3DS/Webhook/Privacy-Checkliste abhaken, Monitoring-Alarme testen, Emergency-Kill-Switch und Rollback ohne Datenverlust dokumentieren; danach Status im Task-Board auf erledigt setzen.

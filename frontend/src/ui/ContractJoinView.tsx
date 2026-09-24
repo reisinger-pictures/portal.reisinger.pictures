@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
@@ -6,8 +6,24 @@ import PageLayout from './components/PageLayout';
 import ErrorMessage from './components/ErrorMessage';
 import { fetchJoinContract, submitJoin, JoinContractResponse } from '../logic/useContractJoin';
 
+function ContractLoadingView() {
+    return <PageLayout>
+        <div className="flex h-full items-center justify-center"><span
+            className="loading loading-spinner loading-lg text-primary"></span></div>
+    </PageLayout>;
+}
+
 export default function ContractJoinView() {
     const { token } = useParams<{ token: string }>();
+
+    if (!token) return <ContractLoadingView />;
+
+    // A join token identifies a separate identity/consent scope. Remounting this
+    // boundary prevents form state or an old submission from crossing tokens.
+    return <ContractJoinTokenView key={token} token={token} />;
+}
+
+function ContractJoinTokenView({ token }: { token: string }) {
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(true);
@@ -19,12 +35,27 @@ export default function ContractJoinView() {
     const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
     const [acceptPrivacy, setAcceptPrivacy] = useState(false);
     const [isJoining, setIsJoining] = useState(false);
+    const viewActive = useRef(true);
 
     useEffect(() => {
-        if (!token) return;
+        viewActive.current = true;
+        return () => { viewActive.current = false; };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
         fetchJoinContract(token)
-            .then(data => { setContract(data); setLoading(false); })
-            .catch(err => { setError(err.message); setLoading(false); });
+            .then(data => {
+                if (!active) return;
+                setContract(data);
+                setLoading(false);
+            })
+            .catch((err: unknown) => {
+                if (!active) return;
+                setError(err instanceof Error ? err.message : String(err));
+                setLoading(false);
+            });
+        return () => { active = false; };
     }, [token]);
 
     const handleRoleToggle = (role: string) => {
@@ -46,18 +77,21 @@ export default function ContractJoinView() {
         setError('');
         try {
             const result = await submitJoin(token, name, email, selectedRoles);
-            navigate(`/contracts/sign/${result.personal_token}`, { replace: true });
+            if (viewActive.current) {
+                navigate(`/contracts/sign/${result.personal_token}`, { replace: true });
+            }
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : String(err));
+            if (viewActive.current) {
+                setError(err instanceof Error ? err.message : String(err));
+            }
         } finally {
-            setIsJoining(false);
+            if (viewActive.current) {
+                setIsJoining(false);
+            }
         }
     };
 
-    if (loading) return <PageLayout>
-        <div className="flex h-full items-center justify-center"><span
-            className="loading loading-spinner loading-lg text-primary"></span></div>
-    </PageLayout>;
+    if (loading) return <ContractLoadingView />;
 
     if (error && !contract) return (
         <PageLayout>

@@ -126,10 +126,10 @@ test.describe('Quote Checkout Workflow', () => {
         const checkoutData = await checkoutRes.json();
         const orderId: string = checkoutData.order_id;
         expect(orderId).toBeTruthy();
-        await StripeHelper.installPaidOrderStatusFixture(page, orderId);
 
         // --- 5. Stripe-Zahlung (Visa 4242) ---
-        await expect(page.locator('h2:has-text("Zahlung abschließen")')).toBeVisible({ timeout: 15000 });
+        const main = page.getByRole('main');
+        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({ timeout: 15000 });
 
         const stripeFrames = await StripeHelper.resolveStripeIframes(page);
 
@@ -150,12 +150,26 @@ test.describe('Quote Checkout Workflow', () => {
         }, { timeout: 60000 });
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
+        // Webhook delivery is not deterministic in the disposable E2E stack.
+        // Transition the real order through the management API and let the
+        // browser poll the actual order resource; the polling/refresh contract
+        // itself remains covered by StripeCheckoutForm Vitest.
+        const paidResponse = await request.put(`/api/management/orders/${orderId}/status`, {
+            data: {status: 'paid'},
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Cookie: helper.getAdminToken(),
+            },
+        });
+        expect(paidResponse.ok(), await paidResponse.text()).toBeTruthy();
+
         // Stripe confirmation precedes the server-authoritative paid state.
         // Wait for the authenticated status poll before checking the success toast.
         await paidOrderResponsePromise;
-        await expect(page.locator('.toast')).toContainText(/Zahlung erfolgreich/i, { timeout: 15000 });
+        await expect(page.getByRole('alert').filter({hasText: /Zahlung erfolgreich/i})).toBeVisible({ timeout: 15000 });
 
         await expect(page).toHaveURL(/.*\/orders/, { timeout: 15000 });
-        await expect(page.locator('h1:has-text("Meine Einkäufe & Lizenzen")')).toBeVisible();
+        await expect(page.getByRole('main').getByRole('heading', {name: 'Meine Einkäufe & Lizenzen'})).toBeVisible();
     });
 });

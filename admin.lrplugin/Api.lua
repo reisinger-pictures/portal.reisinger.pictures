@@ -20,6 +20,18 @@ local CREDENTIAL_KEY = "portalPassword"
 local REQUEST_TIMEOUT = 60
 local UPLOAD_TIMEOUT = 600
 
+-- A single request may re-authenticate and retry at most once.  The bound is
+-- deliberately per request, not per manager: a fresh token can itself expire
+-- during a very long export, while a failed request must never loop.
+local MAX_AUTH_RETRIES = 1
+Api.MAX_AUTH_RETRIES = MAX_AUTH_RETRIES
+-- Kept as a public compatibility alias for older plug-in test harnesses.
+Api.MAX_SESSION_REFRESHES = MAX_AUTH_RETRIES
+
+local function isAuthSession(value)
+    return type(value) == "table" and value._authSession == true
+end
+
 function Api.setBaseUrl(url)
     Api.baseUrl = url
 end
@@ -85,6 +97,10 @@ end
 -- Returns data, status, resBody, resHeaders. `status` is 0 when no HTTP
 -- response was received (network error).
 function Api.call(endpoint, method, payload, jwt)
+    if isAuthSession(jwt) then
+        return Api.callWithSession(jwt, endpoint, method, payload)
+    end
+
     local headers = {}
     table.insert(headers, { field = "Referer", value = Api.baseUrl })
     if jwt then table.insert(headers, { field = "Authorization", value = "Bearer " .. jwt }) end
@@ -160,6 +176,10 @@ end
 
 -- Returns resBody, status on success; nil, status, errDetail on failure.
 function Api.uploadMultipart(endpoint, formFields, jwt)
+    if isAuthSession(jwt) then
+        return Api.uploadWithSession(jwt, endpoint, formFields)
+    end
+
     local fullUrl = Api.baseUrl .. endpoint
     local headers = { { field = "Authorization", value = "Bearer " .. jwt } }
 
@@ -183,6 +203,90 @@ function Api.uploadMultipart(endpoint, formFields, jwt)
         or (resBody and resBody ~= "" and resBody)
         or ("HTTP " .. tostring(status))
     return nil, status, errDetail
+end
+
+-- Creates a deliberately small, credential-free session holder.  The JWT is
+-- mutable, but no password is retained here; the optional refresh callback
+-- can use the protected credential store without exposing it to the holder.
+function Api.createSession(jwt, email, refresh)
+    return {
+        _authSession = true,
+        jwt = jwt,
+        email = email or "",
+        refresh = refresh,
+        expired = false,
+        refreshing = false
+    }
+end
+
+-- Performs one silent re-authentication.  The caller (callWithSession or
+-- uploadWithSession) owns the one-retry bound; this function never loops.
+function Api.refreshSession(session)
+    if not isAuthSession(session) then return nil, "Keine aktive Sitzung." end
+    if session.expired then return nil, "Sitzung ist abgelaufen." end
+    if session.refreshing then return nil, "Sitzung wird bereits erneuert." end
+
+    session.refreshing = true
+    local ok, newJwt, err
+    if type(session.refresh) == "function" then
+        ok, newJwt, err = pcall(session.refresh)
+    else
+        ok, newJwt, err = pcall(Api.login, session.email)
+    end
+    session.refreshing = false
+
+    if not ok then
+        session.expired = true
+        return nil, tostring(newJwt)
+    end
+
+    if type(newJwt) == "string" and newJwt ~= "" then
+        session.jwt = newJwt
+        session.expired = false
+        return newJwt, nil
+    end
+
+    session.expired = true
+    return nil, err or "Sitzung konnte nicht erneuert werden."
+end
+
+-- Calls an authenticated endpoint and retries exactly once after a bounded
+-- re-authentication.  A 401 is returned before the controller performs the
+-- mutation, so the one replay is safe; the original response is returned when
+-- renewal is unavailable, and a second 401 marks this session terminally
+-- expired.
+function Api.callWithSession(session, endpoint, method, payload)
+    if not isAuthSession(session) then return Api.call(endpoint, method, payload, session) end
+    if session.expired then return nil, 401, "Sitzung ist abgelaufen.", nil end
+
+    local data, status, resBody, resHeaders
+    for retry = 0, MAX_AUTH_RETRIES do
+        data, status, resBody, resHeaders = Api.call(endpoint, method, payload, session.jwt)
+        if status ~= 401 or retry >= MAX_AUTH_RETRIES then break end
+
+        local newJwt = Api.refreshSession(session)
+        if not newJwt then return data, status, resBody, resHeaders end
+    end
+    if status == 401 then session.expired = true end
+    return data, status, resBody, resHeaders
+end
+
+-- Multipart equivalent of Api.callWithSession.  Upload retries remain
+-- idempotent because ManagerCore always sends replace=1.
+function Api.uploadWithSession(session, endpoint, formFields)
+    if not isAuthSession(session) then return Api.uploadMultipart(endpoint, formFields, session) end
+    if session.expired then return nil, 401, "Sitzung ist abgelaufen." end
+
+    local resBody, status, errDetail
+    for retry = 0, MAX_AUTH_RETRIES do
+        resBody, status, errDetail = Api.uploadMultipart(endpoint, formFields, session.jwt)
+        if status ~= 401 or retry >= MAX_AUTH_RETRIES then break end
+
+        local newJwt = Api.refreshSession(session)
+        if not newJwt then return nil, status, errDetail end
+    end
+    if status == 401 then session.expired = true end
+    return resBody, status, errDetail
 end
 
 -- Returns isAllowed, data, status. A non-200 status is a transient/technical

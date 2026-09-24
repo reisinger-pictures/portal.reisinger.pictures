@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Board;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\Brand;
 use App\Models\LightroomCatalog;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Tests\TestCase;
 
 class LightroomCatalogTest extends TestCase
 {
@@ -14,9 +16,12 @@ class LightroomCatalogTest extends TestCase
 
     private function createUserWithRole(string $roleName): User
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'brand' => $roleName === 'super_admin' ? null : Brand::B2B->value,
+        ]);
         $role = Role::firstOrCreate(['name' => $roleName]);
         $user->roles()->attach($role);
+
         return $user;
     }
 
@@ -38,6 +43,7 @@ class LightroomCatalogTest extends TestCase
     private function authHeaders(User $user): array
     {
         $token = auth('api')->login($user);
+
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }
 
@@ -200,7 +206,7 @@ class LightroomCatalogTest extends TestCase
 
     public function test_unauthenticated_gets_401_on_all_endpoints(): void
     {
-        $id = (string) \Illuminate\Support\Str::uuid();
+        $id = (string) Str::uuid();
 
         $this->getJson('/api/management/lightroom-catalogs')->assertStatus(401);
         $this->postJson('/api/management/lightroom-catalogs', ['name' => 'X'])->assertStatus(401);

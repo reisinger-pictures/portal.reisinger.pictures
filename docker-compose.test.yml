@@ -1,6 +1,6 @@
 services:
   search:
-    image: getmeili/meilisearch:v1.48.3
+    image: getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29
     container_name: portal_search_test
     restart: unless-stopped
     environment:

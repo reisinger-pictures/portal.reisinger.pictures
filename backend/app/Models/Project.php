@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Casts\AsBrand;
-use App\Enums\PaymentStatus;
-use App\Enums\ProjectStatus;
+use App\Enums\Brand;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +37,15 @@ class Project extends Model
         'position' => 'integer',
     ];
 
+    public function scopeForBrand(Builder $query, string|Brand|null $brand): Builder
+    {
+        if ($brand === null) {
+            return $query->whereNull('brand');
+        }
+
+        return $query->where('brand', $brand instanceof Brand ? $brand->value : $brand);
+    }
+
     public function owner()
     {
         return $this->belongsTo(User::class, 'owner_id');
@@ -56,12 +65,12 @@ class Project extends Model
     {
         static::saving(function ($project) {
             $allowedStatuses = ['anfrage', 'angebot', 'beauftragt', 'rechnung', 'bezahlt', 'storniert'];
-            if (!in_array($project->status, $allowedStatuses)) {
+            if (! in_array($project->status, $allowedStatuses)) {
                 throw new \InvalidArgumentException("Ungültiger Projektstatus: {$project->status}");
             }
 
             $allowedPaymentStatuses = ['open', 'partly_paid', 'paid'];
-            if (!in_array($project->payment_status, $allowedPaymentStatuses)) {
+            if (! in_array($project->payment_status, $allowedPaymentStatuses)) {
                 throw new \InvalidArgumentException("Ungültiger Zahlungsstatus: {$project->payment_status}");
             }
         });

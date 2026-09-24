@@ -14,7 +14,11 @@ use App\Models\ModelProfile;
 use App\Models\ModelRegistrationInvite;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AuthorizationService;
+use App\Services\CustomerSearchSyncService;
+use App\Services\ModelFileCleanupService;
 use App\Services\ModelFileStore;
+use App\Services\ModelPhotoPrimaryService;
 use App\Services\ModelQuestionnaire;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -23,7 +27,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -46,6 +49,9 @@ class ModelRegistrationController extends Controller
     public function __construct(
         private readonly ModelQuestionnaire $questionnaire,
         private readonly ModelFileStore $fileStore,
+        private readonly ModelFileCleanupService $fileCleanup,
+        private readonly CustomerSearchSyncService $searchSync,
+        private readonly ModelPhotoPrimaryService $photoPrimary,
     ) {}
 
     public function check(string $token)
@@ -231,12 +237,15 @@ class ModelRegistrationController extends Controller
         $supersededPaths = [];
         /** @var array<int, \Closure> $deferredMails */
         $deferredMails = [];
+        /** @var array<int, string> $deferredCustomerIds */
+        $deferredCustomerIds = [];
 
         try {
             // The public, login-free flow must never depend on Meilisearch being
-            // reachable: persist the CRM customers without search syncing.
-            $act = Customer::withoutSyncingToSearch(function () use ($request, $invite, $validated, $version, $brand, $managerIndex, &$storedPaths, &$supersededPaths, &$deferredMails) {
-                return DB::transaction(function () use ($request, $invite, $validated, $version, $brand, $managerIndex, &$storedPaths, &$supersededPaths, &$deferredMails) {
+            // reachable: suppress the observer and queue a durable sync only
+            // after the transaction has committed.
+            $act = $this->searchSync->withoutSync(function () use ($request, $invite, $validated, $version, $brand, $managerIndex, &$storedPaths, &$supersededPaths, &$deferredMails, &$deferredCustomerIds) {
+                return DB::transaction(function () use ($request, $invite, $validated, $version, $brand, $managerIndex, &$storedPaths, &$supersededPaths, &$deferredMails, &$deferredCustomerIds) {
                     // Atomic one-time claim. 0 affected rows → someone else redeemed first.
                     $claimed = ModelRegistrationInvite::where('id', $invite->id)
                         ->whereNull('used_at')
@@ -263,6 +272,7 @@ class ModelRegistrationController extends Controller
                         $personContext = ['is_manager' => $isManager, 'person_count' => count($persons)];
 
                         $customer = $this->resolveCustomer($answers, $brand);
+                        $deferredCustomerIds[] = (string) $customer->id;
                         $ageProofRequired = true;
 
                         $profile = ModelProfile::updateOrCreate(
@@ -349,18 +359,26 @@ class ModelRegistrationController extends Controller
             });
         } catch (\Throwable $exception) {
             // A rolled-back transaction must not leave orphaned age proofs behind.
-            if ($storedPaths !== []) {
-                Storage::disk('local')->delete($storedPaths);
-            }
+            $this->fileCleanup->immediately(
+                $storedPaths,
+                'registration_rollback',
+            );
 
             throw $exception;
+        }
+
+        foreach (array_values(array_unique($deferredCustomerIds)) as $customerId) {
+            $this->searchSync->defer($customerId);
         }
 
         // The superseded age proof is removed only after a successful commit:
         // deleting it inside the transaction would leave the rolled-back DB row
         // pointing at a file that no longer exists if anything fails later.
         if ($supersededPaths !== []) {
-            $this->fileStore->delete($supersededPaths);
+            $this->fileCleanup->afterCommit(
+                $supersededPaths,
+                'registration_proof_replaced',
+            );
         }
 
         // Mails are dispatched only after the transaction committed, so a
@@ -446,8 +464,14 @@ class ModelRegistrationController extends Controller
         } catch (\Throwable $exception) {
             // The caller only tracks the path once save() succeeds; if the
             // metadata write fails, remove the already-stored file here so it
-            // cannot be orphaned on the private disk.
-            $this->fileStore->delete($path);
+            // cannot be orphaned on the private disk. A failed unlink is
+            // logged and handed to the retry job rather than masking the DB
+            // exception.
+            $this->fileCleanup->immediately(
+                $path,
+                'age_proof_metadata_rollback',
+                $profile->customer_id,
+            );
 
             throw $exception;
         }
@@ -542,8 +566,11 @@ class ModelRegistrationController extends Controller
                 ->first();
 
         if ($primary !== null) {
-            ModelPhoto::where('model_profile_id', $profile->id)->update(['is_primary' => false]);
-            $primary->forceFill(['is_primary' => true])->save();
+            // The registration submit already owns the outer transaction. Join
+            // the shared profile lock so an existing primary cannot be cleared
+            // without an observable write, and keep the lock until that outer
+            // transaction commits.
+            $this->photoPrimary->promoteInTransaction($profile, $primary->id);
         }
     }
 
@@ -627,8 +654,17 @@ class ModelRegistrationController extends Controller
                 Mail::to($recipient)->send($activationMail);
             };
         } else {
+            // Never attach a legacy null-brand non-Super-Admin to a new
+            // registration flow. The invite has a concrete brand; silently
+            // linking this invalid actor would preserve the reserved-null
+            // violation across the account boundary.
+            if (app(AuthorizationService::class)->isReservedNullBrandActor($user)) {
+                return;
+            }
+
             // Brand isolation: never link a foreign-brand account. Existing
-            // cross-brand (brand = null) or same-brand accounts are linked.
+            // trusted cross-brand (brand = null) or same-brand accounts are
+            // linked.
             $userBrand = $user->brand instanceof Brand ? $user->brand->value : $user->brand;
             if ($userBrand !== null && $userBrand !== $brand) {
                 return;

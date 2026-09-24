@@ -22,6 +22,16 @@ class GalleryGroupResource extends JsonResource
             'is_editorial_only' => $this->is_editorial_only,
             'is_hidden' => $this->is_hidden,
             'restricted_photographers' => $this->restricted_photographers,
+            'orgs' => $this->whenLoaded(
+                'orgs',
+                fn () => $this->orgs
+                    ->map(fn ($org) => [
+                        'id' => $org->id,
+                        'name' => $org->name,
+                    ])
+                    ->values()
+                    ->all(),
+            ),
             'children' => GalleryGroupResource::collection($this->whenLoaded('children')),
             'galleries' => GalleryResource::collection($this->whenLoaded('galleries')),
             'created_at' => $this->created_at?->toISOString(),

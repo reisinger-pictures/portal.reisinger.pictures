@@ -40,8 +40,13 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
     }, [isOpen, editingProduct, reset]);
 
     const onSubmit = async (data: ProductFormValues) => {
-        await onSave({ ...data, price: Math.round(Number(data.price) * 100) });
-        onClose();
+        try {
+            await onSave({ ...data, price: Math.round(Number(data.price) * 100) });
+            onClose();
+        } catch {
+            // The parent reports the API error; keep the entered values and modal open.
+            return;
+        }
     };
 
     if (!isOpen) return null;
