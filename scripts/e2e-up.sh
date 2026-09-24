@@ -34,6 +34,9 @@ readonly E2E_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
 readonly E2E_TURNSTILE_SECRET="1x0000000000000000000000000000000AA"
 readonly E2E_TURNSTILE_USER_THRESHOLD=3
 readonly E2E_TURNSTILE_IP_THRESHOLD=1000
+readonly E2E_MEILISEARCH_HEALTH_URL="${E2E_MEILISEARCH_HEALTH_URL:-http://127.0.0.1:7701/health}"
+readonly E2E_MEILISEARCH_READY_TIMEOUT_SECONDS="${E2E_MEILISEARCH_READY_TIMEOUT_SECONDS:-60}"
+readonly E2E_MEILISEARCH_READY_POLL_SECONDS="${E2E_MEILISEARCH_READY_POLL_SECONDS:-1}"
 
 log()  { printf '[e2e-up] %s\n' "$*"; }
 fail() { printf '[e2e-up] FEHLER: %s\n' "$*" >&2; exit 1; }
@@ -45,6 +48,17 @@ fail() { printf '[e2e-up] FEHLER: %s\n' "$*" >&2; exit 1; }
 # und diesem Skript.
 log "Starte Test-Services (docker-compose.test.yml) ..."
 docker compose -f "$ROOT/docker-compose.test.yml" up -d
+
+log "Warte auf Meilisearch (bounded readiness check) ..."
+if ! MEILISEARCH_HEALTH_URL="$E2E_MEILISEARCH_HEALTH_URL" \
+    MEILISEARCH_READY_TIMEOUT_SECONDS="$E2E_MEILISEARCH_READY_TIMEOUT_SECONDS" \
+    MEILISEARCH_READY_POLL_SECONDS="$E2E_MEILISEARCH_READY_POLL_SECONDS" \
+    bash "$ROOT/scripts/wait-for-meilisearch.sh"; then
+    log "Meilisearch readiness diagnostics:"
+    docker compose -f "$ROOT/docker-compose.test.yml" ps search || true
+    docker compose -f "$ROOT/docker-compose.test.yml" logs --no-color --tail 50 search || true
+    fail "Meilisearch did not become ready within ${E2E_MEILISEARCH_READY_TIMEOUT_SECONDS}s; aborting E2E setup."
+fi
 
 # --- 2. .env.e2e aus .env ableiten (Safe-Patching mit Validierung) ---------
 [ -f "$BACKEND/.env" ] || fail "backend/.env fehlt — bitte zuerst lokal einrichten (README Quickstart)."

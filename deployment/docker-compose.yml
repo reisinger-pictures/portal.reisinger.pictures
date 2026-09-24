@@ -93,6 +93,7 @@ services:
       - LOG_CHANNEL=stderr
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ACCOUNTING_EMAIL=${ACCOUNTING_EMAIL}
       # ---
       # E-Mail-Versand (SMTP via ZeptoMail, Migration vom Gmail-REST-OAuth am 2026-08-24)
       # Konfiguration liegt in .env.production:
