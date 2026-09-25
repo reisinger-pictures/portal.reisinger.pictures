@@ -13,9 +13,16 @@ use App\Models\Photo;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\QuoteLinkService;
+use Illuminate\Contracts\Mail\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\PendingMail;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Support\Testing\Fakes\MailFake;
+use Mockery;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\AbstractTransport;
 use Tests\TestCase;
 
 /**
@@ -73,6 +80,34 @@ class QuoteControllerSecurityTest extends TestCase
             'message' => 'Hier ist mein Angebot.',
             'rights_text' => null,
         ], $overrides);
+    }
+
+    private function useFailingQuoteTransport(): void
+    {
+        // Mail::fake() also replaces the container binding; reach the real manager
+        // so the queue can execute the injected transport.
+        $mailRoot = Mail::getFacadeRoot();
+        $mailManager = $mailRoot instanceof MailFake
+            ? $mailRoot->manager
+            : app('mail.manager');
+        $mailManager->extend('quote_fault', static fn (): AbstractTransport => new class extends AbstractTransport
+        {
+            protected function doSend(SentMessage $message): void
+            {
+                throw new \RuntimeException('quote SMTP transport unavailable');
+            }
+
+            public function __toString(): string
+            {
+                return 'quote_fault';
+            }
+        });
+        Mail::swap($mailManager);
+        Config::set([
+            'mail.default' => 'quote_fault',
+            'mail.mailers.quote_fault' => ['transport' => 'quote_fault'],
+            'queue.default' => 'sync',
+        ]);
     }
 
     public function test_admin_can_answer_pending_quote_request(): void
@@ -246,6 +281,74 @@ class QuoteControllerSecurityTest extends TestCase
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
             ->assertStatus(422);
+
+        Mail::assertQueued(CustomMail::class, 1);
+        $this->assertSame('cancelled', $order->fresh()->status);
+    }
+
+    public function test_transport_failure_rolls_back_quote_and_retry_queues_one_intent(): void
+    {
+        $gallery = Gallery::factory()->create(['is_public' => true]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $order = $this->orderForPhoto($photo);
+        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+
+        $this->useFailingQuoteTransport();
+        try {
+            $this->withHeaders(['Authorization' => "Bearer $token"])
+                ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
+                ->assertStatus(503);
+        } finally {
+            Mail::fake();
+        }
+
+        $this->assertSame('pending', $order->fresh()->status);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
+            ->assertOk();
+
+        Mail::assertQueued(CustomMail::class, 1);
+        $this->assertSame('cancelled', $order->fresh()->status);
+    }
+
+    public function test_enqueue_failure_rolls_back_quote_and_retry_queues_one_intent(): void
+    {
+        $gallery = Gallery::factory()->create(['is_public' => true]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $order = $this->orderForPhoto($photo);
+        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+
+        // Fail after the conditional claim, at the queue boundary.
+        $pendingMail = Mockery::mock(PendingMail::class);
+        $pendingMail->shouldReceive('queue')
+            ->once()
+            ->andThrow(new \RuntimeException('quote mail enqueue unavailable'));
+        $mailFactory = Mockery::mock(Factory::class);
+        $mailFactory->shouldReceive('to')
+            ->once()
+            ->with($order->user->email)
+            ->andReturn($pendingMail);
+        $mailRoot = Mail::getFacadeRoot();
+        $originalMailManager = $mailRoot instanceof MailFake
+            ? $mailRoot->manager
+            : app('mail.manager');
+        Mail::swap($mailFactory);
+
+        try {
+            $this->withHeaders(['Authorization' => "Bearer $token"])
+                ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
+                ->assertStatus(503);
+        } finally {
+            Mail::swap($originalMailManager);
+            Mail::fake();
+        }
+
+        $this->assertSame('pending', $order->fresh()->status);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
+            ->assertOk();
 
         Mail::assertQueued(CustomMail::class, 1);
         $this->assertSame('cancelled', $order->fresh()->status);
