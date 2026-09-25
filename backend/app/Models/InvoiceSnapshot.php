@@ -60,6 +60,13 @@ class InvoiceSnapshot extends Model
      */
     public const MAIL_DISPATCH_KEY = '_invoice_mail_dispatch';
 
+    /**
+     * Source identity for an invoice created while closing a contract. The
+     * existing JSON snapshot column is sufficient; no order or invoice schema
+     * extension is required for contract-close idempotency.
+     */
+    public const CONTRACT_ID_KEY = 'contract_id';
+
     public function invoiceMailDispatchClaimed(): bool
     {
         $details = $this->customer_details;

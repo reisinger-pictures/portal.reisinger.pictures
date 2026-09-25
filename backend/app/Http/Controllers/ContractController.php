@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ContractCloseConflictException;
 use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\UpdateContractRequest;
 use App\Models\Contract;
@@ -171,27 +172,33 @@ class ContractController extends Controller
     {
         $contract = Contract::with('signers')->findOrFail($id);
 
-        if ($contract->status !== 'active') {
-            return response()->json(['error' => 'Nur aktive Verträge können geschlossen werden'], 400);
-        }
-
         try {
-            // Validate before changing the lifecycle state so an invalid
-            // legacy snapshot cannot be closed and then fail during invoicing.
-            $this->contractCloseService->calculateTotal($contract);
+            $result = $this->contractCloseService->close($contract);
+        } catch (ContractCloseConflictException) {
+            return $this->closeConflictResponse();
         } catch (InvalidArgumentException) {
             return response()->json(['error' => 'Der Vertragsbetrag ist ungültig.'], 422);
         }
 
-        $contract->status = 'closed';
-        $contract->save();
+        if ($result['status'] === ContractCloseService::RESULT_NOT_ACTIVE) {
+            return response()->json(['error' => 'Nur aktive Verträge können geschlossen werden'], 400);
+        }
 
-        $this->contractCloseService->close($contract);
+        if ($result['status'] === ContractCloseService::RESULT_CONFLICT) {
+            return $this->closeConflictResponse();
+        }
 
         return response()->json([
             'success' => true,
-            'contract' => $this->serializeContract($contract->load('signers')),
+            'contract' => $this->serializeContract($result['contract']->load('signers')),
         ]);
+    }
+
+    private function closeConflictResponse()
+    {
+        return response()->json([
+            'error' => ContractCloseConflictException::RETRY_MESSAGE,
+        ], 409);
     }
 
     /**
