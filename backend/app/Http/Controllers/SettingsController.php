@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreBrandSettingsRequest;
+use App\Jobs\InvalidateWatermarkCacheJob;
 use App\Models\Gallery;
 use App\Services\BrandSettingsService;
 use App\Services\SettingResolver;
@@ -14,7 +15,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Symfony\Component\Finder\Finder;
 
 class SettingsController extends Controller
@@ -139,18 +139,11 @@ class SettingsController extends Controller
             $disk->putFileAs($dir, $request->file('bucket_2000_sel'), $pfx.'master_selection_2000.png');
         }
 
-        // Cache-Busting: Lösche alle generierten Wasserzeichen-Bilder asynchron im Hintergrund
-        dispatch(function () {
-            $disk = Storage::disk('photos');
-            $directories = $disk->directories();
-            foreach ($directories as $dir) {
-                // Nur Galerie-Ordner (UUIDs) durchsuchen
-                if (Str::isUuid($dir)) {
-                    $disk->deleteDirectory($dir.'/_watermarked');
-                    $disk->deleteDirectory($dir.'/_thumbs/_watermarked');
-                }
-            }
-        });
+        // Cache-Busting: Lösche alle generierten Wasserzeichen-Bilder asynchron
+        // im Hintergrund. Der Job prüft beide Löschvorgänge und wird bei einem
+        // verbleibenden Verzeichnis erneut versucht; ein terminaler Fehler wird
+        // über den Queue-Failure-Handler protokolliert.
+        InvalidateWatermarkCacheJob::dispatch();
 
         return response()->json(['success' => true]);
     }

@@ -10,13 +10,13 @@ use App\Http\Requests\UpdateGroupRequest;
 use App\Http\Resources\GalleryGroupResource;
 use App\Http\Resources\GalleryResource;
 use App\Http\Resources\PhotoResource;
-use App\Jobs\DeleteGalleryFolderJob;
 use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Photo;
 use App\Models\User;
 use App\Services\AuthorizationService;
+use App\Services\GalleryPhotoCleanupService;
 use App\Services\GalleryService;
 use App\Services\GalleryTreeService;
 use App\Services\RatingService;
@@ -24,6 +24,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class GalleryController extends Controller
@@ -32,6 +33,7 @@ class GalleryController extends Controller
         private GalleryTreeService $galleryTreeService,
         private GalleryService $galleryService,
         private RatingService $ratingService,
+        private GalleryPhotoCleanupService $galleryPhotoCleanup,
     ) {}
 
     /**
@@ -123,10 +125,39 @@ class GalleryController extends Controller
             return response()->json(['error' => 'Nur Super-Admins oder der besitzende Fotograf dürfen diese Galerie löschen.'], 403);
         }
 
-        // Dispatch Job to delete files asynchronously
-        DeleteGalleryFolderJob::dispatch((string) $gallery->id);
+        $galleryId = (string) $gallery->getKey();
 
-        $gallery->delete();
+        DB::transaction(function () use ($galleryId): void {
+            // Always reload and lock the row inside the transaction. A retried
+            // DB::transaction() must not reuse an Eloquent instance whose
+            // exists/deleted state belongs to the rolled-back attempt.
+            $lockedGallery = Gallery::query()
+                ->whereKey($galleryId)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $photoIds = Photo::query()
+                ->where('gallery_id', $galleryId)
+                ->lockForUpdate()
+                ->pluck('id')
+                ->map(static fn (mixed $photoId): string => (string) $photoId)
+                ->all();
+
+            $deleted = Gallery::withoutSyncingToSearch(
+                static fn (): bool => $lockedGallery->delete(),
+            );
+            if ($deleted !== true) {
+                throw new \RuntimeException('Gallery deletion was cancelled.');
+            }
+
+            // Register the public photos-disk and Scout-removal intents in the
+            // same transaction as the row deletion. The durable dispatcher
+            // commits the intents first, then dispatches after commit.
+            $this->galleryPhotoCleanup->afterGalleryDelete(
+                $galleryId,
+                'manual_gallery_delete',
+                $photoIds,
+            );
+        }, 3);
 
         return response()->json(['success' => true]);
     }

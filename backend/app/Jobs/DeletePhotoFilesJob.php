@@ -15,9 +15,10 @@ class DeletePhotoFilesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
+    public int $tries = 5;
 
-    public $backoff = [30, 60, 120];
+    /** @var array<int, int> */
+    public array $backoff = [30, 60, 120, 300, 600];
 
     protected $galleryId;
 
@@ -30,6 +31,21 @@ class DeletePhotoFilesJob implements ShouldQueue
         $this->galleryId = $galleryId;
         $this->filename = $filename;
         $this->photoId = $photoId;
+    }
+
+    public function galleryId(): string
+    {
+        return $this->galleryId;
+    }
+
+    public function filename(): string
+    {
+        return $this->filename;
+    }
+
+    public function photoId(): string
+    {
+        return $this->photoId;
     }
 
     public function handle(): void
