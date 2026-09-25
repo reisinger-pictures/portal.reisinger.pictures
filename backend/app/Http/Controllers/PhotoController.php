@@ -3,16 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdatePhotoMetadataRequest;
-use App\Jobs\DeletePhotoFilesJob;
 use App\Models\Photo;
 use App\Models\PhotoMetadataVersion;
 use App\Models\User;
+use App\Services\GalleryPhotoCleanupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class PhotoController extends Controller
 {
+    public function __construct(
+        private GalleryPhotoCleanupService $galleryPhotoCleanup,
+    ) {}
+
     public function updateMetadata(UpdatePhotoMetadataRequest $request, $id)
     {
         $photo = Photo::with('gallery')->findOrFail($id);
@@ -101,16 +105,40 @@ class PhotoController extends Controller
     public function destroy($id)
     {
         $photo = Photo::with('gallery')->findOrFail($id);
-        $user = auth('api')->user();
 
         if (Gate::denies('delete', $photo)) {
             return response()->json(['error' => 'Keine Löschberechtigung.'], 403);
         }
 
-        // Dispatch Job to delete files asynchronously
-        DeletePhotoFilesJob::dispatch((string) $photo->gallery_id, $photo->filename, (string) $photo->id);
+        $photoId = (string) $photo->getKey();
 
-        $photo->delete();
+        DB::transaction(function () use ($photoId): void {
+            // Reload and lock the row for every transaction attempt. This
+            // keeps a retry from reusing an Eloquent instance after rollback.
+            $lockedPhoto = Photo::query()
+                ->whereKey($photoId)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $galleryId = (string) $lockedPhoto->gallery_id;
+            $filename = $lockedPhoto->filename;
+
+            $deleted = Photo::withoutSyncingToSearch(
+                static fn (): bool => $lockedPhoto->delete(),
+            );
+            if ($deleted !== true) {
+                throw new \RuntimeException('Photo deletion was cancelled.');
+            }
+
+            // Keep the row deletion and both public-file/Scout cleanup intents
+            // on one database boundary. A rollback leaves the row and files
+            // untouched and removes the durable intents with the transaction.
+            $this->galleryPhotoCleanup->afterPhotoDelete(
+                $galleryId,
+                $filename,
+                $photoId,
+                'manual_photo_delete',
+            );
+        }, 3);
 
         return response()->json(['success' => true]);
     }

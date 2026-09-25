@@ -5,17 +5,15 @@ namespace Tests\Feature;
 use App\Jobs\DeleteGalleryFolderJob;
 use App\Models\Gallery;
 use Carbon\Carbon;
-use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-use Mockery;
 use Tests\TestCase;
 
 /**
- * Regression: files were deleted before the DB record without a transaction,
- * so a failed DB delete left a broken gallery record behind. Now the record is
- * removed first and file-deletion failures are surfaced and retried.
+ * Regression: the scheduled command must enqueue public photos-disk cleanup
+ * only after the gallery row has committed, while retaining a retryable queue
+ * operation for the asynchronous worker.
  */
 class CleanupGalleriesFailureTest extends TestCase
 {
@@ -24,7 +22,8 @@ class CleanupGalleriesFailureTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Storage::fake('photos');
+        $this->useTemporaryStorageDisk('photos');
+        config(['scout.driver' => 'null']);
     }
 
     protected function tearDown(): void
@@ -33,24 +32,24 @@ class CleanupGalleriesFailureTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_record_is_deleted_and_retry_dispatched_when_file_deletion_fails(): void
+    public function test_record_is_deleted_and_folder_job_is_dispatched_after_commit(): void
     {
         Queue::fake();
-
-        $disk = Mockery::mock(Filesystem::class);
-        $disk->shouldReceive('deleteDirectory')->once()->andReturn(false);
-        $disk->shouldReceive('exists')->andReturn(true);
-        Storage::set('photos', $disk);
-
         Carbon::setTestNow(Carbon::create(2026, 3, 24, 12, 0, 0));
 
         $gallery = Gallery::factory()->create([
             'expires_at' => Carbon::now()->subMonths(4),
         ]);
+        $galleryId = (string) $gallery->id;
+        Storage::disk('photos')->put("{$galleryId}/test.jpg", 'dummy content');
 
         $this->artisan('app:cleanup-galleries')->assertExitCode(0);
 
-        $this->assertDatabaseMissing('galleries', ['id' => $gallery->id]);
+        $this->assertDatabaseMissing('galleries', ['id' => $galleryId]);
         Queue::assertPushed(DeleteGalleryFolderJob::class);
+        // Queue::fake intentionally leaves the external cleanup to its worker.
+        Storage::disk('photos')->assertExists("{$galleryId}/test.jpg");
+        (new DeleteGalleryFolderJob($galleryId))->handle();
+        Storage::disk('photos')->assertMissing($galleryId);
     }
 }

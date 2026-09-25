@@ -13,7 +13,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Dispatches CRM cleanup work and persists a retryable outbox row when the
+ * Dispatches cleanup work and persists a retryable outbox row when the
  * configured queue cannot accept the original job.
  *
  * The existing V001 jobs table is the durable store. Its UUID primary key is
@@ -121,6 +121,105 @@ final class DurableDispatchService
     }
 
     /**
+     * Register a post-commit dispatch with a transaction-bound durable intent.
+     *
+     * The fallback row is written before the business transaction commits. It
+     * is removed only after the primary dispatch succeeds. Consequently a
+     * process crash between COMMIT and callback execution leaves a retryable
+     * outbox row behind, while a rollback removes both the business mutation
+     * and the intent. This is intentionally separate from the legacy
+     * afterCommit() method: CRM model cleanup keeps its established fallback
+     * timing and compatibility contract.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function afterCommitDurably(
+        ShouldQueue $job,
+        CrmCleanupOutboxJob $fallback,
+        string $event,
+        array $context = [],
+    ): void {
+        $connection = $this->database->connection();
+        if ($connection->transactionLevel() === 0) {
+            $this->dispatch($job, $fallback, $event, $context, false);
+
+            return;
+        }
+
+        try {
+            // This row is deliberately written in the business transaction.
+            // It is an intent, not a second deferred dispatch: after a
+            // successful primary dispatch it is removed from the same jobs
+            // table, and a crash leaves it available to the worker.
+            $fallbackJobId = $this->writeFallbackIntent($fallback, $event, $context);
+        } catch (Throwable $exception) {
+            Log::critical($event.'.fallback_failed', array_merge($context, [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]));
+
+            // Do not commit a destructive business mutation without a durable
+            // cleanup path. The caller can report the failure to the operator.
+            throw $exception;
+        }
+
+        $dispatch = function () use ($job, $event, $context, $fallbackJobId): void {
+            try {
+                $this->dispatcher->dispatch($job);
+                Log::info($event.'.queued', $context);
+            } catch (Throwable $exception) {
+                // The pre-commit intent remains in jobs. It is deliberately not
+                // removed when the primary transport fails or may have accepted
+                // the job before throwing.
+                Log::error($event.'.dispatch_failed', array_merge($context, [
+                    'fallback_job_id' => $fallbackJobId,
+                    'exception' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]));
+                Log::warning($event.'.fallback_persisted', array_merge($context, [
+                    'fallback_job_id' => $fallbackJobId,
+                    'dispatch_exception' => $exception::class,
+                    'dispatch_message' => $exception->getMessage(),
+                ]));
+
+                return;
+            }
+
+            try {
+                $this->deleteFallbackIntent($fallbackJobId);
+                Log::info($event.'.fallback_intent_released', array_merge($context, [
+                    'fallback_job_id' => $fallbackJobId,
+                ]));
+            } catch (Throwable $exception) {
+                // A duplicate fallback is safe because all cleanup jobs are
+                // idempotent. Keep the row and make the operational leak
+                // visible instead of claiming a clean success.
+                Log::critical($event.'.fallback_intent_release_failed', array_merge($context, [
+                    'fallback_job_id' => $fallbackJobId,
+                    'exception' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+        };
+
+        try {
+            $connection->afterCommit($dispatch);
+        } catch (Throwable $exception) {
+            Log::critical($event.'.after_commit_failed', array_merge($context, [
+                'fallback_job_id' => $fallbackJobId,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]));
+
+            // The intent is already part of the surrounding transaction. If
+            // callback registration itself fails, leave that intent to become
+            // the post-commit worker path; rolling the business mutation back
+            // would only discard an otherwise durable cleanup request.
+            return;
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $context
      */
     private function dispatch(
@@ -135,7 +234,7 @@ final class DurableDispatchService
             Log::info($event.'.queued', $context);
         } catch (Throwable $exception) {
             // The primary queue may have accepted the row before throwing. The
-            // CRM operations are idempotent, so a duplicate fallback is safe.
+            // cleanup operations are idempotent, so a duplicate fallback is safe.
             Log::error($event.'.dispatch_failed', array_merge($context, [
                 'exception' => $exception::class,
                 'message' => $exception->getMessage(),
@@ -226,6 +325,50 @@ final class DurableDispatchService
             // previously registered callback still runs.
             $write();
         }
+    }
+
+    /**
+     * Persist the durable intent before the surrounding transaction commits.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function writeFallbackIntent(
+        CrmCleanupOutboxJob $fallback,
+        string $event,
+        array $context,
+    ): string {
+        $fallbackJobId = (string) $this->databaseQueue()->push($fallback);
+        if ($fallbackJobId === '') {
+            throw new RuntimeException('The durable cleanup intent did not receive a queue id.');
+        }
+
+        Log::info($event.'.fallback_intent_persisted', array_merge($context, [
+            'fallback_job_id' => $fallbackJobId,
+        ]));
+
+        return $fallbackJobId;
+    }
+
+    /**
+     * Remove a durable intent only after the primary dispatch succeeded.
+     */
+    private function deleteFallbackIntent(string $fallbackJobId): void
+    {
+        $config = config('queue.connections.database');
+        if (! is_array($config) || ($config['driver'] ?? null) !== 'database') {
+            throw new RuntimeException('The database queue connection is not configured.');
+        }
+
+        $table = $config['table'] ?? 'jobs';
+        if (! is_string($table) || $table === '') {
+            throw new RuntimeException('The database queue table is not configured.');
+        }
+
+        $this->database
+            ->connection($config['connection'] ?? null)
+            ->table($table)
+            ->where('id', $fallbackJobId)
+            ->delete();
     }
 
     private function databaseQueue(): UuidDatabaseQueue
