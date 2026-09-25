@@ -22,6 +22,18 @@ class AIService
 
     public const MAX_IMAGE_DIMENSION = 15_000;
 
+    /**
+     * Namespace for the bounded temporary copy of the source image.
+     *
+     * Unlike the hard limits above this is deployment configurable through
+     * `services.ai.temporary_prefix`: it is an operational namespace, not a
+     * resource guard. Several application instances can share one system temp
+     * directory, and each instance needs its own namespace so a concurrent
+     * process can never be mistaken for - or collide with - this instance's
+     * temporary file.
+     */
+    public const DEFAULT_TEMPORARY_PREFIX = 'ai_img_';
+
     public const IMAGE_TOO_LARGE_ERROR = 'Das Bild ist zu groß für die KI-Verarbeitung.';
 
     public const IMAGE_INVALID_ERROR = 'Das Bild konnte nicht für die KI-Verarbeitung verarbeitet werden.';
@@ -297,7 +309,7 @@ class AIService
                 );
             }
 
-            $tmpPath = tempnam(sys_get_temp_dir(), 'ai_img_');
+            $tmpPath = tempnam(sys_get_temp_dir(), $this->temporaryPrefix());
             if ($tmpPath === false) {
                 throw new \RuntimeException('Failed to create temp file for AI image processing');
             }
@@ -425,6 +437,23 @@ class AIService
         }
 
         return 'data:image/jpeg;base64,'.base64_encode($compressed);
+    }
+
+    /**
+     * Resolve the temporary-file namespace for this instance.
+     *
+     * The value is validated because tempnam() appends to it verbatim: a
+     * rejected value must never widen the namespace into a path, and a value
+     * that tempnam() cannot use must not disable the cleanup guarantee. An
+     * unusable override therefore falls back to the documented default.
+     */
+    private function temporaryPrefix(): string
+    {
+        $prefix = config('services.ai.temporary_prefix', self::DEFAULT_TEMPORARY_PREFIX);
+
+        return is_string($prefix) && preg_match('/\A[A-Za-z0-9_]{1,60}\z/', $prefix) === 1
+            ? $prefix
+            : self::DEFAULT_TEMPORARY_PREFIX;
     }
 
     /**

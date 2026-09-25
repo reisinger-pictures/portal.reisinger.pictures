@@ -419,24 +419,37 @@ class GalleryPhotoCleanupDurabilityTest extends TestCase
         $this->app->forgetInstance(GalleryPhotoCleanupService::class);
         config(['queue.default' => 'database']);
 
-        $this->artisan('queue:work', [
-            'database',
-            '--queue' => 'default',
-            '--stop-when-empty' => true,
-        ]);
+        $workerStartedAt = time();
+        $this->runOutboxWorker();
+        $workerStoppedAt = time();
 
-        $reserved = DB::table('jobs')->first();
-        $this->assertNotNull($reserved);
-        $this->assertSame(1, (int) $reserved->attempts);
+        // The retryable intent is selected by its durable operation. An
+        // unordered `first()` would depend on the storage order and could
+        // observe a different, never-attempted row.
+        $reserved = $this->outboxRow(CrmCleanupOutboxJob::GALLERY_FOLDER);
+        $this->assertSame(1, (int) $reserved->attempts, 'The worker must attempt the released intent exactly once.');
+        $this->assertNull($reserved->reserved_at, 'A released intent must not stay reserved.');
+        $this->assertLessThanOrEqual(
+            $workerStoppedAt + 30,
+            (int) $reserved->available_at,
+            'The release must not become available before the first backoff step elapsed.',
+        );
+        $this->assertGreaterThanOrEqual(
+            $workerStartedAt + 30,
+            (int) $reserved->available_at,
+            'The release must use the first step of the declared backoff policy.',
+        );
+        $this->assertDatabaseCount('jobs', 1);
         $this->assertDatabaseCount('failed_jobs', 0);
+
+        $intent = $this->payloadCommand($reserved->payload);
+        $this->assertInstanceOf(CrmCleanupOutboxJob::class, $intent);
+        $this->assertSame(5, $intent->tries, 'The durable intent must carry the five-try policy.');
+        $this->assertSame([30, 60, 120, 300, 600], $intent->backoff);
 
         Storage::set('photos', $realDisk);
         DB::table('jobs')->where('id', $reserved->id)->update(['available_at' => time()]);
-        $this->artisan('queue:work', [
-            'database',
-            '--queue' => 'default',
-            '--stop-when-empty' => true,
-        ]);
+        $this->runOutboxWorker();
 
         Storage::disk('photos')->assertMissing($galleryId);
         $this->assertDatabaseCount('jobs', 0);
@@ -531,6 +544,51 @@ class GalleryPhotoCleanupDurabilityTest extends TestCase
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
         return $user;
+    }
+
+    /**
+     * Drain the durable outbox with an in-process database worker.
+     *
+     * The worker runs inside the PHPUnit process, so its own stop conditions
+     * must not be able to truncate the queue: `queue:work` defaults to
+     * `--memory=128` and `Worker::stopIfNecessary()` silently returns after the
+     * first job as soon as the *test runner* has grown past that budget. A full
+     * sequential suite sits at roughly 160 MB when it reaches this class, and a
+     * paratest worker that already ran other classes is above the limit too.
+     * The durability contract is therefore asserted with the memory guard
+     * disabled explicitly (0 = off).
+     *
+     * `--sleep=0` only removes the default 3 s idle wait that `--stop-when-empty`
+     * does not need, and the exit code is asserted so a truncated worker can
+     * never hide behind a downstream row assertion.
+     */
+    private function runOutboxWorker(): void
+    {
+        $this->artisan('queue:work', [
+            'database',
+            '--queue' => 'default',
+            '--stop-when-empty' => true,
+            '--memory' => 0,
+            '--sleep' => 0,
+        ])->assertExitCode(0)->run();
+    }
+
+    /**
+     * Resolve the single durable intent that belongs to one cleanup operation.
+     *
+     * The jobs table holds one row per intent, so the row under assertion is
+     * addressed by its serialized operation instead of an unordered `first()`.
+     */
+    private function outboxRow(string $operation): object
+    {
+        foreach (DB::table('jobs')->get() as $row) {
+            $command = $this->payloadCommand($row->payload);
+            if ($command instanceof CrmCleanupOutboxJob && $command->operation() === $operation) {
+                return $row;
+            }
+        }
+
+        $this->fail("No durable cleanup intent for operation [{$operation}] is left in the jobs table.");
     }
 
     private function failQueueDispatch(): void
