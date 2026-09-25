@@ -8,6 +8,7 @@ use App\Models\Gallery;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\VolumePreset;
 use App\Services\VolumePresetService;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,8 +90,59 @@ class SettingsControllerTest extends TestCase
 
         $this->getJson('/api/settings/license-terms?gallery_id='.$gallery->id)
             ->assertStatus(200)
-            ->assertJsonPath('volume_pricing.preset_id', $custom->id)
+            // Strict: `preset_id` is the numeric `volume_presets.id` primary key,
+            // never a string. The frontend's opaque preset key relies on it.
+            ->assertJsonPath('volume_pricing.preset_id', $custom->id, true)
             ->assertJsonPath('volume_pricing.tiers.0.price_cents', 7000);
+    }
+
+    /**
+     * Regression: the frontend called `.trim()` on `volume_pricing.preset_id`,
+     * which crashed the photo page ("preset_id?.trim is not a function") as soon
+     * as the endpoint returned the bigint primary key as a JSON number. Pin the
+     * wire *type* of that member, not just its value.
+     */
+    public function test_get_license_terms_serialises_preset_id_and_tiers_as_json_numbers(): void
+    {
+        Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
+
+        $response = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $volumePricing = $response->json('volume_pricing');
+
+        $this->assertIsArray($volumePricing);
+        $this->assertIsInt($volumePricing['preset_id']);
+        $this->assertSame(VolumePreset::forBrand('rp')?->id, $volumePricing['preset_id']);
+        $this->assertIsString($volumePricing['preset_name']);
+        $this->assertNotSame('', $volumePricing['preset_name']);
+        $this->assertNotEmpty($volumePricing['tiers']);
+        foreach ($volumePricing['tiers'] as $tier) {
+            $this->assertIsInt($tier['min_quantity']);
+            $this->assertIsInt($tier['price_cents']);
+        }
+    }
+
+    public function test_get_license_terms_serialises_gallery_preset_id_as_json_number(): void
+    {
+        Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
+
+        $custom = app(VolumePresetService::class)->create('Custom Type', [
+            ['min_quantity' => 0, 'price_cents' => 7000],
+            ['min_quantity' => 5, 'price_cents' => 6000],
+        ]);
+        $gallery = Gallery::factory()->create([
+            'is_public' => true,
+            'licensing_mode' => 'volume_licensing',
+            'volume_preset_id' => $custom->id,
+        ]);
+
+        $volumePricing = $this->getJson('/api/settings/license-terms?gallery_id='.$gallery->id)
+            ->assertStatus(200)
+            ->assertJsonPath('volume_pricing.preset_name', 'Custom Type')
+            ->json('volume_pricing');
+
+        $this->assertIsInt($volumePricing['preset_id']);
+        $this->assertSame((int) $custom->id, $volumePricing['preset_id']);
+        $this->assertNotSame((string) $custom->id, $volumePricing['preset_id']);
     }
 
     public function test_get_license_terms_volume_pricing_null_for_scope(): void

@@ -392,7 +392,7 @@ export interface Gallery {
     brand?: string | null;
     licensing_mode?: string | null;
     effective_licensing_mode?: string;
-    volume_preset_id?: string | null;
+    volume_preset_id?: number | null;
 }
 
 export interface VolumePresetTier {
@@ -402,7 +402,8 @@ export interface VolumePresetTier {
 }
 
 export interface VolumePreset {
-    id: string;
+    /** `volume_presets.id` — a bigint primary key, delivered as a JSON number. */
+    id: number;
     name: string;
     is_default: boolean;
     tiers: VolumePresetTier[];

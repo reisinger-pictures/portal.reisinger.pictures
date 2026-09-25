@@ -18,7 +18,7 @@ import {
     VolumeLicensingResult,
     VolumeTierConfig,
 } from './CartContext';
-import {LicenseTerms, useLicenseTerms} from './useLicenseTerms';
+import {useLicenseTerms} from './useLicenseTerms';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -29,11 +29,31 @@ export interface VolumePricingConfig {
     tiers: VolumeTierConfig[];
 }
 
-/** Backend shape of `volume_pricing` inside `/api/settings/license-terms`. */
+/** One tier of a volume preset as delivered by the license-terms endpoint. */
+export interface VolumePricingTierPayload {
+    min_quantity: number;
+    price_cents: number;
+}
+
+/**
+ * Backend shape of `volume_pricing` inside `/api/settings/license-terms`.
+ *
+ * Contract: `preset_id` is the `volume_presets.id` primary key — a
+ * `foreignId()`/bigint that the API serialises as a JSON **number**
+ * (`SettingsController::getLicenseTerms()`). It is deliberately *not* a string:
+ * the frontend never sends it back, it is only stringified into the opaque
+ * `mode|preset` group key that mirrors
+ * `CheckoutService::groupItemsByLicensingMode()`.
+ *
+ * All three fields are always present once `volume_pricing` is not `null`; the
+ * nullable members cover a payload that legitimately omits them, and
+ * {@link parseVolumePricing} is the single place that decides what "usable"
+ * means for an untrusted response.
+ */
 export interface VolumePricingPayload {
-    preset_id?: string | null;
-    preset_name?: string | null;
-    tiers?: Array<{min_quantity: number; price_cents: number}> | null;
+    preset_id: number | null;
+    preset_name: string | null;
+    tiers: VolumePricingTierPayload[] | null;
 }
 
 export const DEFAULT_VOLUME_PRICING: VolumePricingConfig = {
@@ -44,14 +64,33 @@ export const DEFAULT_VOLUME_PRICING: VolumePricingConfig = {
     ],
 };
 
-/** The fields returned by the public license-terms endpoint. */
+/**
+ * Sentinel preset key for a descriptor without a concrete preset id. It is the
+ * literal the server compares against in
+ * `CheckoutService::strategyForGroup()`, so the client group key keeps matching
+ * the server's `mode|preset` key.
+ */
+export const DEFAULT_PRESET_KEY = 'default';
+
+/**
+ * The fields returned by the public license-terms endpoint, after
+ * {@link parseEffectiveLicenseTerms} validated the response. Both members are
+ * always present; a missing or malformed response is normalised to `null` here
+ * instead of being trusted.
+ */
 export interface EffectiveLicenseTerms {
-    pricing_strategy?: string | null;
-    volume_pricing?: VolumePricingPayload | null;
+    pricing_strategy: string | null;
+    volume_pricing: VolumePricingPayload | null;
 }
 
 export interface EffectivePricingDescriptor {
     licensingMode: CartLicensingMode;
+    /**
+     * Opaque preset key: the decimal `volume_presets.id` or
+     * {@link DEFAULT_PRESET_KEY} when the response carries no usable id. Only
+     * used to build the `mode|preset` group key and `data-testid`s — never
+     * compared against an id and never sent back to the API.
+     */
     presetId: string;
     presetName: string | null;
     config: VolumePricingConfig;
@@ -129,7 +168,7 @@ export function calculateVolumeTotal(
 }
 
 /** Map backend tiers into the config shape and mirror checkout's legacy clamp. */
-export function tiersFromApi(tiers?: Array<{min_quantity: number; price_cents: number}>): VolumeTierConfig[] {
+export function tiersFromApi(tiers?: VolumePricingTierPayload[] | null): VolumeTierConfig[] {
     if (!tiers || tiers.length === 0) {
         return DEFAULT_VOLUME_PRICING.tiers;
     }
@@ -143,6 +182,93 @@ export function tiersFromApi(tiers?: Array<{min_quantity: number; price_cents: n
     }));
 }
 
+// ---------------------------------------------------------------------------
+// Response validation
+// ---------------------------------------------------------------------------
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+);
+
+/**
+ * Normalise a `volume_pricing.preset_id` payload value.
+ *
+ * A primary key is a positive integer, so only a positive safe integer is
+ * accepted. A numeric string is tolerated because a stringifying intermediary
+ * (proxy, replayed fixture, hand-written stub) is a realistic shape for an
+ * otherwise valid payload; everything else — `null`, booleans, objects, `NaN`
+ * — is malformed and collapses to `null`, i.e. {@link DEFAULT_PRESET_KEY}.
+ */
+const asPresetId = (value: unknown): number | null => {
+    if (typeof value === 'number') {
+        return Number.isSafeInteger(value) && value > 0 ? value : null;
+    }
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const trimmed = value.trim();
+    if (trimmed === '') {
+        return null;
+    }
+    const parsed = Number(trimmed);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const asPresetName = (value: unknown): string | null => (
+    typeof value === 'string' && value.trim() !== '' ? value.trim() : null
+);
+
+const asTierPayload = (value: unknown): VolumePricingTierPayload | null => {
+    if (!isRecord(value)) return null;
+    const {min_quantity, price_cents} = value;
+    if (typeof min_quantity !== 'number' || !Number.isFinite(min_quantity)) return null;
+    if (typeof price_cents !== 'number' || !Number.isFinite(price_cents)) return null;
+    return {min_quantity, price_cents};
+};
+
+/**
+ * Validate an untrusted `volume_pricing` payload. A malformed member is
+ * dropped instead of thrown: the descriptor then falls back to the same safe
+ * defaults a loading/missing response uses, so a provider-shaped payload can
+ * never take the page down.
+ */
+export function parseVolumePricing(value: unknown): VolumePricingPayload | null {
+    if (!isRecord(value)) return null;
+    const tiers = Array.isArray(value.tiers)
+        ? value.tiers
+            .map(asTierPayload)
+            .filter((tier): tier is VolumePricingTierPayload => tier !== null)
+        : null;
+
+    return {
+        preset_id: asPresetId(value.preset_id),
+        preset_name: asPresetName(value.preset_name),
+        // An empty tier list is not a malformed list: it is the documented
+        // "no tiers delivered" case and falls back to DEFAULT_VOLUME_PRICING.
+        tiers: tiers && tiers.length > 0 ? tiers : null,
+    };
+}
+
+/**
+ * Validate an untrusted license-terms response. Returns `null` for anything
+ * that is not an object so callers can keep using their own safe default.
+ */
+export function parseEffectiveLicenseTerms(value: unknown): EffectiveLicenseTerms | null {
+    if (!isRecord(value)) return null;
+    const rawVolumePricing = value.volume_pricing;
+    return {
+        pricing_strategy: typeof value.pricing_strategy === 'string' ? value.pricing_strategy : null,
+        volume_pricing: rawVolumePricing === null || rawVolumePricing === undefined
+            ? null
+            : parseVolumePricing(rawVolumePricing),
+    };
+}
+
+/** Decimal form of a validated preset id, or the server's `default` sentinel. */
+export function presetKeyFromId(presetId: number | null | undefined): string {
+    return typeof presetId === 'number' ? String(presetId) : DEFAULT_PRESET_KEY;
+}
+
 /**
  * Resolve the effective mode and preset from a license-terms response.
  * A missing/loading response intentionally falls back to scope licensing,
@@ -154,17 +280,17 @@ export function descriptorFromTerms(terms?: EffectiveLicenseTerms | null): Effec
         : 'scope_licensing';
     const volumePricing = terms?.volume_pricing ?? null;
     const presetId = licensingMode === 'volume_licensing'
-        ? (volumePricing?.preset_id?.trim() || 'default')
-        : 'default';
+        ? presetKeyFromId(volumePricing?.preset_id)
+        : DEFAULT_PRESET_KEY;
     const presetName = licensingMode === 'volume_licensing'
-        ? (volumePricing?.preset_name?.trim() || null)
+        ? (volumePricing?.preset_name ?? null)
         : null;
 
     return {
         licensingMode,
         presetId,
         presetName,
-        config: {tiers: tiersFromApi(volumePricing?.tiers ?? undefined)},
+        config: {tiers: tiersFromApi(volumePricing?.tiers ?? null)},
     };
 }
 
@@ -376,19 +502,20 @@ const cartTermsKey = (galleryIds: string[]): string => (
     `${CART_TERMS_PREFIX}${encodeURIComponent(JSON.stringify(galleryIds))}`
 );
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-    typeof value === 'object' && value !== null && !Array.isArray(value)
-);
-
+/**
+ * A composite response is either a complete per-gallery map of *usable* terms
+ * or no child terms at all — never a partial one.
+ */
 const asTermsMap = (value: unknown, expectedGalleryIds: string[]): Record<string, EffectiveLicenseTerms> | null => {
     if (!isRecord(value)) return null;
-    if (!expectedGalleryIds.every(id => isRecord(value[id]))) return null;
-    return value as Record<string, EffectiveLicenseTerms>;
+    const entries: Array<[string, EffectiveLicenseTerms]> = [];
+    for (const galleryId of expectedGalleryIds) {
+        const terms = parseEffectiveLicenseTerms(value[galleryId]);
+        if (terms === null) return null;
+        entries.push([galleryId, terms]);
+    }
+    return Object.fromEntries(entries);
 };
-
-const asTerms = (value: unknown): EffectiveLicenseTerms | null => (
-    isRecord(value) ? value as EffectiveLicenseTerms : null
-);
 
 const parseGalleryIds = (key: string): string[] => {
     try {
@@ -405,17 +532,18 @@ const parseGalleryIds = (key: string): string[] => {
 /**
  * Load a single gallery's terms or all terms needed by a mixed cart. The
  * latter is one SWR request so hook order remains stable as the cart changes.
+ *
+ * The wire response is untrusted, so the fetcher deliberately resolves to
+ * `unknown`; {@link parseEffectiveLicenseTerms} validates it where it is used.
  */
-const fetchCartLicenseTerms = async (
-    key: string,
-): Promise<EffectiveLicenseTerms | Record<string, EffectiveLicenseTerms>> => {
+const fetchCartLicenseTerms = async (key: string): Promise<unknown> => {
     if (!key.startsWith(CART_TERMS_PREFIX)) {
-        return fetcher<EffectiveLicenseTerms>(key);
+        return fetcher<unknown>(key);
     }
 
     const galleryIds = parseGalleryIds(key);
     const entries = await Promise.all(galleryIds.map(async (galleryId) => {
-        const terms = await fetcher<EffectiveLicenseTerms>(
+        const terms = await fetcher<unknown>(
             `/api/settings/license-terms?gallery_id=${encodeURIComponent(galleryId)}`,
         );
         return [galleryId, terms] as const;
@@ -424,7 +552,7 @@ const fetchCartLicenseTerms = async (
 };
 
 interface ResolvedGalleryLicenseTerms {
-    globalTerms: EffectiveLicenseTerms | undefined;
+    globalTerms: EffectiveLicenseTerms | null;
     galleryTermsMap: Record<string, EffectiveLicenseTerms> | null;
     singleTerms: EffectiveLicenseTerms | null;
     isLoading: boolean;
@@ -447,17 +575,17 @@ function useResolvedGalleryLicenseTerms(galleryIds: string[]): ResolvedGalleryLi
         : uniqueGalleryIds.length === 1
             ? `/api/settings/license-terms?gallery_id=${encodeURIComponent(uniqueGalleryIds[0])}`
             : null;
-    const {data, isLoading} = useSWR<
-        EffectiveLicenseTerms | Record<string, EffectiveLicenseTerms>
-    >(termsKey, fetchCartLicenseTerms, {revalidateOnFocus: false});
+    const {data, isLoading} = useSWR<unknown>(termsKey, fetchCartLicenseTerms, {revalidateOnFocus: false});
 
-    const globalTerms = terms as LicenseTerms | undefined;
+    // `LicenseTerms` only describes the scalar setting values; `volume_pricing`
+    // is an object, so the brand terms are validated before they are used.
+    const globalTerms = parseEffectiveLicenseTerms(terms);
     const galleryTermsMap = usesCompositeTerms
         ? asTermsMap(data, uniqueGalleryIds)
         : null;
     // A composite response is either a complete per-gallery map or no child
     // terms at all. Never reinterpret a partial map as a global terms object.
-    const singleTerms = usesCompositeTerms ? null : asTerms(data);
+    const singleTerms = usesCompositeTerms ? null : parseEffectiveLicenseTerms(data);
 
     return {
         globalTerms,

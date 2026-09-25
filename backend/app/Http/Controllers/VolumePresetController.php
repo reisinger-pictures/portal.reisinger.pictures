@@ -26,13 +26,15 @@ class VolumePresetController extends Controller
 
         return response()->json([
             'presets' => $presets->map(fn (VolumePreset $preset) => [
-                'id' => $preset->id,
+                // Numeric wire contract: `volume_presets.id` is a bigint primary
+                // key and is delivered as a JSON number, not a string.
+                'id' => (int) $preset->id,
                 'name' => $preset->name,
                 'is_default' => $preset->is_default,
                 'tiers' => $preset->tiers->map(fn ($tier) => [
-                    'position' => $tier->position,
-                    'min_quantity' => $tier->min_quantity,
-                    'price_cents' => $tier->price_cents,
+                    'position' => (int) $tier->position,
+                    'min_quantity' => (int) $tier->min_quantity,
+                    'price_cents' => (int) $tier->price_cents,
                 ])->values(),
             ])->values(),
         ]);
@@ -139,13 +141,14 @@ class VolumePresetController extends Controller
     {
         $preset->load('tiers');
         return [
-            'id' => $preset->id,
+            // Numeric wire contract: see index().
+            'id' => (int) $preset->id,
             'name' => $preset->name,
             'is_default' => $preset->is_default,
             'tiers' => $preset->tiers->map(fn ($tier) => [
-                'position' => $tier->position,
-                'min_quantity' => $tier->min_quantity,
-                'price_cents' => $tier->price_cents,
+                'position' => (int) $tier->position,
+                'min_quantity' => (int) $tier->min_quantity,
+                'price_cents' => (int) $tier->price_cents,
             ])->values(),
         ];
     }

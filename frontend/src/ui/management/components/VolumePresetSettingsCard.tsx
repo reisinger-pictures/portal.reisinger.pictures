@@ -217,7 +217,7 @@ export default function VolumePresetSettingsCard() {
     const { presets, isLoading, createPreset, updatePreset, deletePreset, setDefaultPreset } = useVolumePresets();
     const { showToast, confirm } = useUI();
 
-    const [editing, setEditing] = useState<{ id?: string; name: string; tiers: TierEditorRow[] } | null>(null);
+    const [editing, setEditing] = useState<{ id?: number; name: string; tiers: TierEditorRow[] } | null>(null);
 
     const handleSave = async (name: string, tiers: TierEditorRow[]) => {
         if (editing?.id) {
@@ -227,7 +227,7 @@ export default function VolumePresetSettingsCard() {
         }
     };
 
-    const handleSetDefault = async (id: string) => {
+    const handleSetDefault = async (id: number) => {
         try {
             await setDefaultPreset(id);
             showToast('success', t`Als Standard gesetzt`);
@@ -236,7 +236,7 @@ export default function VolumePresetSettingsCard() {
         }
     };
 
-    const handleDelete = async (id: string, name: string) => {
+    const handleDelete = async (id: number, name: string) => {
         if (await confirm({
             title: t`Preset löschen?`,
             message: t`Das Preset "${name}" wirklich löschen? Galerien mit diesem Preset fallen auf den Brand-Standard zurück.`,

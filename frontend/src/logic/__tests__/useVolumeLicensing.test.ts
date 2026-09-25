@@ -2,10 +2,14 @@ import {describe, it, expect} from 'vitest';
 import {
     calculateVolumeTier,
     calculateVolumeTotal,
+    DEFAULT_PRESET_KEY,
     DEFAULT_VOLUME_PRICING,
     descriptorFromTerms,
     groupCartItemsByPricing,
     groupGallerySourcesByPricing,
+    parseEffectiveLicenseTerms,
+    parseVolumePricing,
+    presetKeyFromId,
     sumGalleryPricingGroupTotals,
     sumPricingGroupTotals,
     tiersFromApi,
@@ -225,12 +229,93 @@ describe('tiersFromApi', () => {
     });
 });
 
+describe('preset_id wire contract', () => {
+    it('keeps a numeric primary key as the opaque decimal group key', () => {
+        const descriptor = descriptorFromTerms(parseEffectiveLicenseTerms({
+            pricing_strategy: 'volume_licensing',
+            volume_pricing: {
+                preset_id: 42,
+                preset_name: 'Werbung',
+                tiers: [{min_quantity: 0, price_cents: 4000}],
+            },
+        }));
+
+        expect(descriptor).toMatchObject({
+            licensingMode: 'volume_licensing',
+            presetId: '42',
+            presetName: 'Werbung',
+        });
+        expect(presetKeyFromId(42)).toBe('42');
+    });
+
+    it('tolerates a stringified primary key from a stringifying intermediary', () => {
+        expect(parseVolumePricing({preset_id: ' 7 ', preset_name: 'Preset', tiers: []})).toEqual({
+            preset_id: 7,
+            preset_name: 'Preset',
+            tiers: null,
+        });
+        expect(parseVolumePricing({preset_id: '12abc'})).toMatchObject({preset_id: null});
+    });
+
+    it('rejects malformed identifiers without throwing and falls back to the default key', () => {
+        for (const presetId of [null, undefined, 0, -1, 1.5, Number.NaN, true, {}, [], '']) {
+            expect(parseVolumePricing({preset_id: presetId, tiers: [{min_quantity: 0, price_cents: 4000}]}))
+                .toMatchObject({preset_id: null});
+        }
+
+        const descriptor = descriptorFromTerms(parseEffectiveLicenseTerms({
+            pricing_strategy: 'volume_licensing',
+            volume_pricing: {preset_id: {id: 3}, tiers: [{min_quantity: 0, price_cents: 4000}]},
+        }));
+        expect(descriptor).toMatchObject({
+            licensingMode: 'volume_licensing',
+            presetId: DEFAULT_PRESET_KEY,
+        });
+        expect(descriptor.config.tiers).toEqual([{minQuantity: 0, priceCents: 4000}]);
+    });
+
+    it('drops malformed tiers instead of propagating NaN prices', () => {
+        expect(parseVolumePricing({
+            preset_id: 5,
+            preset_name: 7,
+            tiers: [null, {min_quantity: 0, price_cents: 4000}, {min_quantity: 'x', price_cents: 1}, {min_quantity: 5}],
+        })).toEqual({
+            preset_id: 5,
+            preset_name: null,
+            tiers: [{min_quantity: 0, price_cents: 4000}],
+        });
+    });
+
+    it('normalises a non-object terms payload to null', () => {
+        for (const value of [undefined, null, 'volume_licensing', 3, []]) {
+            expect(parseEffectiveLicenseTerms(value)).toBeNull();
+        }
+        expect(parseEffectiveLicenseTerms({
+            pricing_strategy: 42,
+            volume_pricing: 'not-an-object',
+        })).toEqual({pricing_strategy: null, volume_pricing: null});
+    });
+
+    it('trims the preset name and keeps scope groups on the default key', () => {
+        expect(parseVolumePricing({preset_id: 3, preset_name: '  Werbung  '}))
+            .toMatchObject({preset_name: 'Werbung'});
+        expect(descriptorFromTerms(parseEffectiveLicenseTerms({
+            pricing_strategy: 'scope_licensing',
+            volume_pricing: {preset_id: 3, preset_name: 'Werbung'},
+        }))).toMatchObject({
+            licensingMode: 'scope_licensing',
+            presetId: DEFAULT_PRESET_KEY,
+            presetName: null,
+        });
+    });
+});
+
 describe('mixed cart pricing groups', () => {
-    const scope = descriptorFromTerms({pricing_strategy: 'scope_licensing'});
+    const scope = descriptorFromTerms({pricing_strategy: 'scope_licensing', volume_pricing: null});
     const presetA = descriptorFromTerms({
         pricing_strategy: 'volume_licensing',
         volume_pricing: {
-            preset_id: 'preset-a',
+            preset_id: 1,
             preset_name: 'Preset A',
             tiers: [{min_quantity: 0, price_cents: 5000}, {min_quantity: 2, price_cents: 4000}],
         },
@@ -238,7 +323,7 @@ describe('mixed cart pricing groups', () => {
     const presetB = descriptorFromTerms({
         pricing_strategy: 'volume_licensing',
         volume_pricing: {
-            preset_id: 'preset-b',
+            preset_id: 2,
             preset_name: 'Preset B',
             tiers: [{min_quantity: 0, price_cents: 7000}],
         },
@@ -260,8 +345,8 @@ describe('mixed cart pricing groups', () => {
         expect(groups).toHaveLength(3);
         expect(groups.map(group => [group.licensingMode, group.presetId, group.totalCents])).toEqual([
             ['scope_licensing', 'default', 500],
-            ['volume_licensing', 'preset-a', 8000],
-            ['volume_licensing', 'preset-b', 7000],
+            ['volume_licensing', '1', 8000],
+            ['volume_licensing', '2', 7000],
         ]);
         expect(sumPricingGroupTotals(groups)).toBe(15500);
     });
@@ -291,11 +376,11 @@ describe('mixed cart pricing groups', () => {
 });
 
 describe('mixed child gallery pricing groups', () => {
-    const scope = descriptorFromTerms({pricing_strategy: 'scope_licensing'});
+    const scope = descriptorFromTerms({pricing_strategy: 'scope_licensing', volume_pricing: null});
     const presetA = descriptorFromTerms({
         pricing_strategy: 'volume_licensing',
         volume_pricing: {
-            preset_id: 'child-preset-a',
+            preset_id: 11,
             preset_name: 'Child Preset A',
             tiers: [{min_quantity: 0, price_cents: 5000}, {min_quantity: 2, price_cents: 4000}],
         },
@@ -303,7 +388,7 @@ describe('mixed child gallery pricing groups', () => {
     const presetB = descriptorFromTerms({
         pricing_strategy: 'volume_licensing',
         volume_pricing: {
-            preset_id: 'child-preset-b',
+            preset_id: 12,
             preset_name: 'Child Preset B',
             tiers: [{min_quantity: 0, price_cents: 7000}],
         },
@@ -329,14 +414,14 @@ describe('mixed child gallery pricing groups', () => {
             total: group.totalCents,
         }))).toEqual([
             {
-                key: 'volume_licensing|child-preset-a',
+                key: 'volume_licensing|11',
                 galleries: ['child-a'],
                 parentGroups: ['group-a'],
                 price: 4000,
                 total: 8000,
             },
             {
-                key: 'volume_licensing|child-preset-b',
+                key: 'volume_licensing|12',
                 galleries: ['child-b'],
                 parentGroups: ['group-b'],
                 price: 7000,
