@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ContractCloseConflictException;
 use App\Exceptions\ContractIdentityException;
 use App\Exceptions\ContractUnavailableException;
 use App\Models\Contract;
@@ -366,11 +367,23 @@ class ContractJoinController extends Controller
 
                     $this->contractAuditService->log($lockedContract->getKey(), $lockedSigner->getKey(), 'signed', $request);
 
-                    $lockedContract->load('signers');
                     if ($lockedContract->template_id !== null) {
-                        $lockedContract->status = 'closed';
-                        $lockedContract->save();
+                        $closeResult = $this->contractCloseService->close($lockedContract);
+                        if (! in_array(
+                            $closeResult['status'],
+                            [ContractCloseService::RESULT_CLOSED, ContractCloseService::RESULT_ALREADY_CLOSED],
+                            true,
+                        )) {
+                            // The signature update and automatic close share
+                            // the outer transaction. Roll both back when the
+                            // close claim loses a concurrent transition.
+                            throw new ContractCloseConflictException;
+                        }
+
+                        $lockedContract = $closeResult['contract'];
                     }
+
+                    $lockedContract->load('signers');
 
                     return [
                         'status' => 200,
@@ -383,18 +396,18 @@ class ContractJoinController extends Controller
             return response()->json([
                 'error' => 'Die Unterschrift wird gerade verarbeitet. Bitte versuche es erneut.',
             ], 409);
+        } catch (ContractCloseConflictException) {
+            return $this->closeConflictResponse();
+        } catch (InvalidArgumentException) {
+            return response()->json([
+                'error' => 'Der Vertragsbetrag ist ungültig.',
+            ], 422);
         }
 
         if (($result['status'] ?? 500) !== 200) {
             return response()->json([
                 'error' => $result['error'] ?? 'Die Unterschrift konnte nicht verarbeitet werden.',
             ], (int) ($result['status'] ?? 500));
-        }
-
-        /** @var Contract $contract */
-        $contract = $result['contract'];
-        if ($contract->template_id !== null) {
-            $this->contractCloseService->close($contract);
         }
 
         return response()->json(['success' => true, 'message' => 'Vertrag erfolgreich unterschrieben']);
@@ -573,6 +586,13 @@ class ContractJoinController extends Controller
             'roles' => 'required|array|min:1',
             'roles.*' => ['required', 'string', Rule::in($contract->available_roles ?? [])],
         ]);
+    }
+
+    private function closeConflictResponse()
+    {
+        return response()->json([
+            'error' => ContractCloseConflictException::RETRY_MESSAGE,
+        ], 409);
     }
 
     private function signLockKey(string $personalToken): string

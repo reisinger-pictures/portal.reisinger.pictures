@@ -3,6 +3,8 @@
 namespace Tests\Feature\Contract;
 
 use App\Enums\Brand;
+use App\Exceptions\ContractCloseConflictException;
+use App\Mail\ContractClosedMail;
 use App\Models\Contract;
 use App\Models\ContractSigner;
 use App\Models\Role;
@@ -11,6 +13,7 @@ use App\Services\ContractPricingService;
 use App\Support\BrandRegistry;
 use App\Support\PersistedMoney;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -465,6 +468,111 @@ class ContractControllerTest extends TestCase
             'id' => $contract->id,
             'status' => 'closed',
         ]);
+    }
+
+    public function test_repeated_management_close_is_idempotent(): void
+    {
+        Mail::fake();
+
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Manueller Abschluss',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => [
+                'name' => 'Rechnung',
+                'email' => 'management-close@example.com',
+            ],
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'email' => 'management-close@example.com',
+            'status' => 'signed',
+        ]);
+
+        $first = $this->withHeaders($headers)
+            ->postJson("/api/management/contracts/{$contract->id}/close");
+        $first->assertOk();
+
+        $second = $this->withHeaders($headers)
+            ->postJson("/api/management/contracts/{$contract->id}/close");
+        $second->assertOk();
+
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('invoice_snapshots', 1);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'closed',
+        ]);
+        Mail::assertQueued(ContractClosedMail::class, 1);
+    }
+
+    public function test_close_transition_conflict_returns_a_generic_retryable_response(): void
+    {
+        Mail::fake();
+
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Konkurrenz',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => ['email' => 'close-conflict@example.com'],
+        ]);
+        $competingWriterRan = false;
+        $targetReadCount = 0;
+
+        // Deterministically model a competing conditional writer after the
+        // close service has entered its locked-read boundary. The first target
+        // read is the controller's pre-lock lookup; the second is the service's
+        // row-lock read.
+        Contract::retrieved(function (Contract $loadedContract) use ($contract, &$competingWriterRan, &$targetReadCount): void {
+            if ($loadedContract->getKey() !== $contract->getKey()) {
+                return;
+            }
+
+            $targetReadCount++;
+            if ($competingWriterRan || $targetReadCount !== 2) {
+                return;
+            }
+
+            $competingWriterRan = true;
+            DB::table('contracts')
+                ->where('id', $contract->getKey())
+                ->where('status', 'active')
+                ->update(['status' => 'cancelled']);
+        });
+
+        $response = $this->withHeaders($headers)
+            ->postJson("/api/management/contracts/{$contract->id}/close");
+
+        $response->assertStatus(409);
+        $response->assertJson([
+            'error' => ContractCloseConflictException::RETRY_MESSAGE,
+        ]);
+        $this->assertTrue($competingWriterRan);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'cancelled',
+        ]);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+        Mail::assertNothingQueued();
     }
 
     public function test_cannot_close_draft_contract(): void

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Contract;
 
 use App\Enums\Brand;
+use App\Mail\ContractClosedMail;
 use App\Models\Contract;
 use App\Models\ContractSigner;
 use App\Support\BrandRegistry;
@@ -1218,6 +1219,62 @@ class ContractJoinTest extends TestCase
             'id' => $instance->id,
             'status' => 'closed',
         ]);
+    }
+
+    public function test_repeated_template_auto_close_keeps_one_accounting_and_mail_path(): void
+    {
+        Mail::fake();
+
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+        $instance = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => $template->id,
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Automatischer Abschluss',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => [
+                'name' => 'Rechnung',
+                'email' => 'auto-close@example.com',
+            ],
+        ]);
+        $signer = ContractSigner::factory()->create([
+            'contract_id' => $instance->id,
+            'email' => 'auto-close@example.com',
+            'status' => 'joined',
+        ]);
+
+        $first = $this->postJson("/api/contracts/sign/{$signer->personal_token}", [
+            'accept_contract' => true,
+            'content_version' => $instance->content_version,
+        ]);
+        $first->assertOk();
+
+        // The closed instance is unavailable on a repeated public signature
+        // request, and the close service must not create a second claim.
+        $second = $this->postJson("/api/contracts/sign/{$signer->personal_token}", [
+            'accept_contract' => true,
+            'content_version' => $instance->content_version,
+        ]);
+        $second->assertStatus(410);
+
+        $this->assertDatabaseHas('contracts', [
+            'id' => $instance->id,
+            'status' => 'closed',
+        ]);
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('invoice_snapshots', 1);
+        Mail::assertQueued(ContractClosedMail::class, 1);
     }
 
     public function test_standard_contract_sign_does_not_auto_close(): void

@@ -103,6 +103,13 @@ Bei Bearbeitung eines `active`-Vertrags wird zusätzlich ein `modified`-Audit-Lo
 1. **Auto-Invoicing Trigger:** Das Auto-Invoicing (Erstellung von `Order` und `InvoiceSnapshot`) wird erst ausgelöst, wenn der Vertrag in den Status **`closed`** übergeht UND die `total_gross` > 0 ist. Rechnungsempfänger ist die in `billing_details` definierte Person.
 2. **JWT-Fallback (Polyglot PDF):** Das finale PDF enthält weiterhin den `%OFFER_JWT:{token}%` Marker für den Re-Import in den Manual Invoice Builder.
 
+### Idempotent closure and concurrency
+
+* `ContractCloseService::close()` is the single lifecycle claim for manual and template-instance closure. It locks the contract row and performs the conditional `active` → `closed` update, accounting writes, and closure-mail enqueue in one database transaction. A retry or the loser of a concurrent close observes `closed` and performs no second order, invoice, or durable mail enqueue.
+* Automatic closure of a template instance runs inside the same outer transaction as the final signature update. A close conflict therefore rolls back both the signature and the accounting claim; the public endpoint returns a generic retryable `409` without exposing database details.
+* A contract-created invoice records the source UUID in the existing `invoice_snapshots.customer_details.contract_id` JSON field. This is the durable source identity for accounting reconciliation; the contract row remains the lifecycle/idempotency authority. It is not a new order or invoice column, so no V039+ migration is required for this closure behavior.
+* With the production transactional database queue, the guarantee is at-most-once durable enqueue and accounting state, not exactly-once SMTP delivery. Queue-worker retries and terminal mail recovery remain separate operational concerns.
+
 ## 7. Final PDF Compilation & Dispatch
 Erst wenn der Vertrag geschlossen wird (`status = closed`), wird das finale, unveränderliche PDF generiert:
 1. **Seite 1-X:** Vertragsdetails und Text (reused pattern: `manual_offer.blade.php`).
@@ -154,6 +161,7 @@ POST   /api/contracts/sign/{personal_token}   → submit clickwrap signature (er
 | `app/Services/ContractPricingService.php` | Canonical/legacy normalization and checked integer pricing engine |
 | `app/Support/PersistedMoney.php` | Shared signed-32-bit persisted-money ceiling and exact cent formatting |
 | `app/Services/ContractCloseService.php` | Close orchestration (invoice + PDF + mail) |
+| `app/Exceptions/ContractCloseConflictException.php` | Generic retryable close conflict |
 | `app/Mail/ContractClosedMail.php` | PDF email to all signers |
 | `resources/views/pdf/contract_signatures.blade.php` | PDF template |
 | `routes/api.php` | Route definitions |

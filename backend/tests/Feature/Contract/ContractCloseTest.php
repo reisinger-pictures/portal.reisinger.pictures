@@ -3,6 +3,7 @@
 namespace Tests\Feature\Contract;
 
 use App\Enums\Brand;
+use App\Mail\ContractClosedMail;
 use App\Models\Contract;
 use App\Models\ContractSigner;
 use App\Models\InvoiceSnapshot;
@@ -87,6 +88,8 @@ class ContractCloseTest extends TestCase
 
     public function test_close_with_items_creates_auto_invoice(): void
     {
+        Mail::fake();
+
         $user = $this->createSuperAdmin();
         $headers = $this->authHeaders($user);
 
@@ -96,6 +99,7 @@ class ContractCloseTest extends TestCase
             'items' => [
                 ['type' => 'item', 'description' => 'Test', 'qty' => 1, 'price' => 10000, 'notes' => ''],
             ],
+            'discounts' => [],
             'billing_details' => [
                 'name' => 'Test Kunde',
                 'email' => 'kunde@example.com',
@@ -116,6 +120,88 @@ class ContractCloseTest extends TestCase
             'brand' => 'rp',
             'total_gross' => 10000,
         ]);
+    }
+
+    public function test_repeated_and_stale_close_callers_create_one_accounting_and_mail_path(): void
+    {
+        Mail::fake();
+
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Idempotenter Abschluss',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => [
+                'name' => 'Rechnung',
+                'email' => 'close-idempotent@example.com',
+            ],
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'email' => 'close-idempotent@example.com',
+            'status' => 'signed',
+        ]);
+
+        // Both callers intentionally hold a model snapshot from before the
+        // first close. The second call represents the loser of a concurrent
+        // close and must observe the committed conditional transition.
+        $firstCaller = Contract::query()->findOrFail($contract->id);
+        $secondCaller = Contract::query()->findOrFail($contract->id);
+        $service = app(ContractCloseService::class);
+
+        $first = $service->close($firstCaller);
+        $second = $service->close($secondCaller);
+        $retry = $service->close($firstCaller);
+
+        $this->assertSame(ContractCloseService::RESULT_CLOSED, $first['status']);
+        $this->assertSame(ContractCloseService::RESULT_ALREADY_CLOSED, $second['status']);
+        $this->assertSame(ContractCloseService::RESULT_ALREADY_CLOSED, $retry['status']);
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('invoice_snapshots', 1);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'closed',
+        ]);
+
+        $snapshot = InvoiceSnapshot::query()->firstOrFail();
+        $this->assertSame($contract->id, $snapshot->customer_details[InvoiceSnapshot::CONTRACT_ID_KEY]);
+        Mail::assertQueued(ContractClosedMail::class, 1);
+    }
+
+    public function test_repeated_zero_value_close_does_not_requeue_mail(): void
+    {
+        Mail::fake();
+
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [],
+            'discounts' => [],
+            'billing_details' => null,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'email' => 'zero-value-close@example.com',
+            'status' => 'signed',
+        ]);
+
+        $service = app(ContractCloseService::class);
+        $service->close($contract);
+        $service->close($contract);
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'closed',
+        ]);
+        Mail::assertQueued(ContractClosedMail::class, 1);
     }
 
     public function test_close_serializes_ordered_discounts_into_the_invoice_snapshot(): void
