@@ -9,8 +9,10 @@ use App\Models\GalleryGroup;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\GalleryTreeService;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class GalleryTreeServiceTest extends TestCase
@@ -28,10 +30,10 @@ class GalleryTreeServiceTest extends TestCase
         $this->service = new GalleryTreeService;
     }
 
-    private function makeAdmin(): User
+    private function makeAdmin(Brand|string|null $brand = 'rp', UserRole $role = UserRole::ADMIN): User
     {
-        $admin = User::factory()->create(['brand' => 'rp']);
-        $role = Role::firstOrCreate(['name' => UserRole::ADMIN->value]);
+        $admin = User::factory()->create(['brand' => $brand]);
+        $role = Role::firstOrCreate(['name' => $role->value]);
         $admin->roles()->syncWithoutDetaching([$role->id]);
 
         return $admin;
@@ -101,7 +103,7 @@ class GalleryTreeServiceTest extends TestCase
 
     public function test_get_admin_tree_nested_three_levels_reflected_recursively(): void
     {
-        $admin = $this->makeAdmin();
+        $admin = $this->makeAdmin(null, UserRole::SUPER_ADMIN);
         $level1 = GalleryGroup::factory()->create();
         $level2 = GalleryGroup::factory()->create(['parent_id' => $level1->id]);
         $level3 = GalleryGroup::factory()->create(['parent_id' => $level2->id]);
@@ -109,6 +111,11 @@ class GalleryTreeServiceTest extends TestCase
             'gallery_group_id' => $level3->id,
             'type' => 'selection',
         ]);
+
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
 
         $tree = $this->service->getAdminTree($admin);
 
@@ -121,6 +128,10 @@ class GalleryTreeServiceTest extends TestCase
         $this->assertSame($level3->id, $root['children'][0]['children'][0]['id']);
         $this->assertCount(1, $root['children'][0]['children'][0]['galleries']);
         $this->assertSame($deepGallery->id, $root['children'][0]['children'][0]['galleries'][0]['id']);
+        $this->assertCount(0, array_filter(
+            $queries,
+            fn (string $query): bool => str_contains($query, '"gallery_groups"."id" = ? limit 1'),
+        ), 'Serializing effective group attributes and gallery full paths must not lazy-load parents.');
     }
 
     // =====================================================================
@@ -266,6 +277,21 @@ class GalleryTreeServiceTest extends TestCase
         $this->service->clearCache();
 
         $this->assertNull(Cache::get($cacheKey));
+    }
+
+    public function test_admin_tree_cache_scope_and_clear_cache_handle_enum_backed_brand(): void
+    {
+        $admin = $this->makeAdmin();
+        GalleryGroup::factory()->create(['brand' => Brand::B2B]);
+
+        $this->service->getAdminTree($admin);
+
+        $this->assertNotNull(Cache::get('gallery_tree_admin_rp'));
+        $this->assertNull(Cache::get('gallery_tree_admin'));
+
+        $this->service->clearCache();
+
+        $this->assertNull(Cache::get('gallery_tree_admin_rp'));
     }
 
     // =====================================================================

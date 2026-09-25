@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ContractPricingService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateContractRequest extends FormRequest
@@ -26,16 +27,16 @@ class UpdateContractRequest extends FormRequest
             'billing_details.email' => 'nullable|email|max:255',
             'billing_details.uid' => 'nullable|string|max:50',
             'items' => 'nullable|array',
-            'items.*.type' => 'string|in:item,discount_fixed,discount_percent',
+            'items.*.type' => 'string|in:item',
             'items.*.description' => 'string|max:255',
             'items.*.notes' => 'nullable|string|max:2000',
-            'items.*.qty' => 'integer|min:1',
-            'items.*.price' => 'integer|min:0',
+            'items.*.qty' => 'integer|min:1|max:'.ContractPricingService::MAX_SAFE_INTEGER,
+            'items.*.price' => 'integer|min:0|max:'.ContractPricingService::MAX_SAFE_INTEGER,
             'discounts' => 'nullable|array',
             'discounts.*.type' => 'string|in:discount_fixed,discount_percent',
             'discounts.*.description' => 'string|max:255',
             'discounts.*.notes' => 'nullable|string|max:2000',
-            'discounts.*.price' => 'integer|min:0',
+            'discounts.*.price' => 'integer|min:0|max:'.ContractPricingService::MAX_SAFE_INTEGER,
             'terms_html' => 'nullable|string',
             'available_roles' => 'nullable|array|min:1',
             'available_roles.*' => 'string|max:255',

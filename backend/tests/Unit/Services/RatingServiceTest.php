@@ -157,6 +157,30 @@ class RatingServiceTest extends TestCase
         );
     }
 
+    public function test_rating_status_keeps_query_count_bounded_for_many_users(): void
+    {
+        $gallery = Gallery::factory()->create();
+        Photo::factory()->count(2)->create(['gallery_id' => $gallery->id]);
+        $users = User::factory()->count(150)->create();
+
+        foreach ($users as $user) {
+            $user->galleries()->attach($gallery->id);
+        }
+
+        DB::enableQueryLog();
+        $result = $this->service->ratingStatus($gallery);
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertCount(150, $result['users']);
+        $this->assertSame(0, $result['users'][0]['rated_count']);
+        $this->assertLessThanOrEqual(
+            3,
+            $queryCount,
+            'ratingStatus() must keep its aggregate query count independent of the number of assigned users.',
+        );
+    }
+
     public function test_rating_status_guest_without_name_falls_back_to_gast(): void
     {
         $gallery = Gallery::factory()->create();
@@ -344,5 +368,45 @@ class RatingServiceTest extends TestCase
             $largeCount,
             "exportRatings() must not scale its query count with the number of photos ({$smallCount} vs {$largeCount})."
         );
+    }
+
+    public function test_export_ratings_bounds_photo_id_batches_without_truncating_the_response(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $photos = Photo::factory()->count(101)->create(['gallery_id' => $gallery->id]);
+        $orderedPhotos = $photos->sortBy('id')->values();
+
+        Rating::create([
+            'photo_id' => $orderedPhotos->first()->id,
+            'guest_id' => Str::uuid()->toString(),
+            'rating' => 4,
+        ]);
+        Rating::create([
+            'photo_id' => $orderedPhotos->last()->id,
+            'guest_id' => Str::uuid()->toString(),
+            'rating' => 5,
+        ]);
+
+        DB::enableQueryLog();
+        $result = $this->service->exportRatings($gallery);
+        $queryLog = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $this->assertCount(2, $result);
+        $this->assertEqualsCanonicalizing(
+            [$orderedPhotos->first()->id, $orderedPhotos->last()->id],
+            array_column($result, 'id'),
+        );
+
+        $ratingQueries = array_values(array_filter(
+            $queryLog,
+            fn (array $query): bool => str_contains($query['query'], '"ratings"')
+                || str_contains($query['query'], '`ratings`'),
+        ));
+
+        $this->assertGreaterThanOrEqual(2, count($ratingQueries));
+        foreach ($ratingQueries as $query) {
+            $this->assertLessThanOrEqual(100, count($query['bindings']));
+        }
     }
 }

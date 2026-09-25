@@ -2,9 +2,10 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
 use App\Services\ManualInvoiceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use InvalidArgumentException;
+use Tests\TestCase;
 
 class ManualInvoiceServiceTest extends TestCase
 {
@@ -15,7 +16,7 @@ class ManualInvoiceServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new ManualInvoiceService();
+        $this->service = new ManualInvoiceService;
     }
 
     public function test_process_items_with_simple_items()
@@ -29,6 +30,51 @@ class ManualInvoiceServiceTest extends TestCase
 
         $this->assertCount(2, $result['items']);
         $this->assertEquals(13000, $result['total']); // 10000 + 3000
+    }
+
+    public function test_process_items_preserves_fractional_quantities_through_fixed_point()
+    {
+        $legacy = $this->service->processItems([
+            ['type' => 'item', 'description' => 'Teilstunde', 'qty' => 0.25, 'price' => 1000],
+        ]);
+        $fixedPoint = $this->service->processItems([
+            [
+                'type' => 'item',
+                'description' => 'Teilstunde',
+                'qty' => 25,
+                'quantity_scale' => 100,
+                'price' => 1000,
+            ],
+        ]);
+
+        $this->assertSame(250, $legacy['total']);
+        $this->assertSame('0.25', $legacy['items'][0]['qty']);
+        $this->assertSame(250, $legacy['items'][0]['row_total']);
+        $this->assertSame($legacy, $fixedPoint);
+    }
+
+    public function test_process_items_accepts_legacy_two_decimal_float_quantities_exactly(): void
+    {
+        foreach ([
+            [0.1, 100],
+            [0.25, 250],
+            [0.29, 290],
+        ] as [$quantity, $expectedTotal]) {
+            $result = $this->service->processItems([
+                ['type' => 'item', 'description' => 'Teilstunde', 'qty' => $quantity, 'price' => 1000],
+            ]);
+
+            $this->assertSame($expectedTotal, $result['total']);
+        }
+    }
+
+    public function test_process_items_rejects_quantities_below_manual_fixed_point_precision()
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->service->processItems([
+            ['type' => 'item', 'description' => 'Teilstunde', 'qty' => 0.125, 'price' => 1000],
+        ]);
     }
 
     public function test_process_items_with_fixed_discount()
@@ -57,6 +103,7 @@ class ManualInvoiceServiceTest extends TestCase
 
         $this->assertCount(2, $result['items']);
         $this->assertEquals(9000, $result['total']); // 10000 - 1000
+        $this->assertSame(10, $result['items'][1]['calculated_percentage']);
     }
 
     public function test_process_items_with_multiple_percentage_discounts()
@@ -258,6 +305,6 @@ class ManualInvoiceServiceTest extends TestCase
         $this->assertEquals(1, $discountItem['qty']);
         $this->assertEquals(2500, $discountItem['price']);
         $this->assertEquals(-2500, $discountItem['row_total']);
-        $this->assertEquals(2500, $discountItem['calculated_percentage']);
+        $this->assertEquals(25, $discountItem['calculated_percentage']);
     }
 }

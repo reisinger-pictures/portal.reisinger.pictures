@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\UserRole;
 use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
 use App\Models\GalleryGroup;
-use App\Models\Order;
 use App\Models\Org;
 use App\Models\User;
 use App\Services\AuthorizationService;
@@ -62,9 +61,8 @@ class OrgController extends Controller
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $openDeliveryNotesCount = Order::whereIn('user_id', $org->users()->pluck('id'))
-            ->where('status', 'delivery_note')
-            ->count();
+        $openDeliveryNotesCount = app(InvoiceService::class)
+            ->countOpenDeliveryNotesForOrg($org);
         $org->setAttribute('open_delivery_notes_count', $openDeliveryNotesCount);
 
         return response()->json($org);
@@ -300,7 +298,7 @@ class OrgController extends Controller
         $result = $invoiceService->generateForOrg($org, $user);
 
         if (! $result['success']) {
-            return response()->json(['error' => $result['error']], 400);
+            return response()->json(['error' => $result['error']], (int) ($result['status'] ?? 400));
         }
 
         return response()->json($result);

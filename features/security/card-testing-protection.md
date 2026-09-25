@@ -88,22 +88,33 @@ V036 adds the following authoritative fields to `orders`:
 
 | Field | Contract |
 | --- | --- |
-| `checkout_idempotency_key` | Opaque key for one checkout session; supplied by the `Idempotency-Key` header or generated as `auto-{checkout_fingerprint}`; unique together with `user_id` and non-null for immediate Stripe orders |
+| `checkout_idempotency_key` | Opaque key for one checkout session; supplied by the `Idempotency-Key` header or generated as `auto-{checkout_fingerprint}`; unique together with `user_id` and persisted for every new authenticated checkout (invoice, delivery note, settled-free, reactive quote, and immediate Stripe); legacy rows may be null |
 | `checkout_fingerprint` | 64-character SHA-256 hash of the server-canonicalized checkout intent, including user/brand, item and option identity, billing/quote/coupon context, withdrawal consent, and server-calculated amount; never raw client input |
 | `payment_intent_generation` | Monotonically increasing generation for each intentionally new PI; starts at `1` and changes when a stale/terminal PI is replaced |
 | `payment_failure_count` | Bounded, saturating counter incremented by accepted `payment_intent.payment_failed` events; it must never overflow or trigger an unbounded retry loop |
 | `last_payment_failure_at` | Timestamp of the most recent accepted failure event |
 | `last_payment_decline_code` | Sanitized, truncated Stripe failure/decline code (maximum 64 characters), never a raw error object |
 
+**Identity-namespace decision (2026-09-25):** V036's checkout key and
+fingerprint namespace is intentionally broader than the card-testing scope.
+Every new authenticated checkout persists these fields, including invoice,
+delivery-note, settled-free, and reactive-quote orders, so those paths can use
+one owner/brand/key conflict contract without pretending that they create a
+PaymentIntent. The immediate-Stripe-only gates (account age, dedicated quota,
+kill switch, Customer/PI creation, and Turnstile) do not expand to those paths.
+Pre-change rows with null identity remain readable only through the explicitly
+documented compatibility rules; no V039 migration is required.
+
 The existing `orders.stripe_payment_intent_id` and `orders.ip_address` columns
 remain the PI linkage and accounting-evidence fields. Add the composite
 unique/index support needed for `(user_id, checkout_idempotency_key)` and
 stale-PI selection. A checkout fingerprint is an order/cart fingerprint, not a
-cross-site browser fingerprint. A lost-key fingerprint fallback does not use
-`orders.created_at` as an authoritative freshness cutoff: a pending order may
-have received a freshly replaced PI after its row was created. The server
-retrieves the persisted PI and lets its remote timestamp/identity decide reuse
-versus replacement.
+cross-site browser fingerprint. The immediate-Stripe lost-key fingerprint
+fallback does not use `orders.created_at` as an authoritative freshness cutoff:
+a pending order may have received a freshly replaced PI after its row was
+created. The server retrieves the persisted PI and lets its remote
+timestamp/identity decide reuse versus replacement. Non-immediate paths do
+not perform this fallback and instead use exact-key replay only.
 
 Every new PI carries server-owned identity in Stripe metadata:
 `order_id`, `portal_user_id`, `generation` (and the checkout key/fingerprint
@@ -267,6 +278,18 @@ come from the persisted order identity, never from the new recovery key |
 | PI is canceled, expired, or order is closed | Start a new generation only after confirming the old PI is terminal; retain the order's key for audit but require a new checkout session for a new order |
 | Concurrent identical requests | Unique constraints, row locking, and the Stripe idempotency key ensure one PI |
 
+For the shared non-immediate identity namespace, a request is replayable only
+when the exact browser key, owner, active brand, and canonical fingerprint all
+match. Invoice, delivery-note, settled-free, and reactive-quote retries do not
+perform a fingerprint lookup after a browser key is lost. This is an explicit,
+accepted new-order boundary: without a durable browser session key, the server
+has no safe way to distinguish a retry from a deliberate second purchase of the
+same cart. The frontend regression and backend regression in this repository
+assert that a lost non-immediate key produces a new order rather than claiming
+replay safety. The immediate-Stripe path retains its separately authorized
+same-user/active-brand fingerprint recovery because it can validate the remote
+PaymentIntent before resuming it.
+
 The cache identity lock is a lease, not merely a short de-duplication hint. Its
 TTL must cover the complete locked operation, including the Stripe PHP SDK's
 current per-request timeout (80 seconds by default) and the worst-case sequence
@@ -317,8 +340,13 @@ For each candidate, under a row lock and with Stripe as the source of truth:
    pass the retrieved PI through the shared strict reconciliation service. It
    revalidates identity, amount/received amount, customer, and generation,
    conditionally transitions the still-pending order to `paid`, enriches the
-   fee when available, and queues invoice mail idempotently. The signed webhook
-   remains the normal authority; the command never creates or substitutes a PI
+   fee when available, and durably enqueues invoice mail at most once through
+   the durable snapshot dispatch claim (not an expiring cache marker). The claim
+   is an enqueue guard, not an exactly-once SMTP-delivery guarantee: a queue
+   worker may retry SMTP, and a permanently failed job remains in
+   `failed_jobs` while the claim prevents an automatic second enqueue. The
+   signed webhook remains the normal authority; the command never creates or
+   substitutes a PI
    and never grants paid on an identity mismatch.
 4. If it is still actionable, cancel it through Stripe and record the cleanup
    generation/event.
@@ -580,25 +608,32 @@ prevention, payment execution, and evidence:
 
 ## 11. API and state contracts
 
-The V036 PaymentIntent-abuse contract is deliberately scoped to a
+The V036 PaymentIntent-abuse contract remains deliberately scoped to a
 **positive-value immediate Stripe checkout**: after server-side validation and
 pricing, the request is not a reactive quote request (a cart item flagged
 `isQuote`), selects Stripe rather than invoice/Lieferschein settlement, and has
-a server-calculated total greater than zero. The V036 idempotency,
-minimum-account-age, dedicated checkout quota, kill-switch, Stripe
-Customer/PaymentIntent, and Turnstile contracts apply to that classified path.
+a server-calculated total greater than zero. The V036 minimum-account-age,
+dedicated checkout quota, kill-switch, Stripe Customer/PaymentIntent, and
+Turnstile contracts apply to that classified path.
+
+The V036 **checkout identity namespace**, however, is intentionally shared by
+all new authenticated checkout orders: invoice, delivery-note/Lieferschein,
+settled-free, reactive quote, and positive-value immediate Stripe. This broader
+namespace is an approved product decision, not an expansion of the card-testing
+or PaymentIntent gates. Non-immediate paths use the same owner/brand/key/
+fingerprint validation and terminal-order conflict rules, but never create a
+PaymentIntent and do not receive the immediate-only age, quota, kill-switch,
+Customer, PI, or Turnstile checks. Pre-identity legacy rows may remain null;
+there is no V039 migration to backfill them.
 
 The browser checkout client sends an opaque `Idempotency-Key` on every checkout
-request, including invoice, settled-free, and reactive-quote submissions. Header
-presence is not a global idempotency guarantee. The backend may inspect a
-candidate key during the immediate-Stripe preflight, but only the in-scope path
-persists and uses it as V036 checkout identity; excluded orders retain null
-`checkout_idempotency_key` and `checkout_fingerprint` values. Non-PaymentIntent
-invoice/Lieferschein, zero-value settled-free, and reactive quote-request paths
-remain outside this PI-abuse contract. They retain their existing validation,
-authorization, generic request throttles, and business-flow behavior, but do not
-receive V036 replay/conflict semantics, account-age or dedicated-quota checks,
-Stripe Customer/PI creation, the incident kill switch, or Turnstile gates.
+request. Header presence is not a global replay guarantee. For non-immediate
+paths, the server deliberately performs exact-key resolution only: if browser
+storage is lost, a new key is treated as a new order because the server cannot
+safely distinguish a retry from a deliberate second purchase of the same cart.
+The immediate-Stripe path may use its separately authorized same-user/active-
+brand fingerprint recovery after validating the remote PI. Neither path may
+claim replay safety when its recovery identity is unavailable.
 
 Within the positive-value immediate Stripe scope, the implementation must
 preserve these externally visible contracts:
@@ -646,11 +681,14 @@ still null may bind that event PI under the same locked conditional transition.
    look clean.
 
 Rollout acceptance must also verify that the browser key is present on all
-checkout submissions while the backend persists and uses it only for
-positive-value immediate Stripe checkout. The excluded non-PaymentIntent paths
-must not acquire V036 key/fingerprint persistence or PI-abuse gates. Persistent
-deduplication for those non-immediate paths is a separate follow-up requiring
-its own feature contract and tests; it must not be implied by this rollout.
+checkout submissions and that every new authenticated order persists the
+server-validated V036 key/fingerprint identity, including invoice,
+delivery-note, settled-free, and reactive-quote paths. The non-immediate paths
+must not acquire the immediate-Stripe PI-abuse gates. Their replay guarantee is
+exact-key only; a lost browser key is an accepted, tested new-order boundary,
+not a claimed replay. Persistent deduplication after key loss would require a
+separate durable browser-session/recovery contract and is not implied by this
+rollout.
 
 The feature is complete only when the migration, scoped server enforcement,
 cleanup, webhook identity checks, optional Turnstile behavior, Stripe.js

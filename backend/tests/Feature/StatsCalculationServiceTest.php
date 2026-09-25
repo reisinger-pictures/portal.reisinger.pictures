@@ -2,12 +2,16 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Services\StatsCalculationService;
-use App\Models\User;
+use App\Enums\Brand;
+use App\Enums\UserRole;
+use App\Models\DownloadLog;
 use App\Models\Gallery;
+use App\Models\Org;
 use App\Models\Role;
+use App\Models\User;
+use App\Services\StatsCalculationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class StatsCalculationServiceTest extends TestCase
 {
@@ -18,18 +22,22 @@ class StatsCalculationServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new StatsCalculationService();
+        $this->service = new StatsCalculationService;
     }
 
     public function test_process_domain_stats_aggregates_same_domains()
     {
         $rawStats = (object) [
-            new class {
+            new class
+            {
                 public $domain = 'example.com';
+
                 public $count = 5;
             },
-            new class {
+            new class
+            {
                 public $domain = 'example.com';
+
                 public $count = 3;
             },
         ];
@@ -44,16 +52,22 @@ class StatsCalculationServiceTest extends TestCase
     public function test_process_domain_stats_sorts_by_count_descending()
     {
         $rawStats = (object) [
-            new class {
+            new class
+            {
                 public $domain = 'low.com';
+
                 public $count = 2;
             },
-            new class {
+            new class
+            {
                 public $domain = 'high.com';
+
                 public $count = 10;
             },
-            new class {
+            new class
+            {
                 public $domain = 'mid.com';
+
                 public $count = 5;
             },
         ];
@@ -69,10 +83,14 @@ class StatsCalculationServiceTest extends TestCase
     {
         $rawStats = [];
         for ($i = 1; $i <= 15; $i++) {
-            $rawStats[] = new class($i) {
+            $rawStats[] = new class($i)
+            {
                 public $domain;
+
                 public $count;
-                public function __construct($i) {
+
+                public function __construct($i)
+                {
                     $this->domain = "domain{$i}.com";
                     $this->count = $i;
                 }
@@ -90,12 +108,16 @@ class StatsCalculationServiceTest extends TestCase
     public function test_process_domain_stats_converts_invite_local_to_named_label()
     {
         $rawStats = (object) [
-            new class {
+            new class
+            {
                 public $domain = 'invite.local';
+
                 public $count = 7;
             },
-            new class {
+            new class
+            {
                 public $domain = 'example.com';
+
                 public $count = 3;
             },
         ];
@@ -137,19 +159,19 @@ class StatsCalculationServiceTest extends TestCase
 
     public function test_get_admin_stats_counts_guest_downloads()
     {
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => null,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => null,
             'item_type' => 'single_image',
             'resolution_tier' => 'print',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => User::factory()->create()->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
@@ -163,13 +185,13 @@ class StatsCalculationServiceTest extends TestCase
 
     public function test_get_admin_stats_filters_guest_downloads_by_tier()
     {
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => null,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => null,
             'item_type' => 'single_image',
             'resolution_tier' => 'print',
@@ -189,21 +211,21 @@ class StatsCalculationServiceTest extends TestCase
         $user->galleries()->attach($gallery->id);
 
         // Create some downloads for this gallery
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'user_id' => User::factory()->create()->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'user_id' => User::factory()->create()->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'user_id' => User::factory()->create()->id,
             'item_type' => 'single_image',
@@ -212,13 +234,13 @@ class StatsCalculationServiceTest extends TestCase
 
         // Create downloads for other gallery (should not be counted)
         $otherGallery = Gallery::factory()->create();
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $otherGallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $otherGallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
@@ -236,13 +258,13 @@ class StatsCalculationServiceTest extends TestCase
         $gallery = Gallery::factory()->create();
         $user->galleries()->attach($gallery->id);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'item_type' => 'full_zip',
             'resolution_tier' => 'original',
@@ -261,14 +283,14 @@ class StatsCalculationServiceTest extends TestCase
         $gallery = Gallery::factory()->create();
         $user->galleries()->attach($gallery->id);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'user_id' => null,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'user_id' => null,
             'item_type' => 'single_image',
@@ -286,14 +308,14 @@ class StatsCalculationServiceTest extends TestCase
         $gallery = Gallery::factory()->create();
         $user->galleries()->attach($gallery->id);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'user_id' => null,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'user_id' => null,
             'item_type' => 'single_image',
@@ -307,10 +329,10 @@ class StatsCalculationServiceTest extends TestCase
 
     public function test_get_org_admin_stats_filters_by_orgs()
     {
-        $org = \App\Models\Org::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
+        $org = Org::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
 
         $manager = User::factory()->create();
-        $manager->roles()->attach(\App\Models\Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]));
+        $manager->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
         $manager->org_id = $org->id;
         $manager->save();
 
@@ -322,21 +344,21 @@ class StatsCalculationServiceTest extends TestCase
 
         $gallery = Gallery::factory()->create();
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => $user1->id,
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => $user1->id,
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => $user1->id,
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
@@ -344,14 +366,14 @@ class StatsCalculationServiceTest extends TestCase
         ]);
 
         // user2 is not in the org — should be excluded
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => $user2->id,
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => $user2->id,
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
@@ -366,10 +388,10 @@ class StatsCalculationServiceTest extends TestCase
 
     public function test_get_org_admin_stats_guest_downloads_always_zero()
     {
-        $org = \App\Models\Org::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
+        $org = Org::create(['name' => 'Company Inc', 'invoice_frequency' => 'immediate']);
 
         $manager = User::factory()->create();
-        $manager->roles()->attach(\App\Models\Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]));
+        $manager->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
         $manager->org_id = $org->id;
         $manager->save();
 
@@ -381,7 +403,7 @@ class StatsCalculationServiceTest extends TestCase
     public function test_get_stats_for_user_delegates_to_admin_stats()
     {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
         $result = $this->service->getStatsForUser($admin);
 
@@ -395,7 +417,7 @@ class StatsCalculationServiceTest extends TestCase
     public function test_get_stats_for_user_delegates_to_org_admin_stats()
     {
         $manager = User::factory()->create();
-        $manager->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ORG_ADMIN->value]));
+        $manager->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
 
         $result = $this->service->getStatsForUser($manager);
 
@@ -424,27 +446,27 @@ class StatsCalculationServiceTest extends TestCase
 
     public function test_get_admin_stats_with_tier_filter_excludes_other_tiers()
     {
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'item_type' => 'single_image',
             'resolution_tier' => 'print',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'item_type' => 'single_image',
             'resolution_tier' => 'print',
         ]);
@@ -456,7 +478,7 @@ class StatsCalculationServiceTest extends TestCase
 
     public function test_get_admin_stats_zip_downloads_add_photo_count()
     {
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'item_type' => 'full_zip',
             'resolution_tier' => 'original',
             'photo_count' => 10,
@@ -469,13 +491,13 @@ class StatsCalculationServiceTest extends TestCase
 
     public function test_get_admin_stats_zip_with_tier_filter()
     {
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'item_type' => 'full_zip',
             'resolution_tier' => 'web',
             'photo_count' => 5,
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'item_type' => 'full_zip',
             'resolution_tier' => 'print',
             'photo_count' => 3,
@@ -489,8 +511,10 @@ class StatsCalculationServiceTest extends TestCase
     public function test_process_domain_stats_preserves_domain_case()
     {
         $rawStats = (object) [
-            new class {
+            new class
+            {
                 public $domain = 'Example.COM';
+
                 public $count = 5;
             },
         ];
@@ -500,38 +524,127 @@ class StatsCalculationServiceTest extends TestCase
         $this->assertEquals('Example.COM', $result[0]['domain']);
     }
 
+    public function test_brand_bound_admin_stats_exclude_a_second_brand(): void
+    {
+        $admin = User::factory()->create(['brand' => 'srp']);
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+
+        $ownGallery = Gallery::factory()->create(['brand' => 'srp']);
+        $foreignGallery = Gallery::factory()->create(['brand' => Brand::B2B->value]);
+        $ownDownloader = User::factory()->create([
+            'brand' => 'srp',
+            'email' => 'owner@example.com',
+        ]);
+        $foreignDownloader = User::factory()->create([
+            'brand' => Brand::B2B->value,
+            'email' => 'other@foreign.example',
+        ]);
+
+        DownloadLog::create([
+            'gallery_id' => $ownGallery->id,
+            'user_id' => $ownDownloader->id,
+            'gallery_name_snapshot' => 'OWN',
+            'item_type' => 'single_image',
+            'resolution_tier' => 'web',
+        ]);
+        DownloadLog::create([
+            'gallery_id' => $ownGallery->id,
+            'user_id' => null,
+            'item_type' => 'full_zip',
+            'gallery_name_snapshot' => 'OWN',
+            'resolution_tier' => 'original',
+            'photo_count' => 2,
+        ]);
+        DownloadLog::create([
+            'gallery_id' => $foreignGallery->id,
+            'user_id' => $foreignDownloader->id,
+            'gallery_name_snapshot' => 'FOREIGN',
+            'item_type' => 'single_image',
+            'resolution_tier' => 'web',
+        ]);
+        DownloadLog::create([
+            'gallery_id' => $foreignGallery->id,
+            'user_id' => null,
+            'item_type' => 'full_zip',
+            'gallery_name_snapshot' => 'FOREIGN',
+            'resolution_tier' => 'original',
+            'photo_count' => 3,
+        ]);
+
+        $result = $this->service->getStatsForUser($admin);
+
+        $this->assertSame(1, $result['galleries_count']);
+        $this->assertSame(3, $result['total_downloads']);
+        $this->assertSame(1, $result['guest_downloads']);
+        $this->assertSame('OWN', $result['top_galleries']->first()->name);
+        $this->assertCount(1, $result['domain_stats']);
+        $this->assertSame('example.com', $result['domain_stats'][0]['domain']);
+    }
+
+    public function test_null_brand_super_admin_stats_include_both_brands(): void
+    {
+        $superAdmin = User::factory()->create(['brand' => null]);
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+
+        $firstGallery = Gallery::factory()->create(['brand' => Brand::B2B->value]);
+        $secondGallery = Gallery::factory()->create(['brand' => 'srp']);
+
+        DownloadLog::create([
+            'gallery_id' => $firstGallery->id,
+            'gallery_name_snapshot' => 'FIRST',
+            'item_type' => 'single_image',
+            'resolution_tier' => 'web',
+        ]);
+        DownloadLog::create([
+            'gallery_id' => $secondGallery->id,
+            'gallery_name_snapshot' => 'SECOND',
+            'item_type' => 'full_zip',
+            'resolution_tier' => 'original',
+            'photo_count' => 5,
+        ]);
+
+        $result = $this->service->getStatsForUser($superAdmin);
+
+        $this->assertSame(2, $result['galleries_count']);
+        $this->assertSame(6, $result['total_downloads']);
+        $this->assertSame(
+            ['SECOND', 'FIRST'],
+            $result['top_galleries']->pluck('name')->all(),
+        );
+    }
+
     private function createTestDownloadLogs(): void
     {
         $gallery = Gallery::factory()->create();
 
         // Single image downloads: 2 web, 1 print
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'print',
         ]);
 
         // Zip downloads: 1 web with 3 photos, 1 print with 2 photos
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'item_type' => 'full_zip',
             'resolution_tier' => 'web',
             'photo_count' => 3,
         ]);
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'gallery_id' => $gallery->id,
             'item_type' => 'full_zip',
             'resolution_tier' => 'print',

@@ -3,7 +3,7 @@ domain: photos
 topic: ai-server-side
 status: active
 supersedes: photos/03-ai-batch-edit.md
-reviewed: 2026-09-24
+reviewed: 2026-09-25
 ---
 
 # Technical Concept: Server-Side AI Metadata Generation (OpenAI-compatible)
@@ -98,11 +98,34 @@ Generates metadata from text input only (no image access needed).
 }
 ```
 
-## 4. Authorization
-Access is gated via the `updateMetadata` PhotoPolicy Gate:
-- **Photographers/Admins/Super-Admins:** Always allowed (with gallery access)
-- **Clients:** Allowed only if `can_edit_metadata = true` AND gallery has `allow_client_metadata_edit = true`
-- **All others:** Denied (403)
+## 4. Authorization and target-lookup contract
+The two generation endpoints intentionally use different existing policies. The canonical service contract is also maintained in [features/ai/01-ai-service-architecture.md](../ai/01-ai-service-architecture.md).
+
+### `POST /api/ai/generate-metadata` (vision)
+The requested photo must pass the `updateMetadata` **PhotoPolicy** gate:
+- **Super-Admins/Admins/Photographers:** Allowed when `canManageGallery()` permits the target gallery.
+- **Clients:** Allowed only when `can_edit_metadata = true`, the gallery has `allow_client_metadata_edit = true`, and the client can access that gallery.
+- **Active invite identities:** Allowed only for an active, current-host metadata grant on the target gallery.
+- **All others:** Denied (`403`). The `can_edit_metadata` column is a necessary client capability, never a stand-alone grant.
+
+Target resolution and the coarse capability check are separate safeguards:
+
+1. Authenticate first (`401` for a missing identity).
+2. Check whether the actor is in any metadata-capable category. An actor without that coarse capability receives the same opaque `403` **without querying the submitted photo ID**.
+3. For an actor who passes that check, resolve a submitted non-empty `photo_id`; target-level PhotoPolicy authorization cannot run before the `Photo` and its gallery are resolved.
+4. For delegated client/invite capabilities, a missing, malformed, unknown, or inaccessible target all receive the same opaque `403`. This prevents a target-scoped actor from distinguishing an unknown ID from an inaccessible photo.
+5. For role-capable actors, a missing or unknown ID remains on the normal validation path (`422` when AI is available). Only after target authorization is settled does the controller check AI availability (`503`) and then validate the request (`422`).
+6. Call the provider only after those checks. Provider HTTP failures remain `502`; transport connection failures remain `503`.
+
+The target lookup is used only to construct the policy subject; the endpoint never returns photo existence, metadata, gallery status, or authorization diagnostics in the `403` response.
+
+### `POST /api/ai/generate-metadata-text` (text-only gallery defaults)
+The text flow has no existing photo target. It is authorized by the Gallery `create` **GalleryPolicy** gate, exactly like gallery creation:
+- **Photographers and Super-Admins:** Allowed.
+- **Ordinary Admins:** Denied (`403`).
+- **Clients, invite identities, and all others:** Denied (`403`).
+
+This narrower role contract is intentional: the endpoint is used only to create defaults for a new gallery. Authorization runs before AI availability, validation, or provider work; the `401`/`403`/`503`/`422` and provider mappings above remain unchanged.
 
 ## 5. Frontend (`useAI.ts`)
 The `useAI` hook (replaces the old `useLMStudio`) implements the dual-mode strategy:

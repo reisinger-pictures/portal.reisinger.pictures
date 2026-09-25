@@ -36,5 +36,5 @@ status: active
 - Siehe `backend/app/Mail/BrandAwareMail.php` und `features/infrastructure/06-multi-domain-branding.md`.
 
 ## 5. Local Testing
-- Der `Mailpit` Container fängt alle ausgehenden E-Mails im lokalen Development-Modus ab.
-- E2E Tests (Playwright) und PHPUnit-Tests prüfen via Mailpit API die korrekte Zustellung und das Vorhandensein von Tokens/Links in den generierten HTML-Bodies.
+- Der lokale `Mailpit`-Service fängt alle ausgehenden E-Mails im Development-/CI-Testmodus ab.
+- **Zustellungsnachweis:** PHPUnit-Integrationstests (mindestens der Invoice-/Checkout-Pfad) prüfen über die Mailpit-API die tatsächlich angekommene Nachricht und parse HTML/Token-Links. `Mail::fake()` ist ausschließlich für deterministische Enqueue-/Fault-Injection-Tests erlaubt und liefert keinen SMTP-Zustellungsnachweis. E2E-Tests verwenden Mailpit ebenfalls für die End-to-End-Linkprüfung.

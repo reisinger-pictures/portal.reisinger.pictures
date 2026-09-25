@@ -284,4 +284,4 @@ als Gast öffnen).
   bestehender Fotos aktualisieren. Management-Admin-CRUD bleibt separat.
 - Bestätigungs-/Bestätigungslink je Person (fremde personenbezogene Daten) als
   rechtlicher Ausbau.
-- Formular-Performance bei sehr vielen Personen (clientseitiges Sanity-Limit).
+- **Formular-Performance / Sanity-Limit:** clientseitig umgesetzt; eine Registrierung kann im Browser maximal 10 Personen umfassen. Der Add-Button und die Zod-Validierung verhindern den 11. Eintrag und werden nach Reset/Reopen wieder aktiviert. Das ist bewusst nur ein UX-Schutz; der API-Vertrag bleibt `1..n` und besitzt serverseitig kein Maximum.

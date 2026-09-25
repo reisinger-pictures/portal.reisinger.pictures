@@ -180,6 +180,10 @@ class CheckoutServiceTest extends TestCase
         $snapshot = InvoiceSnapshot::first();
         $this->assertNotNull($snapshot);
         $this->assertStringStartsWith('L-', $snapshot->invoice_number);
+        $this->assertSame(
+            $org->id,
+            $snapshot->customer_details[InvoiceSnapshot::PURCHASE_ORG_ID_KEY]
+        );
 
         $this->assertMailpitSentTo($user->email);
     }

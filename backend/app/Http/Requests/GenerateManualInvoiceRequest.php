@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\AuthorizationService;
+use App\Services\ContractPricingService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -36,8 +37,9 @@ class GenerateManualInvoiceRequest extends FormRequest
             'items.*.type' => 'required|string|in:item,discount_fixed,discount_percent',
             'items.*.description' => 'required|string',
             'items.*.notes' => 'nullable|string',
-            'items.*.price' => 'required|numeric',
-            'items.*.qty' => 'required|numeric|min:0.01',
+            'items.*.price' => 'required|integer|min:0|max:'.ContractPricingService::MAX_SAFE_INTEGER,
+            'items.*.qty' => 'required|numeric|min:0.01|max:'.ContractPricingService::MAX_SAFE_INTEGER,
+            'items.*.quantity_scale' => 'nullable|integer|in:'.ContractPricingService::MANUAL_QUANTITY_SCALE,
             'terms_html' => 'nullable|string',
         ];
     }

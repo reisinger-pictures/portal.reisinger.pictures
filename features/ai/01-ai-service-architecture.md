@@ -170,7 +170,7 @@ interface AIProvider
 | `AnthropicProvider` | `/messages` | `x-api-key: {key}` + `anthropic-version: 2023-06-01` | false | `content[0].text` |
 | `LMStudioProvider` | `/chat/completions` | `Authorization: Bearer {key}` (optional) | false | `choices[0].message.content` |
 
-`AnthropicProvider` extracts the system message from the messages array and sets it as a top-level `system` parameter. All other messages are converted to Anthropic's `{role, content: [{type: "text", text: "..."}]}` format.
+`AnthropicProvider` extracts the system message from the messages array and sets it as a top-level `system` parameter. All other messages are converted to Anthropic's `{role, content: [{type: "text", text: "..."}]}` format. OpenAI-shaped `image_url` blocks are translated to Anthropic `{type: "image", source: ...}` blocks before transport; data URIs are split into `media_type` and Base64 `data`, while HTTP(S) URLs use Anthropic's URL source form.
 
 `LMStudioProvider` follows the OpenAI-compatible format and only sends the `Authorization` header if `api_key` is configured.
 
@@ -192,13 +192,21 @@ class AIProviderFactory
 
 `AIService::callAI()` resolves the provider via `app(AIProviderFactory::class)->make()` and delegates request building, header construction, and response parsing to the provider. Cross-cutting concerns (`temperature`, `max_tokens`, `response_format` when supported) are set in `callAI()`.
 
+For a non-success provider response, `callAI()` logs only the HTTP status and response-body length. It never persists the provider response body because providers may echo prompts, image-derived data, or other sensitive input. The public error contract remains status-only (`502` with `AI API Fehler: <status>`); transport connection failures remain `503`.
+
 ### 5.5 Controller: `AIController`
 
 | Route | Method | Auth | Description |
 |---|---|---|---|---|
 | `GET /api/ai/status` | `status()` | auth:api | Returns `{enabled, status, type, model}` |
-| `POST /api/ai/generate-metadata` | `generateMetadata()` | auth:api + Gate | Photo vision analysis; returns 503 if disabled/unconfigured |
-| `POST /api/ai/generate-metadata-text` | `generateMetadataText()` | auth:api | Text-only metadata; returns 503 if disabled/unconfigured |
+| `POST /api/ai/generate-metadata` | `generateMetadata()` | auth:api + coarse capability check + `updateMetadata` PhotoPolicy Gate | Photo vision analysis; the resolved target is authorized before service availability and request validation |
+| `POST /api/ai/generate-metadata-text` | `generateMetadataText()` | auth:api + `create Gallery` Gate | Text-only metadata for photographers/super-admins; ordinary admins are denied; authorization is checked before service availability |
+
+Both generation endpoints apply the same request-order contract: authenticate first, authorize the actor and any concrete target before evaluating provider availability, then validate the request and perform the provider call. For an authorized actor, availability is checked before request validation, matching the text flow's `503`/`422` precedence.
+
+The vision endpoint needs two authorization stages because `updateMetadata` is target-scoped. First, a coarse category check rejects actors with no possible metadata capability before any photo query; their generic `403` cannot reveal whether a submitted ID exists. Photographers, Admins, and Super-Admins are role-capable; clients with `can_edit_metadata` and identities with active metadata invite grants are target-scoped. For an actor that passes the coarse check, resolving a submitted non-empty `photo_id` is necessary to construct the `Photo` policy subject and its gallery relationship before PhotoPolicy can run.
+
+For target-scoped client/invite actors, missing, malformed, unknown, and inaccessible photo IDs all produce the same opaque `403`; `can_edit_metadata` is never treated as a stand-alone grant or as proof that any target exists. For role-capable actors, a missing or unknown ID remains a normal `422` validation result when AI is available. No target or gallery data is included in either the `403` or validation response. An unauthenticated request is `401`, an unauthorized request is `403` regardless of whether AI is disabled or unconfigured, and only an authorized unavailable request receives `503`. Provider and connection failures keep their existing `502`/`503` contracts.
 
 ### 5.6 Service: `AIService`
 

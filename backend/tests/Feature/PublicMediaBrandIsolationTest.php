@@ -13,7 +13,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -32,13 +31,7 @@ class PublicMediaBrandIsolationTest extends TestCase
         config(['scout.driver' => 'null']);
         BrandRegistry::clearCache();
         BrandRegistry::set(Brand::B2B);
-        Storage::set('photos', Storage::build([
-            'driver' => 'local',
-            'root' => storage_path(
-                'framework/testing/disks/public-media-photos-'.(string) Str::uuid(),
-            ),
-            'throw' => false,
-        ]));
+        $this->useTemporaryStorageDisk('photos');
     }
 
     public function test_public_media_rejects_foreign_and_null_brand_galleries(): void

@@ -13,8 +13,6 @@ use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use PHPOpenSourceSaver\JWTAuth\JWT;
 use PHPOpenSourceSaver\JWTAuth\JWTAuth as JwtAuthManager;
@@ -31,13 +29,7 @@ class InviteRevocationTest extends TestCase
         config(['scout.driver' => 'null']);
         BrandRegistry::clearCache();
         BrandRegistry::set(Brand::B2B);
-        Storage::set('photos', Storage::build([
-            'driver' => 'local',
-            'root' => storage_path(
-                'framework/testing/disks/invite-photos-'.(string) Str::uuid(),
-            ),
-            'throw' => false,
-        ]));
+        $this->useTemporaryStorageDisk('photos');
     }
 
     public function test_registered_invite_grants_are_revoked_after_refresh_but_direct_same_brand_access_remains(): void

@@ -2,10 +2,15 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
+use App\Enums\UserRole;
 use App\Models\Role;
+use App\Models\Setting;
+use App\Models\User;
+use App\Services\OfferTokenService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Tests\TestCase;
 
 class ManualDocumentTest extends TestCase
 {
@@ -15,15 +20,15 @@ class ManualDocumentTest extends TestCase
     {
         parent::setUp();
         // Erforderliche Stammdaten für den PDF-Header/Footer
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'TESTAT11']);
+        Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'TESTAT11']);
     }
 
     public function test_super_admin_can_generate_manual_document_with_discounts()
     {
         $superAdmin = User::factory()->create();
-        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
         $token = auth('api')->login($superAdmin);
 
         $payload = [
@@ -36,36 +41,150 @@ class ManualDocumentTest extends TestCase
                 ['type' => 'item', 'description' => 'Service A', 'qty' => 2, 'price' => 50], // = 100
                 ['type' => 'discount_percent', 'description' => '10% Off', 'qty' => 1, 'price' => 10], // = -10
                 ['type' => 'discount_fixed', 'description' => 'Bonus', 'qty' => 1, 'price' => 5], // = -5 -> Total: 85
-            ]
+            ],
         ];
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
-                    ->postJson('/api/management/invoices/manual', $payload);
+            ->postJson('/api/management/invoices/manual', $payload);
 
         $res->assertStatus(200);
         $res->assertHeader('Content-Type', 'application/pdf');
     }
 
+    public function test_manual_document_accepts_a_fractional_quantity()
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+        $token = auth('api')->login($superAdmin);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/invoices/manual', [
+                'invoice_number' => 'R-2026-1000',
+                'date' => '2026-04-14',
+                'due_date' => 'Zahlbar sofort.',
+                'type' => 'invoice',
+                'customer_name' => 'Test Customer',
+                'items' => [[
+                    'type' => 'item',
+                    'description' => 'Teilstunde',
+                    'qty' => 0.25,
+                    'price' => 1000,
+                ]],
+            ])
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+    }
+
+    public function test_manual_document_accepts_explicit_fixed_point_quarter_quantity(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+        $token = auth('api')->login($superAdmin);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/invoices/manual', [
+                'invoice_number' => 'R-2026-1002',
+                'date' => '2026-04-14',
+                'due_date' => 'Zahlbar sofort.',
+                'type' => 'invoice',
+                'customer_name' => 'Test Customer',
+                'items' => [[
+                    'type' => 'item',
+                    'description' => 'Teilstunde',
+                    'qty' => 25,
+                    'quantity_scale' => 100,
+                    'price' => 1000,
+                ]],
+            ])
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+    }
+
+    public function test_manual_document_accepts_fixed_point_metadata_on_item_and_discount_lines(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+        $token = auth('api')->login($superAdmin);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/invoices/manual', [
+                'invoice_number' => 'R-2026-1003',
+                'date' => '2026-04-14',
+                'due_date' => 'Zahlbar sofort.',
+                'type' => 'invoice',
+                'customer_name' => 'Test Customer',
+                'items' => [
+                    [
+                        'type' => 'item',
+                        'description' => 'Teilstunde',
+                        'qty' => 25,
+                        'quantity_scale' => 100,
+                        'price' => 1000,
+                    ],
+                    [
+                        'type' => 'discount_percent',
+                        'description' => '10% Off',
+                        'qty' => 100,
+                        'quantity_scale' => 100,
+                        'price' => 1000,
+                    ],
+                    [
+                        'type' => 'discount_fixed',
+                        'description' => 'Bonus',
+                        'qty' => 100,
+                        'quantity_scale' => 100,
+                        'price' => 25,
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+    }
+
+    public function test_manual_document_rejects_more_than_two_fractional_quantity_places(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+        $token = auth('api')->login($superAdmin);
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/invoices/manual', [
+                'invoice_number' => 'R-2026-1001',
+                'date' => '2026-04-14',
+                'due_date' => 'Zahlbar sofort.',
+                'type' => 'invoice',
+                'customer_name' => 'Test Customer',
+                'items' => [[
+                    'type' => 'item',
+                    'description' => 'Teilstunde',
+                    'qty' => 0.125,
+                    'price' => 1000,
+                ]],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['items']);
+    }
+
     public function test_normal_admin_cannot_generate_manual_document()
     {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->postJson('/api/management/invoices/manual', [
-                 'invoice_number' => 'R-123',
-                 'date' => '2026-04-14',
-                 'due_date' => 'Sofort',
-                 'items' => [['type' => 'item', 'description' => 'A', 'qty' => 1, 'price' => 10]]
-             ])
-             ->assertStatus(403);
+            ->postJson('/api/management/invoices/manual', [
+                'invoice_number' => 'R-123',
+                'date' => '2026-04-14',
+                'due_date' => 'Sofort',
+                'items' => [['type' => 'item', 'description' => 'A', 'qty' => 1, 'price' => 10]],
+            ])
+            ->assertStatus(403);
     }
 
     public function test_offer_jwt_can_be_generated_and_extracted()
     {
         $superAdmin = User::factory()->create();
-        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
         $token = auth('api')->login($superAdmin);
 
         $payload = [
@@ -79,12 +198,12 @@ class ManualDocumentTest extends TestCase
                 ['type' => 'item', 'description' => 'Consulting', 'qty' => 10, 'price' => 100],
                 ['type' => 'discount_fixed', 'description' => 'Rabatt', 'qty' => 1, 'price' => 50],
             ],
-            'terms_html' => '<p>Test Terms</p>'
+            'terms_html' => '<p>Test Terms</p>',
         ];
 
         // 1. Generate Offer PDF
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
-                    ->postJson('/api/management/invoices/manual', $payload);
+            ->postJson('/api/management/invoices/manual', $payload);
 
         $res->assertStatus(200);
         $res->assertHeader('Content-Type', 'application/pdf');
@@ -99,11 +218,13 @@ class ManualDocumentTest extends TestCase
         $this->assertStringNotContainsString('%SMART_DOC:', $pdfContent);
 
         // 2. Extract Offer
-        $tempPath = storage_path('app/private/temp/test_offer_jwt_' . uniqid() . '.pdf');
-        if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);
+        $tempPath = storage_path('app/private/temp/test_offer_jwt_'.uniqid().'.pdf');
+        if (! is_dir(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
         file_put_contents($tempPath, $pdfContent);
 
-        $uploadedFile = new \Illuminate\Http\UploadedFile(
+        $uploadedFile = new UploadedFile(
             $tempPath,
             'Angebot.pdf',
             'application/pdf',
@@ -112,9 +233,9 @@ class ManualDocumentTest extends TestCase
         );
 
         $extractRes = $this->withHeaders(['Authorization' => "Bearer $token"])
-                           ->post('/api/management/invoices/extract-offer', [
-                               'pdf' => $uploadedFile
-                           ]);
+            ->post('/api/management/invoices/extract-offer', [
+                'pdf' => $uploadedFile,
+            ]);
 
         $extractRes->assertStatus(200);
         $extractRes->assertJsonPath('customer_name', 'Smart Doc Tester');
@@ -127,25 +248,28 @@ class ManualDocumentTest extends TestCase
 
     private function makeFakePdf(string $content): string
     {
-        $realPdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML('<p>Dummy</p>')->output();
-        return $realPdf . "\n" . $content . "\n";
+        $realPdf = Pdf::loadHTML('<p>Dummy</p>')->output();
+
+        return $realPdf."\n".$content."\n";
     }
 
     public function test_expired_offer_jwt_extraction_returns_400()
     {
         $superAdmin = User::factory()->create();
-        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
         $token = auth('api')->login($superAdmin);
 
-        $expiredJwt = app(\App\Services\OfferTokenService::class)
+        $expiredJwt = app(OfferTokenService::class)
             ->issue(['customer_name' => 'Expired'], now()->subDay());
         $pdfContent = $this->makeFakePdf("%OFFER_JWT:{$expiredJwt}%");
 
-        $tempPath = storage_path('app/private/temp/test_expired_offer_' . uniqid() . '.pdf');
-        if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);
+        $tempPath = storage_path('app/private/temp/test_expired_offer_'.uniqid().'.pdf');
+        if (! is_dir(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
         file_put_contents($tempPath, $pdfContent);
 
-        $uploadedFile = new \Illuminate\Http\UploadedFile(
+        $uploadedFile = new UploadedFile(
             $tempPath,
             'Angebot.pdf',
             'application/pdf',
@@ -154,9 +278,9 @@ class ManualDocumentTest extends TestCase
         );
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile])
-             ->assertStatus(400)
-             ->assertJsonPath('error', 'Angebot nicht auslesbar oder abgelaufen.');
+            ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile])
+            ->assertStatus(400)
+            ->assertJsonPath('error', 'Angebot nicht auslesbar oder abgelaufen.');
 
         @unlink($tempPath);
     }
@@ -165,16 +289,18 @@ class ManualDocumentTest extends TestCase
     {
         // Clean break: an old %SMART_DOC% PDF must report no embedded offer.
         $superAdmin = User::factory()->create();
-        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
         $token = auth('api')->login($superAdmin);
 
-        $pdfContent = $this->makeFakePdf("%SMART_DOC:legacy.legacy%");
+        $pdfContent = $this->makeFakePdf('%SMART_DOC:legacy.legacy%');
 
-        $tempPath = storage_path('app/private/temp/test_legacy_' . uniqid() . '.pdf');
-        if (!is_dir(dirname($tempPath))) mkdir(dirname($tempPath), 0755, true);
+        $tempPath = storage_path('app/private/temp/test_legacy_'.uniqid().'.pdf');
+        if (! is_dir(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
         file_put_contents($tempPath, $pdfContent);
 
-        $uploadedFile = new \Illuminate\Http\UploadedFile(
+        $uploadedFile = new UploadedFile(
             $tempPath,
             'Angebot.pdf',
             'application/pdf',
@@ -183,9 +309,9 @@ class ManualDocumentTest extends TestCase
         );
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile])
-             ->assertStatus(404)
-             ->assertJsonPath('error', 'Kein eingebettetes Angebot in diesem PDF gefunden.');
+            ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile])
+            ->assertStatus(404)
+            ->assertJsonPath('error', 'Kein eingebettetes Angebot in diesem PDF gefunden.');
 
         @unlink($tempPath);
     }

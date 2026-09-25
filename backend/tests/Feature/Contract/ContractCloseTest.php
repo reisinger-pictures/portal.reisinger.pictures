@@ -118,6 +118,44 @@ class ContractCloseTest extends TestCase
         ]);
     }
 
+    public function test_close_serializes_ordered_discounts_into_the_invoice_snapshot(): void
+    {
+        Mail::fake();
+
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Leistung',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [
+                ['type' => 'discount_percent', 'description' => '10% Rabatt', 'notes' => '', 'price' => 1000],
+                ['type' => 'discount_fixed', 'description' => 'Bonus', 'notes' => '', 'price' => 500],
+            ],
+            'billing_details' => ['name' => 'Rechnung', 'email' => 'rechnung@example.com'],
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'status' => 'signed',
+        ]);
+
+        app(ContractCloseService::class)->close($contract);
+
+        $snapshot = InvoiceSnapshot::query()->latest('created_at')->first();
+        $this->assertNotNull($snapshot);
+        $this->assertSame(8500, $snapshot->total_gross);
+        $this->assertSame([
+            'item',
+            'discount_percent',
+            'discount_fixed',
+        ], array_column($snapshot->customer_details['items'], 'type'));
+        $this->assertSame([1000, 500], array_column($snapshot->customer_details['discounts'], 'price'));
+    }
+
     public function test_close_scopes_billing_user_resolution_and_order_ownership_to_contract_brand(): void
     {
         Mail::fake();

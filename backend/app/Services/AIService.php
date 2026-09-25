@@ -6,17 +6,9 @@ use App\Models\Photo;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class AIService
 {
-    /**
-     * Maximum number of characters of a provider error response persisted to the
-     * log. Provider bodies can echo prompts back and may be arbitrarily large,
-     * so the log entry must stay bounded.
-     */
-    private const ERROR_BODY_LOG_LIMIT = 500;
-
     public function isDisabled(): bool
     {
         return ! config('services.ai.enabled');
@@ -93,12 +85,13 @@ class AIService
             ->post(rtrim(config('services.ai.base_url'), '/').$provider->getEndpoint(), $requestBody);
 
         if (! $response->successful()) {
-            $rawBody = (string) $response->body();
+            $bodyLength = strlen((string) $response->body());
 
+            // Provider error bodies may echo prompts or other sensitive input.
+            // Keep only non-sensitive diagnostics in the application log.
             Log::error('AI API call failed', [
                 'status' => $response->status(),
-                'body' => Str::limit($rawBody, self::ERROR_BODY_LOG_LIMIT),
-                'body_length' => strlen($rawBody),
+                'body_length' => $bodyLength,
             ]);
             throw new \RuntimeException('AI API Fehler: '.$response->status());
         }

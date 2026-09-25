@@ -8,6 +8,7 @@ use App\Services\ManualInvoiceService;
 use App\Support\BrandRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 
 class InvoiceController extends Controller
@@ -23,7 +24,13 @@ class InvoiceController extends Controller
         $validated = $request->validated();
         $validated['invoice_number'] = $this->normalizeInvoiceNumber($validated['invoice_number']);
 
-        $processed = $this->invoiceService->processItems($validated['items']);
+        try {
+            $processed = $this->invoiceService->processItems($validated['items']);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'items' => $exception->getMessage(),
+            ]);
+        }
         $mappedItems = $processed['items'];
         $total = $processed['total'];
 

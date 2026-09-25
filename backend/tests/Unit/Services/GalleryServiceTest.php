@@ -438,6 +438,50 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('selection', $updated->type);
     }
 
+    public function test_update_gallery_applies_parent_visibility_policy(): void
+    {
+        $privateGroup = GalleryGroup::factory()->create(['is_public' => false]);
+        $publicGroup = GalleryGroup::factory()->create(['is_public' => true]);
+
+        Gallery::withoutSyncingToSearch(function () use ($privateGroup, $publicGroup): void {
+            $gallery = Gallery::factory()->create([
+                'type' => 'delivery',
+                'is_public' => false,
+            ]);
+
+            $updated = $this->service->updateGallery($gallery, [
+                'gallery_group_id' => $privateGroup->id,
+                'is_public' => true,
+            ]);
+            $this->assertFalse($updated->is_public);
+
+            $updated = $this->service->updateGallery($updated, [
+                'gallery_group_id' => $publicGroup->id,
+                'is_public' => false,
+            ]);
+            $this->assertTrue($updated->is_public);
+        });
+    }
+
+    public function test_update_gallery_preserves_explicit_visibility_for_non_enforcing_parent(): void
+    {
+        $group = GalleryGroup::factory()->create(['is_public' => null]);
+
+        Gallery::withoutSyncingToSearch(function () use ($group): void {
+            $gallery = Gallery::factory()->create([
+                'type' => 'delivery',
+                'is_public' => false,
+                'gallery_group_id' => $group->id,
+            ]);
+
+            $updated = $this->service->updateGallery($gallery, [
+                'is_public' => true,
+            ]);
+
+            $this->assertTrue($updated->is_public);
+        });
+    }
+
     public function test_update_gallery_converts_null_booleans_to_false(): void
     {
         $gallery = Gallery::factory()->create();
@@ -495,38 +539,46 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('original-slug', $updated->slug);
     }
 
+    /**
+     * Regression for P1-M1: an omitted optional org_ids field must preserve the
+     * existing pivot assignments instead of being interpreted as an empty list.
+     */
     public function test_update_gallery_keeps_orgs_when_org_ids_absent(): void
     {
-        $gallery = Gallery::factory()->create(['is_live' => false]);
-        $org = Org::factory()->create();
-        $gallery->orgs()->attach($org->id);
+        Gallery::withoutSyncingToSearch(function (): void {
+            $gallery = Gallery::factory()->create(['is_live' => false]);
+            $org = Org::factory()->create();
+            $gallery->orgs()->attach($org->id);
 
-        $updated = $this->service->updateGallery($gallery, ['is_live' => true]);
+            $updated = $this->service->updateGallery($gallery, ['is_live' => true]);
 
-        $this->assertTrue($updated->is_live);
-        $this->assertDatabaseHas('gallery_org', [
-            'gallery_id' => $gallery->id,
-            'org_id' => $org->id,
-        ]);
+            $this->assertTrue($updated->is_live);
+            $this->assertDatabaseHas('gallery_org', [
+                'gallery_id' => $gallery->id,
+                'org_id' => $org->id,
+            ]);
+        });
     }
 
     public function test_update_gallery_syncs_orgs_when_org_ids_provided(): void
     {
-        $gallery = Gallery::factory()->create();
-        $orgA = Org::factory()->create();
-        $orgB = Org::factory()->create();
-        $gallery->orgs()->attach($orgA->id);
+        Gallery::withoutSyncingToSearch(function (): void {
+            $gallery = Gallery::factory()->create();
+            $orgA = Org::factory()->create();
+            $orgB = Org::factory()->create();
+            $gallery->orgs()->attach($orgA->id);
 
-        $this->service->updateGallery($gallery, ['org_ids' => [$orgB->id]]);
+            $this->service->updateGallery($gallery, ['org_ids' => [$orgB->id]]);
 
-        $this->assertDatabaseMissing('gallery_org', [
-            'gallery_id' => $gallery->id,
-            'org_id' => $orgA->id,
-        ]);
-        $this->assertDatabaseHas('gallery_org', [
-            'gallery_id' => $gallery->id,
-            'org_id' => $orgB->id,
-        ]);
+            $this->assertDatabaseMissing('gallery_org', [
+                'gallery_id' => $gallery->id,
+                'org_id' => $orgA->id,
+            ]);
+            $this->assertDatabaseHas('gallery_org', [
+                'gallery_id' => $gallery->id,
+                'org_id' => $orgB->id,
+            ]);
+        });
     }
 
     public function test_update_gallery_ignores_null_slug(): void

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Contract;
+use App\Support\AgeHelper;
 use App\Support\BrandRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -12,14 +13,19 @@ class ContractPdfService
         private ManualInvoiceService $manualInvoiceService,
         private OfferTokenService $offerTokenService,
         private SettingResolver $settingResolver,
+        private ContractPricingService $contractPricingService,
     ) {}
 
     public function generate(Contract $contract): string
     {
         $contract->load('signers.auditLogs');
 
-        $allLineItems = array_merge($contract->items ?? [], $contract->discounts ?? []);
-        $processed = $this->manualInvoiceService->processItems($allLineItems);
+        $snapshot = $this->contractPricingService->normalizeSnapshot(
+            $contract->items,
+            $contract->discounts,
+        );
+        $allLineItems = $snapshot['lines'];
+        $processed = $this->contractPricingService->processLines($allLineItems);
 
         $bankDetails = $this->manualInvoiceService->getBankDetails();
 
@@ -32,7 +38,8 @@ class ContractPdfService
             'customer_country' => $contract->billing_details['country'] ?? '',
             'customer_email' => $contract->billing_details['email'] ?? '',
             'customer_uid' => $contract->billing_details['uid'] ?? '',
-            'items' => $contract->items ?? [],
+            'items' => $allLineItems,
+            'discounts' => $snapshot['discounts'],
             'terms_html' => $contract->terms_html ?? '',
             'due_date' => '',
             'validity' => '',
@@ -41,7 +48,7 @@ class ContractPdfService
         $offerMarker = "%OFFER_JWT:{$offerPayload}%";
 
         $signers = $contract->signers->where('status', 'signed');
-        $ageLabel = \App\Support\AgeHelper::format($contract->billing_details['birthdate'] ?? null, $contract->created_at?->format('Y-m-d'));
+        $ageLabel = AgeHelper::format($contract->billing_details['birthdate'] ?? null, $contract->created_at?->format('Y-m-d'));
         $brand = BrandRegistry::resolveFromContract($contract);
 
         $config = BrandRegistry::configForBrand($brand->value);

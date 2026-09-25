@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\AsBrand;
+use App\Exceptions\ContractIdentityException;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -65,30 +66,105 @@ class Contract extends Model
         return $query->where('type', 'contract')->whereNotNull('template_id');
     }
 
+    public const JOIN_SCOPE_DIRECT_PREFIX = 'contract:';
+
+    public const JOIN_SCOPE_TEMPLATE_PREFIX = 'template:';
+
     /**
-     * Normalize the identity used by the unauthenticated join paths.
-     *
-     * The database has no normalized-email column, so the public join
-     * writers must use the same canonical value before checking or writing a
-     * signer. Keep this in the model so direct-contract and template paths
-     * cannot drift into different lock identities.
+     * Normalize and validate the identity used by the unauthenticated join
+     * paths. The original email remains untouched; this value is the durable
+     * database identity and must never be inferred from a mutable relation.
      */
     public static function normalizeSignerEmail(string $email): string
     {
-        return Str::lower(trim($email));
+        $normalized = Str::lower(trim($email));
+
+        if ($normalized === '' || strlen($normalized) > 255 || filter_var($normalized, FILTER_VALIDATE_EMAIL) === false) {
+            throw new ContractIdentityException('Die E-Mail-Identität ist ungültig.');
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Derive the immutable identity scope for a signer attached to a contract.
+     *
+     * Direct contracts use their own UUID. Every instance of a template uses
+     * the template UUID, not the instance UUID. The template relation is
+     * checked now so a malformed parent cannot be guessed into a scope.
+     */
+    public static function signerJoinScopeKey(self $contract): string
+    {
+        $contractId = self::normalizeUuid($contract->getKey(), 'Vertrag');
+
+        if ($contract->type !== 'contract') {
+            throw new ContractIdentityException('Ungültiger Vertragsscope.');
+        }
+
+        if ($contract->template_id === null) {
+            return self::JOIN_SCOPE_DIRECT_PREFIX.$contractId;
+        }
+
+        $templateId = self::normalizeUuid($contract->template_id, 'Vorlage');
+        $template = self::query()->find($templateId);
+
+        if (! $template instanceof self
+            || $template->type !== 'template'
+            || strtolower((string) $template->getKey()) !== $templateId) {
+            throw new ContractIdentityException('Ungültiger Template-Scope.');
+        }
+
+        return self::JOIN_SCOPE_TEMPLATE_PREFIX.$templateId;
+    }
+
+    /**
+     * Derive a template scope from a validated template model.
+     */
+    public static function templateJoinScopeKey(self $template): string
+    {
+        if ($template->type !== 'template') {
+            throw new ContractIdentityException('Ungültiger Template-Scope.');
+        }
+
+        return self::JOIN_SCOPE_TEMPLATE_PREFIX.self::normalizeUuid($template->getKey(), 'Vorlage');
+    }
+
+    public static function joinScopeKeyFor(self $contract): string
+    {
+        return self::signerJoinScopeKey($contract);
+    }
+
+    /**
+     * Validate a persisted scope snapshot without trying to repair it.
+     */
+    public static function validateJoinScopeKey(string $scopeKey): string
+    {
+        if (preg_match('/^(contract|template):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $scopeKey) !== 1) {
+            throw new ContractIdentityException('Ungültiger Vertragsscope.');
+        }
+
+        return $scopeKey;
     }
 
     /**
      * Return the stable cache-lock identity for a join scope.
      *
-     * A direct contract uses its own ID; a template uses the template ID for
-     * every instance it creates. UUID IDs are globally unique, so the scope
-     * ID is sufficient for both paths. The same prefix is intentionally used
-     * by the controller and the template service.
+     * The scope ID argument is deliberately kept separate from the durable
+     * scope key for compatibility with the existing lock callers. The
+     * database duplicate query always uses signerJoinScopeKey().
      */
     public static function joinLockKey(string $scopeId, string $email): string
     {
         return 'contract-join:'.$scopeId.':'.hash('sha256', self::normalizeSignerEmail($email));
+    }
+
+    private static function normalizeUuid(mixed $value, string $label): string
+    {
+        if (! Str::isUuid($value)) {
+            throw new ContractIdentityException("Ungültige {$label}-UUID.");
+        }
+
+        return strtolower($value);
     }
 
     /**

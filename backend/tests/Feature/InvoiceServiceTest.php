@@ -6,8 +6,10 @@ use App\Models\InvoiceSequence;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\Org;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\InvoiceService;
+use App\Support\PersistedMoney;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Tests\Support\MailpitAssertions;
@@ -15,19 +17,19 @@ use Tests\TestCase;
 
 class InvoiceServiceTest extends TestCase
 {
-    use RefreshDatabase, MailpitAssertions;
+    use MailpitAssertions, RefreshDatabase;
 
     private InvoiceService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new InvoiceService();
+        $this->service = new InvoiceService;
 
         // Bankdaten für den InvoiceMail-PDF-Build
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
+        Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'BIC']);
     }
 
     /**
@@ -58,7 +60,7 @@ class InvoiceServiceTest extends TestCase
         return $order;
     }
 
-    public function test_generateForOrg_happy_path_single_user_single_order(): void
+    public function test_generate_for_org_happy_path_single_user_single_order(): void
     {
         $org = Org::create(['name' => 'Happy Org', 'invoice_frequency' => 'monthly']);
         $user = User::factory()->create(['email' => 'happy@example.com']);
@@ -98,7 +100,7 @@ class InvoiceServiceTest extends TestCase
      * durch, sodass der booted()-Creating-Hook (nur bei leerer Nummer aktiv) nicht erneut generiert.
      * (Verifiziert: kein Doppel-Inkrement.)
      */
-    public function test_generateForOrg_invoice_number_consistency_single_increment_review(): void
+    public function test_generate_for_org_invoice_number_consistency_single_increment_review(): void
     {
         $org = Org::create(['name' => 'Seq Org']);
         $user = User::factory()->create(['email' => 'seq@example.com']);
@@ -106,7 +108,7 @@ class InvoiceServiceTest extends TestCase
         $user->save();
         $this->makeDeliveryNoteOrder($user, 1000);
 
-        $year = (int)date('Y');
+        $year = (int) date('Y');
         // makeDeliveryNoteOrder hat bereits 1× inkrementiert (L-Nummer) → $before NACHDEM lesen
         $before = InvoiceSequence::firstOrCreate(['year' => $year], ['current_value' => 0])->current_value;
 
@@ -133,7 +135,7 @@ class InvoiceServiceTest extends TestCase
         );
     }
 
-    public function test_generateForOrg_enriches_items_with_ordered_by_and_original_order_id(): void
+    public function test_generate_for_org_enriches_items_with_ordered_by_and_original_order_id(): void
     {
         $org = Org::create(['name' => 'Items Org']);
         $user = User::factory()->create(['name' => 'Maria Bestellerin', 'email' => 'items@example.com']);
@@ -158,7 +160,7 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame($originalOrder->id, $items[0]['original_order_id']);
     }
 
-    public function test_generateForOrg_merges_terms_across_multiple_orders(): void
+    public function test_generate_for_org_merges_terms_across_multiple_orders(): void
     {
         $org = Org::create(['name' => 'Terms Org']);
         $user = User::factory()->create(['email' => 'terms@example.com']);
@@ -186,7 +188,7 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame('versichert', $terms['shipping']);
     }
 
-    public function test_generateForOrg_billing_fallback_firmenadresse_when_initiator_null_and_user_billing_empty(): void
+    public function test_generate_for_org_billing_fallback_firmenadresse_when_initiator_null_and_user_billing_empty(): void
     {
         $org = Org::create(['name' => 'Fallback Org']);
         // billing_* bewusst NICHT setzen → bleiben null → Fallback greift
@@ -208,7 +210,7 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame('Österreich', $details['country']);
     }
 
-    public function test_generateForOrg_uses_initiator_billing_when_provided(): void
+    public function test_generate_for_org_uses_initiator_billing_when_provided(): void
     {
         $org = Org::create(['name' => 'Initiator Org']);
         $user = User::factory()->create(['email' => 'tenantuser@example.com']);
@@ -240,7 +242,7 @@ class InvoiceServiceTest extends TestCase
         $this->assertMailpitSentTo('initiator@example.com');
     }
 
-    public function test_generateForOrg_org_without_users_returns_error(): void
+    public function test_generate_for_org_org_without_users_returns_error(): void
     {
         $org = Org::create(['name' => 'Empty Org']);
 
@@ -257,7 +259,7 @@ class InvoiceServiceTest extends TestCase
         // da er über die vorherigen Guards ohnehin unerreichbar war.
     }
 
-    public function test_generateForOrg_users_without_delivery_note_orders_returns_error(): void
+    public function test_generate_for_org_users_without_delivery_note_orders_returns_error(): void
     {
         $org = Org::create(['name' => 'NoDelivery Org']);
         $user = User::factory()->create(['email' => 'paid@example.com']);
@@ -276,7 +278,7 @@ class InvoiceServiceTest extends TestCase
         $this->assertDatabaseMissing('orders', ['status' => 'invoice_created']);
     }
 
-    public function test_generateForOrg_multiple_users_multiple_orders_all_archived_and_accumulated(): void
+    public function test_generate_for_org_multiple_users_multiple_orders_all_archived_and_accumulated(): void
     {
         $org = Org::create(['name' => 'Multi Org']);
 
@@ -307,12 +309,12 @@ class InvoiceServiceTest extends TestCase
         // Eine collective Order mit kumuliertem total_amount (Geld = Cents)
         $collectiveOrder = Order::where('status', 'invoice_created')->first();
         $this->assertNotNull($collectiveOrder);
-        $this->assertSame(7000, (int)$collectiveOrder->total_amount);
+        $this->assertSame(7000, (int) $collectiveOrder->total_amount);
 
         // Collective Snapshot summiert Net/Gross
         $snapshot = InvoiceSnapshot::where('order_id', $collectiveOrder->id)->first();
-        $this->assertSame(7000, (int)$snapshot->total_net);
-        $this->assertSame(7000, (int)$snapshot->total_gross);
+        $this->assertSame(7000, (int) $snapshot->total_net);
+        $this->assertSame(7000, (int) $snapshot->total_gross);
 
         // Items enthalten alle 3 Einträge mit korrektem ordered_by
         $items = $snapshot->customer_details['items'];
@@ -322,7 +324,28 @@ class InvoiceServiceTest extends TestCase
         $this->assertSame(['Alpha', 'Alpha', 'Beta'], $orderedBy);
     }
 
-    public function test_generateForOrg_status_filter_excludes_non_delivery_note_orders(): void
+    public function test_generate_for_org_rejects_persisted_total_overflow_without_archiving_orders(): void
+    {
+        Mail::fake();
+        $org = Org::create(['name' => 'Overflow Org', 'invoice_frequency' => 'monthly']);
+        $user = User::factory()->create(['email' => 'overflow@example.com']);
+        $user->org_id = $org->id;
+        $user->save();
+        $first = $this->makeDeliveryNoteOrder($user, PersistedMoney::MAX_CENTS);
+        $second = $this->makeDeliveryNoteOrder($user, 1);
+
+        $result = $this->service->generateForOrg($org);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(422, $result['status']);
+        $this->assertDatabaseHas('orders', ['id' => $first->id, 'status' => 'delivery_note']);
+        $this->assertDatabaseHas('orders', ['id' => $second->id, 'status' => 'delivery_note']);
+        $this->assertDatabaseMissing('orders', ['status' => 'invoice_created']);
+        $this->assertDatabaseCount('invoice_snapshots', 2);
+        Mail::assertNothingQueued();
+    }
+
+    public function test_generate_for_org_status_filter_excludes_non_delivery_note_orders(): void
     {
         // Sicherheitsnetz: auch wenn eine Order is_quote_request=true hat, entscheidet der
         // status=delivery_note Filter. Andere Status werden nicht gezogen.
@@ -345,6 +368,6 @@ class InvoiceServiceTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertSame(1, $result['processed_orders']);
         $this->assertSame(1, Order::where('status', 'archived_in_collective')->count());
-        $this->assertSame(800, (int)Order::where('status', 'invoice_created')->value('total_amount'));
+        $this->assertSame(800, (int) Order::where('status', 'invoice_created')->value('total_amount'));
     }
 }

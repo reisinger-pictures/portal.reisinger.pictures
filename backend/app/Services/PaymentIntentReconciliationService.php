@@ -2,13 +2,10 @@
 
 namespace App\Services;
 
-use App\Mail\InvoiceMail;
 use App\Models\Order;
 use App\Models\User;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Shared strict reconciliation for a PaymentIntent that is already known to
@@ -17,8 +14,13 @@ use Illuminate\Support\Facades\Mail;
  */
 class PaymentIntentReconciliationService
 {
-    public function __construct(private readonly StripePaymentService $stripePayment)
-    {
+    private readonly InvoiceMailDispatcher $invoiceMailDispatcher;
+
+    public function __construct(
+        private readonly StripePaymentService $stripePayment,
+        ?InvoiceMailDispatcher $invoiceMailDispatcher = null,
+    ) {
+        $this->invoiceMailDispatcher = $invoiceMailDispatcher ?? app(InvoiceMailDispatcher::class);
     }
 
     /**
@@ -158,8 +160,7 @@ class PaymentIntentReconciliationService
         object|array $paymentIntent,
         bool $requireReceivedAmount,
         bool $allowMissingLink = false,
-    ): ?string
-    {
+    ): ?string {
         $paymentIntentId = $this->valueString($this->objectValue($paymentIntent, 'id'));
         $storedPaymentIntentId = $order->stripe_payment_intent_id;
         if ($paymentIntentId === null
@@ -291,15 +292,7 @@ class PaymentIntentReconciliationService
     {
         try {
             if ($order->user && $order->invoiceSnapshot) {
-                Cache::lock('invoice-mail:'.$order->getKey(), 30)->block(5, function () use ($order): void {
-                    $marker = 'invoice_sent_'.$order->getKey();
-                    if (Cache::has($marker)) {
-                        return;
-                    }
-
-                    Mail::to($order->user->email)->queue(new InvoiceMail($order, $order->invoiceSnapshot));
-                    Cache::put($marker, true, now()->addDays(7));
-                });
+                $this->invoiceMailDispatcher->queueOnce($order, $order->user);
             }
 
             return ['status' => $successStatus, 'reason' => null];

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\Brand;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
+use App\Models\Org;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Collection;
@@ -12,6 +13,19 @@ use Illuminate\Support\Facades\Cache;
 
 class GalleryTreeService
 {
+    /**
+     * Return the cache scope for the normalized actor brand.
+     *
+     * A null brand is reserved for the trusted cross-brand tree; every
+     * brand-bound actor gets its own cache entry.
+     */
+    private function adminTreeCacheKey(?string $brand): string
+    {
+        return $brand === null
+            ? 'gallery_tree_admin'
+            : 'gallery_tree_admin_'.$brand;
+    }
+
     /**
      * Get the complete gallery tree for admin view with optional filtering.
      *
@@ -28,19 +42,25 @@ class GalleryTreeService
             return [];
         }
 
-        $brand = $authorization->isTrustedCrossBrandActor($user)
-            ? null
-            : ($user->brand instanceof Brand ? $user->brand->value : (string) $user->brand);
+        $crossBrand = $authorization->isTrustedCrossBrandActor($user);
+        $brand = $crossBrand ? null : BrandRegistry::normalizeId($user->brand);
 
-        $cacheKey = $brand === null ? 'gallery_tree_admin' : 'gallery_tree_admin_'.$brand;
+        // A null brand is reserved for a trusted, persisted Super-Admin.  Keep
+        // this fail-closed check next to the cache-scope decision so a malformed
+        // or legacy actor can never fall back to the cross-brand cache.
+        if (! $crossBrand && $brand === null) {
+            return [];
+        }
+
+        $cacheKey = $this->adminTreeCacheKey($brand);
 
         $buildTree = function () use ($brand) {
             $groupQuery = GalleryGroup::query()
                 ->whereNull('parent_id')
-                ->with(['children', 'children.orgs', 'children.galleries.galleryGroup.parent', 'galleries.galleryGroup.parent', 'orgs']);
+                ->with(['children', 'children.orgs', 'galleries', 'galleries.orgs', 'orgs']);
             $galleryQuery = Gallery::query()
                 ->whereNull('gallery_group_id')
-                ->with('galleryGroup.parent');
+                ->with('orgs');
 
             if ($brand !== null) {
                 $groupQuery->where('brand', $brand);
@@ -49,6 +69,8 @@ class GalleryTreeService
 
             $groups = $groupQuery->get();
             $rootGalleries = $galleryQuery->get();
+            $this->hydrateTreeGroupChains($groups);
+            $rootGalleries->each(fn (Gallery $gallery): Gallery => $gallery->setRelation('galleryGroup', null));
 
             // A brand-bound management tree must not expose a child/group or
             // gallery whose parent chain is foreign or brand-less.  The SQL
@@ -85,6 +107,24 @@ class GalleryTreeService
         }
 
         return $treeArray;
+    }
+
+    /**
+     * Link every eager-loaded gallery to its in-memory group chain before the
+     * tree is serialized. This keeps effective attributes and full paths from
+     * issuing one parent query per node.
+     *
+     * @param  Collection<int, GalleryGroup>  $groups
+     */
+    private function hydrateTreeGroupChains(Collection $groups, ?GalleryGroup $parent = null): void
+    {
+        $groups->each(function (GalleryGroup $group) use ($parent): void {
+            $group->setRelation('parent', $parent);
+            $group->getRelation('galleries')
+                ->each(fn (Gallery $gallery): Gallery => $gallery->setRelation('galleryGroup', $group));
+
+            $this->hydrateTreeGroupChains($group->getRelation('children'), $group);
+        });
     }
 
     /**
@@ -238,7 +278,7 @@ class GalleryTreeService
      */
     public function clearCache(): void
     {
-        Cache::forget('gallery_tree_admin');
+        Cache::forget($this->adminTreeCacheKey(null));
         Cache::forget('unrestricted_photographer_gallery_ids');
 
         $brands = array_keys(config('brands', []));
@@ -249,11 +289,11 @@ class GalleryTreeService
             ->map(fn ($brand) => $brand instanceof Brand ? $brand->value : (string) $brand);
 
         foreach ($brands as $brand) {
-            Cache::forget('gallery_tree_admin_'.$brand);
+            Cache::forget($this->adminTreeCacheKey((string) $brand));
         }
 
         foreach ($dbBrands->unique() as $brand) {
-            Cache::forget('gallery_tree_admin_'.$brand);
+            Cache::forget($this->adminTreeCacheKey($brand));
         }
     }
 }

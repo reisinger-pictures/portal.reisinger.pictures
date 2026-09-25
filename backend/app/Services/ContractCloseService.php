@@ -14,49 +14,47 @@ use Illuminate\Support\Facades\Mail;
 
 class ContractCloseService
 {
+    public function __construct(
+        private ContractPricingService $contractPricingService,
+    ) {}
+
     /**
-     * Calculate the authoritative contract total from its immutable JSON
-     * snapshot. Item and fixed-discount prices are cents; percentage-discount
-     * prices are basis points (10% = 1000). Discounts are applied in stored
-     * order against the running subtotal and the final amount cannot be
-     * negative.
+     * Return the canonical snapshot used by the public response, PDF, and
+     * invoice serializer. Legacy mixed placement is normalized for reads.
+     *
+     * @return array{items: list<array<string, mixed>>, discounts: list<array<string, mixed>>, lines: list<array<string, mixed>>}
+     */
+    public function normalizedSnapshot(Contract $contract): array
+    {
+        return $this->contractPricingService->normalizeSnapshot(
+            $contract->items,
+            $contract->discounts,
+        );
+    }
+
+    /**
+     * Calculate the authoritative contract total in integer cents.
      */
     public function calculateTotal(Contract $contract): int
     {
-        $items = $contract->items ?? [];
-        $discounts = $contract->discounts ?? [];
-        $subtotal = 0;
+        $snapshot = $this->normalizedSnapshot($contract);
 
-        foreach ($items as $item) {
-            if (($item['type'] ?? 'item') === 'item') {
-                $subtotal += ($item['price'] ?? 0) * ($item['qty'] ?? 1);
-            }
-        }
-
-        foreach ($discounts as $discount) {
-            if (($discount['type'] ?? '') === 'discount_fixed') {
-                $subtotal -= ($discount['price'] ?? 0);
-            } elseif (($discount['type'] ?? '') === 'discount_percent') {
-                $subtotal -= (int) round($subtotal * ($discount['price'] ?? 0) / 10000);
-            }
-        }
-
-        return (int) max(0, $subtotal);
+        return $this->contractPricingService->preflightSnapshot($snapshot)['total'];
     }
 
     public function close(Contract $contract): void
     {
-        $totalGross = $this->calculateTotal($contract);
+        $snapshot = $this->normalizedSnapshot($contract);
+        $processed = $this->contractPricingService->preflightSnapshot($snapshot);
+        $totalGross = $processed['total'];
+        $billingDetails = is_array($contract->billing_details) ? $contract->billing_details : [];
 
-        $orderId = null;
-        $invoiceNumber = null;
-
-        if ($totalGross > 0 && ! empty($contract->billing_details)) {
-            DB::transaction(function () use ($contract, $totalGross, &$orderId, &$invoiceNumber) {
+        if ($totalGross > 0 && $billingDetails !== []) {
+            DB::transaction(function () use ($contract, $billingDetails, $processed, $totalGross) {
                 $brand = $contract->brand ?? BrandRegistry::currentOrDefault();
 
                 $userId = $this->resolveBillingUserId(
-                    $contract->billing_details['email'] ?? null,
+                    $billingDetails['email'] ?? null,
                     $contract->brand ?? BrandRegistry::currentIdOrNull(),
                 );
 
@@ -75,25 +73,36 @@ class ContractCloseService
                     'order_id' => $order->id,
                     'brand' => $brand,
                     'customer_details' => array_merge(
-                        $contract->billing_details ?? [],
-                        ['items' => $contract->items ?? [], 'terms' => $contract->terms_html ?? '']
+                        $billingDetails,
+                        [
+                            // Invoices consume one ordered line array. Keep the
+                            // separate key as well for consumers that need to
+                            // inspect the canonical contract partition.
+                            'items' => $processed['items'],
+                            'discounts' => array_values(array_filter(
+                                $processed['items'],
+                                static fn (array $line): bool => $line['type'] !== ContractPricingService::ITEM_TYPE,
+                            )),
+                            'terms' => $contract->terms_html ?? '',
+                        ],
                     ),
                     'total_net' => $totalGross,
                     'total_gross' => $totalGross,
                     'tax_rate' => null,
                 ]);
 
-                $orderId = $order->id;
             });
         }
 
-        $recipients = $contract->signers->pluck('email')->unique()->toArray();
+        $recipients = $contract->relationLoaded('signers')
+            ? $contract->signers->pluck('email')->unique()->toArray()
+            : $contract->signers()->pluck('email')->unique()->toArray();
 
-        if (! empty($contract->billing_details['email'])) {
-            $recipients[] = $contract->billing_details['email'];
+        if (! empty($billingDetails['email'])) {
+            $recipients[] = $billingDetails['email'];
         }
 
-        $recipients = array_unique(array_filter($recipients));
+        $recipients = array_values(array_unique(array_filter($recipients)));
 
         foreach ($recipients as $recipient) {
             Mail::to($recipient)->queue(new ContractClosedMail($contract));
