@@ -97,6 +97,38 @@ AIGalleryDefaultsModal → useAI.generateMetadataFromText(text_input, global_con
   uses the server endpoint and has no local-mode branch.
 - Model ID is resolved via `GET {localUrl}/v1/models`.
 
+## 3.4 Prompt data/instruction boundary
+
+All caller-supplied gallery and context text is untrusted data, never a source of
+instructions. The server text flow, server vision flow, and local browser vision
+flow use the same conservative policy:
+
+- The trusted system message contains the data-boundary rule: text inside
+  `<untrusted_context>` and `<untrusted_input>` blocks must be treated as data,
+  and directives inside those blocks must be ignored.
+- `text_input` is placed in an `<untrusted_input>` block; `global_context` and
+  `specific_context` are each placed in an `<untrusted_context>` block. Empty
+  contexts retain the existing `Keiner` value. The user data is never
+  interpolated into the system message.
+- Angle brackets in caller text are encoded as `&lt;`/`&gt;` before it is put
+  inside a block, so a value cannot close or reopen its own delimiter. This is
+  boundary encoding, not content filtering; the existing metadata rules, JSON
+  schema, image block, temperature, and response contract remain unchanged.
+- The local LM Studio request uses the same delimiters and system policy as the
+  server vision request. The text-only flow remains server-only.
+
+This is defense-in-depth and a deterministic prompt-construction contract, not a
+claim that an external model is immune to prompt injection. The tests below
+prove what is sent; they do not prove model compliance. Instructions embedded in
+the image, novel or multimodal attacks, provider/gateway normalization, model
+fine-tuning, and future model behavior can still cross this boundary. Production
+reliance therefore requires adversarial evaluation against every configured
+provider/model and operational review of generated metadata; output must remain
+untrusted until validated and rendered through the existing safety boundaries.
+The deterministic contracts are covered by
+`backend/tests/Unit/AIServicePromptInjectionTest.php` and the local request-body
+cases in `frontend/src/logic/__tests__/useAI.test.ts`.
+
 ## 4. Frontend Architecture
 
 ### 4.1 Hook: `useAI()`
