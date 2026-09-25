@@ -147,6 +147,21 @@ The text flow has no existing photo target. It is authorized by the Gallery `cre
 
 This narrower role contract is intentional: the endpoint is used only to create defaults for a new gallery. Authorization runs before AI availability, validation, or provider work; the `401`/`403`/`503`/`422` and provider mappings above remain unchanged.
 
+### 4.1 Prompt data/instruction boundary
+
+Server and local vision prompts treat `global_context` and `specific_context` as
+untrusted data. Each value is enclosed in an explicit `<untrusted_context>`
+block, the trusted system message tells the model to ignore directives inside
+those blocks, and angle brackets in caller text are encoded so a value cannot
+close its own delimiter. The server text flow applies the same rule to
+`text_input` in an `<untrusted_input>` block. Image payloads, metadata schema,
+and response validation are unchanged.
+
+The canonical policy and its evaluation limits are documented in
+[the AI service architecture](../ai/01-ai-service-architecture.md#34-prompt-datainstruction-boundary)
+and [the AI testing strategy](../ai/02-testing-strategy.md). The boundary is
+defense-in-depth; it does not make an external model immune to prompt injection.
+
 ## 5. Frontend (`useAI.ts`)
 The `useAI` hook (replaces the old `useLMStudio`) implements the dual-mode strategy:
 1. On mount, checks `/api/ai/status`.
