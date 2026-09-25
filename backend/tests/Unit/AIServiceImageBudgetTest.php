@@ -11,9 +11,26 @@ use Tests\TestCase;
 
 class AIServiceImageBudgetTest extends TestCase
 {
+    /**
+     * Temporary-file namespace that is unique to this test process and method.
+     *
+     * AIService derives its temp prefix from `services.ai.temporary_prefix`, so
+     * the "no temporary file left behind" assertions below observe exactly the
+     * files this invocation can create. sys_get_temp_dir() is global to the
+     * host: a sibling paratest worker's in-flight file in the production
+     * namespace is otherwise indistinguishable from a leak of this test.
+     *
+     * The namespace is longer than the six random characters tempnam() appends
+     * to the default prefix, so the two namespaces are disjoint by structure
+     * and not merely by convention.
+     */
+    private string $temporaryPrefix;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->temporaryPrefix = 'ai_img_u'.bin2hex(random_bytes(8)).'_';
 
         config(['services.ai' => [
             'enabled' => true,
@@ -21,6 +38,7 @@ class AIServiceImageBudgetTest extends TestCase
             'base_url' => 'https://api.openai.com/v1',
             'api_key' => 'test-key',
             'model' => 'gpt-4o',
+            'temporary_prefix' => $this->temporaryPrefix,
         ]]);
     }
 
@@ -162,6 +180,59 @@ class AIServiceImageBudgetTest extends TestCase
         $this->assertStringNotContainsString('stream_copy_to_stream', $loadSource);
     }
 
+    public function test_a_concurrent_worker_temporary_file_cannot_be_mistaken_for_a_leak(): void
+    {
+        Http::fake();
+
+        // The service must really use the configured namespace; a hardcoded
+        // prefix would silently reintroduce the shared-namespace bug.
+        $this->assertSame(
+            $this->temporaryPrefix,
+            config('services.ai.temporary_prefix'),
+            'The test namespace must be the one the service resolves.'
+        );
+        $this->assertStringStartsWith(
+            AIService::DEFAULT_TEMPORARY_PREFIX,
+            $this->temporaryPrefix,
+            'The scoped namespace must stay inside the production file pattern.'
+        );
+
+        $before = $this->temporaryImageFiles();
+        $photo = $this->storePhoto(str_repeat('x', AIService::MAX_IMAGE_BYTES + 1));
+
+        // A sibling paratest worker creates its temporary file in the shared
+        // system temp directory *inside* this test's observation window. That is
+        // exactly the race that used to make the leak assertion fail.
+        $foreign = tempnam(sys_get_temp_dir(), AIService::DEFAULT_TEMPORARY_PREFIX);
+        $this->assertIsString($foreign);
+
+        try {
+            try {
+                app(AIService::class)->generateMetadata($photo);
+                $this->fail('Expected an oversized image to be rejected.');
+            } catch (AIImageProcessingException $exception) {
+                $this->assertSame(AIImageProcessingException::REASON_BYTES, $exception->reason);
+                $this->assertSame(AIService::IMAGE_TOO_LARGE_ERROR, $exception->getMessage());
+            }
+
+            Http::assertNothingSent();
+
+            // The leak assertion must stay blind to the foreign file...
+            $this->assertNoNewTemporaryFiles($before);
+            $this->assertNotContains($foreign, $this->temporaryImageFiles());
+
+            // ...while a global glob over the shared temp directory would have
+            // reported it. This is the assertion that regressed to red when the
+            // observation window was widened to the whole system temp dir.
+            $global = glob(sys_get_temp_dir().DIRECTORY_SEPARATOR.AIService::DEFAULT_TEMPORARY_PREFIX.'*');
+            $this->assertContains($foreign, $global === false ? [] : $global);
+        } finally {
+            if (is_string($foreign) && is_file($foreign)) {
+                @unlink($foreign);
+            }
+        }
+    }
+
     private function storePhoto(string $contents): Photo
     {
         $this->useTemporaryStorageDisk('photos');
@@ -175,11 +246,18 @@ class AIServiceImageBudgetTest extends TestCase
     }
 
     /**
+     * Snapshot of the temporary files this invocation's namespace can hold.
+     *
+     * Scoped to the pinned namespace on purpose: a global
+     * `glob(sys_get_temp_dir().'/ai_img_*')` also matches files that a
+     * concurrent worker is writing right now, which is what made these
+     * assertions fail intermittently under `--parallel`.
+     *
      * @return array<int, string>
      */
     private function temporaryImageFiles(): array
     {
-        $files = glob(sys_get_temp_dir().DIRECTORY_SEPARATOR.'ai_img_*');
+        $files = glob(sys_get_temp_dir().DIRECTORY_SEPARATOR.$this->temporaryPrefix.'*');
 
         return $files === false ? [] : $files;
     }
