@@ -5,9 +5,9 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { KanbanHelper } from '../helpers/KanbanHelper';
 
 test.describe('Bildbearbeitungs-Board (Photographer)', () => {
-    // Drag & Drop / Status-Select verändern das Board live; die Tests teilen sich
+    // Status-Select-Transitions verändern das Board live; die Tests teilen sich
     // dieselbe Spalte. `fullyParallel: true` (playwright.config) würde die Tests
-    // dieser Datei parallel ausführen -> Layout-Shift / verschobene Drop-Ziele.
+    // dieser Datei parallel ausführen -> konkurrierende Board-Mutationen.
     // Datei seriell ausführen (analog projects-board.spec.ts).
     test.describe.configure({ mode: 'serial' });
 
@@ -162,11 +162,10 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await expect(reloadedModal.locator('.form-control').filter({ hasText: 'Zuständig' }).locator('select')).toHaveValue('');
     });
 
-    test('Admin verschiebt einen Auftrag per Drag & Drop', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
+    test('Admin verschiebt einen Auftrag semantisch in die Bearbeitung-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
-        const title = `Drag Auftrag ${Math.random().toString(36).substring(2, 8)}`;
+        const title = `Status Auftrag ${Math.random().toString(36).substring(2, 8)}`;
 
         await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
@@ -174,13 +173,13 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.waitForCreate('/api/management/photo-jobs');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(title, 'Bearbeitung');
+        await kanban.selectCardStatus(title, 'Bearbeitung');
 
+        await kanban.expectColumn('Bearbeitung');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
     });
 
-    test('Admin verschiebt einen Auftrag in die Abgebrochen-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
+    test('Admin verschiebt einen Auftrag semantisch in die Abgebrochen-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
         const title = `Abbruch ${Math.random().toString(36).substring(2, 8)}`;
@@ -191,14 +190,13 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.waitForCreate('/api/management/photo-jobs');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(title, 'Abgebrochen');
+        await kanban.selectCardStatus(title, 'Abgebrochen');
 
         await kanban.expectColumn('Abgebrochen');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
     });
 
     test('Admin löscht einen abgebrochenen Auftrag', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
         const title = `Abbruch Del ${Math.random().toString(36).substring(2, 8)}`;
@@ -209,7 +207,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.waitForCreate('/api/management/photo-jobs');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(title, 'Abgebrochen');
+        await kanban.selectCardStatus(title, 'Abgebrochen');
 
         const card = page.locator('main').getByText(title, { exact: false }).first()
             .locator('xpath=ancestor::div[contains(@class,"card")][1]');
@@ -239,6 +237,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
 
         await kanban.selectCardStatus(title, 'Culling');
 
+        await kanban.expectColumn('Culling');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
     });
 });

@@ -155,6 +155,14 @@ enum PaymentStatus: string
 }
 ```
 
+### 4.1 Status-Validierung (Übergang, nicht Zustand)
+
+Die Enum-Listen sind die einzige Quelle der Wahrheit; `ModelStatusGuard::assertTransitionAllowed()` validiert **ausschließlich ein tatsächlich geschriebenes Attribut**:
+
+- Ein **unberührter** Status wird nie validiert. Eine Zeile mit einem Legacy-Wert (vor dem Enum geschrieben, per Import, direktes SQL) bleibt damit über Notes/Position/Uploads hinweg speicherbar, statt jeden Save mit `InvalidArgumentException` (HTTP 500) abzubrechen.
+- Ein **geschriebener** Wert außerhalb der Enum-Liste — inklusive `null` — bleibt verboten. Der Guard erzeugt also nie einen neuen ungültigen Zustand; er schützt nur den Übergang.
+- Erlaubnislisten: `Project::allowedStatuses()` / `allowedPaymentStatuses()` bzw. `PhotoJob::allowedStatuses()` (enum-abgeleitet). `orders.status` nutzt `Order::ALLOWED_STATUSES` (kein Enum, siehe [Galerie-/Core-Architektur](../gallery/01-core-architecture.md#7-status-column-guard-transition-only-validation)).
+
 ---
 
 ## 5. API-Vertrag (verbindlich — Backend & Frontend MÜSSEN alignen)
