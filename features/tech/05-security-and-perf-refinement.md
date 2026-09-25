@@ -15,6 +15,7 @@ status: active
 
 ## 3. Storage Lifecycle (Queue-Based)
 - **Lösch-Strategie:** Das Löschen großer Datenmengen (`destroyGallery`) erfolgt asynchron über die Queue. Jobs arbeiten in Batches von max. 100 Dateien, um die Systemlast (I/O) gering zu halten.
+- **Durable CRM cleanup:** Datei- und Scout-Cleanup wird erst nach erfolgreichem Commit dispatcht. Wenn der primäre Dispatch innerhalb einer Transaktion oder unmittelbar danach fehlschlägt, persistiert `DurableDispatchService` eine `CrmCleanupOutboxJob` in der bestehenden UUID-basierten `jobs`-Tabelle. Der Job führt Dateilöschung und Scout-Synchronisierung idempotent aus, verwendet fünf Gesamtversuche mit Backoff `[30, 60, 120, 300, 600]` und landet bei terminalem Fehler sichtbar in `failed_jobs` mit Wrapper- und Underlying-Auditereignissen. Die Zustellung ist at-least-once; der Cleanup muss daher mehrfach ausführbar sein. Ein Fehler beim Schreiben der Fallback-Zeile ist ein kritischer, betrieblich zu alarmierender Zustand.
 
 ## 4. Deployment & Admin Security
 - **Admin Provisionierung:** `admin:update` läuft im fail-closed Backend-Start nach den Credential-/Pfad-Guards und nach `migrate`/`db:seed`; ein Fehler stoppt den Start vor Queue, Scheduler und PHP-FPM. Es verwendet `ADMIN_EMAIL`/`ADMIN_PASSWORD` ohne Runtime-Fallback.

@@ -44,6 +44,7 @@ status: active
   untagged tests; untagged legacy tests remain part of the full suite only.
 - **Trace Viewer & Debugging:** CI never records or uploads Playwright traces, reports, screenshots, videos, or `test-results`, because browser storage and request data can contain credentials or PII. For local debugging, opt in with `PW_TRACE=1` and inspect the trace/report only on the local machine (`npx playwright show-report`).
 - **Test Parallelism & Isolation (CRITICAL):** The default local E2E setup is the isolated backend from `scripts/e2e-up.sh` with `backend/database/database.e2e.sqlite`; CI uses its own test services and database. Tests MUST be isolated and non-destructive and must never be pointed at the developer's working database.
+  - **Bounded Meilisearch readiness (CR-TEST-012):** The local Compose harness and every CI job with live Scout access (backend PHPUnit and E2E) MUST invoke `scripts/wait-for-meilisearch.sh` before Scout operations. The helper validates positive bounded intervals (total wait at most 300 seconds, retry interval at most 30 seconds, and each HTTP request at most 30 seconds), caps the request and sleep to the remaining wall-clock deadline, and fails setup when the health endpoint does not become available. The E2E job uses the service DNS endpoint `http://meilisearch:7700/health`; the host-networked backend and local Compose harness use `http://127.0.0.1:7701/health`, and the local harness prints Compose diagnostics after a bounded failure.
   - Never share or hardcode specific user emails, gallery names, or order IDs.
   - Always use highly dynamic identifiers (e.g., `Math.random().toString(36)`).
   - Cross-contamination between parallel tests will cause flaky CI pipelines and false positives.
@@ -54,8 +55,18 @@ status: active
 - **Negative Testing (IDOR):** Jeder Endpunkt, der auf eine spezifische Ressource zugreift (Galerie, Foto, Download), MUSS explizit mit einem unberechtigten Nutzer getestet werden (Insecure Direct Object Reference Protection). Es muss zwingend ein 403 (Forbidden) oder 404 (Not Found) Statuscode erwartet werden.
 - **API Resources (Leak Prevention):** In PHPUnit, do not just check HTTP status codes. Always assert the JSON response structure (`assertJsonStructure` or `assertJsonMissing`) to ensure no unintended fields (e.g., `password_hash`) are leaked.
 - **Email & Link Integrity:**
-  - Mocking emails is forbidden. Tests must query the local Mailpit API.
-  - Tests MUST parse the HTML body of the email, extract generated action links (e.g., Magic Links), and confirm that navigating to these links resolves successfully (HTTP 200).
+  - Deterministic queue/mail fault-injection tests MAY use `Mail::fake()` or a
+    narrowly scoped mail-factory double to assert enqueue counts, transaction
+    rollback, duplicate-claim suppression, and retry behavior. These tests do
+    not prove SMTP delivery and must not be described as delivery evidence.
+  - Delivery/integration evidence MUST use the real local Mailpit API. The
+    required PHPUnit coverage includes at least one checkout/invoice path that
+    reaches Mailpit and a link/HTML assertion where applicable. Mailpit is an
+    environment dependency; if unavailable, report the exact connection limit
+    and keep the deterministic fault-injection tests as the code-level proof.
+  - Tests MUST parse the HTML body of the email, extract generated action links
+    (e.g., Magic Links), and confirm that navigating to these links resolves
+    successfully (HTTP 200).
 
 ## 4. Resource Tracking & Isolation (CRITICAL)
 - **No Global Cleanups:** Never use global admin scripts to wipe all E2E data. This breaks parallelism.

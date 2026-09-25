@@ -152,6 +152,7 @@ def main() -> int:
     require(api, "function Api.refreshSession", "session renewal")
     require(api, "function Api.callWithSession", "non-upload session wrapper")
     require(api, "function Api.uploadWithSession", "upload session wrapper")
+    require(api, 'string.gmatch(cookieValue .. ";"', "Lua 5.1 cookie fallback")
 
     json_source = (PLUGIN_DIR / "json.lua").read_text(encoding="utf-8")
     require(json_source, "json.null = {}", "explicit JSON null sentinel")
@@ -188,6 +189,10 @@ def main() -> int:
     assert "uploadWithSession" in api_regression
     assert "terminalRefreshes" in api_regression
     assert "cookie-token" in api_regression
+    require(api_regression, "_G.LrTasks = { pcall = pcall", "LrTasks.pcall mock")
+    require(api_regression, 'name = "lr_uuid"', "upload identity fixture")
+    require(api_regression, "non-idempotent POST was replayed", "POST replay guard")
+    require(api_regression, "upload without UUID identity was replayed", "upload replay guard")
     manager_regression = (PLUGIN_DIR / "tests" / "manager_upload_regression.lua").read_text(encoding="utf-8")
     require(manager_regression, 'readFile("ManagerCore.lua")', "ManagerCore mock loader")
     require(manager_regression, 'ManagerCore("delivery"', "ManagerCore mock execution")

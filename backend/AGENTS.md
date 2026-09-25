@@ -23,7 +23,7 @@ Nach `php artisan migrate:fresh` MUSS `php artisan db:seed` (oder `--seed` Flag)
 
 **E2E Location Fixtures:** `DatabaseSeeder` remains network-free and does not load E2E locations. Fresh E2E databases use the explicit `E2ELocationSeeder` plus the Scout location-index commands from `scripts/e2e-up.sh` or `.github/workflows/ci.yml`. Never call `app:import-locations` from the standard seed or production startup; production keeps its weekly, locked scheduler.
 
-**Migration Policy (CRITICAL):** Bei jeder Migration muss der Agent vorher nachfragen, ob die Änderung als **neue, separate Migration** oder als **Erweiterung der aktuell letzten Migration** erfolgen soll. **V038 ist die aktuelle Repository-Frontier; V037 ist die vorhergehende Guest-Ownership-Migration, V036 bleibt der Card-Testing-Migrationsstand, und V035 ist laut aktuellem Deployment-Status die zuletzt deployte Migration.** Neue Schema-Änderungen erfolgen als separate Migrationen ab V039. **`down()`-Methoden werden nie ausgeführt und können als Regel leer gelassen werden** (etabliert 2026-08-03).
+**Migration Policy (CRITICAL):** V035 ist die zuletzt deployte Migration und bleibt unverändert. V036–V038 sind die aktuelle nicht-produktive Repository-Frontier und dürfen fachlich passend konsolidiert werden, wenn die bestehende Struktur dadurch sicher verbessert wird. Eine neue V039+-Migration ist nur zulässig, wenn die Anforderung mit bestehenden Tabellen, Indizes und Job-Verträgen nicht sicher erfüllbar ist; vorab ist die konkrete Schema-/Backfill-/Rollback-Entscheidung zu dokumentieren. **`down()`-Methoden werden nie ausgeführt und können als Regel leer gelassen werden** (etabliert 2026-08-03).
 
 ## Backend Parallel Testing (PHP) — SQLite `:memory:` (2026-08-07)
 

@@ -40,7 +40,13 @@ aktuellen Commits werden weiterhin im Job installiert.
      `php artisan db:seed --class=E2ELocationSeeder --force` →
      `scout:flush`/`scout:sync-index-settings`/`scout:import` für `Location` →
      `php artisan serve --host=127.0.0.1 --port=8000 --no-reload`.
-     Die Location-Fixture ist versioniert, netzwerkfrei und ein expliziter
+     Direkt nach dem Checkout wartet der Job mit
+     `scripts/wait-for-meilisearch.sh` gegen
+     `http://meilisearch:7700/health` auf den Service; der Check ist auf 60
+     Sekunden begrenzt und liegt vor jeder Scout-Indexmutation. Dasselbe
+     gemeinsame, begrenzte Script verwendet `scripts/e2e-up.sh` für den lokalen
+     Compose-Service auf Port 7701. Die Location-Fixture ist versioniert,
+     netzwerkfrei und ein expliziter
      Test-Setup-Schritt; `DatabaseSeeder` und der Produktionsstart importieren
      keine GeoNames-Daten. Der wöchentliche, gelockte Produktionsimport bleibt
      davon unabhängig.
@@ -48,6 +54,10 @@ aktuellen Commits werden weiterhin im Job installiert.
      Service-Namen erreicht (`mariadb`, `meilisearch`, `mailpit`); die
      `.env`-Overrides werden nur im E2E-Job vorgenommen. `backend/.env.ci`
      bleibt für den separaten Backend-/PHPUnit-Job unverändert.
+   - Auch der Backend-/PHPUnit-Job ruft nach dem Checkout dasselbe
+     `scripts/wait-for-meilisearch.sh` gegen den auf Port 7701 geöffneten
+     Service auf. Dadurch beginnen die Live-Scout-Tests nicht vor verfügbarer
+     Search-Engine und nutzen denselben begrenzten 60-Sekunden-Contract.
    - `MAILPIT_API_URL=http://mailpit:8025/api/v1` wird als Job-Env gesetzt;
      lokale E2E-Läufe verwenden den Default `localhost:8025` aus
      `scripts/e2e-up.sh`.
@@ -83,7 +93,10 @@ ebenfalls isoliert. Das ist eine Testplanungs-Ausnahme, keine Erlaubnis für
 gemeinsame Fixtures.
 
 Die früheren Zeit- und Shard-Messungen sind historisch und keine aktuelle
-Garantie. Der Playwright-Global-Budget beträgt weiterhin 15 Minuten; nach einer Matrix-
+Garantie. Der Playwright-Global-Budget beträgt 25 Minuten (`1500000` ms). Im
+abgeschlossenen CI-Run `36035927250` brauchte der langsamste parallele Shard
+17m09s und erreichte damit den bisherigen 900000-ms-Cap; 26 Tests blieben
+nicht ausgeführt. Der 25-Minuten-Budget lässt damit rund 7m51s Puffer. Nach einer Matrix-
 Änderung müssen die tatsächlichen Entry-Dauern gemessen und Matrix, Image-Doku
 und E2E-Strategie gemeinsam aktualisiert werden.
 

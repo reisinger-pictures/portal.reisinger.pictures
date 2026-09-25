@@ -2,9 +2,10 @@ name: CI
 
 # Push auf ALLE Branches (inkl. Dependabot-Branches wie
 # dependabot/npm_and_yarn/frontend/...): Dependabot-ausgelöste pull_request-Runs
-# erhalten KEINE Secrets und nur read-only GITHUB_TOKEN (werden wie Fork-PRs
-# behandelt). Da E2E Stripe-Test-Keys braucht, läuft die komplette CI-Logik über
-# `push`, damit Secrets verfügbar sind. `pull_request` deckt normale PRs ab.
+# erhalten KEINE Secrets und nur read-only GITHUB_TOKEN. Deren secret-dependent
+# E2E-/Aggregate-Gate wird deshalb explizit übersprungen; der Push-Lauf auf
+# demselben Head-SHA bleibt der autoritative Gate. `pull_request` deckt
+# normale Same-Repo-PRs weiterhin fail-closed ab.
 on:
   push:
   pull_request:
@@ -56,6 +57,16 @@ jobs:
           - 8025:8025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Wait for Meilisearch
+        # PHPUnit includes live Scout coverage. A started service container is
+        # not necessarily ready to accept the first index request.
+        working-directory: ${{ github.workspace }}
+        env:
+          MEILISEARCH_HEALTH_URL: http://127.0.0.1:7701/health
+          MEILISEARCH_READY_TIMEOUT_SECONDS: "60"
+          MEILISEARCH_REQUEST_TIMEOUT_SECONDS: "2"
+          MEILISEARCH_READY_POLL_SECONDS: "1"
+        run: bash scripts/wait-for-meilisearch.sh
       # PHP-Tests laufen im digest-gepinnten Prod-Image portal-base (PHP 8.5 +
       # exiftool + alle App-Extensions) - identisch zur Prod-Runtime. Composer
       # kommt wie in Prod aus einem digest-gepinnten offiziellen Image. Die
@@ -163,6 +174,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint
         run: pnpm lint
+      - name: Lint E2E
+        run: pnpm lint:e2e
+      - name: Type-check E2E-inclusive test sources
+        run: pnpm exec tsc -p tsconfig.tests.json --noEmit --pretty false
       # prebuild (tsc -b + check-i18n) läuft automatisch vor `pnpm build`
       - name: Build
         run: pnpm build
@@ -194,12 +209,13 @@ jobs:
     # ausgewählten Specs werden im Serial-Shard isoliert.
     name: E2E (Playwright) — ${{ matrix.name }}
     # Job-level `if` darf KEINEN secrets-Context lesen (offizielle Context
-    # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Secrets
-    # existieren nur bei push (inkl. dependabot-Branches) und bei PRs aus dem
-    # eigenen Repo (fork == false). Fork-PRs werden übersprungen - dort sind
-    # Secrets ohnehin nie verfügbar. Das tatsächliche Fehlen der Secrets wird
-    # im ersten Step geprüft (dort ist der secrets-Context erlaubt).
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
+    # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Push runs
+    # (including Dependabot branches) are authoritative. Dependabot's
+    # pull_request event is intentionally skipped because its secret-dependent
+    # E2E environment is unavailable; its push run remains the sole E2E gate.
+    # Fork PRs are also skipped, while normal same-repository PRs stay enabled.
+    # The actual missing-secret check remains in the first step below.
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false)
     runs-on: ubuntu-latest
     # Gesamter E2E-Job laeuft im Test-Image portal-e2e (portal-base + Node/
     # pnpm/Composer + Playwright-Chromium vorinstalliert) -> kein Browser-
@@ -218,8 +234,9 @@ jobs:
           # Board-/Settings-Suites. Die gewählten Worker-Zahlen und der
           # 2/3-Eintrag sind eine
           # Abbauentscheidung für die aktuelle Suite; historische Timing-Werte
-          # sind keine Garantie. Die 120s/Test- und 900s/Global-Budgets
-          # bleiben unverändert, damit echte Hänger weiterhin fehlschlagen.
+          # sind keine Garantie. Die 120s/Test- und 1500s/Global-Budgets
+          # bleiben getrennte, begrenzte Limits, damit echte Hänger weiterhin
+          # fehlschlagen.
           # Playwright shardet nach Datei-Reihenfolge, nicht Laufzeit -> nach
           # einem Lauf die Entry-Dauern messen und nur bei aktuellem Bedarf
           # anhand stabiler Gruppen nachbalancieren.
@@ -284,6 +301,16 @@ jobs:
           - 1025:1025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Wait for Meilisearch
+        # GitHub service containers are started before the job, but their
+        # readiness is not guaranteed. Keep Scout setup behind the same bounded
+        # health contract as the local Compose harness.
+        env:
+          MEILISEARCH_HEALTH_URL: http://meilisearch:7700/health
+          MEILISEARCH_READY_TIMEOUT_SECONDS: "60"
+          MEILISEARCH_REQUEST_TIMEOUT_SECONDS: "2"
+          MEILISEARCH_READY_POLL_SECONDS: "1"
+        run: bash scripts/wait-for-meilisearch.sh
       - name: Ensure Stripe test keys are configured
         env:
           STRIPE_SECRET_SET: ${{ secrets.STRIPE_SECRET != '' }}
@@ -480,3 +507,33 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       # SECURITY: No Playwright artifacts are uploaded. Reports and test-results
       # can contain browser storage, cookies, screenshots, or request data.
+
+  ci-gate:
+    # The event suffix is part of the check-run identity. Dependabot creates
+    # both a push run and a pull_request run for the same head SHA; distinct
+    # names keep the PR aggregate usable without making the push aggregate
+    # wait on (or be poisoned by) the PR-side jobs.
+    name: CI gate (${{ github.event_name }})
+    # Keep the fail-closed always() gate for push and normal PRs. The
+    # Dependabot pull_request aggregate is intentionally skipped together with
+    # its secret-dependent E2E job; the push aggregate is authoritative.
+    if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]')) }}
+    needs:
+      - security-contract
+      - backend
+      - frontend
+      - e2e
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI dependency to succeed
+        env:
+          SECURITY_CONTRACT_RESULT: ${{ needs.security-contract.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          set -euo pipefail
+          [[ "$SECURITY_CONTRACT_RESULT" == "success" ]]
+          [[ "$BACKEND_RESULT" == "success" ]]
+          [[ "$FRONTEND_RESULT" == "success" ]]
+          [[ "$E2E_RESULT" == "success" ]]

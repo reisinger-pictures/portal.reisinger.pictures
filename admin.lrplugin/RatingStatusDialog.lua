@@ -12,7 +12,8 @@ return function(galleryId, galleryName, jwt, onSyncComplete, requestApi)
         local props = LrBinding.makePropertyTable(context)
         local function apiRequest(endpoint, method, payload)
             if requestApi then return requestApi(endpoint, method, payload) end
-            return Api.call(endpoint, method, payload, jwt)
+            local data, status, _, _, errorDetail = Api.call(endpoint, method, payload, jwt)
+            return data, status, errorDetail
         end
 
         props.loading = true
@@ -55,32 +56,47 @@ return function(galleryId, galleryName, jwt, onSyncComplete, requestApi)
         -- Runs inside an async task: LrHttp must never be called while the
         -- dialog is being constructed, or Lightroom freezes.
         local function loadData()
-            local dataExport, statusExport = apiRequest("/api/management/galleries/" .. galleryId .. "/export", "GET", nil)
-            local dataStatus, statusStatus = apiRequest("/api/management/galleries/" .. galleryId .. "/rating-status", "GET", nil)
-
-            if statusExport == 200 and statusStatus == 200 and dataExport and dataStatus then
-                props.ratings = dataExport
-                props.users = dataStatus.users or {}
-                props.totalPhotos = dataStatus.total_photos or 0
-                props.syncEnabled = (#props.ratings > 0)
-                props.usersText = (#props.users > 0) and buildUserLines(props.users, props.totalPhotos) or "Keine Personen mit Bewertungen."
-                props.ratingsText = (#props.ratings > 0) and buildRatingLines(props.ratings) or "Noch keine Bewertungen vorhanden."
-                props.error = false
-                props.contentVisible = true
-            else
-                props.errorText = "Fehler beim Laden der Bewertungen (HTTP " .. tostring(statusExport) .. "/" .. tostring(statusStatus) .. ")."
+            local dataExport, statusExport, detailExport = apiRequest("/api/management/galleries/" .. galleryId .. "/export", "GET", nil)
+            if statusExport ~= 200 or type(dataExport) ~= "table" then
+                props.errorText = "Fehler beim Laden der Bewertungen (HTTP " .. tostring(statusExport) .. ")."
+                if detailExport and detailExport ~= "" then props.errorText = props.errorText .. "\n" .. tostring(detailExport) end
                 props.error = true
                 props.contentVisible = false
+                props.loading = false
+                props.loaded = true
+                return
             end
+
+            local dataStatus, statusStatus, detailStatus = apiRequest("/api/management/galleries/" .. galleryId .. "/rating-status", "GET", nil)
+            if statusStatus ~= 200 or type(dataStatus) ~= "table" then
+                props.errorText = "Fehler beim Laden der Bewertungsübersicht (HTTP " .. tostring(statusStatus) .. ")."
+                if detailStatus and detailStatus ~= "" then props.errorText = props.errorText .. "\n" .. tostring(detailStatus) end
+                props.error = true
+                props.contentVisible = false
+                props.loading = false
+                props.loaded = true
+                return
+            end
+
+            props.ratings = dataExport
+            props.users = type(dataStatus.users) == "table" and dataStatus.users or {}
+            props.totalPhotos = tonumber(dataStatus.total_photos) or 0
+            props.syncEnabled = (#props.ratings > 0)
+            props.usersText = (#props.users > 0) and buildUserLines(props.users, props.totalPhotos) or "Keine Personen mit Bewertungen."
+            props.ratingsText = (#props.ratings > 0) and buildRatingLines(props.ratings) or "Noch keine Bewertungen vorhanden."
+            props.error = false
+            props.contentVisible = true
             props.loading = false
             props.loaded = true
         end
 
         local function runSync()
             local catalog = LrApplication.activeCatalog()
-            local resData, stat = apiRequest("/api/management/galleries/" .. galleryId .. "/export", "GET", nil)
-            if stat ~= 200 or not resData then
-                LrDialogs.message(Api.getTitle("Fehler"), "Bewertungen konnten nicht geladen werden.", "critical")
+            local resData, stat, detail = apiRequest("/api/management/galleries/" .. galleryId .. "/export", "GET", nil)
+            if stat ~= 200 or type(resData) ~= "table" then
+                local message = "Bewertungen konnten nicht geladen werden (HTTP " .. tostring(stat) .. ")."
+                if detail and detail ~= "" then message = message .. "\n" .. tostring(detail) end
+                LrDialogs.message(Api.getTitle("Fehler"), message, "critical")
                 return
             end
 

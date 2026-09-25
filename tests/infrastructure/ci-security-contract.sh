@@ -13,6 +13,8 @@ DOCKERFILE="$ROOT_DIR/deployment/Dockerfile"
 E2E_DOCKERFILE="$ROOT_DIR/deployment/Dockerfile.e2e"
 COMPOSE_FILE="$ROOT_DIR/deployment/docker-compose.yml"
 PACKAGE_JSON="$ROOT_DIR/frontend/package.json"
+WAIT_FOR_MEILISEARCH="$ROOT_DIR/scripts/wait-for-meilisearch.sh"
+E2E_UP_SCRIPT="$ROOT_DIR/scripts/e2e-up.sh"
 ENCRYPTED_ENV_REL="backend/.env.encrypted"
 ENCRYPTED_ENV="$ROOT_DIR/$ENCRYPTED_ENV_REL"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/portal-ci-security-contract.XXXXXX")"
@@ -46,6 +48,14 @@ assert_not_contains() {
     fi
 }
 
+assert_contains_text() {
+    local text="$1"
+    local expected="$2"
+    local description="$3"
+
+    grep -Fq -- "$expected" <<<"$text" || fail "$description"
+}
+
 require_file "$AUTOMERGE_WORKFLOW"
 require_file "$CI_WORKFLOW"
 require_file "$PLAYWRIGHT_CONFIG"
@@ -53,6 +63,8 @@ require_file "$DOCKERFILE"
 require_file "$E2E_DOCKERFILE"
 require_file "$COMPOSE_FILE"
 require_file "$PACKAGE_JSON"
+require_file "$WAIT_FOR_MEILISEARCH"
+require_file "$E2E_UP_SCRIPT"
 
 mapfile -t workflow_files < <(
     find "$WORKFLOW_DIR" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sort
@@ -124,14 +136,179 @@ wait_gate="$(
         in_gate && /- name: Checkout main/ { exit }
     ' "$AUTOMERGE_WORKFLOW"
 )"
-ci_check_regexp='^(CI security contract|Backend \(PHPUnit\)|Frontend \(Lint, Build, Vitest\)|E2E \(Playwright\) — (Desktop \([1-3]/3\)|Mobile \([1-3]/3\)|serial \(isolated suites\)))$'
-if ! grep -Fq -- "          check-regexp: '${ci_check_regexp}'" <<<"$wait_gate"; then
-    fail 'automerge must filter the known repository CI check names'
+if ! grep -Fq -- "          check-name: 'CI gate (push)'" <<<"$wait_gate"; then
+    fail 'automerge must wait for the exact push aggregate CI check'
+fi
+if grep -Fq -- "          check-name: 'CI gate'" <<<"$wait_gate"; then
+    fail 'automerge must not use the ambiguous aggregate check name'
+fi
+if ! grep -Fq -- '          checks-discovery-timeout: 2100' <<<"$wait_gate"; then
+    fail 'automerge check discovery must allow the 25-minute CI budget plus headroom'
+fi
+if grep -Eq '^[[:space:]]*check-regexp:' <<<"$wait_gate"; then
+    fail 'automerge must not use a subset regex for the CI gate'
+fi
+if grep -Eq '^[[:space:]]*timeout:' <<<"$wait_gate"; then
+    fail 'wait-on-check must not rely on an unsupported generic timeout input'
 fi
 if grep -Eq '^[[:space:]]*fail-on-no-checks:[[:space:]]*true' <<<"$wait_gate" \
-    && ! grep -Eq '^[[:space:]]*check-(name|regexp):[[:space:]]*.+' <<<"$wait_gate"; then
-    fail 'fail-on-no-checks is ineffective without check-name or check-regexp'
+    && ! grep -Eq '^[[:space:]]*check-name:[[:space:]]*.+' <<<"$wait_gate"; then
+    fail 'fail-on-no-checks is ineffective without the exact check-name filter'
 fi
+
+# checks-discovery-timeout is only a discovery bound. The automerge job also
+# needs a hard total bound: 25m CI + 35m discovery + 5m checkout/merge buffer.
+automerge_job="$(
+    awk '
+        /^  automerge:[[:space:]]*$/ { in_job = 1 }
+        in_job && /^  [[:alnum:]_-]+:[[:space:]]*$/ && $0 !~ /^  automerge:/ { exit }
+        in_job { print }
+    ' "$AUTOMERGE_WORKFLOW"
+)"
+[[ -n "$automerge_job" ]] || fail 'automerge must define a total job timeout'
+automerge_timeout_minutes="$(
+    awk '/^[[:space:]]+timeout-minutes:[[:space:]]*[0-9]+[[:space:]]*$/ { print $2; exit }' <<<"$automerge_job"
+)"
+[[ "$automerge_timeout_minutes" =~ ^[0-9]+$ ]] || fail 'automerge timeout-minutes must be a positive integer'
+if (( automerge_timeout_minutes < 65 )); then
+    fail 'automerge total timeout must cover 25m CI + 35m discovery + 5m merge buffer'
+fi
+if grep -Eq '^[[:space:]]+timeout:' <<<"$automerge_job"; then
+    fail 'automerge must use job-level timeout-minutes, not an unsupported step timeout input'
+fi
+
+frontend_ci_job="$(
+    awk '
+        /^  frontend:[[:space:]]*$/ { in_job = 1 }
+        in_job && /^  [[:alnum:]_-]+:[[:space:]]*$/ && $0 !~ /^  frontend:/ { exit }
+        in_job { print }
+    ' "$CI_WORKFLOW"
+)"
+[[ -n "$frontend_ci_job" ]] || fail 'CI must define the frontend job'
+assert_contains_text "$frontend_ci_job" '        run: pnpm lint:e2e' \
+    'frontend CI must lint the Playwright E2E sources'
+assert_contains_text "$frontend_ci_job" \
+    '        run: pnpm exec tsc -p tsconfig.tests.json --noEmit --pretty false' \
+    'frontend CI must type-check the E2E-inclusive test sources'
+
+e2e_ci_job="$(
+    awk '
+        /^  e2e:[[:space:]]*$/ { in_job = 1 }
+        in_job && /^  [[:alnum:]_-]+:[[:space:]]*$/ && $0 !~ /^  e2e:/ { exit }
+        in_job { print }
+    ' "$CI_WORKFLOW"
+)"
+[[ -n "$e2e_ci_job" ]] || fail 'CI must define the E2E job'
+assert_contains_text "$e2e_ci_job" \
+    "    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false)" \
+    'E2E must run on push and normal same-repository PRs, but skip Dependabot PR-side secret-dependent runs'
+if grep -Fq 'github.event.pull_request.head.repo.fork == false' <<<"$e2e_ci_job" \
+    && ! grep -Fq "github.actor != 'dependabot[bot]'" <<<"$e2e_ci_job"; then
+    fail 'E2E condition must distinguish Dependabot PRs from normal same-repository PRs'
+fi
+
+# Meilisearch readiness is deliberately bounded at every call site. The helper
+# owns the maximums; CI and the local E2E harness pass the documented 60/2/1
+# total/request/poll-second contract rather than relying on an unbounded wait.
+if [[ "$(grep -Fc -- 'run: bash scripts/wait-for-meilisearch.sh' "$CI_WORKFLOW" || true)" -ne 2 ]]; then
+    fail 'backend PHPUnit and E2E CI must each invoke the bounded Meilisearch wait'
+fi
+for ci_meili_timeout in \
+    'MEILISEARCH_READY_TIMEOUT_SECONDS: "60"' \
+    'MEILISEARCH_REQUEST_TIMEOUT_SECONDS: "2"' \
+    'MEILISEARCH_READY_POLL_SECONDS: "1"'; do
+    if [[ "$(grep -Fc -- "$ci_meili_timeout" "$CI_WORKFLOW" || true)" -ne 2 ]]; then
+        fail "both CI Meilisearch wait call sites must set $ci_meili_timeout"
+    fi
+done
+assert_contains "$CI_WORKFLOW" '          MEILISEARCH_HEALTH_URL: http://127.0.0.1:7701/health' \
+    'backend CI Meilisearch wait must use the host-network health endpoint'
+assert_contains "$CI_WORKFLOW" '          MEILISEARCH_HEALTH_URL: http://meilisearch:7700/health' \
+    'E2E CI Meilisearch wait must use the service health endpoint'
+
+assert_contains "$WAIT_FOR_MEILISEARCH" 'readonly MAX_TIMEOUT_SECONDS=300' \
+    'Meilisearch total wait must remain bounded to 300 seconds'
+assert_contains "$WAIT_FOR_MEILISEARCH" 'readonly MAX_POLL_SECONDS=30' \
+    'Meilisearch retry interval must remain bounded to 30 seconds'
+assert_contains "$WAIT_FOR_MEILISEARCH" 'readonly MAX_REQUEST_TIMEOUT_SECONDS=30' \
+    'Meilisearch request timeout must remain bounded to 30 seconds'
+assert_contains "$WAIT_FOR_MEILISEARCH" \
+    'validate_positive_integer MEILISEARCH_READY_TIMEOUT_SECONDS "$timeout_seconds" "$MAX_TIMEOUT_SECONDS"' \
+    'Meilisearch total timeout must be validated against its bound'
+assert_contains "$WAIT_FOR_MEILISEARCH" \
+    'validate_positive_integer MEILISEARCH_READY_POLL_SECONDS "$poll_seconds" "$MAX_POLL_SECONDS"' \
+    'Meilisearch retry interval must be validated against its bound'
+assert_contains "$WAIT_FOR_MEILISEARCH" \
+    'validate_positive_integer MEILISEARCH_REQUEST_TIMEOUT_SECONDS "$request_timeout_seconds" "$MAX_REQUEST_TIMEOUT_SECONDS"' \
+    'Meilisearch request timeout must be validated against its bound'
+
+assert_contains "$E2E_UP_SCRIPT" \
+    'readonly E2E_MEILISEARCH_READY_TIMEOUT_SECONDS="${E2E_MEILISEARCH_READY_TIMEOUT_SECONDS:-60}"' \
+    'local E2E harness must default to a 60-second Meilisearch wait'
+assert_contains "$E2E_UP_SCRIPT" \
+    'readonly E2E_MEILISEARCH_REQUEST_TIMEOUT_SECONDS="${E2E_MEILISEARCH_REQUEST_TIMEOUT_SECONDS:-2}"' \
+    'local E2E harness must default to a 2-second Meilisearch request timeout'
+assert_contains "$E2E_UP_SCRIPT" \
+    'readonly E2E_MEILISEARCH_READY_POLL_SECONDS="${E2E_MEILISEARCH_READY_POLL_SECONDS:-1}"' \
+    'local E2E harness must default to a 1-second Meilisearch poll interval'
+assert_contains "$E2E_UP_SCRIPT" \
+    '    MEILISEARCH_READY_TIMEOUT_SECONDS="$E2E_MEILISEARCH_READY_TIMEOUT_SECONDS" \' \
+    'local E2E harness must pass its bounded total Meilisearch timeout'
+assert_contains "$E2E_UP_SCRIPT" \
+    '    MEILISEARCH_REQUEST_TIMEOUT_SECONDS="$E2E_MEILISEARCH_REQUEST_TIMEOUT_SECONDS" \' \
+    'local E2E harness must pass its bounded Meilisearch request timeout'
+assert_contains "$E2E_UP_SCRIPT" \
+    '    MEILISEARCH_READY_POLL_SECONDS="$E2E_MEILISEARCH_READY_POLL_SECONDS" \' \
+    'local E2E harness must pass its bounded Meilisearch poll interval'
+assert_contains "$E2E_UP_SCRIPT" \
+    '    bash "$ROOT/scripts/wait-for-meilisearch.sh"; then' \
+    'local E2E harness must invoke the bounded Meilisearch wait helper'
+
+ci_gate_job="$(
+    awk '
+        /^  ci-gate:[[:space:]]*$/ { in_gate = 1 }
+        in_gate && /^  [[:alnum:]_-]+:[[:space:]]*$/ && $0 !~ /^  ci-gate:/ { exit }
+        in_gate { print }
+    ' "$CI_WORKFLOW"
+)"
+[[ -n "$ci_gate_job" ]] || fail 'CI must define the required ci-gate job'
+assert_contains_text "$ci_gate_job" '    name: CI gate (${{ github.event_name }})' \
+    'CI gate must expose distinct push and pull_request aggregate names'
+assert_contains_text "$ci_gate_job" \
+    "    if: \${{ always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]')) }}" \
+    'CI gate must stay fail-closed for push/normal PRs and skip only Dependabot PR-side runs'
+assert_contains_text "$ci_gate_job" '    needs:' \
+    'CI gate must retain its dependency aggregate'
+assert_contains "$CI_WORKFLOW" '  push:' 'CI must retain the push aggregate used by Dependabot automerge'
+assert_contains "$CI_WORKFLOW" '  pull_request:' 'CI must retain the normal pull-request aggregate'
+ci_gate_needs="$(
+    awk '
+        /^[[:space:]]+needs:[[:space:]]*$/ { in_needs = 1; next }
+        in_needs && /^[[:space:]]*-[[:space:]]+/ { print; next }
+        in_needs { exit }
+    ' <<<"$ci_gate_job"
+)"
+for required_job in security-contract backend frontend e2e; do
+    if ! grep -Eq "^[[:space:]]*-[[:space:]]+${required_job}[[:space:]]*$" <<<"$ci_gate_needs"; then
+        fail "CI gate must need $required_job"
+    fi
+done
+for result_mapping in \
+    'SECURITY_CONTRACT_RESULT: ${{ needs.security-contract.result }}' \
+    'BACKEND_RESULT: ${{ needs.backend.result }}' \
+    'FRONTEND_RESULT: ${{ needs.frontend.result }}' \
+    'E2E_RESULT: ${{ needs.e2e.result }}'; do
+    assert_contains_text "$ci_gate_job" "          $result_mapping" \
+        "CI gate must expose the required result for ${result_mapping%%:*}"
+done
+for result_assertion in \
+    '[[ "$SECURITY_CONTRACT_RESULT" == "success" ]]' \
+    '[[ "$BACKEND_RESULT" == "success" ]]' \
+    '[[ "$FRONTEND_RESULT" == "success" ]]' \
+    '[[ "$E2E_RESULT" == "success" ]]'; do
+    assert_contains_text "$ci_gate_job" "          $result_assertion" \
+        'CI gate must fail unless every required job result is success'
+done
 
 automerge_script="$(
     awk '
@@ -200,6 +377,10 @@ fi
 
 assert_contains "$PLAYWRIGHT_CONFIG" "const isCi = process.env.CI === 'true' || process.env.CI === '1';" \
     'Playwright config must detect GitHub CI explicitly'
+assert_contains "$PLAYWRIGHT_CONFIG" '    timeout: 120000,' \
+    'Playwright per-test budget must remain bounded at 120 seconds'
+assert_contains "$PLAYWRIGHT_CONFIG" '    globalTimeout: 1500000,' \
+    'Playwright CI whole-run budget must remain bounded at 25 minutes'
 assert_contains "$PLAYWRIGHT_CONFIG" "reporter: isCi ? [['list']] : [['html', {open: 'never'}]]," \
     'Playwright must select only the list reporter in CI'
 assert_contains "$PLAYWRIGHT_CONFIG" "outputDir: isCi ? '/tmp/portal-playwright-results' : 'test-results'," \

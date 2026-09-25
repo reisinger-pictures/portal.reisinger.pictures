@@ -50,8 +50,16 @@ return function(mode, baseUrl)
         local prefs = import 'LrPrefs'.prefsForPlugin()
         -- Move any plaintext password from an older plugin version into the
         -- OS-protected credential store, then try a silent login with the
-        -- saved credentials.
-        Api.migrateLegacyPassword()
+        -- saved credentials. If the keychain is unavailable, keep the legacy
+        -- value until it can be migrated rather than silently deleting it.
+        local legacyMigrationOk = Api.migrateLegacyPassword()
+        if legacyMigrationOk == false then
+            LrDialogs.message(
+                Api.getTitle("Passwortmigration"),
+                "Das gespeicherte Passwort konnte nicht in den Betriebssystem-Schlüsselbund übernommen werden. Bitte melde dich erneut an.",
+                "warning"
+            )
+        end
         local credEmail = prefs.apiUser or ""
         local credPassword = Api.getStoredPassword()
 
@@ -120,23 +128,42 @@ return function(mode, baseUrl)
 
             jwt, lastErr, lastDetail = Api.login(credEmail, credPassword)
             if jwt then
-                Api.storePassword(credPassword)
+                local passwordStored = true
+                if credPassword and credPassword ~= "" then
+                    passwordStored = Api.storePassword(credPassword)
+                end
                 -- Do not keep a plaintext password in the long-lived manager
                 -- closure; renewal must use the protected Api.login fallback.
                 credPassword = nil
+                if not passwordStored then
+                    LrDialogs.message(
+                        Api.getTitle("Passwort nicht gespeichert"),
+                        "Die Anmeldung war erfolgreich, das Passwort konnte aber nicht im Betriebssystem-Schlüsselbund gespeichert werden. Beim nächsten Start muss es erneut eingegeben werden.",
+                        "warning"
+                    )
+                end
                 if not session then
                     session = Api.createSession(jwt, credEmail, function()
                         return Api.login(credEmail)
                     end)
                 end
-                local isAllowed, userData, roleStatus = Api.checkRole(session)
+                local isAllowed, userData, roleStatus, roleDetail = Api.checkRole(session)
                 if isAllowed then
                     break
-                elseif roleStatus == 200 then
+                elseif roleStatus == 401 then
+                    LrDialogs.message(
+                        Api.getTitle("Sitzung abgelaufen"),
+                        "Die Anmeldung konnte nicht erneuert werden. Bitte den Manager schließen und erneut starten.",
+                        "critical"
+                    )
+                    return
+                elseif roleStatus == 200 and userData then
                     LrDialogs.message(Api.getTitle("Zugriff verweigert"), "Dein Account hat nicht die erforderliche Fotografen- oder Admin-Rolle.", "critical")
                     return
                 else
-                    LrDialogs.message(Api.getTitle("Verbindung fehlgeschlagen"), "Die Rolle konnte nicht geprüft werden (HTTP " .. tostring(roleStatus) .. "). Bitte erneut versuchen.", "critical")
+                    local message = "Die Rolle konnte nicht geprüft werden (HTTP " .. tostring(roleStatus) .. ")."
+                    if roleDetail and roleDetail ~= "" then message = message .. "\n" .. tostring(roleDetail) end
+                    LrDialogs.message(Api.getTitle("Verbindung fehlgeschlagen"), message .. " Bitte später erneut versuchen.", "critical")
                     return
                 end
             else
@@ -151,7 +178,7 @@ return function(mode, baseUrl)
         -- credential source used when a long manager session receives a 401.
         local sessionExpiredNotified = false
         local function requestApi(endpoint, method, payload)
-            local data, status = Api.callWithSession(session, endpoint, method, payload)
+            local data, status, _, _, errorDetail = Api.callWithSession(session, endpoint, method, payload)
             if status == 401 and not sessionExpiredNotified then
                 sessionExpiredNotified = true
                 LrDialogs.message(
@@ -160,23 +187,27 @@ return function(mode, baseUrl)
                     "critical"
                 )
             end
-            return data, status
+            return data, status, errorDetail
         end
 
         -- 2. Daten laden
         local treeData = nil
         local function reloadTree()
-            local data, status = requestApi("/api/management/galleries?filter_type=" .. mode, "GET", nil)
+            local data, status, errorDetail = requestApi("/api/management/galleries?filter_type=" .. mode, "GET", nil)
             if status == 200 and data then
                 treeData = data
-                return true
+                return true, status, nil
             end
-            return false, status
+            -- Keep the last successful tree intact so a failed refresh cannot
+            -- silently turn the manager into an empty/stale-looking view.
+            return false, status, errorDetail
         end
 
-        local treeOk, treeStatus = reloadTree()
+        local treeOk, treeStatus, treeDetail = reloadTree()
         if not treeOk or not treeData then
-            LrDialogs.message(Api.getTitle("Fehler"), "Galerien konnten nicht geladen werden (HTTP " .. tostring(treeStatus) .. ").", "critical")
+            local message = "Galerien konnten nicht geladen werden (HTTP " .. tostring(treeStatus) .. ")."
+            if treeDetail and treeDetail ~= "" then message = message .. "\n" .. tostring(treeDetail) end
+            LrDialogs.message(Api.getTitle("Fehler"), message, "critical")
             return
         end
 
@@ -230,9 +261,11 @@ return function(mode, baseUrl)
             end)
 
             local function handleReload()
-                local ok, status = reloadTree()
+                local ok, status, errorDetail = reloadTree()
                 if not ok then
-                    LrDialogs.message(Api.getTitle("Fehler"), "Galerien konnten nicht neu geladen werden (HTTP " .. tostring(status) .. ").", "warning")
+                    local message = "Galerien konnten nicht neu geladen werden (HTTP " .. tostring(status) .. ")."
+                    if errorDetail and errorDetail ~= "" then message = message .. "\n" .. tostring(errorDetail) end
+                    LrDialogs.message(Api.getTitle("Fehler"), message, "warning")
                     return
                 end
                 updateDropdown()
