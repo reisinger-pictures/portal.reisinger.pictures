@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Constants\TierRanks;
+use App\Exceptions\InvalidPhotoIdentifierException;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
 
 class Photo extends Model
@@ -14,6 +16,16 @@ class Photo extends Model
     use HasFactory, HasUuids, Searchable;
 
     public const DERIVATIVE_SIZES = [250, 400, 800, 1024, 1200, 2000];
+
+    /**
+     * Columns derived from the file's own EXIF data by the import writers.
+     *
+     * They are server-side facts about the stored file, never client input, so
+     * they stay out of `$fillable` and are assigned deliberately by
+     * {@see self::createWithId()} instead. Listing them explicitly is what keeps
+     * a future import writer from silently dropping them.
+     */
+    private const DERIVED_IMPORT_ATTRIBUTES = ['captured_at'];
 
     protected $visible = [
         'id', 'gallery_id', 'lr_uuid', 'width', 'height',
@@ -24,8 +36,14 @@ class Photo extends Model
         'effective_is_editorial_only', 'effective_is_hidden', 'last_accessed_at', 'is_downscaled', 'captured_at',
     ];
 
+    /**
+     * `id` is intentionally absent: the primary key is the photo's filesystem
+     * identity and must only ever be set through {@see self::createWithId()}.
+     *
+     * @see static::createWithId()
+     */
     protected $fillable = [
-        'id', 'gallery_id', 'mime_type', 'lr_uuid', 'width', 'height',
+        'gallery_id', 'mime_type', 'lr_uuid', 'width', 'height',
         'title', 'headline', 'description', 'user_id', 'keywords', 'location',
         'city', 'state', 'country', 'iso_country', 'is_editorial_only',
         'is_hidden', 'last_accessed_at', 'is_downscaled',
@@ -44,6 +62,55 @@ class Photo extends Model
     ];
 
     protected $with = ['gallery'];
+
+    /**
+     * Create a photo with an explicitly supplied, pre-generated identifier.
+     *
+     * Import and upload writers must know `photos.id` before the row exists: the
+     * identifier is the stored original's file name (`{id}.{ext}`) and the key
+     * of every derivative URL. `id` is therefore not fillable — which is what
+     * stops a request payload from choosing the identity of the row it writes —
+     * and this factory is the only sanctioned way to set it.
+     *
+     * Mass assignment stays in force for `$attributes`; the identifier and the
+     * EXIF-derived columns are written deliberately, one attribute at a time.
+     * No `unguarded()` window is opened.
+     *
+     * @param  array<string, mixed>  $attributes  Must not contain `id`. Every key
+     *                                            must be fillable or a derived import column.
+     *
+     * @throws InvalidPhotoIdentifierException
+     */
+    public static function createWithId(array $attributes, string $id): self
+    {
+        if (! Str::isUuid($id)) {
+            throw InvalidPhotoIdentifierException::notACanonicalUuid($id);
+        }
+
+        $photo = new self;
+        $keyName = $photo->getKeyName();
+
+        if (array_key_exists($keyName, $attributes)) {
+            throw InvalidPhotoIdentifierException::suppliedInsideAttributes();
+        }
+
+        $managed = array_merge($photo->getFillable(), self::DERIVED_IMPORT_ATTRIBUTES);
+        $unmanaged = array_diff(array_keys($attributes), $managed);
+        if ($unmanaged !== []) {
+            throw InvalidPhotoIdentifierException::unmanagedAttribute((string) reset($unmanaged));
+        }
+
+        $derived = array_intersect_key($attributes, array_flip(self::DERIVED_IMPORT_ATTRIBUTES));
+
+        $photo->fill($attributes);
+        foreach ($derived as $column => $value) {
+            $photo->setAttribute($column, $value);
+        }
+        $photo->setAttribute($keyName, $id);
+        $photo->save();
+
+        return $photo;
+    }
 
     public function gallery()
     {
