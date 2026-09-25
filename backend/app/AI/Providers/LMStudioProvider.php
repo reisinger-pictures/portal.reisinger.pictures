@@ -1,8 +1,9 @@
 <?php
+
 namespace App\AI\Providers;
 
-use App\AI\Contracts\AIProvider;
 use App\AI\Concerns\HasUserAgent;
+use App\AI\Contracts\AIProvider;
 
 class LMStudioProvider implements AIProvider
 {
@@ -29,8 +30,8 @@ class LMStudioProvider implements AIProvider
         ];
 
         $apiKey = config('services.ai.api_key');
-        if (!empty($apiKey)) {
-            $headers['Authorization'] = 'Bearer ' . $apiKey;
+        if (! empty($apiKey)) {
+            $headers['Authorization'] = 'Bearer '.$apiKey;
         }
 
         return $this->withUserAgent($headers);
@@ -41,9 +42,22 @@ class LMStudioProvider implements AIProvider
         return '/chat/completions';
     }
 
-    public function parseResponse(array $responseData): string
+    public function parseResponse(\stdClass $responseData): string
     {
-        return $responseData['choices'][0]['message']['content'] ?? '{}';
+        $choices = $responseData->choices ?? null;
+        if (! is_array($choices) || ! array_is_list($choices)) {
+            return '';
+        }
+
+        $choice = $choices[0] ?? null;
+        $message = $choice instanceof \stdClass ? ($choice->message ?? null) : null;
+        if (! $message instanceof \stdClass) {
+            return '';
+        }
+
+        $content = $message->content ?? null;
+
+        return is_string($content) ? $content : '';
     }
 
     public function supportsJsonMode(): bool

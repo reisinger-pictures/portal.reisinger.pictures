@@ -1,9 +1,10 @@
 <?php
+
 namespace App\AI\Providers;
 
-use App\AI\Contracts\AIProvider;
 use App\AI\Concerns\HasSessionHeader;
 use App\AI\Concerns\HasUserAgent;
+use App\AI\Contracts\AIProvider;
 
 class OpenAIProvider implements AIProvider
 {
@@ -21,7 +22,7 @@ class OpenAIProvider implements AIProvider
     public function buildHeaders(?string $sessionId = null): array
     {
         return $this->withUserAgent($this->withSessionHeader([
-            'Authorization' => 'Bearer ' . config('services.ai.api_key'),
+            'Authorization' => 'Bearer '.config('services.ai.api_key'),
             'Content-Type' => 'application/json',
         ], $sessionId));
     }
@@ -31,9 +32,22 @@ class OpenAIProvider implements AIProvider
         return '/chat/completions';
     }
 
-    public function parseResponse(array $responseData): string
+    public function parseResponse(\stdClass $responseData): string
     {
-        return $responseData['choices'][0]['message']['content'] ?? '{}';
+        $choices = $responseData->choices ?? null;
+        if (! is_array($choices) || ! array_is_list($choices)) {
+            return '';
+        }
+
+        $choice = $choices[0] ?? null;
+        $message = $choice instanceof \stdClass ? ($choice->message ?? null) : null;
+        if (! $message instanceof \stdClass) {
+            return '';
+        }
+
+        $content = $message->content ?? null;
+
+        return is_string($content) ? $content : '';
     }
 
     public function supportsJsonMode(): bool

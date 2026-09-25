@@ -636,6 +636,68 @@ class AIMetadataTest extends TestCase
             ->assertExactJson(['error' => 'AI API Fehler: 500']);
     }
 
+    public function test_generate_metadata_text_returns_502_for_malformed_http_200_provider_response(): void
+    {
+        $rawBody = '<html><body>PRIVATE-PROVIDER-BODY</body></html>';
+
+        Http::fake([
+            '*/chat/completions' => Http::response($rawBody, 200),
+        ]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata-text', [
+                'text_input' => 'A landscape photo of the Eiffel Tower',
+            ]);
+
+        $response->assertStatus(502)
+            ->assertExactJson(['error' => 'AI API Fehler: 200']);
+        $this->assertStringNotContainsString('PRIVATE-PROVIDER-BODY', (string) $response->getContent());
+    }
+
+    public function test_generate_metadata_text_returns_502_for_invalid_json_http_200_provider_response(): void
+    {
+        $rawBody = 'PRIVATE-PROVIDER-CONTENT';
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => $rawBody],
+                ]],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata-text', [
+                'text_input' => 'A landscape photo of the Eiffel Tower',
+            ]);
+
+        $response->assertStatus(502)
+            ->assertExactJson(['error' => 'AI API Fehler: 200']);
+        $this->assertStringNotContainsString($rawBody, (string) $response->getContent());
+    }
+
+    public function test_generate_metadata_text_returns_502_for_wrong_keyword_shape(): void
+    {
+        $rawContent = '{"title":"T","description":"D","keywords":{"first":"PRIVATE-PROVIDER-SHAPE"},"location":"L"}';
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => $rawContent],
+                ]],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($this->photographer, 'api')
+            ->postJson('/api/ai/generate-metadata-text', [
+                'text_input' => 'A landscape photo of the Eiffel Tower',
+            ]);
+
+        $response->assertStatus(502)
+            ->assertExactJson(['error' => 'AI API Fehler: 200']);
+        $this->assertStringNotContainsString('PRIVATE-PROVIDER-SHAPE', (string) $response->getContent());
+    }
+
     public function test_generate_metadata_returns_502_on_api_error()
     {
         $this->setupStorageWithPhotoImage();

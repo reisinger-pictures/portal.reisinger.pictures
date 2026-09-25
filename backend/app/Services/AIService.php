@@ -2,13 +2,36 @@
 
 namespace App\Services;
 
+use App\Exceptions\AIImageProcessingException;
 use App\Models\Photo;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class AIService
 {
+    /**
+     * Hard limits applied before GD is allowed to decode the source image.
+     * These are intentionally not environment-configurable: a deployment
+     * override must not be able to turn off the resource guard.
+     */
+    public const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+    public const MAX_IMAGE_PIXELS = 40_000_000;
+
+    public const MAX_IMAGE_DIMENSION = 15_000;
+
+    public const IMAGE_TOO_LARGE_ERROR = 'Das Bild ist zu groß für die KI-Verarbeitung.';
+
+    public const IMAGE_INVALID_ERROR = 'Das Bild konnte nicht für die KI-Verarbeitung verarbeitet werden.';
+
+    private const MAX_AI_KEYWORDS = 30;
+
+    private const MAX_AI_KEYWORD_LENGTH = 100;
+
+    private const MAX_AI_KEYWORDS_LENGTH = 2000;
+
     public function isDisabled(): bool
     {
         return ! config('services.ai.enabled');
@@ -85,35 +108,135 @@ class AIService
             ->post(rtrim(config('services.ai.base_url'), '/').$provider->getEndpoint(), $requestBody);
 
         if (! $response->successful()) {
-            $bodyLength = strlen((string) $response->body());
-
-            // Provider error bodies may echo prompts or other sensitive input.
-            // Keep only non-sensitive diagnostics in the application log.
-            Log::error('AI API call failed', [
-                'status' => $response->status(),
-                'body_length' => $bodyLength,
-            ]);
-            throw new \RuntimeException('AI API Fehler: '.$response->status());
+            $this->throwProviderResponseError($response);
         }
 
-        $data = $response->json();
-        $content = $provider->parseResponse($data);
+        // Decode as objects so numeric-key JSON objects do not become
+        // indistinguishable from the documented provider lists. Reject
+        // non-object envelopes before they can reach parser access.
+        $data = $response->object();
+        if (! $data instanceof \stdClass) {
+            $this->throwProviderResponseError($response);
+        }
 
-        $cleanContent = preg_replace('/```(?:json)?\n?/', '', $content ?? '');
+        try {
+            $content = $provider->parseResponse($data);
+        } catch (\TypeError) {
+            $this->throwProviderResponseError($response);
+        }
+
+        if (! is_string($content) || trim($content) === '') {
+            $this->throwProviderResponseError($response);
+        }
+
+        $cleanContent = preg_replace('/```(?:json)?\n?/', '', $content) ?? '';
         $cleanContent = trim($cleanContent);
 
-        $parsed = json_decode($cleanContent, true);
+        $parsed = json_decode($cleanContent);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException('AI response is not valid JSON: '.json_last_error_msg());
+            $this->throwProviderResponseError($response);
+        }
+
+        $metadata = $this->normalizeMetadata($parsed);
+        if ($metadata === null) {
+            $this->throwProviderResponseError($response);
+        }
+
+        return $metadata;
+    }
+
+    private function normalizeMetadata(mixed $parsed): ?array
+    {
+        if (! $parsed instanceof \stdClass) {
+            return null;
+        }
+
+        $metadata = get_object_vars($parsed);
+        foreach (['title', 'description', 'location'] as $field) {
+            if (! array_key_exists($field, $metadata) || ! is_string($metadata[$field])) {
+                return null;
+            }
+        }
+
+        if (array_key_exists('detected_city', $metadata) && ! is_string($metadata['detected_city'])) {
+            return null;
+        }
+
+        $keywords = $this->normalizeKeywords($metadata['keywords'] ?? null);
+        if ($keywords === null) {
+            return null;
         }
 
         return [
-            'title' => $parsed['title'] ?? '',
-            'description' => $parsed['description'] ?? '',
-            'keywords' => $parsed['keywords'] ?? '',
-            'location' => $parsed['location'] ?? '',
-            'detected_city' => $parsed['detected_city'] ?? '',
+            'title' => $metadata['title'],
+            'description' => $metadata['description'],
+            'keywords' => $keywords,
+            'location' => $metadata['location'],
+            'detected_city' => $metadata['detected_city'] ?? '',
         ];
+    }
+
+    private function normalizeKeywords(mixed $keywords): ?string
+    {
+        if (is_string($keywords)) {
+            if (strlen($keywords) > self::MAX_AI_KEYWORDS_LENGTH) {
+                return null;
+            }
+            $values = explode(',', $keywords);
+        } elseif (is_array($keywords) && array_is_list($keywords)) {
+            $values = $keywords;
+        } else {
+            return null;
+        }
+
+        if (count($values) > self::MAX_AI_KEYWORDS) {
+            return null;
+        }
+
+        $normalized = [];
+        foreach ($values as $value) {
+            if (! is_string($value)) {
+                return null;
+            }
+
+            foreach (explode(',', $value) as $part) {
+                $part = preg_replace('/\\s+/u', ' ', trim($part));
+                if ($part === null) {
+                    return null;
+                }
+                if ($part === '') {
+                    continue;
+                }
+                if (strlen($part) > self::MAX_AI_KEYWORD_LENGTH) {
+                    return null;
+                }
+                if (! in_array($part, $normalized, true)) {
+                    $normalized[] = $part;
+                }
+            }
+        }
+
+        if (count($normalized) > self::MAX_AI_KEYWORDS) {
+            return null;
+        }
+
+        $result = implode(', ', $normalized);
+
+        return strlen($result) <= self::MAX_AI_KEYWORDS_LENGTH ? $result : null;
+    }
+
+    /**
+     * Keep provider failures on the public status-only contract. The response
+     * body is intentionally reduced to its length before it reaches the log.
+     */
+    private function throwProviderResponseError(Response $response): never
+    {
+        Log::error('AI API call failed', [
+            'status' => $response->status(),
+            'body_length' => strlen((string) $response->body()),
+        ]);
+
+        throw new \RuntimeException('AI API Fehler: '.$response->status());
     }
 
     private function loadAndCompressImage(Photo $photo): string
@@ -130,45 +253,208 @@ class AIService
             throw new \RuntimeException('Failed to open image stream for AI processing');
         }
 
-        $tmpPath = tempnam(sys_get_temp_dir(), 'ai_img_');
-        $tmpHandle = fopen($tmpPath, 'wb');
-        if ($tmpHandle === false) {
-            fclose($stream);
-            throw new \RuntimeException('Failed to create temp file for AI image processing');
-        }
-        stream_copy_to_stream($stream, $tmpHandle);
-        fclose($stream);
-        fclose($tmpHandle);
+        $tmpPath = null;
+        $tmpHandle = null;
+        $image = null;
 
-        $image = @imagecreatefromstring(file_get_contents($tmpPath));
-        unlink($tmpPath);
+        try {
+            // A known stream size lets us reject an oversized file before
+            // allocating a temporary copy. The bounded copy below remains the
+            // source of truth for streams whose size is not available.
+            $streamStat = @fstat($stream);
+            if (is_array($streamStat)
+                && isset($streamStat['size'])
+                && (int) $streamStat['size'] > self::MAX_IMAGE_BYTES) {
+                throw new AIImageProcessingException(
+                    AIImageProcessingException::REASON_BYTES,
+                    self::IMAGE_TOO_LARGE_ERROR,
+                );
+            }
 
-        if (! $image) {
-            throw new \RuntimeException('Failed to decode image for AI processing');
-        }
+            $tmpPath = tempnam(sys_get_temp_dir(), 'ai_img_');
+            if ($tmpPath === false) {
+                throw new \RuntimeException('Failed to create temp file for AI image processing');
+            }
 
-        $origWidth = imagesx($image);
-        $origHeight = imagesy($image);
-        $maxDim = 2048;
+            $tmpHandle = @fopen($tmpPath, 'wb');
+            if ($tmpHandle === false) {
+                throw new \RuntimeException('Failed to create temp file for AI image processing');
+            }
 
-        if ($origWidth > $maxDim || $origHeight > $maxDim) {
-            $ratio = min($maxDim / $origWidth, $maxDim / $origHeight);
-            $newWidth = (int) round($origWidth * $ratio);
-            $newHeight = (int) round($origHeight * $ratio);
-            $resized = imagescale($image, $newWidth, $newHeight, IMG_BILINEAR_FIXED);
-            if ($resized !== false) {
-                imagedestroy($image);
-                $image = $resized;
+            $this->copyStreamWithinBudget($stream, $tmpHandle);
+            @fclose($stream);
+            $stream = null;
+            @fclose($tmpHandle);
+            $tmpHandle = null;
+
+            // The copy is bounded, and the explicit length keeps this second
+            // read bounded as well if a custom filesystem stream misbehaves.
+            $contents = @file_get_contents($tmpPath, false, null, 0, self::MAX_IMAGE_BYTES + 1);
+            if ($contents === false) {
+                throw new \RuntimeException('Failed to read image data for AI processing');
+            }
+
+            if (strlen($contents) > self::MAX_IMAGE_BYTES) {
+                throw new AIImageProcessingException(
+                    AIImageProcessingException::REASON_BYTES,
+                    self::IMAGE_TOO_LARGE_ERROR,
+                );
+            }
+
+            // Header inspection is deliberately before imagecreatefromstring().
+            // It rejects decompression/pixel bombs without asking GD to
+            // allocate the decoded bitmap.
+            try {
+                $imageInfo = @getimagesizefromstring($contents);
+            } catch (\Throwable) {
+                $imageInfo = false;
+            }
+            if ($imageInfo === false) {
+                throw new AIImageProcessingException(
+                    AIImageProcessingException::REASON_DECODE,
+                    self::IMAGE_INVALID_ERROR,
+                );
+            }
+
+            $origWidth = (int) ($imageInfo[0] ?? 0);
+            $origHeight = (int) ($imageInfo[1] ?? 0);
+            if ($origWidth <= 0
+                || $origHeight <= 0
+                || $origWidth > self::MAX_IMAGE_DIMENSION
+                || $origHeight > self::MAX_IMAGE_DIMENSION
+                || $origHeight > intdiv(self::MAX_IMAGE_PIXELS, $origWidth)) {
+                throw new AIImageProcessingException(
+                    AIImageProcessingException::REASON_PIXELS,
+                    self::IMAGE_TOO_LARGE_ERROR,
+                );
+            }
+
+            if (! function_exists('imagecreatefromstring')
+                || ! function_exists('imagejpeg')
+                || ! function_exists('imagescale')
+                || ! function_exists('imagesx')
+                || ! function_exists('imagesy')) {
+                throw new AIImageProcessingException(
+                    AIImageProcessingException::REASON_DECODE,
+                    self::IMAGE_INVALID_ERROR,
+                );
+            }
+
+            try {
+                $image = @imagecreatefromstring($contents);
+            } catch (\Throwable) {
+                $image = false;
+            }
+            unset($contents);
+            if ($image === false) {
+                throw new AIImageProcessingException(
+                    AIImageProcessingException::REASON_DECODE,
+                    self::IMAGE_INVALID_ERROR,
+                );
+            }
+
+            // The decoded resource is checked again because a malformed file
+            // can present one set of header dimensions and decode to another.
+            // The preflight check above still prevents the normal pixel-bomb
+            // path from reaching GD at all.
+            $origWidth = imagesx($image);
+            $origHeight = imagesy($image);
+            if ($origWidth <= 0
+                || $origHeight <= 0
+                || $origWidth > self::MAX_IMAGE_DIMENSION
+                || $origHeight > self::MAX_IMAGE_DIMENSION
+                || $origHeight > intdiv(self::MAX_IMAGE_PIXELS, $origWidth)) {
+                throw new AIImageProcessingException(
+                    AIImageProcessingException::REASON_PIXELS,
+                    self::IMAGE_TOO_LARGE_ERROR,
+                );
+            }
+
+            $maxDim = 2048;
+            if ($origWidth > $maxDim || $origHeight > $maxDim) {
+                $ratio = min($maxDim / $origWidth, $maxDim / $origHeight);
+                $newWidth = max(1, (int) round($origWidth * $ratio));
+                $newHeight = max(1, (int) round($origHeight * $ratio));
+                $resized = @imagescale($image, $newWidth, $newHeight, IMG_BILINEAR_FIXED);
+                if ($resized !== false) {
+                    imagedestroy($image);
+                    $image = $resized;
+                }
+            }
+
+            $compressed = $this->encodeJpeg($image);
+        } finally {
+            if ($image instanceof \GdImage) {
+                @imagedestroy($image);
+            }
+            if (is_resource($stream)) {
+                @fclose($stream);
+            }
+            if (is_resource($tmpHandle)) {
+                @fclose($tmpHandle);
+            }
+            if (is_string($tmpPath) && (is_file($tmpPath) || is_link($tmpPath))) {
+                @unlink($tmpPath);
             }
         }
 
+        return 'data:image/jpeg;base64,'.base64_encode($compressed);
+    }
+
+    /**
+     * Copy at most one byte over the budget so the caller can distinguish an
+     * oversized file without ever reading an unbounded source stream.
+     */
+    private function copyStreamWithinBudget(mixed $stream, mixed $destination): void
+    {
+        $remaining = self::MAX_IMAGE_BYTES + 1;
+
+        while ($remaining > 0) {
+            $chunk = @fread($stream, min(8192, $remaining));
+            if ($chunk === false) {
+                throw new \RuntimeException('Failed to read image stream for AI processing');
+            }
+            if ($chunk === '') {
+                if (feof($stream)) {
+                    break;
+                }
+
+                throw new \RuntimeException('Failed to read image stream for AI processing');
+            }
+
+            $length = strlen($chunk);
+            $written = 0;
+            while ($written < $length) {
+                $bytesWritten = @fwrite($destination, substr($chunk, $written));
+                if ($bytesWritten === false || $bytesWritten === 0) {
+                    throw new \RuntimeException('Failed to write image data for AI processing');
+                }
+                $written += $bytesWritten;
+            }
+            $remaining -= $length;
+        }
+    }
+
+    private function encodeJpeg(\GdImage $image): string
+    {
+        $bufferLevel = ob_get_level();
         ob_start();
-        imagejpeg($image, null, 80);
-        $compressed = ob_get_clean();
-        imagedestroy($image);
 
-        $base64 = base64_encode($compressed);
+        try {
+            if (! @imagejpeg($image, null, 80)) {
+                throw new \RuntimeException('Failed to encode image for AI processing');
+            }
+            $compressed = ob_get_contents();
+        } finally {
+            while (ob_get_level() > $bufferLevel) {
+                ob_end_clean();
+            }
+        }
 
-        return 'data:image/jpeg;base64,'.$base64;
+        if (! is_string($compressed) || $compressed === '') {
+            throw new \RuntimeException('Failed to encode image for AI processing');
+        }
+
+        return $compressed;
     }
 }
