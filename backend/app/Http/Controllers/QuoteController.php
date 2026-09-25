@@ -15,6 +15,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class QuoteController extends Controller
@@ -74,29 +75,52 @@ class QuoteController extends Controller
             return response()->json(['error' => 'Die Fotoauswahl ist ungültig oder nicht lieferbar.'], 422);
         }
 
-        if (! $this->claimPendingQuote($order)) {
+        $order->refresh();
+        $subject = 'Individuelles Angebot';
+        $body = '<p>'.nl2br(htmlspecialchars($request->message))."</p><br><p><a href=\"{$link}\">Hier geht es zum Angebot und Checkout</a></p>";
+        $recipient = (string) $order->user->email;
+        $mailable = new CustomMail($subject, $body);
+
+        try {
+            $claimed = $this->claimPendingQuote($order, $recipient, $mailable);
+        } catch (\Throwable $exception) {
+            Log::warning('quote.mail_dispatch_failed', [
+                'order_id' => (string) $order->getKey(),
+                'exception_class' => $exception::class,
+            ]);
+
+            return response()->json([
+                'error' => 'Das Angebot konnte nicht versendet werden. Bitte versuche es erneut.',
+            ], 503);
+        }
+
+        if (! $claimed) {
             return response()->json([
                 'error' => 'Das Angebot wurde zwischenzeitlich anderweitig aktualisiert.',
             ], 409);
         }
 
-        $order->refresh();
-        $subject = 'Individuelles Angebot';
-        $body = '<p>'.nl2br(htmlspecialchars($request->message))."</p><br><p><a href=\"{$link}\">Hier geht es zum Angebot und Checkout</a></p>";
-
-        Mail::to($order->user->email)->send(new CustomMail($subject, $body));
-
         return response()->json(['success' => true]);
     }
 
     /**
-     * Atomically claim the pending quote before any mail is emitted.  The row
-     * lock serializes contenders on databases that support it; the conditional
-     * UPDATE remains the correctness boundary on SQLite and other engines.
+     * Atomically claim the pending quote and durably enqueue its mailable.
+     *
+     * The queue insert is part of the same database transaction as the
+     * conditional pending -> cancelled update. A transport or enqueue failure
+     * therefore rolls the claim back, so the request can be retried instead of
+     * leaving a permanently cancelled quote with no delivery intent. The
+     * conditional update remains the correctness boundary on SQLite and other
+     * engines. The order row is the quote intent claim; no invoice-snapshot
+     * marker or second mail dispatcher is needed.
+     *
+     * This is an at-most-one durable enqueue guarantee, not an exactly-once
+     * SMTP guarantee. Queue-worker retries and terminal SMTP recovery remain
+     * separate concerns, consistent with invoice mail dispatch.
      */
-    private function claimPendingQuote(Order $order): bool
+    private function claimPendingQuote(Order $order, string $recipient, CustomMail $mailable): bool
     {
-        return DB::transaction(function () use ($order): bool {
+        return DB::transaction(function () use ($order, $recipient, $mailable): bool {
             $locked = Order::query()
                 ->whereKey($order->getKey())
                 ->lockForUpdate()
@@ -107,11 +131,18 @@ class QuoteController extends Controller
                 return false;
             }
 
-            return Order::query()
+            $claimed = Order::query()
                 ->whereKey($locked->getKey())
                 ->where('is_quote_request', true)
                 ->where('status', 'pending')
                 ->update(['status' => 'cancelled']) === 1;
+            if (! $claimed) {
+                return false;
+            }
+
+            Mail::to($recipient)->queue($mailable);
+
+            return true;
         });
     }
 
