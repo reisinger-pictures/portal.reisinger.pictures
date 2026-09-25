@@ -19,7 +19,12 @@ introduce Redis, Horizon, Supervisor, or another external process manager.
 The shell supervisor in `deployment/backend-supervisor.sh` is intentionally
 small and runs inside the existing PHP-FPM container as UID/GID `1000:1000`.
 The base-image workflow rebuilds the image when that script or the raw preflight
-script changes; refreshing the digest consumed by the deployment compose file
+script changes. It publishes to the **org namespace
+`ghcr.io/reisinger-pictures/portal-base`** via
+`OWNER: ${{ github.repository_owner }}`, which is the path every consumer
+(`deployment/docker-compose.yml`, `ci.yml`, `deployment/Dockerfile.e2e`) must
+therefore pin — pointing at any other namespace leaves the pinned digest on a
+stale image. Refreshing the digest consumed by the deployment compose file
 remains a release/rollout step and is not asserted by this repository change.
 The compose bootstrap also fails closed if an old image does not contain the
 executable preflight and supervisor binaries.
@@ -87,11 +92,15 @@ path checks, then follows this order **before any migration or seed**:
 5. run migrations, seed, and admin provisioning;
 6. start Scout settings, the queue restart signal, and the supervisor.
 
-Neither the preflight nor the supervisor binary is present in the currently
-pinned GHCR digest. Until the base image is rebuilt, pushed, and the compose
-digest is updated, startup stops at step 1 with an explicit rebuild/digest
-message; no migration, seed, or worker is started. This repository does not
-claim that the pinned image is deployable.
+The compose file now pins
+`ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736`, pushed by the
+`base-image.yml` run of 2026-09-25 whose build log shows the preflight and
+supervisor copy/chmod steps. That is build-log evidence that step 1 can pass,
+not an observation of a started stack. The fail-closed gate stays in place: if a
+host ever resolves the pinned digest to an image without the two executables,
+startup stops at step 1 with an explicit rebuild/digest message and no
+migration, seed, or worker is started. This repository does not claim that the
+pinned image is deployable.
 
 `backend-supervisor.sh` performs these actions:
 

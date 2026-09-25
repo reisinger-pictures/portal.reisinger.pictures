@@ -80,7 +80,7 @@ jobs:
             --network host \
             -v "${{ github.workspace }}:/app" \
             -w /app/backend \
-            ghcr.io/reisi007/portal-base:8.5@sha256:484410448bdff80c2571778e69e3ec264a0033baf22b0534eaac12331f6940ba \
+            ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736 \
             sleep infinity
           until docker exec php php -v > /dev/null 2>&1; do sleep 1; done
       - name: Prepare environment
@@ -224,7 +224,7 @@ jobs:
     # meili/mailpit) sind per Service-Name erreichbar. Details: features/
     # infrastructure/28-ci-test-image.md.
     container:
-      image: ghcr.io/reisi007/portal-e2e@sha256:d542ae69748bf53212c47180318e07d135ec0cbaf8ede1040a61adc320264185
+      image: ghcr.io/reisinger-pictures/portal-e2e@sha256:c09b2f8e2cb93be6d84f9917c33072cc171b941ce8c0933c9390570b48295aaf
     strategy:
       fail-fast: false
       matrix:
@@ -348,7 +348,7 @@ jobs:
           fi
           echo "Stripe write (payment_intents create) OK"
       # Der komplette Job laeuft im digest-gepinnten Test-Image
-      # ghcr.io/reisi007/portal-e2e (portal-base + Node/pnpm/Composer +
+      # ghcr.io/reisinger-pictures/portal-e2e (portal-base + Node/pnpm/Composer +
       # Playwright-Chromium vorinstalliert) ->
       # kein Browser-Download, kein apt-Deps-Setup pro Run. App-Code wird vom
       # Runner gemountet; Dependencies werden pro Commit frisch installiert

@@ -1,7 +1,7 @@
 # ==========================================================================
 # portal-e2e — E2E-/Test-Image (aus portal-base abgeleitet)
 # --------------------------------------------------------------------------
-# Basis: ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 Prod-Runtime, exiftool,
+# Basis: ghcr.io/reisinger-pictures/portal-base:8.5 (PHP 8.5 Prod-Runtime, exiftool,
 # ImageMagick, alle App-Extensions; Debian trixie) — identische Runtime wie
 # Produktion. Zusätzlich für die E2E-CI (ci.yml, Job `e2e`) vorinstalliert:
 #   * Composer (Dist-Binary, wie Prod aus einem digest-gepinnten Image)
@@ -15,7 +15,7 @@
 # -> Rebuild-Trigger siehe .github/workflows/e2e-image.yml
 # (features/infrastructure/28-ci-test-image.md).
 # ==========================================================================
-FROM ghcr.io/reisi007/portal-base:8.5@sha256:484410448bdff80c2571778e69e3ec264a0033baf22b0534eaac12331f6940ba
+FROM ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736
 
 # Build-time package installation needs root. The final runtime identity is
 # restored to www-data after all tooling and browser binaries are installed.

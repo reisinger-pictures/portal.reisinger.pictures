@@ -17,7 +17,7 @@ aktuellen Commits werden weiterhin im Job installiert.
 ## SOLL-Zustand
 
 1. **`deployment/Dockerfile.e2e`** ist ein Derivat von
-   `ghcr.io/reisi007/portal-base:8.5@sha256:484410448bdff80c2571778e69e3ec264a0033baf22b0534eaac12331f6940ba`
+   `ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736`
    (PHP-8.5-Prod-Runtime inklusive exiftool/ImageMagick/Extensions, Debian
    trixie) und enthält:
    - Composer (Dist-Binary via `COPY --from=composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b`)
@@ -33,8 +33,22 @@ aktuellen Commits werden weiterhin im Job installiert.
    publiziert `:latest` und einen versionsgebundenen Tag für Debugging/Rollback;
    `ci.yml` pinnt den konsumierten Image-Digest im Job, damit ein Run nicht
    unbemerkt von einem Tag-Wechsel abhängt.
+   **Namensraum-Invariante:** `e2e-image.yml` und `base-image.yml` publizieren
+   beide über `OWNER: ${{ github.repository_owner }}`, also in den
+   **Org-Namespace `ghcr.io/reisinger-pictures/`**. Jeder Konsument
+   (`Dockerfile.e2e`, `ci.yml`, `deployment/docker-compose.yml`, `scripts/`,
+   Doku) muss denselben Namespace nennen; ein Verweis auf einen persönlichen
+   `ghcr.io`-Namespace stillt den Rebuild aus, weil dort kein neues Image
+   ankommt.
+   **Rebuild-Reihenfolge:** Da `Dockerfile.e2e` per `FROM` auf den
+   digest-gepinnten `portal-base`-Digest zeigt, muss `base-image.yml`
+   **vorher** laufen. Ein `portal-e2e`-Build gegen einen veralteten
+   `portal-base`-Digest erbt dessen Layer und ist damit kein gültiger Rebuild —
+   der neue `portal-e2e`-Digest ist erst nach dem nächsten Lauf des
+   `e2e-image.yml`-Workflows gültig. `workflow_dispatch` baut gegen den
+   committeten Stand des Refs, nicht gegen den Working Tree.
 3. Der **`e2e`-Job in `ci.yml`** läuft im Test-Image
-   (`ghcr.io/reisi007/portal-e2e` mit dem in `ci.yml` gepinnten Digest):
+   (`ghcr.io/reisinger-pictures/portal-e2e` mit dem in `ci.yml` gepinnten Digest):
    - `composer install` → `php artisan key:generate` →
      `php artisan migrate --force` → `php artisan db:seed --force` →
      `php artisan db:seed --class=E2ELocationSeeder --force` →
@@ -122,7 +136,7 @@ Für eine kontrollierte Rückkehr auf einen Runner-Host kann der E2E-Job
 alternative Host-Semantik und den im Image enthaltenen Browser-cache nutzen:
 
 ```bash
-PORTAL_E2E_IMAGE='ghcr.io/reisi007/portal-e2e@sha256:<digest-from-ci.yml>'
+PORTAL_E2E_IMAGE='ghcr.io/reisinger-pictures/portal-e2e@sha256:<digest-from-ci.yml>'
 docker create --name pw-cache "$PORTAL_E2E_IMAGE"
 docker cp pw-cache:/ms-playwright "$HOME/ms-playwright"
 docker rm pw-cache
