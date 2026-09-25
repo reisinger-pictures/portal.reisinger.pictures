@@ -41,6 +41,48 @@
 
 > Ziel: alle **actionable** TODOs in Abhängigkeitsreihenfolge abarbeiten. Historische `[x]`-Einträge werden nicht automatisch neu geprüft; stale/duplicate Findings werden durch einen aktuellen Reproduktionstest geschlossen oder als offen markiert. Der aktuelle Working Tree ist dirty; kein Checkbox-Status und kein Diff allein gilt als Verifikationsnachweis.
 
+## 🛑 SESSION-HANDOVER (2026-09-25, Ende der Arbeitssession)
+
+**Ergebnis in einem Satz:** 13 verifizierte Commits sind auf `main`; die verbleibenden Arbeitsstränge sind mit **unterschiedlichem Nachweisgrad** committed (2× fertig, 3× halb fertig), und die CI ist aus **genau einem** externen Grund rot.
+
+### Commit-Stand
+| Commit | Inhalt | Nachweisgrad |
+|---|---|---|
+| `f659de3`…`aa6dafd` | CI/Plugin, Frontend, Backend/Contract/V039, AI, Cleanup/Scout, Quote-Mail, Payout/V040 | **verifiziert** (unabhängige Verifier + grüne Suite 2349–2365 Tests) |
+| `d7f3596` | Image-Namespace `reisinger-pictures` | verifiziert, **löst aber den GHCR-Blocker aus** |
+| `aac83b4`, `70185eb` | GHCR-Blocker + P1-I5-Korrektur | Doku |
+| `cf5e8fc`, `2bfaed8` | Gallery-Traversal/Status-Guard, Brand-Invariante (fail-closed) | **verifiziert** |
+| `8cc3fcb` | Non-Root-Image-Gate | verifiziert (Fail-the-Guard belegt) |
+| P1-M11 (`id` raus aus `$fillable`) | `Photo::createWithId()` | **FERTIG** — 275 Tests/996 Assertions + 46 Proben, PASS |
+| Flake A+C (`attempts 0!==1`, `ai_img_*`-Glob) | Test-Härtung + injizierbares Temp-Prefix | **FERTIG** — serial 10/10, parallel 5/5, Ballast 25/25, 2× Revert-to-red |
+| exiftool-Testbudget | explizites Budget + 1 Retry | **HALB** — Testmitigation fertig, **Produktionspfad ungefixt** |
+| `preset_id`-Vertrag + GalleryModal-Zod-Bug | Integer-Kontrakt beidseitig | **HALB** — Frontend belegt, **Backend und 4 E2E-Specs unbelegt** |
+| `SidebarHelper` + `E2E_SKIP_DOCKER_SERVICES` | kein Mobile-only-Gate mehr | **HALB** — Unit 4/4, **kein E2E-Lauf** |
+
+### ⚠️ Umgebung während der Session verloren — nicht reproduzierbar
+`/usr/local/bin/meilisearch`, `/usr/local/bin/mailpit`, `/usr/bin/exiftool`, `/usr/bin/pgrep`, `/usr/bin/ss` sowie die aus PHP-8.5.10-Quellen gebaute `gd.so` sind **alle weg**; `/tmp` wurde geleert. Das native Setup hat **nicht persistiert**. Konsequenz: **im aktuellen Zustand ist keine Testausführung möglich**; alle nach dem Verlust gemessenen Zahlen sind entsprechend zu behandeln. Vor jedem Resume müssen GD, exiftool sowie ein host-erreichbares Meilisearch + Mailpit wiederhergestellt werden.
+
+### ⛔ Einzelner CI-Blocker
+Beide Org-Pakete sind `private`; `backend` und alle 7 E2E-Jobs scheitern mit `unauthorized` beim Image-Pull, das neue Non-Root-Gate zusätzlich mit HTTP 401. `Frontend (Lint, Build, Vitest)` bleibt grün. **Owner-Aktion:** `portal-base` und `portal-e2e` auf `public` — https://github.com/orgs/reisinger-pictures/packages/container/package/portal-base (analog `portal-e2e`).
+
+### Offene Defekte (bewusst nicht gefixt)
+- **`CrmCleanupDispatchFallbackTest`** (6 `queue:work`-Aufrufe: 215/299/370/384/416/552) teilt exakt den Defekt, der bei A behoben wurde: unguarded `--memory=128` bei In-Process-Worker. Dieselbe 2-Zeilen-Fix + Exit-Code-Assertion fehlt dort.
+- **Produktions-Exiftool-Timeout**: `PhotoDownloadController.php:225/228`, `ImageProcessor.php:254/401`, `PhotoProcessingService.php:85` rufen `Process::run()` ungeschützt mit 60 s Default. Auf einem überlasteten Host wird ein Download zum 500.
+- **P1-M11 D1**: die bewusst erhaltene `captured_at`-Divergenz (FTP persistiert, HTTP nicht) hat **keinen Repo-Test** — ein künftiges `captured_at` in `$fillable` würde stillschweigend greifen.
+- **P1-M11 D2**: `createWithId()` koppelt `PhotoProcessingService` per Ausnahmeliste; ein neues EXIF-Feld wirft `InvalidPhotoIdentifierException`, `FtpController` behält die Datei → der Import-Poll klemmt dauerhaft.
+- **P1-M15 F2**: `GalleryService::updateGroup()` ohne Brand-Chain-Guard; ein Cross-Brand-Super-Admin kann eine `srp`-Gruppe unter einen `rp`-Elternteil hängen. In `features/gallery/01-core-architecture.md` §8.5 als offen deklariert.
+- **P1-I5**: Non-Root-Eigenschaft des gepinnten `d762d47c` ist **unverifiziert** (Pull 401). Das Gate erzwingt den Nachweis, sobald die Pakete public sind.
+- **`preset_id`-Backend**: 3 neue PHPUnit-Tests wurden **nie ausgeführt**. `features/infrastructure/27-volume-licensing-presets.md:55` dokumentiert den numerischen Vertrag noch nicht.
+
+### Umgebungsfallen
+1. Nach jedem `gh auth refresh` muss `gh auth setup-git` laufen, sonst scheitert `git push` an `could not read Username`.
+2. `concurrency: cancel-in-progress: true` in `ci.yml` **vernichtet den Log eines laufenden Laufs**, sobald gepusht wird. Beim Debuggen nicht währenddessen pushen.
+3. Die Platte war zweimal über 90 % voll (fremde Projekte: `LuminaRust` 163 GB, Docker-Volumes 82 GB). Volle Testläufe brechen dann mit `No space left on device` ab.
+4. `backend/tests/Fixtures/sample.jpg` wurde von einer parallelen Session **gelöscht** und aus dem Git-Objekt wiederhergestellt; `git status` ist für die Datei clean.
+
+### Abbau dieser Session (durchgeführt)
+Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`, `e2e-pf`, `e2e-fix`, `pf-mailpit`, `pf-meili`, `pf-mariadb`, `pf-meili-local`, `seed-ws-pf` sowie Volumes `ws-head`, `ws-ci-base`, `ws-pf`, `ws-fix` und die Netze `e2e-net`, `pfnet` entfernt; Host-Dienste Meilisearch/Mailpit gestoppt; Worktree `portal-staged-verify` geprüft (`git diff --cached main --diff-filter=A` leer ⇒ kein Unique-Work) und entfernt; Scratch unter `/tmp` bereinigt.
+
 ### Gate 0 — Baseline und Änderungsdisziplin
 - [x] Bestehende staged/unstaged/untracked Änderungen nach Workstream zuordnen und Überschneidungen dokumentieren.
 - [x] Unabhängige Baseline ausführen: Backend `php artisan test`, Frontend `pnpm test:run`, `pnpm lint:fix`, `pnpm build`, Plugin-Harness `bash admin.lrplugin/tests/run.sh`, `git diff --check`.
