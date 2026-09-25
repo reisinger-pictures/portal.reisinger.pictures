@@ -204,6 +204,97 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
         );
     }
 
+    /**
+     * The static half of the P1-I5 policy. Only the *last* `USER` instruction
+     * of the final build stage reaches the image config, so an earlier
+     * `USER root` in a base stage must never be able to satisfy this guard.
+     *
+     * This is a source check, not a proof about the deployed artifact: the
+     * digest production pinned until commit d7f3596 was built on 2026-08-20,
+     * before `USER www-data` existed in the Dockerfile, and ran as uid 0. The
+     * artifact half is
+     * {@see test_pinned_base_image_artifact_gate_is_wired_into_the_security_contract_job()}.
+     */
+    public function test_base_image_source_declares_a_non_root_runtime_user(): void
+    {
+        $dockerfile = $this->read('deployment/Dockerfile');
+        preg_match_all('/^[ \t]*USER[ \t]+(\S+)/mi', $dockerfile, $matches);
+
+        $this->assertNotEmpty(
+            $matches[1],
+            'deployment/Dockerfile must declare a runtime user, otherwise the image runs as root'
+        );
+
+        $effectiveUser = strtolower((string) end($matches[1]));
+        $this->assertNotContains(
+            ['root', '0', '0.0', '0:0', 'root:root'],
+            array_map('strtolower', $matches[1]),
+            'no build stage of the base image may switch the runtime user back to root'
+        );
+        $this->assertSame(
+            'www-data',
+            $effectiveUser,
+            'the effective (last) USER instruction of deployment/Dockerfile must be www-data; '
+                .'a USER after it would silently override the non-root runtime'
+        );
+    }
+
+    /**
+     * The artifact half is only a gate while it is wired into a job that has no
+     * image dependency, and while the pin it inspects is the pin production
+     * boots. This asserts both: the script exists, fails closed (no `|| true`
+     * escape hatch, no hardcoded second copy of a digest), and the
+     * `security-contract` job actually runs it.
+     */
+    public function test_pinned_base_image_artifact_gate_is_wired_into_the_security_contract_job(): void
+    {
+        $gate = 'tests/infrastructure/verify-image-nonroot.sh';
+        $gateSource = $this->read($gate);
+
+        $this->assertStringContainsString('set -euo pipefail', $gateSource);
+        $this->assertStringContainsString(
+            'packages must be public',
+            $gateSource,
+            'a 401/403 from the registry must fail the gate with an actionable message, never a skip'
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/sha256:[0-9a-f]{64}/',
+            $gateSource,
+            "{$gate} must not carry a second copy of a digest; it resolves the pin from the repository"
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\|\|[[:space:]]*true/',
+            $gateSource,
+            "{$gate} must fail closed; a swallowed exit code would turn the gate into a no-op"
+        );
+
+        $digests = [];
+        foreach (['deployment/docker-compose.yml', '.github/workflows/ci.yml'] as $consumer) {
+            preg_match_all(
+                '#\bportal-base(?::[^\s\'"@]+)?@sha256:([0-9a-f]{64})#',
+                $this->read($consumer),
+                $matches
+            );
+            $this->assertNotEmpty($matches[1], "{$consumer} must pin the portal-base digest");
+            foreach ($matches[1] as $digest) {
+                $digests[$digest] = true;
+            }
+        }
+        $this->assertCount(
+            1,
+            $digests,
+            'the artifact gate resolves its input from these files, so their pins must agree, found: '
+                .implode(', ', array_keys($digests))
+        );
+
+        $this->assertStringContainsString(
+            "run: bash {$gate}",
+            $this->ciJob('security-contract'),
+            'the security-contract job must run the artifact gate: it is the only job without an image dependency, '
+                .'so it keeps enforcing the non-root property while backend and e2e are blocked on a private package'
+        );
+    }
+
     public function test_image_publishing_workflows_derive_the_owner_from_the_repository(): void
     {
         foreach (['.github/workflows/base-image.yml', '.github/workflows/e2e-image.yml'] as $workflow) {
@@ -324,6 +415,25 @@ PHP;
             $compose
         );
         $this->assertStringNotContainsString('app:import-locations', $compose);
+    }
+
+    /**
+     * Raw YAML of a single top-level CI job. Job keys sit at two-space
+     * indentation under `jobs:`, so the next key on that level closes the
+     * block without needing a YAML parser.
+     *
+     * @return string
+     */
+    private function ciJob(string $name): string
+    {
+        $contents = $this->read('.github/workflows/ci.yml');
+        $pattern = '/^  ' . preg_quote($name, '/') . ':[ \t]*$(.*?)(?=^  [\w-]+:[ \t]*$|\z)/ms';
+        $matched = preg_match($pattern, $contents, $matches);
+
+        $this->assertSame(1, $matched, "ci.yml must define the {$name} job");
+        $this->assertNotEmpty(trim($matches[1]), "the {$name} job must not be empty");
+
+        return $matches[1];
     }
 
     /**
