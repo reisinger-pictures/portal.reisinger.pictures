@@ -88,6 +88,26 @@ Generates metadata from a photo. Image is loaded server-side from the `photos` d
 }
 ```
 
+### Image processing limits and errors
+
+The server reads the photo from the `photos` disk and prepares it before any
+provider request. The source is bounded to **20 MiB**, **15,000 px per side**,
+and **40,000,000 total pixels**. `AIService` inspects the bounded bytes before
+GD decodes or resizes them, and always removes its temporary file and image
+resource in a `finally` block.
+
+An image rejected by the byte/pixel budget, or one that cannot be decoded,
+returns HTTP `422` with one of these controlled messages:
+
+```json
+{"error":"Das Bild ist zu groß für die KI-Verarbeitung."}
+{"error":"Das Bild konnte nicht für die KI-Verarbeitung verarbeitet werden."}
+```
+
+The endpoint does not call the AI provider after either rejection. Provider
+HTTP failures remain `502` (`AI API Fehler: <status>`) and connection failures
+remain `503`.
+
 ### `POST /api/ai/generate-metadata-text`
 Generates metadata from text input only (no image access needed).
 **Request:**

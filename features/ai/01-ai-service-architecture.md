@@ -157,7 +157,7 @@ interface AIProvider
     public function buildHeaders(?string $sessionId = null): array;
     public function sessionHeaderName(): ?string;
     public function getEndpoint(): string;
-    public function parseResponse(array $responseData): string;
+    public function parseResponse(\stdClass $responseData): string;
     public function supportsJsonMode(): bool;
 }
 ```
@@ -172,7 +172,7 @@ interface AIProvider
 
 `AnthropicProvider` extracts the system message from the messages array and sets it as a top-level `system` parameter. All other messages are converted to Anthropic's `{role, content: [{type: "text", text: "..."}]}` format. OpenAI-shaped `image_url` blocks are translated to Anthropic `{type: "image", source: ...}` blocks before transport; data URIs are split into `media_type` and Base64 `data`, while HTTP(S) URLs use Anthropic's URL source form.
 
-`LMStudioProvider` follows the OpenAI-compatible format and only sends the `Authorization` header if `api_key` is configured.
+`LMStudioProvider` follows the OpenAI-compatible format and only sends the `Authorization` header if `api_key` is configured. Provider envelopes are decoded as JSON objects, while `choices` (OpenAI/LM Studio) and `content` (Anthropic) must be JSON lists; numeric-key objects are rejected rather than canonicalized.
 
 ### 5.4 Factory: `AIProviderFactory`
 
@@ -192,9 +192,27 @@ class AIProviderFactory
 
 `AIService::callAI()` resolves the provider via `app(AIProviderFactory::class)->make()` and delegates request building, header construction, and response parsing to the provider. Cross-cutting concerns (`temperature`, `max_tokens`, `response_format` when supported) are set in `callAI()`.
 
-For a non-success provider response, `callAI()` logs only the HTTP status and response-body length. It never persists the provider response body because providers may echo prompts, image-derived data, or other sensitive input. The public error contract remains status-only (`502` with `AI API Fehler: <status>`); transport connection failures remain `503`.
+For a non-success provider response, `callAI()` logs only the HTTP status and response-body length. It never persists the provider response body because providers may echo prompts, image-derived data, or other sensitive input. The public error contract remains status-only (`502` with `AI API Fehler: <status>`); transport connection failures remain `503`. Invalid JSON in an HTTP-200 provider response follows the same status-only `502` contract.
 
-### 5.5 Controller: `AIController`
+A successful provider payload must decode to an object with string `title`, `description`, and `location` fields. `keywords` follows the frontend contract: it is either a string or a JSON list of strings. The service trims and collapses whitespace, removes empty and exact duplicate terms, and joins the normalized terms with `, `. It rejects (rather than truncates) more than 30 terms, terms longer than 100 bytes, a raw keyword string longer than 2,000 bytes, or a normalized value longer than 2,000 bytes; invalid JSON or any other shape also produces the generic status-only `502` response.
+
+### 5.5 AI image resource budget and rejection contract
+
+`generateMetadata()` prepares the source image completely before it constructs the
+provider request. The preparation boundary is deliberately bounded before GD
+sees the bytes:
+
+- The source stream is copied with a hard cap of **20 MiB** (`20 * 1024 * 1024` bytes). A known stream size is rejected before the temporary copy; unknown streams are read only through the same bounded copy.
+- The bounded bytes are inspected with `getimagesizefromstring()` before `imagecreatefromstring()`. Images are rejected when either dimension exceeds **15,000 px** or the total exceeds **40,000,000 pixels**. This check is independent of the later 2,048 px output resize.
+- The temporary file, source stream, and decoded GD resource are released in a `finally` block on success and on every failure path. Cleanup does not depend on the exception being a provider error.
+- An oversized or undecodable image raises `AIImageProcessingException`; the vision controller maps it to HTTP `422` with one of these stable messages: `Das Bild ist zu groß für die KI-Verarbeitung.` or `Das Bild konnte nicht für die KI-Verarbeitung verarbeitet werden.` The provider is not constructed or called after either rejection. Provider HTTP errors remain `502`, and transport failures remain `503`.
+
+The limits are code-level guardrails, not deployment settings. They protect the
+GD process even when a file arrived through FTP rather than the web-upload
+validation path. FTP import remains a separate storage pipeline; its source
+cleanup contract is unchanged.
+
+### 5.6 Controller: `AIController`
 
 | Route | Method | Auth | Description |
 |---|---|---|---|---|
@@ -208,7 +226,7 @@ The vision endpoint needs two authorization stages because `updateMetadata` is t
 
 For target-scoped client/invite actors, missing, malformed, unknown, and inaccessible photo IDs all produce the same opaque `403`; `can_edit_metadata` is never treated as a stand-alone grant or as proof that any target exists. For role-capable actors, a missing or unknown ID remains a normal `422` validation result when AI is available. No target or gallery data is included in either the `403` or validation response. An unauthenticated request is `401`, an unauthorized request is `403` regardless of whether AI is disabled or unconfigured, and only an authorized unavailable request receives `503`. Provider and connection failures keep their existing `502`/`503` contracts.
 
-### 5.6 Service: `AIService`
+### 5.7 Service: `AIService`
 
 | Method | Type | Depends on |
 |---|---|---|
@@ -220,7 +238,7 @@ For target-scoped client/invite actors, missing, malformed, unknown, and inacces
 | `loadAndCompressImage(Photo)` | helper | GD library, `Storage::disk('photos')` |
 | `callAI(messages, sessionId?)` | transport | `AIProviderFactory::make()`, HTTP client, `config('services.ai.*')` |
 
-### 5.7 Session-affinity header (prompt-cache routing)
+### 5.8 Session-affinity header (prompt-cache routing)
 
 Batch vision requests (`AIBatchEditModal` → "Alle generieren") share an identical
 prefix (system prompt + global context) and differ only per image. To let
@@ -239,19 +257,35 @@ AIBatchEditModal (handleGenerateAll → crypto.randomUUID())
   header name, or `null` when the provider needs no session affinity
   (`LMStudioProvider`). `OpenAIProvider` and `AnthropicProvider` share the
   `HasSessionHeader` trait and default to `x-opencode-session` (OpenCode Go).
-- The header name is configurable per deployment via `AI_SESSION_HEADER`
-  (empty value disables the header); the value prefix via `AI_SESSION_PREFIX`
-  (default `portal-`). Values are sanitized to `[A-Za-z0-9._-]` and clamped to
-  128 chars.
+- The header name is configurable per deployment via `AI_SESSION_HEADER`.
+  An explicit empty value disables session-affinity headers. Non-empty names
+  are trimmed and must match the conservative `[A-Za-z0-9-]` field-name
+  allowlist; invalid names are omitted at runtime and abort the production
+  container before application bootstrap. The value prefix is configured via
+  `AI_SESSION_PREFIX` (default `portal-`, explicit empty allowed). Prefix and
+  per-request session id are sanitized to `[A-Za-z0-9._-]`, so CR/LF and other
+  disallowed bytes become `-`; the concatenated value is then capped at 128
+  characters, including when the prefix itself is overlong.
+- Production Compose uses unset-only defaults
+  (`${AI_SESSION_HEADER-x-opencode-session}` and
+  `${AI_SESSION_PREFIX-portal-}`). Missing host overrides therefore resolve to
+  the same values as `config/services.php`, while an explicitly empty host
+  value remains empty (the header opt-out, or an unprefixed session id). This
+  distinguishes an intentional override from an absent host variable.
+  Configured session-header names also cannot replace an existing mandatory
+  provider header (case-insensitive comparison).
 - Without a `session_id` no session header is sent at all (no generated
   fallback); `generate-metadata-text` accepts an optional `session_id` but the
   UI does not send one (single text-only request, no batch prefix to reuse).
+  The existing batch contract remains one frontend UUID per run, producing the
+  same `portal-{uuid}` value for every request in that batch.
 - Every provider request additionally carries a **hardcoded** `User-Agent:
   reisinger.pictures Portal` header, applied by all three providers in
   `buildHeaders()` via the shared `HasUserAgent` concern. The value is
   deliberately not configurable (no env/config key): OpenCode Go requires
   proper client identification and blocks generic defaults such as Guzzle's
-  `GuzzleHttp/x.y`.
+  `GuzzleHttp/x.y`. Invalid or colliding session-header configuration cannot
+  replace it.
 
 ## 6. Configuration
 
@@ -263,8 +297,8 @@ AIBatchEditModal (handleGenerateAll → crypto.randomUUID())
     'base_url'       => env('AI_BASE_URL', 'https://api.openai.com/v1'),
     'api_key'        => env('AI_API_KEY'),
     'model'          => env('AI_MODEL', 'gpt-4o'),
-    'session_header' => env('AI_SESSION_HEADER', 'x-opencode-session'), // '' disables
-    'session_prefix' => env('AI_SESSION_PREFIX', 'portal-'),
+    'session_header' => env('AI_SESSION_HEADER', 'x-opencode-session'), // explicit '' disables
+    'session_prefix' => env('AI_SESSION_PREFIX', 'portal-'),            // explicit '' allowed
 ],
 ```
 

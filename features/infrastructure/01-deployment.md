@@ -79,6 +79,13 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   `/var/www/ftp` müssen existieren, schreibbar sein und `stat` muss für sie
   `1000:1000` liefern. Die Prüfung erfolgt generisch ohne hartcodierte
   Schlüsselwerte.
+- **AI-Session-Config-Guard:** Nichtleere `AI_SESSION_HEADER` dürfen nur
+  Buchstaben, Ziffern und Bindestriche enthalten; `AI_SESSION_PREFIX` darf leer
+  sein oder nur Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich
+  enthalten. CRLF und andere Zeichen verweigern den Produktionsstart. Fehlende
+  Host-Overrides erhalten über die Compose-Interpolation dieselben Defaults wie
+  `backend/config/services.php`; explizit leere Werte bleiben leer. Insbesondere
+  bleibt ein leerer Header-Name die dokumentierte Session-Deaktivierung.
 - **Migrations-/Seed-/Admin-Gate:** Erst nach diesen Guards führt der Start
   `php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1`
   aus. Ein Fehler in **einem** dieser Schritte verhindert `queue:work`, den

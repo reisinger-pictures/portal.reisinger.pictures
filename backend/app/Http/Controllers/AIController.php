@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AIImageProcessingException;
 use App\Models\Gallery;
 use App\Models\Photo;
 use App\Models\User;
@@ -83,6 +84,8 @@ class AIController extends Controller
             return response()->json($result);
         } catch (ConnectionException $e) {
             return response()->json(['error' => 'KI-Dienst ist derzeit nicht erreichbar.'], 503);
+        } catch (AIImageProcessingException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
         } catch (\RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 502);
         }

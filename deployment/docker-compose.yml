@@ -150,8 +150,9 @@ services:
       - AI_BASE_URL=${AI_BASE_URL}
       - AI_API_KEY=${AI_API_KEY}
       - AI_MODEL=${AI_MODEL}
-      - AI_SESSION_HEADER=${AI_SESSION_HEADER}
-      - AI_SESSION_PREFIX=${AI_SESSION_PREFIX}
+      # Unset-only defaults keep an explicit empty header as the opt-out.
+      - AI_SESSION_HEADER=${AI_SESSION_HEADER-x-opencode-session}
+      - AI_SESSION_PREFIX=${AI_SESSION_PREFIX-portal-}
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1 2>/dev/null && grep -q php-fpm /proc/1/cmdline"]
       interval: "30s"
@@ -171,6 +172,14 @@ services:
       case \"$${PHOTO_STORAGE_PATH}\" in
         /*) ;;
         *) echo 'FATAL: PHOTO_STORAGE_PATH muss ein absoluter Mount-Pfad sein. Start verweigert!'; exit 1;;
+      esac;
+      case \"$${AI_SESSION_HEADER}\" in
+        '') ;;
+        *[!A-Za-z0-9-]*) echo 'FATAL: AI_SESSION_HEADER darf nur Buchstaben, Ziffern und Bindestriche enthalten. Start verweigert (fail-closed)!'; exit 1;;
+      esac;
+      case \"$${AI_SESSION_PREFIX}\" in
+        '') ;;
+        *[!A-Za-z0-9._-]*) echo 'FATAL: AI_SESSION_PREFIX darf nur Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich enthalten. Start verweigert (fail-closed)!'; exit 1;;
       esac;
       for path in /var/www/html \"$${PHOTO_STORAGE_PATH}\" /var/www/ftp; do
         if [ ! -d \"$${path}\" ] || [ ! -w \"$${path}\" ] || [ \"$$(stat -c '%u:%g' \"$${path}\")\" != '1000:1000' ]; then
