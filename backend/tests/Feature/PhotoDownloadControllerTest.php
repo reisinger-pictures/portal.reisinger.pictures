@@ -22,7 +22,7 @@ class PhotoDownloadControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Storage::fake('photos');
+        $this->useTemporaryStorageDisk('photos');
     }
 
     public function test_authorized_user_can_download_single_image_and_metadata_is_injected()
@@ -147,7 +147,24 @@ class PhotoDownloadControllerTest extends TestCase
             'user_name_snapshot' => 'Gast',
             'item_type' => 'full_zip',
             'gallery_id' => $gallery->id,
+            'photo_count' => 2,
         ]);
+    }
+
+    public function test_empty_public_gallery_zip_returns_422_without_a_download_log(): void
+    {
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => true,
+            'slug' => 'empty-zip',
+        ]);
+
+        $this->get("/api/galleries/{$gallery->id}/download-zip")
+            ->assertStatus(422)
+            ->assertJson(['error' => 'Der ZIP-Download enthält keine Bilder.']);
+
+        $this->assertDatabaseCount('download_logs', 0);
     }
 
     public function test_user_cannot_download_private_photo_from_unauthorized_gallery()
@@ -232,7 +249,17 @@ class PhotoDownloadControllerTest extends TestCase
             'type' => 'delivery',
             'is_public' => true,
         ]);
-        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $photos = Photo::factory()->count(2)->create(['gallery_id' => $gallery->id]);
+
+        // The prepared archive is derived from real files on the photos disk, so
+        // the fixture has to write the source images just like the production
+        // import does. Without them the ZIP branch prepares nothing and returns
+        // the documented 422 instead of a download log.
+        $content = (string) file_get_contents(base_path('tests/Fixtures/sample.jpg'));
+        foreach ($photos as $photo) {
+            Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $content);
+        }
+
         $order = Order::factory()->paid()->create([
             'user_id' => $user->id,
             'brand' => 'rp',
@@ -243,9 +270,11 @@ class PhotoDownloadControllerTest extends TestCase
             'invoice_number' => 'P-DOWNLOAD-LOG',
             'brand' => 'rp',
             'customer_details' => [
-                'items' => [
-                    ['photoId' => $photo->id, 'tier' => 'original', 'price' => 3500],
-                ],
+                'items' => $photos->map(fn (Photo $photo): array => [
+                    'photoId' => $photo->id,
+                    'tier' => 'original',
+                    'price' => 1750,
+                ])->all(),
             ],
             'total_net' => 3500,
             'total_gross' => 3500,
@@ -259,6 +288,48 @@ class PhotoDownloadControllerTest extends TestCase
         $log = DownloadLog::sole();
         $this->assertSame($order->id, $log->order_id);
         $this->assertSame($gallery->id, $log->gallery_id);
+        // photo_count is derived from the two prepared files, not from the
+        // number of persisted Photo rows and not from the legacy default of 1.
+        $this->assertSame(2, $log->photo_count);
+    }
+
+    public function test_paid_order_zip_without_source_file_returns_422_without_a_download_log(): void
+    {
+        $user = User::factory()->create();
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+        ]);
+        // Orderable and visible, but the source file never reached the photos
+        // disk. Preparation therefore yields zero files and the archive branch
+        // must fail closed instead of logging a zero-count ZIP.
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+
+        $order = Order::factory()->paid()->create([
+            'user_id' => $user->id,
+            'brand' => 'rp',
+        ]);
+
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'P-EMPTY-ZIP',
+            'brand' => 'rp',
+            'customer_details' => [
+                'items' => [
+                    ['photoId' => $photo->id, 'tier' => 'original', 'price' => 3500],
+                ],
+            ],
+            'total_net' => 3500,
+            'total_gross' => 3500,
+            'tax_rate' => 0,
+        ]);
+
+        $this->actingAs($user, 'api')
+            ->getJson("/api/orders/{$order->id}/download-zip")
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Der ZIP-Download enthält keine Bilder.']);
+
+        $this->assertDatabaseCount('download_logs', 0);
     }
 
     public function test_gallery_zip_fails_closed_when_watermark_bucket_is_missing(): void

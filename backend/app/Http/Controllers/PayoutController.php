@@ -33,22 +33,49 @@ class PayoutController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $service) {
-            $pool = PayoutPool::updateOrCreate(
-                ['month' => $request->month, 'year' => $request->year],
-                ['net_pool_cents' => $request->net_pool_cents, 'photographer_share_percent' => 50]
+            $poolIdentity = [
+                'year' => (int) $request->year,
+                'month' => (int) $request->month,
+            ];
+
+            // createOrFirst is the race-safe insert primitive: the V040
+            // natural-key index resolves a concurrent first insert, and the
+            // following row lock serializes the financial update.
+            $pool = PayoutPool::query()->createOrFirst(
+                $poolIdentity,
+                [
+                    'net_pool_cents' => (int) $request->net_pool_cents,
+                    'photographer_share_percent' => 50,
+                ],
             );
+            $pool = PayoutPool::query()
+                ->whereKey($pool->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $pool->update([
+                'net_pool_cents' => (int) $request->net_pool_cents,
+                'photographer_share_percent' => 50,
+            ]);
 
             // Never destroy the audit trail: approved/paid statements are locked and
-            // must survive a recalculation. Only recalculable (pending/rollover)
-            // statements are replaced; the service guards skip the locked rows.
-            PhotographerStatement::where('month', $request->month)
-                ->where('year', $request->year)
+            // must survive a recalculation. Lock the recalculable set before
+            // deleting it so an approval cannot race the delete boundary.
+            $recalculable = PhotographerStatement::query()
+                ->where('year', $poolIdentity['year'])
+                ->where('month', $poolIdentity['month'])
                 ->whereNotIn('status', ['approved', 'paid'])
-                ->delete();
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            if ($recalculable->isNotEmpty()) {
+                PhotographerStatement::query()
+                    ->whereKey($recalculable->modelKeys())
+                    ->delete();
+            }
 
             $service->calculatePoolShares($pool);
-            $service->calculatePowerUserDelta($request->month, $request->year);
-            $service->finalizeStatements($request->month, $request->year);
+            $service->calculatePowerUserDelta($pool->month, $pool->year);
+            $service->finalizeStatements($pool->month, $pool->year);
         });
 
         return response()->json(['success' => true]);
@@ -56,20 +83,30 @@ class PayoutController extends Controller
 
     public function approveStatement($id)
     {
-        $stmt = PhotographerStatement::findOrFail($id);
-        if ($stmt->status === 'pending') {
-            $stmt->update(['status' => 'approved']);
-        }
+        DB::transaction(function () use ($id): void {
+            $stmt = PhotographerStatement::query()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($stmt->status === 'pending') {
+                $stmt->update(['status' => 'approved']);
+            }
+        });
 
         return response()->json(['success' => true]);
     }
 
     public function markAsPaid($id)
     {
-        $stmt = PhotographerStatement::findOrFail($id);
-        if ($stmt->status === 'approved') {
-            $stmt->update(['status' => 'paid']);
-        }
+        DB::transaction(function () use ($id): void {
+            $stmt = PhotographerStatement::query()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($stmt->status === 'approved') {
+                $stmt->update(['status' => 'paid']);
+            }
+        });
 
         return response()->json(['success' => true]);
     }

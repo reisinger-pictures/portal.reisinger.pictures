@@ -35,7 +35,7 @@ class OrderDownloadFulfillmentTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Storage::fake('photos');
+        $this->useTemporaryStorageDisk('photos');
         BrandRegistry::clearCache();
         BrandRegistry::set(Brand::B2B);
         Mail::fake();
