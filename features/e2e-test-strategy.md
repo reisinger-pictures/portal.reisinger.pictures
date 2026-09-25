@@ -16,8 +16,20 @@ The suite runs in two browser projects:
 
 `fullyParallel` is enabled. Local runs use eight workers by default; CI uses the
 matrix worker count described below. Each test has a 120-second timeout and the
-whole run has a 15-minute (`900000` ms) global budget. CI retries a test up to
-two times (`retries: 2`); local runs do not retry automatically.
+whole run has a bounded 25-minute (`1500000` ms) global budget. CI retries a test
+up to two times (`retries: 2`); local runs do not retry automatically.
+
+### Explicit timeout decision (2026-09-25)
+
+The completed CI run `36035927250` measured a 6m51s serial entry and a 17m09s
+slowest parallel shard; the former 900000-ms cap stopped that shard with 26
+tests not run. The generic doubling guideline would produce 34m18s from
+17m09s, but the user-approved contract deliberately caps the whole run at
+25 minutes (`1500000` ms), leaving 7m51s above the measured maximum. The
+per-test budget remains `120000` ms. This is an explicit, auditable exception
+to the generic doubling rule, not an inferred timeout: any change requires a
+new CI measurement and explicit approval. The task board records the same
+decision and the fact that no local Playwright evidence is being claimed.
 
 The current CI matrix has seven entries:
 
@@ -109,9 +121,13 @@ startup.
 
 ### CI and deployment
 
-CI runs the full seven-entry E2E matrix on pushes and on pull requests from the
-same repository. Fork pull requests are skipped because their secrets are not
-available. A deployment requires the full suite; `@smoke` is the fast local
+CI runs the full seven-entry E2E matrix on pushes and on normal same-repository
+pull requests. Dependabot's `pull_request` event is intentionally skipped for
+the secret-dependent E2E job and its aggregate gate because that event has no
+usable repository secrets; the push run on the same head SHA is the sole
+authoritative `CI gate (push)`. Fork pull requests are also skipped because
+their secrets are not available, while normal same-repository PRs remain
+fail-closed. A deployment requires the full suite; `@smoke` is the fast local
 post-change check, not a replacement for the CI matrix. Every fresh CI E2E
 matrix database runs the same explicit, offline location-fixture seeder and Scout
 import before the backend server starts.
@@ -160,8 +176,12 @@ Turnstile failure.
 ## Shard maintenance
 
 Do not change shard counts or worker counts from historical timing claims. The
-`900000` ms global timeout is a budget, not an SLA. After changing the matrix,
-measure the actual matrix entries and keep the selection in this document and
+`1500000` ms global timeout is a bounded CI budget, not an SLA. The explicit
+25-minute decision and its exception to the generic doubling policy are
+recorded above; the former `900000` ms cap was hit by the slowest parallel
+shard in completed run `36035927250` (17m09s, with 26 tests not run), so it was
+replaced with the 25-minute budget. After changing the matrix, measure the
+actual matrix entries and keep the selection in this document and
 `features/infrastructure/28-ci-test-image.md` in sync. Re-balance only when a
 current run demonstrates a problem, and preserve the dedicated serial shard for
 the documented board/settings suites.

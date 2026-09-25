@@ -13,12 +13,12 @@ export default defineConfig({
     // Timeout semantics (Playwright) — explicit, per AGENTS.md E2E Timeout Policy:
     //  - `timeout` below is the PER-TEST budget (Playwright default: 30s). 120s
     //    covers the heaviest login/upload/checkout flows without masking hangs.
-    //  - The policy's measured ~7 min → doubled 15 min (900000 ms) is the budget
-    //    for the WHOLE run (all tests/workers), i.e. Playwright's `globalTimeout`.
-    //  - Validated 2026-09-12 (CI run 34710924406): each CI shard invocation runs
-    //    ~3 min, the full local run ~7 min — both far below the 15 min cap.
+    //  - The whole-run budget is separately bounded at 25 min (1500000 ms) for
+    //    CI headroom. In completed run 36035927250, the slowest parallel shard
+    //    reached 17m09s under the former 900000 ms cap and left 26 tests unrun;
+    //    the serial shard passed in 6m51s. Re-measure after E2E changes.
     timeout: 120000,
-    globalTimeout: 900000,
+    globalTimeout: 1500000,
     maxFailures: isCi ? 10 : 0,
     // CI must stay on the text-only reporter. The local HTML report remains a
     // developer-only debugging aid and is never an upload target.

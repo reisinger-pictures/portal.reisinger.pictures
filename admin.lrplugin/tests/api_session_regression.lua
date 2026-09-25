@@ -41,7 +41,7 @@ _G.LrPrefs = {
         return { apiUser = "photographer@example.test", useLocal = false }
     end
 }
-_G.LrTasks = { sleep = function(_) end }
+_G.LrTasks = { pcall = pcall, sleep = function(_) end }
 _G.LrPasswords = {
     store = function(_, _) return true end,
     retrieve = function(_) return "protected-password" end,
@@ -140,8 +140,21 @@ assert(select(2, Api.callWithSession(longSession, "/first", "GET", nil)) == 200)
 assert(select(2, Api.callWithSession(longSession, "/second", "GET", nil)) == 200)
 assert(longRefreshes == 2, "per-request auth bound was accidentally global")
 
+-- A non-idempotent POST is attempted once after a 401; replaying it could
+-- create a duplicate gallery, group, invite, or rating mutation.
+responses = { { headers = { status = 401 } } }
+local postRefreshes = 0
+local postSession = Api.createSession("post-old", "photographer@example.test", function()
+    postRefreshes = postRefreshes + 1
+    return "post-new"
+end)
+local postCallCount = #calls
+local _, postStatus = Api.callWithSession(postSession, "/api/management/galleries", "POST", {})
+assert(postStatus == 401 and postRefreshes == 0, "non-idempotent POST was replayed")
+assert(#calls == postCallCount + 2, "non-idempotent POST made more than one request")
+
 -- Multipart calls use the same bounded renewal path and remain idempotent via
--- the caller's replace=1 form field.
+-- the caller's replace=1 + lr_uuid identity contract.
 responses = {
     { headers = { status = 401 } },
     { body = '{"uploaded":true}', headers = { status = 200 } },
@@ -153,8 +166,32 @@ local uploadSession = Api.createSession("upload-old", "photographer@example.test
 end)
 local uploadBody, uploadStatus = Api.uploadWithSession(uploadSession, "/api/management/upload", {
     { name = "replace", value = "1" },
+    { name = "lr_uuid", value = "uuid-1" },
 })
 assert(uploadStatus == 200 and uploadBody == '{"uploaded":true}', "upload renewal did not succeed")
 assert(uploadRefreshes == 1, "upload renewal was not bounded")
+
+assert(Api.isIdempotentUpload({
+    { name = "replace", value = "1" },
+    { name = "lr_uuid", value = "uuid-2" },
+}), "replace + UUID upload must be replayable")
+assert(not Api.isIdempotentUpload({ { name = "replace", value = "1" } }),
+    "replace without UUID must not be replayable")
+
+-- Without the replacement identity, a 401 upload is not replayed even when a
+-- refresh callback is available.
+responses = { { headers = { status = 401 } } }
+local unsafeUploadRefreshes = 0
+local unsafeUploadSession = Api.createSession("unsafe-upload-old", "photographer@example.test", function()
+    unsafeUploadRefreshes = unsafeUploadRefreshes + 1
+    return "unsafe-upload-new"
+end)
+local unsafeCallCount = #calls
+local _, unsafeUploadStatus = Api.uploadWithSession(unsafeUploadSession, "/api/management/upload", {
+    { name = "replace", value = "1" },
+})
+assert(unsafeUploadStatus == 401 and unsafeUploadRefreshes == 0,
+    "upload without UUID identity was replayed")
+assert(#calls == unsafeCallCount + 2, "unsafe upload made more than one request")
 
 print("Lua API session regression checks passed")

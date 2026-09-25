@@ -49,14 +49,28 @@ return {
                         title = "Login testen",
                         action = function()
                             LrTasks.startAsyncTask(function()
-                                Api.migrateLegacyPassword()
-                                prefs.apiUser = propertyTable.apiUser
+                                local migrationOk = Api.migrateLegacyPassword()
+                                if migrationOk == false then
+                                    LrDialogs.message(
+                                        "Passwortmigration fehlgeschlagen",
+                                        "Das alte Passwort konnte nicht in den Betriebssystem-Schlüsselbund übernommen werden. Bitte gib das Passwort erneut ein.",
+                                        "warning"
+                                    )
+                                end
+                                prefs.apiUser = propertyTable.apiUser or ""
                                 local typedPassword = propertyTable.apiPass
                                 local password = (typedPassword and typedPassword ~= "") and typedPassword or Api.getStoredPassword()
                                 local token, err, detail = Api.login(propertyTable.apiUser, password)
                                 if token then
-                                    Api.storePassword(password)
-                                    LrDialogs.message("Erfolg!", "Verbindung zum Portal erfolgreich hergestellt.", "info")
+                                    local stored = true
+                                    if password and password ~= "" then
+                                        stored = Api.storePassword(password)
+                                    end
+                                    if stored then
+                                        LrDialogs.message("Erfolg!", "Verbindung zum Portal erfolgreich hergestellt. Das Passwort wird sicher im Betriebssystem gespeichert.", "info")
+                                    else
+                                        LrDialogs.message("Verbindung erfolgreich, Passwort nicht gespeichert", "Die Anmeldung war erfolgreich, das Passwort konnte aber nicht im Betriebssystem-Schlüsselbund gespeichert werden.", "warning")
+                                    end
                                 else
                                     LrDialogs.message("Fehlgeschlagen", "Fehler: " .. tostring(err) .. "\n\n" .. tostring(detail), "critical")
                                 end
