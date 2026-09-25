@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\AsBrand;
 use App\Support\ActorIdentity;
+use App\Support\ModelStatusGuard;
 use App\Support\PersistedMoney;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -16,6 +17,28 @@ class Order extends Model
     use HasFactory, HasUuids;
 
     public const UPDATED_AT = null;
+
+    /**
+     * The current order workflow states.
+     *
+     * Persisted rows may still carry a legacy value that is no longer part of
+     * this list; such a row must not fail unrelated saves (see
+     * {@see ModelStatusGuard::assertTransitionAllowed()}).
+     *
+     * @var array<int, string>
+     */
+    public const ALLOWED_STATUSES = [
+        'pending',
+        'invoice_created',
+        'pending_payment',
+        'paid',
+        'overdue',
+        'cancelled',
+        'disputed',
+        'refunded',
+        'delivery_note',
+        'archived_in_collective',
+    ];
 
     protected $attributes = [
         'payment_intent_generation' => 1,
@@ -82,10 +105,15 @@ class Order extends Model
             ActorIdentity::assertOrderOwnerInvariant($order->user_id, $order->guest_id);
             PersistedMoney::assertFitsCents($order->total_amount, 'orders.total_amount');
 
-            $allowedStatuses = ['pending', 'invoice_created', 'pending_payment', 'paid', 'overdue', 'cancelled', 'disputed', 'refunded', 'delivery_note', 'archived_in_collective'];
-            if (! in_array($order->status, $allowedStatuses)) {
-                throw new \InvalidArgumentException("Ungültiger Bestellstatus: {$order->status}");
-            }
+            // Transition guard: a persisted legacy status must not break saves
+            // that do not touch the status column (e.g. payment-failure
+            // bookkeeping or the withdrawal consent snapshot).
+            ModelStatusGuard::assertTransitionAllowed(
+                $order,
+                'status',
+                self::ALLOWED_STATUSES,
+                'Bestellstatus',
+            );
         });
     }
 

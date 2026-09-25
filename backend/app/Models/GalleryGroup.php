@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Brand;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -43,79 +44,65 @@ class GalleryGroup extends Model
         static::saving(function (GalleryGroup $group) {
             $parentId = $group->parent_id;
 
+            if ($parentId === null) {
+                return;
+            }
+
             // Selbstreferenz.
-            if ($parentId !== null && $parentId === $group->id) {
+            if ($parentId === $group->id) {
                 throw new \InvalidArgumentException(
                     'GalleryGroup#parent_id darf nicht auf sich selbst verweisen (Zyklus).'
                 );
             }
 
-            // Zyklus über die bestehende Eltern-Kette des Ziel-Parents aufbauen.
-            if ($parentId !== null) {
-                $visited = [$group->id => true];
-                $cursor = GalleryGroup::find($parentId);
-
-                while ($cursor !== null) {
-                    if (isset($visited[$cursor->id])) {
-                        throw new \InvalidArgumentException(
-                            'GalleryGroup#parent_id würde einen Zyklus erzeugen.'
-                        );
-                    }
-                    $visited[$cursor->id] = true;
-
-                    // Wurzel erreicht.
-                    if ($cursor->parent_id === null) {
-                        break;
-                    }
-                    $cursor = GalleryGroup::find($cursor->parent_id);
-                }
+            // Zyklus über die bestehende Eltern-Kette des Ziel-Parents. Eine
+            // einzelne, selbstterminierende Abfrage statt eines Lookups pro
+            // Ancestor-Level (Query-Budget unabhängig von der Tiefe).
+            if (GalleryGroupSubtree::parentChainContains($parentId, self::stringKey($group->id))) {
+                throw new \InvalidArgumentException(
+                    'GalleryGroup#parent_id würde einen Zyklus erzeugen.'
+                );
             }
         });
 
         static::saved(function (GalleryGroup $group) {
-            \Illuminate\Support\Facades\DB::afterCommit(function() use ($group) {
+            DB::afterCommit(function () use ($group) {
                 app(\App\Services\GalleryTreeService::class)->clearCache();
             });
 
             if ($group->wasChanged('brand') && $group->brand !== null) {
-                $groupIds = DB::select("
-                    WITH RECURSIVE descendants AS (
-                        SELECT id FROM gallery_groups WHERE parent_id = ?
-                        UNION ALL
-                        SELECT g.id FROM gallery_groups g
-                        INNER JOIN descendants d ON g.parent_id = d.id
-                    )
-                    SELECT id FROM descendants
-                ", [$group->id]);
+                // Bounded, cycle-safe descendant walk (depth/node budgets,
+                // chunked `whereIn`). The previous recursive CTE used
+                // `UNION ALL`, which never terminates on corrupt A→B→A data.
+                $descendantIds = GalleryGroupSubtree::descendantIds([$group->id]);
+                $brand = $group->brand;
 
-                $groupIds = array_column($groupIds, 'id');
-
-                if (!empty($groupIds)) {
-                    GalleryGroup::whereIn('id', $groupIds)
-                        ->where(function ($q) use ($group) {
-                        $q->where('brand', '!=', $group->brand)
-                          ->orWhereNull('brand');
+                foreach (array_chunk($descendantIds, GalleryGroupSubtree::PARENT_ID_CHUNK) as $chunk) {
+                    GalleryGroup::whereIn('id', $chunk)
+                        ->where(function ($q) use ($brand) {
+                            $q->where('brand', '!=', $brand)
+                                ->orWhereNull('brand');
                         })
-                        ->update(['brand' => $group->brand]);
+                        ->update(['brand' => $brand]);
 
-                    Gallery::whereIn('gallery_group_id', $groupIds)
-                        ->where(function ($q) use ($group) {
-                            $q->where('brand', '!=', $group->brand)
-                              ->orWhereNull('brand');
+                    Gallery::whereIn('gallery_group_id', $chunk)
+                        ->where(function ($q) use ($brand) {
+                            $q->where('brand', '!=', $brand)
+                                ->orWhereNull('brand');
                         })
-                        ->update(['brand' => $group->brand]);
+                        ->update(['brand' => $brand]);
                 }
 
                 Gallery::where('gallery_group_id', $group->id)
-                    ->where(function ($q) use ($group) {
-                        $q->where('brand', '!=', $group->brand)
+                    ->where(function ($q) use ($brand) {
+                        $q->where('brand', '!=', $brand)
                           ->orWhereNull('brand');
                     })
-                    ->update(['brand' => $group->brand]);
+                    ->update(['brand' => $brand]);
             }
         });
         static::deleted(function () {
-            \Illuminate\Support\Facades\DB::afterCommit(function() {
+            DB::afterCommit(function () {
                 app(\App\Services\GalleryTreeService::class)->clearCache();
             });
         });
@@ -201,9 +188,20 @@ class GalleryGroup extends Model
         return $this->belongsTo(GalleryGroup::class, 'parent_id');
     }
 
+    /**
+     * Direct children only.
+     *
+     * This relation intentionally carries no nested eager loads: a
+     * self-referential `with(['children'])` re-applies itself on every level
+     * and therefore walks the full hierarchy — unbounded in depth, one query
+     * per node, and an infinite loop on corrupt cyclic data. Use
+     * {@see GalleryGroupSubtree::loadSubtree()} /
+     * {@see GalleryGroupSubtree::loadForest()} for a bounded, cycle-safe
+     * subtree.
+     */
     public function children()
     {
-        return $this->hasMany(GalleryGroup::class, 'parent_id')->with(['children', 'galleries', 'orgs']);
+        return $this->hasMany(GalleryGroup::class, 'parent_id');
     }
 
     public function galleries()
@@ -214,5 +212,10 @@ class GalleryGroup extends Model
     public function orgs()
     {
         return $this->belongsToMany(Org::class);
+    }
+
+    private static function stringKey(mixed $key): ?string
+    {
+        return is_string($key) || is_int($key) ? (string) $key : null;
     }
 }
