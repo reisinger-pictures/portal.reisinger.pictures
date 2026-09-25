@@ -40,6 +40,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Verify workflow and artifact security invariants
         run: bash tests/infrastructure/ci-security-contract.sh
+      # P1-I5: the pinned base image must not run as root. This inspects the
+      # published artifact anonymously - a source-only 'USER www-data' check is
+      # not evidence, because the digest production pinned until d7f3596 was
+      # built before that line existed and ran as uid 0. A private package
+      # answers 401/403 and FAILS this step on purpose; it never degrades to a
+      # skip. See tests/infrastructure/verify-image-nonroot.sh.
+      - name: Verify the pinned base image is not a root image
+        run: bash tests/infrastructure/verify-image-nonroot.sh
 
   backend:
     name: Backend (PHPUnit)
