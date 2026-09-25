@@ -435,6 +435,9 @@ class PhotoDownloadController extends Controller
             $photoIds = collect($preparedFiles)->pluck('photo_id')->filter()->unique()->values();
             $galleryIds = collect($preparedFiles)->pluck('gallery_id')->filter()->unique()->values();
             $photoCount = $photoIds->count();
+            if ($photoCount < 1) {
+                abort(422, 'Der ZIP-Download enthält keine Bilder.');
+            }
 
             [$currentGallery, $currentUser] = $this->authorizeGalleryZipDownload($galleryId, $tier);
             $this->assertPreparedGalleryFilesCurrent($preparedFiles, $currentGallery);
@@ -1047,11 +1050,7 @@ class PhotoDownloadController extends Controller
             abort(404, 'Keine Bilder in dieser Bestellung gefunden.');
         }
 
-        $photos = $this->authorizeOrderItemsForDownload($items, $order, $snapshot, $actor);
-        $photoIds = $this->boundedAuditIds($photos->keys());
-        $galleryIds = $this->boundedAuditIds($photos->pluck('gallery_id'));
-        $photoCount = $photos->count();
-        $galleryId = count($galleryIds) === 1 ? $galleryIds[0] : null;
+        $this->authorizeOrderItemsForDownload($items, $order, $snapshot, $actor);
         $tiers = [];
         foreach ($items as $item) {
             $tiers[] = is_array($item) && is_string($item['tier'] ?? null)
@@ -1078,6 +1077,21 @@ class PhotoDownloadController extends Controller
                 $actor->name,
                 $customConditions,
             );
+
+            $preparedPhotoIds = collect($preparedFiles)
+                ->pluck('photo_id')
+                ->filter()
+                ->unique()
+                ->values();
+            $photoIds = $this->boundedAuditIds($preparedPhotoIds);
+            $galleryIds = $this->boundedAuditIds(
+                collect($preparedFiles)->pluck('gallery_id')->filter()->unique(),
+            );
+            $photoCount = $preparedPhotoIds->count();
+            if ($photoCount < 1) {
+                abort(422, 'Der ZIP-Download enthält keine Bilder.');
+            }
+            $galleryId = count($galleryIds) === 1 ? $galleryIds[0] : null;
 
             $currentContext = $this->loadCurrentOrderDownloadContext(
                 $orderId,

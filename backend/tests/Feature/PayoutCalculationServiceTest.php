@@ -464,9 +464,10 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertNotEmpty($stmt->sequence_number); // auto-generated
     }
 
-    public function test_calculate_pool_shares_accumulates_into_existing_statement(): void
+    public function test_calculate_pool_shares_replaces_existing_pool_contribution(): void
     {
-        // REVIEW: firstOrNew lädt bestehendes Statement und addiert Shares/Earnings.
+        // The pool calculation is authoritative for (year, month): it replaces
+        // pool-derived fields instead of adding to a previous run.
         $pool = PayoutPool::factory()
             ->forMonth(6, 2026)->withNetPool(10000)
             ->create(['photographer_share_percent' => 100]);
@@ -475,6 +476,7 @@ class PayoutCalculationServiceTest extends TestCase
         PhotographerStatement::create([
             'user_id' => $photographer->id, 'month' => 6, 'year' => 2026,
             'total_shares_earned' => '5.0000', 'pool_earnings_cents' => 3000,
+            'delta_surcharge_earnings_cents' => 250,
         ]);
 
         $gallery = Gallery::factory()->create();
@@ -488,8 +490,9 @@ class PayoutCalculationServiceTest extends TestCase
         $this->service->calculatePoolShares($pool->fresh());
 
         $stmt = PhotographerStatement::where('user_id', $photographer->id)->sole();
-        $this->assertSame('6.0000', $stmt->total_shares_earned); // 5 + 1
-        $this->assertSame(13000, $stmt->pool_earnings_cents); // 3000 + (1*10000*100%)
+        $this->assertSame('1.0000', $stmt->total_shares_earned);
+        $this->assertSame(10000, $stmt->pool_earnings_cents); // 1 * 10000 * 100%
+        $this->assertSame(250, $stmt->delta_surcharge_earnings_cents);
     }
 
     // ============================================================
