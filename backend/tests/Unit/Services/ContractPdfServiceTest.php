@@ -8,7 +8,6 @@ use App\Models\ContractSigner;
 use App\Services\ContractPdfService;
 use App\Services\ManualInvoiceService;
 use App\Services\OfferTokenService;
-use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,14 +49,6 @@ class ContractPdfServiceTest extends TestCase
         ]);
 
         $manualInvoiceMock = $this->mock(ManualInvoiceService::class);
-        $manualInvoiceMock->shouldReceive('processItems')
-            ->once()
-            ->andReturn([
-                'items' => [
-                    ['type' => 'item', 'filename' => 'Foto A', 'qty' => 1, 'price' => 5000, 'row_total' => 5000],
-                ],
-                'total' => 5000,
-            ]);
         $manualInvoiceMock->shouldReceive('getBankDetails')
             ->once()
             ->andReturn([
@@ -99,10 +90,6 @@ class ContractPdfServiceTest extends TestCase
         ]);
 
         $manualInvoiceMock = $this->mock(ManualInvoiceService::class);
-        $manualInvoiceMock->shouldReceive('processItems')->once()->andReturn([
-            'items' => [['type' => 'item', 'filename' => 'Test', 'qty' => 1, 'price' => 1000, 'row_total' => 1000]],
-            'total' => 1000,
-        ]);
         $manualInvoiceMock->shouldReceive('getBankDetails')->once()->andReturn([
             'holder' => 'Bank', 'iban' => 'DE00', 'bic' => 'BIC',
         ]);
@@ -117,6 +104,7 @@ class ContractPdfServiceTest extends TestCase
             ->with('pdf.contract_signatures', \Mockery::on(function ($data) {
                 $this->assertEquals('#1E5631', $data['primaryColor']);
                 $this->assertEquals('#A4B494', $data['secondaryColor']);
+
                 return true;
             }))
             ->andReturn($domPdfMock);
@@ -141,10 +129,6 @@ class ContractPdfServiceTest extends TestCase
         ]);
 
         $manualInvoiceMock = $this->mock(ManualInvoiceService::class);
-        $manualInvoiceMock->shouldReceive('processItems')->once()->andReturn([
-            'items' => [['type' => 'item', 'filename' => 'Test', 'qty' => 1, 'price' => 1000, 'row_total' => 1000]],
-            'total' => 1000,
-        ]);
         $manualInvoiceMock->shouldReceive('getBankDetails')->once()->andReturn([
             'holder' => 'Bank', 'iban' => 'DE00', 'bic' => 'BIC',
         ]);

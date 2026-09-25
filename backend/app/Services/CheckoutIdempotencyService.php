@@ -9,6 +9,8 @@ use App\Support\BrandRegistry;
 use App\Support\CheckoutKey;
 use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -60,15 +62,21 @@ class CheckoutIdempotencyService
      */
     public function findPositiveStripeOrderByKey(User $user, string $key): ?Order
     {
-        return Order::query()
+        $query = Order::query()
             ->ownedBy($user)
             ->with('invoiceSnapshot')
             ->where('checkout_idempotency_key', $key)
             ->whereIn('status', ['pending_payment', 'paid'])
             ->where('is_quote_request', false)
             ->where('total_amount', '>', 0)
-            ->whereNotNull('checkout_fingerprint')
-            ->first();
+            ->whereNotNull('checkout_fingerprint');
+        // A positive immediate claim is actionable only inside the active
+        // host brand. Legacy null-brand rows must not be promoted into a
+        // current-brand replay; the resolver applies the same fail-closed rule
+        // for exact-key and fingerprint-fallback paths.
+        $this->scopeToActiveBrand($query);
+
+        return $query->first();
     }
 
     /**
@@ -82,7 +90,11 @@ class CheckoutIdempotencyService
         Request $request,
         string $paymentMethod,
     ): ?Order {
-        $brand = BrandRegistry::current()?->value;
+        $brand = BrandRegistry::currentIdOrNull();
+        if ($brand === null) {
+            return null;
+        }
+
         $query = Order::query()
             ->ownedBy($user)
             ->with('invoiceSnapshot')
@@ -94,11 +106,7 @@ class CheckoutIdempotencyService
             ->latest('created_at')
             ->latest('id')
             ->limit(50);
-        if ($brand === null) {
-            $query->whereNull('brand');
-        } else {
-            $query->where('brand', $brand);
-        }
+        $query->where('brand', $brand);
 
         foreach ($query->get() as $order) {
             $fingerprint = $this->fingerprint(
@@ -137,6 +145,85 @@ class CheckoutIdempotencyService
     }
 
     /**
+     * Resolve an exact-key non-immediate claim before coupon revalidation.
+     *
+     * The persisted server total is used only to reconstruct the canonical
+     * fingerprint. This lets a retry of a finite/free coupon or invoice claim
+     * succeed even when the coupon has since been exhausted or deactivated.
+     * A positive PaymentIntent claim is deliberately left to the existing
+     * immediate-Stripe replay path.
+     *
+     * @param  Closure(Order): JsonResponse  $finalizer
+     */
+    public function replayNonImmediateByKey(
+        User $user,
+        Request $request,
+        string $paymentMethod,
+        Closure $finalizer,
+    ): ?JsonResponse {
+        $providedKey = trim((string) $request->header('Idempotency-Key', ''));
+        if ($providedKey === '') {
+            return null;
+        }
+
+        // Validate the opaque key before doing any exact-key lookup.
+        $seed = $this->identify($request, $user, null, $paymentMethod);
+        $candidate = $this->findOrderForIdentity($user, $seed['key'], '', false);
+        if ($candidate === null || $this->isImmediateStripeClaim($candidate)) {
+            return null;
+        }
+
+        $amountCents = (int) $candidate->total_amount;
+        $identity = $this->identify($request, $user, $amountCents, $paymentMethod);
+
+        try {
+            return $this->withIdentityLocks(
+                $user,
+                $identity['key'],
+                $identity['fingerprint'],
+                function () use ($user, $identity, $finalizer): ?JsonResponse {
+                    $order = $this->findOrderForIdentity($user, $identity['key'], $identity['fingerprint'], false);
+                    if ($order === null || $this->isImmediateStripeClaim($order)) {
+                        return null;
+                    }
+
+                    return $this->resolveNonImmediateExistingOrder(
+                        $user,
+                        $order,
+                        $identity['key'],
+                        $identity['fingerprint'],
+                        (int) $order->total_amount,
+                        function (?Order $resolvedOrder) use ($finalizer): JsonResponse {
+                            if ($resolvedOrder === null) {
+                                return response()->json([
+                                    'error' => 'Der Checkout konnte nicht sicher fortgesetzt werden.',
+                                ], 503);
+                            }
+
+                            try {
+                                return $finalizer($resolvedOrder);
+                            } catch (\Throwable $exception) {
+                                Log::warning('Non-immediate checkout replay finalizer failed', [
+                                    'order_id' => $resolvedOrder->id,
+                                    'exception_class' => $exception::class,
+                                ]);
+
+                                return response()->json([
+                                    'error' => 'Der Checkout konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
+                                ], 503);
+                            }
+                        },
+                    );
+                },
+            );
+        } catch (LockTimeoutException) {
+            return response()->json([
+                'error' => 'Ein identischer Checkout läuft bereits. Bitte versuche es in wenigen Sekunden erneut.',
+            ], 409);
+        }
+    }
+
+    /**
      * @param  Closure(?Order): JsonResponse  $creator
      */
     public function execute(
@@ -156,7 +243,30 @@ class CheckoutIdempotencyService
                     $order = $this->findOrderForIdentity($user, $key, $fingerprint, $allowFingerprintFallback);
 
                     if ($order === null) {
-                        return $creator(null);
+                        try {
+                            return $creator(null);
+                        } catch (UniqueConstraintViolationException $exception) {
+                            // A different worker can win the database unique
+                            // constraint between the cache-lock lookup and the
+                            // creator's order insert. Re-read while the identity
+                            // lock is held, then apply the same brand/key/
+                            // fingerprint/status rules as a normal replay.
+                            $claimedOrder = $this->findOrderForIdentity($user, $key, $fingerprint, false);
+                            if ($claimedOrder === null) {
+                                if ($this->hasOwnedKeyOutsideCurrentBrand($user, $key)) {
+                                    return $this->conflict('Dieser Checkout-Versuch gehört zu einer anderen Marke.');
+                                }
+
+                                throw $exception;
+                            }
+
+                            return $this->resolveExistingOrder(
+                                $claimedOrder,
+                                $fingerprint,
+                                $amountCents,
+                                $creator,
+                            );
+                        }
                     }
 
                     return $this->resolveExistingOrder($order, $fingerprint, $amountCents, $creator);
@@ -170,6 +280,161 @@ class CheckoutIdempotencyService
     }
 
     /**
+     * Execute a checkout that does not create a PaymentIntent.
+     *
+     * Invoice, settled-free, delivery-note, and reactive-quote orders still
+     * create exactly one Order + InvoiceSnapshot pair. They intentionally share
+     * the V036 key/fingerprint namespace with immediate Stripe, but the
+     * resolver never contacts Stripe and only resumes the settlement transition
+     * when a previous request stopped before its final response. A lost browser
+     * key is not recovered by fingerprint: exact-key replay is the deliberate
+     * safe boundary for these non-immediate paths.
+     *
+     * @param  Closure(?Order): JsonResponse  $creator
+     */
+    public function executeNonImmediate(
+        User $user,
+        string $key,
+        string $fingerprint,
+        int $amountCents,
+        Closure $creator,
+        bool $allowFingerprintFallback = false,
+    ): JsonResponse {
+        try {
+            return $this->withIdentityLocks(
+                $user,
+                $key,
+                $fingerprint,
+                function () use ($user, $key, $fingerprint, $amountCents, $creator, $allowFingerprintFallback): JsonResponse {
+                    $order = $this->findOrderForIdentity($user, $key, $fingerprint, $allowFingerprintFallback);
+
+                    if ($order !== null) {
+                        return $this->resolveNonImmediateExistingOrder(
+                            $user,
+                            $order,
+                            $key,
+                            $fingerprint,
+                            $amountCents,
+                            $creator,
+                        );
+                    }
+
+                    if ($this->hasOwnedKeyOutsideCurrentBrand($user, $key)) {
+                        return $this->conflict('Dieser Checkout-Versuch gehört zu einer anderen Marke.');
+                    }
+
+                    try {
+                        return $creator(null);
+                    } catch (UniqueConstraintViolationException $exception) {
+                        // A different worker can win the database unique
+                        // constraint between the cache-lock lookup and the
+                        // creator's insert. Re-read the claimed order while the
+                        // identity lock is still held and resolve it through the
+                        // same fingerprint/status rules.
+                        $claimedOrder = $this->findOrderForIdentity($user, $key, $fingerprint, false);
+                        if ($claimedOrder === null) {
+                            if ($this->hasOwnedKeyOutsideCurrentBrand($user, $key)) {
+                                return $this->conflict('Dieser Checkout-Versuch gehört zu einer anderen Marke.');
+                            }
+
+                            throw $exception;
+                        }
+
+                        return $this->resolveNonImmediateExistingOrder(
+                            $user,
+                            $claimedOrder,
+                            $key,
+                            $fingerprint,
+                            $amountCents,
+                            $creator,
+                        );
+                    }
+                },
+            );
+        } catch (LockTimeoutException) {
+            return response()->json([
+                'error' => 'Ein identischer Checkout läuft bereits. Bitte versuche es in wenigen Sekunden erneut.',
+            ], 409);
+        }
+    }
+
+    /**
+     * @param  Closure(?Order): JsonResponse  $creator
+     */
+    private function resolveNonImmediateExistingOrder(
+        User $user,
+        Order $order,
+        string $key,
+        string $fingerprint,
+        int $amountCents,
+        Closure $creator,
+    ): JsonResponse {
+        if (! ActorIdentity::ownsOrder($order, $user)
+            || ! $this->orderMatchesCurrentBrand($order)
+            || ! is_string($order->checkout_idempotency_key)
+            || $order->checkout_idempotency_key !== $key
+            || (int) $order->total_amount !== $amountCents
+            || ! is_string($order->checkout_fingerprint)
+            || $order->checkout_fingerprint === ''
+            || ! hash_equals($order->checkout_fingerprint, $fingerprint)) {
+            return $this->conflict('Dieser Checkout-Versuch wurde bereits mit anderen Daten verwendet.');
+        }
+
+        $order->loadMissing('invoiceSnapshot');
+
+        // A claim that owns a PaymentIntent belongs exclusively to the
+        // immediate-Stripe state machine. Never reinterpret it as an invoice,
+        // delivery note, quote, or settled-free order if the current org or
+        // request classification changes while the browser key is reused.
+        if ($order->stripe_payment_intent_id !== null) {
+            return $this->conflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+        }
+
+        if ((bool) $order->is_quote_request) {
+            if ($order->status === 'pending') {
+                return $creator($order);
+            }
+
+            return $this->conflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+        }
+
+        $isFreeOrder = (int) $order->total_amount === 0;
+
+        // A free checkout creates its Order before the final conditional
+        // pending_payment/invoice_created -> paid transition. If the process
+        // failed between those writes, let the creator finish that transition
+        // using the same order rather than inserting a second one.
+        if ($isFreeOrder
+            && in_array($order->status, ['pending_payment', 'invoice_created'], true)
+            && $order->stripe_payment_intent_id === null) {
+            $lockedOrder = $this->lockNonImmediateOrderForRetry(
+                $user,
+                $order,
+                $key,
+                $fingerprint,
+                $amountCents,
+            );
+            if ($lockedOrder instanceof JsonResponse) {
+                return $lockedOrder;
+            }
+
+            return $creator($lockedOrder);
+        }
+
+        if ($order->status === 'paid'
+            || in_array($order->status, ['invoice_created', 'delivery_note'], true)) {
+            // Re-run the idempotent finalizer for an existing claim. The
+            // finalizer uses a durable order/snapshot and a mail enqueue
+            // marker, so a transient failure after the DB commit can be
+            // retried without creating another order or another enqueue. SMTP
+            // delivery itself remains subject to queue-worker retries.
+            return $creator($order);
+        }
+
+        return $this->conflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+    }
+
+    /**
      * @param  Closure(?Order): JsonResponse|null  $creator
      */
     private function resolveExistingOrder(
@@ -178,7 +443,8 @@ class CheckoutIdempotencyService
         int $amountCents,
         ?Closure $creator,
     ): ?JsonResponse {
-        if (! hash_equals((string) $order->checkout_fingerprint, $fingerprint)) {
+        if (! $this->positiveStripeOrderMatchesActiveBrand($order)
+            || ! hash_equals((string) $order->checkout_fingerprint, $fingerprint)) {
             return $this->conflict('Dieser Checkout-Versuch wurde bereits mit anderen Daten verwendet.');
         }
 
@@ -335,9 +601,10 @@ class CheckoutIdempotencyService
             ], 403);
         }
 
+        $brandScope = BrandRegistry::currentIdOrNull() ?? 'default';
         $lockKeys = [
-            CheckoutKey::user($actorIdentifier.'|'.$key, 'checkout-idempotency-key'),
-            CheckoutKey::user($actorIdentifier.'|'.$fingerprint, 'checkout-idempotency-fingerprint'),
+            CheckoutKey::user($actorIdentifier.'|'.$brandScope.'|'.$key, 'checkout-idempotency-key'),
+            CheckoutKey::user($actorIdentifier.'|'.$brandScope.'|'.$fingerprint, 'checkout-idempotency-fingerprint'),
         ];
         $lockKeys = array_values(array_unique($lockKeys));
         sort($lockKeys);
@@ -363,12 +630,87 @@ class CheckoutIdempotencyService
             + self::IDENTITY_LOCK_TTL_MARGIN_SECONDS;
     }
 
+    /**
+     * Scope a positive immediate-Stripe lookup to the explicit active brand.
+     *
+     * A missing brand context is not an instruction to fall back to the
+     * default brand for an actionable payment. Returning an empty query keeps
+     * direct service callers fail-closed as well; only non-immediate legacy
+     * resolution has a separately documented compatibility path.
+     */
+    private function scopeToActiveBrand(Builder $query): Builder
+    {
+        $currentBrand = BrandRegistry::currentIdOrNull();
+        if ($currentBrand === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('brand', $currentBrand);
+    }
+
+    private function positiveStripeOrderMatchesActiveBrand(Order $order): bool
+    {
+        $currentBrand = BrandRegistry::currentIdOrNull();
+        $orderBrand = BrandRegistry::normalizeId($order->brand);
+
+        return $currentBrand !== null
+            && $orderBrand !== null
+            && hash_equals($currentBrand, $orderBrand);
+    }
+
+    private function orderMatchesCurrentBrand(Order $order): bool
+    {
+        $currentBrand = BrandRegistry::currentIdOrNull();
+        $orderBrand = BrandRegistry::normalizeId($order->brand);
+
+        if ($currentBrand !== null) {
+            return $orderBrand === $currentBrand;
+        }
+
+        // Direct service callers in legacy tests/tools may not install a host
+        // context. Preserve compatibility with both the default B2B order and
+        // an explicitly ownerless fixture for the non-immediate resolver.
+        return $orderBrand === null || $orderBrand === BrandRegistry::currentId();
+    }
+
+    private function hasOwnedKeyOutsideCurrentBrand(User $user, string $key): bool
+    {
+        $currentBrand = BrandRegistry::currentIdOrNull();
+        if ($currentBrand === null) {
+            return false;
+        }
+
+        // This is an explicit conflict probe, not a replay lookup. Include
+        // null/foreign rows so a reused key cannot be mistaken for a new
+        // checkout; the resolver will never treat them as active claims.
+        return Order::query()
+            ->ownedBy($user)
+            ->where('checkout_idempotency_key', $key)
+            ->where(function ($query) use ($currentBrand): void {
+                $query->where('brand', '!=', $currentBrand)->orWhereNull('brand');
+            })
+            ->exists();
+    }
+
+    private function isImmediateStripeClaim(Order $order): bool
+    {
+        if ((bool) $order->is_quote_request || (int) $order->total_amount <= 0) {
+            return false;
+        }
+
+        return $order->status === 'pending_payment'
+            || ($order->status === 'paid' && $order->stripe_payment_intent_id !== null);
+    }
+
     private function findOrderForIdentity(
         User $user,
         string $key,
         string $fingerprint,
         bool $allowFingerprintFallback,
     ): ?Order {
+        // Exact-key candidates are deliberately loaded even when their brand
+        // is null/foreign so the resolver can return a deterministic conflict
+        // instead of allowing a same-key insert or a cross-brand replay.
         $order = Order::query()
             ->ownedBy($user)
             ->with('invoiceSnapshot')
@@ -388,14 +730,24 @@ class CheckoutIdempotencyService
         // replaced long after the order was created. Keep the matching pending
         // order discoverable and let the remote PI timestamp/identity checks
         // decide reuse versus replacement.
-        return Order::query()
+        $query = Order::query()
             ->ownedBy($user)
             ->with('invoiceSnapshot')
             ->where('checkout_fingerprint', $fingerprint)
             ->where('status', 'pending_payment')
             ->latest('created_at')
-            ->latest('id')
-            ->first();
+            ->latest('id');
+        $currentBrand = BrandRegistry::currentIdOrNull();
+        if ($currentBrand === null) {
+            return null;
+        }
+
+        // A fingerprint fallback is an order lookup, not a cross-brand or
+        // legacy-null lookup. An explicit active brand is required before a
+        // pending claim can be resumed.
+        $query->where('brand', $currentBrand);
+
+        return $query->first();
     }
 
     private function fingerprint(Request $request, User $user, ?int $amountCents, ?string $paymentMethod = null): string
@@ -424,7 +776,7 @@ class CheckoutIdempotencyService
 
         $canonical = [
             ...$ownerIdentity,
-            'brand' => BrandRegistry::current()?->value,
+            'brand' => BrandRegistry::currentIdOrNull(),
             'items' => $items,
             'billing_name' => $request->input('billing_name'),
             'billing_company' => $request->input('billing_company'),
@@ -575,6 +927,67 @@ class CheckoutIdempotencyService
                 || $lockedOrder->stripe_payment_intent_id !== null
                 || (int) $lockedOrder->payment_intent_generation !== $expectedGeneration) {
                 return ['response' => $this->conflict('Der Checkout hat sich zwischenzeitlich geändert.')];
+            }
+
+            return ['order' => $lockedOrder];
+        });
+
+        if (isset($result['response'])) {
+            return $result['response'];
+        }
+
+        return $result['order'];
+    }
+
+    /**
+     * Lock an incomplete free-order claim before its final paid transition.
+     * The generic Stripe retry lock intentionally rejects invoice_created rows;
+     * this path needs the same durable identity checks for the non-PaymentIntent
+     * free flow without ever reopening a closed or PI-backed order.
+     */
+    private function lockNonImmediateOrderForRetry(
+        User $user,
+        Order $order,
+        string $key,
+        string $fingerprint,
+        int $amountCents,
+    ): Order|JsonResponse {
+        $result = DB::transaction(function () use ($user, $order, $key, $fingerprint, $amountCents): array {
+            $lockedOrder = Order::query()
+                ->with('invoiceSnapshot')
+                ->lockForUpdate()
+                ->find($order->getKey());
+
+            if ($lockedOrder === null) {
+                return ['response' => $this->conflict('Der Checkout existiert nicht mehr.')];
+            }
+
+            if (! ActorIdentity::ownsOrder($lockedOrder, $user)
+                || ! $this->orderMatchesCurrentBrand($lockedOrder)
+                || ! is_string($lockedOrder->checkout_idempotency_key)
+                || $lockedOrder->checkout_idempotency_key !== $key
+                || (int) $lockedOrder->total_amount !== $amountCents
+                || ! is_string($lockedOrder->checkout_fingerprint)
+                || $lockedOrder->checkout_fingerprint === ''
+                || ! hash_equals($lockedOrder->checkout_fingerprint, $fingerprint)) {
+                return ['response' => $this->conflict('Dieser Checkout-Versuch wurde bereits mit anderen Daten verwendet.')];
+            }
+
+            $lockedOrder->loadMissing('invoiceSnapshot');
+
+            // A concurrent finalizer may have completed the claim while this
+            // request was waiting for the row lock. Return the durable order so
+            // the caller can produce the same response and retry mail enqueue
+            // safely; SMTP delivery itself remains worker-managed.
+            if ($lockedOrder->status === 'paid' || $lockedOrder->status === 'delivery_note') {
+                return ['order' => $lockedOrder];
+            }
+
+            if ((bool) $lockedOrder->is_quote_request
+                || (int) $lockedOrder->total_amount !== 0
+                || $lockedOrder->stripe_payment_intent_id !== null
+                || ! in_array($lockedOrder->status, ['pending_payment', 'invoice_created'], true)) {
+                return ['response' => $this->conflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.')];
             }
 
             return ['order' => $lockedOrder];

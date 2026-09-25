@@ -7,6 +7,7 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 use Stripe\ApiRequestor;
@@ -39,7 +40,7 @@ class WebhookReplayMailTest extends TestCase
         return [$payload, "t={$timestamp},v1={$signature}"];
     }
 
-    public function test_duplicate_payment_intent_succeeded_sends_only_one_invoice_mail(): void
+    public function test_duplicate_payment_intent_succeeded_enqueues_only_one_invoice_job(): void
     {
         $user = User::factory()->create();
         $order = Order::factory()->create([
@@ -105,14 +106,17 @@ class WebhookReplayMailTest extends TestCase
             ]);
         ApiRequestor::setHttpClient($clientMock);
 
-        // First delivery — order becomes paid, invoice mail is queued
+        // First delivery — order becomes paid and one invoice job is enqueued
         $this->postJson('/api/webhooks/stripe', $payloadData, [
             'Stripe-Signature' => $sigHeader,
         ])->assertStatus(200);
 
         Mail::assertQueued(InvoiceMail::class, 1);
 
-        // Second delivery — exact same event, order already paid, no additional mail
+        // Losing the event-dedupe cache must not lose the durable mail claim.
+        Cache::flush();
+
+        // Second delivery — exact same event, order already paid, no additional enqueue
         $this->postJson('/api/webhooks/stripe', $payloadData, [
             'Stripe-Signature' => $sigHeader,
         ])->assertStatus(200);

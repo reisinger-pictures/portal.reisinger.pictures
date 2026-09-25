@@ -2,13 +2,17 @@
 
 namespace Tests\Feature\Checkout;
 
+use App\Enums\Brand;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\CheckoutIdempotencyService;
 use App\Services\StripePaymentService;
 use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Stripe\HttpClient\CurlClient;
@@ -52,6 +56,44 @@ class CheckoutIdempotencyServiceTest extends TestCase
         $this->assertSame($order->id, $response->getData(true)['order_id']);
     }
 
+    public function test_null_brand_positive_payment_intent_claim_fails_closed(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $request = Request::create('/', 'POST', [
+            'items' => [['photoId' => 'null-brand-photo']],
+            'billing_name' => 'Tester',
+        ]);
+        $stripe = $this->createMock(StripePaymentService::class);
+        $stripe->expects($this->never())->method('retrievePaymentIntent');
+        $service = new CheckoutIdempotencyService($stripe);
+        $identity = $service->identify($request, $user, 4000, 'stripe');
+        $order = Order::factory()->create([
+            'user_id' => $user->id,
+            'brand' => null,
+            'status' => 'pending_payment',
+            'total_amount' => 4000,
+            'stripe_payment_intent_id' => 'pi_null_brand',
+            'checkout_idempotency_key' => $identity['key'],
+            'checkout_fingerprint' => $identity['fingerprint'],
+        ]);
+        InvoiceSnapshot::factory()->for($order)->create();
+
+        $this->assertNull($service->findPositiveStripeOrderByKey($user, $identity['key']));
+        $this->assertNull($service->findPositiveStripeOrderByFingerprint($user, $request, 'stripe'));
+
+        $response = $service->replay(
+            $user,
+            $identity['key'],
+            $identity['fingerprint'],
+            4000,
+        );
+
+        $this->assertNotNull($response);
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame('pi_null_brand', $order->fresh()->stripe_payment_intent_id);
+        $this->assertSame('pending_payment', $order->fresh()->status);
+    }
+
     public function test_identity_lock_lease_covers_the_full_stripe_timeout_budget(): void
     {
         $user = User::factory()->create();
@@ -81,6 +123,187 @@ class CheckoutIdempotencyServiceTest extends TestCase
         $expectedTtl = CurlClient::DEFAULT_TIMEOUT * 4 + 30;
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame([$expectedTtl, $expectedTtl], $lockTtls);
+    }
+
+    public function test_identity_lock_timeout_is_retryable_without_running_the_creator(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $lock = $this->createMock(Lock::class);
+        $lock->expects($this->once())
+            ->method('block')
+            ->willThrowException(new LockTimeoutException('competing checkout holds the identity lock'));
+
+        Cache::shouldReceive('lock')
+            ->once()
+            ->andReturn($lock);
+
+        $service = new CheckoutIdempotencyService($this->createMock(StripePaymentService::class));
+        $response = $service->executeNonImmediate(
+            $user,
+            'checkout-lock-timeout-0001',
+            str_repeat('a', 64),
+            4000,
+            fn () => $this->fail('A timed-out identity lock must not run the creator.'),
+        );
+
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame(0, Order::query()->count());
+    }
+
+    public function test_unique_constraint_race_reloads_and_resolves_the_competing_creator_claim(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $key = 'checkout-unique-race-0001';
+        $fingerprint = str_repeat('b', 64);
+        $creatorCalls = 0;
+        $service = new CheckoutIdempotencyService($this->createMock(StripePaymentService::class));
+
+        $response = $service->executeNonImmediate(
+            $user,
+            $key,
+            $fingerprint,
+            4000,
+            function (?Order $existingOrder) use (&$creatorCalls, $user, $key, $fingerprint): JsonResponse {
+                $creatorCalls++;
+                if ($existingOrder !== null) {
+                    return response()->json(['order_id' => $existingOrder->id]);
+                }
+
+                // Model the other worker's committed insert winning the unique
+                // key race. No sleep or second process is needed to exercise
+                // the recovery seam deterministically.
+                Order::factory()->create([
+                    'user_id' => $user->id,
+                    'brand' => Brand::B2B,
+                    'status' => 'invoice_created',
+                    'total_amount' => 4000,
+                    'is_quote_request' => false,
+                    'checkout_idempotency_key' => $key,
+                    'checkout_fingerprint' => $fingerprint,
+                ]);
+
+                throw new UniqueConstraintViolationException(
+                    'sqlite',
+                    'insert into orders ...',
+                    [],
+                    new \RuntimeException('duplicate checkout identity'),
+                );
+            },
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(2, $creatorCalls);
+        $this->assertSame(1, Order::query()->count());
+        $this->assertSame($key, Order::query()->value('checkout_idempotency_key'));
+    }
+
+    public function test_immediate_unique_constraint_race_reloads_and_replays_winning_pending_claim(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $key = 'checkout-immediate-race-0001';
+        $fingerprint = str_repeat('d', 64);
+        $creatorCalls = 0;
+        $winner = null;
+        $stripe = $this->createMock(StripePaymentService::class);
+        $stripe->expects($this->once())
+            ->method('retrievePaymentIntent')
+            ->with('pi_immediate_race')
+            ->willReturnCallback(function (string $paymentIntentId) use (&$winner): array {
+                $this->assertInstanceOf(Order::class, $winner);
+
+                return $this->intent($paymentIntentId, $winner);
+            });
+        $stripe->expects($this->never())->method('cancelPaymentIntent');
+        $service = new CheckoutIdempotencyService($stripe);
+
+        $response = $service->execute(
+            $user,
+            $key,
+            $fingerprint,
+            4000,
+            function (?Order $existingOrder) use (&$creatorCalls, &$winner, $user, $key, $fingerprint): JsonResponse {
+                $creatorCalls++;
+                if ($existingOrder !== null) {
+                    return response()->json(['order_id' => $existingOrder->id]);
+                }
+
+                // The competing worker commits the unique-key claim after the
+                // initial lookup and before this creator reaches its insert.
+                $winner = Order::factory()->create([
+                    'user_id' => $user->id,
+                    'brand' => Brand::B2B,
+                    'status' => 'pending_payment',
+                    'total_amount' => 4000,
+                    'stripe_payment_intent_id' => 'pi_immediate_race',
+                    'checkout_idempotency_key' => $key,
+                    'checkout_fingerprint' => $fingerprint,
+                ]);
+                InvoiceSnapshot::factory()->for($winner)->create();
+
+                throw new UniqueConstraintViolationException(
+                    'sqlite',
+                    'insert into orders ...',
+                    [],
+                    new \RuntimeException('duplicate immediate checkout identity'),
+                );
+            },
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(1, $creatorCalls);
+        $this->assertSame($winner?->id, $response->getData(true)['order_id']);
+        $this->assertSame('pi_immediate_race_secret', $response->getData(true)['client_secret']);
+        $this->assertSame(1, Order::query()->count());
+    }
+
+    public function test_immediate_unique_constraint_race_reloads_and_returns_a_fingerprint_conflict(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $key = 'checkout-immediate-race-0002';
+        $fingerprint = str_repeat('e', 64);
+        $creatorCalls = 0;
+        $stripe = $this->createMock(StripePaymentService::class);
+        $stripe->expects($this->never())->method('retrievePaymentIntent');
+        $stripe->expects($this->never())->method('cancelPaymentIntent');
+        $service = new CheckoutIdempotencyService($stripe);
+
+        $response = $service->execute(
+            $user,
+            $key,
+            $fingerprint,
+            4000,
+            function (?Order $existingOrder) use (&$creatorCalls, $user, $key): JsonResponse {
+                $creatorCalls++;
+                if ($existingOrder !== null) {
+                    return response()->json(['order_id' => $existingOrder->id]);
+                }
+
+                // The winning row has a different canonical checkout intent;
+                // the unique-key race must become a deterministic 409, never
+                // a new Stripe operation or an unsafe replay.
+                Order::factory()->create([
+                    'user_id' => $user->id,
+                    'brand' => Brand::B2B,
+                    'status' => 'pending_payment',
+                    'total_amount' => 4000,
+                    'stripe_payment_intent_id' => 'pi_immediate_conflict',
+                    'checkout_idempotency_key' => $key,
+                    'checkout_fingerprint' => str_repeat('f', 64),
+                ]);
+
+                throw new UniqueConstraintViolationException(
+                    'sqlite',
+                    'insert into orders ...',
+                    [],
+                    new \RuntimeException('duplicate immediate checkout identity'),
+                );
+            },
+        );
+
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['idempotency_conflict']);
+        $this->assertSame(1, $creatorCalls);
+        $this->assertSame(1, Order::query()->count());
     }
 
     public function test_v036_replay_rejects_missing_portal_user_metadata(): void
@@ -562,6 +785,7 @@ class CheckoutIdempotencyServiceTest extends TestCase
     {
         return Order::factory()->create([
             'user_id' => $user->id,
+            'brand' => Brand::B2B,
             'status' => 'pending_payment',
             'total_amount' => 4000,
             'stripe_payment_intent_id' => 'pi_pending',

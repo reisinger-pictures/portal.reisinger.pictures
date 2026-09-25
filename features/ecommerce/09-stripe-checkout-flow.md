@@ -51,7 +51,13 @@ paid → refunded (direct)
 
 ### 2.2 Checkout Service
 
-Order and invoice-snapshot creation run inside a `DB::transaction`. The positive-value immediate Stripe path additionally uses per-user checkout identity locks and a final row lock before the external Stripe call:
+Order and invoice-snapshot creation run inside a `DB::transaction`. Every new
+authenticated checkout persists the server-validated checkout key/fingerprint;
+the positive-value immediate Stripe path additionally uses per-user checkout
+identity locks and a final row lock before the external Stripe call. The
+identity namespace is shared by non-immediate invoice, delivery-note,
+settled-free, and reactive-quote orders, while the PI/card-testing gates remain
+limited to positive-value immediate Stripe:
 
 1. **Item validation:** Each item is looked up (`Photo::with('gallery')`). If the gallery is non-public, `canAccessGallery()` is checked (403 on failure). For scope licensing, `LicenseUseCase::find()` validates use-case existence and brand consistency (defense-in-depth).
 2. **Pricing:** If `quote_token` is present, `CheckoutService` verifies its signature and expiry, requires a positive token price, and uses that price as the server-authoritative total; client item prices are ignored and the standard pricing strategies are bypassed. Otherwise `PricingStrategy::calculateCart()` is called on the server-authoritative groups:
@@ -61,7 +67,7 @@ Order and invoice-snapshot creation run inside a `DB::transaction`. The positive
 4. **Invoice snapshot:** An `InvoiceSnapshot` record freezes all customer details, line items, price breakdown, and the invoice number (generated via `InvoiceSequence::getNextInvoiceNumber` with `P-` or `L-` prefix). A quote offer's `rights_text` is stored as `customer_details.custom_conditions`.
 5. **Stripe PaymentIntent:** For a positive-value immediate Stripe checkout that needs a new or replacement generation, a `PaymentIntent` is created with the authoritative `amount` (in cents), `currency=eur`, mapped Stripe Customer, `receipt_email`, and server-owned order, user, checkout key, fingerprint, and generation metadata. The generation-aware Stripe **idempotency key** is `pi_{orderId}_{payment_intent_generation}`.
 6. **Response:** A new or reusable actionable PaymentIntent returns `client_secret`, `order_id`, and `invoice_number`. A paid replay returns the settled result. If a retrieved PI is remotely succeeded before strict success reconciliation, checkout returns `payment_pending` with a poll URL and no client secret; it does not grant paid access itself.
-7. **Pending recovery:** A matching user/key/fingerprint retry reuses the existing `pending_payment` order and actionable PI without creating another PI. If an ambiguous create left the local PI link null, retry uses the same generation and deterministic Stripe key. A terminal stale PI is replaced only after identity validation and a generation increment.
+7. **Pending recovery:** A matching user/key/fingerprint retry reuses the existing `pending_payment` order and actionable PI without creating another PI. If an ambiguous create left the local PI link null, retry uses the same generation and deterministic Stripe key. A terminal stale PI is replaced only after identity validation and a generation increment. Positive/PI-backed replay additionally requires an explicit order brand equal to the active host brand; a null-brand claim is never a legacy shortcut.
 
 ### 2.3 Frontend Confirmation
 
@@ -72,7 +78,7 @@ For an actionable response, the frontend uses `@stripe/react-stripe-js` to confi
 1. Stripe sends a `payment_intent.succeeded` event to `POST /api/webhooks/stripe`.
 2. `WebhookController::handleStripe()` verifies the event and delegates to the strict identity checks in §3.
 3. Only after those checks pass does a locked, conditional `pending_payment → paid` transition grant access. The Stripe fee is enriched from `latest_charge.balance_transaction.fee` when available.
-4. `InvoiceMail` is queued idempotently after the paid transition.
+4. `InvoiceMail` is durably enqueued at most once after the paid transition; SMTP delivery remains subject to queue-worker retries.
 
 ### 2.5 Scope vs Volume Licensing Differences
 
@@ -104,7 +110,7 @@ The endpoint `POST /api/webhooks/stripe` accepts raw JSON payloads. Signature ve
 
 | Stripe Event | Action |
 |---|---|
-| `payment_intent.succeeded` | Use `metadata.order_id` only to locate a candidate. For V036 orders, require the event PI ID, complete server-owned metadata (checkout key, fingerprint, generation, user/account evidence, amount/currency), received amount, and mapped Customer to match, then conditionally transition `pending_payment → paid`, enrich `stripe_fee_cents` when available, and queue `InvoiceMail` idempotently. A signed event may bind a still-null local PI ID only in the same validated transition. Clearly pre-V036 orders retain only the explicit legacy compatibility defined by the security feature. |
+| `payment_intent.succeeded` | Use `metadata.order_id` only to locate a candidate. For V036 orders, require the event PI ID, complete server-owned metadata (checkout key, fingerprint, generation, user/account evidence, amount/currency), received amount, and mapped Customer to match, then conditionally transition `pending_payment → paid`, enrich `stripe_fee_cents` when available, and durably enqueue `InvoiceMail` at most once. A signed event may bind a still-null local PI ID only in the same validated transition. Clearly pre-V036 orders retain only the explicit legacy compatibility defined by the security feature. |
 | `payment_intent.payment_failed` | Require the stored PI ID and current generation plus the applicable V036 identity to match; deduplicate by event ID and record only bounded failure telemetry. The order remains recoverable and no fulfillment is granted. |
 | `charge.dispute.created` | Find order by `stripe_payment_intent_id` → update `status=disputed`. Email `ACCOUNTING_EMAIL` with dispute notification. |
 | `charge.refunded` | Find order by `stripe_payment_intent_id` → update `status=refunded` only for a full refund. |
@@ -133,11 +139,40 @@ If fee expansion is unavailable, the verified success still transitions the orde
 
 | Layer | Mechanism |
 |---|---|
-| Checkout identity | The browser `Idempotency-Key` and a server-canonical fingerprint identify one positive-value immediate Stripe checkout. A same-key/different-fingerprint request receives `409`; a lost key may recover only the authorized matching user/fingerprint order. |
+| Checkout identity | The browser `Idempotency-Key` and a server-canonical fingerprint identify every new authenticated checkout. A same-key/different-fingerprint request receives `409`. Immediate Stripe can additionally recover a lost key only through the authorized same-user/active-brand fingerprint path; non-immediate paths are exact-key only. |
 | Stripe API (PaymentIntent creation) | Generation-aware key `pi_{orderId}_{payment_intent_generation}` prevents duplicate PIs within a generation. A terminal replacement increments the generation; a same-generation ambiguous create retries the same key. |
-| Pending recovery | A matching retry retrieves and revalidates the persisted PI. Reusable pending PIs are returned with their existing client secret; remotely succeeded PIs return the non-destructive `payment_pending` recovery response until strict success reconciliation grants paid. |
-| Webhook processing | Stripe event IDs are deduplicated; strict identity checks and a locked conditional `pending_payment → paid` update make matching retries idempotent. Invoice mail uses a separate durable idempotency guard. |
+| Pending recovery | A matching immediate retry retrieves and revalidates the persisted PI. Reusable pending PIs are returned with their existing client secret; remotely succeeded PIs return the non-destructive `payment_pending` recovery response until strict success reconciliation grants paid. |
+| Webhook processing | Stripe event IDs are deduplicated; strict identity checks and a locked conditional `pending_payment → paid` update make matching retries idempotent. Invoice mail uses the durable `InvoiceSnapshot::MAIL_DISPATCH_KEY` claim, written in the same database transaction as the queue insert; it provides at-most-once durable enqueue, not exactly-once SMTP delivery. |
 | Database | Order/snapshot creation and state transitions use `DB::transaction` plus row/identity locks where required; external Stripe calls are not held inside a database transaction. |
+
+### 4.1 Invoice-mail claim
+
+`InvoiceMailDispatcher` locks the existing invoice snapshot and writes the reserved
+`InvoiceSnapshot::MAIL_DISPATCH_KEY` metadata before enqueueing the mailable. With the
+production database queue (the dispatcher fails closed if production is configured
+with a non-transactional queue), that marker update and queue insert commit or roll back as
+one unit. A queue-insert failure leaves no claim and is retryable by a later
+checkout/webhook request. Once the claim commits, this contract guarantees
+**at most one durable enqueue**, not exactly-once SMTP delivery: a worker may
+retry SMTP after a transport error, and a permanently failed job remains in
+`failed_jobs` while the marker prevents an automatic second enqueue. Recovery
+of a terminal mail failure is an explicit operator decision and must account
+for the ambiguity that SMTP may have accepted a message before its response was
+lost. The marker is operational metadata only and is omitted from the public
+snapshot resource. No V039+ migration is required; the existing JSON column and
+transactional queue primitive are sufficient.
+
+### 4.2 Non-immediate identity and lost browser keys
+
+Invoice, delivery-note, settled-free, and reactive-quote checkouts use the
+same persisted key/fingerprint fields as immediate Stripe, but never use those
+fields to authorize a PaymentIntent. Exact-key retries revalidate the owner,
+active brand, amount, and canonical fingerprint and may resume an unfinished
+order. A lost browser key is intentionally not recovered by fingerprint: a
+new key is treated as a new order because the server cannot safely distinguish
+a retry from a deliberate second purchase of the same cart. The frontend and
+backend regressions cover this accepted boundary; no replay claim is made for
+that key-loss case.
 
 ## 5. Error Recovery Scenarios
 
@@ -147,7 +182,7 @@ If fee expansion is unavailable, the verified success still transitions the orde
 | Card declined during frontend confirmation | Stripe.js returns an error and may emit `payment_intent.payment_failed`. The verified event records bounded telemetry only; the order remains `pending_payment`, and normal retries stay within the current PI/checkout generation. |
 | Webhook delivery delayed | A checkout replay that sees a remotely succeeded PI returns `payment_pending` with a poll URL and no client secret. It cannot grant paid access; the signed webhook normally performs the strict paid transition. |
 | Webhook not delivered | The signed webhook remains the normal authority. Scheduled stale-PI cleanup may reconcile a remotely succeeded PI only by its stored ID and only after the same strict identity, amount, received-amount, Customer, and generation checks. |
-| Duplicate webhook delivery | Stripe event deduplication, the conditional paid transition, and invoice-mail idempotency prevent repeated state changes or mail. |
+| Duplicate webhook delivery | Stripe event deduplication, the conditional paid transition, and the durable mail-enqueue claim prevent repeated state changes or a second enqueue. SMTP delivery retries remain queue-worker behavior. |
 | Dispute/chargeback | Order set to `disputed`. Downloads blocked (access gates check order status). Admin notified via email. |
 | Signature verification failure | 400 returned. Stripe retries with exponential backoff. All configured secrets are tried; if none match, logs error with secret count. |
 

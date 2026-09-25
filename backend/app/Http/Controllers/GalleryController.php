@@ -186,7 +186,9 @@ class GalleryController extends Controller
         $groupIds = $this->galleryTreeService->getAllSubgroupIds($group);
         $groupIds[] = $group->id;
 
-        $galleryQuery = Gallery::query()->with('galleryGroup');
+        $galleryQuery = Gallery::query()
+            ->with('galleryGroup')
+            ->withCount('photos');
         $galleryQuery->whereIn('gallery_group_id', $groupIds);
         if ($user->brand !== null) {
             $galleryQuery->where('brand', $user->brand);
@@ -195,24 +197,45 @@ class GalleryController extends Controller
         // Do not let an own-brand gallery under a foreign descendant leak into
         // the management group response.  The same helper is also used by the
         // public boundaries, keeping the invariant centralized.
-        $galleryIds = $galleryQuery->get()
+        $galleries = $galleryQuery->get()
             ->filter(function (Gallery $gallery) use ($user): bool {
                 return $user->brand === null
                     || BrandRegistry::galleryTreeMatchesBrand($gallery, $user->brand);
-            })
-            ->pluck('id')
-            ->values()
-            ->all();
+            });
 
         if (! $svc->isAdmin($user)) {
-            $allowedGalleryIds = $user->getAllowedGalleryIds();
-            $galleryIds = array_intersect($galleryIds, $allowedGalleryIds);
+            $allowedGalleryIds = array_flip($user->getAllowedGalleryIds());
+            $galleries = $galleries->filter(
+                fn (Gallery $gallery): bool => isset($allowedGalleryIds[$gallery->id])
+            );
         }
 
-        $photos = Photo::whereIn('gallery_id', $galleryIds)->orderBy('id', 'desc')->paginate(50);
+        $galleryIds = $galleries->pluck('id')->values()->all();
+        $galleryPricingSources = $galleries
+            ->sortBy('id')
+            ->map(fn (Gallery $gallery): array => [
+                'gallery_id' => $gallery->id,
+                'gallery_group_id' => $gallery->gallery_group_id,
+                'gallery_name' => $gallery->name,
+                'photo_count' => (int) $gallery->photos_count,
+            ])
+            ->values();
+
+        // The meta-gallery UI resolves licensing per child gallery. Eager-load
+        // the gallery and its parent-group reference so the response carries
+        // the same child descriptor contract as the rest of the management API;
+        // the paginated photo list must not force a lazy load per row.
+        $photos = Photo::with('gallery.galleryGroup')
+            ->whereIn('gallery_id', $galleryIds)
+            ->orderBy('id', 'desc')
+            ->paginate(50);
 
         return response()->json([
             'group' => new GalleryGroupResource($group),
+            // This summary is complete for the authorized gallery set, not just
+            // the current photo page. The management UI needs full per-child
+            // counts to resolve retroactive volume tiers deterministically.
+            'gallery_pricing_sources' => $galleryPricingSources,
             'downloads_count' => DownloadLog::whereIn('gallery_id', $galleryIds)->count(),
             'photos' => $photos->items() ? collect($photos->items())->map(fn ($p) => new PhotoResource($p))->values() : [],
             'current_page' => $photos->currentPage(),

@@ -2,15 +2,18 @@
 
 namespace Tests\Feature\Contract;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\Brand;
 use App\Models\Contract;
 use App\Models\ContractSigner;
-use App\Enums\Brand;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\ContractPricingService;
 use App\Support\BrandRegistry;
+use App\Support\PersistedMoney;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
 
 class ContractControllerTest extends TestCase
 {
@@ -21,6 +24,7 @@ class ContractControllerTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => 'super_admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
@@ -29,12 +33,14 @@ class ContractControllerTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => 'admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function authHeaders(User $user): array
     {
         $token = auth('api')->login($user);
+
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }
 
@@ -74,6 +80,303 @@ class ContractControllerTest extends TestCase
         $this->assertDatabaseHas('contracts', [
             'brand' => 'rp',
             'status' => 'draft',
+        ]);
+    }
+
+    public function test_store_rejects_mixed_item_and_discount_placement_before_persistence(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'discount_percent',
+                'description' => 'Nicht erlaubt',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 1000,
+            ]],
+            'discounts' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('contracts', 0);
+    }
+
+    public function test_store_rejects_integer_like_contract_prices_before_persistence(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Leistung',
+                'qty' => 1,
+                'price' => '1000',
+            ]],
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('contracts', 0);
+    }
+
+    /**
+     * @return array<string, array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>}>
+     */
+    public static function pricingOverflowPayloadProvider(): array
+    {
+        $maximum = ContractPricingService::MAX_SAFE_INTEGER;
+
+        return [
+            'product overflow' => [
+                [[
+                    'type' => 'item',
+                    'description' => 'Produkt',
+                    'qty' => 2,
+                    'price' => $maximum,
+                ]],
+                [],
+            ],
+            'running total overflow' => [
+                [
+                    [
+                        'type' => 'item',
+                        'description' => 'Summenlauf 1',
+                        'qty' => 1,
+                        'price' => $maximum,
+                    ],
+                    [
+                        'type' => 'item',
+                        'description' => 'Summenlauf 2',
+                        'qty' => 1,
+                        'price' => 1,
+                    ],
+                ],
+                [],
+            ],
+            'percentage overflow' => [
+                [[
+                    'type' => 'item',
+                    'description' => 'Basis',
+                    'qty' => 1,
+                    'price' => $maximum,
+                ]],
+                [[
+                    'type' => 'discount_percent',
+                    'description' => 'Überlauf',
+                    'price' => $maximum,
+                ]],
+            ],
+        ];
+    }
+
+    #[DataProvider('pricingOverflowPayloadProvider')]
+    public function test_store_rejects_authoritative_pricing_overflow_before_persistence(
+        array $items,
+        array $discounts,
+    ): void {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => $items,
+            'discounts' => $discounts,
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('items');
+        $this->assertDatabaseCount('contracts', 0);
+    }
+
+    #[DataProvider('pricingOverflowPayloadProvider')]
+    public function test_update_rejects_authoritative_pricing_overflow_before_mutation(
+        array $items,
+        array $discounts,
+    ): void {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'draft',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Original',
+                'qty' => 1,
+                'price' => 100,
+            ]],
+            'discounts' => [],
+        ]);
+        $originalItems = $contract->items;
+
+        $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
+            'items' => $items,
+            'discounts' => $discounts,
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('items');
+        $contract->refresh();
+        $this->assertSame($originalItems, $contract->items);
+        $this->assertSame(0, $contract->content_version);
+    }
+
+    public function test_store_accepts_the_persisted_money_ceiling_boundary(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $boundary = PersistedMoney::MAX_CENTS;
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Grenzwert',
+                'qty' => 1,
+                'price' => $boundary,
+            ]],
+            'discounts' => [],
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('contracts', [
+            'status' => 'draft',
+            'items' => json_encode([[
+                'type' => 'item',
+                'description' => 'Grenzwert',
+                'qty' => 1,
+                'price' => $boundary,
+            ]]),
+        ]);
+    }
+
+    public function test_store_rejects_persisted_money_overflow_without_persistence(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Zu groß',
+                'qty' => 1,
+                'price' => PersistedMoney::MAX_CENTS + 1,
+            ]],
+            'discounts' => [],
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('items');
+        $this->assertDatabaseCount('contracts', 0);
+    }
+
+    public function test_open_rejects_persisted_money_overflow_without_changing_contract_state(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'type' => 'contract',
+            'status' => 'draft',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Zu groß',
+                'qty' => 1,
+                'price' => PersistedMoney::MAX_CENTS + 1,
+            ]],
+            'discounts' => [],
+            'join_token' => null,
+        ]);
+
+        $response = $this->withHeaders($headers)->postJson("/api/management/contracts/{$contract->id}/open");
+
+        $response->assertStatus(422);
+        $contract->refresh();
+        $this->assertSame('draft', $contract->status);
+        $this->assertNull($contract->join_token);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+    }
+
+    public function test_close_rejects_persisted_money_overflow_without_partial_accounting_state(): void
+    {
+        Mail::fake();
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'type' => 'contract',
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'billing_details' => ['email' => 'boundary@example.com'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Zu groß',
+                'qty' => 1,
+                'price' => PersistedMoney::MAX_CENTS + 1,
+            ]],
+            'discounts' => [],
+        ]);
+
+        $response = $this->withHeaders($headers)->postJson("/api/management/contracts/{$contract->id}/close");
+
+        $response->assertStatus(422);
+        $contract->refresh();
+        $this->assertSame('active', $contract->status);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+    }
+
+    public function test_partial_update_keeps_omitted_snapshot_arrays_and_canonicalizes_both_partitions(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'draft',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Leistung',
+                'notes' => '',
+                'qty' => 2,
+                'price' => 5000,
+            ]],
+            'discounts' => [[
+                'type' => 'discount_fixed',
+                'description' => 'Rabatt',
+                'notes' => '',
+                'price' => 500,
+            ]],
+        ]);
+
+        $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Aktualisierte Leistung',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 8000,
+            ]],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('contract.items.0.price', 8000);
+        $response->assertJsonPath('contract.discounts.0.price', 500);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'items' => json_encode([[
+                'type' => 'item',
+                'description' => 'Aktualisierte Leistung',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 8000,
+            ]]),
+            'discounts' => json_encode([[
+                'type' => 'discount_fixed',
+                'description' => 'Rabatt',
+                'notes' => '',
+                'price' => 500,
+            ]]),
         ]);
     }
 
@@ -123,7 +426,7 @@ class ContractControllerTest extends TestCase
         $headers = $this->authHeaders($user);
         $contract = Contract::factory()->create(['status' => 'active', 'brand' => Brand::B2B]);
         $contract->signers()->create(
-            \App\Models\ContractSigner::factory()->make(['status' => 'signed', 'signed_at' => now()])->toArray()
+            ContractSigner::factory()->make(['status' => 'signed', 'signed_at' => now()])->toArray()
         );
 
         $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [

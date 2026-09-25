@@ -17,6 +17,8 @@ use App\Services\VolumePresetService;
 use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use App\Support\CheckoutKey;
+use App\Support\UuidDatabaseFailedJobProvider;
+use App\Support\UuidDatabaseQueueConnector;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +37,31 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // V001 defines jobs.id as a UUID, while Laravel's stock database
+        // connector uses insertGetId() and assumes an auto-increment key. Use
+        // the compatible queue writer for both normal dispatch and worker
+        // releases; the UUID is only a physical queue-row key.
+        $app = $this->app;
+        $this->app->afterResolving('queue', function ($queue) use ($app): void {
+            $queue->extend('database', fn (): UuidDatabaseQueueConnector => new UuidDatabaseQueueConnector(
+                $app->make('db'),
+            ));
+        });
+
+        // V001 also requires a physical UUID for failed_jobs.id, while
+        // Laravel's database-uuids provider normally relies on an auto-increment
+        // id. Keep the standard failed-job contract with a schema-compatible
+        // provider instead of changing the deployed table shape.
+        if ($app['config']->get('queue.failed.driver') === 'database-uuids') {
+            $this->app->extend('queue.failer', fn ($provider, $app) => $provider instanceof UuidDatabaseFailedJobProvider
+                ? $provider
+                : new UuidDatabaseFailedJobProvider(
+                    $app->make('db'),
+                    $app['config']->get('queue.failed.database'),
+                    $app['config']->get('queue.failed.table', 'failed_jobs'),
+                ));
+        }
+
         $this->app->singleton(HtmlSanitizer::class, function ($app) {
             $config = (new HtmlSanitizerConfig)
                 ->allowElement('p')

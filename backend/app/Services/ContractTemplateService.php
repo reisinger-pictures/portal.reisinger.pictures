@@ -2,15 +2,24 @@
 
 namespace App\Services;
 
+use App\Exceptions\ContractIdentityException;
 use App\Exceptions\ContractUnavailableException;
 use App\Models\Contract;
 use App\Models\ContractSigner;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ContractTemplateService
 {
+    private ContractPricingService $contractPricingService;
+
+    public function __construct(?ContractPricingService $contractPricingService = null)
+    {
+        $this->contractPricingService = $contractPricingService ?? new ContractPricingService;
+    }
+
     /**
      * Create a new contract instance from a template, including a signer.
      *
@@ -76,16 +85,14 @@ class ContractTemplateService
                         ]);
                     }
 
-                    // The cache lock, locked template row, duplicate SELECT
-                    // and instance/signer INSERT are one transaction. Since
-                    // this schema has no normalized-email unique index, this
-                    // remains an application-level invariant for supported
-                    // writers rather than a durable database constraint.
+                    // The cache lock, locked template row, canonical duplicate
+                    // SELECT and instance/signer INSERT are one transaction.
+                    // The V039 unique index is the final authority if another
+                    // connection wins the race after this check.
+                    $scopeKey = Contract::templateJoinScopeKey($lockedTemplate);
                     $existingSigner = ContractSigner::query()
-                        ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
-                        ->whereHas('contract', function ($query) use ($lockedTemplate): void {
-                            $query->where('template_id', $lockedTemplate->getKey());
-                        })
+                        ->where('join_scope_key', $scopeKey)
+                        ->where('normalized_email', $email)
                         ->orderBy('created_at')
                         ->orderBy('id')
                         ->lockForUpdate()
@@ -98,7 +105,7 @@ class ContractTemplateService
                             'created' => false,
                             'instance' => null,
                             'signer' => null,
-                            'error' => 'Für diese E-Mail besteht bereits ein Vertrag.',
+                            'error' => ContractSigner::DUPLICATE_JOIN_ERROR,
                             'status' => 409,
                         ];
                     }
@@ -120,13 +127,31 @@ class ContractTemplateService
                         ];
                     }
 
+                    $templateSnapshot = $this->contractPricingService->normalizeSnapshot(
+                        $lockedTemplate->items,
+                        $lockedTemplate->discounts,
+                    );
+
+                    if (! $this->contractPricingService->canCopySnapshotWithoutReordering(
+                        $lockedTemplate->items,
+                        $lockedTemplate->discounts,
+                    )) {
+                        throw ValidationException::withMessages([
+                            'items' => 'Die Reihenfolge der Legacy-Preispositionen kann beim Kopieren der Vorlage nicht verlustfrei erhalten werden.',
+                        ]);
+                    }
+
+                    // Validate both arithmetic and the persisted-money ceiling
+                    // before inserting either the instance or its signer.
+                    $this->contractPricingService->preflightSnapshot($templateSnapshot);
+
                     $instance = Contract::create([
                         'type' => 'contract',
                         'template_id' => $lockedTemplate->getKey(),
                         'status' => 'active',
                         'billing_details' => $lockedTemplate->billing_details,
-                        'items' => $lockedTemplate->items,
-                        'discounts' => $lockedTemplate->discounts,
+                        'items' => $templateSnapshot['items'],
+                        'discounts' => $templateSnapshot['discounts'],
                         'terms_html' => $lockedTemplate->terms_html,
                         'available_roles' => $lockedTemplate->available_roles,
                         'allow_multiple_roles_per_signer' => $lockedTemplate->allow_multiple_roles_per_signer,
@@ -141,6 +166,8 @@ class ContractTemplateService
                         'contract_id' => $instance->getKey(),
                         'name' => $signerData['name'],
                         'email' => $email,
+                        'normalized_email' => $email,
+                        'join_scope_key' => $scopeKey,
                         'roles' => $roles,
                         'personal_token' => $signerData['personal_token'],
                         'status' => 'joined',
@@ -173,6 +200,26 @@ class ContractTemplateService
                 'signer' => null,
                 'error' => $exception->getMessage(),
                 'status' => 410,
+            ];
+        } catch (ContractIdentityException $exception) {
+            return [
+                'created' => false,
+                'instance' => null,
+                'signer' => null,
+                'error' => $exception->getMessage(),
+                'status' => 422,
+            ];
+        } catch (UniqueConstraintViolationException $exception) {
+            if (! ContractSigner::isIdentityUniqueViolation($exception)) {
+                throw $exception;
+            }
+
+            return [
+                'created' => false,
+                'instance' => null,
+                'signer' => null,
+                'error' => ContractSigner::DUPLICATE_JOIN_ERROR,
+                'status' => 409,
             ];
         }
     }

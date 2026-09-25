@@ -221,6 +221,36 @@ class ContractJoinTest extends TestCase
         $response->assertJsonPath('contract.total', 8500);
     }
 
+    public function test_view_contract_content_normalizes_legacy_mixed_snapshot_before_total(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [
+                ['type' => 'item', 'description' => 'Fotoshooting', 'notes' => '', 'qty' => 1, 'price' => 10000],
+                ['type' => 'discount_percent', 'description' => '10% Rabatt', 'notes' => '', 'price' => 1000],
+            ],
+            'discounts' => [
+                ['type' => 'discount_fixed', 'description' => 'Bonus', 'notes' => '', 'price' => 500],
+            ],
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'legacy-mixed-contract',
+            'status' => 'joined',
+        ]);
+
+        $response = $this->getJson('/api/contracts/sign/legacy-mixed-contract');
+
+        $response->assertOk();
+        $response->assertJsonPath('contract.items.0.type', 'item');
+        $response->assertJsonCount(1, 'contract.items');
+        $response->assertJsonPath('contract.discounts.0.type', 'discount_percent');
+        $response->assertJsonPath('contract.discounts.1.type', 'discount_fixed');
+        // Legacy source order is retained: 10000 - 10% = 9000, then -500.
+        $response->assertJsonPath('contract.total', 8500);
+    }
+
     public function test_heartbeat_logs_audit(): void
     {
         $contract = Contract::factory()->create(['status' => 'active', 'brand' => Brand::B2B]);

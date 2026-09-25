@@ -52,14 +52,7 @@ class MediaVerifierFollowUpsTest extends TestCase
         // These regressions exercise DB/media boundaries, not the search index;
         // use Scout's no-op engine so the test is independent of Meilisearch.
         config(['scout.driver' => 'null']);
-        $photoRoot = storage_path(
-            'framework/testing/disks/photos-'.(string) Str::uuid(),
-        );
-        Storage::set('photos', Storage::build([
-            'driver' => 'local',
-            'root' => $photoRoot,
-            'throw' => false,
-        ]));
+        $this->useTemporaryStorageDisk('photos');
         BrandRegistry::set(Brand::B2B);
         $this->withoutMiddleware(ThrottleRequests::class);
     }

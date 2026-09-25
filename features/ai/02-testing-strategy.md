@@ -12,8 +12,10 @@
 - `isUnconfigured()` is a raw enabled-plus-empty-key helper; after the disabled check, the status endpoint gives `isAvailable()` precedence, so an available LM Studio configuration is reported as `available` even when that helper is true.
 - Provider Strategy Pattern: `AIProviderFactory::make()` returns correct provider per `AI_TYPE`
 - `AIController::status()` returns `{enabled, status, type, model}`; `enabled` is effective availability, not the raw switch.
-- `generateMetadata()` returns 503 when AI is disabled or otherwise unavailable; the text endpoint has the same server-only availability rule.
-- LM Studio is a browser-side vision fallback only; it is not a provider for the text-only endpoint.
+- Both generation endpoints authenticate and authorize before `isAvailable()`: vision uses a coarse capability pre-check followed by the target-level `updateMetadata` PhotoPolicy permission, while text uses the Gallery `create` permission. Only Photographers and Super-Admins pass the text permission; an ordinary Admin must receive `403` before availability or validation.
+- Status precedence is part of the regression contract: unauthenticated `401`, unauthorized `403` regardless of provider state, authorized unavailable `503`, and authorized invalid input `422`. For an authorized actor, availability is checked before validation, matching the text flow. Provider/connection failure mappings remain unchanged (`502`/`503`).
+- Vision authorization regression coverage must include disabled and unconfigured requests from a user without `updateMetadata` permission and assert that no provider request is sent. An actor with only `can_edit_metadata=true`, no target access, and an empty request must receive `403` before `isAvailable()`, validation, or provider work.
+- Target-lookup regressions must prove that an actor without coarse metadata capability receives `403` without querying `photos`, and that a target-scoped client/invite actor receives the same opaque `403` for unknown and inaccessible photo IDs. LM Studio is a browser-side vision fallback only; it is not a provider for the text-only endpoint.
 
 ### Frontend
 - `useAI()` resolves mode (`server` / `local` / `unavailable`) from `/api/ai/status`

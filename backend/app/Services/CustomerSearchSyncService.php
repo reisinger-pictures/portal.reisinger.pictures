@@ -2,13 +2,11 @@
 
 namespace App\Services;
 
+use App\Jobs\CrmCleanupOutboxJob;
 use App\Jobs\SyncCustomerSearchJob;
 use App\Models\Customer;
 use Closure;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
-use Throwable;
 
 /**
  * Defers customer search side effects until the surrounding database commit.
@@ -20,6 +18,8 @@ use Throwable;
  */
 class CustomerSearchSyncService
 {
+    public function __construct(private readonly DurableDispatchService $dispatch) {}
+
     /**
      * Run a customer write without Scout's model observer.
      */
@@ -31,9 +31,10 @@ class CustomerSearchSyncService
     /**
      * Queue an index or remove operation after the current commit.
      *
-     * Dispatch failures are logged instead of being allowed to turn a committed
-     * CRM request into a false 500. With the database queue the job is durable;
-     * operators can inspect and retry it through failed_jobs.
+     * Dispatch failures are persisted as a retryable CRM cleanup outbox job
+     * instead of being allowed to turn a committed CRM request into a false
+     * 500. The existing jobs table is the durable fallback; terminal worker
+     * failures remain visible through failed_jobs.
      */
     public function defer(Customer|string $customer, string $operation = SyncCustomerSearchJob::INDEX): void
     {
@@ -49,39 +50,14 @@ class CustomerSearchSyncService
             return;
         }
 
-        $dispatch = function () use ($customerId, $operation): void {
-            try {
-                SyncCustomerSearchJob::dispatch($customerId, $operation);
-                Log::info('customer.search_sync.queued', [
-                    'customer_id' => $customerId,
-                    'operation' => $operation,
-                ]);
-            } catch (Throwable $exception) {
-                // A queue outage must not make the already committed request look
-                // failed. Keep a structured event for operators/retry tooling.
-                Log::error('customer.search_sync.dispatch_failed', [
-                    'customer_id' => $customerId,
-                    'operation' => $operation,
-                    'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
-                ]);
-            }
-        };
-
-        try {
-            $connection = DB::connection();
-            if ($connection->transactionLevel() > 0) {
-                $connection->afterCommit($dispatch);
-            } else {
-                $dispatch();
-            }
-        } catch (Throwable $exception) {
-            Log::error('customer.search_sync.defer_failed', [
+        $this->dispatch->afterCommit(
+            new SyncCustomerSearchJob($customerId, $operation),
+            CrmCleanupOutboxJob::forCustomerSearch($customerId, $operation),
+            'customer.search_sync',
+            [
                 'customer_id' => $customerId,
                 'operation' => $operation,
-                'exception' => $exception::class,
-                'message' => $exception->getMessage(),
-            ]);
-        }
+            ],
+        );
     }
 }

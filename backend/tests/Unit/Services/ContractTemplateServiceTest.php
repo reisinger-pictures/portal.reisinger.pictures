@@ -5,11 +5,14 @@ namespace Tests\Unit\Services;
 use App\Enums\Brand;
 use App\Models\Contract;
 use App\Models\ContractSigner;
+use App\Services\ContractPricingService;
 use App\Services\ContractTemplateService;
 use App\Support\BrandRegistry;
+use App\Support\PersistedMoney;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class ContractTemplateServiceTest extends TestCase
@@ -80,6 +83,124 @@ class ContractTemplateServiceTest extends TestCase
         $this->assertEquals(['Model'], $signer->roles);
         $this->assertEquals('test-personal-token-123', $signer->personal_token);
         $this->assertEquals('joined', $signer->status);
+    }
+
+    public function test_legacy_mixed_placement_that_would_reorder_fails_closed_without_instance_or_signer(): void
+    {
+        $template = Contract::factory()->template()->create([
+            'status' => 'active',
+            'expires_at' => now()->addDays(10),
+            'closes_at' => now()->addDays(20),
+            'available_roles' => ['Model'],
+            'items' => [
+                [
+                    'type' => 'discount_fixed',
+                    'description' => 'Rabatt vor Position',
+                    'price' => 100,
+                ],
+                [
+                    'type' => 'item',
+                    'description' => 'Leistung',
+                    'qty' => 1,
+                    'price' => 1000,
+                ],
+            ],
+            'discounts' => [],
+        ]);
+        $originalItems = $template->items;
+        $originalDiscounts = $template->discounts;
+
+        try {
+            (new ContractTemplateService)->createInstance($template, [
+                'name' => 'Nicht kopierbar',
+                'email' => 'mixed-template@example.com',
+                'roles' => ['Model'],
+                'personal_token' => 'mixed-template-token',
+            ]);
+            $this->fail('Expected the legacy mixed-placement copy to fail closed.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('nicht verlustfrei erhalten', $exception->getMessage());
+        }
+
+        $template->refresh();
+        $this->assertSame($originalItems, $template->items);
+        $this->assertSame($originalDiscounts, $template->discounts);
+        $this->assertDatabaseCount('contracts', 1);
+        $this->assertDatabaseCount('contract_signers', 0);
+    }
+
+    public function test_legacy_mixed_placement_preserves_compatible_order_when_copying(): void
+    {
+        $template = Contract::factory()->template()->create([
+            'status' => 'active',
+            'expires_at' => now()->addDays(10),
+            'closes_at' => now()->addDays(20),
+            'available_roles' => ['Model'],
+            'items' => [
+                [
+                    'type' => 'item',
+                    'description' => 'Leistung',
+                    'qty' => 1,
+                    'price' => 1000,
+                ],
+                [
+                    'type' => 'discount_fixed',
+                    'description' => 'Rabatt nach Position',
+                    'price' => 100,
+                ],
+            ],
+            'discounts' => [],
+        ]);
+
+        $result = (new ContractTemplateService)->createInstance($template, [
+            'name' => 'Kompatibler Legacy-Copy',
+            'email' => 'compatible-template@example.com',
+            'roles' => ['Model'],
+            'personal_token' => 'compatible-template-token',
+        ]);
+
+        $this->assertTrue($result['created']);
+        $this->assertSame(
+            ['item', 'discount_fixed'],
+            array_map(fn (array $line): string => $line['type'], array_merge(
+                $result['instance']->items,
+                $result['instance']->discounts,
+            )),
+        );
+        $this->assertSame(900, app(ContractPricingService::class)->calculateTotal(
+            $result['instance']->items,
+            $result['instance']->discounts,
+        ));
+    }
+
+    public function test_template_persisted_money_overflow_fails_before_instance_or_signer_insert(): void
+    {
+        $template = Contract::factory()->template()->create([
+            'status' => 'active',
+            'expires_at' => now()->addDays(10),
+            'closes_at' => now()->addDays(20),
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Zu groß',
+                'qty' => 1,
+                'price' => PersistedMoney::MAX_CENTS + 1,
+            ]],
+            'discounts' => [],
+        ]);
+
+        try {
+            (new ContractTemplateService)->createInstance($template, [
+                'name' => 'Nicht persistierbar',
+                'email' => 'overflow-template@example.com',
+                'roles' => ['Model'],
+                'personal_token' => 'overflow-template-token',
+            ]);
+            $this->fail('Expected the template pricing ceiling to reject the copy.');
+        } catch (\InvalidArgumentException) {
+            $this->assertDatabaseCount('contracts', 1);
+            $this->assertDatabaseCount('contract_signers', 0);
+        }
     }
 
     public function test_create_instance_persists_to_database(): void

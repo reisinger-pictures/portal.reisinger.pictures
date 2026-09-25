@@ -6,6 +6,7 @@ use App\Enums\Brand;
 use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class StatsCalculationService
@@ -25,18 +26,20 @@ class StatsCalculationService
     }
 
     /**
-     * All gallery IDs belonging to a brand. Empty for a trusted cross-brand
-     * Super-Admin.
+     * Gallery IDs belonging to a brand as a query, not a materialized array.
+     * A null brand is intentionally unscoped for a trusted cross-brand
+     * Super-Admin; callers must only use that path after the actor guard.
      *
-     * @return array<string>
+     * @return Builder<Gallery>
      */
-    private function galleryIdsForBrand(?string $brand): array
+    private function galleryIdsForBrand(?string $brand): Builder
     {
-        if ($brand === null) {
-            return [];
-        }
-
-        return Gallery::where('brand', $brand)->pluck('id')->all();
+        return Gallery::query()
+            ->select('id')
+            ->when(
+                $brand !== null,
+                fn (Builder $query) => $query->where('brand', $brand),
+            );
     }
 
     /**
@@ -78,7 +81,7 @@ class StatsCalculationService
             }
         };
 
-        $galleriesCount = $brand === null ? Gallery::count() : count($brandGalleryIds);
+        $galleriesCount = $this->galleryIdsForBrand($brand)->count();
 
         $totalDownloads = DownloadLog::where('item_type', 'single_image')
             ->when($brand !== null, fn ($q) => $q->whereIn('gallery_id', $brandGalleryIds))
@@ -200,14 +203,17 @@ class StatsCalculationService
     {
         $brand = $this->normalizeBrand($brand ?? $user->brand);
 
-        $galleryIds = array_unique(array_merge(
-            $user->galleries()->pluck('galleries.id')->toArray(),
-            $user->photographerGalleries()->pluck('galleries.id')->toArray()
-        ));
+        $scopeToBrand = function ($query) use ($brand) {
+            return $query->when(
+                $brand !== null,
+                fn ($scopedQuery) => $scopedQuery->where('galleries.brand', $brand),
+            );
+        };
 
-        if ($brand !== null) {
-            $galleryIds = array_values(array_intersect($galleryIds, $this->galleryIdsForBrand($brand)));
-        }
+        $galleryIds = array_unique(array_merge(
+            $scopeToBrand($user->galleries())->pluck('galleries.id')->toArray(),
+            $scopeToBrand($user->photographerGalleries())->pluck('galleries.id')->toArray(),
+        ));
 
         $galleriesCount = count($galleryIds);
 

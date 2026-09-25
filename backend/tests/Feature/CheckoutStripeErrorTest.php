@@ -12,9 +12,11 @@ use App\Models\User;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CheckoutIdempotencyService;
 use App\Services\CheckoutService;
+use App\Services\StripePaymentService;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\Log;
@@ -55,7 +57,7 @@ class CheckoutStripeErrorTest extends TestCase
         $user = User::factory()->create();
         $user->galleries()->attach($gallery->id);
 
-        $stripe = $this->createMock(\App\Services\StripePaymentService::class);
+        $stripe = $this->createMock(StripePaymentService::class);
         $stripe->expects($this->once())
             ->method('createPaymentIntent')
             ->willReturnCallback(function (
@@ -153,7 +155,7 @@ class CheckoutStripeErrorTest extends TestCase
         $user->galleries()->attach($gallery->id);
         config(['app.stripe.customers_enabled' => false]);
 
-        $stripe = $this->createMock(\App\Services\StripePaymentService::class);
+        $stripe = $this->createMock(StripePaymentService::class);
         $stripe->expects($this->once())
             ->method('createPaymentIntent')
             ->willReturnCallback(function (
@@ -216,11 +218,12 @@ class CheckoutStripeErrorTest extends TestCase
         $user = User::factory()->create();
         $user->galleries()->attach($gallery->id);
         $request = $this->checkoutRequest('creator-race-key-0001');
-        $stripe = $this->createMock(\App\Services\StripePaymentService::class);
+        $stripe = $this->createMock(StripePaymentService::class);
         $identityService = new CheckoutIdempotencyService($stripe);
         $identity = $identityService->identify($request, $user, 4000, 'stripe');
         $order = Order::factory()->create([
             'user_id' => $user->id,
+            'brand' => Brand::B2B,
             'status' => 'pending_payment',
             'total_amount' => 4000,
             'stripe_payment_intent_id' => 'pi_creator_race_old',
@@ -243,7 +246,7 @@ class CheckoutStripeErrorTest extends TestCase
                 int $amountCents,
                 \Closure $creator,
                 bool $allowFingerprintFallback,
-            ) use ($order): \Illuminate\Http\JsonResponse {
+            ) use ($order): JsonResponse {
                 Order::query()->whereKey($order->getKey())->update(['status' => 'paid']);
 
                 return $creator($order->fresh());

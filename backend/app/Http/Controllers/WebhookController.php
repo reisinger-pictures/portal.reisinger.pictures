@@ -220,8 +220,10 @@ class WebhookController extends Controller
 
         if ($order->status === 'paid') {
             // A previous event may have transitioned the order before mail
-            // dispatch failed. Re-enter the shared durable mail path on every
+            // enqueue failed. Re-enter the shared durable mail path on every
             // paid retry instead of acknowledging solely from order status.
+            // The claim prevents a second enqueue; SMTP delivery retries remain
+            // the queue worker's responsibility.
             return $this->reconciliationResponse(
                 $this->paymentReconciliation->reconcileSucceeded($order, $paymentIntent),
                 $eventId,

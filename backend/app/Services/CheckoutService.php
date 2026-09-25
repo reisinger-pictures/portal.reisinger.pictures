@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Contracts\PricingStrategy;
 use App\Mail\CustomMail;
-use App\Mail\InvoiceMail;
 use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\InvoiceSequence;
@@ -20,6 +19,7 @@ use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
+use App\Support\PersistedMoney;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -50,6 +50,8 @@ class CheckoutService
 
     private StripeCheckoutKillSwitch $checkoutKillSwitch;
 
+    private InvoiceMailDispatcher $invoiceMailDispatcher;
+
     public function __construct(
         PricingStrategy $strategy,
         ?StripePaymentService $stripePayment = null,
@@ -58,6 +60,7 @@ class CheckoutService
         ?CheckoutRiskService $checkoutRisk = null,
         ?CheckoutIdempotencyService $checkoutIdempotency = null,
         ?StripeCheckoutKillSwitch $checkoutKillSwitch = null,
+        ?InvoiceMailDispatcher $invoiceMailDispatcher = null,
     ) {
         $this->strategy = $strategy;
         $this->stripePayment = $stripePayment ?? app(StripePaymentService::class);
@@ -66,6 +69,7 @@ class CheckoutService
         $this->checkoutRisk = $checkoutRisk ?? app(CheckoutRiskService::class);
         $this->checkoutIdempotency = $checkoutIdempotency ?? new CheckoutIdempotencyService($this->stripePayment);
         $this->checkoutKillSwitch = $checkoutKillSwitch ?? app(StripeCheckoutKillSwitch::class);
+        $this->invoiceMailDispatcher = $invoiceMailDispatcher ?? app(InvoiceMailDispatcher::class);
     }
 
     public function processCheckout($request, $user, $paymentMethod)
@@ -81,6 +85,21 @@ class CheckoutService
                     'error' => 'Der Checkout ist für Gäste derzeit nicht verfügbar. Bitte melde dich mit einem Portal-Konto an.',
                     'guest_checkout_unsupported' => true,
                 ], 403);
+            }
+
+            // Resolve an exact non-immediate claim before token, item, and
+            // coupon validation. The persisted fingerprint and order owner
+            // bind the replay to the original request; mutable catalog,
+            // authorization, and coupon state must not strand a committed
+            // invoice, delivery note, settled-free order, or quote response.
+            $nonImmediateReplay = $this->checkoutIdempotency->replayNonImmediateByKey(
+                $user,
+                $request,
+                $paymentMethod,
+                fn (Order $order): JsonResponse => $this->respondForExistingNonImmediateOrder($order, $user),
+            );
+            if ($nonImmediateReplay !== null) {
+                return $nonImmediateReplay;
             }
 
             $quoteToken = $request->input('quote_token');
@@ -275,6 +294,14 @@ class CheckoutService
                 return response()->json(['error' => 'Warenkorb hat keinen Wert.'], 400);
             }
 
+            try {
+                PersistedMoney::assertFitsCents($totalNetCents, 'checkout total');
+            } catch (\InvalidArgumentException) {
+                return response()->json([
+                    'error' => 'Der Gesamtbetrag überschreitet das zulässige gespeicherte Betragslimit.',
+                ], 422);
+            }
+
             // A zero total is only legitimate when a real discount reduced a
             // positive cart to zero. An empty/valueless cart (e.g. a flatrate-
             // covered cart without a coupon) stays rejected.
@@ -333,49 +360,19 @@ class CheckoutService
                 );
             }
 
-            $order = DB::transaction(function () use ($request, $user, $paymentMethod, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived, $quoteTokenPayload) {
-                if ($quoteTokenPayload !== null) {
-                    // Re-read and re-authorize immediately before persistence. A
-                    // gallery assignment, brand, expiry, or hidden state may have
-                    // changed since the initial token validation above.
-                    $this->assertQuotePhotosAuthorized(
-                        $user,
-                        $quoteTokenPayload['photos'],
-                        $quoteTokenPayload['brand'],
-                    );
-                }
-
-                $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
-
-                $appliedCouponId = null;
-                if ($appliedCoupon !== null) {
-                    [$lockedCoupon, $couponError] = $this->couponService->lockAndRevalidateCoupon($appliedCoupon, $user->id);
-                    if ($lockedCoupon === null) {
-                        throw new HttpResponseException(response()->json(['error' => $couponError], 422));
-                    }
-                    $appliedCouponId = $lockedCoupon->id;
-                }
-
-                $order = $this->createOrder(
-                    $user,
-                    $totalNetCents,
-                    $isQuoteRequest,
-                    $paymentMethod,
-                    $appliedCouponId,
-                    $couponDiscountCents,
-                    $withdrawalWaived,
-                    null,
-                    null,
-                    1,
-                    $request->ip(),
-                );
-
-                $this->createInvoiceSnapshot($order, $request, $user, $lineItems, $totalNetCents, $customConditions, $withdrawalWaived);
-
-                return $order;
-            });
-
-            return $this->respondBasedOnPayment($order, $request, $user, $isQuoteRequest, $paymentMethod, $totalNetCents);
+            return $this->processNonImmediateCheckout(
+                $request,
+                $user,
+                $paymentMethod,
+                $totalNetCents,
+                $isQuoteRequest,
+                $appliedCoupon,
+                $couponDiscountCents,
+                $lineItems,
+                $customConditions,
+                $withdrawalWaived,
+                $quoteTokenPayload,
+            );
         } catch (HttpResponseException $e) {
             return $e->getResponse();
         } catch (QueryException $e) {
@@ -384,6 +381,111 @@ class CheckoutService
             }
             throw $e;
         }
+    }
+
+    /**
+     * Persist and answer an invoice, settled-free, delivery-note, or reactive
+     * quote checkout under the same browser key claim used by Stripe checkout.
+     * The V036 identity namespace is intentionally shared, while no
+     * Stripe-specific admission, quota, kill-switch, or customer/PI work is
+     * introduced on this branch. Exact-key replay is safe; a lost browser key
+     * is intentionally a new-order boundary.
+     */
+    private function processNonImmediateCheckout(
+        $request,
+        $user,
+        string $paymentMethod,
+        int $totalNetCents,
+        bool $isQuoteRequest,
+        ?Coupon $appliedCoupon,
+        int $couponDiscountCents,
+        array $lineItems,
+        null|string|array $customConditions,
+        bool $withdrawalWaived,
+        ?array $quoteTokenPayload,
+    ): JsonResponse {
+        $identity = $this->checkoutIdempotency->identify(
+            $request,
+            $user,
+            $totalNetCents,
+            $paymentMethod,
+        );
+
+        return $this->checkoutIdempotency->executeNonImmediate(
+            $user,
+            $identity['key'],
+            $identity['fingerprint'],
+            $totalNetCents,
+            function (?Order $existingOrder) use (
+                $request,
+                $user,
+                $paymentMethod,
+                $totalNetCents,
+                $isQuoteRequest,
+                $appliedCoupon,
+                $couponDiscountCents,
+                $lineItems,
+                $customConditions,
+                $withdrawalWaived,
+                $quoteTokenPayload,
+                $identity,
+            ): JsonResponse {
+                if ($existingOrder !== null) {
+                    return $this->safeNonImmediateResponse(
+                        fn (): JsonResponse => $this->respondForExistingNonImmediateOrder($existingOrder, $user),
+                        $existingOrder,
+                    );
+                }
+
+                $order = DB::transaction(function () use ($request, $user, $paymentMethod, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived, $quoteTokenPayload, $identity) {
+                    if ($quoteTokenPayload !== null) {
+                        // Re-read and re-authorize immediately before persistence. A
+                        // gallery assignment, brand, expiry, or hidden state may have
+                        // changed since the initial token validation above.
+                        $this->assertQuotePhotosAuthorized(
+                            $user,
+                            $quoteTokenPayload['photos'],
+                            $quoteTokenPayload['brand'],
+                        );
+                    }
+
+                    $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
+
+                    $appliedCouponId = null;
+                    if ($appliedCoupon !== null) {
+                        [$lockedCoupon, $couponError] = $this->couponService->lockAndRevalidateCoupon($appliedCoupon, $user->id);
+                        if ($lockedCoupon === null) {
+                            throw new HttpResponseException(response()->json(['error' => $couponError], 422));
+                        }
+                        $appliedCouponId = $lockedCoupon->id;
+                    }
+
+                    $order = $this->createOrder(
+                        $user,
+                        $totalNetCents,
+                        $isQuoteRequest,
+                        $paymentMethod,
+                        $appliedCouponId,
+                        $couponDiscountCents,
+                        $withdrawalWaived,
+                        $identity['key'],
+                        $identity['fingerprint'],
+                        1,
+                        $request->ip(),
+                    );
+
+                    $this->createInvoiceSnapshot($order, $request, $user, $lineItems, $totalNetCents, $customConditions, $withdrawalWaived);
+
+                    return $order;
+                });
+
+                return $this->safeNonImmediateResponse(
+                    fn (): JsonResponse => $this->respondBasedOnPayment($order, $request, $user, $isQuoteRequest, $paymentMethod, $totalNetCents),
+                    $order,
+                );
+            },
+            false,
+        );
     }
 
     /**
@@ -647,8 +749,11 @@ class CheckoutService
                 $mode = 'volume_licensing';
             }
 
+            // Resolve a null gallery override to the concrete brand-default ID
+            // so it shares the retroactive tier with a gallery that explicitly
+            // selects that same default preset.
             $presetKey = $mode === 'volume_licensing'
-                ? ($gallery?->volume_preset_id ?: 'default')
+                ? app(VolumePresetService::class)->resolveForGallery($gallery)->id
                 : 'default';
             $groups[$mode.'|'.$presetKey][] = $item;
         }
@@ -1454,6 +1559,20 @@ class CheckoutService
             'country' => 'Österreich', 'items' => $lineItems, 'quote_message' => $request->quote_message ?? null, 'terms' => [],
         ];
 
+        // Freeze organization ownership at purchase time. Collective invoice
+        // generation must not infer this from the user's later org_id value.
+        // A delivery-note order must never reach persistence without that
+        // immutable attribution; failing here rolls the transaction back.
+        $orgId = $org?->getKey() ?? $user->org_id;
+        if ($order->status === 'delivery_note'
+            && ($orgId === null || trim((string) $orgId) === '')) {
+            throw new \LogicException('A delivery-note checkout requires an organization.');
+        }
+
+        if ($orgId !== null && trim((string) $orgId) !== '') {
+            $customerDetails[InvoiceSnapshot::PURCHASE_ORG_ID_KEY] = (string) $orgId;
+        }
+
         if ($customConditions !== null) {
             $customerDetails['custom_conditions'] = $customConditions;
         }
@@ -1476,6 +1595,78 @@ class CheckoutService
         ]);
     }
 
+    private function safeNonImmediateResponse(callable $responder, ?Order $order): JsonResponse
+    {
+        try {
+            return $responder();
+        } catch (HttpResponseException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            Log::warning('Non-immediate checkout response failed after order claim', [
+                'order_id' => $order?->id,
+                'exception_class' => $exception::class,
+            ]);
+
+            return response()->json([
+                'error' => 'Der Checkout konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
+            ], 503);
+        }
+    }
+
+    /**
+     * Finalize an exact-key claim found before server-side coupon revalidation.
+     * The persisted order state, rather than the current request's mutable
+     * flags, is authoritative for the response and the durable mail-enqueue
+     * side effect.
+     */
+    private function respondForExistingNonImmediateOrder(Order $order, User $user): JsonResponse
+    {
+        // Re-read the durable state before any mail side effect. An admin may
+        // have cancelled, archived, or otherwise closed the claim after the
+        // identity lookup; a stale model must not turn that terminal state into
+        // a successful replay.
+        $order->refresh();
+        $order->loadMissing('invoiceSnapshot');
+        $snapshot = $order->invoiceSnapshot;
+        if ($snapshot === null) {
+            Log::warning('Non-immediate checkout replay has no invoice snapshot', [
+                'order_id' => $order->id,
+            ]);
+
+            return response()->json([
+                'error' => 'Der Checkout konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
+            ], 503);
+        }
+
+        if ((bool) $order->is_quote_request) {
+            if ($order->status !== 'pending') {
+                return $this->checkoutStateConflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+            }
+
+            return response()->json([
+                'success' => true,
+                'order_id' => $order->id,
+                'invoice_number' => $snapshot->invoice_number,
+            ]);
+        }
+
+        if ((int) $order->total_amount === 0) {
+            return $this->respondForSettledFreeOrder($order, $user);
+        }
+
+        if (! in_array($order->status, ['invoice_created', 'delivery_note', 'paid'], true)) {
+            return $this->checkoutStateConflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+        }
+
+        $this->queueInvoiceMailOnce($order, $user);
+
+        return response()->json([
+            'success' => true,
+            'order_id' => $order->id,
+            'invoice_number' => $snapshot->invoice_number,
+        ]);
+    }
+
     private function respondBasedOnPayment(Order $order, $request, $user, bool $isQuoteRequest, string $paymentMethod, int $totalNetCents): JsonResponse
     {
         $snapshot = $order->invoiceSnapshot;
@@ -1494,7 +1685,7 @@ class CheckoutService
         $isLieferschein = $org && $org->invoice_frequency !== 'immediate';
 
         if ($isLieferschein || $paymentMethod === 'invoice') {
-            Mail::to($user->email)->queue(new InvoiceMail($order, $snapshot));
+            $this->queueInvoiceMailOnce($order, $user);
 
             return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
         }
@@ -1521,12 +1712,30 @@ class CheckoutService
             // A concurrent admin transition (for example to cancelled or
             // delivery_note) wins; never reopen that terminal/collective state.
             $order->refresh();
+            if (! in_array($order->status, ['paid', 'delivery_note'], true)) {
+                return $this->checkoutStateConflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+            }
         }
 
         $snapshot = $order->invoiceSnapshot;
 
-        Mail::to($user->email)->queue(new InvoiceMail($order, $snapshot));
+        $this->queueInvoiceMailOnce($order, $user);
 
         return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
+    }
+
+    /**
+     * Queue the checkout invoice through the durable snapshot claim.
+     *
+     * The dispatcher writes its non-expiring marker and the queue insert in
+     * one database transaction. A retry after a queue failure can therefore
+     * try again, while cache eviction, a crash after queueing, or a marker
+     * failure cannot create a second enqueue. This is not an exactly-once SMTP
+     * delivery guarantee: worker retries and terminal failed_jobs handling are
+     * deliberately separate operational concerns.
+     */
+    private function queueInvoiceMailOnce(Order $order, User $user): void
+    {
+        $this->invoiceMailDispatcher->queueOnce($order, $user);
     }
 }

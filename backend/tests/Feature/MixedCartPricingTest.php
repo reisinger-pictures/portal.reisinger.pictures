@@ -14,6 +14,7 @@ use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class MixedCartPricingTest extends TestCase
@@ -217,5 +218,47 @@ class MixedCartPricingTest extends TestCase
 
         // Single non-quote item → tier 1 of the brand default (3000).
         $this->assertDatabaseHas('orders', ['total_amount' => 3000]);
+    }
+
+    public function test_explicit_and_implicit_default_preset_share_one_volume_group(): void
+    {
+        Mail::fake();
+        $presetService = app(VolumePresetService::class);
+        $default = $presetService->ensureDefaultPresetForBrand(Brand::B2B);
+        $presetService->update($default, 'Default', [
+            ['min_quantity' => 0, 'price_cents' => 5000],
+            ['min_quantity' => 2, 'price_cents' => 3000],
+        ]);
+
+        $implicitGallery = Gallery::factory()->create([
+            'is_public' => true,
+            'licensing_mode' => 'volume_licensing',
+            'volume_preset_id' => null,
+        ]);
+        $explicitGallery = Gallery::factory()->create([
+            'is_public' => true,
+            'licensing_mode' => 'volume_licensing',
+            'volume_preset_id' => $default->id,
+        ]);
+        $implicitPhoto = Photo::factory()->create(['gallery_id' => $implicitGallery->id]);
+        $explicitPhoto = Photo::factory()->create(['gallery_id' => $explicitGallery->id]);
+        $user = User::factory()->create();
+
+        $request = Request::create('/', 'POST', [
+            'items' => [
+                ['photoId' => $implicitPhoto->id, 'tier' => 'web'],
+                ['photoId' => $explicitPhoto->id, 'tier' => 'web'],
+            ],
+            'billing_name' => 'Tester',
+            'billing_street' => 'Street',
+            'billing_zip' => '1234',
+            'billing_city' => 'City',
+            'withdrawal_waived' => true,
+        ]);
+
+        $response = $this->service->processCheckout($request, $user, 'invoice');
+
+        $this->assertEquals(200, $response->status());
+        $this->assertDatabaseHas('orders', ['total_amount' => 6000]);
     }
 }

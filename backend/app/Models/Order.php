@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\AsBrand;
 use App\Support\ActorIdentity;
+use App\Support\PersistedMoney;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -79,6 +80,7 @@ class Order extends Model
     {
         static::saving(function ($order) {
             ActorIdentity::assertOrderOwnerInvariant($order->user_id, $order->guest_id);
+            PersistedMoney::assertFitsCents($order->total_amount, 'orders.total_amount');
 
             $allowedStatuses = ['pending', 'invoice_created', 'pending_payment', 'paid', 'overdue', 'cancelled', 'disputed', 'refunded', 'delivery_note', 'archived_in_collective'];
             if (! in_array($order->status, $allowedStatuses)) {

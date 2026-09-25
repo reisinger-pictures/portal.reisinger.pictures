@@ -183,6 +183,21 @@ class GalleryService
         unset($data['password']);
 
         $effectiveType = $data['type'] ?? $gallery->type;
+        $effectiveGroupId = array_key_exists('gallery_group_id', $data)
+            ? $data['gallery_group_id']
+            : $gallery->gallery_group_id;
+
+        // Keep create/update visibility semantics identical: a meta-gallery
+        // policy is copied onto the gallery and overrides the submitted flag.
+        // A null policy remains non-enforcing, so the user's explicit value is
+        // preserved.
+        if ($effectiveType !== 'selection' && ! empty($effectiveGroupId)) {
+            $group = GalleryGroup::find($effectiveGroupId);
+            if ($group?->is_public !== null) {
+                $data['is_public'] = (bool) $group->is_public;
+            }
+        }
+
         if ($effectiveType === 'selection') {
             $data['is_live'] = false;
             $data['is_public'] = false;
