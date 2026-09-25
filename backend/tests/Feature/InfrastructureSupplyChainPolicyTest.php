@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use DirectoryIterator;
+use SplFileInfo;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
+use UnexpectedValueException;
 
 class InfrastructureSupplyChainPolicyTest extends TestCase
 {
@@ -12,6 +15,42 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
     private const IMAGE_DIGEST_PATTERN = '/@sha256:[0-9a-f]{64}$/';
 
     private const MEILISEARCH_IMAGE = 'getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29';
+
+    /**
+     * The GitHub organisation that owns this repository. Both image workflows
+     * publish through `OWNER: ${{ github.repository_owner }}`, so every
+     * consumer must pin this namespace. The previously used personal `ghcr.io`
+     * namespace silently froze the pinned digests on stale images: rebuilds only
+     * ever reached the organisation path. The literal old path is deliberately
+     * not spelled out here, because this guard rejects *any* non-organisation
+     * `ghcr.io` reference — including in comments and documentation.
+     */
+    private const IMAGE_NAMESPACE = 'reisinger-pictures';
+
+    /**
+     * Directories that never contain tracked container-artifact references.
+     *
+     * @var list<string>
+     */
+    private const SCAN_EXCLUDED_DIRECTORIES = [
+        '.git',
+        'node_modules',
+        'vendor',
+        'dist',
+        // Runtime/test scratch: unreadable subtrees and never source of a pin.
+        'storage',
+        'bootstrap',
+        'test-results',
+        'playwright-report',
+    ];
+
+    /**
+     * `@var list<string>` Session-owned scratch file. It deliberately records
+     * historical artifact references, so it is not part of the policy scan.
+     */
+    private const SCAN_EXCLUDED_FILES = [
+        'AGENTS.todo.md',
+    ];
 
     /**
      * @var list<string>
@@ -90,6 +129,95 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
                 self::IMAGE_DIGEST_PATTERN,
                 $reference,
                 'Container images must use an immutable sha256 digest'
+            );
+        }
+    }
+
+    /**
+     * Regression guard for the namespace drift: both image workflows publish
+     * under the owning organisation, so a consumer that names any other
+     * registry namespace pins a digest no rebuild can ever refresh.
+     */
+    public function test_container_image_references_use_the_owning_organization_namespace(): void
+    {
+        $scannedFiles = 0;
+        $references = [];
+
+        foreach ($this->scannableFiles() as $relativePath) {
+            $contents = $this->read($relativePath);
+            $scannedFiles++;
+
+            if (preg_match_all('#\bghcr\.io/([^/\s\'"`]+)/#', $contents, $matches) === 0) {
+                continue;
+            }
+
+            foreach ($matches[0] as $index => $reference) {
+                $references[] = sprintf('%s:%d (%s)', $relativePath, $this->lineOf($contents, $matches[0][$index]), $reference);
+            }
+        }
+
+        $this->assertGreaterThan(0, $scannedFiles, 'the namespace scan must cover the repository');
+        $this->assertNotEmpty(
+            $references,
+            'the repository must still declare at least one ghcr.io image reference'
+        );
+
+        foreach ($references as $reference) {
+            $this->assertMatchesRegularExpression(
+                '#\bghcr\.io/'.preg_quote(self::IMAGE_NAMESPACE, '#').'/#',
+                $reference,
+                'Container image references must use the ghcr.io/'.self::IMAGE_NAMESPACE
+                    .' namespace that base-image.yml and e2e-image.yml publish to'
+            );
+        }
+    }
+
+    /**
+     * The same `portal-base` build must be pinned byte-identically by every
+     * consumer. A drifted copy is how the deployment compose file kept booting
+     * an image whose preflight/supervisor binaries were missing.
+     */
+    public function test_portal_base_is_pinned_to_one_single_digest_everywhere(): void
+    {
+        $digests = [];
+
+        foreach ($this->scannableFiles() as $relativePath) {
+            $contents = $this->read($relativePath);
+            if (preg_match_all(
+                '#\bghcr\.io/'.preg_quote(self::IMAGE_NAMESPACE, '#').'/portal-base(?::[^\s\'"@]+)?@sha256:([0-9a-f]{64})#',
+                $contents,
+                $matches
+            ) === 0) {
+                continue;
+            }
+
+            foreach ($matches[1] as $digest) {
+                $digests[$digest] = true;
+            }
+        }
+
+        $this->assertCount(
+            1,
+            $digests,
+            'every ghcr.io/'.self::IMAGE_NAMESPACE.'/portal-base reference must pin the same sha256 digest, found: '
+                .implode(', ', array_keys($digests))
+        );
+    }
+
+    public function test_image_publishing_workflows_derive_the_owner_from_the_repository(): void
+    {
+        foreach (['.github/workflows/base-image.yml', '.github/workflows/e2e-image.yml'] as $workflow) {
+            $contents = $this->read($workflow);
+
+            $this->assertStringContainsString(
+                'OWNER: ${{ github.repository_owner }}',
+                $contents,
+                "{$workflow} must publish under the repository owner namespace"
+            );
+            $this->assertDoesNotMatchRegularExpression(
+                '/OWNER:\s*[\'"]?[A-Za-z0-9._-]+\/?[\'"]?\s*$/m',
+                $contents,
+                "{$workflow} must not hardcode a literal OWNER that could drift from the repository owner"
             );
         }
     }
@@ -208,6 +336,80 @@ PHP;
         sort($files);
 
         return array_values($files);
+    }
+
+    /**
+     * Every tracked text file that may name a container artifact. Comments and
+     * documentation are scanned on purpose: a stale namespace in either is
+     * exactly what allowed this drift to go unnoticed.
+     *
+     * @return list<string>
+     */
+    private function scannableFiles(): array
+    {
+        $root = $this->projectPath();
+        $files = [];
+
+        // Explicit breadth-first walk. A recursive iterator combined with a
+        // filter callback does not reliably descend on every supported PHP
+        // version, and an unreadable directory must not abort the scan.
+        $queue = [$root];
+        while ($queue !== []) {
+            $directory = array_shift($queue);
+
+            try {
+                $entries = new DirectoryIterator($directory);
+            } catch (UnexpectedValueException) {
+                continue;
+            }
+
+            foreach ($entries as $entry) {
+                /** @var SplFileInfo $entry */
+                $name = $entry->getFilename();
+
+                if ($entry->isDot()) {
+                    continue;
+                }
+
+                if ($entry->isDir()) {
+                    if (! in_array($name, self::SCAN_EXCLUDED_DIRECTORIES, true)) {
+                        $queue[] = $entry->getPathname();
+                    }
+
+                    continue;
+                }
+
+                if (! $entry->isFile() || in_array($name, self::SCAN_EXCLUDED_FILES, true)) {
+                    continue;
+                }
+
+                // Binary or generated assets can never carry a reviewable pin.
+                if (! preg_match(
+                    '/\.(?:md|ya?ml|sh|php|ts|tsx|js|jsx|json|jsonc|xml|txt|conf|cfg|ini|env|ci|example|css|html|htaccess)$/i',
+                    $name
+                )
+                    && ! in_array($name, ['.env.ci', '.env.example', 'Dockerfile', 'Dockerfile.e2e', '.gitignore'], true)) {
+                    continue;
+                }
+
+                $path = $entry->getPathname();
+                $files[] = str_starts_with($path, $root.'/') ? substr($path, strlen($root) + 1) : $path;
+            }
+        }
+
+        sort($files);
+
+        return $files;
+    }
+
+    /**
+     * Best-effort 1-based line number for a match, for actionable failures.
+     */
+    private function lineOf(string $contents, string $needle): int
+    {
+        $position = strpos($contents, $needle);
+
+        return $position === false ? 0 : substr_count($contents, "\n", 0, $position) + 1;
     }
 
     private function read(string $relativePath): string

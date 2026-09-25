@@ -110,6 +110,6 @@ has_whitespace "$mail_from_address" && fail 'MAIL_FROM_ADDRESS must not contain 
 sender_lower=$(printf '%s' "$mail_from_address" | tr '[:upper:]' '[:lower:]')
 [ "$sender_lower" != 'hello@example.com' ] || fail 'MAIL_FROM_ADDRESS must not use the placeholder sender address.'
 
-[ -x /usr/local/bin/portal-backend-supervisor ] || fail 'Supervisor binary is missing; rebuild portal-base, push GHCR, and update the compose digest before starting.'
+[ -x /usr/local/bin/portal-backend-supervisor ] || fail 'Supervisor binary is missing; rebuild ghcr.io/reisinger-pictures/portal-base, push GHCR, and update the compose digest before starting.'
 
 echo 'Production environment preflight passed.'

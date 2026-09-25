@@ -54,7 +54,7 @@ services:
     command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
 
   backend:
-    image: ghcr.io/reisi007/portal-base:8.5@sha256:484410448bdff80c2571778e69e3ec264a0033baf22b0534eaac12331f6940ba
+    image: ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736
     user: "1000:1000"
     container_name: portal_backend
     restart: unless-stopped
@@ -215,6 +215,11 @@ services:
           exit 1;
         fi;
       done;
+      # Rebuild-Pfad: portal-base wird von .github/workflows/base-image.yml
+      # unter OWNER: ${{ github.repository_owner }} publiziert, also in den
+      # Org-Namespace ghcr.io/reisinger-pictures/ (nicht in einen persönlichen
+      # Namespace). Nach dem GHCR-Push den gepinnten Digest weiter unten in
+      # dieser Datei und in ci.yml/Dockerfile.e2e nachziehen.
       if [ ! -x /usr/local/bin/validate-production-env ] || [ ! -x /usr/local/bin/portal-backend-supervisor ]; then
         echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose digest, then redeploy. No migration or seed was run.';
         exit 1;

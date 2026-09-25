@@ -263,7 +263,7 @@ class ProductionOperationsPolicyTest extends TestCase
 
         $this->assertFalse($process->isSuccessful());
         $this->assertSame(
-            "FATAL: Supervisor binary is missing; rebuild portal-base, push GHCR, and update the compose digest before starting.\n",
+            "FATAL: Supervisor binary is missing; rebuild ghcr.io/reisinger-pictures/portal-base, push GHCR, and update the compose digest before starting.\n",
             $process->getErrorOutput(),
         );
         $this->assertStringNotContainsString('Production environment preflight passed.', $process->getOutput());
