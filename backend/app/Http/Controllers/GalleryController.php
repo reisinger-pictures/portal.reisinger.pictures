@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\GalleryGroupBudgetExceededException;
 use App\Http\Requests\StoreGalleryRequest;
 use App\Http\Requests\StoreGroupRequest;
 use App\Http\Requests\SyncGalleryAccessRequest;
@@ -21,11 +22,13 @@ use App\Services\GalleryService;
 use App\Services\GalleryTreeService;
 use App\Services\RatingService;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 
 class GalleryController extends Controller
 {
@@ -110,7 +113,14 @@ class GalleryController extends Controller
     public function updateGallery(UpdateGalleryRequest $request, $id)
     {
         $gallery = Gallery::findOrFail($id);
-        $gallery = $this->galleryService->updateGallery($gallery, $request->validated());
+        $user = auth('api')->user();
+        // Fail closed on the service's non-nullable actor contract.
+        // `UpdateGalleryRequest::authorize()` already requires the `manage`
+        // gate, so an unauthenticated request is rejected before this point;
+        // the explicit check keeps the guarantee local instead of implicit.
+        abort_if($user === null, 401, 'Unauthenticated');
+
+        $gallery = $this->galleryService->updateGallery($gallery, $request->validated(), $user);
 
         return response()->json(['success' => true, 'gallery' => new GalleryResource($gallery)]);
     }
@@ -193,7 +203,24 @@ class GalleryController extends Controller
      */
     public function showGroup($id)
     {
-        $group = GalleryGroup::with(['children', 'orgs'])->findOrFail($id);
+        $group = GalleryGroup::with('orgs')->findOrFail($id);
+        // Bounded, cycle-safe subtree load. The `children` relation itself is
+        // deliberately not self-eager-loading (unbounded depth, endless loop
+        // on corrupt cycles), so the nested group structure is filled here
+        // within the documented depth budget.
+        try {
+            GalleryGroupSubtree::loadSubtree($group);
+        } catch (GalleryGroupBudgetExceededException $exception) {
+            // Fail closed: the group itself is still rendered, but no nested
+            // structure and therefore no descendant galleries are exposed.
+            Log::error('gallery_groups.show_subtree_budget_exceeded', [
+                'group_id' => (string) $group->getKey(),
+                'limit' => $exception->limit(),
+                'requested' => $exception->requested(),
+                'kind' => $exception->kind(),
+            ]);
+            $group->setRelation('children', new Collection);
+        }
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 
@@ -281,20 +308,43 @@ class GalleryController extends Controller
      * also exposes the nested group structure.
      *
      * @param  Collection<int, GalleryGroup>  $groups
+     * @param  array<string, bool>  $visited
      * @return Collection<int, GalleryGroup>
      */
-    private function filterGroupChildrenForBrand(Collection $groups, string $brand): Collection
-    {
+    private function filterGroupChildrenForBrand(
+        Collection $groups,
+        string $brand,
+        int $depth = 0,
+        array $visited = [],
+    ): Collection {
+        if ($depth >= GalleryGroupSubtree::MAX_LEVELS) {
+            return new Collection;
+        }
+
         return $groups
-            ->map(function (GalleryGroup $group) use ($brand): ?GalleryGroup {
+            ->map(function (GalleryGroup $group) use ($brand, $depth, $visited): ?GalleryGroup {
+                $key = (string) $group->getKey();
+                if (isset($visited[$key])) {
+                    // Cycle or repeated node in a malformed tree.
+                    return null;
+                }
+
                 if (! BrandRegistry::galleryGroupTreeMatchesBrand($group, $brand)) {
                     return null;
                 }
 
+                $branchVisited = $visited;
+                $branchVisited[$key] = true;
+
                 if ($group->relationLoaded('children')) {
                     $group->setRelation(
                         'children',
-                        $this->filterGroupChildrenForBrand($group->getRelation('children'), $brand),
+                        $this->filterGroupChildrenForBrand(
+                            $group->getRelation('children'),
+                            $brand,
+                            $depth + 1,
+                            $branchVisited,
+                        ),
                     );
                 }
                 if ($group->relationLoaded('galleries')) {
