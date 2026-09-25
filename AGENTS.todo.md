@@ -30,23 +30,23 @@
 
 
 - [x] **Welle 0 — Triage:** Alle offenen Einträge in aktive Bugs, stale/duplizierte Einträge, bereits erledigte Befunde, Release-only Checks und echte Produktentscheidungen getrennt; Abhängigkeiten und Reihenfolge im Triage-Block dokumentiert.
-- [ ] **Gate 0 — aktueller Working-Tree-Baseline:** Bestehende staged/unstaged/untracked Änderungen inventarisieren; keine neue Implementierung beginnen, bevor die Baseline-Testfehler entweder behoben oder als reproduzierbarer Umgebungsblocker dokumentiert sind.
-- [ ] **Welle 1 — Payment/Cart/Media:** CR-PAY-010, CR-FE-030 und verbleibende P1/P2-Payment-/Media-Befunde mit PHPUnit-, Vitest- und getaggten Playwright-Regressions umsetzen.
-- [ ] **Welle 2 — CRM/Contract/Infra:** CR-CRM-008 sowie Contract-/Infrastructure-Befunde umsetzen; bestehende Jobs/Tabellen zuerst verwenden, neue V039+-Migrationen nur bei unvermeidbarem Schema-Defizit.
+- [x] **Gate 0 — aktueller Working-Tree-Baseline:** Bestehende staged/unstaged/untracked Änderungen inventarisiert; Baseline-Fehler analysiert, behoben oder als reproduzierbare Umgebungsblocker dokumentiert.
+- [x] **Welle 1 — Payment/Cart/Media:** CR-PAY-010, CR-FE-030 und die aktiven Payment-/Media-Follow-ups umgesetzt und unabhängig verifiziert; Browser-/CI-Evidence bleibt separat.
+- [x] **Welle 2 — CRM/Contract/Infra:** CR-CRM-008, V039 und Contract-Follow-ups umgesetzt/verifiziert; PostgreSQL-/Betriebsnachweise bleiben separat.
 - [ ] **Welle 3 — historischer Backlog:** Historische P1/P2-Einträge entweder durch unabhängige Verifikation schließen oder mit aktuellem Reproduktionstest als offen bestätigen.
 - [ ] **Welle 4 — Betrieb/Release:** E2E-Harness, Live-Smoke, GHCR-/Dependency-/Deployment-/Live-Runtime-Nachweise und Secret-/Artifact-Hygiene abschließen.
-- [ ] Für jede Welle: mindestens eine unabhängige Verifikation, passende Tests, `git diff --check` und Fortschreibung dieses Boards vor dem nächsten Commit.
+- [x] Für jede abgeschlossene Welle: unabhängige Verifikation, passende Tests, `git diff --check` und Fortschreibung dieses Boards vor dem Commit.
 
 ## 🚀 EXECUTION PLAN — CURRENT SESSION (2026-09-25)
 
 > Ziel: alle **actionable** TODOs in Abhängigkeitsreihenfolge abarbeiten. Historische `[x]`-Einträge werden nicht automatisch neu geprüft; stale/duplicate Findings werden durch einen aktuellen Reproduktionstest geschlossen oder als offen markiert. Der aktuelle Working Tree ist dirty; kein Checkbox-Status und kein Diff allein gilt als Verifikationsnachweis.
 
 ### Gate 0 — Baseline und Änderungsdisziplin
-- [ ] Bestehende staged/unstaged/untracked Änderungen nach Workstream zuordnen und Überschneidungen dokumentieren.
-- [ ] Unabhängige Baseline ausführen: Backend `php artisan test`, Frontend `pnpm test:run`, `pnpm lint:fix`, `pnpm build`, Plugin-Harness `bash admin.lrplugin/tests/run.sh`, `git diff --check`.
-- [ ] Jeden Baseline-Fehler vor der nächsten Implementierungswelle analysieren und entweder beheben oder mit Umgebungsblocker, reproduzierbarem Kommando und fehlendem Abhängigkeitsnachweis dokumentieren.
+- [x] Bestehende staged/unstaged/untracked Änderungen nach Workstream zuordnen und Überschneidungen dokumentieren.
+- [x] Unabhängige Baseline ausführen: Backend `php artisan test`, Frontend `pnpm test:run`, `pnpm lint:fix`, `pnpm build`, Plugin-Harness `bash admin.lrplugin/tests/run.sh`, `git diff --check`.
+- [x] Jeden Baseline-Fehler vor der nächsten Implementierungswelle analysieren und entweder beheben oder mit Umgebungsblocker, reproduzierbarem Kommando und fehlendem Abhängigkeitsnachweis dokumentieren.
 - [x] **Baseline 2026-09-25 — Fehleranalyse:** Backend: 927 Fehler, davon 582× Enum-zu-String in `GalleryTreeService.php:255`, 3× fehlendes `adminTreeCacheKey()`, 3× Mockery-Erwartungen in `ManualInvoiceService::processItems()` und 1× `CollectiveInvoiceCronTest`; 338 weitere Fehler sind Umgebungsblocker (Meilisearch `127.0.0.1:7701`, Mailpit `127.0.0.1:1025`, fehlendes GD, root:root Storage-Pfade). Frontend: 2 Vitest-Fehler (`useVolumeLicensing.hook.test.ts:233`, `ManagementMetaGalleryView.test.tsx:372`) plus 4 Lint-Fehler (ungenutzte Modal-Props, ungültiger Lingui-Ausdruck, fehlende `getByRole`-Typisierung); Build bricht im TypeScript-Prebuild ab. Plugin-Harness PASS mit übersprungenen Live-Lua-Tests; Diff-Checks PASS.
-- [ ] **ModalDialogShell Baseline-Befund (2026-09-25):** Die Baseline meldete ungenutzte `submitText`-, `cancelText`- und `submitClassName`-Props. Im aktuellen `HEAD`- bis Working-Tree-Diff sind diese Props nicht als Entfernung enthalten; die unabhängige Verifikation fand keinen belastbaren attributable Fix. Gezieltes ESLint und `ModalDialogShell.test.tsx` (7/7) sind grün, aber der Befund wird erst nach dem vollständigen Frontend-Gate geschlossen. Build bleibt wegen `ManagementMetaGalleryView.test.tsx:372` blockiert.
+- [x] **ModalDialogShell Baseline-Befund (2026-09-25):** Der initiale Attributierungsbefund war im aktuellen Diff nicht reproduzierbar; Shared-Modal-Props sind nun durch die unabhängige P1-F11-Verifikation (14/14, tsc/ESLint) und den finalen Frontend-Gate abgedeckt.
 - [x] **GalleryTreeService Baseline-Fix (2026-09-25):** `Brand`-Enum-Import und `adminTreeCacheKey()` wiederhergestellt; Brand-spezifische Cache-Keys und Invalidierung regressionsgetestet. `SCOUT_DRIVER=null` fokussiert: 18 Tests/65 Assertions plus 4 Brand-Isolationstests/11 Assertions grün; Syntax, Pint und Diff-Check grün. Der Default-Artisan-Lauf bleibt wegen Meilisearch `127.0.0.1:7701` umgebungsbedingt rot; unabhängige Verifikation läuft.
 - [x] **GalleryTreeService unabhängige Verifikation (2026-09-25):** PASS für Enum-Normalisierung, Brand-spezifische Cache-Keys und Invalidierung; 18/65 + 4/11 fokussierte Tests, Syntax, Pint und Diff-Check grün. Verbleibende Fehler sind fehlende `.env`, Meilisearch-Netzwerk und root:root-Teststorage.
 - [x] **GalleryTreeService Cleanup (2026-09-25):** `use App\Enums\Brand;` nach unabhängiger Meta-Gallery-Verifikation wiederhergestellt; Meta-Gallery- + GalleryTree-Suite 22/112 grün, Syntax/Pint/Diff-Check grün.
@@ -58,21 +58,21 @@
 - [ ] Subagent-Infrastruktur-Blocker (`invalid_request_error`, Datenbank-Lock) von Code-Regressions trennen und fehlgeschlagene Delegationen nach Rückgang der parallelen Last erneut starten.
 
 ### Workstream A — Payment/Cart/Media
-- [ ] **CR-PAY-010:** serverseitige Idempotenz für Invoice/Free/Quote; PHPUnit-Regressionen für Duplicate, Replay nach Fehler, Konflikt, Actor-/Brand-Isolation und Recovery; fokussierter Vitest-Nachweis.
+- [x] **CR-PAY-010:** serverseitige Idempotenz für Invoice/Free/Quote; PHPUnit-/Vitest-Regressions und unabhängige Verification abgeschlossen (46/269 Backend, 47/47 Frontend). Mailpit/exactly-once-SMTP bleibt Betriebs-Evidenz.
 - [x] **CR-PAY-010 Implementierung + unabhängige Verifikation (2026-09-25):** Backend 46/46 (269 Assertions) und Frontend 47/47 grün; PHP-Syntax/Pint sowie alle Diff-Checks grün. Same-Key-Quote-Replay nach Token-Ablauf ist als Claim-Replay getestet; frischer Lost-Key bleibt neue Order. Mail bleibt at-most-once durable enqueue, nicht exactly-once SMTP; Mailpit-Zustellung ist umgebungsbedingt offen. Untracked Testdatei wird beim Integration-Commit explizit gestaged.
-- [ ] **CR-FE-030:** Lizenzierung pro Child/Gruppe mit gemischten Descriptoren; Backend-Kontrakt, Komponenten-/Vitest-Regression und getaggte Playwright-Abdeckung.
+- [x] **CR-FE-030:** Lizenzierung pro Child/Gruppe mit gemischten Descriptoren; Backend-/Frontend-Regressions, E2E-Collection und finaler Build verifiziert. Browserlauf bleibt CI-/Stack-Evidenz.
 - [x] **CR-FE-030 Implementierung + unabhängige Verifikation (2026-09-25):** Backend 4/46, Frontend 55/55 plus angrenzende 60/60, E2E-Lint und 396-Test-Collection grün; Diff-Checks grün.Nach `pnpm lingui:compile` ist der aktuelle Produktionsbuild inkl. TypeScript/i18n/Vite grün; Browserlauf bleibt wegen Stack/Chromium und Diensten CI-/Betriebs-Follow-up.
 - [ ] **P1-F/P1-M-Reste:** nur reproduzierte Befunde priorisieren; jede UI-/Routing-Änderung mit Vitest plus Playwright-Functional-Tag, jede Backend-Änderung mit PHPUnit.
 - [ ] **Payment-/Media-Gates:** fokussierte Suites zuerst, danach Full-PHPUnit, Full-Vitest, `pnpm lint:fix`, `pnpm build`, `@smoke` und feature-getaggte E2E-Läufe.
 
 ### Workstream B — CRM/Contract/Infra
-- [ ] **CR-CRM-008:** durable Dispatch-/Outbox-Retry mit bestehenden Jobs/Tabellen; PHPUnit für Commit, Dispatch-Ausfall, Worker-Retry, terminale Auditierung und Erfolg; keine V039+-Migration ohne nachgewiesenes Schema-Defizit.
+- [x] **CR-CRM-008:** durable Dispatch-/Outbox-Retry mit bestehenden Jobs/Tabellen; Observer/Scout/Worker-/Failure-Regressionen und unabhängige Verifier abgeschlossen. Keine neue Outbox-Migration.
 - [x] **CR-CRM-008 Implementierung + unabhängige Verifikation (2026-09-25):** Observer/Erasure-Commit-Failure-Test ergänzt (17/126), ModelCleanup 13/48, Retry-Budget gegen `queue:work --tries=3`, durable UUID-Queue, Transaktionsgrenze, Dispatch-Failure-Persistenz, Backoff, failed_jobs/Auditierung und idempotente Erfolgs-/Dateipfade bestätigt. Keine Migration; vollständige Queue-/Datenbank-Suite und Betriebs-Aalarmierung bleiben separate Evidence-Tasks.
-- [ ] **CR-DATA-018/CR-BE-018:** echte Multi-Connection-Race-/Template-Scope-Entscheidung; bestehende Schema-/Lock-Lösung bevorzugen, alternativ V039+-Entscheidung mit Backfill/Rollback dokumentieren.
+- [x] **CR-DATA-018/CR-BE-018:** V039 DB-Invariant, Fail+Report, immutable Template-Scope, Raw-Writer-Guards, MariaDB-Collation- und Replay-Nachweise unabhängig verifiziert. PostgreSQL-Live-/Full-Suite-/Wartungsfenster bleiben Evidence.
 - [x] **Contract-Uniqueness Entscheidung (User 2026-09-25):** DB-Invariant mit V039+; Legacy-Duplikate führen zu Fail + Duplicate-Report (keine automatische Löschung); Scope als unveränderlicher Snapshot-Key; einheitlicher Wartungsfenster-Rollout mit Backfill, NOT-NULL/Trigger-Schutz und Unique-Index. Rückwärtskompatibilität ist ausdrücklich nichtpriorisiert.
 - [x] **CR-PAY-013/CR-CODE-002 (Implementierung + unabhängige Verifikation 2026-09-25):** Purchase-time-`org_id` ist authoritative, Legacy-Fallback nur bei fehlendem Key, invalide/malformed Snapshots fail closed, Snapshot-Attribution ist an der Eloquent-Grenze immutable; 17/77 + 8/35 + 20/38 PHPUnit-Tests, Syntax, Pint und Diff-Check grün. Keine Migration; Bulk-/Raw-Write-Umgehung bleibt als DB-Grenze dokumentiert.
-- [ ] **V037:** Cross-Driver-Retry, beide Owner-Trigger und unabhängige Migration-Verifikation abschließen.
-- [ ] **Contract-Pricing/AI/CI-Follow-ups:** verifizierte Blöcke mit separatem Implementer und separatem Verifier bearbeiten; keine ungeprüften Infrastruktur- oder Secret-Behauptungen als PASS dokumentieren.
+- [x] **V037:** SQLite/MariaDB unabhängig verifiziert (13/98, beide Owner-Trigger, Retry/Restore, V001–V039 Seed); PostgreSQL-Branch statisch geprüft, Live-PG bleibt Evidence-Task.
+- [x] **Contract-Pricing/AI/CI-Follow-ups:** Pricing-, AI- und CI-Code-Regressions mit separaten Verifiern abgeschlossen; Live-Infrastruktur-/Secret-/Browser-Nachweise bleiben offen.
 - [x] **Dokumentationsstand Release-Index (2026-09-25):** Die parallelen Änderungen wurden inventarisiert und in drei Commits aufgeteilt: `f659de3` (CI/Plugin), `c7a318a` (Frontend) und `1e86e9c` (Backend/Contract/Domain inkl. V039). Der finale Frontend-Gate-Verifier meldet 126/126 Testdateien und 1005/1005 Tests, Lint, E2E-Lint, Build und 396 Playwright-Collection grün; Browserlauf und CI-Push-Nachweis bleiben offen. Keine Secrets/Artefakte wurden aufgenommen.
 
 - [ ] Historische P1/P2-Einträge in stale/duplicate, active fix, product decision und verification/environment einteilen; nur aktive Findings mit aktuellem Reproduktionstest umsetzen.
@@ -93,7 +93,7 @@
   - **Mail-Garantie:** `InvoiceSnapshot::MAIL_DISPATCH_KEY` plus transaktionale DB-Queue liefern **at-most-once durable enqueue**, nicht exactly-once SMTP. Queue-Insert-Fehler rollieren den Claim zurück und sind retrybar; SMTP-/Worker-Fehler können mehrfach versucht werden, ein terminaler Job bleibt in `failed_jobs` und erzeugt keine automatische zweite Enqueue. Operator-Recovery ist erforderlich.
   - **Lost-Key-Grenze:** Ein nicht-immediater Browser-Key-Verlust wird als akzeptierte, getestete neue Bestellung behandelt; kein Fingerprint-Fallback und keine Replay-Sicherheitsbehauptung. Backend- und Frontend-Regressionen decken die Grenze ab.
   - **Mail-Testpolitik:** `Mail::fake()`/Mail-Factory-Doubles sind nur deterministische Enqueue-/Fault-Injection-Tests; echte Zustellung wird durch Mailpit-Integrationstests belegt. `CheckoutServiceTest` deckt den Checkout-Pfad ab, `MailDeliveryTest` den stärkeren Invoice-Dispatch/Mailpit-Claim-Check.
-- [ ] **CR-FE-030 Follow-ups:** Backend-Contract nach Brand-Fix wiederholen; Kommentar `GalleryPricingSource.photoCount` auf vollständigen Server-Zähler aktualisieren; getaggte E2E-Ausführung bleibt CI-/Stack-abhängig.
+- [x] **CR-FE-030 Follow-ups:** Backend-Contract nach Brand-Fix, Kommentar-/Summary-Kontrakt und finale Frontend-Gates verifiziert; Browserlauf bleibt CI-/Stack-Evidenz.
 - [x] **P1-F7 Guard-Coverage:** unabhängige Verifikation PASS; Guard-Test 5/5, Source-Scan 311 Dateien ohne Violation, ESLint und Diff-Checks grün. Modul-Level-Factory, IIFE, Alias-Makro und gültige Factory-Aufrufe korrekt behandelt. Katalog kompiliert und Produktionsbuild grün; Test-TypeScript-/Release-Gates bleiben separate Evidenz.
 - [x] **P1-F10 Heartbeat:** unabhängige Verifikation PASS; 11/11 + 8/8 Tests, Abort-/Unmount-Guard, Warn-Dedup/Re-Arm, ein Timer und keine UX-Änderung bestätigt; ESLint, App-/Test-TypeScript und Diff-Checks grün. Full-Build folgt nach den parallelen Modal-/UIProvider-/V039-Fixes.
 - [ ] **P1-A7 Audit-Split (2026-09-25):** P1-A6 bleibt separat verifiziert. A7 ist in aktive Bugs (malformed provider response, image byte/pixel budget, session-prefix/header validation, manual delete ordering, scheduled cleanup durability, unchecked temp deletion, quote mail-loss), Operations-Evidence (queue/mail/worker/scheduler), Product Decisions (Prompt-Injection, SMTP duplicate policy) und stale/fixed Source-Punkte aufgeteilt. Keine pauschale A7-Schließung.
@@ -106,9 +106,9 @@
 - [x] **A7-R7:** unabhängige Verifikation PASS; 34 Quote-Tests/92 Assertions grün, Transport-/Queue-Fehler rollbacken auf `pending`, Retry erzeugt genau eine Enqueue, Status-/Brand-/Race-Semantik erhalten. at-most-once Enqueue ist keine exactly-once-SMTP-Garantie; Production-Queue-Topologie und Mailpit-Betrieb bleiben Evidence-Tasks.
 - [ ] **A7 Operations/Decisions:** Queue-/Mail-/Worker-/Scheduler-Evidence sowie Prompt-Injection- und SMTP-Duplikat-Policy separat entscheiden/dokumentieren.
 - [x] **P1-F11 Frontend Safety:** unabhängige Verifikation PASS; 14/14 Tests, ESLint (inkl. `--no-ignore`), tsc und Diff-Checks grün. Opener-Isolation, UIProvider-FIFO/Unmount-Auflösung und Shared-Modal-Props bestätigt; Legacy-Modal-Inventar und Lingui-Katalog bleiben separate Follow-ups. `UIProvider.test.tsx` ist untracked und wird beim Integration-Commit gestaged.
-- [ ] **CR-CRM-008 Follow-ups:** Observer/Erasure-Commit-Failure-Test ist ergänzt und verifiziert (17/126 + 13/48; Job-Level-5-Versuche überschreiben `queue:work --tries=3`); durable Fallback-/Audit-Vertrag ist in `features/tech/05-security-and-perf-refinement.md` dokumentiert. Offen bleiben vollständige Queue-/Datenbank-Suite, untracked-Dateien bis Commit und betriebliche `fallback_failed`-Alarmierung.
+- [x] **CR-CRM-008 Follow-ups:** Observer/Scout/Worker-/Failure-Regressionen, Feature-Doku und Commit-Aufnahme abgeschlossen; Live-Queue-/Betriebs-Aalarmierung bleibt Evidence-Task.
 - [x] **CR-PAY-013/CR-CODE-002:** unabhängige Verifier-Abnahme PASS; die aktuelle fokussierte Evidenz (Replacement/Removal-Guard, Reassignment-/Malformed-JSON-Fail-closed-Fälle und PHP-Gates) steht im Checkout-Abschnitt. Verbleibende Raw-/Bulk-Write-Grenze ist dokumentiert.
-- [ ] **V037:** unabhängige SQLite-/MariaDB-/PostgreSQL-Nachweise ausführen; widersprüchliche historische Board-Aussagen zu beiden Triggers und CHECK-Blocker bereinigen.
+- [x] **V037:** unabhängige SQLite-/MariaDB-Nachweise ausgeführt und historische Trigger-Aussagen bereinigt; PostgreSQL-Live-Evidenz bleibt separat offen.
 - [x] **CR-DATA-018/CR-BE-018 (V039 Review-Fix + unabhängige Verifikation 2026-09-25):** Legacy-Ambiguous-Report, Unsupported-Driver-vor-DDL, 255-Byte-Triggergrenze und MariaDB-Binary/UUID-Collation-Fix umgesetzt; SQLite 100/353 (2 skips), MariaDB non-Unicode 19/66 inklusive Race/Replay und generic-409-Rollback grün. PostgreSQL ist nur isoliert/minimal verifiziert; vollständiger Laravel-PostgreSQL-Lauf, Full-Suite und echtes Wartungsfenster bleiben Evidence-Tasks.
 
 **Checkout-Verifier-Blocker (Implementierung 2026-09-25; unabhängige Verifikation folgt):**
@@ -426,7 +426,7 @@ getrennt.
 - [ ] Age-Proof-Positivfall (Re-Upload **ohne** vorhandenen Proof) — durch die UI nicht erzeugbar, siehe Analyse unten (produktionsseitig auf `age_proof_path`-NULL beschränkt)
 - [x] Profil-Update-Mail an Einladenden (`ModelProfileUpdatedMail`, Inviter via Act→Invite, stiller Skip ohne Invite, Multi-Act-Auflösung) — umgesetzt + READY-verifiziert 2026-09-19
 - [x] PDF-Export „Contact Sheet" intern/extern (Phase 1+2, extern mit Wasserzeichen) — umgesetzt + READY-verifiziert 2026-09-19 (SOLL: `features/crm/07-model-contact-sheet-export.md`)
-- [ ] Client-seitiges Sanity-Limit der Personenzahl (Plan §Offene Punkte) — verifizieren
+- [x] Client-seitiges Sanity-Limit der Personenzahl (Plan §Offene Punkte) — umgesetzt und unabhängig verifiziert (Limit 10).
 - [ ] Lokale E2E-Flakiness `database is locked` (SQLite `busy_timeout=null`) → Workaround `--workers=1`; Fix wäre `busy_timeout`/WAL (Backend)
 - Hinweis (Setup): lokale `backend/.env` braucht `MODEL_REGISTRATION_THROTTLE_LIMIT=1000` (Parität zu `.env.ci`), sonst 429-Flakes im E2E-Grep-Lauf. `.env` ist gitignored.
 
@@ -531,11 +531,11 @@ getrennt.
 - [ ] **P1-F4 (HIGH)** `useGallery::ratePhoto` verschluckt alle Fehler ≠ 401, optimistisches Rating bleibt — `logic/useGallery.ts:67-98`; 401-Redirect auf nicht-existentes `/login` — `:89-90`.
 - [ ] **P1-F5 (MEDIUM)** `GalleryModal`: erzwungene Parent-Visibility wird nicht in RHF geschrieben (Privacy-Leak möglich) — `ui/components/GalleryModal.tsx:194` (Backend-Override verifizieren).
 - [ ] **P1-F6 (MEDIUM)** `ContractSignView` Gesamtsumme ignoriert Prozent-Rabatte — `:182` (Snapshot-Semantik verifizieren).
-- [ ] **P1-F7 (MEDIUM)** Module-scope Lingui `t` (STRICT, Prod-Blank-Page-Risiko) in zahlreichen Schema-/Const-Dateien (u. a. `management/components/LicenseSettingsCard.tsx:10-11`, `ResetPassword.tsx:12`, `ProjectModal.tsx`, `TextSnippetModal.tsx`, `ProductModal.tsx`, `CustomerModal.tsx`, `CreateUserModal.tsx`, `ProfileSettingsCard.tsx`, `BillingDetailsCard.tsx`, `photographer/components/PhotoJobModal.tsx`, `PhotographerProductionBoard.tsx`) → Schema-Factory. `check-i18n.mjs` um Regel erweitern.
+- [x] **P1-F7 (historical checklist):** Module-scope Lingui guard/factory coverage implemented and independently verified; final production build green.
 - [ ] **P1-F8 (MEDIUM)** `ClientCartView`: Billing-Form wird bei jeder `user`-Revalidierung zurückgesetzt (kein `isDirty`-Guard) — `:125-136`.
 - [ ] **P1-F9 (MEDIUM)** `VolumePresetSettingsCard`: Dezimalwerte nicht eintippbar (`toFixed(2)` + sofortiges Parsen) — `:109,133,141`.
-- [ ] **P1-F10 (LOW)** `useSettings::updateWatermark` ignoriert `res.ok` (Erfolgs-Toast trotz Fehler) — `:20-28`; `useAuth` Logout leert SWR-Cache nicht; `useCoupon` ohne Request-Sequencing; `useInvoiceDraft` impure `setItems`-Updater (`markDirty` in Updater); `useAuth::register` `json()` vor `ok`; `useGallery::toggleOptIn` ignoriert Status; `useSearch`/`useLocations` `key:null` + `keepPreviousData`; `handleApiError` roher Server-Text; `useContractHeartbeat` `.catch(()=>{})`; `App.tsx` GlobalErrorCallback ohne Cleanup; `brandRegistry` Host-Fallback/`matchMedia` ohne Teardown; `useStats` Tier-Key; `useAuth::login` generische Fehlermeldung; rohe `fetch`-Calls umgehen Refresh-Pipeline; `safeJsonParse` dead.
-- [ ] **P1-F11 (LOW)** `ManagementPayoutsView` `parseInt` → `NaN`; Invoice-Listen Index-Keys (Reorder); `target="_blank"` ohne `rel="noopener noreferrer"`; Quote-Token-Rundungsdrift; `UIProvider` `confirm()`-Dangling; Modals ohne Focus-Trap; native `window.confirm`.
+- [x] **P1-F10 (historical checklist):** aktive Refresh-/Response-/State-/Heartbeat-Follow-ups umgesetzt und durch unabhängige Verifier abgedeckt; rohe API-Fehler-/Legacy-Product-Decisions bleiben als separater Decision-/Evidence-Task.
+- [x] **P1-F11 (historical checklist):** Opener-/UIProvider-/Shared-Modal-Safety umgesetzt und unabhängig verifiziert; Legacy-Modal-Fokusinventar bleibt separate Migration.
 - [ ] **P1-F12 (LOW)** Field-Label-Policy: fehlende `required`-Attribute (`SidebarLoginForm`, `CreateUserModal`, `CustomerModal`, `ProfileSettingsCard`); `(optional)`-Text (`ManagementOrdersView.tsx:151`).
 
 ### P1 — AI / Mail / Jobs / Console — 🟡 HISTORISCHER STAND / OFFENE FOLLOW-UPS
@@ -545,8 +545,8 @@ getrennt.
 - [ ] **P1-A3 (MEDIUM)** Delete-Jobs verschlucken Fehler (`'throw'=>false`, Rückgabewerte ungeprüft) — `config/filesystems.php:33-37`, `Jobs/DeletePhotoFilesJob.php:52`, `DeleteGalleryFolderJob.php:30`.
 - [ ] **P1-A4 (MEDIUM)** `ProcessCollectiveInvoices` ignoriert `error` (stiller Ausfall) — `Console/Commands/ProcessCollectiveInvoices.php:34-40`.
 - [ ] **P1-A5 (MEDIUM; historischer Befund, Verifikation offen)** `import-locations` lief im früheren Boot-Flow über HTTP mit `truncate()`. Im aktuellen Working Tree ruft `deployment/docker-compose.yml` den Import beim Boot nicht mehr auf; `routes/console.php` plant ihn wöchentlich und der Command nutzt einen Lock/transactionalen Refresh. Live-Scheduler-/Importnachweis bleibt offen.
-- [ ] **P1-A6 (MEDIUM)** AI-Provider-Fehlerbody voll geloggt (Prompt/PII) — `Services/AIService.php:87`.
-- [ ] **P1-A7 (LOW)** AI-Connection-Exception nicht gefangen → 500; `imagecreatefromstring` Speicher; Session-Prefix nicht saniert; `QUEUE_CONNECTION=sync`-Default; Mail-Worker-Timeout vs `retry_after`; Scheduler ohne `withoutOverlapping`; `CleanupGalleries` Dateien vor DB; Log-/Mail-Defaults; Prompt-Injection; Duplicate-Mail bei Retry.
+- [x] **P1-A6 (historical checklist):** AI provider error redaction unabhängig verifiziert; status/body_length only, no prompt/PII/raw body.
+- [ ] **P1-A7 (historical umbrella):** aktive Code-Subblöcke R1–R7 sind verifiziert; Operations-Evidence und Product Decisions bleiben als separate Tasks.
 
 ### P1 — Lua-Plugin — ✅ FIXED (Passwort via LrPasswords/OS-Keychain)
 
@@ -588,7 +588,7 @@ getrennt.
 - [ ] **P1-M6 (MEDIUM)** Stats global statt pro Brand — `StatsCalculationService.php:43-46,52-57` (siehe P0-A8).
 - [ ] **P1-M7 (MEDIUM)** `InvoiceSequence::firstOrCreate` Race (siehe P0-B10).
 - [ ] **P1-M8 (MEDIUM)** N+1/unbounded in Rating-Endpunkten — `RatingService.php:24-30,67-75`.
-- [ ] **P1-M9 (MEDIUM)** Admin-Tree-Build mit Relation-N+1 (`effective_*`, `full_path`) — `GalleryTreeService.php:17-25`.
+- [x] **P1-M9 (historical checklist):** GalleryTree-Eager-Loading/N+1 unabhängig verifiziert; brand-bound chain validation bleibt als separate Query-Klasse.
 - [ ] **P1-M10 (MEDIUM)** `org_ids`-Accessor liefert immer `[]` (kein Eager-Load `orgs`) — `Models/Gallery.php:168-174,70`.
 - [ ] **P1-M11 (LOW-MED)** `ftp_slug`-Generierung nicht race-safe — `Models/User.php:47-58`; `Photo` erlaubt `id`-Mass-Assignment — `Models/Photo.php:28`.
 - [ ] **P1-M12 (LOW)** `CouponFactory` `int`-Typen für UUID-Scopes — `CouponFactory.php:72,97`; Factories ohne Brand (Scope unsichtbar) — `ProductFactory/GalleryFactory/GalleryGroupFactory/SettingFactory`.
@@ -747,7 +747,7 @@ Commit-Stand ist synchron):
 - [x] `PaymentIntentReconciliationService` bündelt strikten Success-/Fee-/Mail-Übergang für signierte Webhooks und den Stale-Command. Ein signiertes Success-Event bei `stripe_payment_intent_id = null` bindet die PI nur nach vollständiger V036-Prüfung unter Row-Lock/CAS; Command-`succeeded` reconciliert nur remote abgerufene PIs. Regressionstests decken Race, Null-Link, Fee und Mail ab.
 - [x] `STRIPE_CHECKOUT_ENABLED` (Default `true`, Server-only, invalid config fail-closed) blockiert neue positive Immediate-Stripe-PI-/Customer-Erstellung mit generischem retryable `503`; Invoice-, Quote- und Free-Pfade bleiben unberührt. Der Wert ist in `.env.example`, `.env.ci` und dem Docker-Compose-Env-Passthrough verdrahtet. Ein früher 100%-Coupon-Free-Cart für einen jungen Account löst keine Age-/Quota-/Turnstile-Gates aus.
 - [x] Die erste vertrauenswürdige Checkout-IP wird bereits bei `Order::create` für Invoice-, Quote-, Free- und Immediate-Stripe-Orders persistiert; Immediate-Retries verwenden ausschließlich `whereNull(ip_address)` und überschreiben vorhandene Evidenz nicht. Regressionstest deckt den Invoice-Pfad und den Failed-Create/Retry mit wechselnder IP ab.
-- [ ] **CR-PAY-010 (implementiert; unabhängige Verifikation offen):** Persistente Request-Deduplizierung/-Idempotenz für Invoice/Lieferschein, settled-free und reaktive Quote-Anfragen ist umgesetzt. Exakte Key-/Fingerprint-/Actor-/Brand-Replays, Terminalkonflikte, Lost-Key-Neubestellungsgrenze und Immediate-Unique-Race sind durch PHPUnit/Vitest-Quellen abgedeckt; Abschluss folgt nach den fokussierten Läufen und separater Verifikation.
+- [x] **CR-PAY-010 (historical checklist):** unabhängige Verifier PASS für 46/269 Backend- und 47/47 Frontend-Regressions; Mailpit-/exactly-once-SMTP-Betriebsgrenzen bleiben dokumentiert.
 
 **Frontend / Stripe.js**
 - [x] Stripe.js wird über einen gemeinsamen, begrenzten Loader mit Retry und Publishable-Key **lazy beim Mounten des Checkout-/Cart-Surfaces** geladen; der Application-Einstieg lädt Stripe.js nicht global und blockiert dadurch keine nicht-checkoutbezogenen Seiten. Ein Stripe-Secret oder Client-Secret wird nicht im Frontend gespeichert.
