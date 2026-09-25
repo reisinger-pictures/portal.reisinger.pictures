@@ -40,7 +40,11 @@ return [
 
         'database' => [
             'driver' => 'database',
-            'connection' => env('DB_QUEUE_CONNECTION'),
+            // Production must explicitly use the application database
+            // connection. The fallback keeps local/test configuration
+            // deterministic while making the production compose values
+            // visible to the topology policy.
+            'connection' => env('DB_QUEUE_CONNECTION', env('DB_CONNECTION')),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),

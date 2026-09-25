@@ -13,6 +13,8 @@ status: active
 ## 2. Environment Variables
 - All configuration is managed via Portainer environment variables, overriding the `.env` file.
 - Key variables include database credentials (`DB_ROOT_PASSWORD`), Meilisearch keys (`MEILI_MASTER_KEY`), and SMTP settings (production currently uses ZeptoMail; the legacy Gmail transport remains only as a code fallback).
+- Production queue/scheduler values are explicit: `QUEUE_CONNECTION=database`, `DB_QUEUE_CONNECTION=DB_CONNECTION`, `DB_QUEUE_RETRY_AFTER=90`, `QUEUE_WORKER_TIMEOUT=60`, and a shared `CACHE_STORE=database` with `DB_CACHE_CONNECTION=DB_CONNECTION` and `DB_CACHE_LOCK_CONNECTION=DB_CACHE_CONNECTION`. The values are validated before background processes start; see [29-production-operations-runbook.md](29-production-operations-runbook.md).
+- Production SMTP requires `MAIL_MAILER=smtp`, `MAIL_SCHEME=smtp|smtps`, `MAIL_REQUIRE_TLS=true`, a host/port, credentials, and a real `MAIL_FROM_ADDRESS`/`MAIL_FROM_NAME`. `MAIL_ENCRYPTION` is ignored by Laravel 13/Symfony and is not a TLS control. Local Mailpit and CI fixtures are intentionally exempt because the policy is production-only.
 
 ## 3. Frontend & Routing
 - The frontend is built statically (`pnpm build`) and served **directly by Caddy** (kein nginx-Container mehr, seit 2026-07-31).
@@ -92,6 +94,32 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   Scheduler und PHP-FPM. `admin:update` ist damit Teil desselben
   fail-closed Gates; ein fehlgeschlagener Admin-Schritt darf nicht als
   erfolgreicher Deployment-Start durchrutschen.
+- **Operations-Policy-Gate:** Vor **jedem** Laravel-Kommando prüft der Start
+  zuerst die Verfügbarkeit von `validate-production-env` und
+  `portal-backend-supervisor` sowie die rohen Umgebungswerte. Whitespace,
+  fraktionale Zahlen und ungültige Topologie werden thus nicht durch
+  Casts/Normalisierung verdeckt und erreichen keine Migration/Seed. Nach
+  `optimize` und vor Migration/Worker-Start führt der Start
+  `php artisan ops:validate-production || exit 1` aus. Im Produktionsmodus
+  müssen die Datenbank-Queue und ihre Failed-Job-Verbindung dieselbe
+  DB-Verbindung wie die App nutzen, `QUEUE_WORKER_TIMEOUT` kleiner als
+  `DB_QUEUE_RETRY_AFTER` sein, `MAIL_SCHEME`/`MAIL_REQUIRE_TLS` einen
+  tatsächlich TLS-geschützten Symfony-Transport ergeben und für
+  `onOneServer()` ein geteilter Cache-Store gesetzt sein. Fehlende, leere oder
+  ungültige Werte beenden den Stack fail-closed. Lokale/CI-Fixtures mit
+  `sync`/`array`/Mailpit werden nicht durch diese Produktionsregel
+  fälschlich blockiert.
+- **Image-/Digest-Gate:** Der aktuell gepinnte `portal-base:8.5`-Digest enthält
+  die neuen Skripte nicht. Compose verweigert den Start mit einem expliziten
+  Rebuild-/GHCR-Push-/Digest-Hinweis, bevor `cache:clear`, Migration oder Seed
+  laufen. Ein GHCR-Rebuild/Push und die Digest-Aktualisierung bleiben externe
+  Release-Schritte; daraus wird keine Readiness abgeleitet.
+- **Worker-/Health-Vertrag:** `deployment/backend-supervisor.sh` überwacht den
+  `queue:work`-Prozess im bestehenden Backend-Container, startet ihn nach
+  einem Exit neu und schreibt PID-Marker. Der Compose-Healthcheck verlangt
+  PHP-FPM, Supervisor, Worker und Scheduler als laufende Prozesse. Das ist ein
+  statisch definierter Vertrag; Live-Health-, Queue- und SMTP-Nachweise bleiben
+  eine Betreiberprüfung.
 
 
 ## 10. Meilisearch Upgrade — Deployment Procedure

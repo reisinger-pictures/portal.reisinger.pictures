@@ -112,6 +112,7 @@ Detaillierte Spezifikationen nach Kategorie:
 - [18-jwt-offer-tokens.md](./features/infrastructure/18-jwt-offer-tokens.md)
 - [19-ftp-upload-pipeline.md](./features/infrastructure/19-ftp-upload-pipeline.md)
 - [20-setting-resolver.md](./features/infrastructure/20-setting-resolver.md)
+- [29-production-operations-runbook.md](./features/infrastructure/29-production-operations-runbook.md)
 
 ### Photos
 - [01-upload-and-processing.md](./features/photos/01-upload-and-processing.md)

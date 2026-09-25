@@ -1,18 +1,21 @@
 <?php
 
 return [
-    // Safe default: without an explicit MAIL_MAILER the app writes mail to the
-    // log instead of silently attempting localhost:1025 (which fails on
-    // production). Local dev sets MAIL_MAILER=smtp (Mailpit) in .env.
-    'default' => env('MAIL_MAILER', 'log'),
+    // Production must select SMTP explicitly. Local/test environments keep a
+    // log fallback when no mailer is configured, so unit fixtures do not need a
+    // live SMTP service.
+    'default' => env('MAIL_MAILER', env('APP_ENV') === 'production' ? null : 'log'),
 
     'mailers' => [
         // ... Laravel's Standard Mailer ...
         'smtp' => [
             'transport' => 'smtp',
-            'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', 1025),
-            'encryption' => env('MAIL_ENCRYPTION', 'null'),
+            // Laravel 13 passes these keys to Symfony's EsmtpTransportFactory.
+            // `encryption` is not a Laravel 13/Symfony SMTP setting.
+            'scheme' => env('MAIL_SCHEME'),
+            'require_tls' => env('MAIL_REQUIRE_TLS', env('APP_ENV') === 'production'),
+            'host' => env('MAIL_HOST'),
+            'port' => env('MAIL_PORT'),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
@@ -37,7 +40,12 @@ return [
     ],
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Reisinger Foto Portal')),
+        // No placeholder sender is safe for production. The production policy
+        // command requires a real address before workers are started.
+        'address' => env('MAIL_FROM_ADDRESS'),
+        'name' => env(
+            'MAIL_FROM_NAME',
+            env('APP_ENV') === 'production' ? null : env('APP_NAME', 'Reisinger Foto Portal'),
+        ),
     ],
 ];

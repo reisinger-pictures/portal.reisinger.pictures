@@ -8,7 +8,7 @@ status: active
 
 ## 1. Stateless API & Processing
 - The backend serves exclusively as a stateless JSON API.
-- All processing tasks (ExifTool) are executed synchronously to keep infrastructure simple (no queue workers), with the exception of lazy thumbnail generation.
+- Most request-path processing (including ExifTool) remains synchronous to keep local infrastructure simple. Production mail, durable cleanup, and selected indexing work use the supervised database queue described in the [Production Operations Runbook](../infrastructure/29-production-operations-runbook.md); local and CI fixtures intentionally use `sync` jobs.
 - **Fail Fast:** File uploads are strictly validated before touching the disk. Corrupt files yield a 422 error.
 
 ## 3. Database Access (Eloquent Only)

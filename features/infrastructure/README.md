@@ -26,3 +26,4 @@
 * [Per-User Settings Pattern](26-per-user-settings.md)
 * [Volume-Licensing-Presets](27-volume-licensing-presets.md)
 * [CI/test image](28-ci-test-image.md)
+* [Production operations runbook](29-production-operations-runbook.md)

@@ -5,6 +5,8 @@ on:
     branches: [ "main" ]
     paths:
       - 'deployment/Dockerfile'
+      - 'deployment/backend-supervisor.sh'
+      - 'deployment/validate-production-env.sh'
       - '.github/workflows/base-image.yml'
   schedule:
     - cron: '0 1 * * *'

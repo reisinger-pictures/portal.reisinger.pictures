@@ -4,6 +4,10 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
+// Keep scheduler mutexes on the configured shared store. The production
+// operations policy rejects file/array stores when onOneServer() is used.
+Schedule::useCache(config('cache.default'));
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

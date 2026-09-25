@@ -15,7 +15,9 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'file'),
+    // Production scheduler events use a shared store by default. Local/test
+    // environments retain the file fallback when no explicit store is set.
+    'default' => env('CACHE_STORE', env('APP_ENV') === 'production' ? 'database' : 'file'),
 
     /*
     |--------------------------------------------------------------------------
@@ -41,9 +43,9 @@ return [
 
         'database' => [
             'driver' => 'database',
-            'connection' => env('DB_CACHE_CONNECTION'),
+            'connection' => env('DB_CACHE_CONNECTION', env('DB_CONNECTION')),
             'table' => env('DB_CACHE_TABLE', 'cache'),
-            'lock_connection' => env('DB_CACHE_LOCK_CONNECTION'),
+            'lock_connection' => env('DB_CACHE_LOCK_CONNECTION', env('DB_CACHE_CONNECTION', env('DB_CONNECTION'))),
             'lock_table' => env('DB_CACHE_LOCK_TABLE'),
         ],
 

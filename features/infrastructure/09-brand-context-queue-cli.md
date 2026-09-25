@@ -77,3 +77,23 @@ Damit ist das PDF-Rendering unabhängig vom vorherigen Worker-State korrekt.
 - `BrandRegistry::currentOrDefault()` fällt bei `null` sicher auf `B2B` zurück
 - `InvoiceMail::build()` rekonstruiert SRP-Brand aus persistierter Order, auch wenn
   `Queue::before()` den Brand zuvor auf `null` gesetzt hat
+
+## 6. Production Queue-/Scheduler-Betrieb
+
+- Die Queue-Verbindung muss in Produktion `database` sein und dieselbe
+  Datenbankverbindung wie die Anwendung verwenden. Das sichert die
+  transaktionale Grenze zwischen Brand-Queue-Jobs, Cleanup-Outbox und
+  Invoice-Mail-Claims.
+- `QUEUE_WORKER_TIMEOUT` muss strikt kleiner als `DB_QUEUE_RETRY_AFTER` sein.
+  Der Produktions-Worker wird im bestehenden Backend-Container von
+  `deployment/backend-supervisor.sh` überwacht und nach einem Exit neu gestartet;
+  der Compose-Healthcheck prüft Supervisor-, Worker- und Scheduler-PID.
+- Scheduler-Events mit `onOneServer()` benötigen einen geteilten Cache-Store.
+  Der aktuelle Stack verwendet den vorhandenen MariaDB-Cache; `file`/`array`
+  sind für diesen Produktionspfad ungültig. Die Policy erzwingt die
+  Shared-Cache-Anforderung, ohne Redis oder eine andere nicht vorhandene
+  Infrastruktur einzuführen.
+- Die vollständige Betriebs- und Recovery-Matrix steht im
+  [Production Operations Runbook](29-production-operations-runbook.md). Statische
+  Policy- und Shell-Tests sind kein Nachweis für einen laufenden Worker, eine
+  SMTP-Zustellung oder einen Scheduler-Lauf.
