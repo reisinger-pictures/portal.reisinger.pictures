@@ -55,11 +55,11 @@ export default function ClientOrdersView() {
 isBlocked ? <span className="badge badge-error font-bold p-3"><Trans>Zugriff gesperrt ({orderStatus})</Trans></span> :
                                             <>
                                                 {!isPendingPayment && (
-                                                    <button className="btn btn-primary btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/download-zip', '_blank')} title={t`Lizenzierte Bilder als ZIP herunterladen`}>
+                                                    <button className="btn btn-primary btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/download-zip', '_blank', 'noopener,noreferrer')} title={t`Lizenzierte Bilder als ZIP herunterladen`}>
                                                         <span className="iconify mdi--zip-box"></span> <Trans>Bilder ZIP</Trans>
                                                     </button>
                                                 )}
-                                                <button className="btn btn-outline btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/invoice', '_blank')} title={t`Rechnung als PDF herunterladen`}>
+                                                <button className="btn btn-outline btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/invoice', '_blank', 'noopener,noreferrer')} title={t`Rechnung als PDF herunterladen`}>
                                                     <span className="iconify mdi--file-pdf-box text-error"></span> <Trans>Beleg</Trans>
                                                 </button>
                                             </>}

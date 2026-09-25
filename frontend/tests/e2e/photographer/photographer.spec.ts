@@ -121,6 +121,19 @@ test.describe('Photographer Core Workflow', () => {
         await sidebar.navigateTo('Mein Profil');
         await expect(page.locator('h1:has-text("Mein Profil")')).toBeVisible();
 
+        const main = page.getByRole('main');
+        const nameInput = main.getByRole('textbox', { name: 'Dein Name', exact: true });
+        const ftpSlugInput = main.getByRole('textbox', { name: /^FTP Upload Ordner \(Slug\)/ });
+        const copyrightInput = main.getByRole('textbox', { name: /^Standard-Urheber \(IPTC Copyright\)/ });
+        const profileFields = [nameInput, ftpSlugInput, copyrightInput];
+        for (const field of profileFields) {
+            await expect(field).toHaveAttribute('id', /.+/);
+            await expect(field).toHaveAccessibleName(/.+/);
+        }
+        const profileFieldIds = await Promise.all(profileFields.map(field => field.getAttribute('id')));
+        expect(new Set(profileFieldIds).size).toBe(profileFields.length);
+        await expect(nameInput).toHaveAttribute('required', '');
+
         const modal = new ModalHelper(page);
         const form = new FormHelper(page, modal);
         await form.fillProfileForm({ name: newName, ftpSlug: newSlug, copyright: newCopyright });

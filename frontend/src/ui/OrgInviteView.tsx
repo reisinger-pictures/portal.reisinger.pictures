@@ -159,7 +159,7 @@ export default function OrgInviteView() {
                                     <label className="cursor-pointer label justify-start gap-3 p-3 rounded-box hover:bg-base-300/50 transition-colors">
                                         <input type="checkbox" required className="checkbox checkbox-primary mt-0.5 shrink-0" checked={acceptPrivacy} onChange={e => setAcceptPrivacy(e.target.checked)} />
                                         <span className="label-text text-sm leading-tight">
-                                            <Trans>Ich habe die <a href="/privacy" target="_blank" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.</Trans>
+                                            <Trans>Ich habe die <a href="/privacy" target="_blank" rel="noopener noreferrer" className="link link-primary">Datenschutzerklärung</a> gelesen und akzeptiert.</Trans>
                                         </span>
                                     </label>
                                 </div>

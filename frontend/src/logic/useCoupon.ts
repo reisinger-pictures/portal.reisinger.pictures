@@ -14,7 +14,7 @@
  * @see features/ecommerce/08-srp-coupon-system.md
  */
 
-import {useState} from 'react';
+import {useRef, useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {apiMutate} from '../api';
 
@@ -298,6 +298,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
         eligibleItemPricesCents,
     );
     const [state, setState] = useState<CouponState>(() => initialCouponState(contextKey, 0, enabled));
+    const requestSequence = useRef(0);
     const contextChanged = state.contextKey !== contextKey || state.enabled !== enabled;
     if (contextChanged) {
         // React's supported render-phase adjustment for prop-derived state. The
@@ -325,6 +326,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
 
     const applyCoupon = async (code: string): Promise<void> => {
         if (!enabled) return;
+        const requestId = ++requestSequence.current;
         const trimmed = code.trim();
         if (!trimmed) {
             updateCurrentState({
@@ -336,6 +338,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
 
         updateCurrentState({...INITIAL_STATE, isLoading: true});
         const result = await requestCouponValidation({code: trimmed, galleryId, metaGalleryId});
+        if (requestId !== requestSequence.current) return;
 
         if (result.kind === 'network') {
             updateCurrentState({
@@ -377,6 +380,7 @@ export default function useCoupon(options?: UseCouponOptions): UseCouponResult {
     };
 
     const removeCoupon = (): void => {
+        requestSequence.current += 1;
         updateCurrentState(INITIAL_STATE);
     };
 

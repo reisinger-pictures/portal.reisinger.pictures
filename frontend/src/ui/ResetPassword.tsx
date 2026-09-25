@@ -9,7 +9,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-const resetSchema = z.object({
+const createResetSchema = () => z.object({
     password: z.string().min(8, t`Das Passwort muss mindestens 8 Zeichen lang sein.`),
     passwordConfirm: z.string()
 }).refine((data) => data.password === data.passwordConfirm, {
@@ -17,7 +17,7 @@ const resetSchema = z.object({
     path: ["passwordConfirm"],
 });
 
-type ResetFormValues = z.infer<typeof resetSchema>;
+type ResetFormValues = z.infer<ReturnType<typeof createResetSchema>>;
 
 export default function ResetPassword() {
     "use no memo";
@@ -28,6 +28,7 @@ export default function ResetPassword() {
     const { mutate } = useSWRConfig();
 
     const [globalError, setGlobalError] = useState('');
+    const resetSchema = createResetSchema();
 
     const {
         register,

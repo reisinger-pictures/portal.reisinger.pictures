@@ -82,6 +82,13 @@ export type PhotoVisibility = 'public' | 'internal';
 
 export const MAX_PHOTOS_PER_PERSON = 5;
 
+/**
+ * Client-side sanity cap for the public registration form. The feature/API
+ * contract remains 1..n persons; this only prevents an unbounded field array
+ * from degrading the browser and does not define a server-side limit.
+ */
+export const MAX_PERSONS_PER_REGISTRATION = 10;
+
 export interface PersonPhotoUpload {
     /** Stable client-side key for drag & drop reordering. */
     id: string;
@@ -809,7 +816,8 @@ export function createRegistrationSchema(catalog: ModelRegistrationCheck) {
                             .max(MAX_PHOTOS_PER_PERSON, t`Maximal 5 Fotos pro Person.`),
                     }),
                 )
-                .min(1, t`Mindestens eine Person muss erfasst werden.`),
+                .min(1, t`Mindestens eine Person muss erfasst werden.`)
+                .max(MAX_PERSONS_PER_REGISTRATION, t`Maximal 10 Personen pro Registrierung.`),
             act_answers: z.record(z.string(), z.unknown()),
             manager_index: z.number().int().min(0),
         })

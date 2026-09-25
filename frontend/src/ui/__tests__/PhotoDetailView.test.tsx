@@ -205,4 +205,18 @@ describe('PhotoDetailView licensing context', () => {
         expect(screen.getByTestId('volume-selector')).toBeInTheDocument();
         expect(screen.queryByTestId('scope-selector')).not.toBeInTheDocument();
     });
+
+    it('replaces the scope fallback with the volume card when licensing resolves', async () => {
+        let mode: 'scope_licensing' | 'volume_licensing' = 'scope_licensing';
+        vi.mocked(useLicensingMode).mockImplementation(() => mode);
+
+        const view = renderWithProviders(<PhotoDetailView />);
+        expect(screen.getByTestId('scope-selector')).toBeInTheDocument();
+
+        mode = 'volume_licensing';
+        view.rerender(<PhotoDetailView />);
+
+        expect(await screen.findByTestId('volume-selector')).toBeInTheDocument();
+        expect(screen.queryByTestId('scope-selector')).not.toBeInTheDocument();
+    });
 });

@@ -6,14 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Product } from '../../../api';
 
-const productSchema = z.object({
+const createProductSchema = () => z.object({
     type: z.enum(['item', 'discount_fixed', 'discount_percent']),
     name: z.string().min(1, t`Name ist erforderlich`),
     description: z.string().optional(),
     price: z.number().min(0, t`Wert muss positiv sein`)
 });
 
-type ProductFormValues = z.infer<typeof productSchema>;
+type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
 interface Props {
     isOpen: boolean;
@@ -24,6 +24,7 @@ interface Props {
 
 export default function ProductModal({ isOpen, onClose, editingProduct, onSave }: Props) {
     "use no memo";
+    const productSchema = createProductSchema();
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema)
     });

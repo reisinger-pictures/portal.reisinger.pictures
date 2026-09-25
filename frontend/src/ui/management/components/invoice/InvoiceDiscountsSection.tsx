@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import {InvoiceDiscount, Product} from '../../../../api';
 import AutocompleteInput from '../../../components/AutocompleteInput';
+import {calculateEditorDiscountAmounts} from '../../../../logic/contractPricing';
 
 interface InvoiceDiscountsSectionProps {
     discounts: InvoiceDiscount[];
@@ -13,6 +14,20 @@ interface InvoiceDiscountsSectionProps {
     onMoveDiscountDown?: (index: number) => void;
 }
 
+function getOrderedDiscountAmounts(subtotal: number, discounts: InvoiceDiscount[]): number[] | null {
+    try {
+        return calculateEditorDiscountAmounts(subtotal, discounts);
+    } catch {
+        return null;
+    }
+}
+
+function formatDiscountAmount(amount: number | undefined): string {
+    return typeof amount === 'number' && Number.isFinite(amount)
+        ? `${amount.toFixed(2)} €`
+        : '—';
+}
+
 export default function InvoiceDiscountsSection({
     discounts,
     subtotal,
@@ -22,6 +37,8 @@ export default function InvoiceDiscountsSection({
     onMoveDiscountUp,
     onMoveDiscountDown
 }: InvoiceDiscountsSectionProps) {
+    const orderedDiscountAmounts = getOrderedDiscountAmounts(subtotal, discounts);
+
     return (
         <div className="mt-6 border-t border-base-300 pt-6">
             <div className="flex justify-between items-center border-b border-base-300 pb-2 mb-4">
@@ -123,7 +140,7 @@ export default function InvoiceDiscountsSection({
                                 <span className="label-text text-sm font-bold"><Trans>Gesamt</Trans></span>
                             </label>
                             <div className="text-right font-mono font-bold mt-1 text-base-content">
-                                {(discount.type === 'discount_percent' ? subtotal * discount.price / 100 : discount.price).toFixed(2)} €
+                                {formatDiscountAmount(orderedDiscountAmounts?.[idx])}
                             </div>
                         </div>
 

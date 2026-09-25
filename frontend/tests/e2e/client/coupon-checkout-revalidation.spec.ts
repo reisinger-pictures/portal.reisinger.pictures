@@ -49,11 +49,21 @@ test.describe('Coupon Checkout Re-validation', () => {
 
     async function addItemToCart(page: Page, galleryName: string) {
         const main = page.getByRole('main');
-        await main.getByText(galleryName).first().click();
+        const galleryHeading = main.getByRole('heading', {name: galleryName, exact: true}).first();
+        await expect(galleryHeading).toBeVisible({timeout: 15000});
+        await galleryHeading.click();
+        await expect(main.getByRole('heading', {name: galleryName, exact: true})).toBeVisible({timeout: 15000});
         await expect(main.locator('a.pswp-item img').first()).toBeVisible({timeout: 15000});
         await main.getByRole('button', {name: 'Bild öffnen'}).first().click();
         await expect(page).toHaveURL(/\/photos\//, {timeout: 15000});
-        await main.getByRole('button', {name: 'In den Warenkorb'}).click();
+        // Gallery licensing is resolved through SWR. Wait for the volume
+        // branch itself; the initial scope fallback intentionally has no
+        // volume-only purchase button.
+        const volumePricingCard = main.getByTestId('volume-pricing-card');
+        await expect(volumePricingCard).toBeVisible({timeout: 15000});
+        const addToCartButton = volumePricingCard.getByRole('button', {name: 'In den Warenkorb', exact: true});
+        await expect(addToCartButton).toBeEnabled({timeout: 15000});
+        await addToCartButton.click();
         await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
     }
 
@@ -82,10 +92,11 @@ test.describe('Coupon Checkout Re-validation', () => {
 
         const auth = new AuthHelper(page);
         await auth.login(buyerUser.email, buyerUser.password, 'http://localhost:4321/');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateToClientGalleries();
 
         await addItemToCart(page, galleryName);
 
-        const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Warenkorb');
         const main = page.getByRole('main');
         await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible();
@@ -110,10 +121,11 @@ test.describe('Coupon Checkout Re-validation', () => {
 
         const auth = new AuthHelper(page);
         await auth.login(buyerUser.email, buyerUser.password, 'http://localhost:4321/');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateToClientGalleries();
 
         await addItemToCart(page, galleryName);
 
-        const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Warenkorb');
         const main = page.getByRole('main');
         await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible();
@@ -160,10 +172,11 @@ test.describe('Coupon Checkout Re-validation', () => {
 
         const auth = new AuthHelper(page);
         await auth.login(buyerUser.email, buyerUser.password, 'http://localhost:4321/');
+        const sidebar = new SidebarHelper(page);
+        await sidebar.navigateToClientGalleries();
 
         await addItemToCart(page, galleryName);
 
-        const sidebar = new SidebarHelper(page);
         await sidebar.navigateTo('Warenkorb');
         const main = page.getByRole('main');
         await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible();

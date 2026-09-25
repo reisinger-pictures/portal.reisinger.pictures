@@ -7,13 +7,13 @@ import { z } from 'zod';
 import { TextSnippet } from '../../../api';
 import WysiwygEditor from '../../components/WysiwygEditor';
 
-const snippetSchema = z.object({
+const createSnippetSchema = () => z.object({
     title: z.string().min(1, t`Titel ist erforderlich`),
     shortcut: z.string().min(1, t`Kürzel ist erforderlich`).regex(/^[a-z0-9_-]+$/, t`Nur Kleinbuchstaben, Zahlen, - und _`),
     content_html: z.string().min(1, t`Inhalt ist erforderlich`)
 });
 
-type SnippetFormValues = z.infer<typeof snippetSchema>;
+type SnippetFormValues = z.infer<ReturnType<typeof createSnippetSchema>>;
 
 interface Props {
     isOpen: boolean;
@@ -24,6 +24,7 @@ interface Props {
 
 export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSave }: Props) {
     "use no memo";
+    const snippetSchema = createSnippetSchema();
     const { register, handleSubmit, reset, setValue, control, formState: { errors, isSubmitting } } = useForm<SnippetFormValues>({
         resolver: zodResolver(snippetSchema)
     });

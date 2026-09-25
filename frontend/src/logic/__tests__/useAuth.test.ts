@@ -296,4 +296,34 @@ describe('useAuth', () => {
         }));
         expect(globalMutate).toHaveBeenCalledWith(expect.any(Function), undefined, {revalidate: false});
     });
+
+    it('does not issue a recursive logout when the refresh credential is invalid', async () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: authMeUserFixture,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(JSON.stringify({error: 'Unauthenticated.'}), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'}
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({error: 'Token konnte nicht aktualisiert werden.'}), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'}
+            }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { result } = renderHook(() => useAuth());
+
+        await expect(result.current.logout()).rejects.toThrow('Unauthenticated.');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock.mock.calls.map(([input]) => input)).toEqual([
+            '/api/auth/logout',
+            '/api/auth/refresh',
+        ]);
+        expect(globalMutate).not.toHaveBeenCalled();
+    });
 });

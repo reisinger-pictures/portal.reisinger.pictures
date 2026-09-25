@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState, useTransition} from 'react';
+import React, {useEffect, useId, useRef, useState, useTransition} from 'react';
 import useSWR from 'swr';
 import {fetcher} from '../../api';
 
@@ -10,6 +10,8 @@ export interface AutocompleteOption<T> {
 }
 
 interface Props<T> {
+    id?: string;
+    ariaLabel?: string;
     label?: string;
     value: string;
     onChange: (val: string) => void;
@@ -23,17 +25,23 @@ interface Props<T> {
 }
 
 export default function AutocompleteInput<T>({
-                                                 label,
-                                                 value,
-                                                 onChange,
-                                                 onSelect,
-                                                 endpoint,
-                                                 mapResponse,
-                                                 placeholder,
-                                                 disabled,
-                                                 className,
-                                                 required
-                                             }: Props<T>) {
+    id,
+    ariaLabel,
+    label,
+    value,
+    onChange,
+    onSelect,
+    endpoint,
+    mapResponse,
+    placeholder,
+    disabled,
+    className,
+    required
+}: Props<T>) {
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
+    const listboxId = `${inputId}-listbox`;
+    const getOptionId = (index: number) => `${inputId}-option-${index}`;
     const [, startTransition] = useTransition();
     const [query, setQuery] = useState(() => value || '');
     const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -60,9 +68,32 @@ export default function AutocompleteInput<T>({
     // isValidating ist bei SWR true, solange ein Request (auch im Hintergrund) läuft
     const {data, isValidating} = useSWR<T[]>(fetchUrl, fetcher, {keepPreviousData: true});
     const options = data ? mapResponse(data) : [];
+    const [previousOptionCount, setPreviousOptionCount] = useState(options.length);
+    if (options.length !== previousOptionCount) {
+        setPreviousOptionCount(options.length);
+        setActiveIndex(-1);
+    }
+    const hasOpenListbox = isOpen && !disabled && options.length > 0;
+    const activeOptionId = hasOpenListbox && activeIndex >= 0 && activeIndex < options.length
+        ? getOptionId(activeIndex)
+        : undefined;
+
+    const closeSuggestions = () => {
+        setIsOpen(false);
+        setActiveIndex(-1);
+    };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (!isOpen || options.length === 0) return;
+        if (e.key === 'Tab') {
+            closeSuggestions();
+            return;
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeSuggestions();
+            return;
+        }
+        if (!hasOpenListbox) return;
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             setActiveIndex(prev => (prev < options.length - 1 ? prev + 1 : prev));
@@ -72,17 +103,18 @@ export default function AutocompleteInput<T>({
         } else if (e.key === 'Enter') {
             e.preventDefault();
             if (activeIndex >= 0 && activeIndex < options.length) {
+                closeSuggestions();
                 onSelect(options[activeIndex].raw);
-                setIsOpen(false);
             }
-        } else if (e.key === 'Escape') {
-            setIsOpen(false);
         }
     };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) setIsOpen(false);
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+                setActiveIndex(-1);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -95,15 +127,17 @@ export default function AutocompleteInput<T>({
 
     return (
         <div className="relative flex-1 w-full form-control" ref={wrapperRef}>
-            {label && <label className="label"><span className="label-text font-bold">{label}</span></label>}
+            {label && <label className="label" htmlFor={inputId}><span className="label-text font-bold">{label}</span></label>}
             <div className="relative w-full">
                 <input
+                    id={inputId}
                     type="text"
                     role="combobox"
-                    aria-expanded={isOpen}
+                    aria-label={ariaLabel}
+                    aria-expanded={hasOpenListbox}
                     aria-autocomplete="list"
-                    aria-activedescendant={activeIndex >= 0 ? `autocomplete-option-${activeIndex}` : undefined}
-                    aria-controls="autocomplete-listbox"
+                    aria-activedescendant={activeOptionId}
+                    aria-controls={hasOpenListbox ? listboxId : undefined}
                     required={required}
                     value={query}
                     onChange={e => {
@@ -112,7 +146,11 @@ export default function AutocompleteInput<T>({
                         setIsOpen(true);
                         setActiveIndex(-1);
                     }}
-                    onFocus={() => setIsOpen(true)}
+                    onFocus={() => {
+                        setIsOpen(true);
+                        setActiveIndex(-1);
+                    }}
+                    onBlur={closeSuggestions}
                     onKeyDown={handleKeyDown}
                     disabled={disabled}
                     placeholder={placeholder}
@@ -125,18 +163,19 @@ export default function AutocompleteInput<T>({
                     </div>
                 )}
             </div>
-            {isOpen && !disabled && options.length > 0 && (
-                <ul id="autocomplete-listbox" role="listbox" className="absolute z-50 top-full left-0 w-full min-w-72 mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
+            {hasOpenListbox && (
+                <ul id={listboxId} role="listbox" className="absolute z-50 top-full left-0 w-full min-w-72 mt-1 bg-base-100 shadow-2xl rounded-box border border-base-300 max-h-60 overflow-y-auto">
                     {options.map((opt, idx) => (
                         <li
                             key={opt.id}
-                            id={`autocomplete-option-${idx}`}
+                            id={getOptionId(idx)}
                             role="option"
                             aria-selected={activeIndex === idx}
                             className={`px-4 py-2 cursor-pointer flex flex-col border-b border-base-200/50 last:border-0 ${activeIndex === idx ? 'bg-base-200' : 'hover:bg-base-200'}`}
+                            onMouseDown={event => event.preventDefault()}
                             onClick={() => {
+                                closeSuggestions();
                                 onSelect(opt.raw);
-                                setIsOpen(false);
                             }}
                             onMouseEnter={() => setActiveIndex(idx)}
                         >

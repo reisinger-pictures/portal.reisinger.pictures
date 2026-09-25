@@ -99,6 +99,7 @@ describe('VolumeLicensingCard', () => {
         );
 
         expect(useVolumeLicensing).toHaveBeenCalledWith(items, 'displayed-gallery');
+        expect(screen.getByTestId('volume-pricing-card')).toBeInTheDocument();
         expect(screen.getAllByText(formatMoney(6000)).length).toBeGreaterThanOrEqual(2);
         expect(screen.getByText(formatMoney(4000))).toBeInTheDocument();
     });

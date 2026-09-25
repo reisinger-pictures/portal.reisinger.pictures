@@ -40,9 +40,6 @@ function SearchRouteHarness() {
             <button type="button" onClick={() => navigate('/search?q=first-query')}>
                 Erste Suche
             </button>
-            <button type="button" onClick={() => navigate('/search?q=second-query')}>
-                Zweite Suche
-            </button>
             <button type="button" onClick={() => navigate(-1)}>
                 Eine Suche zurück
             </button>
@@ -60,6 +57,16 @@ function SearchRouteHarness() {
 describe('SearchBarWithSuggestions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    it('exposes an accessible name for the submit button', () => {
+        renderWithProviders(
+            <MemoryRouter>
+                <SearchBarWithSuggestions />
+            </MemoryRouter>,
+        );
+
+        expect(screen.getByRole('button', { name: 'Suche' })).toBeVisible();
     });
 
     it('uses the URL query as the initial and subsequent input value', async () => {
@@ -125,7 +132,9 @@ describe('SearchBarWithSuggestions', () => {
         const mountMarker = 'mounted-search-input';
         input.setAttribute('data-mount-marker', mountMarker);
 
-        await user.click(screen.getByRole('button', { name: 'Zweite Suche' }));
+        await user.clear(input);
+        await user.type(input, 'second-query');
+        await user.keyboard('{Enter}');
         await waitFor(() => {
             expect(getUrl()).toHaveTextContent('/search?q=second-query');
             expect(getInput()).toBe(input);

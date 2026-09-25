@@ -131,14 +131,14 @@ test.describe('Cart pricing and coupon integration', () => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         await auth.login(buyer.email, buyer.password);
-        await sidebar.navigateTo('Galerien');
+        await sidebar.navigateToClientGalleries();
         for (const [index, fixture] of fixtures.entries()) {
             await addFirstPhotoToCart(
                 page,
                 fixture.name,
                 index === fixtures.length - 1 ? scopeUseCase.name : undefined,
             );
-            await sidebar.navigateTo('Galerien');
+            await sidebar.navigateToClientGalleries();
         }
         await openCart(page, sidebar);
 
@@ -188,7 +188,7 @@ test.describe('Cart pricing and coupon integration', () => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         await auth.login(buyer.email, buyer.password);
-        await sidebar.navigateTo('Galerien');
+        await sidebar.navigateToClientGalleries();
         await addFirstPhotoToCart(page, fixtures[0].name);
         await openCart(page, sidebar);
 

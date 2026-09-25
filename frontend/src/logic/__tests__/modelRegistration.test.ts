@@ -16,6 +16,7 @@ import {
     isScaleQuestion,
     isSkillRowRelevant,
     isTruthyAnswer,
+    MAX_PERSONS_PER_REGISTRATION,
     makeActAnswers,
     makePersonAnswers,
     makeRegistrationValues,
@@ -167,6 +168,36 @@ describe('createRegistrationSchema', () => {
     it('rejects an empty person list', () => {
         const schema = createRegistrationSchema(catalog);
         expect(schema.safeParse(validValues({ persons: [] })).success).toBe(false);
+    });
+
+    it('accepts exactly the client-side person limit', () => {
+        expect(MAX_PERSONS_PER_REGISTRATION).toBe(10);
+        const schema = createRegistrationSchema(catalog);
+        const persons = Array.from({ length: MAX_PERSONS_PER_REGISTRATION }, (_, index) => person({
+            first_name: `Person ${index + 1}`,
+            email: `person-${index + 1}@example.com`,
+            consent_privacy: true,
+            consent_all_persons: index === 0,
+        }));
+
+        expect(schema.safeParse(validValues({ persons })).success).toBe(true);
+    });
+
+    it('rejects one person above the client-side limit with a field-level message', () => {
+        const schema = createRegistrationSchema(catalog);
+        const persons = Array.from({ length: MAX_PERSONS_PER_REGISTRATION + 1 }, (_, index) => person({
+            first_name: `Person ${index + 1}`,
+            email: `person-${index + 1}@example.com`,
+            consent_privacy: true,
+            consent_all_persons: index === 0,
+        }));
+
+        const result = schema.safeParse(validValues({ persons }));
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            const issue = result.error.issues.find(candidate => candidate.path.join('.') === 'persons');
+            expect(issue?.message).toBe(`Maximal ${MAX_PERSONS_PER_REGISTRATION} Personen pro Registrierung.`);
+        }
     });
 
     it('requires mandatory text, email and willingness fields', () => {

@@ -77,6 +77,10 @@ msgstr "{galleryCount} Downloads"
 #~ msgstr "{groupNextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {groupNextTierLabel}"
 
 #: src/ui/client/components/CartItemList.tsx
+msgid "{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})"
+msgstr "{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})"
+
+#: src/ui/client/components/CartItemList.tsx
 #~ msgid "{groupPriceText} pro Bild (Tier {groupTierIndex})"
 #~ msgstr "{groupPriceText} pro Bild (Tier {groupTierIndex})"
 
@@ -97,16 +101,24 @@ msgid "{packageQuantity} Fotos für {packagePriceText}"
 msgstr "{packageQuantity} Fotos für {packagePriceText}"
 
 #: src/ui/client/components/CartItemList.tsx
-#~ msgid "{payableCount} Bilder"
-#~ msgstr "{payableCount} Bilder"
+msgid "{payableCount} Bilder"
+msgstr "{payableCount} Bilder"
 
 #: src/ui/client/components/CartItemList.tsx
-#~ msgid "{payableItemCount} Bilder"
-#~ msgstr "{payableItemCount} Bilder"
+msgid "{payableItemCount} Bilder"
+msgstr "{payableItemCount} Bilder"
+
+#: src/ui/management/ManagementMetaGalleryView.tsx
+msgid "{photoCount} Bilder"
+msgstr "{photoCount} Bilder"
 
 #: src/logic/useVolumeLicensing.ts
 msgid "{price}€ pro Bild"
 msgstr "{price}€ pro Bild"
+
+#: src/ui/management/ManagementMetaGalleryView.tsx
+msgid "{pricePerItem} pro Bild (Tier {tierIndex})"
+msgstr "{pricePerItem} pro Bild (Tier {tierIndex})"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "{pricePerItemStr} pro Bild (Tier {tierNum})"
@@ -269,6 +281,7 @@ msgid "Ab {minQuantity} Bildern {price}€ pro Bild"
 msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
 
 #: src/ui/components/ModalDialogShell.tsx
+#: src/ui/components/UIProvider.tsx
 #: src/ui/components/WysiwygEditor.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/CreateUserModal.tsx
@@ -941,6 +954,10 @@ msgstr "Beschreibung:"
 msgid "Bestätige die einmalige Prüfung, um den Checkout fortzusetzen."
 msgstr "Bestätige die einmalige Prüfung, um den Checkout fortzusetzen."
 
+#: src/ui/components/UIProvider.tsx
+msgid "Bestätigen"
+msgstr "Bestätigen"
+
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Beste Übereinstimmung"
 msgstr "Beste Übereinstimmung"
@@ -1546,6 +1563,10 @@ msgstr "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzule
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
 msgstr "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
+
+#: src/ui/client/components/CartItemList.tsx
+msgid "Der Rabatt wird auf den serverberechneten Warenkorb angewendet."
+msgstr "Der Rabatt wird auf den serverberechneten Warenkorb angewendet."
 
 #: src/ui/Privacy.tsx
 msgid "Der Schutz Ihrer Daten ist uns wichtig. Nachfolgend informieren wir Sie über die Verarbeitung personenbezogener Daten bei der Nutzung dieses Foto-Portals."
@@ -3568,6 +3589,14 @@ msgstr "Max. globale Verwendungen"
 msgid "Max. Verwendungen pro Account"
 msgstr "Max. Verwendungen pro Account"
 
+#: src/ui/ModelRegistrationView.tsx
+msgid "Maximal {MAX_PERSONS_PER_REGISTRATION} Personen pro Registrierung."
+msgstr "Maximal {MAX_PERSONS_PER_REGISTRATION} Personen pro Registrierung."
+
+#: src/logic/modelRegistration.ts
+msgid "Maximal 10 Personen pro Registrierung."
+msgstr "Maximal 10 Personen pro Registrierung."
+
 #: src/logic/modelRegistration.ts
 msgid "Maximal 5 Fotos pro Person."
 msgstr "Maximal 5 Fotos pro Person."
@@ -4545,6 +4574,14 @@ msgstr "Preis / Stück"
 msgid "Preise & Lizenzen"
 msgstr "Preise & Lizenzen"
 
+#: src/ui/management/ManagementMetaGalleryView.tsx
+msgid "Preise nach Untergalerie"
+msgstr "Preise nach Untergalerie"
+
+#: src/ui/management/ManagementMetaGalleryView.tsx
+msgid "Preisgruppe {galleryNames}"
+msgstr "Preisgruppe {galleryNames}"
+
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preisstruktur (retroaktiv)"
 msgstr "Preisstruktur (retroaktiv)"
@@ -4735,6 +4772,10 @@ msgstr "Qualität wählen"
 msgid "Rabatt hinzufügen"
 msgstr "Rabatt hinzufügen"
 
+#: src/ui/client/components/CartItemList.tsx
+msgid "Rabatt: −{formattedDiscount}"
+msgstr "Rabatt: −{formattedDiscount}"
+
 #: src/ui/client/components/CouponInput.tsx
 msgid "Rabattcode"
 msgstr "Rabattcode"
@@ -4889,6 +4930,10 @@ msgstr "Schließen"
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Scope"
 msgstr "Scope"
+
+#: src/ui/management/ManagementMetaGalleryView.tsx
+msgid "Scope-Lizenz"
+msgstr "Scope-Lizenz"
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Scope-Lizenzierung"
@@ -5199,6 +5244,7 @@ msgstr "Stripe konnte nicht geladen werden. Bitte versuche es erneut oder öffne
 msgid "Stufe abwählen"
 msgstr "Stufe abwählen"
 
+#: src/ui/components/SearchBarWithSuggestions.tsx
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Suche"
 msgstr "Suche"
@@ -5330,6 +5376,10 @@ msgstr "Top Domains"
 msgid "Top-Kategorien & Bereitschaft"
 msgstr "Top-Kategorien & Bereitschaft"
 
+#: src/ui/components/UIProvider.tsx
+msgid "Trotzdem fortfahren"
+msgstr "Trotzdem fortfahren"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -5451,9 +5501,14 @@ msgstr "Unbenannt"
 msgid "Unbenanntes Model"
 msgstr "Unbenanntes Model"
 
+#: src/ui/components/UIProvider.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Ungespeicherte Änderungen"
 msgstr "Ungespeicherte Änderungen"
+
+#: src/ui/components/UIProvider.tsx
+msgid "Ungespeicherte Änderungen gehen verloren. Trotzdem fortfahren?"
+msgstr "Ungespeicherte Änderungen gehen verloren. Trotzdem fortfahren?"
 
 #: src/logic/modelRegistration.ts
 msgid "Ungültige Auswahl."
@@ -5759,6 +5814,10 @@ msgstr "Volume-Preset"
 #: src/ui/management/components/PricingSettingsTabs.tsx
 msgid "Volume-Pricing"
 msgstr "Volume-Pricing"
+
+#: src/ui/management/ManagementMetaGalleryView.tsx
+msgid "Volumen-Summe"
+msgstr "Volumen-Summe"
 
 #. placeholder {0}: volumeGroup.tierIndex
 #: src/ui/client/components/CartItemList.tsx
@@ -6259,3 +6318,7 @@ msgstr "Zuweisungen speichern"
 #: src/ui/ContractSignView.tsx
 msgid "Zwischensumme"
 msgstr "Zwischensumme"
+
+#: src/ui/client/components/CartItemList.tsx
+msgid "Zwischensumme: {formattedTotalAmount}"
+msgstr "Zwischensumme: {formattedTotalAmount}"

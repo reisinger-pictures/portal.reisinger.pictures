@@ -114,6 +114,35 @@ describe('usePdfExtraction', () => {
         });
     });
 
+    it('restores fixed-point manual quantities as editor decimals', async () => {
+        const onDataExtracted = vi.fn();
+        mockFetch({
+            items: [{
+                type: 'item',
+                description: 'Teilstunde',
+                notes: '',
+                qty: 25,
+                quantity_scale: 100,
+                price: 1000,
+            }],
+        });
+
+        const {result} = renderHook(() => usePdfExtraction(onDataExtracted));
+        await act(async () => {
+            await result.current.processPdfFile(createMockFile());
+        });
+
+        expect(onDataExtracted).toHaveBeenCalledWith(expect.objectContaining({
+            items: [{
+                type: 'item',
+                description: 'Teilstunde',
+                notes: '',
+                qty: 0.25,
+                price: 10,
+            }],
+        }));
+    });
+
     it('sets isExtracting true during request and false after', async () => {
         const onDataExtracted = vi.fn();
 

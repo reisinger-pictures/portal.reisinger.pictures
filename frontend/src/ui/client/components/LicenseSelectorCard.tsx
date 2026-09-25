@@ -117,7 +117,7 @@ export default function LicenseSelectorCard({photo}: LicenseSelectorCardProps) {
     };
 
     return (
-        <div className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
+        <div data-testid="license-selector-card" className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
             <h4 className="font-bold text-xl flex items-center gap-2"><span
                 className="iconify mdi--license text-primary"></span> <Trans>Lizenz wählen</Trans></h4>
 

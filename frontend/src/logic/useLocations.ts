@@ -14,11 +14,11 @@ export interface LocationResult {
 export function useLocations(query: string, type: 'city' | 'country') {
     const key = query.length >= 2 ? `/api/search/locations?q=${encodeURIComponent(query)}&type=${type}` : null;
     
-    const { data, error, isLoading } = useSWR<LocationResult[]>(
-        key,
-        fetcher,
-        { keepPreviousData: true }
-    );
+    const {data, error, isLoading} = useSWR<LocationResult[]>(key, fetcher);
 
-    return { locations: data || [], isLoading, isError: error };
+    return {
+        locations: key ? data ?? [] : [],
+        isLoading: Boolean(key) && isLoading,
+        isError: key ? error : undefined,
+    };
 }

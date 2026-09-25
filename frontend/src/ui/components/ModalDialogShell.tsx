@@ -14,6 +14,11 @@ interface ModalDialogShellProps {
     modalRef?: RefObject<HTMLDialogElement | null>;
     maxWidth?: 'default' | 'lg' | 'xl' | '2xl';
     secondaryAction?: ReactNode;
+    submitText?: string;
+    cancelText?: string;
+    submitClassName?: string;
+    descriptionId?: string;
+    className?: string;
     children: ReactNode;
 }
 
@@ -28,6 +33,11 @@ export default function ModalDialogShell({
     modalRef,
     maxWidth = 'default',
     secondaryAction,
+    submitText = t`Speichern`,
+    cancelText = t`Abbrechen`,
+    submitClassName = 'btn-primary',
+    descriptionId,
+    className = '',
     children,
 }: ModalDialogShellProps) {
     const widthClass = maxWidth === '2xl' ? 'max-w-2xl' : '';
@@ -48,7 +58,8 @@ export default function ModalDialogShell({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="modal modal-open"
+            aria-describedby={descriptionId}
+            className={`modal modal-open ${className}`.trim()}
             onKeyDown={handleKeyDown}
             onCancel={(event) => {
                 event.preventDefault();
@@ -81,9 +92,9 @@ export default function ModalDialogShell({
                             <button type="button" className="btn btn-outline btn-error" onClick={onDelete}><Trans>Löschen</Trans></button>
                         ) : <div></div>}
                         <div>
-                            <button type="button" className="btn btn-ghost mr-2" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
+                            <button type="button" className="btn btn-ghost mr-2" onClick={onClose}>{cancelText}</button>
+                            <button type="submit" className={`btn ${submitClassName}`} disabled={isSubmitting}>
+                                {isSubmitting ? <span className="loading loading-spinner"></span> : submitText}
                             </button>
                         </div>
                     </div>

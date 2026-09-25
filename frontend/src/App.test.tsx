@@ -90,4 +90,37 @@ describe('ProtectedRoute trailing-slash normalization', () => {
         expect(screen.getByRole('heading', {name: heading})).toBeInTheDocument();
         expect(screen.getByRole('status', {name: 'Aktuelle Route'})).toHaveTextContent(`${path}${query}#content`);
     });
+
+    it('redirects a failed auth check to the root authentication surface, not a missing /login route', () => {
+        vi.mocked(useAuth).mockReturnValue({
+            user: undefined,
+            isLoading: false,
+            isError: new Error('Unauthenticated'),
+            login: vi.fn(),
+            register: vi.fn(),
+            logout: vi.fn(),
+            mutate: vi.fn(),
+        });
+
+        render(
+            <MemoryRouter initialEntries={['/profile']}>
+                <Routes>
+                    <Route path="/" element={<main><h1>Authentifizierung</h1></main>}/>
+                    <Route
+                        path="/profile"
+                        element={(
+                            <ProtectedRoute>
+                                <section><h1>Privates Profil</h1></section>
+                            </ProtectedRoute>
+                        )}
+                    />
+                </Routes>
+                <CurrentLocation/>
+            </MemoryRouter>
+        );
+
+        expect(screen.getByRole('heading', {name: 'Authentifizierung'})).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Privates Profil'})).not.toBeInTheDocument();
+        expect(screen.getByRole('status', {name: 'Aktuelle Route'})).toHaveTextContent('/');
+    });
 });

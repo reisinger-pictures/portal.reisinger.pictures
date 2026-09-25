@@ -40,8 +40,10 @@ export function useAuth() {
             credentials: 'include',
             body: JSON.stringify({email, password})
         });
-        const data = await readAuthMessage(response);
-        if (!response.ok) throw new Error(data.message || data.error || t`Login fehlgeschlagen.`);
+        if (!response.ok) {
+            const data = await readAuthMessage(response);
+            throw new Error(data.message || data.error || t`Login fehlgeschlagen.`);
+        }
         await globalMutate(() => true, undefined, {revalidate: true});
     };
 
@@ -52,8 +54,11 @@ export function useAuth() {
             credentials: 'include',
             body: JSON.stringify({name, email})
         });
+        if (!response.ok) {
+            const data = await readAuthMessage(response);
+            throw new Error(data.message || data.error || t`Registrierung fehlgeschlagen`);
+        }
         const data = await readAuthMessage(response);
-        if (!response.ok) throw new Error(data.message || data.error || t`Registrierung fehlgeschlagen`);
         return data.message || t`Erfolgreich registriert`;
     };
 

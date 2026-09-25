@@ -39,6 +39,9 @@ const shouldAttemptRefresh = (url: string): boolean =>
 const isAbortError = (error: unknown): boolean =>
     typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError';
 
+const isJsonObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const NETWORK_ERROR_MESSAGE = 'Netzwerkfehler: Keine Verbindung zum Server.';
 
 /**
@@ -151,30 +154,35 @@ const getHeaders = (): Record<string, string> => ({
 
 const handleApiError = async (res: Response) => {
     let errorMsg = `HTTP Fehler ${res.status}`;
-    let errorInfo;
+    let errorInfo: unknown;
     const contentType = res.headers.get('content-type');
 
     if (contentType && contentType.includes('application/json')) {
         try {
-            errorInfo = await res.json();
-            errorMsg = errorInfo.error || errorInfo.message || errorMsg;
+            const parsed: unknown = await res.json();
+            if (isJsonObject(parsed)) {
+                errorInfo = parsed;
+                if (typeof parsed.error === 'string' && parsed.error.length > 0) {
+                    errorMsg = parsed.error;
+                } else if (typeof parsed.message === 'string' && parsed.message.length > 0) {
+                    errorMsg = parsed.message;
+                }
+            } else {
+                errorInfo = {body: parsed};
+            }
         } catch (parseError) {
             if (isAbortError(parseError)) throw parseError;
             errorInfo = { parseError: String(parseError) };
         }
     } else {
+        // Non-JSON error bodies are frequently produced by proxies, PHP
+        // warnings or framework debug output and can contain internal details
+        // (stack traces, SQL, paths). Drain the body for connection hygiene,
+        // but never promote it to a user-visible error message or error info.
         try {
-            const text = await res.text();
-            if (text.includes('<title>')) {
-                const match = text.match(/<title>(.*?)<\/title>/i);
-                if (match) errorMsg = match[1];
-            } else if (text) {
-                errorMsg = text.substring(0, 150);
-            }
-            errorInfo = { text };
+            await res.text();
         } catch (parseError) {
             if (isAbortError(parseError)) throw parseError;
-            errorInfo = { parseError: String(parseError) };
         }
     }
     
@@ -453,9 +461,9 @@ export interface AuthMeUser extends User {
     photographer_gallery_groups: Array<{ id: string; name: string }>;
 }
 export interface TextSnippet { id: string; title: string; shortcut?: string | null; content_html: string; }
-export interface OrderItem { id?: string; order_id?: string; photo_id?: string; tier: string; price: number; use_case_id?: string; qty?: number; filename?: string; notes?: string; row_total?: number; type?: string; description?: string; calculated_percentage?: number; }
+export interface OrderItem { id?: string; order_id?: string; photo_id?: string; tier: string; price: number; use_case_id?: string; qty?: number; filename?: string; notes?: string; row_total?: number; type?: string; description?: string; calculated_percentage?: number | string; }
 export interface InvoiceItem { type: string; description: string; notes: string; qty: number; price: number; row_total?: number; filename?: string; tier?: string; }
-export interface InvoiceDiscount { type: string; description: string; notes: string; price: number; calculated_percentage?: number; row_total?: number; filename?: string; tier?: string; }
+export interface InvoiceDiscount { type: string; description: string; notes: string; price: number; calculated_percentage?: number | string; row_total?: number; filename?: string; tier?: string; }
 
 export interface DocumentFormData {
     type: string;

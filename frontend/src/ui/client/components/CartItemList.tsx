@@ -54,29 +54,30 @@ export const CartItemList = ({
     discountAmount = 0,
     netTotalAmount,
 }: CartItemListProps) => {
-    const groupedVolumeLicensing = volumeLicensing?.isVolumePricing
-        ? volumeLicensing.groups?.filter(group => group.isVolumePricing) ?? []
-        : [];
-    const volumeGroups = groupedVolumeLicensing.length > 0
+    const groupedVolumeLicensing = volumeLicensing?.groups
+        ?.filter(group => group.isVolumePricing) ?? [];
+    const volumeGroups = volumeLicensing?.groups !== undefined
         ? groupedVolumeLicensing
-        : volumeLicensing?.isVolumePricing ? [legacyVolumeGroup(items, volumeLicensing)] : [];
+        : volumeLicensing?.isVolumePricing
+            ? [legacyVolumeGroup(items, volumeLicensing)]
+            : [];
     const isVolumeLicensingMode = volumeGroups.length > 0;
     const payableItemCount = items.filter(item => !item.isQuote).length;
     const cappedDiscount = Math.min(Math.max(0, discountAmount), Math.max(0, totalAmount));
     const displayedTotal = hasQuotes
         ? 0
         : Math.max(0, netTotalAmount ?? totalAmount - cappedDiscount);
+    const formattedTotalAmount = formatMoney(totalAmount);
+    const formattedDiscount = formatMoney(cappedDiscount);
     const showDiscount = !hasQuotes && cappedDiscount > 0;
 
     const groupForItem = (item: CartItem): CartPricingGroup | undefined => (
         volumeGroups.find(group => group.itemIds.includes(item.photoId))
     );
     const priceForItem = (item: CartItem, group?: CartPricingGroup): number => (
-        group?.itemPriceCents[item.photoId]
-        ?? volumeLicensing?.volumeItemPrices?.[item.photoId]
-        ?? group?.pricePerItemCents
-        ?? volumeLicensing?.pricePerItemCents
-        ?? item.price
+        group
+            ? group.itemPriceCents[item.photoId] ?? group.pricePerItemCents ?? item.price
+            : item.price
     );
 
     return (
@@ -111,7 +112,7 @@ export const CartItemList = ({
                                 </div>
                                 <div className="flex items-center gap-3 flex-wrap">
                                     <span className="text-xs opacity-70">
-                                        {payableCount} Bilder
+                                        <Trans>{payableCount} Bilder</Trans>
                                     </span>
                                     {group.nextTierCount > 0 && (
                                         <span className="text-xs opacity-70">
@@ -217,20 +218,20 @@ export const CartItemList = ({
                         const groupTotalTierIndex = group.tierIndex;
                         return (
                             <span key={`total-${group.key}`} className="text-xs opacity-60">
-                                {groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})
+                                <Trans>{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})</Trans>
                             </span>
                         );
                     })}
                     {!isVolumeLicensingMode && !hasQuotes && payableItemCount > 0 && (
-                        <span className="text-xs opacity-60">{payableItemCount} Bilder</span>
+                        <span className="text-xs opacity-60"><Trans>{payableItemCount} Bilder</Trans></span>
                     )}
                     {showDiscount && (
                         <>
                             <span className="text-xs opacity-70" data-testid="cart-subtotal">
-                                Zwischensumme: {formatMoney(totalAmount)}
+                                <Trans>Zwischensumme: {formattedTotalAmount}</Trans>
                             </span>
                             <span className="text-sm text-success font-semibold" data-testid="cart-discount">
-                                Rabatt: −{formatMoney(cappedDiscount)}
+                                <Trans>Rabatt: −{formattedDiscount}</Trans>
                             </span>
                         </>
                     )}
@@ -244,7 +245,7 @@ export const CartItemList = ({
             </div>
             {showDiscount && (
                 <p className="text-xs opacity-60 text-right mt-1" data-testid="cart-discount-note">
-                    Der Rabatt wird auf den serverberechneten Warenkorb angewendet.
+                    <Trans>Der Rabatt wird auf den serverberechneten Warenkorb angewendet.</Trans>
                 </p>
             )}
             <p className="text-sm opacity-60 text-right mt-2"><Trans>Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG.</Trans></p>
