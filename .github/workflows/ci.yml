@@ -14,8 +14,15 @@ on:
 # the jobs that need them and are never printed, fingerprinted, or written to
 # artifacts. E2E output is limited to the sanitized step summary: Playwright
 # reports, traces, screenshots, videos, and test-results are never uploaded.
-# Container images are pulled anonymously from public GHCR (no `packages`
-# scope needed).
+#
+# GHCR-Sichtbarkeit ist eine harte Voraussetzung, kein Komfort: Die Container-
+# Images werden anonym gezogen, also OHNE `packages`-Scope und OHNE
+# docker-login (Least Privilege). Das ist technisch nicht umgehbar, weil das
+# E2E-Job-`container:`-Image vom Runner VOR dem ersten Step gepullt wird — ein
+# Login-Step im Job käme zu spät. Solange `portal-base`/`portal-e2e` im
+# Org-Namespace privat sind, bricht der Pull mit `unauthorized` ab (Exit 125)
+# und die betroffenen Jobs laufen nie. Der Org-Owner muss beide Pakete auf
+# `public` setzen; siehe AGENTS.todo.md.
 permissions:
   contents: read
 
