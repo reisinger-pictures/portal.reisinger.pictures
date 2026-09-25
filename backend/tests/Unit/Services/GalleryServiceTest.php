@@ -25,12 +25,35 @@ class GalleryServiceTest extends TestCase
 
     private SlugService|Stub $slugService;
 
+    private ?User $actor = null;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->slugService = $this->createStub(SlugService::class);
         $this->service = new GalleryService($this->slugService);
+    }
+
+    /**
+     * A persisted cross-brand Super-Admin — the most permissive actor
+     * `updateGallery()` accepts.
+     *
+     * P1-M15 made the actor a required, non-nullable argument: an earlier
+     * `?User $user = null` default silently disabled every identity and brand
+     * check for callers that forgot it. These unit tests therefore pass the
+     * real actor instead of relying on a default; a trusted cross-brand
+     * Super-Admin keeps the field-mapping assertions below free of
+     * authorization concerns.
+     */
+    private function actor(): User
+    {
+        return $this->actor ??= tap(
+            User::factory()->create(['brand' => null]),
+            function (User $user): void {
+                $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+            }
+        );
     }
 
     // ─── storeGroup() ───────────────────────────────────────────────
@@ -271,7 +294,7 @@ class GalleryServiceTest extends TestCase
             'is_public' => true,
             'is_free_download' => true,
             'is_live' => true,
-        ]);
+        ], $this->actor());
 
         $this->assertFalse($updated->is_public);
         $this->assertFalse($updated->is_free_download);
@@ -379,7 +402,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'name' => 'Updated Name',
-        ]);
+        ], $this->actor());
 
         $this->assertSame('Updated Name', $updated->name);
         $this->assertDatabaseHas('galleries', [
@@ -401,7 +424,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'slug' => 'new-slug',
-        ]);
+        ], $this->actor());
 
         $this->assertSame('new-slug-1', $updated->slug);
     }
@@ -417,7 +440,7 @@ class GalleryServiceTest extends TestCase
 
         $this->service->updateGallery($gallery, [
             'name' => 'New Name',
-        ]);
+        ], $this->actor());
     }
 
     public function test_update_gallery_selection_type_forces_is_live_and_is_public_false(): void
@@ -431,7 +454,7 @@ class GalleryServiceTest extends TestCase
         $updated = $this->service->updateGallery($gallery, [
             'type' => 'selection',
             'name' => 'Now Selection',
-        ]);
+        ], $this->actor());
 
         $this->assertFalse($updated->is_live);
         $this->assertFalse($updated->is_public);
@@ -452,13 +475,13 @@ class GalleryServiceTest extends TestCase
             $updated = $this->service->updateGallery($gallery, [
                 'gallery_group_id' => $privateGroup->id,
                 'is_public' => true,
-            ]);
+            ], $this->actor());
             $this->assertFalse($updated->is_public);
 
             $updated = $this->service->updateGallery($updated, [
                 'gallery_group_id' => $publicGroup->id,
                 'is_public' => false,
-            ]);
+            ], $this->actor());
             $this->assertTrue($updated->is_public);
         });
     }
@@ -476,7 +499,7 @@ class GalleryServiceTest extends TestCase
 
             $updated = $this->service->updateGallery($gallery, [
                 'is_public' => true,
-            ]);
+            ], $this->actor());
 
             $this->assertTrue($updated->is_public);
         });
@@ -490,7 +513,7 @@ class GalleryServiceTest extends TestCase
             'is_free_download' => null,
             'is_editorial_only' => null,
             'is_hidden' => null,
-        ]);
+        ], $this->actor());
 
         $this->assertFalse($updated->is_free_download);
         $this->assertFalse($updated->is_editorial_only);
@@ -503,7 +526,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'password' => 'new-password',
-        ]);
+        ], $this->actor());
 
         $this->assertNotNull($updated->password_hash);
         $this->assertTrue(Hash::check('new-password', $updated->password_hash));
@@ -515,7 +538,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'expires_at' => '2027-06-15',
-        ]);
+        ], $this->actor());
 
         $this->assertNotNull($updated->expires_at);
         $this->assertSame('2027-06-15 23:59:59', $updated->expires_at->format('Y-m-d H:i:s'));
@@ -534,7 +557,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'name' => 'Updated Name',
-        ]);
+        ], $this->actor());
 
         $this->assertSame('original-slug', $updated->slug);
     }
@@ -550,7 +573,7 @@ class GalleryServiceTest extends TestCase
             $org = Org::factory()->create();
             $gallery->orgs()->attach($org->id);
 
-            $updated = $this->service->updateGallery($gallery, ['is_live' => true]);
+            $updated = $this->service->updateGallery($gallery, ['is_live' => true], $this->actor());
 
             $this->assertTrue($updated->is_live);
             $this->assertDatabaseHas('gallery_org', [
@@ -568,7 +591,7 @@ class GalleryServiceTest extends TestCase
             $orgB = Org::factory()->create();
             $gallery->orgs()->attach($orgA->id);
 
-            $this->service->updateGallery($gallery, ['org_ids' => [$orgB->id]]);
+            $this->service->updateGallery($gallery, ['org_ids' => [$orgB->id]], $this->actor());
 
             $this->assertDatabaseMissing('gallery_org', [
                 'gallery_id' => $gallery->id,
@@ -592,7 +615,7 @@ class GalleryServiceTest extends TestCase
         $updated = $this->service->updateGallery($gallery, [
             'slug' => null,
             'name' => 'Name stays',
-        ]);
+        ], $this->actor());
 
         $this->assertSame('keep-me', $updated->slug);
         $this->assertSame('Name stays', $updated->name);
