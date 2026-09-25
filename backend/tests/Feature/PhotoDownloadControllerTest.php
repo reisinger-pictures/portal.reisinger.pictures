@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 use ZipArchive;
@@ -18,6 +19,28 @@ use ZipArchive;
 class PhotoDownloadControllerTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Wall-clock budget for the exiftool read-back that verifies a download.
+     *
+     * A healthy `exiftool` invocation needs roughly 0.1 s and measured process
+     * lifetimes stay far below one second even at high host concurrency, so
+     * Symfony's 60 s default is not a safety limit for the binary: it is a
+     * limit on how long the *test process* may be starved by the host. On an
+     * oversubscribed runner that budget expires while exiftool has long
+     * finished, which turned a slow-but-successful verification into a hard
+     * failure. The bound below only keeps a genuinely stuck process from
+     * hanging the suite; the production timeout is deliberately untouched.
+     */
+    private const EXIFTOOL_VERIFICATION_TIMEOUT = 300.0;
+
+    /**
+     * One retry absorbs a single starved poll. exiftool only reads the
+     * delivered file here, so a retry is side-effect free and cannot mask a
+     * metadata mismatch: the assertions run on the output of whichever attempt
+     * completed.
+     */
+    private const EXIFTOOL_VERIFICATION_ATTEMPTS = 2;
 
     protected function setUp(): void
     {
@@ -59,11 +82,7 @@ class PhotoDownloadControllerTest extends TestCase
         $imageSize = @getimagesize($downloadedFilePath);
         $this->assertNotFalse($imageSize, 'Die heruntergeladene Datei ist kein valides Bild.');
 
-        $process = new Process(['exiftool', '-json', $downloadedFilePath]);
-        $process->run();
-        $this->assertTrue($process->isSuccessful(), 'ExifTool konnte nicht ausgeführt werden.');
-
-        $metaData = json_decode($process->getOutput(), true)[0];
+        $metaData = $this->readExifMetadata($downloadedFilePath, 'single download with injected metadata');
 
         $this->assertArrayHasKey('SpecialInstructions', $metaData, 'SpecialInstructions fehlen in den Metadaten.');
         $this->assertStringContainsString('Max Mustermann', $metaData['SpecialInstructions']);
@@ -96,9 +115,7 @@ class PhotoDownloadControllerTest extends TestCase
 
         $downloadedFilePath = $response->getFile()->getPathname();
 
-        $process = new Process(['exiftool', '-json', $downloadedFilePath]);
-        $process->run();
-        $metaData = json_decode($process->getOutput(), true)[0];
+        $metaData = $this->readExifMetadata($downloadedFilePath, 'editorial-only single download');
 
         $this->assertArrayHasKey('SpecialInstructions', $metaData);
         $this->assertStringContainsString('EDITORIAL USE ONLY', $metaData['SpecialInstructions']);
@@ -373,5 +390,61 @@ class PhotoDownloadControllerTest extends TestCase
             ->get('/api/media/'.$gallery->slug.'/'.$photo->id.'.jpg');
 
         $response->assertStatus(200);
+    }
+
+    /**
+     * Read back the metadata the download pipeline actually wrote.
+     *
+     * The assertions stay on the real exiftool output; only the wall-clock
+     * budget of this verification process is decoupled from the host load that
+     * the production path inherits.
+     *
+     * @return array<string, mixed>
+     */
+    private function readExifMetadata(string $path, string $context): array
+    {
+        $this->assertFileExists($path, "Die heruntergeladene Datei [{$context}] fehlt auf der Platte.");
+
+        $process = null;
+        $failure = null;
+
+        for ($attempt = 1; $attempt <= self::EXIFTOOL_VERIFICATION_ATTEMPTS; $attempt++) {
+            $process = new Process(['exiftool', '-json', $path]);
+            $process->setTimeout(self::EXIFTOOL_VERIFICATION_TIMEOUT);
+
+            try {
+                $process->run();
+                $failure = null;
+
+                break;
+            } catch (ProcessTimedOutException $exception) {
+                // A timeout already stopped the child, and this invocation only
+                // reads the delivered file, so retrying cannot double-apply a
+                // side effect.
+                $failure = $exception;
+            }
+        }
+
+        $this->assertNull(
+            $failure,
+            sprintf(
+                'exiftool did not finish within %.1fs for [%s] after %d attempts on this host.',
+                self::EXIFTOOL_VERIFICATION_TIMEOUT,
+                $context,
+                self::EXIFTOOL_VERIFICATION_ATTEMPTS,
+            ),
+        );
+
+        $this->assertInstanceOf(Process::class, $process);
+        $this->assertTrue(
+            $process->isSuccessful(),
+            "ExifTool konnte nicht ausgeführt werden [{$context}] (exit {$process->getExitCode()}): ".$process->getErrorOutput(),
+        );
+
+        $decoded = json_decode($process->getOutput(), true);
+        $this->assertIsArray($decoded, "ExifTool lieferte kein JSON [{$context}]: ".$process->getOutput());
+        $this->assertArrayHasKey(0, $decoded, "ExifTool lieferte kein Metadaten-Objekt [{$context}].");
+
+        return $decoded[0];
     }
 }
