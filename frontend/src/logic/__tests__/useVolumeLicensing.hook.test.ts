@@ -53,7 +53,7 @@ describe('useVolumeLicensing gallery context', () => {
             'displayed-gallery': {
                 pricing_strategy: 'volume_licensing',
                 volume_pricing: {
-                    preset_id: 'displayed-preset',
+                    preset_id: 31,
                     preset_name: 'Displayed Preset',
                     tiers: [
                         {min_quantity: 0, price_cents: 7000},
@@ -94,7 +94,7 @@ describe('useVolumeLicensing gallery context', () => {
             'cart-gallery': {
                 pricing_strategy: 'volume_licensing',
                 volume_pricing: {
-                    preset_id: 'brand-default',
+                    preset_id: 41,
                     tiers: [{min_quantity: 0, price_cents: 3000}],
                 },
             },
@@ -121,7 +121,7 @@ describe('useVolumeLicensing gallery context', () => {
             'volume-gallery': {
                 pricing_strategy: 'volume_licensing',
                 volume_pricing: {
-                    preset_id: 'volume-override',
+                    preset_id: 51,
                     preset_name: 'Volume Override',
                     tiers: [{min_quantity: 0, price_cents: 6200}],
                 },
@@ -147,6 +147,7 @@ describe('useVolumeLicensing gallery context', () => {
         mockGalleryTerms({
             pricing_strategy: 'volume_licensing',
             volume_pricing: {
+                preset_id: null,
                 tiers: [{min_quantity: 0, price_cents: 4100}],
             },
         });
@@ -159,12 +160,76 @@ describe('useVolumeLicensing gallery context', () => {
         )).toBe(true);
     });
 
+    // Regression: the API delivers `volume_pricing.preset_id` as the numeric
+    // `volume_presets.id` primary key. Calling `.trim()` on it threw
+    // "volumePricing?.preset_id?.trim is not a function", which unmounted the
+    // whole photo page behind the ErrorBoundary.
+    it('resolves a numeric preset id without throwing and keys the group by its decimal form', () => {
+        mockGalleryTerms({
+            pricing_strategy: 'volume_licensing',
+            volume_pricing: {
+                preset_id: 7,
+                preset_name: 'Werbung',
+                tiers: [{min_quantity: 0, price_cents: 4000}],
+            },
+        });
+
+        const {result} = renderHook(() => useVolumeLicensing(cartItems, 'cart-gallery'));
+
+        expect(result.current).toMatchObject({isVolumePricing: true, pricePerItemCents: 4000});
+        expect(result.current.groups?.map(group => [group.presetId, group.presetName])).toEqual([
+            ['7', 'Werbung'],
+        ]);
+    });
+
+    it('still resolves a stringified preset id from a stringifying intermediary', () => {
+        mockGalleryTerms({
+            pricing_strategy: 'volume_licensing',
+            volume_pricing: {
+                preset_id: '7',
+                preset_name: 'Werbung',
+                tiers: [{min_quantity: 0, price_cents: 4000}],
+            },
+        });
+
+        const {result} = renderHook(() => useVolumeLicensing(cartItems, 'cart-gallery'));
+
+        expect(result.current.groups?.map(group => group.presetId)).toEqual(['7']);
+    });
+
+    it('falls back to the default preset key for a malformed provider payload', () => {
+        mockGalleryTerms({
+            pricing_strategy: 'volume_licensing',
+            volume_pricing: {
+                preset_id: {id: 7},
+                preset_name: 12,
+                tiers: [null, {min_quantity: 0, price_cents: 4000}],
+            },
+        });
+
+        const {result} = renderHook(() => useVolumeLicensing(cartItems, 'cart-gallery'));
+
+        expect(result.current).toMatchObject({isVolumePricing: true, pricePerItemCents: 4000});
+        expect(result.current.groups?.map(group => [group.presetId, group.presetName])).toEqual([
+            ['default', null],
+        ]);
+    });
+
+    it('ignores a non-object terms response instead of throwing', () => {
+        mockGalleryTerms('volume_licensing');
+
+        const {result} = renderHook(() => useVolumeLicensing(cartItems, 'cart-gallery'));
+
+        expect(result.current.isVolumePricing).toBe(false);
+        expect(result.current.pricePerItemCents).toBe(0);
+    });
+
     it('keeps mixed child groups independent even when a displayed gallery is supplied', () => {
         mockGalleryTerms({
             'gallery-a': {
                 pricing_strategy: 'volume_licensing',
                 volume_pricing: {
-                    preset_id: 'preset-a',
+                    preset_id: 1,
                     preset_name: 'Preset A',
                     tiers: [{min_quantity: 0, price_cents: 5000}, {min_quantity: 2, price_cents: 4000}],
                 },
@@ -172,7 +237,7 @@ describe('useVolumeLicensing gallery context', () => {
             'gallery-b': {
                 pricing_strategy: 'volume_licensing',
                 volume_pricing: {
-                    preset_id: 'preset-b',
+                    preset_id: 2,
                     preset_name: 'Preset B',
                     tiers: [{min_quantity: 0, price_cents: 7000}],
                 },
@@ -187,8 +252,8 @@ describe('useVolumeLicensing gallery context', () => {
         const {result} = renderHook(() => useVolumeLicensing(mixedItems, 'gallery-a'));
 
         expect(result.current.groups?.map(group => [group.presetId, group.totalCents])).toEqual([
-            ['preset-a', 5000],
-            ['preset-b', 14000],
+            ['1', 5000],
+            ['2', 14000],
         ]);
         expect(result.current.groupedTotalCents).toBe(19000);
         expect(result.current.volumeSubtotalCents).toBe(19000);
@@ -255,7 +320,7 @@ describe('useVolumeLicensing gallery context', () => {
             'gallery-a': {
                 pricing_strategy: 'volume_licensing',
                 volume_pricing: {
-                    preset_id: 'preset-a',
+                    preset_id: 1,
                     preset_name: 'Preset A',
                     tiers: [{min_quantity: 0, price_cents: 5000}, {min_quantity: 2, price_cents: 4000}],
                 },
@@ -263,7 +328,7 @@ describe('useVolumeLicensing gallery context', () => {
             'gallery-b': {
                 pricing_strategy: 'volume_licensing',
                 volume_pricing: {
-                    preset_id: 'preset-b',
+                    preset_id: 2,
                     preset_name: 'Preset B',
                     tiers: [{min_quantity: 0, price_cents: 7000}],
                 },
@@ -282,8 +347,8 @@ describe('useVolumeLicensing gallery context', () => {
 
         expect(result.current.isVolumePricing).toBe(true);
         expect(result.current.groups.map(group => [group.presetId, group.totalCents])).toEqual([
-            ['preset-a', 8000],
-            ['preset-b', 7000],
+            ['1', 8000],
+            ['2', 7000],
             ['default', null],
         ]);
         expect(result.current.volumeSubtotalCents).toBe(15000);

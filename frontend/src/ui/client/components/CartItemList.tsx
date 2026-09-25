@@ -2,6 +2,7 @@ import {t} from '@lingui/core/macro';
 import {Trans, Plural} from '@lingui/react/macro';
 import type {CartPricingGroup, VolumeLicensingResult} from '../../../logic/CartContext';
 import {CartItem} from '../../../logic/CartContext';
+import {DEFAULT_PRESET_KEY} from '../../../logic/useVolumeLicensing';
 import {formatMoney} from '../../../logic/utils';
 
 export interface CartItemListProps {
@@ -27,7 +28,7 @@ const legacyVolumeGroup = (
     return {
         key: 'volume_licensing|legacy',
         licensingMode: 'volume_licensing',
-        presetId: 'default',
+        presetId: DEFAULT_PRESET_KEY,
         presetName: null,
         items: payableItems,
         itemIds: payableItems.map(item => item.photoId),

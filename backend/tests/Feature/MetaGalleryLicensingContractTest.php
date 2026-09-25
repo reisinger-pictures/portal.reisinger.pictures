@@ -125,7 +125,8 @@ class MetaGalleryLicensingContractTest extends TestCase
         $this->getJson("/api/settings/license-terms?gallery_id={$volumeGallery->id}")
             ->assertOk()
             ->assertJsonPath('pricing_strategy', 'volume_licensing')
-            ->assertJsonPath('volume_pricing.preset_id', $nestedPreset->id)
+            // Strict: the numeric `volume_presets.id` primary key, not a string.
+            ->assertJsonPath('volume_pricing.preset_id', $nestedPreset->id, true)
             ->assertJsonPath('volume_pricing.preset_name', 'Nested volume preset')
             ->assertJsonPath('volume_pricing.tiers.0.min_quantity', 0)
             ->assertJsonPath('volume_pricing.tiers.0.price_cents', 5000)
@@ -134,7 +135,7 @@ class MetaGalleryLicensingContractTest extends TestCase
         $this->getJson("/api/settings/license-terms?gallery_id={$emptyVolumeGallery->id}")
             ->assertOk()
             ->assertJsonPath('pricing_strategy', 'volume_licensing')
-            ->assertJsonPath('volume_pricing.preset_id', $emptyPreset->id)
+            ->assertJsonPath('volume_pricing.preset_id', $emptyPreset->id, true)
             ->assertJsonPath('volume_pricing.preset_name', 'Empty volume preset');
     }
 

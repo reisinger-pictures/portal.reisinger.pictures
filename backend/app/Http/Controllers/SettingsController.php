@@ -229,12 +229,17 @@ class SettingsController extends Controller
             'srp_privacy_fee' => $resolver->get('privacy_fee'),
             'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
             'pricing_strategy' => $pricingStrategy,
+            // Wire contract: `preset_id` is the `volume_presets.id` primary key
+            // and is serialised as a JSON *number*. The frontend treats it as an
+            // opaque identifier and only stringifies it for the `mode|preset`
+            // group key; stringifying it here would break the numeric contract
+            // documented in features/infrastructure/27-volume-licensing-presets.md.
             'volume_pricing' => $preset !== null ? [
-                'preset_id' => $preset->id,
+                'preset_id' => (int) $preset->id,
                 'preset_name' => $preset->name,
                 'tiers' => $preset->tiers->map(fn ($tier) => [
-                    'min_quantity' => $tier->min_quantity,
-                    'price_cents' => $tier->price_cents,
+                    'min_quantity' => (int) $tier->min_quantity,
+                    'price_cents' => (int) $tier->price_cents,
                 ])->values(),
             ] : null,
         ]);

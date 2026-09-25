@@ -22,13 +22,13 @@ vi.mock('../ModalDialogShell', () => ({
     ),
 }));
 
-function setupSwr() {
+function setupSwr(presets: Array<{id: number; name: string; is_default: boolean}> = []) {
     vi.mocked(useSWR).mockImplementation(((key: unknown) => {
         if (key === '/api/management/orgs') {
             return {data: [], error: undefined, isLoading: false, mutate: vi.fn()};
         }
         if (key === '/api/management/settings/volume-presets') {
-            return {data: {presets: []}, error: undefined, isLoading: false, mutate: vi.fn()};
+            return {data: {presets}, error: undefined, isLoading: false, mutate: vi.fn()};
         }
         return {data: undefined, error: undefined, isLoading: false, mutate: vi.fn()};
     }) as never);
@@ -172,6 +172,105 @@ describe('GalleryModal forced visibility', () => {
         expect(visibilitySelect).toBeEnabled();
         await user.click(screen.getByRole('button', {name: 'Speichern'}));
         expect(onCreate.mock.calls[0][4]).toBe(true);
+    });
+
+    // Regression: `volume_preset_id` is the numeric `volume_presets.id` primary
+    // key. Seeding the form with the raw number made `z.string().optional()`
+    // reject it, so editing a gallery that already had a volume preset assigned
+    // failed validation and could not be saved at all.
+    it('keeps a numeric volume_preset_id editable and submits it unchanged', async () => {
+        const user = userEvent.setup();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        vi.clearAllMocks();
+        setupSwr([
+            {id: 7, name: 'Werbung', is_default: true},
+            {id: 9, name: 'Editorial', is_default: false},
+        ]);
+        const editingGallery = {
+            id: 'gallery-1',
+            name: 'Bestehende Galerie',
+            slug: 'bestehende-galerie',
+            full_path: 'galleries/bestehende-galerie',
+            type: 'delivery' as const,
+            is_live: false,
+            is_public: true,
+            licensing_mode: 'volume_licensing',
+            volume_preset_id: 7,
+        };
+
+        renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[]}
+                editingGallery={editingGallery}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={onUpdate}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        // The preset select's label is not tied to the control, so it is
+        // addressed through the option the API list rendered.
+        const presetSelect = screen.getByRole('option', {name: 'Werbung (Standard)'})
+            .closest('select') as HTMLSelectElement;
+        expect(Array.from(presetSelect.options).map(option => option.value)).toEqual(['', '7', '9']);
+        expect(presetSelect).toHaveValue('7');
+
+        // Saving without touching the select is the regression: the numeric id
+        // was seeded into the form as-is and failed `z.string().optional()`, so
+        // the whole gallery update was rejected.
+        await user.click(screen.getByRole('button', {name: 'Speichern'}));
+
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+        // Positional args: (id, name, slug, type, isLive, isPublic, pId, pw, exp, metadataOpts, orgIds)
+        expect(onUpdate.mock.calls[0][9]).toMatchObject({
+            licensing_mode: 'volume_licensing',
+            volume_preset_id: '7',
+        });
+    });
+
+    it('submits a newly chosen numeric preset id', async () => {
+        const user = userEvent.setup();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        vi.clearAllMocks();
+        setupSwr([
+            {id: 7, name: 'Werbung', is_default: true},
+            {id: 9, name: 'Editorial', is_default: false},
+        ]);
+        const editingGallery = {
+            id: 'gallery-1',
+            name: 'Bestehende Galerie',
+            slug: 'bestehende-galerie',
+            full_path: 'galleries/bestehende-galerie',
+            type: 'delivery' as const,
+            is_live: false,
+            is_public: true,
+            licensing_mode: 'volume_licensing',
+            volume_preset_id: 7,
+        };
+
+        renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[]}
+                editingGallery={editingGallery}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={onUpdate}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        const presetSelect = screen.getByRole('option', {name: 'Editorial'})
+            .closest('select') as HTMLSelectElement;
+        await user.selectOptions(presetSelect, '9');
+        await user.click(screen.getByRole('button', {name: 'Speichern'}));
+
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+        expect(onUpdate.mock.calls[0][9]).toMatchObject({volume_preset_id: '9'});
     });
 
     it('restores explicit private intent after a forcing parent is removed', async () => {

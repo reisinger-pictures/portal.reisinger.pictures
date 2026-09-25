@@ -7,6 +7,7 @@ import { Trans } from "@lingui/react/macro";
 import { useForm, useWatch } from 'react-hook-form';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
+import type { VolumePresetsResponse } from '../../logic/useVolumePresets';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toSlug } from '../../logic/utils';
@@ -84,7 +85,13 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 is_editorial_only: !!editingGallery?.is_editorial_only,
                 is_hidden: !!editingGallery?.is_hidden,
                 licensing_mode: editingGallery?.licensing_mode || '',
-                volume_preset_id: editingGallery?.volume_preset_id || ''
+                // `volume_preset_id` is a bigint primary key and arrives as a
+                // JSON number; the select is a form field, so normalise it to
+                // its decimal string here (a raw number would fail `z.string()`
+                // and block the save of a gallery that has a preset assigned).
+                volume_preset_id: editingGallery?.volume_preset_id != null
+                    ? String(editingGallery.volume_preset_id)
+                    : ''
             });
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);
@@ -96,7 +103,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     const watchOrgIds = useWatch({ control, name: 'org_ids' });
     const watchLicensingMode = useWatch({ control, name: 'licensing_mode' });
 
-    const { data: presets } = useSWR<{ presets: Array<{ id: string; name: string; is_default: boolean }> }>('/api/management/settings/volume-presets', fetcher);
+    const { data: presets } = useSWR<VolumePresetsResponse>('/api/management/settings/volume-presets', fetcher);
     const volumePresets = watchLicensingMode === 'volume_licensing' ? presets?.presets : undefined;
 
     const forcedVisibility = resolveForcedVisibility(watchType, watchGroupId, availableGroups);
@@ -284,7 +291,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                     <select {...register('volume_preset_id')} className="select select-bordered w-full">
                         <option value=""><Trans>Brand-Standard</Trans></option>
                         {volumePresets?.map(p => (
-                            <option key={p.id} value={p.id}>
+                            <option key={p.id} value={String(p.id)}>
                                 {p.name}{p.is_default ? ' (Standard)' : ''}
                             </option>
                         ))}
