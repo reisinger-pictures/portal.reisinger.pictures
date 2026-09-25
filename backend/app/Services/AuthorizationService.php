@@ -4,13 +4,16 @@ namespace App\Services;
 
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use App\Exceptions\GalleryGroupBudgetExceededException;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\GalleryInvite;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AuthorizationService
 {
@@ -589,33 +592,56 @@ class AuthorizationService
     }
 
     /**
-     * Recursively get all subgroup IDs (including the parents themselves) using a CTE.
+     * Recursively get all subgroup IDs (including the parents themselves).
+     *
+     * Uses the canonical hierarchy traversal
+     * ({@see GalleryGroupSubtree::descendantIds()}): cycle safe, depth bounded
+     * and chunked. The previous hand-written recursive CTE had no depth or node
+     * budget at all, so a corrupt or over-sized hierarchy could pin the request.
+     *
+     * Fail closed: when the node budget cannot be met, only the directly
+     * authorized (and verified) seeds are returned — the traversal never
+     * *widens* an authorization beyond what was granted, it only refuses to
+     * expand it. The cut-off is logged. A depth cut-off additionally hides the
+     * deeper levels (truncation), which can only narrow the result.
      *
      * @param  array<string>  $parentIds
      * @return array<string>
      */
-    public function getSubGroupIds(array $parentIds): array
+    public function getSubGroupIds(array $parentIds, ?int $maxDepth = null, ?int $maxNodes = null): array
     {
-        if (empty($parentIds)) {
+        $maxDepth ??= GalleryGroupSubtree::MAX_DEPTH;
+        $maxNodes ??= GalleryGroupSubtree::MAX_NODES;
+
+        if (GalleryGroupSubtree::normalizeIds($parentIds) === []) {
             return [];
         }
 
-        $parentIds = array_values($parentIds);
-        $placeholders = implode(', ', array_fill(0, count($parentIds), '?'));
+        $seeds = [];
 
-        $query = "
-            WITH RECURSIVE child_groups AS (
-                SELECT id, parent_id FROM gallery_groups WHERE id IN ($placeholders)
-                UNION ALL
-                SELECT g.id, g.parent_id FROM gallery_groups g
-                INNER JOIN child_groups cg ON g.parent_id = cg.id
-            )
-            SELECT id FROM child_groups
-        ";
+        try {
+            // Unknown ids are dropped first: only a real, directly granted
+            // group may be echoed back into an authorization answer.
+            $seeds = GalleryGroupSubtree::existingIds($parentIds, $maxNodes);
 
-        $result = DB::select($query, $parentIds);
+            if ($seeds === []) {
+                return [];
+            }
 
-        return array_values(array_unique(array_column($result, 'id')));
+            $descendants = GalleryGroupSubtree::descendantIds($seeds, $maxDepth, $maxNodes);
+        } catch (GalleryGroupBudgetExceededException $exception) {
+            Log::error('authorization.sub_group_ids_budget_exceeded', [
+                'requested_count' => count($parentIds),
+                'verified_count' => count($seeds),
+                'limit' => $exception->limit(),
+                'requested' => $exception->requested(),
+                'kind' => $exception->kind(),
+            ]);
+
+            return $seeds;
+        }
+
+        return array_values(array_unique(array_merge($seeds, $descendants)));
     }
 
     /**

@@ -3,13 +3,16 @@
 namespace App\Services;
 
 use App\Enums\Brand;
+use App\Exceptions\GalleryGroupBudgetExceededException;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Org;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class GalleryTreeService
 {
@@ -55,9 +58,13 @@ class GalleryTreeService
         $cacheKey = $this->adminTreeCacheKey($brand);
 
         $buildTree = function () use ($brand) {
+            // The node budget is a hard limit, so the root query is capped at
+            // one row beyond it: an over-sized forest is detected without
+            // hydrating 100k root models.
             $groupQuery = GalleryGroup::query()
                 ->whereNull('parent_id')
-                ->with(['children', 'children.orgs', 'galleries', 'galleries.orgs', 'orgs']);
+                ->with(['galleries', 'galleries.orgs', 'orgs'])
+                ->limit(GalleryGroupSubtree::MAX_NODES + 1);
             $galleryQuery = Gallery::query()
                 ->whereNull('gallery_group_id')
                 ->with('orgs');
@@ -67,7 +74,10 @@ class GalleryTreeService
                 $galleryQuery->where('brand', $brand);
             }
 
-            $groups = $groupQuery->get();
+            // The descendant levels are loaded by the bounded, cycle-safe
+            // traversal instead of a self-referential eager load (which was
+            // unbounded in depth and looped forever on corrupt cycles).
+            $groups = GalleryGroupSubtree::loadForest($groupQuery->get());
             $rootGalleries = $galleryQuery->get();
             $this->hydrateTreeGroupChains($groups);
             $rootGalleries->each(fn (Gallery $gallery): Gallery => $gallery->setRelation('galleryGroup', null));
@@ -88,7 +98,21 @@ class GalleryTreeService
                 'root_galleries' => $rootGalleries->toArray(),
             ];
         };
-        $tree = Cache::rememberForever($cacheKey, $buildTree);
+
+        try {
+            $tree = Cache::rememberForever($cacheKey, $buildTree);
+        } catch (GalleryGroupBudgetExceededException $exception) {
+            // Fail closed: an over-sized hierarchy is not rendered at all, and
+            // nothing is cached so the next request re-evaluates the budget.
+            Log::error('gallery_tree.budget_exceeded', [
+                'cache_key' => $cacheKey,
+                'limit' => $exception->limit(),
+                'requested' => $exception->requested(),
+                'kind' => $exception->kind(),
+            ]);
+
+            return ['groups' => [], 'root_galleries' => []];
+        }
 
         $treeArray = json_decode(json_encode($tree), true);
 
@@ -114,16 +138,27 @@ class GalleryTreeService
      * tree is serialized. This keeps effective attributes and full paths from
      * issuing one parent query per node.
      *
+     * The recursion is bounded by {@see GalleryGroupSubtree::MAX_LEVELS}, the
+     * number of levels a bounded subtree can have; a deeper (or corrupt)
+     * structure is cut off instead of recursing.
+     *
      * @param  Collection<int, GalleryGroup>  $groups
      */
-    private function hydrateTreeGroupChains(Collection $groups, ?GalleryGroup $parent = null): void
-    {
-        $groups->each(function (GalleryGroup $group) use ($parent): void {
+    private function hydrateTreeGroupChains(
+        Collection $groups,
+        ?GalleryGroup $parent = null,
+        int $depth = 0,
+    ): void {
+        if ($depth >= GalleryGroupSubtree::MAX_LEVELS) {
+            return;
+        }
+
+        $groups->each(function (GalleryGroup $group) use ($parent, $depth): void {
             $group->setRelation('parent', $parent);
             $group->getRelation('galleries')
                 ->each(fn (Gallery $gallery): Gallery => $gallery->setRelation('galleryGroup', $group));
 
-            $this->hydrateTreeGroupChains($group->getRelation('children'), $group);
+            $this->hydrateTreeGroupChains($group->getRelation('children'), $group, $depth + 1);
         });
     }
 
@@ -132,20 +167,41 @@ class GalleryTreeService
      * for the brand-bound management tree.  This deliberately runs while the
      * cache is being built, before permission/type/org filters are applied.
      *
+     * The traversal is depth-bounded (see {@see GalleryGroupSubtree::MAX_LEVELS})
+     * and never re-visits a node id, so a malformed in-memory tree terminates.
+     *
      * @param  Collection<int, GalleryGroup>  $groups
+     * @param  array<string, bool>  $visited
      * @return Collection<int, GalleryGroup>
      */
-    private function filterGroupsByBrand(Collection $groups, string $brand): Collection
-    {
+    private function filterGroupsByBrand(
+        Collection $groups,
+        string $brand,
+        int $depth = 0,
+        array $visited = [],
+    ): Collection {
+        if ($depth >= GalleryGroupSubtree::MAX_LEVELS) {
+            return new Collection;
+        }
+
         return $groups
-            ->map(function (GalleryGroup $group) use ($brand): ?GalleryGroup {
+            ->map(function (GalleryGroup $group) use ($brand, $depth, $visited): ?GalleryGroup {
+                $key = (string) $group->getKey();
+                if (isset($visited[$key])) {
+                    // Cycle or repeated node in a malformed tree.
+                    return null;
+                }
+
                 if (! BrandRegistry::galleryGroupTreeMatchesBrand($group, $brand)) {
                     return null;
                 }
 
+                $branchVisited = $visited;
+                $branchVisited[$key] = true;
+
                 $group->setRelation(
                     'children',
-                    $this->filterGroupsByBrand($group->getRelation('children'), $brand),
+                    $this->filterGroupsByBrand($group->getRelation('children'), $brand, $depth + 1, $branchVisited),
                 );
                 $group->setRelation(
                     'galleries',
@@ -160,8 +216,20 @@ class GalleryTreeService
             ->values();
     }
 
-    private function filterGroupsRecursive(array $groups, callable $galleryPredicate, ?callable $groupPredicate = null): array
-    {
+    /**
+     * @param  array<int, array<string, mixed>>  $groups
+     * @return array<int, array<string, mixed>>
+     */
+    private function filterGroupsRecursive(
+        array $groups,
+        callable $galleryPredicate,
+        ?callable $groupPredicate = null,
+        int $depth = 0,
+    ): array {
+        if ($depth >= GalleryGroupSubtree::MAX_LEVELS) {
+            return [];
+        }
+
         $groupPredicate = $groupPredicate ?? fn (array $node): bool => true;
         $result = [];
         foreach ($groups as $group) {
@@ -172,7 +240,12 @@ class GalleryTreeService
                 $group['galleries'] = array_values(array_filter($group['galleries'], $galleryPredicate));
             }
             if (isset($group['children'])) {
-                $group['children'] = $this->filterGroupsRecursive($group['children'], $galleryPredicate, $groupPredicate);
+                $group['children'] = $this->filterGroupsRecursive(
+                    $group['children'],
+                    $galleryPredicate,
+                    $groupPredicate,
+                    $depth + 1,
+                );
             }
             $result[] = $group;
         }
@@ -240,12 +313,26 @@ class GalleryTreeService
     /**
      * Remove group husks that have neither galleries nor surviving children.
      * A structural parent (galleries empty but children non-empty) is preserved.
+     *
+     * Depth-bounded (see {@see GalleryGroupSubtree::MAX_LEVELS}); a stale cache
+     * entry holding a deeper or malformed structure is cut off instead of
+     * recursing.
+     *
+     * @param  array<int, array<string, mixed>>  $groups
+     * @param  array<int, string>  $explicitGroupIds
+     * @return array<int, array<string, mixed>>
      */
-    private function pruneEmptyGroups(array $groups, array $explicitGroupIds = []): array
+    private function pruneEmptyGroups(array $groups, array $explicitGroupIds = [], int $depth = 0): array
     {
+        if ($depth >= GalleryGroupSubtree::MAX_LEVELS) {
+            return [];
+        }
+
         $result = [];
         foreach ($groups as $group) {
-            $children = isset($group['children']) ? $this->pruneEmptyGroups($group['children'], $explicitGroupIds) : [];
+            $children = isset($group['children'])
+                ? $this->pruneEmptyGroups($group['children'], $explicitGroupIds, $depth + 1)
+                : [];
             $galleries = $group['galleries'] ?? [];
             if (! empty($galleries) || ! empty($children) || in_array($group['id'], $explicitGroupIds)) {
                 $group['children'] = $children;
@@ -257,17 +344,47 @@ class GalleryTreeService
     }
 
     /**
-     * Get all subgroup IDs recursively for a given group
+     * Get all subgroup IDs recursively for a given group.
+     *
+     * Bounded and cycle-safe: at most {@see GalleryGroupSubtree::MAX_DEPTH}
+     * levels and {@see GalleryGroupSubtree::MAX_NODES} nodes are visited, ids
+     * are collected with a visited set, and the parent ids are queried in
+     * chunks. The group's own id is never part of the result.
+     *
+     * Fail closed: if the node budget cannot be met, the descendants are not
+     * reported at all (the caller therefore sees the group only) and the
+     * cut-off is logged. A shorter answer would widen nothing but could hide
+     * a structural problem, so the denial is audited instead.
+     *
+     * @return array<int, string>
      */
-    public function getAllSubgroupIds(GalleryGroup $group): array
-    {
-        $ids = [];
-        foreach ($group->children as $child) {
-            $ids[] = $child->id;
-            $ids = array_merge($ids, $this->getAllSubgroupIds($child));
+    public function getAllSubgroupIds(
+        GalleryGroup $group,
+        ?int $maxDepth = null,
+        ?int $maxNodes = null,
+    ): array {
+        $key = $group->getKey();
+
+        if (! is_string($key) && ! is_int($key)) {
+            return [];
         }
 
-        return $ids;
+        try {
+            return GalleryGroupSubtree::descendantIds(
+                [$key],
+                $maxDepth ?? GalleryGroupSubtree::MAX_DEPTH,
+                $maxNodes ?? GalleryGroupSubtree::MAX_NODES,
+            );
+        } catch (GalleryGroupBudgetExceededException $exception) {
+            Log::error('gallery_groups.descendants_budget_exceeded', [
+                'group_id' => (string) $key,
+                'limit' => $exception->limit(),
+                'requested' => $exception->requested(),
+                'kind' => $exception->kind(),
+            ]);
+
+            return [];
+        }
     }
 
     /**
