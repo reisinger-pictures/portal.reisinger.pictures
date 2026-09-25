@@ -10,18 +10,16 @@ import { Customer } from '../../../api';
 import { Project, ProjectInput } from '../../../logic/useProjectsBoard';
 import { useUsers } from '../../../logic/useUsers';
 
-const priceMessage = t`Bitte einen gültigen Betrag eingeben`;
-
 export interface BoardStatusOption { value: string; label: string; }
 
-const projectSchema = z.object({
+const createProjectSchema = () => z.object({
     client_name: z.string().min(1, t`Kundenname ist erforderlich`),
     email: z.string().email(t`Bitte eine gültige E-Mail angeben`).optional().or(z.literal('')),
     phone: z.string().optional(),
     package: z.string().optional(),
     price_eur: z.string().optional().refine(
         (val) => val === undefined || val === '' || (!Number.isNaN(Number(val)) && Number(val) >= 0),
-        { message: priceMessage }
+        { message: t`Bitte einen gültigen Betrag eingeben` }
     ),
     payment_status: z.string().optional(),
     status: z.string().optional(),
@@ -29,7 +27,13 @@ const projectSchema = z.object({
     notes: z.string().optional(),
 });
 
-type ProjectFormValues = z.infer<typeof projectSchema>;
+type ProjectFormValues = z.infer<ReturnType<typeof createProjectSchema>>;
+
+const createPaymentOptions = (): BoardStatusOption[] => [
+    { value: 'open', label: t`Offen` },
+    { value: 'partly_paid', label: t`Teilbezahlt` },
+    { value: 'paid', label: t`Bezahlt` },
+];
 
 interface Props {
     isOpen: boolean;
@@ -41,14 +45,10 @@ interface Props {
     initial?: { client_name?: string; email?: string };
 }
 
-const paymentOptions = [
-    { value: 'open', label: t`Offen` },
-    { value: 'partly_paid', label: t`Teilbezahlt` },
-    { value: 'paid', label: t`Bezahlt` },
-];
-
 export default function ProjectModal({ isOpen, onClose, editing, onSave, initial, defaultStatus, statusOptions }: Props) {
     "use no memo";
+    const projectSchema = createProjectSchema();
+    const paymentOptions = createPaymentOptions();
     const { register, control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<ProjectFormValues>({
         resolver: zodResolver(projectSchema),
         defaultValues: {

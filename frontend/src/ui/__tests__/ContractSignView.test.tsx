@@ -49,6 +49,7 @@ const version1Data: SignContractResponse = {
         terms_html: '<p>Version 1</p>',
         items: [],
         discounts: [],
+        total: 0,
         billing_details: null,
         available_roles: ['Model'],
         content_version: 0,
@@ -68,6 +69,7 @@ const version2Data: SignContractResponse = {
         terms_html: '<p>Version 2</p>',
         items: [],
         discounts: [],
+        total: 0,
         billing_details: null,
         available_roles: ['Fotograf'],
         content_version: 1,
@@ -87,6 +89,7 @@ const version3Data: SignContractResponse = {
         terms_html: '<p>Version 3</p>',
         items: [],
         discounts: [],
+        total: 0,
         billing_details: null,
         available_roles: ['Model'],
         content_version: 2,
@@ -185,6 +188,7 @@ describe('ContractSignView stale detection', () => {
                 terms_html: '<script>alert("xss")</script><p>safe content</p>',
                 items: [],
                 discounts: [],
+                total: 0,
                 billing_details: null,
                 available_roles: ['Model'],
                 content_version: 0,
@@ -213,16 +217,82 @@ describe('ContractSignView stale detection', () => {
         expect(container.innerHTML).not.toContain('alert("xss")');
     });
 
-    it('applies percentage discounts when computing the grand total (backend snapshot semantics)', async () => {
-        const dataWithDiscounts = {
+    it('displays the authoritative percentage-discount total', async () => {
+        const dataWithPercentageDiscount: SignContractResponse = {
             contract: {
-                id: 'contract-discounts',
+                id: 'contract-percentage-discount',
                 terms_html: '<p>Version 1</p>',
                 items: [
-                    { type: 'item', description: 'Fotos', notes: '', qty: 2, price: 5000, row_total: 10000 },
+                    { type: 'item', description: 'Fotos', notes: '', qty: 2, price: 5000 },
                 ],
                 discounts: [
-                    // 10% => stored as basis points (percent × 100)
+                    { type: 'discount_percent', description: '10% Rabatt', notes: '', price: 1000 },
+                ],
+                total: 9000,
+                billing_details: null,
+                available_roles: ['Model'],
+                content_version: 0,
+            },
+            signer: {
+                id: 'signer-1',
+                name: 'Test User',
+                email: 'test@example.com',
+                roles: ['Model'],
+                status: 'joined',
+            },
+        };
+        vi.mocked(fetchSignContract).mockResolvedValueOnce(dataWithPercentageDiscount);
+
+        renderWithProviders(<ContractSignView />);
+
+        await waitFor(() => expect(screen.getByText('Gesamtbetrag')).toBeInTheDocument());
+        expect(screen.getByText('10%')).toBeInTheDocument();
+        expect(screen.getByText('90,00 €')).toBeInTheDocument();
+    });
+
+    it('displays the authoritative fixed-discount total', async () => {
+        const dataWithFixedDiscount: SignContractResponse = {
+            contract: {
+                id: 'contract-fixed-discount',
+                terms_html: '<p>Version 1</p>',
+                items: [
+                    { type: 'item', description: 'Fotos', notes: '', qty: 2, price: 5000 },
+                ],
+                discounts: [
+                    { type: 'discount_fixed', description: 'Bonus', notes: '', price: 500 },
+                ],
+                total: 9500,
+                billing_details: null,
+                available_roles: ['Model'],
+                content_version: 0,
+            },
+            signer: {
+                id: 'signer-1',
+                name: 'Test User',
+                email: 'test@example.com',
+                roles: ['Model'],
+                status: 'joined',
+            },
+        };
+        vi.mocked(fetchSignContract).mockResolvedValueOnce(dataWithFixedDiscount);
+
+        renderWithProviders(<ContractSignView />);
+
+        await waitFor(() => expect(screen.getByText('Gesamtbetrag')).toBeInTheDocument());
+        expect(screen.getByText('5,00 €')).toBeInTheDocument();
+        expect(screen.getByText('95,00 €')).toBeInTheDocument();
+    });
+
+    it('uses ordered percentage and fixed discounts only for valid legacy snapshots without a total', async () => {
+        const legacyData = {
+            contract: {
+                id: 'contract-legacy-discounts',
+                terms_html: '<p>Version 1</p>',
+                items: [
+                    // row_total is not part of the authoritative contract API and must not override price × qty.
+                    { type: 'item', description: 'Fotos', notes: '', qty: 2, price: 5000, row_total: 1 },
+                ],
+                discounts: [
                     { type: 'discount_percent', description: '10% Rabatt', notes: '', price: 1000 },
                     { type: 'discount_fixed', description: 'Bonus', notes: '', price: 500 },
                 ],
@@ -238,14 +308,11 @@ describe('ContractSignView stale detection', () => {
                 status: 'joined',
             },
         };
-        vi.mocked(fetchSignContract).mockResolvedValueOnce(dataWithDiscounts);
+        vi.mocked(fetchSignContract).mockResolvedValueOnce(legacyData as unknown as SignContractResponse);
 
         renderWithProviders(<ContractSignView />);
 
-        await waitFor(() => {
-            expect(screen.getByText('Gesamtbetrag')).toBeInTheDocument();
-        });
-
+        await waitFor(() => expect(screen.getByText('Gesamtbetrag')).toBeInTheDocument());
         // 10000 - round(10000 × 1000 / 10000) = 9000; 9000 - 500 = 8500
         expect(screen.getByText('85,00 €')).toBeInTheDocument();
     });

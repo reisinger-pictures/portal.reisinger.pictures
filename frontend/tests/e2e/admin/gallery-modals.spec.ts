@@ -37,6 +37,46 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
         await expect(newGalleryButton).toBeFocused();
     });
 
+    test('Gallery visibility follows a parent policy without losing explicit intent', { tag: ['@feature:admin:galleries', '@regression'] }, async ({ page, request }) => {
+        const adminHeaders = { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() };
+        const suffix = Math.random().toString(36).substring(2, 8);
+        const createGroup = async (name: string, isPublic: boolean | null) => {
+            const response = await request.post('/api/management/gallery-groups', {
+                data: { name, is_public: isPublic },
+                headers: adminHeaders,
+            });
+            expect(response.ok()).toBeTruthy();
+            const payload = await response.json() as { group?: { id?: string } };
+            const groupId = payload.group?.id;
+            if (!groupId) throw new Error(`Group ID missing for ${name}`);
+            helper.trackGroup(groupId);
+            return groupId;
+        };
+
+        const publicGroupId = await createGroup(`E2E Public Parent ${suffix}`, true);
+        const neutralGroupId = await createGroup(`E2E Neutral Parent ${suffix}`, null);
+
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        await auth.login(testUser.email, testUser.password);
+        await sidebar.navigateTo('Galerien & Ordner');
+        const main = page.locator('main');
+        await main.getByRole('button', { name: 'Neue Galerie' }).click();
+
+        const dialog = page.getByRole('dialog', { name: 'Neue Galerie' });
+        const visibility = dialog.getByLabel('Sichtbarkeit');
+        const parent = dialog.getByLabel('In welchem Ordner soll die Galerie liegen?');
+
+        await visibility.selectOption('false');
+        await parent.selectOption(publicGroupId);
+        await expect(visibility).toHaveValue('true');
+        await expect(visibility).toBeDisabled();
+
+        await parent.selectOption(neutralGroupId);
+        await expect(visibility).toHaveValue('false');
+        await expect(visibility).toBeEnabled();
+    });
+
     test('Photographer can save and restore all boolean flags via Group Modal', { tag: ['@feature:admin:galleries'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

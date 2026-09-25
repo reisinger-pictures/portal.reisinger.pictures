@@ -1,5 +1,14 @@
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../api';
+import type {InvoiceDiscount, InvoiceItem} from '../api';
+import {
+    calculateContractTotal,
+    fixedPointToMajorUnits,
+    normalizeContractSnapshot,
+    serializeContractSnapshot,
+    type ContractWireDiscount,
+    type ContractWireItem,
+} from './contractPricing';
 
 export interface BillingDetails {
     name?: string;
@@ -31,7 +40,9 @@ export interface Contract {
     status: 'draft' | 'active' | 'closed' | 'cancelled';
     billing_details: BillingDetails | null;
     items: ContractItem[];
-    discounts: ContractItem[];
+    discounts: ContractDiscount[];
+    /** Authoritative server-calculated cents. */
+    total: number;
     terms_html: string;
     available_roles: string[];
     allow_multiple_roles_per_signer: boolean;
@@ -46,18 +57,64 @@ export interface Contract {
 
 export type ContractInstance = Contract;
 
-export interface ContractItem {
-    type: 'item' | 'discount_fixed' | 'discount_percent';
-    description: string;
-    notes: string;
-    qty: number;
-    price: number;
+export type ContractItem = ContractWireItem & {
+    /** Legacy output only; authoritative totals never read this field. */
     row_total?: number;
+};
+
+export type ContractDiscount = ContractWireDiscount & {
+    /** Legacy output only; authoritative totals never read this field. */
+    row_total?: number;
+};
+
+/** Normalize a management response and calculate its server-equivalent total. */
+export function normalizeManagementContract(contract: Omit<Contract, 'total'> & { total?: number }): Contract {
+    const snapshot = normalizeContractSnapshot(contract.items, contract.discounts);
+    const total = typeof contract.total === 'number' && Number.isSafeInteger(contract.total) && contract.total >= 0
+        ? contract.total
+        : calculateContractTotal(snapshot);
+    return {
+        ...contract,
+        items: snapshot.items,
+        discounts: snapshot.discounts,
+        total,
+    };
+}
+
+/** Convert API cents to the editor's major-unit display value. */
+export function contractItemToEditor(item: ContractItem): InvoiceItem {
+    return {
+        type: 'item',
+        description: item.description,
+        notes: item.notes,
+        qty: item.qty,
+        price: fixedPointToMajorUnits(item.price),
+    };
+}
+
+/** Convert fixed-discount cents or percentage basis points to editor units. */
+export function contractDiscountToEditor(discount: ContractDiscount): InvoiceDiscount {
+    return {
+        type: discount.type,
+        description: discount.description,
+        notes: discount.notes,
+        price: fixedPointToMajorUnits(discount.price),
+    };
+}
+
+/** Serialize one editor item into the canonical contract items array. */
+export function contractItemToSnapshot(item: InvoiceItem): ContractItem {
+    return serializeContractSnapshot([item], []).items[0];
+}
+
+/** Serialize one editor discount into the canonical contract discounts array. */
+export function contractDiscountToSnapshot(discount: InvoiceDiscount): ContractDiscount {
+    return serializeContractSnapshot([], [discount]).discounts[0];
 }
 
 export interface ContractFormData {
     items: ContractItem[];
-    discounts: ContractItem[];
+    discounts: ContractDiscount[];
     terms_html: string;
     available_roles: string[];
     allow_multiple_roles_per_signer: boolean;

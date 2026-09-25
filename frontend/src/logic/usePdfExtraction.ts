@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
 import {apiUpload, InvoiceDiscount, InvoiceItem} from '../api';
+import {fixedPointToMajorUnits, MANUAL_QUANTITY_SCALE} from './contractPricing';
 
 export interface ExtractedData {
     customer_name?: string;
@@ -17,6 +18,9 @@ export interface ExtractedData {
     discounts: InvoiceDiscount[];
 }
 
+type ExtractedWireItem = InvoiceItem & {quantity_scale?: number};
+type ExtractedWireDiscount = InvoiceDiscount & {qty?: number; quantity_scale?: number};
+
 export interface OfferExtractionResponse {
     customer_name?: string;
     customer_company?: string;
@@ -27,7 +31,7 @@ export interface OfferExtractionResponse {
     customer_email?: string;
     customer_uid?: string;
     terms_html?: string;
-    items?: Array<InvoiceItem | InvoiceDiscount>;
+    items?: Array<ExtractedWireItem | ExtractedWireDiscount>;
     error?: string;
     message?: string;
 }
@@ -45,17 +49,24 @@ export function usePdfExtraction(onDataExtracted: (data: ExtractedData) => void)
             const data = await apiUpload<OfferExtractionResponse>('/api/management/invoices/extract-offer', fd);
 
             const items: InvoiceItem[] = data.items
-                ?.filter((row): row is InvoiceItem => row.type === 'item')
+                ?.filter((row): row is ExtractedWireItem => row.type === 'item')
                 .map((row) => ({
-                    ...row,
-                    price: row.price / 100,
+                    type: row.type,
+                    description: row.description,
+                    notes: row.notes,
+                    qty: row.quantity_scale === MANUAL_QUANTITY_SCALE
+                        ? fixedPointToMajorUnits(row.qty, MANUAL_QUANTITY_SCALE)
+                        : row.qty,
+                    price: fixedPointToMajorUnits(row.price),
                 })) || [];
 
             const discounts: InvoiceDiscount[] = data.items
-                ?.filter((row): row is InvoiceDiscount => row.type !== 'item')
+                ?.filter((row): row is ExtractedWireDiscount => row.type !== 'item')
                 .map((row) => ({
-                    ...row,
-                    price: row.price / 100,
+                    type: row.type,
+                    description: row.description,
+                    notes: row.notes,
+                    price: fixedPointToMajorUnits(row.price),
                 })) || [];
 
             onDataExtracted({

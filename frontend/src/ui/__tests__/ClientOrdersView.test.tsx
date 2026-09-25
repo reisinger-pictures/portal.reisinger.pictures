@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import { MemoryRouter } from 'react-router-dom';
 import ClientOrdersView from '../client/ClientOrdersView';
@@ -88,5 +88,25 @@ describe('ClientOrdersView', () => {
         expect(within(pendingCard as HTMLElement).queryByRole('button', { name: 'Bilder ZIP' })).not.toBeInTheDocument();
         expect(within(pendingCard as HTMLElement).getByRole('button', { name: 'Beleg' })).toBeInTheDocument();
         expect(within(paidCard as HTMLElement).getByRole('button', { name: 'Bilder ZIP' })).toBeInTheDocument();
+    });
+
+    it('opens order documents without exposing the opener', () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: [makeOrder('paid', 'paid')],
+            error: undefined,
+            isLoading: false,
+        } as never);
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+        renderView();
+
+        const orderCard = screen.getByText(/INV-PAID/).closest('.card');
+        expect(orderCard).not.toBeNull();
+        fireEvent.click(within(orderCard as HTMLElement).getByRole('button', {name: 'Bilder ZIP'}));
+        fireEvent.click(within(orderCard as HTMLElement).getByRole('button', {name: 'Beleg'}));
+
+        expect(openSpy).toHaveBeenNthCalledWith(1, '/api/orders/paid/download-zip', '_blank', 'noopener,noreferrer');
+        expect(openSpy).toHaveBeenNthCalledWith(2, '/api/orders/paid/invoice', '_blank', 'noopener,noreferrer');
+        openSpy.mockRestore();
     });
 });

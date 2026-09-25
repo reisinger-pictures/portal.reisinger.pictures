@@ -55,6 +55,56 @@ export interface CartPricingGroup {
     itemPriceCents: Record<string, number>;
 }
 
+/**
+ * One child gallery represented in a meta-gallery pricing preview.
+ * `photoCount` is the complete authorized gallery count returned by the
+ * meta-gallery endpoint. Legacy responses may derive it from loaded photos;
+ * zero is valid for an empty child gallery, which still contributes its
+ * effective licensing descriptor. The same child can therefore be grouped with
+ * another gallery only when the effective server pricing key matches.
+ */
+export interface GalleryPricingSource {
+    galleryId: string;
+    galleryGroupId?: string;
+    /** Display name supplied by the meta-gallery response, when available. */
+    galleryName?: string;
+    photoCount: number;
+}
+
+/**
+ * Effective pricing descriptor for a set of child galleries in a
+ * meta-gallery. Scope groups deliberately have a null total because their
+ * per-photo catalog price is resolved only by the server at checkout.
+ */
+export interface GalleryPricingGroup {
+    key: string;
+    licensingMode: CartLicensingMode;
+    presetId: string;
+    presetName: string | null;
+    galleryIds: string[];
+    galleryGroupIds: string[];
+    photoCount: number;
+    totalCents: number | null;
+    pricePerItemCents: number | null;
+    tiers: VolumeTierConfig[];
+    tierIndex: number;
+    isMaxTier: boolean;
+    nextTierCount: number;
+    nextTierLabel: string;
+    isVolumePricing: boolean;
+}
+
+export interface GalleryLicensingResult {
+    /** True when at least one child gallery resolves to volume licensing. */
+    isVolumePricing: boolean;
+    /** Effective child-gallery groups, including scope groups. */
+    groups: GalleryPricingGroup[];
+    /** Sum of all volume-group totals; scope totals remain server-priced. */
+    volumeSubtotalCents: number;
+    /** True while the child terms are still being resolved. */
+    isLoading: boolean;
+}
+
 /** Volume licensing pricing summary derived from cart items. */
 export interface VolumeLicensingResult {
     /** 0-based index of the currently qualifying tier. */

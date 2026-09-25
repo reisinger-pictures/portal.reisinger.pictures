@@ -287,6 +287,48 @@ describe('CartItemList', () => {
         expect(screen.getByText(formatMoney(500))).toBeInTheDocument();
     });
 
+    it('keeps explicit scope groups on their server item prices even if legacy flags are inconsistent', () => {
+        const scopeGroups = [{
+            key: 'scope_licensing|default',
+            licensingMode: 'scope_licensing' as const,
+            presetId: 'default',
+            presetName: null,
+            items: mockItems,
+            itemIds: mockItems.map(item => item.photoId),
+            totalCents: 4000,
+            pricePerItemCents: null,
+            tiers: [],
+            tierIndex: 0,
+            isMaxTier: false,
+            nextTierCount: 0,
+            nextTierLabel: '',
+            isVolumePricing: false,
+            itemPriceCents: {},
+        }];
+
+        renderList({
+            items: mockItems,
+            totalAmount: 4000,
+            volumeLicensing: {
+                tierIndex: 0,
+                isMaxTier: false,
+                pricePerItemCents: 9999,
+                totalCents: 0,
+                nextTierCount: 0,
+                nextTierLabel: '',
+                tiers: [],
+                isVolumePricing: true,
+                groups: scopeGroups,
+                groupedTotalCents: 4000,
+            },
+        });
+
+        expect(screen.queryByTestId('volume-pricing-groups')).not.toBeInTheDocument();
+        expect(screen.getByText(formatMoney(mockItems[0].price))).toBeInTheDocument();
+        expect(screen.getByText(formatMoney(mockItems[1].price))).toBeInTheDocument();
+        expect(screen.queryByText(formatMoney(9999))).not.toBeInTheDocument();
+    });
+
     it('shows the server-consistent discount and net total', () => {
         renderList({
             items: mockItems,
@@ -295,7 +337,11 @@ describe('CartItemList', () => {
             netTotalAmount: 4500,
         });
 
-        expect(screen.getByTestId('cart-discount')).toHaveTextContent('15.00 €');
+        expect(screen.getByTestId('cart-subtotal')).toHaveTextContent('Zwischensumme: 60.00 €');
+        expect(screen.getByTestId('cart-discount')).toHaveTextContent('Rabatt: −15.00 €');
+        expect(screen.getByTestId('cart-discount-note')).toHaveTextContent(
+            'Der Rabatt wird auf den serverberechneten Warenkorb angewendet.',
+        );
         expect(screen.getByTestId('cart-total')).toHaveTextContent('45.00 €');
     });
 

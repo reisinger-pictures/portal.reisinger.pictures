@@ -170,6 +170,43 @@ describe('useCoupon', () => {
         expect(result.current.error).toBeNull();
     });
 
+    it('ignores an older same-context validation response', async () => {
+        let resolveFirst: (response: Response) => void = () => undefined;
+        let resolveSecond: (response: Response) => void = () => undefined;
+        const firstResponse = new Promise<Response>((resolve) => { resolveFirst = resolve; });
+        const secondResponse = new Promise<Response>((resolve) => { resolveSecond = resolve; });
+        vi.stubGlobal('fetch', vi.fn()
+            .mockReturnValueOnce(firstResponse)
+            .mockReturnValueOnce(secondResponse));
+
+        const {result} = renderHook(() => useCoupon({validationContextKey: 'same-cart'}));
+        let firstRequest!: Promise<void>;
+        let secondRequest!: Promise<void>;
+        act(() => {
+            firstRequest = result.current.applyCoupon('FIRST');
+            secondRequest = result.current.applyCoupon('SECOND');
+        });
+
+        await act(async () => {
+            resolveSecond(new Response(
+                JSON.stringify({...VALID_RESPONSE, coupon: {...VALID_RESPONSE.coupon, code: 'SECOND'}}),
+                {status: 200, headers: {'Content-Type': 'application/json'}},
+            ));
+            await secondRequest;
+        });
+        expect(result.current.couponCode).toBe('SECOND');
+
+        await act(async () => {
+            resolveFirst(new Response(
+                JSON.stringify(VALID_RESPONSE),
+                {status: 200, headers: {'Content-Type': 'application/json'}},
+            ));
+            await firstRequest;
+        });
+        expect(result.current.couponCode).toBe('SECOND');
+        expect(result.current.isValid).toBe(true);
+    });
+
     it('clears an applied coupon when eligibility or cart identity changes', async () => {
         mockFetchOnce(VALID_RESPONSE);
         const {result, rerender} = renderHook(

@@ -145,6 +145,52 @@ describe('useGallery', () => {
         expect(mockMutate.mock.calls[1][1]).toEqual({revalidate: false});
     });
 
+    it('preserves the rating API error when cache rollback itself fails', async () => {
+        const mockMutate = vi.fn()
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValueOnce(new Error('cache rollback failed'));
+        vi.mocked(useSWRInfinite).mockReturnValue({
+            data: [mockPage],
+            error: undefined,
+            isLoading: false,
+            isValidating: false,
+            size: 1,
+            setSize: vi.fn(),
+            mutate: mockMutate,
+        } as never);
+        const apiError = Object.assign(new Error('Rating failed with 500'), {status: 500});
+        vi.mocked(apiMutate).mockRejectedValueOnce(apiError);
+
+        const { result } = renderHook(() => useGallery('test-gallery'));
+
+        await expect(result.current.ratePhoto('p1', 5, 'Great!')).rejects.toBe(apiError);
+        expect(mockMutate).toHaveBeenCalledTimes(2);
+        expect(window.location.replace).not.toHaveBeenCalled();
+    });
+
+    it('rolls back and rethrows a transient rating transport failure without redirecting', async () => {
+        const mockMutate = vi.fn().mockResolvedValue(undefined);
+        vi.mocked(useSWRInfinite).mockReturnValue({
+            data: [mockPage],
+            error: undefined,
+            isLoading: false,
+            isValidating: false,
+            size: 1,
+            setSize: vi.fn(),
+            mutate: mockMutate,
+        } as never);
+        const apiError = Object.assign(new Error('Rating service temporarily unavailable'), {status: 0});
+        vi.mocked(apiMutate).mockRejectedValueOnce(apiError);
+
+        const { result } = renderHook(() => useGallery('test-gallery'));
+
+        await expect(result.current.ratePhoto('p1', 5, 'Great!')).rejects.toBe(apiError);
+        expect(mockMutate).toHaveBeenCalledTimes(2);
+        expect(mockMutate.mock.calls[1][0]).toEqual([mockPage]);
+        expect(mockMutate.mock.calls[1][1]).toEqual({revalidate: false});
+        expect(window.location.replace).not.toHaveBeenCalled();
+    });
+
     it('rolls back and opens the real authentication flow after a 401', async () => {
         const mockMutate = vi.fn().mockResolvedValue(undefined);
         vi.mocked(useSWRInfinite).mockReturnValue({

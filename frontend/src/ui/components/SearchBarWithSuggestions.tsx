@@ -47,6 +47,15 @@ function SearchBarState({
         query: initialQuery,
         debouncedQuery: initialQuery,
     }));
+    // A browser history entry can be revisited with its original location key.
+    // Reset a draft during render so it cannot be mistaken for that entry's URL.
+    if (state.version !== urlVersion) {
+        setState({
+            version: urlVersion,
+            query: initialQuery,
+            debouncedQuery: initialQuery,
+        });
+    }
     const isCurrentQuery = state.version === urlVersion;
     const searchQuery = isCurrentQuery ? state.query : initialQuery;
     const debouncedQuery = isCurrentQuery ? state.debouncedQuery : initialQuery;
@@ -126,7 +135,11 @@ function SearchBarState({
                     onBlur={handleBlur}
                     autoFocus={autoFocus}
                 />
-                <button type="submit" className="btn btn-primary join-item">
+                <button
+                    type="submit"
+                    aria-label={t`Suche`}
+                    className="btn btn-primary join-item"
+                >
                     <span className="iconify mdi--magnify text-xl"></span>
                 </button>
             </div>

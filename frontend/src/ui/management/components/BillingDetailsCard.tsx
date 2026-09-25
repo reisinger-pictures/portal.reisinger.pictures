@@ -10,7 +10,7 @@ import {useUI} from '../../components/UIContext';
 // IBAN: AT/DE format, basic structural check (country + checksum + alphanumerics), spaces allowed.
 const ibanRegex = /^(AT|DE)\d{2}[ ]?(\d{4}[ ]?){4,7}\d{0,4}$/i;
 
-const billingDetailsSchema = z.object({
+const createBillingDetailsSchema = () => z.object({
     bank_holder: z.string().min(2, t`Mindestens 2 Zeichen`),
     bank_iban: z.string().regex(ibanRegex, t`Ungültige IBAN (AT/DE)`).max(42),
     bank_bic: z.string().max(12).optional().or(z.literal('')),
@@ -21,7 +21,7 @@ const billingDetailsSchema = z.object({
     company_email: z.string().email(t`Ungültige E-Mail`).optional().or(z.literal('')),
 });
 
-type BillingFormValues = z.infer<typeof billingDetailsSchema>;
+type BillingFormValues = z.infer<ReturnType<typeof createBillingDetailsSchema>>;
 
 const EMPTY_DEFAULTS: BillingFormValues = {
     bank_holder: '', bank_iban: '', bank_bic: '',
@@ -39,6 +39,7 @@ export default function BillingDetailsCard() {
     const {billingDetails, updateBillingDetails, isLoading} = useBillingDetails();
     const {showToast} = useUI();
     const {isSuperAdmin} = usePermissions();
+    const billingDetailsSchema = createBillingDetailsSchema();
 
     const canEdit = isSuperAdmin;
 

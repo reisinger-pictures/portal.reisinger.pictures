@@ -38,7 +38,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
 
     const bestPrice = formatMoney(tiers[tiers.length - 1]?.priceCents ?? 0);
     return (
-        <div className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
+        <div data-testid="volume-pricing-card" className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
             <h4 className="font-bold text-xl flex items-center gap-2">
                 <span className="iconify mdi--currency-eur text-primary"></span> <Trans>Preis</Trans>
             </h4>

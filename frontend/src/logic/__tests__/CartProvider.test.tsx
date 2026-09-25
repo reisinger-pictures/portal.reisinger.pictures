@@ -6,6 +6,7 @@ import { useCart } from '../CartContext';
 import { useAuth } from '../useAuth';
 import { useUI } from '../../ui/components/UIContext';
 import { useVolumeLicensing } from '../useVolumeLicensing';
+import { checkoutSessionStorageKey } from '../checkoutSession';
 
 vi.mock('../useAuth', () => ({
     useAuth: vi.fn(),
@@ -41,6 +42,7 @@ function wrapper({children}: {children: ReactNode}) {
 describe('CartProvider quote metadata', () => {
     beforeEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
         vi.mocked(useAuth).mockReturnValue({user} as never);
         vi.mocked(useUI).mockReturnValue({showToast: vi.fn()} as never);
         vi.mocked(useVolumeLicensing).mockReturnValue({
@@ -57,6 +59,7 @@ describe('CartProvider quote metadata', () => {
 
     afterEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
     });
 
     it('uses grouped server totals instead of the default volume preset total', async () => {
@@ -148,5 +151,24 @@ describe('CartProvider quote metadata', () => {
 
         await waitFor(() => expect(result.current.quoteToken).toBeNull());
         expect(result.current.items.map(cartItem => cartItem.photoId)).toEqual(['p2']);
+    });
+
+    it('clears the checkout recovery key when the cart is cleared', async () => {
+        const recoveryKey = checkoutSessionStorageKey(user.id);
+        sessionStorage.setItem(recoveryKey, JSON.stringify({
+            version: 1,
+            userId: user.id,
+            cartMarker: 'cart-v1-0000000000000000',
+            idempotencyKey: '11111111-1111-4111-8111-111111111111',
+        }));
+        localStorage.setItem(cartKey, JSON.stringify([item]));
+
+        const {result} = renderHook(() => useCart(), {wrapper});
+        await waitFor(() => expect(result.current.items).toHaveLength(1));
+
+        act(() => result.current.clearCart());
+
+        await waitFor(() => expect(result.current.items).toHaveLength(0));
+        expect(sessionStorage.getItem(recoveryKey)).toBeNull();
     });
 });

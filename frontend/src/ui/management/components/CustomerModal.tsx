@@ -33,7 +33,14 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
     const formId = useId();
     const nameInputId = `${formId}-name`;
     const companyInputId = `${formId}-company`;
+    const emailInputId = `${formId}-email`;
     const birthdateInputId = `${formId}-birthdate`;
+    const uidInputId = `${formId}-uid`;
+    const streetInputId = `${formId}-street`;
+    const zipInputId = `${formId}-zip`;
+    const cityInputId = `${formId}-city`;
+    const countryInputId = `${formId}-country`;
+    const locationGroupLabelId = `${formId}-location-group-label`;
     const customerSchema = createCustomerSchema();
     const { register, handleSubmit, reset, setValue, control, formState: { errors, isSubmitting } } = useForm<CustomerFormValues>({
         resolver: zodResolver(customerSchema)
@@ -92,8 +99,8 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                             <input id={companyInputId} type="text" {...register('company')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">E-Mail Adresse</span></label>
-                            <input type="email" {...register('email')} className={`input input-bordered ${errors.email ? 'input-error' : ''}`} />
+                            <label className="label" htmlFor={emailInputId}><span className="label-text font-bold">E-Mail Adresse</span></label>
+                            <input id={emailInputId} type="email" {...register('email')} className={`input input-bordered ${errors.email ? 'input-error' : ''}`} />
                             {errors.email && <span className="text-error text-xs mt-1">{errors.email.message}</span>}
                         </div>
                         <div className="form-control">
@@ -101,18 +108,26 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                             <input id={birthdateInputId} type="date" {...register('birthdate')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
-                            <input type="text" {...register('uid')} className="input input-bordered" />
+                            <label className="label" htmlFor={uidInputId}><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
+                            <input id={uidInputId} type="text" {...register('uid')} className="input input-bordered" />
                         </div>
                         <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
-                            <input type="text" {...register('street')} className="input input-bordered" />
+                            <label className="label" htmlFor={streetInputId}><span className="label-text font-bold">Straße & Hausnummer</span></label>
+                            <input id={streetInputId} type="text" {...register('street')} className="input input-bordered" />
                         </div>
-                        <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">PLZ & Stadt</span></label>
+                        <div
+                            className="form-control md:col-span-2"
+                            role="group"
+                            aria-labelledby={locationGroupLabelId}
+                        >
+                            <div className="label">
+                                <span id={locationGroupLabelId} className="label-text font-bold">PLZ & Stadt</span>
+                            </div>
                             <div className="flex gap-2">
                                 <div className="w-1/3 md:w-32">
                                     <AutocompleteInput<LocationResult>
+                                        id={zipInputId}
+                                        ariaLabel="PLZ"
                                         value={watchZip || ''}
                                         onChange={val => setValue('zip', val)}
                                         endpoint="/api/search/locations?type=city&q="
@@ -127,6 +142,8 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                                 </div>
                                 <div className="flex-1">
                                     <AutocompleteInput<LocationResult>
+                                        id={cityInputId}
+                                        ariaLabel="Stadt"
                                         value={watchCity || ''}
                                         onChange={val => setValue('city', val)}
                                         endpoint="/api/search/locations?type=city&q="
@@ -143,6 +160,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                         </div>
                         <div className="form-control md:col-span-2">
                             <AutocompleteInput<LocationResult>
+                                id={countryInputId}
                                 label="Land"
                                 value={watchCountry || ''}
                                 onChange={(val) => setValue('country', val)}

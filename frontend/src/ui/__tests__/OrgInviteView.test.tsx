@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {screen, waitFor} from '@testing-library/react';
+import {fireEvent, screen, waitFor} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
 import {renderWithProviders} from '../../test-setup';
 import OrgInviteView from '../OrgInviteView';
@@ -76,9 +76,10 @@ describe('OrgInviteView invite lookup', () => {
     it('ignores an older organization lookup after the token changes', async () => {
         const oldLookup = deferredResponse();
         const newLookup = deferredResponse();
-        const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) =>
-            input.toString().includes('old-token') ? oldLookup.promise : newLookup.promise
-        );
+        const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+            void init;
+            return input.toString().includes('old-token') ? oldLookup.promise : newLookup.promise;
+        });
         vi.stubGlobal('fetch', fetchMock);
 
         mockToken.value = 'old-token';
@@ -119,5 +120,22 @@ describe('OrgInviteView invite lookup', () => {
         await waitFor(() => expect(screen.getByText('Dieser Einladungslink ist ungültig oder abgelaufen.')).toBeInTheDocument());
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).not.toHaveBeenCalledWith('/api/auth/refresh', expect.anything());
+    });
+
+    it('opens the privacy policy with opener isolation', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+            org_name: 'Sicherheitsorganisation',
+            email: 'member@example.com',
+        }), {status: 200, headers: {'Content-Type': 'application/json'}}));
+        vi.stubGlobal('fetch', fetchMock);
+
+        renderOrgInvite();
+
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Beitreten & Fortfahren'})).toBeInTheDocument());
+        fireEvent.click(screen.getByRole('button', {name: 'Beitreten & Fortfahren'}));
+
+        const privacyLink = screen.getByRole('link', {name: 'Datenschutzerklärung'});
+        expect(privacyLink).toHaveAttribute('target', '_blank');
+        expect(privacyLink).toHaveAttribute('rel', 'noopener noreferrer');
     });
 });

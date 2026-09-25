@@ -68,9 +68,30 @@ test.describe('Selection rating regressions', () => {
             });
 
             await auth.logout();
-            await page.goto(`/${galleryPath}`);
-            await expect(main.getByRole('heading', {name: galleryName})).toHaveCount(0);
+            const gallerySlug = galleryPath.split('/').pop();
+            if (!gallerySlug) throw new Error('Selection gallery path did not contain a slug');
+
+            // Direct navigation is intentional here: this is the real SPA
+            // route-guard boundary, not ordinary in-app navigation. The
+            // response wait makes the negative assertion happen after the
+            // private gallery request has actually been rejected.
+            const privateGalleryPath = `/${galleryPath.replace(/^\/+/, '')}`;
+            const anonymousRouteResponsePromise = page.waitForResponse(response => {
+                const url = new URL(response.url());
+                return url.pathname === `/api/galleries/${gallerySlug}` && response.status() === 401;
+            });
+            await page.goto(privateGalleryPath);
+            const anonymousRouteResponse = await anonymousRouteResponsePromise;
+            expect(anonymousRouteResponse.status()).toBe(401);
+            await expect(page).toHaveURL(/localhost:4321\/?$/);
+            await expect(main.getByRole('heading', {name: galleryName, exact: true})).toHaveCount(0);
+            await expect(main.getByText(galleryName, {exact: true})).toHaveCount(0);
             expect(guestRatingRequests).toBe(0);
+
+            // Keep an explicit API assertion alongside the real SPA route
+            // guard; both boundaries must remain unauthorized before redeem.
+            const anonymousGalleryResponse = await page.request.get(`/api/galleries/${gallerySlug}?page=1`);
+            expect(anonymousGalleryResponse.status()).toBe(401);
 
             // Redeem a real invite before exercising the rating UI. This keeps
             // the private-access boundary separate from the invited-guest path.
@@ -80,7 +101,9 @@ test.describe('Selection rating regressions', () => {
             await main.getByRole('button', {name: `Weiter als ${guestName}`}).click();
             await expect(main.getByRole('heading', {name: galleryName})).toBeVisible();
 
-            const photoLink = main.getByRole('link').filter({has: main.getByRole('img')}).first();
+            // PhotoSwipe exposes the photo id on the link; this functional
+            // attribute is more stable than a role-based image filter.
+            const photoLink = main.locator('a[data-photo-id]').first();
             await expect(photoLink).toBeVisible({timeout: 15000});
             await photoLink.click();
 

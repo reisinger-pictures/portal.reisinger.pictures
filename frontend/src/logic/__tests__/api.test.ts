@@ -46,6 +46,31 @@ describe('apiMutate', () => {
         expect(retryOptions.headers).toEqual(expect.objectContaining(customHeaders));
         expect(retryOptions.headers).toEqual(initialOptions.headers);
     });
+
+    it('retries a rating mutation after a 401 through the shared refresh pipeline', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(null, {status: 401}))
+            .mockResolvedValueOnce(new Response(JSON.stringify({success: true}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'}
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({success: true}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'}
+            }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(apiMutate('/api/photos/p1/rate', 'POST', {rating: 5, comment: 'Great!'}))
+            .resolves.toEqual({success: true});
+
+        expect(fetchMock.mock.calls.map(([input]) =>
+            input instanceof Request ? input.url : input.toString()
+        )).toEqual(['/api/photos/p1/rate', '/api/auth/refresh', '/api/photos/p1/rate']);
+        expect(fetchMock.mock.calls[2][1]).toEqual(expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({rating: 5, comment: 'Great!'}),
+        }));
+    });
 });
 
 describe('auth session refresh', () => {
@@ -177,6 +202,60 @@ describe('auth session refresh', () => {
         expect(fetchMock.mock.calls.map(([input]) =>
             input instanceof Request ? input.url : input.toString()
         )).toEqual(['/api/auth/me', '/api/auth/refresh']);
+    });
+
+    it('does not start a refresh for a transient /api/auth/me failure', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(new Response(
+            JSON.stringify({error: 'Auth-Dienst vorübergehend nicht verfügbar.'}),
+            {status: 503, headers: {'Content-Type': 'application/json'}}
+        ));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(fetcher('/api/auth/me')).rejects.toMatchObject({
+            status: 503,
+            message: 'Auth-Dienst vorübergehend nicht verfügbar.'
+        });
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/me');
+    });
+
+    it('keeps the original 401 when the shared refresh endpoint is transiently unavailable', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(null, {status: 401}))
+            .mockResolvedValueOnce(new Response(JSON.stringify({error: 'Refresh vorübergehend nicht verfügbar.'}), {
+                status: 503,
+                headers: {'Content-Type': 'application/json'}
+            }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(fetcher('/api/auth/me')).rejects.toMatchObject({status: 401});
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock.mock.calls.map(([input]) =>
+            input instanceof Request ? input.url : input.toString()
+        )).toEqual(['/api/auth/me', '/api/auth/refresh']);
+    });
+
+    it('preserves the status when a failed auth response contains non-object JSON', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(JSON.stringify(null), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'}
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({error: 'Token konnte nicht aktualisiert werden.'}), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'}
+            }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(fetcher('/api/auth/me')).rejects.toMatchObject({
+            status: 401,
+            message: 'HTTP Fehler 401',
+            info: {body: null},
+        });
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     it('refreshes and retries a multipart upload with the same FormData body', async () => {

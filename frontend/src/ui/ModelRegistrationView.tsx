@@ -10,6 +10,7 @@ import { useModelRegistration } from '../logic/useModelRegistration';
 import { calcAge } from '../logic/utils';
 import {
     AGE_PROOF_KEY,
+    MAX_PERSONS_PER_REGISTRATION,
     MAX_PHOTOS_PER_PERSON,
     createRegistrationSchema,
     groupWillingnessByLevel,
@@ -694,8 +695,10 @@ export function RegistrationForm({ catalog, submit, onSubmitted, onFatalError }:
         section.questions.filter(question => question.scope === 'act'),
     );
     const isMultiple = fields.length > 1;
+    const canAddPerson = fields.length < MAX_PERSONS_PER_REGISTRATION;
 
     const addPerson = () => {
+        if (!canAddPerson) return;
         append({ answers: makePersonAnswers(catalog), create_account: false, age_proof: null, photos: [] });
     };
 
@@ -769,10 +772,15 @@ export function RegistrationForm({ catalog, submit, onSubmitted, onFatalError }:
                         </label>
                     </div>
                     <div>
-                        <button type="button" className="btn btn-outline btn-sm" data-testid="add-person" onClick={addPerson}>
+                        <button type="button" className="btn btn-outline btn-sm" data-testid="add-person" onClick={addPerson} disabled={!canAddPerson} aria-disabled={!canAddPerson}>
                             <span className="iconify mdi--account-plus"></span>
                             <Trans>Weitere Person hinzufügen</Trans>
                         </button>
+                        {!canAddPerson && (
+                            <p className="mt-2 text-sm text-warning" role="status">
+                                <Trans>Maximal {MAX_PERSONS_PER_REGISTRATION} Personen pro Registrierung.</Trans>
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>

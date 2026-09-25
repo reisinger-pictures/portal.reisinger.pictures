@@ -1025,6 +1025,133 @@ describe('ClientCartView', () => {
         expect(idempotencyKeyForCall(1)).toBe(idempotencyKeyForCall(0));
     });
 
+    it('replays the same browser key for a settled-free checkout after a transient failure', async () => {
+        const user = userEvent.setup();
+        const cart = setCartWithItems();
+        vi.mocked(useCart).mockReturnValue({
+            ...cart,
+            volumeLicensing: {
+                isVolumePricing: true,
+                tierIndex: 0,
+                isMaxTier: true,
+                pricePerItemCents: 2000,
+                totalCents: 4000,
+                nextTierCount: 0,
+                nextTierLabel: '',
+                tiers: [{minQuantity: 0, priceCents: 2000}],
+                volumeSubtotalCents: 4000,
+                volumeItemPrices: {p1: 2000, p2: 2000},
+            },
+        });
+        vi.mocked(apiMutate)
+            .mockResolvedValueOnce({
+                valid: true,
+                coupon: {code: 'FREE100', type: 'percentage', value: 100},
+                discount_cents: 4000,
+            })
+            .mockRejectedValueOnce(createApiError(503, {}))
+            .mockResolvedValueOnce({success: true, invoice_number: 'INV-FREE-RETRY'});
+
+        renderCartView();
+        await user.type(screen.getByLabelText('Rabattcode'), 'FREE100');
+        await user.click(screen.getByRole('button', {name: 'Anwenden'}));
+        await screen.findByRole('button', {name: 'Kostenlos bestellen'});
+        const checkoutButton = screen.getByRole('button', {name: 'Kostenlos bestellen'});
+        await user.click(checkoutButton);
+        await user.click(checkoutButton);
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(3));
+        expect(idempotencyKeyForCall(1)).toBe(idempotencyKeyForCall(2));
+        expect(idempotencyKeyForCall(1)).toMatch(/^[0-9a-f-]{36}$/i);
+    });
+
+    it('replays the same browser key for a reactive quote after a transient failure', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useCart).mockReturnValue({
+            items: [{...mockCartItems[0], isQuote: true, price: 0}],
+            quoteToken: null,
+            setQuoteToken: vi.fn(),
+            removeFromCart: vi.fn(),
+            totalAmount: 0,
+            clearCart: vi.fn(),
+            addToCart: vi.fn(),
+            itemCount: 1,
+        });
+        vi.mocked(apiMutate)
+            .mockRejectedValueOnce(createApiError(503, {}))
+            .mockResolvedValueOnce({success: true, invoice_number: 'INV-QUOTE-RETRY'});
+
+        renderCartView();
+        const checkoutButton = screen.getByRole('button', {name: /unverbindlich anfragen/i});
+        await user.click(checkoutButton);
+        await user.click(checkoutButton);
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(2));
+        expect(idempotencyKeyForCall(0)).toBe(idempotencyKeyForCall(1));
+    });
+
+    it('replays the same browser key for invoice checkout after a transient failure', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useAuth).mockReturnValue({
+            user: {...mockUser, roles: ['client']},
+            isLoading: false,
+            isError: undefined,
+            login: vi.fn(),
+            register: vi.fn(),
+            logout: vi.fn(),
+            mutate: vi.fn(),
+        });
+        setCartWithItems();
+        vi.mocked(apiMutate)
+            .mockRejectedValueOnce(createApiError(503, {}))
+            .mockResolvedValueOnce({success: true, invoice_number: 'INV-INVOICE-RETRY'});
+
+        renderCartView();
+        await user.click(screen.getByRole('radio', {name: 'Kauf auf Rechnung'}));
+        const checkoutButton = screen.getByRole('button', {name: /zahlungspflichtig bestellen/i});
+        await user.click(checkoutButton);
+        await user.click(checkoutButton);
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(2));
+        expect(idempotencyKeyForCall(0)).toBe(idempotencyKeyForCall(1));
+    });
+
+    it('generates a new recovery key when an invoice checkout loses browser storage', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useAuth).mockReturnValue({
+            user: {...mockUser, roles: ['client']},
+            isLoading: false,
+            isError: undefined,
+            login: vi.fn(),
+            register: vi.fn(),
+            logout: vi.fn(),
+            mutate: vi.fn(),
+        });
+        setCartWithItems();
+        vi.mocked(apiMutate)
+            .mockRejectedValueOnce(createApiError(503, {}))
+            .mockResolvedValueOnce({success: true, invoice_number: 'INV-NO-KEY'});
+
+        renderCartView();
+        await user.click(screen.getByRole('radio', {name: 'Kauf auf Rechnung'}));
+        const checkoutButton = screen.getByRole('button', {name: /zahlungspflichtig bestellen/i});
+        await user.click(checkoutButton);
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(1));
+        const firstKey = idempotencyKeyForCall(0);
+
+        // Simulate a browser/session-storage loss between retries. The
+        // non-immediate backend contract has no fingerprint fallback, so the
+        // client must not pretend that the lost key can replay the old order.
+        sessionStorage.removeItem(checkoutSessionStorageKey(mockUser.id));
+        await user.click(checkoutButton);
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(2));
+        const secondKey = idempotencyKeyForCall(1);
+        expect(firstKey).toMatch(/^[0-9a-f-]{36}$/i);
+        expect(secondKey).toMatch(/^[0-9a-f-]{36}$/i);
+        expect(secondKey).not.toBe(firstKey);
+    });
+
     it('recovers the same idempotency key after a CartView remount', async () => {
         const user = userEvent.setup();
         setCartWithItems();

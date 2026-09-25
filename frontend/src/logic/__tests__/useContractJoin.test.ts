@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchJoinContract, submitJoin } from '../useContractJoin';
+import { fetchJoinContract, submitJoin, normalizeSignContractResponse, type SignContractApiResponse } from '../useContractJoin';
 
 vi.mock('../../api', () => ({
     fetcher: vi.fn(),
@@ -45,6 +45,30 @@ describe('fetchJoinContract', () => {
 
         await fetchJoinContract('another-token');
         expect(fetcher).toHaveBeenCalledWith('/api/contracts/join/another-token');
+    });
+});
+
+describe('sign contract response normalization', () => {
+    it('fills the explicit legacy response boundary with the ordered authoritative calculation', () => {
+        const legacyResponse: SignContractApiResponse = {
+            contract: {
+                id: 'legacy',
+                terms_html: '',
+                items: [{ type: 'item', description: 'Leistung', notes: '', qty: 2, price: 5000 }],
+                discounts: [
+                    { type: 'discount_percent', description: '10%', notes: '', price: 1000 },
+                    { type: 'discount_fixed', description: 'Bonus', notes: '', price: 500 },
+                ],
+                billing_details: null,
+                available_roles: [],
+                content_version: 0,
+            },
+            signer: { id: 'signer', name: 'Signer', email: 'signer@example.com', roles: [], status: 'joined' },
+        };
+
+        const result = normalizeSignContractResponse(legacyResponse);
+
+        expect(result.contract.total).toBe(8500);
     });
 });
 

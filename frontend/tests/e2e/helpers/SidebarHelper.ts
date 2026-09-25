@@ -10,6 +10,10 @@ export class SidebarHelper {
         const menuBtn = this.page.getByRole('button', { name: 'Menü öffnen' }).first();
         const backdrop = this.page.locator('div.fixed.inset-0').first();
 
+        // After a reload the app loader can briefly replace the dashboard. Wait
+        // for its mobile menu before deciding that no drawer click is needed.
+        await expect(menuBtn).toBeAttached({ timeout: 10000 });
+
         if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
             await expect(async () => {
                 if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
@@ -22,11 +26,14 @@ export class SidebarHelper {
         const link = this.page.getByRole('complementary')
             .getByRole('link', { name: menuText, exact: false })
             .first();
-        // 10s statt 5s: unter CI-Last kann das Sidebar-Rendering den 5s-Timeout
-        // überschreiten (beobachtet 2026-08-23, no-b2b-label.spec.ts).
-        await link.waitFor({ state: 'visible', timeout: 10000 });
-        await link.scrollIntoViewIfNeeded();
+        // click() performs its own actionability and scrolling checks.
+        await expect(link).toBeVisible({ timeout: 10000 });
         await link.click();
+    }
+
+    async navigateToClientGalleries() {
+        // Client users reach public galleries through discovery, not the staff-only gallery manager.
+        await this.navigateTo('Suche & Entdecken');
     }
 
     async openNewGalleryModal() {

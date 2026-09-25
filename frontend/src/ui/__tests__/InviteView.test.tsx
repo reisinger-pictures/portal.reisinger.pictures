@@ -128,6 +128,11 @@ describe('InviteView invite lookup', () => {
         const view = renderInvite();
         await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(1));
         await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
+        expect(mockMutate).toHaveBeenCalledWith('/api/auth/me', undefined, {revalidate: true});
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(
+            '/galleries/registered-gallery',
+            {replace: true},
+        ));
 
         // SWR revalidation returns a fresh object for the same identity. The
         // primitive identity dependencies must not cancel a successful redeem.
@@ -138,19 +143,17 @@ describe('InviteView invite lookup', () => {
             </MemoryRouter>,
         );
         resolveMutate();
-
-        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(
-            '/galleries/registered-gallery',
-            {replace: true},
-        ));
     });
 
     it('ignores an older lookup after the invite token changes', async () => {
         const oldLookup = deferredResponse();
         const newLookup = deferredResponse();
-        const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) =>
-            input.toString().includes('old-token') ? oldLookup.promise : newLookup.promise
-        );
+        const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.signal?.aborted) {
+                return Promise.reject(init.signal.reason ?? new DOMException('Aborted', 'AbortError'));
+            }
+            return input.toString().includes('old-token') ? oldLookup.promise : newLookup.promise;
+        });
         vi.stubGlobal('fetch', fetchMock);
 
         mockToken.value = 'old-token';

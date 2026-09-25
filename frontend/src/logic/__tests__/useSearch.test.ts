@@ -35,6 +35,21 @@ describe('useSearch', () => {
         expect(result.current.isLoading).toBe(false);
     });
 
+    it('does not expose stale data when the query is skipped', () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: mockResults,
+            error: new Error('stale'),
+            isLoading: true,
+            mutate: vi.fn(),
+        } as never);
+
+        const { result } = renderHook(() => useSearch('', false, true));
+
+        expect(result.current.results).toBeUndefined();
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.isError).toBeUndefined();
+    });
+
     it('returns results when query is provided', () => {
         vi.mocked(useSWR).mockReturnValue({
             data: mockResults,

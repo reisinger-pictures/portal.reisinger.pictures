@@ -12,7 +12,7 @@ import KanbanBoard, { KanbanColumnDef } from '../components/KanbanBoard';
 import ErrorMessage from '../components/ErrorMessage';
 import ProjectModal from './components/ProjectModal';
 
-const columns: KanbanColumnDef[] = [
+const createProjectColumns = (): KanbanColumnDef[] => [
     { status: 'anfrage', label: t`Anfrage` },
     { status: 'angebot', label: t`Angebot` },
     { status: 'beauftragt', label: t`Beauftragt` },
@@ -42,6 +42,7 @@ export default function ManagementProjectsBoard({ embedded = false }: Management
     const isDesktop = useIsDesktop();
     const disallowDrag = !isSuperAdmin || !isDesktop;
     const { showToast, confirm } = useUI();
+    const columns = createProjectColumns();
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Project | null>(null);

@@ -30,7 +30,7 @@ vi.mock('../components/ErrorMessage', () => ({
 const firstContract: JoinContractResponse = {
     contract_id: 'contract-1',
     status: 'open',
-    available_roles: ['Model'],
+    available_roles: ['Model', 'Fotograf'],
     allow_multiple_roles: false,
     terms_html: '<p>Erster Vertrag</p>',
 };
@@ -38,7 +38,7 @@ const firstContract: JoinContractResponse = {
 const secondContract: JoinContractResponse = {
     contract_id: 'contract-2',
     status: 'open',
-    available_roles: ['Fotograf'],
+    available_roles: ['Model', 'Fotograf'],
     allow_multiple_roles: false,
     terms_html: '<p>Zweiter Vertrag</p>',
 };
@@ -59,7 +59,7 @@ describe('ContractJoinView token state', () => {
         routerState.navigate.mockReset();
     });
 
-    it('resets identity, role, consent, error and data state for a new join token', async () => {
+    it('resets identity, role selection, consent, error and data state when a reusable join token changes', async () => {
         const secondTokenFetch = createDeferred<JoinContractResponse>();
         vi.mocked(fetchJoinContract).mockImplementation((token) => {
             return token === 'join-token-1'
@@ -74,6 +74,7 @@ describe('ContractJoinView token state', () => {
         fireEvent.change(screen.getByPlaceholderText('z.B. Maria Muster'), { target: { value: 'First User' } });
         fireEvent.change(screen.getByPlaceholderText('maria@beispiel.de'), { target: { value: 'first@example.com' } });
         fireEvent.click(screen.getByRole('button', { name: 'Model' }));
+        expect(screen.getByRole('button', { name: 'Model' })).toHaveAttribute('aria-pressed', 'true');
         fireEvent.click(screen.getByRole('checkbox'));
         fireEvent.click(screen.getByRole('button', { name: 'Vertraulich ansehen & unterschreiben' }));
 
@@ -93,6 +94,8 @@ describe('ContractJoinView token state', () => {
         expect(screen.getByPlaceholderText('z.B. Maria Muster')).toHaveValue('');
         expect(screen.getByPlaceholderText('maria@beispiel.de')).toHaveValue('');
         expect(screen.getByRole('checkbox')).not.toBeChecked();
+        expect(screen.getByRole('button', { name: 'Model' })).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', { name: 'Fotograf' })).toHaveAttribute('aria-pressed', 'false');
         expect(screen.getByRole('button', { name: 'Vertraulich ansehen & unterschreiben' })).toBeDisabled();
         expect(screen.queryByText('Token 1 join failed')).not.toBeInTheDocument();
     });

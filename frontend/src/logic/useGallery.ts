@@ -83,7 +83,12 @@ export function useGallery(slug: string | undefined) {
             await apiMutate('/api/photos/' + photoId + '/rate', 'POST', {rating, comment});
         } catch (error) {
             if (oldData) {
-                await mutate(oldData, {revalidate: false});
+                try {
+                    await mutate(oldData, {revalidate: false});
+                } catch {
+                    // The API error below is the actionable failure. A local
+                    // cache rollback failure must not replace it for callers.
+                }
             }
 
             if (hasErrorStatus(error, 401)) {

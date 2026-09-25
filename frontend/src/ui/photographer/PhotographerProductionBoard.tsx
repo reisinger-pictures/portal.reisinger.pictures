@@ -9,7 +9,7 @@ import KanbanBoard, { KanbanColumnDef } from '../components/KanbanBoard';
 import ErrorMessage from '../components/ErrorMessage';
 import PhotoJobModal from './components/PhotoJobModal';
 
-const columns: KanbanColumnDef[] = [
+const createProductionColumns = (): KanbanColumnDef[] => [
     { status: 'importiert', label: t`Importiert` },
     { status: 'culling', label: t`Culling` },
     { status: 'bearbeitung', label: t`Bearbeitung` },
@@ -27,6 +27,7 @@ export default function PhotographerProductionBoard({ embedded = false }: Photog
     const isDesktop = useIsDesktop();
     const disallowDrag = !isSuperAdmin || !isDesktop;
     const { showToast, confirm } = useUI();
+    const columns = createProductionColumns();
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<PhotoJob | null>(null);

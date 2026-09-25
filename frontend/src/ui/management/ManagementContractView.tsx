@@ -16,22 +16,35 @@ import {
     openContract,
     closeContract,
     fetchInstances,
+    contractDiscountToEditor,
+    contractItemToEditor,
+    normalizeManagementContract,
     Contract,
     BillingDetails,
 } from '../../logic/useContractManagement';
+import {
+    calculateEditorContractTotal,
+    calculateEditorSubtotal,
+    serializeContractSnapshot,
+} from '../../logic/contractPricing';
 import type {InvoiceItem, InvoiceDiscount} from '../../api';
-
-function toInvoiceItem(i: Contract['items'][number]): InvoiceItem {
-    return {type: i.type, description: i.description, notes: i.notes, qty: i.qty, price: i.price, row_total: i.row_total};
-}
-
-function toInvoiceDiscount(i: Contract['discounts'][number]): InvoiceDiscount {
-    return {type: i.type, description: i.description, notes: i.notes, price: i.price, row_total: i.row_total};
-}
 
 const emptyBilling: BillingDetails = {
     name: '', company: '', street: '', zip: '', city: '', country: '', email: '', uid: '', birthdate: '',
 };
+
+function getEditorTotals(items: InvoiceItem[], discounts: InvoiceDiscount[]): {subtotal: number; total: number} {
+    try {
+        return {
+            subtotal: calculateEditorSubtotal(items) / 100,
+            total: calculateEditorContractTotal(items, discounts) / 100,
+        };
+    } catch {
+        // The input controls intentionally allow transient zero/NaN states.
+        // Saving still uses the strict serializer and surfaces its error.
+        return {subtotal: 0, total: 0};
+    }
+}
 
 export default function ManagementContractView() {
     const {isSuperAdmin} = usePermissions();
@@ -70,22 +83,24 @@ export default function ManagementContractView() {
     };
 
     const loadContract = (contract: Contract) => {
-        setItems(contract.items.length > 0 ? contract.items.map(toInvoiceItem) : [{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
-        setDiscounts(contract.discounts.map(toInvoiceDiscount));
-        setTermsHtml(contract.terms_html || '');
-        setAvailableRoles(contract.available_roles || []);
-        setAllowMultipleRoles(contract.allow_multiple_roles_per_signer);
-        setBillingDetails(contract.billing_details ?? {...emptyBilling});
-        setClosesAt(contract.closes_at || '');
-        setContractType(contract.type || 'contract');
-        setExpiresAt(contract.expires_at || '');
+        const normalized = normalizeManagementContract(contract);
+        setItems(normalized.items.length > 0 ? normalized.items.map(contractItemToEditor) : [{type: 'item', description: '', notes: '', qty: 1, price: 0}]);
+        setDiscounts(normalized.discounts.map(contractDiscountToEditor));
+        setTermsHtml(normalized.terms_html || '');
+        setAvailableRoles(normalized.available_roles || []);
+        setAllowMultipleRoles(normalized.allow_multiple_roles_per_signer);
+        setBillingDetails(normalized.billing_details ?? {...emptyBilling});
+        setClosesAt(normalized.closes_at || '');
+        setContractType(normalized.type || 'contract');
+        setExpiresAt(normalized.expires_at || '');
         setJoinLink(null);
     };
 
     const instancesReqIdRef = useRef(0);
 
     const handleSelectContract = (contract: Contract) => {
-        setEditingContract(contract);
+        const normalized = normalizeManagementContract(contract);
+        setEditingContract(normalized);
         setIsNew(false);
         loadContract(contract);
         if (contract.type === 'template') {
@@ -109,9 +124,10 @@ export default function ManagementContractView() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
+            const snapshot = serializeContractSnapshot(items, discounts);
             const payload = {
-                items: items.map(i => ({type: i.type as Contract['items'][number]['type'], description: i.description, notes: i.notes, qty: i.qty, price: i.price})),
-                discounts: discounts.map(d => ({type: d.type as Contract['discounts'][number]['type'], description: d.description, notes: d.notes, qty: 1, price: d.price})),
+                items: snapshot.items,
+                discounts: snapshot.discounts,
                 terms_html: termsHtml,
                 available_roles: availableRoles,
                 allow_multiple_roles_per_signer: allowMultipleRoles,
@@ -257,11 +273,7 @@ export default function ManagementContractView() {
         setBillingDetails(prev => ({...prev, [field]: value}));
     };
 
-    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    const total = discounts.reduce(
-        (t, d) => (d.type === 'discount_percent' ? t * (1 - d.price / 100) : t - d.price),
-        subtotal,
-    );
+    const {subtotal, total} = getEditorTotals(items, discounts);
 
     const statusBadge = (s: Contract['status']) => {
         const map: Record<string, string> = {
@@ -512,6 +524,7 @@ export default function ManagementContractView() {
                     {/* Items / Discounts (reuse existing invoice components) */}
                     <InvoiceItemsTable
                         items={items}
+                        quantityMode="contract"
                         onItemChange={handleItemChange}
                         onAddItem={addItem}
                         onRemoveItem={removeItem}

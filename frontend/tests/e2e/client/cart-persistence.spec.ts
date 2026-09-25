@@ -104,7 +104,10 @@ test.describe('Cart Persistence', () => {
         await main.getByLabel('Vor- & Nachname').fill('Reload Quote Buyer');
         await main.getByLabel('Straße & Hausnummer').fill('Reloadstraße 1');
         await main.getByLabel('PLZ').fill('1010');
-        await main.getByLabel('Ort').fill('Wien');
+        // The bare label also matches the withdrawal consent checkbox.
+        const cityInput = main.getByRole('textbox', {name: 'Ort *', exact: true});
+        await expect(cityInput).toHaveCount(1);
+        await cityInput.fill('Wien');
         await main.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i}).check();
         await main.getByRole('checkbox', {name: /widerrufsrecht/i}).check();
 

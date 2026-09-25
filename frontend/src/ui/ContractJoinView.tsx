@@ -130,6 +130,7 @@ function ContractJoinTokenView({ token }: { token: string }) {
                                     {contract?.available_roles.map(role => (
                                         <button type="button" key={role}
                                             onClick={() => handleRoleToggle(role)}
+                                            aria-pressed={selectedRoles.includes(role)}
                                             className={`btn btn-sm ${selectedRoles.includes(role) ? 'btn-primary' : 'btn-outline'}`}>
                                             {role}
                                             {selectedRoles.includes(role) && <span className="iconify mdi--check ml-1"></span>}

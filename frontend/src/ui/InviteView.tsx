@@ -114,7 +114,7 @@ export default function InviteView() {
             }
 
             // SWR anweisen, die User-Session frisch zu laden
-            await mutate(() => true, undefined, { revalidate: true });
+            await mutate('/api/auth/me', undefined, { revalidate: true });
             
             navigate('/' + data.full_path, {replace: true});
         } catch (err: unknown) {
@@ -150,9 +150,11 @@ export default function InviteView() {
                 if (cancelled || controller.signal.aborted) return;
 
                 if (resData.full_path) {
-                    await mutate(() => true, undefined, { revalidate: true });
-                    if (cancelled || controller.signal.aborted) return;
+                    // The redeem response already installed the new auth cookies.
+                    // Navigate first so an unrelated, slow SWR revalidation cannot
+                    // leave the invite route mounted after a successful redemption.
                     navigate('/' + resData.full_path, {replace: true});
+                    await mutate('/api/auth/me', undefined, {revalidate: true});
                 } else {
                     setAutoRedeeming(false);
                     autoRedeemStartedRef.current = false;

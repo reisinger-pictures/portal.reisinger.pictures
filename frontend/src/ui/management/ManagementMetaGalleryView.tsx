@@ -5,11 +5,12 @@ import ErrorMessage from '../components/ErrorMessage';
 import {useRef, useState} from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams, useSearchParams} from 'react-router-dom';
-import {flattenGroups} from '../../logic/utils';
+import {flattenGroups, formatMoney} from '../../logic/utils';
 import {useProtectedGalleries} from '../../logic/useGalleries';
 import {usePermissions} from '../../logic/usePermissions';
 import {useMetaGallery} from '../../logic/useMetaGallery';
-import {useLicensingMode} from '../../logic/useLicensingMode';
+import {useGalleryLicensing} from '../../logic/useVolumeLicensing';
+import {findGalleryGroup, galleryPricingSourcesForMetaGallery} from '../../logic/metaGalleryPricing';
 import PageLayout from '../components/PageLayout';
 import GalleryModals from '../components/GalleryModals';
 import GalleryGroupCouponsTab from './components/GalleryGroupCouponsTab';
@@ -23,6 +24,7 @@ export default function ManagementMetaGalleryView() {
     const {
         group,
         photos,
+        galleryPricingSources: serverGalleryPricingSources,
         downloadsCount,
         isLoading,
         isError,
@@ -31,11 +33,16 @@ export default function ManagementMetaGalleryView() {
         isReachingEnd,
         mutate
     } = useMetaGallery(id);
-    // A meta gallery aggregates photos from child galleries. Use the first
-    // displayed photo's actual gallery ID; the group ID is not a Gallery UUID
-    // and must not be sent to the gallery-specific license-terms endpoint.
-    const licensingMode = useLicensingMode(photos[0]?.gallery_id);
-    const isVolumeLicensing = licensingMode === 'volume_licensing';
+    const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
+    const pricingGroup = findGalleryGroup(safeGroups, id) ?? group;
+    const pricingSources = galleryPricingSourcesForMetaGallery(
+        pricingGroup,
+        photos,
+        serverGalleryPricingSources,
+    );
+    const galleryLicensing = useGalleryLicensing(pricingSources);
+    const isLicensingResolved = !galleryLicensing.isLoading;
+    const isVolumeLicensing = isLicensingResolved && galleryLicensing.isVolumePricing;
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab: 'bilder' | 'coupons' =
         isVolumeLicensing && searchParams.get('tab') === 'coupons' ? 'coupons' : 'bilder';
@@ -51,7 +58,6 @@ export default function ManagementMetaGalleryView() {
         });
     };
     const [isGroupEditModalOpen, setGroupEditModalOpen] = useState(false);
-    const safeGroups = Array.isArray(tree?.groups) ? tree.groups : [];
     const galleryRef = useRef<HTMLDivElement>(null);
 
     usePhotoSwipe({ galleryRef, trigger: photos.length });
@@ -64,6 +70,9 @@ export default function ManagementMetaGalleryView() {
     </PageLayout>;
 
     const totalDownloads = downloadsCount || 0;
+    const galleryNamesById = new Map(
+        pricingSources.map(source => [source.galleryId, source.galleryName ?? source.galleryId]),
+    );
     return (
         <PageLayout>
             <div className="container mx-auto p-4 md:p-8">
@@ -83,9 +92,64 @@ export default function ManagementMetaGalleryView() {
                             möglich.</Trans></p>
                     </div>
                     <div className="flex items-center">
-                        <span className="badge badge-ghost font-normal"><Trans>{totalDownloads} Downloads gesamt</Trans></span>
+                        <span className="badge badge-ghost font-normal">
+                            {t`${totalDownloads} Downloads gesamt`}
+                        </span>
                     </div>
                 </div>
+
+                {isVolumeLicensing && galleryLicensing.groups.length > 0 && (
+                    <section
+                        className="mb-6 rounded-box border border-primary/20 bg-primary/5 p-4"
+                        aria-labelledby="meta-gallery-pricing-heading"
+                        data-testid="meta-gallery-licensing-groups"
+                    >
+                        <h2 id="meta-gallery-pricing-heading" className="font-bold text-lg mb-3"><Trans>Preise nach Untergalerie</Trans></h2>
+                        <div className="space-y-2">
+                            {galleryLicensing.groups.map(group => {
+                                const galleryNames = group.galleryIds
+                                    .map(galleryId => galleryNamesById.get(galleryId) ?? galleryId)
+                                    .join(', ');
+                                const pricePerItem = formatMoney(group.pricePerItemCents ?? 0);
+                                const photoCount = group.photoCount;
+                                const tierIndex = group.tierIndex;
+                                const priceLabel = t`${pricePerItem} pro Bild (Tier ${tierIndex})`;
+                                return (
+                                    <article
+                                        key={group.key}
+                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-box bg-base-100 p-3"
+                                        aria-label={t`Preisgruppe ${galleryNames}`}
+                                        data-testid={`meta-gallery-pricing-group-${group.presetId}`}
+                                        data-gallery-ids={group.galleryIds.join(',')}
+                                        data-gallery-group-ids={group.galleryGroupIds.join(',')}
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="font-semibold text-sm truncate">{galleryNames}</div>
+                                            {group.presetName && <div className="text-xs opacity-70">{group.presetName}</div>}
+                                        </div>
+                                        {group.isVolumePricing ? (
+                                            <div className="flex items-center gap-3 text-sm">
+                                                <span>{t`${photoCount} Bilder`}</span>
+                                                <span>{priceLabel}</span>
+                                                <span className="font-mono font-bold" data-testid={`meta-gallery-group-total-${group.presetId}`}>
+                                                    {formatMoney(group.totalCents ?? 0)}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="badge badge-ghost"><Trans>Scope-Lizenz</Trans></span>
+                                        )}
+                                    </article>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between border-t border-primary/20 pt-3 font-semibold">
+                            <span><Trans>Volumen-Summe</Trans></span>
+                            <span className="font-mono" data-testid="meta-gallery-volume-subtotal">
+                                {formatMoney(galleryLicensing.volumeSubtotalCents)}
+                            </span>
+                        </div>
+                    </section>
+                )}
 
                 {isVolumeLicensing && (
                     <div role="tablist" className="tabs tabs-boxed w-full md:w-auto bg-base-200 border border-base-300 p-1 flex-wrap shadow-sm mb-6">

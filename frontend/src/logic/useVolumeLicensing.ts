@@ -12,6 +12,9 @@ import {
     CartItem,
     CartLicensingMode,
     CartPricingGroup,
+    GalleryLicensingResult,
+    GalleryPricingGroup,
+    GalleryPricingSource,
     VolumeLicensingResult,
     VolumeTierConfig,
 } from './CartContext';
@@ -77,26 +80,31 @@ export function calculateVolumeTier(
     count: number,
     config: VolumePricingConfig = DEFAULT_VOLUME_PRICING,
 ): VolumeTierResult {
+    const usableTiers = config.tiers.length > 0 ? config.tiers : DEFAULT_VOLUME_PRICING.tiers;
     let qualifyingIndex = 0;
-    for (let i = 0; i < config.tiers.length; i++) {
-        if (count >= config.tiers[i].minQuantity) {
+    for (let i = 0; i < usableTiers.length; i++) {
+        if (count >= usableTiers[i].minQuantity) {
             qualifyingIndex = i;
         } else {
             break;
         }
     }
 
-    const tier = config.tiers[qualifyingIndex];
-    const price = (tier.priceCents / 100).toFixed(0);
+    const tier = usableTiers[qualifyingIndex];
+    const basePriceCents = Math.max(0, usableTiers[0].priceCents);
+    // Checkout clamps legacy/non-monotonic tier data to the base price. Mirror
+    // that rule here so previews and totals can never exceed server pricing.
+    const priceCents = Math.max(0, Math.min(basePriceCents, tier.priceCents));
+    const price = (priceCents / 100).toFixed(0);
     const minQuantity = tier.minQuantity;
     const label = minQuantity === 0
         ? t`${price}€ pro Bild`
         : t`Ab ${minQuantity} Bildern ${price}€ pro Bild`;
 
     return {
-        priceCents: tier.priceCents,
+        priceCents,
         tierIndex: qualifyingIndex,
-        isMaxTier: qualifyingIndex === config.tiers.length - 1,
+        isMaxTier: qualifyingIndex === usableTiers.length - 1,
         label,
     };
 }
@@ -120,14 +128,19 @@ export function calculateVolumeTotal(
     return count * priceCents;
 }
 
-/** Map the backend `volume_pricing.tiers` payload into the config shape. */
+/** Map backend tiers into the config shape and mirror checkout's legacy clamp. */
 export function tiersFromApi(tiers?: Array<{min_quantity: number; price_cents: number}>): VolumeTierConfig[] {
     if (!tiers || tiers.length === 0) {
         return DEFAULT_VOLUME_PRICING.tiers;
     }
-    return [...tiers]
+    const mapped = [...tiers]
         .sort((a, b) => a.min_quantity - b.min_quantity)
-        .map(t => ({minQuantity: t.min_quantity, priceCents: t.price_cents}));
+        .map(tier => ({minQuantity: tier.min_quantity, priceCents: tier.price_cents}));
+    const basePriceCents = Math.max(0, mapped[0].priceCents);
+    return mapped.map(tier => ({
+        ...tier,
+        priceCents: Math.max(0, Math.min(basePriceCents, tier.priceCents)),
+    }));
 }
 
 /**
@@ -250,6 +263,109 @@ export function sumPricingGroupTotals(groups: CartPricingGroup[]): number {
     return groups.reduce((sum, group) => sum + group.totalCents, 0);
 }
 
+const isValidGalleryPricingSource = (source: GalleryPricingSource): boolean => (
+    typeof source.galleryId === 'string'
+    && source.galleryId.length > 0
+    && Number.isSafeInteger(source.photoCount)
+    && source.photoCount >= 0
+);
+
+/**
+ * Group meta-gallery child galleries by the same effective server key used by
+ * checkout. A group may contain more than one child gallery when they resolve
+ * to the same mode and preset; it must not be split merely because the
+ * galleries belong to different parent groups.
+ */
+export function groupGallerySourcesByPricing(
+    sources: GalleryPricingSource[],
+    resolveDescriptor: (source: GalleryPricingSource) => EffectivePricingDescriptor,
+): GalleryPricingGroup[] {
+    const groups = new Map<string, {descriptor: EffectivePricingDescriptor; sources: GalleryPricingSource[]}>();
+    const seenGalleryIds = new Set<string>();
+
+    for (const source of sources) {
+        // Keep zero-count children: an empty volume gallery must still expose
+        // its effective mode/preset to the meta-gallery management UI.
+        if (
+            !isValidGalleryPricingSource(source)
+            || seenGalleryIds.has(source.galleryId)
+        ) {
+            continue;
+        }
+        seenGalleryIds.add(source.galleryId);
+
+        const descriptor = resolveDescriptor(source);
+        const key = groupKeyForDescriptor(descriptor);
+        const current = groups.get(key);
+        if (current) {
+            current.sources.push(source);
+        } else {
+            groups.set(key, {descriptor, sources: [source]});
+        }
+    }
+
+    return Array.from(groups.entries()).map(([key, group]) => {
+        const galleryIds = Array.from(new Set(group.sources.map(source => source.galleryId)));
+        const galleryGroupIds = Array.from(new Set(
+            group.sources
+                .map(source => source.galleryGroupId)
+                .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ));
+        const photoCount = group.sources.reduce((sum, source) => sum + source.photoCount, 0);
+
+        if (group.descriptor.licensingMode === 'scope_licensing') {
+            return {
+                key,
+                licensingMode: group.descriptor.licensingMode,
+                presetId: group.descriptor.presetId,
+                presetName: group.descriptor.presetName,
+                galleryIds,
+                galleryGroupIds,
+                photoCount,
+                totalCents: null,
+                pricePerItemCents: null,
+                tiers: group.descriptor.config.tiers,
+                tierIndex: 0,
+                isMaxTier: false,
+                nextTierCount: 0,
+                nextTierLabel: '',
+                isVolumePricing: false,
+            };
+        }
+
+        const tier = calculateVolumeTier(photoCount, group.descriptor.config);
+        let nextTierCount = 0;
+        let nextTierLabel = '';
+        if (!tier.isMaxTier) {
+            const nextTier = group.descriptor.config.tiers[tier.tierIndex + 1];
+            nextTierCount = Math.max(0, nextTier.minQuantity - photoCount);
+            nextTierLabel = calculateVolumeTier(nextTier.minQuantity, group.descriptor.config).label;
+        }
+
+        return {
+            key,
+            licensingMode: group.descriptor.licensingMode,
+            presetId: group.descriptor.presetId,
+            presetName: group.descriptor.presetName,
+            galleryIds,
+            galleryGroupIds,
+            photoCount,
+            totalCents: photoCount * tier.priceCents,
+            pricePerItemCents: tier.priceCents,
+            tiers: group.descriptor.config.tiers,
+            tierIndex: tier.tierIndex,
+            isMaxTier: tier.isMaxTier,
+            nextTierCount,
+            nextTierLabel,
+            isVolumePricing: true,
+        };
+    });
+}
+
+export function sumGalleryPricingGroupTotals(groups: GalleryPricingGroup[]): number {
+    return groups.reduce((sum, group) => sum + (group.totalCents ?? 0), 0);
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -264,10 +380,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
     typeof value === 'object' && value !== null && !Array.isArray(value)
 );
 
-const asTermsMap = (value: unknown): Record<string, EffectiveLicenseTerms> | null => {
+const asTermsMap = (value: unknown, expectedGalleryIds: string[]): Record<string, EffectiveLicenseTerms> | null => {
     if (!isRecord(value)) return null;
-    const entries = Object.entries(value);
-    if (!entries.every(([, entry]) => isRecord(entry))) return null;
+    if (!expectedGalleryIds.every(id => isRecord(value[id]))) return null;
     return value as Record<string, EffectiveLicenseTerms>;
 };
 
@@ -308,6 +423,80 @@ const fetchCartLicenseTerms = async (
     return Object.fromEntries(entries);
 };
 
+interface ResolvedGalleryLicenseTerms {
+    globalTerms: EffectiveLicenseTerms | undefined;
+    galleryTermsMap: Record<string, EffectiveLicenseTerms> | null;
+    singleTerms: EffectiveLicenseTerms | null;
+    isLoading: boolean;
+    descriptorForGallery: (galleryId?: string) => EffectivePricingDescriptor;
+}
+
+/**
+ * Resolve all requested child-gallery terms through one stable SWR key. A
+ * single gallery keeps the ordinary endpoint response; a mixed set uses one
+ * composite fetcher which performs the per-gallery requests concurrently.
+ */
+function useResolvedGalleryLicenseTerms(galleryIds: string[]): ResolvedGalleryLicenseTerms {
+    const {terms, isLoading: globalTermsLoading} = useLicenseTerms();
+    const uniqueGalleryIds = Array.from(new Set(
+        galleryIds.filter(id => typeof id === 'string' && id.length > 0),
+    )).sort();
+    const usesCompositeTerms = uniqueGalleryIds.length > 1;
+    const termsKey = usesCompositeTerms
+        ? cartTermsKey(uniqueGalleryIds)
+        : uniqueGalleryIds.length === 1
+            ? `/api/settings/license-terms?gallery_id=${encodeURIComponent(uniqueGalleryIds[0])}`
+            : null;
+    const {data, isLoading} = useSWR<
+        EffectiveLicenseTerms | Record<string, EffectiveLicenseTerms>
+    >(termsKey, fetchCartLicenseTerms, {revalidateOnFocus: false});
+
+    const globalTerms = terms as LicenseTerms | undefined;
+    const galleryTermsMap = usesCompositeTerms
+        ? asTermsMap(data, uniqueGalleryIds)
+        : null;
+    // A composite response is either a complete per-gallery map or no child
+    // terms at all. Never reinterpret a partial map as a global terms object.
+    const singleTerms = usesCompositeTerms ? null : asTerms(data);
+
+    return {
+        globalTerms,
+        galleryTermsMap,
+        singleTerms,
+        isLoading: Boolean(globalTermsLoading || isLoading),
+        descriptorForGallery: (galleryId?: string) => descriptorFromTerms(
+            (galleryId ? galleryTermsMap?.[galleryId] : undefined)
+            ?? singleTerms
+            ?? globalTerms,
+        ),
+    };
+}
+
+/**
+ * Resolve a meta-gallery's child galleries independently. The returned groups
+ * are keyed by effective mode/preset, matching the server's grouping rule;
+ * gallery/group IDs remain available for a transparent UI breakdown.
+ */
+export function useGalleryLicensing(sources: GalleryPricingSource[]): GalleryLicensingResult {
+    const validSources = sources.filter(isValidGalleryPricingSource);
+    const galleryIds = validSources.map(source => source.galleryId);
+    const resolvedTerms = useResolvedGalleryLicenseTerms(galleryIds);
+    const groups = groupGallerySourcesByPricing(
+        validSources,
+        source => resolvedTerms.descriptorForGallery(source.galleryId),
+    );
+    const volumeSubtotalCents = sumGalleryPricingGroupTotals(
+        groups.filter(group => group.isVolumePricing),
+    );
+
+    return {
+        isVolumePricing: groups.some(group => group.isVolumePricing),
+        groups,
+        volumeSubtotalCents,
+        isLoading: resolvedTerms.isLoading,
+    };
+}
+
 /**
  * React hook that derives volume licensing pricing from cart items.
  *
@@ -318,50 +507,48 @@ const fetchCartLicenseTerms = async (
  * group the resulting server-equivalent pricing groups.
  */
 export function useVolumeLicensing(items: CartItem[], galleryId?: string): VolumeLicensingResult {
-    const {terms} = useLicenseTerms();
-    const cartGalleryIds = Array.from(new Set(
-        items
-            .map(item => item.galleryId)
-            .filter((id): id is string => typeof id === 'string' && id.length > 0),
-    ));
-    const usesCompositeTerms = !galleryId && cartGalleryIds.length > 1;
-    const singleGalleryId = galleryId ?? (cartGalleryIds.length === 1 ? cartGalleryIds[0] : undefined);
-    const termsKey = usesCompositeTerms
-        ? cartTermsKey(cartGalleryIds)
-        : singleGalleryId
-            ? `/api/settings/license-terms?gallery_id=${encodeURIComponent(singleGalleryId)}`
-            : null;
-    const {data: termsData} = useSWR<
-        EffectiveLicenseTerms | Record<string, EffectiveLicenseTerms>
-    >(termsKey, fetchCartLicenseTerms, {revalidateOnFocus: false});
+    const cartGalleryIds = items
+        .map(item => item.galleryId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    // An explicit displayed-gallery context still resolves every cart child
+    // independently. The displayed descriptor is used only for the
+    // prospective summary below; the groups remain authoritative for a mixed
+    // cart and therefore cannot leak the displayed gallery into another one.
+    const requestedGalleryIds = galleryId
+        ? [...cartGalleryIds, galleryId]
+        : cartGalleryIds;
+    const resolvedTerms = useResolvedGalleryLicenseTerms(requestedGalleryIds);
+    const displayedDescriptor = resolvedTerms.descriptorForGallery(galleryId);
 
-    const globalTerms = terms as LicenseTerms | undefined;
-    const galleryTerms = asTerms(termsData);
-    // A single-gallery response has the same object shape as a normal terms
-    // response. Only interpret it as a map when the composite key requested
-    // one, otherwise a normal `pricing_strategy` field would be mistaken for a
-    // gallery id.
-    const galleryTermsMap = usesCompositeTerms ? asTermsMap(termsData) : null;
-    const displayedDescriptor = galleryId
-        ? descriptorFromTerms(
-            (galleryTermsMap?.[galleryId] ?? galleryTerms ?? globalTerms) as EffectiveLicenseTerms | undefined,
-        )
-        : galleryTermsMap
-            ? descriptorFromTerms(globalTerms as EffectiveLicenseTerms | undefined)
-            : descriptorFromTerms((galleryTerms ?? globalTerms) as EffectiveLicenseTerms | undefined);
-
-    const groups = groupCartItemsByPricing(items, (item) => {
-        // Explicit gallery context is used by the photo-price card. It keeps
-        // the existing prospective-price behavior for that displayed gallery.
-        if (galleryId) return displayedDescriptor;
-        if (galleryTermsMap) {
-            const itemTerms = item.galleryId ? galleryTermsMap[item.galleryId] : undefined;
-            return descriptorFromTerms((itemTerms ?? globalTerms) as EffectiveLicenseTerms | undefined);
-        }
-        return displayedDescriptor;
-    });
+    // Resolve every cart item independently. A complete composite response
+    // supplies each child descriptor; a missing/legacy composite response falls
+    // back to the brand terms. Never apply the displayed gallery's descriptor
+    // to unrelated cart galleries.
+    const groups = groupCartItemsByPricing(
+        items,
+        item => resolvedTerms.descriptorForGallery(item.galleryId),
+    );
     const volumeGroups = groups.filter(group => group.isVolumePricing);
-    const selectedGroup = volumeGroups[0];
+
+    // A photo-price card may show a prospective price for a gallery that is
+    // not in the cart yet. Count only cart items from the same effective
+    // server group; items from another gallery/preset must not advance this
+    // gallery's retroactive tier.
+    const displayedGroupKey = galleryId ? groupKeyForDescriptor(displayedDescriptor) : null;
+    const displayedPricingItems = displayedGroupKey === null
+        ? []
+        : items.filter(item => (
+            item.galleryId
+            && groupKeyForDescriptor(resolvedTerms.descriptorForGallery(item.galleryId)) === displayedGroupKey
+        ));
+    const displayedGroup = galleryId && displayedDescriptor.licensingMode === 'volume_licensing'
+        ? createPricingGroup(
+            `displayed|${displayedGroupKey}`,
+            displayedDescriptor,
+            displayedPricingItems,
+        )
+        : undefined;
+    const selectedGroup = galleryId ? displayedGroup : volumeGroups[0];
     const volumeItemPrices = Object.assign(
         {},
         ...volumeGroups.map(group => group.itemPriceCents),
@@ -378,7 +565,9 @@ export function useVolumeLicensing(items: CartItem[], galleryId?: string): Volum
         nextTierCount: selectedGroup?.nextTierCount ?? 0,
         nextTierLabel: selectedGroup?.nextTierLabel ?? '',
         tiers: selectedTiers,
-        isVolumePricing: selectedGroup !== undefined,
+        isVolumePricing: galleryId
+            ? displayedDescriptor.licensingMode === 'volume_licensing'
+            : selectedGroup !== undefined,
         groups,
         groupedTotalCents,
         volumeSubtotalCents,

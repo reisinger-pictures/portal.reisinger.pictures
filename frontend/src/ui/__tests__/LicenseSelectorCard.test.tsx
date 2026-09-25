@@ -183,6 +183,7 @@ describe('LicenseSelectorCard', () => {
 
     it('renders use cases with correct names and prices', () => {
         renderCard();
+        expect(screen.getByTestId('license-selector-card')).toBeInTheDocument();
         expect(screen.getByText('Lizenz wählen')).toBeInTheDocument();
         expect(screen.getByText('Web-Nutzung')).toBeInTheDocument();
         expect(screen.getByText('Print')).toBeInTheDocument();
