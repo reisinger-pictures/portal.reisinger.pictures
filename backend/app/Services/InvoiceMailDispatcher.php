@@ -45,7 +45,10 @@ class InvoiceMailDispatcher
         $databaseConnection = config('database.default');
         if (app()->environment('production')
             && (config('queue.default') !== 'database'
-                || ($queueConnection !== null && $queueConnection !== $databaseConnection))) {
+                || config('queue.connections.database.driver') !== 'database'
+                || ! is_string($queueConnection)
+                || $queueConnection === ''
+                || $queueConnection !== $databaseConnection)) {
             throw new RuntimeException('Invoice mail requires the transactional database queue in production.');
         }
 

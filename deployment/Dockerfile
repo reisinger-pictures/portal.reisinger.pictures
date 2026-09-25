@@ -29,7 +29,10 @@ RUN apt-get update && apt-get install -y \
     && usermod --uid "${RUNTIME_UID}" --gid "${RUNTIME_GID}" www-data
 
 WORKDIR /var/www/html
-RUN mkdir -p /var/www/photos /var/www/ftp \
+COPY backend-supervisor.sh /usr/local/bin/portal-backend-supervisor
+COPY validate-production-env.sh /usr/local/bin/validate-production-env
+RUN chmod 0755 /usr/local/bin/portal-backend-supervisor /usr/local/bin/validate-production-env \
+    && mkdir -p /var/www/photos /var/www/ftp \
     && chown -R www-data:www-data /var/www/html /var/www/photos /var/www/ftp
 
 # PHP Config (higher limits for image-intensive apps)

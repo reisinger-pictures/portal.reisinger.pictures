@@ -74,11 +74,18 @@ services:
       - /home/webadmin/portal/images:/var/www/photos:Z
       - /home/webadmin/websites/ftp:/var/www/ftp:Z
     environment:
+      - DB_CONNECTION=${DB_CONNECTION:-mariadb}
       - DB_HOST=db
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
-      - APP_ENV=${APP_ENV}
+      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-mariadb}
+      - DB_QUEUE_RETRY_AFTER=${DB_QUEUE_RETRY_AFTER:-90}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+      - QUEUE_FAILED_DRIVER=${QUEUE_FAILED_DRIVER:-database-uuids}
+      - QUEUE_WORKER_TIMEOUT=${QUEUE_WORKER_TIMEOUT:-60}
+      - QUEUE_WORKER_RESTART_DELAY=${QUEUE_WORKER_RESTART_DELAY:-5}
+      - APP_ENV=${APP_ENV:-production}
       # Default false: never enable debug by accident in production.
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL}
@@ -98,9 +105,10 @@ services:
       # E-Mail-Versand (SMTP via ZeptoMail, Migration vom Gmail-REST-OAuth am 2026-08-24)
       # Konfiguration liegt in .env.production:
       #   MAIL_MAILER=smtp
+      #   MAIL_SCHEME=smtp
+      #   MAIL_REQUIRE_TLS=true
       #   MAIL_HOST=smtp.zeptomail.eu
       #   MAIL_PORT=587
-      #   MAIL_ENCRYPTION=tls
       #   MAIL_USERNAME=emailapikey
       #   MAIL_PASSWORD=<ZeptoMail-API-Key>
       #   MAIL_FROM_ADDRESS=noreply@reisinger.pictures
@@ -108,13 +116,19 @@ services:
       # im Code erhalten; OAUTH_*-Secrets sind aus dem PROD-Setup entfernt.
       # ---
       - MAIL_MAILER=${MAIL_MAILER}
+      - MAIL_SCHEME=${MAIL_SCHEME}
+      - MAIL_REQUIRE_TLS=${MAIL_REQUIRE_TLS:-true}
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
-      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      # Scheduler mutexes must use a store shared by every backend replica.
+      # The provisioned MariaDB store is the current production default.
+      - CACHE_STORE=${CACHE_STORE:-database}
+      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-mariadb}
+      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-mariadb}
       - MAKE_WEBHOOK_URL=${MAKE_WEBHOOK_URL}
       - MAKE_API_KEY=${MAKE_API_KEY}
       - MEILISEARCH_HOST=http://search:7700
@@ -154,15 +168,29 @@ services:
       - AI_SESSION_HEADER=${AI_SESSION_HEADER-x-opencode-session}
       - AI_SESSION_PREFIX=${AI_SESSION_PREFIX-portal-}
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1 2>/dev/null && grep -q php-fpm /proc/1/cmdline"]
+      test:
+        - CMD-SHELL
+        - >-
+          kill -0 1 2>/dev/null &&
+          grep -q php-fpm /proc/1/cmdline &&
+          test -s /tmp/portal-queue-supervisor.pid &&
+          test -s /tmp/portal-queue-worker.pid &&
+          test -s /tmp/portal-scheduler.pid &&
+          kill -0 "$$(cat /tmp/portal-queue-supervisor.pid)" 2>/dev/null &&
+          kill -0 "$$(cat /tmp/portal-queue-worker.pid)" 2>/dev/null &&
+          kill -0 "$$(cat /tmp/portal-scheduler.pid)" 2>/dev/null
       interval: "30s"
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 90s
     command: >
       sh -c "
       if [ \"$$(id -u)\" -ne 1000 ] || [ \"$$(id -g)\" -ne 1000 ]; then
         echo 'FATAL: Backend muss als UID:GID 1000:1000 laufen. Start verweigert (fail-closed)!';
+        exit 1;
+      fi;
+      if [ \"$${APP_ENV}\" != 'production' ]; then
+        echo 'FATAL: APP_ENV muss im Produktions-Stack production sein. Start verweigert (fail-closed)!';
         exit 1;
       fi;
       if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ] || [ -z \"$${FILE_ENCRYPTION_KEY}\" ] || [ -z \"$${ADMIN_EMAIL}\" ] || [ -z \"$${ADMIN_PASSWORD}\" ] || [ -z \"$${PHOTO_STORAGE_PATH}\" ]; then
@@ -187,16 +215,19 @@ services:
           exit 1;
         fi;
       done;
-      php artisan cache:clear;
-      php artisan optimize;
+      if [ ! -x /usr/local/bin/validate-production-env ] || [ ! -x /usr/local/bin/portal-backend-supervisor ]; then
+        echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose digest, then redeploy. No migration or seed was run.';
+        exit 1;
+      fi;
+      /usr/local/bin/validate-production-env || exit 1;
+      php artisan cache:clear || exit 1;
+      php artisan optimize || exit 1;
+      php artisan ops:validate-production || exit 1;
       php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1;
-      php artisan scout:sync-index-settings;
-      php artisan queue:restart;
-      echo 'Starte Hintergrund-Prozesse...';
-      php artisan queue:work --tries=3 &
-      (while true; do php artisan schedule:run >> /dev/null 2>&1; sleep 60; done) &
-      echo 'Starte PHP-FPM...';
-      exec php-fpm
+      php artisan scout:sync-index-settings || exit 1;
+      php artisan queue:restart || exit 1;
+      echo 'Starte Supervisor...';
+      exec /usr/local/bin/portal-backend-supervisor
       "
     networks:
       portal_internal:

@@ -30,7 +30,7 @@ class AISessionHeaderDeploymentPolicyTest extends TestCase
 
         $headerGuard = strpos($compose, 'case \\"$${AI_SESSION_HEADER}\\" in');
         $prefixGuard = strpos($compose, 'case \\"$${AI_SESSION_PREFIX}\\" in');
-        $applicationBootstrap = strpos($compose, 'php artisan cache:clear;');
+        $applicationBootstrap = strpos($compose, 'php artisan cache:clear');
 
         $this->assertNotFalse($headerGuard);
         $this->assertNotFalse($prefixGuard);

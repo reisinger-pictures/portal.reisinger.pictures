@@ -38,3 +38,10 @@ status: active
 ## 5. Local Testing
 - Der lokale `Mailpit`-Service fängt alle ausgehenden E-Mails im Development-/CI-Testmodus ab.
 - **Zustellungsnachweis:** PHPUnit-Integrationstests (mindestens der Invoice-/Checkout-Pfad) prüfen über die Mailpit-API die tatsächlich angekommene Nachricht und parse HTML/Token-Links. `Mail::fake()` ist ausschließlich für deterministische Enqueue-/Fault-Injection-Tests erlaubt und liefert keinen SMTP-Zustellungsnachweis. E2E-Tests verwenden Mailpit ebenfalls für die End-to-End-Linkprüfung.
+
+## 6. Production SMTP Gate
+- Im Produktionsbetrieb muss `MAIL_MAILER=smtp` gesetzt sein. `MAIL_SCHEME=smtp|smtps` und `MAIL_REQUIRE_TLS=true` sind zusammen mit `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS` und `MAIL_FROM_NAME` Pflichtwerte. `MAIL_ENCRYPTION` ist in Laravel 13 kein gültiger SMTP-Schlüssel und darf nicht als TLS-Nachweis verwendet werden.
+- `smtp` verwendet Symfony STARTTLS nur mit `require_tls=true`; `smtps` verwendet implizites TLS. Der effektive Transport wird vor Queue-, Scheduler- und PHP-FPM-Start geprüft. Der Gate validiert nur Konfiguration und Topologie, nicht die Zustellung oder Erreichbarkeit des SMTP-Providers.
+- Die Queue kann einen SMTP-Transportfehler retryen. Invoice-Mail garantiert deshalb höchstens einen durable Enqueue-Vorgang, nicht exactly-once SMTP-Zustellung. Terminale Jobs bleiben in `failed_jobs` und benötigen eine dokumentierte Operator-Recovery.
+- Mailpit darf ausschließlich als lokales/CI-Testfixture dokumentiert werden. Ein Mailpit-Test ist kein Live-Nachweis für den Produktions-SMTP- oder den Provider-Zustellungsstatus.
+- Die Betriebsprüfung und die Grenzen der Queue-Semantik stehen im [Production Operations Runbook](29-production-operations-runbook.md).

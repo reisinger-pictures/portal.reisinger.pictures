@@ -66,6 +66,7 @@ This directory serves as the single source of truth for all technical concepts, 
 * [22-brand-settings-overlay.md](infrastructure/22-brand-settings-overlay.md) - Database overlay for the brand-settings whitelist.
 * [25-brand-separation-matrix.md](infrastructure/25-brand-separation-matrix.md) - Brand/Org separation decisions and boundaries.
 * [28-ci-test-image.md](infrastructure/28-ci-test-image.md) - **E2E-Test-Image `portal-e2e`:** portal-base + Node/pnpm/Composer + Playwright-Chromium vorinstalliert; CI-E2E läuft komplett im Container.
+* [29-production-operations-runbook.md](infrastructure/29-production-operations-runbook.md) - Production queue, SMTP, worker supervision, scheduler, and recovery contract.
 
 ### 📷 Photos & Metadata
 * [01-upload-and-processing.md](photos/01-upload-and-processing.md) - Lightroom UUIDs and ImageProcessor.
