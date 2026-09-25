@@ -47,8 +47,19 @@ fail() { printf '[e2e-up] FEHLER: %s\n' "$*" >&2; exit 1; }
 # container_name (portal_search_test) — ein einziger Compose-Projektname
 # (Default) verhindert Container-Name-Conflicts zwischen "Start Docker (Test)"
 # und diesem Skript.
-log "Starte Test-Services (docker-compose.test.yml) ..."
-docker compose -f "$ROOT/docker-compose.test.yml" up -d
+# E2E_SKIP_DOCKER_SERVICES=1 überspringt ausschließlich den Compose-Start aus
+# Schritt 1. Der Readiness-Check läuft in beiden Fällen unverändert gegen 7701,
+# d. h. ein nativ gestarteter Meilisearch mit derselben Version und demselben
+# Master-Key aus docker-compose.test.yml ist ein gültiger Ersatz. Default "0"
+# = bisheriges Verhalten (Docker).
+readonly E2E_SKIP_DOCKER_SERVICES="${E2E_SKIP_DOCKER_SERVICES:-0}"
+
+if [ "$E2E_SKIP_DOCKER_SERVICES" = "1" ]; then
+    log "E2E_SKIP_DOCKER_SERVICES=1: ueberspringe docker compose (erwartet nativ laufenden Meilisearch auf ${E2E_MEILISEARCH_HEALTH_URL}) ..."
+else
+    log "Starte Test-Services (docker-compose.test.yml) ..."
+    docker compose -f "$ROOT/docker-compose.test.yml" up -d
+fi
 
 log "Warte auf Meilisearch (bounded readiness check) ..."
 if ! MEILISEARCH_HEALTH_URL="$E2E_MEILISEARCH_HEALTH_URL" \
@@ -57,8 +68,10 @@ if ! MEILISEARCH_HEALTH_URL="$E2E_MEILISEARCH_HEALTH_URL" \
     MEILISEARCH_READY_POLL_SECONDS="$E2E_MEILISEARCH_READY_POLL_SECONDS" \
     bash "$ROOT/scripts/wait-for-meilisearch.sh"; then
     log "Meilisearch readiness diagnostics:"
-    docker compose -f "$ROOT/docker-compose.test.yml" ps search || true
-    docker compose -f "$ROOT/docker-compose.test.yml" logs --no-color --tail 50 search || true
+    if [ "$E2E_SKIP_DOCKER_SERVICES" != "1" ]; then
+        docker compose -f "$ROOT/docker-compose.test.yml" ps search || true
+        docker compose -f "$ROOT/docker-compose.test.yml" logs --no-color --tail 50 search || true
+    fi
     fail "Meilisearch did not become ready within ${E2E_MEILISEARCH_READY_TIMEOUT_SECONDS}s; aborting E2E setup."
 fi
 

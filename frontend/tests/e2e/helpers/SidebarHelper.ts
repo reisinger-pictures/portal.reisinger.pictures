@@ -7,13 +7,28 @@ export class SidebarHelper {
         // Anti-Flakiness: Sicherstellen, dass keine Fade-Out Animationen von Modals den Klick blockieren
         await expect(this.page.locator('.modal-open')).toHaveCount(0, { timeout: 5000 });
 
+        // Anti-Flakiness: Nach einem Reload ersetzt der App-Loader in `ProtectedRoute` kurzzeitig das
+        // ganze Dashboard. Erst wenn die Navigations-Shell wieder montiert ist, darf über den
+        // Drawer-Zustand entschieden werden — sonst arbeitet navigateTo auf einem Element, das gleich
+        // wieder ersetzt wird.
+        //
+        // Als Readiness-Signal taugt dafür nur das `<aside>`-Landmark, nicht der Drawer-Trigger: der
+        // trägt `md:hidden` und ist ab dem `md`-Breakpoint nicht Teil des Accessibility-Tree, den
+        // `getByRole` auswertet. `toBeAttached()` auf dem Trigger-Locator bleibt dort dauerhaft leer
+        // (Button im DOM vorhanden, Locator ohne Treffer) und läuft in den Timeout. Das Landmark wird
+        // dagegen von jedem Dashboard (Staff, Client, Gast) auf jedem Viewport montiert; mobil ist es
+        // nur per `-translate-x-full` aus dem Viewport verschoben, was es im Tree belässt. Beide
+        // Elemente werden im selben React-Commit montiert, unterhalb des `md`-Breakpoints löst sich
+        // das Gate also zum identischen Zeitpunkt wie der frühere Trigger-Wait.
+        const shell = this.page.getByRole('complementary');
+        await expect(shell).toBeAttached({ timeout: 10000 });
+
         const menuBtn = this.page.getByRole('button', { name: 'Menü öffnen' }).first();
         const backdrop = this.page.locator('div.fixed.inset-0').first();
 
-        // After a reload the app loader can briefly replace the dashboard. Wait
-        // for its mobile menu before deciding that no drawer click is needed.
-        await expect(menuBtn).toBeAttached({ timeout: 10000 });
-
+        // Nur unterhalb des `md`-Breakpoints ist der Drawer geschlossen und der Trigger sichtbar; ab
+        // `md` ist `isVisible()` dauerhaft false und der Zweig entfällt. Die Prüfung ist damit
+        // viewport-agnostisch, der Drawer wird auf Mobile wie bisher vor dem Link-Klick geöffnet.
         if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
             await expect(async () => {
                 if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
@@ -23,7 +38,7 @@ export class SidebarHelper {
             }).toPass({ timeout: 10000 });
         }
 
-        const link = this.page.getByRole('complementary')
+        const link = shell
             .getByRole('link', { name: menuText, exact: false })
             .first();
         // click() performs its own actionability and scrolling checks.
