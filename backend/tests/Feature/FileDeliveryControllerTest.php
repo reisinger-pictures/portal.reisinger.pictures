@@ -381,6 +381,37 @@ class FileDeliveryControllerTest extends TestCase
             ->assertJson(['error' => 'Foto nicht gefunden']);
     }
 
+    /**
+     * AUTH-3: arbitrary digit sequences used to become `_thumbs/{size}` files
+     * and full-resolution unwatermarked intermediates. Only the model's
+     * whitelisted derivative sizes may be materialized.
+     */
+    public function test_unknown_thumbnail_size_is_rejected_before_any_file_is_written(): void
+    {
+        $user = $this->user(['flatrate_level' => 'original']);
+        $gallery = $this->createPrivateDeliveryGallery();
+        $user->galleries()->attach($gallery);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $this->fixtureContent);
+
+        foreach (['999999', '0'] as $size) {
+            $this->actingAs($user, 'api')
+                ->get('/api/media/'.$gallery->slug.'/_thumbs/'.$size.'/'.$photo->id.'.webp')
+                ->assertStatus(400)
+                ->assertJson(['error' => 'Ungültige Thumbnail-Größe']);
+
+            $this->assertFalse(
+                Storage::disk('photos')->exists($gallery->id.'/_thumbs/'.$size.'/'.$photo->id.'.webp'),
+                "Expected no file for rejected thumbnail size {$size}."
+            );
+        }
+
+        // The whitelisted path is untouched: a regular derivative still works.
+        $this->actingAs($user, 'api')
+            ->get('/api/media/'.$gallery->slug.'/_thumbs/800/'.$photo->id.'.webp')
+            ->assertStatus(200);
+    }
+
     // ---------------------------------------------------------------
     // RESPONSE HEADERS & CACHING
     // ---------------------------------------------------------------

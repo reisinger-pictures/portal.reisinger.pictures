@@ -202,47 +202,56 @@ class AuthorizationService
         $records = $this->normalizeInviteRecords($claims, $galleries, $metaGalleries);
         $activeGalleries = [];
         $activeMetaGalleries = [];
-        $revokedGalleries = [];
-        $revokedMetaGalleries = [];
         $activeInvites = [];
 
         foreach ($records as $inviteId => $record) {
+            $inviteKey = (string) $inviteId;
             $recordGalleries = $this->normalizeGalleryIds($record['gallery_ids'] ?? []);
-            $recordMetaGalleries = $this->normalizeGalleryIds($record['meta_gallery_ids'] ?? []);
 
-            if ($this->isInviteActive((string) $inviteId)) {
-                $activeGalleries = array_merge($activeGalleries, $recordGalleries);
-                $activeMetaGalleries = array_merge($activeMetaGalleries, $recordMetaGalleries);
-                $activeInvites[(string) $inviteId] = [
-                    'gallery_ids' => $recordGalleries,
-                    'meta_gallery_ids' => $recordMetaGalleries,
-                ];
-
+            // AUTH-2: resolve the live invite exactly like the guest branch
+            // instead of trusting the self-contained claim for any invite that
+            // merely exists. This applies the current-host/tree check and clamps
+            // every claimed gallery to the invite's real gallery, so a foreign
+            // id in a server-signed (or replayed) token can never become a
+            // grant.
+            $invite = $this->activeCurrentHostInvite($inviteKey);
+            if (! $invite instanceof GalleryInvite) {
                 continue;
             }
 
-            $revokedGalleries = array_merge($revokedGalleries, $recordGalleries);
-            $revokedMetaGalleries = array_merge($revokedMetaGalleries, $recordMetaGalleries);
+            $inviteGalleryId = (string) $invite->gallery_id;
+            $recordGalleries = array_values(array_intersect($recordGalleries, [$inviteGalleryId]));
+            if ($recordGalleries === []) {
+                // The claim never named the invite's own gallery: grant
+                // nothing for this invite.
+                continue;
+            }
+
+            // Metadata permission comes from the live invite, never the claim.
+            $recordMetaGalleries = $invite->can_edit_metadata ? $recordGalleries : [];
+
+            $activeGalleries = array_merge($activeGalleries, $recordGalleries);
+            $activeMetaGalleries = array_merge($activeMetaGalleries, $recordMetaGalleries);
+            $activeInvites[$inviteKey] = [
+                'gallery_ids' => $recordGalleries,
+                'meta_gallery_ids' => $recordMetaGalleries,
+            ];
         }
 
-        // A provenance claim that cannot be decoded must not turn an otherwise
-        // unrelated array claim into an unscoped grant. This is especially
-        // important for old/garbled tokens after a refresh.
-        if ($records === []) {
-            $revokedGalleries = $galleries;
-            $revokedMetaGalleries = $metaGalleries;
-        }
-
-        $revokedOnlyGalleries = array_diff($revokedGalleries, $activeGalleries);
-        $revokedOnlyMetaGalleries = array_diff($revokedMetaGalleries, $activeMetaGalleries);
-        $galleries = array_values(array_diff($galleries, $revokedOnlyGalleries));
-        $metaGalleries = array_values(array_diff($metaGalleries, $revokedOnlyMetaGalleries));
-
-        // Derive grants from an active invite record as well. This keeps a
-        // valid claim coherent even if a client or an older token omitted one
-        // of the denormalized gallery arrays.
-        $galleries = array_values(array_unique(array_merge($galleries, $activeGalleries)));
-        $metaGalleries = array_values(array_unique(array_merge($metaGalleries, $activeMetaGalleries)));
+        // Clamp the denormalized top-level arrays to the live, active invite
+        // grants as well. They are a client-visible mirror of the invite map,
+        // not an independent source of access: a foreign id that only appears
+        // in `transient_galleries` (with no matching active invite record) is
+        // dropped. When the provenance claim cannot be decoded at all,
+        // $activeGalleries stays empty and this fails closed.
+        $galleries = array_values(array_unique(array_merge(
+            array_values(array_intersect($galleries, $activeGalleries)),
+            $activeGalleries,
+        )));
+        $metaGalleries = array_values(array_unique(array_merge(
+            array_values(array_intersect($metaGalleries, $activeMetaGalleries)),
+            $activeMetaGalleries,
+        )));
 
         return [
             'transient_galleries' => $galleries,

@@ -153,9 +153,18 @@ class BrandRegistry
         }
 
         $visited = [];
+        $depth = 0;
         $current = $group;
 
         while ($current instanceof GalleryGroup) {
+            // AUTH-5: bound the ancestor walk to one lookup per level so an
+            // over-deep (or corrupt) hierarchy cannot pin the request. A cycle
+            // fails closed through the visited set below; exceeding the shared
+            // traversal depth budget fails closed here.
+            if ($depth++ > GalleryGroupSubtree::MAX_DEPTH) {
+                return false;
+            }
+
             $id = $current->getKey();
             if ($id === null || $id === '') {
                 return false;

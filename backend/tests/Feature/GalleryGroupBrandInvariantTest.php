@@ -578,6 +578,114 @@ class GalleryGroupBrandInvariantTest extends TestCase
         $this->assertSame('srp', $this->brandId($updated));
     }
 
+    // ─── AUTH-1: same-brand but unmanaged group is rejected ────────────
+
+    /**
+     * AUTH-1: brand coherence is not authorization. Previously any same-brand
+     * photographer could attach their own gallery to a same-brand group they
+     * had no assignment to and inherit that group's visibility policy,
+     * polluting another user's subtree. The target group is now clamped to the
+     * actor's `canManageGalleryGroup()` capability.
+     *
+     * The owner's group carries a restricted gallery owned by the owner, so the
+     * intruder demonstrably cannot manage it.
+     */
+    public function test_same_brand_photographer_cannot_attach_to_another_photographers_group(): void
+    {
+        $group = GalleryGroup::factory()->create(['brand' => Brand::B2B->value]);
+        $ownedGallery = Gallery::factory()->create([
+            'brand' => Brand::B2B->value,
+            'gallery_group_id' => $group->id,
+            'restricted_photographers' => true,
+        ]);
+
+        $owner = $this->user(UserRole::PHOTOGRAPHER, Brand::B2B->value);
+        $owner->photographerGalleries()->attach($ownedGallery->id);
+
+        $intruder = $this->user(UserRole::PHOTOGRAPHER, Brand::B2B->value);
+        $this->assertFalse(app(AuthorizationService::class)->canManageGalleryGroup($intruder, $group));
+
+        try {
+            $this->service->storeGallery([
+                'name' => 'Intruder gallery',
+                'type' => 'delivery',
+                'gallery_group_id' => $group->id,
+            ], $intruder);
+
+            $this->fail('Expected a ValidationException for a group the actor may not manage.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('gallery_group_id', $exception->errors());
+        }
+
+        $this->assertDatabaseMissing('galleries', [
+            'gallery_group_id' => $group->id,
+            'name' => 'Intruder gallery',
+        ]);
+    }
+
+    public function test_same_brand_photographer_cannot_reparent_into_another_photographers_group(): void
+    {
+        $group = GalleryGroup::factory()->create(['brand' => Brand::B2B->value]);
+        $ownedGallery = Gallery::factory()->create([
+            'brand' => Brand::B2B->value,
+            'gallery_group_id' => $group->id,
+            'restricted_photographers' => true,
+        ]);
+
+        $owner = $this->user(UserRole::PHOTOGRAPHER, Brand::B2B->value);
+        $owner->photographerGalleries()->attach($ownedGallery->id);
+
+        $intruder = $this->user(UserRole::PHOTOGRAPHER, Brand::B2B->value);
+        $intruderGallery = Gallery::factory()->create([
+            'brand' => Brand::B2B->value,
+            'gallery_group_id' => null,
+        ]);
+
+        try {
+            $this->service->updateGallery(
+                $intruderGallery,
+                ['gallery_group_id' => $group->id],
+                $intruder
+            );
+
+            $this->fail('Expected a ValidationException for a group the actor may not manage.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('gallery_group_id', $exception->errors());
+        }
+
+        $this->assertDatabaseHas('galleries', [
+            'id' => $intruderGallery->id,
+            'gallery_group_id' => null,
+        ]);
+    }
+
+    /**
+     * Control for the two tests above: the very same actor may attach to a group
+     * it can actually manage (here: its own restricted gallery's group).
+     */
+    public function test_photographer_may_attach_to_a_group_it_manages(): void
+    {
+        $group = GalleryGroup::factory()->create(['brand' => Brand::B2B->value]);
+        $ownedGallery = Gallery::factory()->create([
+            'brand' => Brand::B2B->value,
+            'gallery_group_id' => $group->id,
+            'restricted_photographers' => true,
+        ]);
+
+        $photographer = $this->user(UserRole::PHOTOGRAPHER, Brand::B2B->value);
+        $photographer->photographerGalleries()->attach($ownedGallery->id);
+        $this->assertTrue(app(AuthorizationService::class)->canManageGalleryGroup($photographer, $group));
+
+        $gallery = $this->service->storeGallery([
+            'name' => 'Managed group gallery',
+            'type' => 'delivery',
+            'gallery_group_id' => $group->id,
+        ], $photographer);
+
+        $this->assertSame($group->id, $gallery->gallery_group_id);
+        $this->assertSame(Brand::B2B->value, $this->brandId($gallery));
+    }
+
     // ─── The update path enforces the same guards as the create path ──
 
     public function test_transient_guest_cannot_reparent_into_a_group(): void

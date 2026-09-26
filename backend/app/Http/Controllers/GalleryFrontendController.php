@@ -11,6 +11,7 @@ use App\Models\Photo;
 use App\Services\AuthorizationService;
 use App\Services\RatingService;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -90,7 +91,18 @@ class GalleryFrontendController extends Controller
 
         $breadcrumbs = [];
         $groupId = $gallery->gallery_group_id;
+        // AUTH-5: cycle-safe and depth-bounded. The endpoint's brand guard
+        // above normally 404s a cyclic chain first, but the breadcrumb walk
+        // must never be able to loop forever on its own.
+        $visitedGroupIds = [];
+        $depth = 0;
         while ($groupId) {
+            $groupKey = (string) $groupId;
+            if (isset($visitedGroupIds[$groupKey]) || $depth++ > GalleryGroupSubtree::MAX_DEPTH) {
+                break;
+            }
+            $visitedGroupIds[$groupKey] = true;
+
             $group = GalleryGroup::find($groupId);
             if ($group) {
                 if (! BrandRegistry::resourceMatchesCurrent($group->brand)) {
