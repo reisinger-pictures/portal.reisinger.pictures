@@ -5,6 +5,18 @@ import {renderWithProviders} from '../../test-setup';
 import ProfileSettingsCard from '../management/components/ProfileSettingsCard';
 import {apiMutate} from '../../api';
 
+const {mockMutate} = vi.hoisted(() => ({
+    mockMutate: vi.fn(),
+}));
+
+vi.mock('swr', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('swr')>();
+    return {
+        ...actual,
+        useSWRConfig: () => ({mutate: mockMutate}),
+    };
+});
+
 vi.mock('../../logic/useAuth', () => ({
     useAuth: vi.fn(),
 }));
@@ -156,6 +168,22 @@ describe('ProfileSettingsCard', () => {
         await user.click(screen.getByRole('button', {name: 'Verstanden, ausblenden'}));
         expect(screen.queryByText('Neues Kamera-Passwort')).not.toBeInTheDocument();
         expect(screen.queryByText(password)).not.toBeInTheDocument();
+    });
+
+    it('invalidates the cached FTP status after a slug change so the dashboard shows the new folder', async () => {
+        const user = userEvent.setup();
+        renderWithProviders(<ProfileSettingsCard />);
+
+        const ftpSlugInput = screen.getByRole('textbox', {name: /^FTP Upload Ordner \(Slug\)/});
+        await user.clear(ftpSlugInput);
+        await user.type(ftpSlugInput, 'j-doe');
+        await user.click(screen.getByRole('button', {name: /Profil speichern/}));
+
+        // The FTP inbox reads `ftp_folder` from this key; without the invalidation
+        // it re-mounts inside SWR's deduping window and shows the old account name.
+        await waitFor(() => {
+            expect(mockMutate).toHaveBeenCalledWith('/api/management/ftp/status', undefined, {revalidate: true});
+        });
     });
 
     it('does not show the password panel when the response carries no new password', async () => {
