@@ -34,6 +34,20 @@ Two storage disks are involved:
   ```
 - Each authenticated photographer has a dedicated directory named by their `ftp_slug` (falls back to `user.id`).
 - The FTP server (external) is configured to write incoming files into the correct user directory.
+- **Transport wird ersetzt (2026-09-26, in Arbeit).** Der externe Server ist
+  aktuell `pure-ftpd` und wird durch **SFTPGo** abgelöst. Zwei Gründe:
+  `pure-ftpd` kann `AES128-SHA` nicht anbieten (verifiziert — die Cipher-Liste
+  wird intern gebaut und ignoriert `OPENSSL_CONF`), damit erreicht die Kamera
+  den Server nicht; und `pure-ftpd` liest seine User-DB nur beim Start, was
+  PHP-verwaltete Passwörter ohne Neustart unmöglich macht. Tasks:
+  **P1-M21 bis P1-M29** in `AGENTS.todo.md`, Infrastruktur-Anforderung in
+  `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e.
+- **Für diesen Abschnitt bleibt entscheidend, dass sich nichts ändert:**
+  SFTPGo schreibt auf denselben Host-Pfad `/home/webadmin/websites/ftp`, der
+  Bind-Mount auf `/var/www/ftp` bleibt, und `ftp_inbox` bleibt `driver=local`.
+  `FtpController` und `FtpImportTest` werden **nicht** angefasst. Ein Wechsel
+  auf den `sftp`-Flysystem-Treiber wäre ein Netzwerk-Roundtrip nach localhost
+  pro Datei — bewusst nicht gewollt (P1-M25).
 
 ### 2.2 Photo Storage (`photos` disk)
 
