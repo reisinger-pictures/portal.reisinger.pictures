@@ -13,9 +13,10 @@
 - [ ] **Backup des gesamten `ftp`-Baums** inkl. `1002:webgroup`, `2777`/setgid
 - [ ] **Restore-Test** — nicht nur Backup vorhanden, sondern geprüft, dass ein
       Restore funktioniert
-- [ ] **`pure-ftpd` läuft noch** — nicht vor Kamerabestätigung abschalten
 - [ ] **SFTPGo-Ordner auf dem Host:** `ftp/<slug>` mit `1002:webgroup` und
-      `2777` (setgid) — neue Dateien erben die Gruppe
+      `2777` (setgid) — neue Dateien erben die Gruppe. Kein gemeinsamer
+      `r1`-User mehr; jeder User bekommt sein eigenes Home.
+- [ ] **`pure-ftpd` läuft noch** — nicht vor Kamerabestätigung abschalten
 
 ## 2. Docker-Stack (Portainer)
 
