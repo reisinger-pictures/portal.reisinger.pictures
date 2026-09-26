@@ -15,11 +15,11 @@ type GalleryFixture = {
 
 test.describe('Meta-gallery child licensing', () => {
     let helper: E2ESessionHelper;
-    let testUser: {email: string; password: string};
+    let testUser: {email: string; password: string; id: string};
 
     test.beforeEach(async ({request}) => {
         helper = new E2ESessionHelper(request);
-        testUser = await helper.createIsolatedUser('super_admin');
+        testUser = await helper.createIsolatedUser('photographer');
     });
 
     test.afterEach(async () => {
@@ -126,13 +126,21 @@ test.describe('Meta-gallery child licensing', () => {
         });
 
         await new AuthHelper(page).login(testUser.email, testUser.password);
+        // The fixtures above are admin-created, so a photographer would see an
+        // empty tree: the tree prunes every group whose galleries are outside
+        // getAllowedGalleryIds(). Group membership feeds that list recursively,
+        // so assign both meta-gallery groups before navigating.
+        await helper.assignUserToGalleryGroups(testUser.id, [groupId, childGroupId]);
         await new SidebarHelper(page).navigateTo('Galerien & Ordner');
 
         const main = page.getByRole('main');
         await main.getByRole('button', {name: 'Alle ausklappen'}).click();
         const nestedGalleryName = definitions[2].name;
         await main.getByRole('link', {name: nestedGalleryName}).click();
-        await expect(main.getByRole('heading', {name: nestedGalleryName, exact: true})).toBeVisible();
+        // Anchored regex, not `exact`: the detail heading reads
+        // "<gallery> Galerie bearbeiten", so an exact match on the bare gallery
+        // name never resolves. The prefix still pins the gallery identity.
+        await expect(main.getByRole('heading', {name: new RegExp(`^${nestedGalleryName}`)})).toBeVisible();
         await expect(main.getByRole('link', {name: childGroupName, exact: true})).toBeVisible();
         await main.getByRole('link', {name: `E2E Meta Licensing ${suffix}`, exact: true}).click();
         await expect(page).toHaveURL(new RegExp(`/meta/${groupId}$`));
