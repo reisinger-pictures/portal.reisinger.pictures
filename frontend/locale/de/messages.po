@@ -3200,6 +3200,10 @@ msgstr "Kamera-Konto noch nicht angelegt"
 msgid "Kamera-Verbindung"
 msgstr "Kamera-Verbindung"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Kamera-Zugang einrichten"
+msgstr "Kamera-Zugang einrichten"
+
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
 msgid "Katalog aktualisiert"
 msgstr "Katalog aktualisiert"
