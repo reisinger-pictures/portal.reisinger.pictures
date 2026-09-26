@@ -106,6 +106,38 @@ Triggers the import pipeline.
 
 Thumbnails are NOT generated during FTP import. The old thumbnail generation in `PhotoProcessingService` was removed. Thumbnails are created on-the-fly by `FileDeliveryController::serve()` when a `_thumbs/{size}/{photoId}.webp` URL is requested (see `features/delivery/03-file-delivery-controller.md`).
 
+#### 3.3.2 Concurrency Guard
+
+`process()` is a read → copy → Photo row → unlink sequence over a directory the
+FTP server writes into at the same time. Two runs can each hold their own
+`glob()` snapshot of the same file; without a guard the loser of the unlink race
+would still have produced a second `Photo` row and a second stored file under a
+different UUID. The pipeline is therefore serialized per photographer.
+
+- **Lock:** `Cache::lock('ftp-process:{user_id}', 300)`, acquired **only** once
+  the inbox actually holds images, and **non-blocking**. A second call is
+  refused with **409** plus a German error message and a `Retry-After` header —
+  it is never queued, merged, or silently served. The lock is released in a
+  `finally`, so a failed import frees it immediately.
+- **Key:** the user id, which is a globally unique UUID. The inbox folder is
+  user-level too, so this is the narrowest key that still covers exactly the
+  files a run can touch. No brand component: the `Brand` enum has a single case
+  and the folder namespace is deliberately not brand-scoped yet (§7.11).
+- **Per file:** the `glob()` snapshot is re-checked with `file_exists()` at the
+  top of each loop iteration. A file that a competing run claimed in between is
+  skipped, not imported a second time.
+
+**What the lock is not.** It is not a lock across a system boundary: the
+FTP/SFTP server takes no protocol-level lock, so a file a camera is still
+writing can be read half-finished. Keeping uploads and imports apart is the
+photographer's workflow, not the guard's job. Its reach is exactly the reach of
+the configured cache store — a deployment with a per-node file cache degrades it
+to a per-node best effort. It is not a renewed lease: a run that outlives the
+TTL loses the guard, and a PHP fatal releases the lock only when the TTL
+expires. The TTL is therefore set far above a realistic import, because the
+failure mode of a too-short TTL is a duplicated photo, while a too-long TTL only
+delays a retry.
+
 ## 4. Brand Isolation
 
 See `features/infrastructure/13-ftp-brand-isolation.md` for full details. Summary:
@@ -132,7 +164,8 @@ Gallery assignment is purely explicit via `setTarget()`:
 | File copy fails | Exception propagates → `process()` returns HTTP 500. Transaction per file (not wrapped in global transaction) — already-copied files remain imported. |
 | Metadata extraction fails | `PhotoProcessingService` falls back to gallery defaults. The photo is still created. |
 | Storage disk full | PHP file operations throw — HTTP 500. Admin must free space. |
-| Concurrent process calls | No locking — duplicate processing of same files is possible. Design assumes single-user access. |
+| Concurrent process calls | Guarded per photographer — see §3.3.2. A second call is refused with 409 and imports nothing. Not a cross-boundary lock: the FTP server keeps writing into the same directory, and the guard's reach is only the configured cache store. |
+| File vanishes between the `glob()` snapshot and its loop iteration | Skipped, not imported — a competing run already claimed it (§3.3.2). |
 | Gallery deleted between setTarget and process | `Gallery::find()` returns null in process() loop — error may occur. Current code uses `Gallery::find()` after the check. |
 | Brand isolation violation | 403 response — the user is informed before any import occurs. |
 
@@ -210,10 +243,13 @@ Ablösung als Parallelsystem plant, plant den Ausfall für den Fotografen.
 
 - Der FTP-/SFTP-Username ist **`users.ftp_slug`** — bereits vorhanden
   (`V001__initial_portal_schema.php:62`), `unique()` und selbst wählbar
-  (`AuthController.php:220-230`).
-- **Verbindliche Formatregel** (P1-M21): `^[a-z0-9][a-z0-9_-]{2,31}$`.
-  Keine Punkte, kein `@`, kein Slash, max. 32 Zeichen, kleingeschrieben.
-  Offene Frage zur Migration bestehender Werte: 7.6.
+  (`AuthController::updateProfile()`).
+- **Verbindliche Formatregel** (P1-M21, umgesetzt 2026-09-26):
+  `^[a-z0-9][a-z0-9_-]{2,31}$`. Keine Punkte, kein `@`, kein Slash, max. 32
+  Zeichen, kleingeschrieben. **Einzige Quelle:** `App\Support\FtpSlug`
+  (`PATTERN`, `MESSAGE`, `normalize()`, `toValidBase()`, `withSuffix()`), benutzt
+  vom Schreibpfad und von der Auto-Generierung. Umsetzung und die Entscheidung zu
+  Bestandswerten: 7.11.
 - Der FTP-Ordner ist `ftp/<ftp_slug>`, konsistent mit `getInboxPath()`
   (`:151-156`).
 
@@ -239,6 +275,30 @@ verschlüsselten Secrets at rest. Der zwischenzeitlich erwogene Entwurf mit
 oder nur der Admin? Ein Selbständerungs-Flow bräuchte einen Confirm-Schritt
 mit dem aktuellen Passwort.
 
+**Umsetzung (P1-M23).** `FtpCredentialService`
+(`app/Services/FtpCredentialService.php`) kapselt genau diese vier Schritte;
+`provisionAndShow(User $user)` erzeugt, provisioniert und **gibt das Passwort
+einmal zurück**. Festgeschrieben ist:
+
+- **Kein Schreibzugriff.** Die Methode schreibt keine Spalte, keine Datei, kein
+  Cache-Element. Der Provisionierungsstatus aus 7.4 wird **nicht** von hier
+  gepflegt — das ist eine eigene Entscheidung pro Aufrufer (und bis dahin
+  bleibt der Cache bewusst `pending`).
+- **Kein Konto-Name-Fallback.** Ohne `ftp_slug` wird **nicht** auf die
+  Primary-Key-ID zurückgefallen: `FtpController` mag das für den Inbox-Pfad,
+  ein Konto namens einer UUID kann aber niemand auf einer Kamera eintippen.
+- **Die Regel aus 7.2 wird durchgesetzt**, nicht nur dokumentiert. Ein
+  regelwidriger Alt-Slug (`j.doe`) führt zu einem benannten Fehler mit
+  Verweis auf die Profilseite, statt still ein unbrauchbares Konto anzulegen.
+- **Das Home-Verzeichnis** ist `filesystems.disks.ftp_inbox.root` + Slug, nicht
+  eine zweite Konstante: beide Container mounten denselben Host-Pfad auf
+  denselben Container-Pfad, also stimmen Portal und Dienst mit einem String
+  überein (7.8).
+- **Kein Passwort im Log.** Der Client loggt pro Aufruf Operation, Konto,
+  Status, Dauer und `body_length`, nie den Body — der Body von
+  `provisionUser` **ist** das Passwort. Passwort-Parameter stehen zusätzlich
+  unter `#[\SensitiveParameter]`, was sie aus Stacktraces entfernt.
+
 ### 7.4 Provisionierungsstatus auf `users`
 
 `status()` braucht eine Kontoanzeige, obwohl kein Passwort gespeichert wird.
@@ -248,8 +308,9 @@ Lesepfad würde die UI vom Dienst abhängig machen und widerspricht 7.5; er
 bräuchte außerdem ein Credential auch für Read-Operationen und nähme der
 Reduktion der Secret-Fläche den Kern.
 
-Migration **V041+** (Reihe endet bei V040; `backend/AGENTS.md` verlangt die
-vorab dokumentierte Schema-/Backfill-/Rollback-Entscheidung):
+Migration **V041** (`V041__add_ftp_account_status_to_users.php`; die Reihe endete
+bei V040, und `backend/AGENTS.md` verlangt die vorab dokumentierte
+Schema-/Backfill-/Rollback-Entscheidung):
 
 | Spalte | Typ | Bedeutung |
 |---|---|---|
@@ -258,8 +319,20 @@ vorab dokumentierte Schema-/Backfill-/Rollback-Entscheidung):
 | `ftp_account_error` | text nullable | Fehlertext für `error` |
 
 - **Backfill:** bestehende Fotografen auf `pending` — der Zustand ist
-  unbekannt, sie wurden nie über SFTPGo provisioniert.
-- **Rollback:** reines Spalten-Drop, kein Datenverlust.
+  unbekannt, sie wurden nie über SFTPGo provisioniert. Der **Spaltendefault ist
+  der Backfill**: MySQL/MariaDB, PostgreSQL und SQLite füllen eine neu
+  hinzugefügte Spalte aus ihrem Default, ein zusätzliches `UPDATE users ...` wäre
+  ein zweiter Volltabellen-Schreibvorgang auf der Produktions-`users` und könnte
+  nur denselben Wert erzeugen. `pending` ist zugleich der korrekte Zustand für
+  Nicht-Fotografen, die nie ein FTP-Konto bekommen.
+- **Kein Index:** die Spalten werden ausschließlich über den Primärschlüssel
+  gelesen, ein Index wäre reiner Schreib-Overhead ohne Query, das ihn nutzt.
+- **Nicht massenassignierbar:** die drei Spalten stehen bewusst weder in
+  `$fillable` noch in `$visible` des `User`-Modells. Sie sind Systemzustand der
+  Provisionierung, kein Request-Input, und kein Teil des User-Payloads.
+- **Rollback:** reines Spalten-Drop, kein Datenverlust. Die `down()`-Methode ist
+  trotz der Repo-Policy implementiert und getestet, weil der Rollback Teil des
+  dokumentierten Vertrags ist und ein ungeprüfter Rollback kein Vertrag ist.
 - Die Spalte ist ein **Cache**, nicht die Wahrheit: wird der User in SFTPGo von
   Hand gelöscht, ist sie veraltet. Deshalb ein expliziter
   `reconcileAccount()`-Pfad statt eines stillen Live-Query.
@@ -272,19 +345,40 @@ sein, wenn SFTPGo ausfällt. **`process()` hat keinen SFTPGo-Kontakt.**
 - `status()` liefert bei Timeout **keinen** 500er, sondern den zuletzt
   bekannten Stand aus 7.4. Der Fotograf soll sehen, was das System weiß, nicht
   einen Fehler, der nach Datenverlust aussieht.
-- Der HTTP-Client bekommt feste Timeouts (`Http::timeout(5)` connect,
-  `Http::timeout(15)` total), kein Default-Timeout.
+- Der HTTP-Client bekommt feste Timeouts, kein Default-Timeout:
+  `Http::connectTimeout(5)` für den Connect, `Http::timeout(15)` als **Gesamt**
+  budget. **Präzisierung 2026-09-26 (P1-M22):** in Laravel ist `timeout()` das
+  Gesamtbudget, der Connect-Budget heißt `connectTimeout()`. Ein
+  `timeout(5)->timeout(15)` — wie die frühere Fassung dieses Absatzes es
+  nahelegte — setzt nur das Gesamtbudget und **verwirft** den Connect-Wert
+  lautlos.
 
 ### 7.6 Admin-API-Client
 
 `SftpGoClient` (`app/Services/`) kapselt ausschließlich HTTP gegen die
 Admin-API. **Kein** FTP-/SFTP-Protokoll-Speak im Portal.
 
-- Endpunkte `/api/v2/users` (POST anlegen, PUT ändern), Auth über
-  `X-SFTPGO-API-KEY` oder JWT aus `POST /api/v2/token`.
+- Endpunkte `/api/v2/users` (POST anlegen, GET lesen, PUT ändern, DELETE
+  löschen), Auth über `X-SFTPGO-API-KEY` oder JWT aus **`GET /api/v2/token`**
+  (Basic-Auth des Admin-Users). **Korrigiert 2026-09-26 (P1-M22):** ein `POST`
+  auf `/api/v2/token` antwortet **405** — `openapi/openapi.yaml` v2.7.6
+  definiert dort `get: security: [BasicAuth]`. Die frühere Fassung dieses
+  Absatzes nannte `POST`.
 - **Schema nicht raten.** Quelle: `GET /openapi` an der laufenden Instanz
   (Swagger UI, im Community-Build aktiv), dann `openapi.yaml` im Repository
-  `drakkan/sftpgo`.
+  `drakkan/sftpgo`. Für die Umsetzung (P1-M22) wurde `openapi.yaml` des Tags
+  **v2.7.6** plus `internal/httpd/api_user.go` und `api_utils.go` gelesen.
+- **`PUT` ist kein partielles Update.** `updateUser` dekodiert den Body in ein
+  *neues* User-Objekt und stellt nur `password`, `username`, `id`,
+  Recovery-Codes, TOTP und `last_password_change` wieder her. Ein
+  `PUT` mit nur `{"password": ...}` würde `home_dir` und `permissions`
+  zurücksetzen und das Konto still brechen. `resetPassword()` liest deshalb
+  vorher den User, ersetzt das Passwort und schreibt das vollständige Objekt
+  zurück — mit `?disconnect=1`, damit eine bestehende Sitzung nicht mit dem
+  alten Passwort weiterläuft.
+- **Kein automatisches `retry()`.** Ein wiederholtes `POST /api/v2/users` aus
+  einer verlorenen Antwort heraus erzeugt ein zweites Konto (409) statt eines
+  sauberen Fehlers.
 
 ### 7.7 Credential-Haltung
 
@@ -315,8 +409,14 @@ Bind-Mount `-> /var/www/ftp` und Disk `ftp_inbox` als `driver=local` bleiben.
   und damit der Startvorgang können sich zwischen Minor-Versionen ändern, und
   ein Rebuild, der den Startpfad verändert, fällt auf einem Server mit
   laufendem Betrieb nicht auf, sondern erst beim Fotografen.
-- `FtpImportTest` muss nach dem Wechsel unverändert grün bleiben. P1-M25
-  ergänzt einen Test, der festschreibt, dass `ftp_inbox` lokal bleibt.
+- `FtpImportTest` muss nach dem Wechsel unverändert grün bleiben (P1-M25).
+  `FtpInboxLocalDiskTest` schreibt zusätzlich fest, dass `ftp_inbox` lokal
+  bleibt: kein `sftp`-/`ftp`-Disk in der Config und kein Treiber `ftp`/`sftp`,
+  der Import liest und schreibt ausschließlich über `ftp_inbox` und `photos`
+  (beobachtet über einen `Storage::disk()`-Spy), kein HTTP-Roundtrip, und kein
+  Treiber- bzw. `sftp://`-/`ftp://`-Verweis im `FtpController`-Quelltext für
+  Zweige, die der Spy nicht durchläuft. Wer den Import auf
+  `Storage::disk('sftp')` umbaut, bekommt drei rote Tests.
 
 ### 7.9 Ownership-Regeln auf dem Host
 
@@ -424,11 +524,35 @@ werden. Vor der Messung Config-Weg und Datenprovider-Persistenz klären.
 Provisionierung (M22), während die Kamera ihn vorher konfigurieren muss. Der
 Cutover (7.12) behandelt das als Reihenfolgeproblem, nicht als Detail.
 
-**Bestehende `ftp_slug`-Werte.** `Str::slug()` lässt Punkte zu, ein Localpart
-wie `j.doe` wird zu `j.doe`; die neue Regel verbietet das. Eine Umbenennung ist
-keine Kosmetik, weil `ftp_slug` Fremdschlüssel für `storage/app/private`-Pfade
-ist. Zu entscheiden: Altslugs automatisch normalisieren (mit Folge für die
-Ordnerstruktur) oder den Fotografen wählen lassen, mit Fehlerpfad bis dahin.
+**Bestehende `ftp_slug`-Werte — entschieden (2026-09-26, P1-M21): nichts wird
+stillschweigend umbenannt.** Der Fotograf wählt, mit Fehlerpfad bis dahin.
+
+- **Korrektur der Diagnose:** `Str::slug()` ließ Punkte *nicht* zu — es
+  entfernt sie ohne Trennzeichen. Aus `j.doe` wurde `jdoe` und damit eine stille
+  Namenskollision mit einem Fotografen, dessen Localpart genau so lautet;
+  `Max.Mustermann` wurde zu `maxmustermann` statt `max-mustermann`. `@` wurde über
+  das Default-Dictionary zu `at`, ein Slash verschwand ersatzlos (`a/b` → `ab`).
+  Der Fehler war nicht der erhaltene Punkt, sondern das **stille Verschlucken**
+  identitätsrelevanter Zeichen.
+- **Deshalb zwei Normalisierungen, nicht eine.** Für den selbst gewählten Wert
+  (`AuthController::updateProfile()`) gilt `FtpSlug::normalize()`: es fasst nur
+  Kosmetik an (Groß-/Kleinschreibung, Umlaute, Leerzeichen). Punkt, `@`, Slash
+  und ein führendes Trennzeichen überstehen und werden von der Formatregel
+  **abgelehnt** — aus einem getippten Login darf nicht ein anderer werden. Für
+  **generierte** Werte (`User::nextAvailableFtpSlug()`, nur beim Insert, niemand
+  hat sie getippt, nichts referenziert sie) gilt `FtpSlug::toValidBase()`, das
+  auch reduziert (`j.doe` → `j-doe`).
+- **Keine Migration, kein Backfill.** `ftp_slug` ist Fremdschlüssel für
+  `storage/app/private`-Pfade und für `ftp/<slug>` auf dem Host; eine
+  automatische Normalisierung würde das Verzeichnis verwaizen lassen, ohne dass
+  jemand etwas mitbekäme. Bestehende regelwidrige Werte bleiben deshalb stehen,
+  und wer sie erneut abspeichert, bekommt den Fehler mit der Formatregel im Text —
+  der Fotograf vergibt selbst einen zulässigen Namen. Das ist der bewusst
+  gewählte Zweig aus der offenen Frage.
+- **Einzige Quelle der Wahrheit:** `backend/app/Support/FtpSlug.php` (Muster,
+  Längen, Meldung, beide Normalisierungen, kollisionssicheres Suffix). Der
+  Client prüft dasselbe Muster in `ProfileSettingsCard.tsx` gegen die **Endform**
+  (nicht gegen eine zweite Normalisierung) und benennt die Regel im Feld.
 
 **Brand-Scope.** `ftp_slug` ist user-level, nicht brand-level
 (`25-brand-separation-matrix.md:33`). Der `Brand`-Enum hat aktuell genau einen
@@ -437,9 +561,12 @@ einen zweiten Brand braucht es eine Trennung des Folder-Namespaces, sonst sieht
 ein Fotograf die Ordner einer anderen Marke. Bewusst nicht vorgebaut, aber
 dokumentiert (P1-M29).
 
-**Concurrency im Import.** Siehe Abschnitt 6: `process()` hat keinen Lock. Mit
-mehreren Fotografen ist die Annahme "single-user access" eine Fehlerquelle
-(P1-M28).
+**Concurrency im Import.** Erledigt (P1-M28): `process()` hat einen Lock pro
+Fotograf, siehe §3.3.2. Die Annahme "single-user access" aus Abschnitt 6 gilt
+nicht mehr und ist dort ersetzt; ein zweiter Aufruf bekommt 409 und arbeitet
+nicht. Der Lock ist ausdrücklich **kein** Lock über Grenzen hinweg — der
+FTP-Server schreibt ohne Protokoll-Lock in dasselbe Verzeichnis, und die Reichweite
+des Guards ist nur der konfigurierte Cache-Store.
 
 ### 7.12 Cutover-Runbook
 

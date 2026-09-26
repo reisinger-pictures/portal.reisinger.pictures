@@ -1,0 +1,18 @@
+Connecting to 127.0.0.1:19890
+803FA7F101000000:error:0A000410:SSL routines:ssl3_read_bytes:ssl/tls alert handshake failure:ssl/record/rec_layer_s3.c:918:SSL alert number 40
+CONNECTED(00000003)
+---
+no peer certificate available
+---
+No client certificate CA names sent
+SSL handshake has read 74 bytes and written 131 bytes
+Verification: OK
+---
+New, (NONE), Cipher is (NONE)
+Protocol: TLSv1.2
+Secure Renegotiation IS NOT supported
+Compression: NONE
+Expansion: NONE
+No ALPN negotiated
+    Protocol  : TLSv1.2
+    Cipher    : 0000

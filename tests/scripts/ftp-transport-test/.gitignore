@@ -1,0 +1,7 @@
+.gitignore im Test-Harness ftp-transport-test
+============================================
+
+Laufzeit-Artefakte des Harness (Credentials, SQLite-DB, Zertifikate,
+Upload-Payloads). Nichts davon darf ins Repo.
+
+.runtime/

@@ -15,7 +15,7 @@
 # -> Rebuild-Trigger siehe .github/workflows/e2e-image.yml
 # (features/infrastructure/28-ci-test-image.md).
 # ==========================================================================
-FROM ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736
+FROM ghcr.io/reisinger-pictures/portal-base:8.5
 
 # Build-time package installation needs root. The final runtime identity is
 # restored to www-data after all tooling and browser binaries are installed.
@@ -37,7 +37,7 @@ ARG PNPM_VERSION=11.23.0
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Composer — statisches Dist-Binary (portabel über Debian-Varianten)
-COPY --from=composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.10.3 /usr/bin/composer /usr/bin/composer
 
 # System-Utils: git (actions/checkout), curl (Downloads), xz-utils (Node-Tarball),
 # unzip/zip (composer dist-Extraktion)

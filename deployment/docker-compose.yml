@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: mariadb:11.4@sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b
+    image: mariadb:11.4
     container_name: portal_db
     restart: unless-stopped
     logging:
@@ -25,7 +25,7 @@ services:
       - portal_internal
 
   search:
-    image: getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29
+    image: getmeili/meilisearch:v1.48.3
     container_name: portal_search
     restart: unless-stopped
     logging:
@@ -46,7 +46,7 @@ services:
       - portal_internal
 
   composer_init:
-    image: composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b
+    image: composer:2.10.3
     user: "1000:1000"
     container_name: portal_composer
     volumes:
@@ -54,7 +54,7 @@ services:
     command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
 
   backend:
-    image: ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736
+    image: ghcr.io/reisinger-pictures/portal-base:8.5
     user: "1000:1000"
     container_name: portal_backend
     restart: unless-stopped

@@ -1,0 +1,13 @@
+Connecting to 127.0.0.1:19890
+---
+no peer certificate available
+---
+No client certificate CA names sent
+SSL handshake has read 2542 bytes and written 1596 bytes
+Verification: OK
+---
+New, (NONE), Cipher is (NONE)
+Protocol: TLSv1.3
+    Protocol  : TLSv1.3
+    Cipher    : (NONE)
+    Verify return code: 18 (self-signed certificate)

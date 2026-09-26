@@ -7,13 +7,41 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
 use App\Services\PhotoProcessingService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class FtpController extends Controller
 {
+    /**
+     * Lifetime of the per-photographer import lock, in seconds.
+     *
+     * This is a hard ceiling, not a lease renewal: the guard is lost once it
+     * expires. It is therefore set far above a realistic import (ExifTool per
+     * file, one file copy and one DB transaction each), because the failure
+     * mode of a too-short TTL is a duplicated photo, while the failure mode of a
+     * too-long TTL is only that a photographer who hit a PHP fatal waits for
+     * the lock to expire instead of retrying immediately.
+     */
+    private const IMPORT_LOCK_TTL_SECONDS = 300;
+
+    /**
+     * Cache-lock name for one photographer's import run.
+     *
+     * Keyed by the user id, which is a globally unique UUID: the inbox folder is
+     * user-level too, so this is the narrowest key that still covers exactly the
+     * files the run can touch. A brand component would add nothing while the
+     * Brand enum has a single case, and the folder namespace is deliberately not
+     * brand-scoped yet (features/infrastructure/19-ftp-upload-pipeline.md §7.11).
+     */
+    public static function importLockName(string $userId): string
+    {
+        return 'ftp-process:'.$userId;
+    }
+
     public function __construct(
         private readonly PhotoProcessingService $photoService,
     ) {}
@@ -58,6 +86,37 @@ class FtpController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Triggers the FTP import for the calling photographer.
+     *
+     * Concurrency guard (P1-M28). The pipeline is read → copy → Photo row →
+     * unlink over a directory the FTP server writes into at the same time. Two
+     * runs can each take their own `glob()` snapshot of the same file, and the
+     * loser of the unlink race would still have produced a second Photo row and
+     * a second stored file under a different UUID. The "single-user access"
+     * assumption in
+     * features/infrastructure/19-ftp-upload-pipeline.md §6 stopped holding once
+     * several photographers import in parallel, so it is replaced by a
+     * per-photographer cache lock.
+     *
+     * What it protects: the whole read → copy → metadata → Photo row → unlink
+     * sequence of one photographer, for as long as this deployment's cache store
+     * is shared. A competing call is answered with 409 and imports nothing.
+     *
+     * What it does NOT protect — deliberately not claimed:
+     * - It is not a lock across a system boundary. The FTP/SFTP server writes
+     *   into the same directory and takes no protocol-level lock, so a file a
+     *   camera is still writing can be read half-finished. Keeping uploads and
+     *   imports apart is the photographer's workflow, not this guard's job.
+     * - It is not global. Its reach is exactly the reach of the configured cache
+     *   store. A deployment that gives every node its own file cache degrades it
+     *   to a per-node best effort.
+     * - It is not a renewed lease, see IMPORT_LOCK_TTL_SECONDS. A run that
+     *   outlives the TTL loses the guard; a PHP fatal releases it only when the
+     *   TTL expires.
+     * - It does not merge or queue requests. The rejected call does no work at
+     *   all; the photographer sees "an import is already running" and retries.
+     */
     public function process(Request $request)
     {
         $user = auth('api')->user();
@@ -86,9 +145,46 @@ class FtpController extends Controller
             return response()->json(['success' => true, 'processed' => 0]);
         }
 
+        // Acquired only once there is work to do, so an idle photographer never
+        // blocks their own next import. Non-blocking on purpose: a second run
+        // must be told that it is too early instead of silently waiting and then
+        // racing the first one through the very same files.
+        $lock = Cache::lock(self::importLockName($user->id), self::IMPORT_LOCK_TTL_SECONDS);
+        if (! $lock->get()) {
+            return response()->json([
+                'error' => 'Ein Import läuft bereits. Bitte warte, bis er abgeschlossen ist.',
+            ], 409, ['Retry-After' => (string) self::IMPORT_LOCK_TTL_SECONDS]);
+        }
+
+        try {
+            return $this->runImport($user, $gallery, $imageFiles);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Imports the given inbox files into the target gallery.
+     *
+     * The caller must hold the import lock of `process()`. The sequence per file
+     * is read → copy to the photo disk → Photo row in a transaction → unlink the
+     * inbox copy, so a failure leaves the source file in place for the next run
+     * (features/infrastructure/19-ftp-upload-pipeline.md §6).
+     *
+     * @param  list<string>  $imageFiles
+     */
+    private function runImport($user, Gallery $gallery, array $imageFiles): JsonResponse
+    {
         $processedCount = 0;
 
         foreach ($imageFiles as $file) {
+            // `glob()` is a snapshot taken before this loop. A file that vanished
+            // in between was already claimed by a competing run, so it is
+            // skipped instead of imported a second time under a new UUID.
+            if (! file_exists($file)) {
+                continue;
+            }
+
             $originalName = pathinfo($file, PATHINFO_FILENAME);
             $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
             if ($extension === 'jpeg') {

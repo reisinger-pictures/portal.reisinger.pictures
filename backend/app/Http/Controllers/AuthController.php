@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\AIService;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
+use App\Support\FtpSlug;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -217,18 +218,37 @@ class AuthController extends Controller
     {
         $user = Auth::guard('api')->user();
 
-        // Zwingend formatieren, bevor die Validation (und Unique-Regel) greift!
+        // P1-M21: `ftp_slug` ist der FTP-/SFTP-Accountname, kein Anzeigename.
+        // Formatiert wird deshalb nur kosmetisch (Groß-/Kleinschreibung, Umlaute,
+        // Leerzeichen) — `Str::slug()` wäre hier falsch, weil es genau die Zeichen
+        // verschluckt, die die Formatregel verbietet (`a/b` -> `ab`, `a@b` ->
+        // `a-at-b`, `j.doe` -> `jdoe` und damit eine stille Namenskollision).
+        // Punkt, `@`, Slash und ein führendes Trennzeichen überstehen die
+        // Normalisierung und werden unten abgelehnt: aus einem getippten Login
+        // darf nicht stillschweigend ein anderer werden. Das alte `max:255` ist
+        // durch die Formatregel (max. 32 Zeichen) überflüssig.
         if ($request->has('ftp_slug') && ! empty($request->input('ftp_slug'))) {
             $request->merge([
-                'ftp_slug' => Str::slug($request->input('ftp_slug')),
+                'ftp_slug' => FtpSlug::normalize((string) $request->input('ftp_slug')),
             ]);
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'metadata_copyright' => 'nullable|string|max:255',
-            'ftp_slug' => 'sometimes|required|string|max:255|unique:users,ftp_slug,'.$user->id,
-        ]);
+        $validated = $request->validate(
+            [
+                'name' => 'required|string|max:255',
+                'metadata_copyright' => 'nullable|string|max:255',
+                'ftp_slug' => [
+                    'sometimes',
+                    'required',
+                    'string',
+                    'regex:'.FtpSlug::PATTERN,
+                    'unique:users,ftp_slug,'.$user->id,
+                ],
+            ],
+            [
+                'ftp_slug.regex' => FtpSlug::message(),
+            ]
+        );
 
         DB::transaction(function () use ($user, $validated) {
             $user->update($validated);

@@ -97,7 +97,7 @@ jobs:
         working-directory: backend
     services:
       meilisearch:
-        image: getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29
+        image: getmeili/meilisearch:v1.48.3
         ports:
           - 7701:7700
         env:
@@ -106,7 +106,7 @@ jobs:
       mailpit:
         # phpunit.xml sendet via SMTP auf 127.0.0.1:1025; MailpitAssertions.php
         # liest Mails ueber die HTTP-API auf 127.0.0.1:8025 (hardcodiert).
-        image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+        image: axllent/mailpit:v1.31.2
         ports:
           - 1025:1025
           - 8025:8025
@@ -144,7 +144,7 @@ jobs:
             --network host \
             -v "${{ github.workspace }}:/app" \
             -w /app/backend \
-            ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736 \
+            ghcr.io/reisinger-pictures/portal-base:8.5 \
             sleep infinity
           until docker exec php php -v > /dev/null 2>&1; do sleep 1; done
       - name: Prepare environment
@@ -156,7 +156,7 @@ jobs:
             --network host \
             -v "${{ github.workspace }}:/app" \
             -w /app/backend \
-            composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b install --ignore-platform-reqs --no-interaction --optimize-autoloader
+            composer:2.10.3 install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
         run: docker exec php php artisan key:generate
       - name: Check PHP formatting (Pint)
@@ -296,7 +296,7 @@ jobs:
     # meili/mailpit) sind per Service-Name erreichbar. Details: features/
     # infrastructure/28-ci-test-image.md.
     container:
-      image: ghcr.io/reisinger-pictures/portal-e2e@sha256:c09b2f8e2cb93be6d84f9917c33072cc171b941ce8c0933c9390570b48295aaf
+      image: ghcr.io/reisinger-pictures/portal-e2e:v2026.09.24
       # INFRA-2: the runner mounts the host workspace at $GITHUB_WORKSPACE and
       # runs steps inside this container. Dockerfile.e2e ends in
       # `USER www-data` (uid 1000), so without this override actions/checkout,
@@ -358,7 +358,7 @@ jobs:
       MAILPIT_API_URL: http://mailpit:8025/api/v1
     services:
       mariadb:
-        image: mariadb:11.4@sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b
+        image: mariadb:11.4
         ports:
           - 3307:3306
         env:
@@ -372,14 +372,14 @@ jobs:
           --health-timeout=5s
           --health-retries=10
       meilisearch:
-        image: getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29
+        image: getmeili/meilisearch:v1.48.3
         ports:
           - 7701:7700
         env:
           MEILI_MASTER_KEY: test_meili_secret
           MEILI_ENV: development
       mailpit:
-        image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+        image: axllent/mailpit:v1.31.2
         ports:
           - 8025:8025
           - 1025:1025
