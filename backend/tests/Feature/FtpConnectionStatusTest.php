@@ -72,6 +72,10 @@ class FtpConnectionStatusTest extends TestCase
         $response->assertJsonPath('connection.ftps_port', 989);
         $response->assertJsonPath('connection.pasv_port_start', 50000);
         $response->assertJsonPath('connection.pasv_port_end', 50100);
+        // Translated, not passed through: the camera says "explicit", SFTPGo
+        // says 1, and the translation lives in the backend so the UI has no
+        // second source of truth for it.
+        $response->assertJsonPath('connection.ftps_tls_mode', 'explicit');
     }
 
     /**
@@ -256,6 +260,7 @@ class FtpConnectionStatusTest extends TestCase
                 'ftps_port',
                 'pasv_port_start',
                 'pasv_port_end',
+                'ftps_tls_mode',
             ],
         ]);
 
@@ -331,6 +336,7 @@ class FtpConnectionStatusTest extends TestCase
                 'ftps_port' => '989',
                 'pasv_port_start' => '50000',
                 'pasv_port_end' => '50100',
+                'ftps_tls_mode' => '1',
             ], $overrides),
         ]);
     }
