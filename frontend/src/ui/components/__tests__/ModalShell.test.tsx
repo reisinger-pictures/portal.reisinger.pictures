@@ -105,6 +105,48 @@ describe('ModalShell', () => {
         expect(form).toContainElement(screen.getByRole('button', { name: 'Erste Aktion' }));
     });
 
+    it('closes only the innermost dialog when two are nested', () => {
+        // AIGalleryDefaultsModal opens inside another dialog. A key event on
+        // the inner one bubbles to the outer handler, so without the
+        // top-of-stack check a single Escape closed both at once.
+        const closeOuter = vi.fn();
+        const closeInner = vi.fn();
+
+        renderWithProviders(
+            <ModalShell title="Äußeres Dialog" onClose={closeOuter}>
+                <ModalShell title="Inneres Dialog" onClose={closeInner}>
+                    <button type="button">Innen</button>
+                </ModalShell>
+            </ModalShell>,
+        );
+
+        const inner = screen.getByRole('dialog', { name: 'Inneres Dialog' });
+        fireEvent.keyDown(inner, { key: 'Escape' });
+
+        expect(closeInner).toHaveBeenCalledTimes(1);
+        expect(closeOuter).not.toHaveBeenCalled();
+    });
+
+    it('passes noValidate through to the form', () => {
+        // PhotoJobModal submits through Zod and relied on native constraint
+        // validation being off; losing it blocks submit behind a browser
+        // tooltip instead of surfacing the field error.
+        const { container } = renderShell({
+            onFormSubmit: (event: React.FormEvent) => event.preventDefault(),
+            noValidate: true,
+        });
+
+        expect(container.querySelector('form')).toHaveAttribute('novalidate');
+    });
+
+    it('leaves native validation on by default', () => {
+        const { container } = renderShell({
+            onFormSubmit: (event: React.FormEvent) => event.preventDefault(),
+        });
+
+        expect(container.querySelector('form')).not.toHaveAttribute('novalidate');
+    });
+
     it('keeps focus inside the dialog', async () => {
         renderShell();
 

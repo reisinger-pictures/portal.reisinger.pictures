@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { type KeyboardEvent, type ReactNode, type RefObject, useId } from 'react';
-import { useFocusTrap } from '../../logic/useFocusTrap';
+import { isTopmostTrapContainer, useFocusTrap } from '../../logic/useFocusTrap';
 
 /**
  * The accessibility contract for every dialog in this app, with no opinion
@@ -39,6 +39,15 @@ interface ModalShellProps {
     boxClassName?: string;
     /** When provided, children and footer render inside a form element. */
     onFormSubmit?: (e: React.FormEvent) => void;
+    /**
+     * Disables native browser constraint validation on that form.
+     *
+     * PhotoJobModal relied on this: its title input is `required`, but the form
+     * submitted through Zod validation, and native validation would have
+     * blocked submit with a browser tooltip instead of surfacing the field
+     * error. It is not the default because most forms here do want it.
+     */
+    noValidate?: boolean;
     /** Rendered after children, inside the form when `onFormSubmit` is set. */
     footer?: ReactNode;
     children: ReactNode;
@@ -55,6 +64,7 @@ export default function ModalShell({
     className = '',
     boxClassName = '',
     onFormSubmit,
+    noValidate = false,
     footer,
     children,
 }: ModalShellProps) {
@@ -67,12 +77,16 @@ export default function ModalShell({
 
     const handleKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
         if (event.key !== 'Escape') return;
+        // A nested dialog's Escape bubbles to this handler too. Acting on it
+        // here would close both the inner and the outer dialog, so only the
+        // innermost trap may respond.
+        if (!isTopmostTrapContainer(event.currentTarget)) return;
         event.preventDefault();
         onClose();
     };
 
     const body = onFormSubmit ? (
-        <form onSubmit={onFormSubmit}>
+        <form onSubmit={onFormSubmit} noValidate={noValidate}>
             {children}
             {footer}
         </form>
@@ -94,6 +108,7 @@ export default function ModalShell({
             className={`modal modal-open ${className}`.trim()}
             onKeyDown={handleKeyDown}
             onCancel={(event) => {
+                if (!isTopmostTrapContainer(event.currentTarget)) return;
                 event.preventDefault();
                 onClose();
             }}

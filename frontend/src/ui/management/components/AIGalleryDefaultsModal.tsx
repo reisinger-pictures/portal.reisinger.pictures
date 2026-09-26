@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { useAI } from '../../../logic/useAI';
 import { useUI } from '../../components/UIContext';
+import ModalShell from '../../components/ModalShell';
 import { IptcData } from '../../../logic/usePhoto';
 
 interface Props {
@@ -50,12 +51,17 @@ export default function AIGalleryDefaultsModal({ isOpen, onClose, onApply }: Pro
     };
 
     return (
-        <dialog className="modal modal-open">
-            <div className="modal-box max-w-xl relative">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
-                    <span className="iconify mdi--robot-outline text-primary"></span> <Trans>KI-Vorschlag für Vorgaben</Trans>
-                </h3>
+        <ModalShell
+            title={<Trans>KI-Vorschlag für Vorgaben</Trans>}
+            icon="mdi--robot-outline"
+            onClose={onClose}
+            boxClassName="max-w-xl"
+            footer={
+                <div className="flex justify-end gap-3">
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}><Trans>Schliessen</Trans></button>
+                </div>
+            }
+        >
                 <p className="text-sm opacity-70 mb-4">
                     <Trans>Beschreibe die Galerie — die KI generiert Vorschläge für Titel, Beschreibung und Keywords (nur Text, keine Bildanalyse).</Trans>
                 </p>
@@ -97,12 +103,6 @@ export default function AIGalleryDefaultsModal({ isOpen, onClose, onApply }: Pro
                         </button>
                     </div>
                 )}
-
-                <div className="flex justify-end gap-3">
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}><Trans>Schliessen</Trans></button>
-                </div>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </dialog>
+        </ModalShell>
     );
 }

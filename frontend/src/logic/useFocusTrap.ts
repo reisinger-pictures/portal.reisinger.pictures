@@ -16,6 +16,7 @@ export interface FocusTrapOptions<T extends HTMLElement = HTMLElement> {
 }
 
 interface FocusTrapEntry {
+    container: HTMLElement;
     previousFocus: HTMLElement | null;
     addedTabIndex: boolean;
 }
@@ -32,6 +33,45 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
 
 function isTopTrap(stack: FocusTrapEntry[], entry: FocusTrapEntry): boolean {
     return stack[stack.length - 1] === entry;
+}
+
+/**
+ * Whether a container is the innermost active focus trap in its document.
+ *
+ * Dialogs can nest — AIGalleryDefaultsModal opens inside another dialog — and a
+ * key event on the inner one bubbles up to the outer handler. Without this
+ * check, Escape in the inner dialog closes both, because the outer dialog sees
+ * the same event and cannot tell it was already handled.
+ *
+ * With no trap registered at all this returns true, so a dialog that is not
+ * itself trapped still responds to Escape rather than silently doing nothing.
+ */
+export function isTopmostTrapContainer(container: HTMLElement | null): boolean {
+    if (!container) {
+        return true;
+    }
+
+    const stack = trapStacks.get(container.ownerDocument);
+    if (!stack || stack.length <= 1) {
+        return true;
+    }
+
+    // Registration order is not nesting order. React runs effects child-first,
+    // so a nested dialog registers BEFORE its parent, and a "last registered
+    // wins" check hands Escape to the outer dialog and leaves the inner one
+    // inert. Document order is what expresses nesting, because a nested dialog
+    // is rendered inside its parent's subtree. Sibling dialogs that were
+    // opened one after another are appended to the body, so the later one also
+    // follows the earlier one and the same check stays correct for them.
+    const isFollowedByAnotherTrap = stack.some(
+        (entry) =>
+            entry.container !== container &&
+            (container.compareDocumentPosition(entry.container) &
+                Node.DOCUMENT_POSITION_FOLLOWING) !==
+                0,
+    );
+
+    return !isFollowedByAnotherTrap;
 }
 
 function removeTrapEntry(stack: FocusTrapEntry[], entry: FocusTrapEntry): void {
@@ -84,6 +124,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>(
         const activeElement = ownerDocument.activeElement;
         const previousFocus = activeElement instanceof HTMLElement ? activeElement : null;
         const entry: FocusTrapEntry = {
+            container,
             previousFocus,
             addedTabIndex: false,
         };

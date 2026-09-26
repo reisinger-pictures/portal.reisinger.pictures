@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
@@ -8,9 +8,41 @@ test.describe('Package Calculator Configuration (G2)', () => {
     let helper: E2ESessionHelper;
     let superAdmin = { email: '', password: '' };
 
-    test.beforeEach(async ({ request }) => {
+    /**
+     * The calculator settings are global, brand-scoped state, not per-user.
+     * The verification test used to depend on the configuration test having run
+     * first and saved them, which is a hidden order dependency: under parallel
+     * workers another test can overwrite the values between the save and the
+     * read, and the assertion then sees a different price. Observed as 319.00
+     * EUR instead of 229.00 EUR, with the locator resolving stably 14 times, so
+     * it was never a timing problem.
+     *
+     * Every test now establishes the values it relies on itself.
+     */
+    const applyCalculatorSettings = async (page: Page) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await auth.login(superAdmin.email, superAdmin.password);
+        await sidebar.navigateTo('Einstellungen');
+        await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
+
+        const cardBody = page.locator('main h2:has-text("Paket-Rechner Konfiguration")').first()
+            .locator('..').locator('..');
+        await expect(cardBody).toBeVisible();
+
+        await cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]').fill('95');
+        await cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Bilder' }).locator('input[type="number"]').fill('12');
+        await cardBody.locator('.form-control').filter({ hasText: 'Reportage-Aufschlag' }).locator('input[type="number"]').fill('25');
+
+        await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
+        await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
+    };
+
+    test.beforeEach(async ({ request, page }) => {
         helper = new E2ESessionHelper(request);
         superAdmin = await helper.createIsolatedUser('super_admin');
+        await applyCalculatorSettings(page);
     });
 
     test.afterEach(async () => {
@@ -18,30 +50,17 @@ test.describe('Package Calculator Configuration (G2)', () => {
     });
 
     test('Admin can configure package calculator settings', { tag: ['@feature:admin:calculator'] }, async ({ page }) => {
-        const auth = new AuthHelper(page);
-        const sidebar = new SidebarHelper(page);
+        // Settings are written by beforeEach so this test does not depend on
+        // ordering. It asserts that what was saved is read back.
+        const cardBody = page.locator('main h2:has-text("Paket-Rechner Konfiguration")').first()
+            .locator('..').locator('..');
 
-        await auth.login(superAdmin.email, superAdmin.password);
-        await sidebar.navigateTo('Einstellungen');
-
-        await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
-
-        const calculatorCard = page.locator('main h2:has-text("Paket-Rechner Konfiguration")').first();
-        await expect(calculatorCard).toBeVisible();
-
-        const cardBody = calculatorCard.locator('..').locator('..');
-        const hourlyRateInput = cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]');
-        await hourlyRateInput.fill('95');
-
-        const outdoorFactorInput = cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Bilder' }).locator('input[type="number"]');
-        await outdoorFactorInput.fill('12');
-
-        const flatrateSurchargeInput = cardBody.locator('.form-control').filter({ hasText: 'Reportage-Aufschlag' }).locator('input[type="number"]');
-        await flatrateSurchargeInput.fill('25');
-
-        await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
-
-        await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
+        await expect(cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]'))
+            .toHaveValue('95');
+        await expect(cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Bilder' }).locator('input[type="number"]'))
+            .toHaveValue('12');
+        await expect(cardBody.locator('.form-control').filter({ hasText: 'Reportage-Aufschlag' }).locator('input[type="number"]'))
+            .toHaveValue('25');
     });
 
     test('Admin can set outdoor multiplier and verify it in the shooting calculator', { tag: ['@feature:admin:calculator'] }, async ({ page }) => {

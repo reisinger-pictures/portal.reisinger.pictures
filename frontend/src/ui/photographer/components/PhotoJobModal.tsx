@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useUI } from '../../components/UIContext';
+import ModalDialogShell from '../../components/ModalDialogShell';
 import { BoardUser, PhotoJob, PhotoJobInput } from '../../../logic/useProductionBoard';
 import { useUsers } from '../../../logic/useUsers';
 import { useProtectedGalleries } from '../../../logic/useGalleries';
@@ -134,70 +135,67 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
     };
 
     return (
-        <div className="modal modal-open">
-            <div className="modal-box max-w-2xl">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-6">
-                    {editing ? <Trans>Auftrag bearbeiten</Trans> : <Trans>Neuen Auftrag anlegen</Trans>}
-                </h3>
-                <form onSubmit={handleSubmit(onSubmit)} noValidate>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold"><Trans>Titel</Trans></span></label>
-                            <input required type="text" {...register('title')} className={`input input-bordered w-full ${errors.title ? 'input-error' : ''}`} />
-                            {errors.title && <span className="text-error text-xs mt-1">{errors.title.message}</span>}
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold"><Trans>Lightroom-Katalog</Trans></span></label>
-                            <select {...register('lightroom_catalog')} className="select select-bordered w-full">
-                                <option value=""><Trans>Kein Katalog</Trans></option>
-                                {catalogOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold"><Trans>Ziel-Galerie</Trans></span></label>
-                            <select {...register('target_gallery_id')} className="select select-bordered w-full">
-                                <option value=""><Trans>Keine</Trans></option>
-                                {galleries?.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold"><Trans>Bilder gesamt</Trans></span></label>
-                            <input type="number" min="0" step="1" {...register('total_count')} className={`input input-bordered w-full ${errors.total_count ? 'input-error' : ''}`} />
-                            {errors.total_count && <span className="text-error text-xs mt-1">{errors.total_count.message}</span>}
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold"><Trans>Bilder selektiert</Trans></span></label>
-                            <input type="number" min="0" step="1" {...register('selected_count')} className={`input input-bordered w-full ${errors.selected_count ? 'input-error' : ''}`} />
-                            {errors.selected_count && <span className="text-error text-xs mt-1">{errors.selected_count.message}</span>}
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold"><Trans>Zuständig</Trans></span></label>
-                            <select {...register('assignee_id')} className="select select-bordered w-full">
-                                <option value=""><Trans>Keine Zuweisung</Trans></option>
-                                {assigneeOptions.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-control">
-                            <label className="label"><span className="label-text font-bold"><Trans>Status</Trans></span></label>
-                            <select {...register('status')} className="select select-bordered w-full">
-                                {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold"><Trans>Notiz</Trans></span></label>
-                            <textarea {...register('notes')} rows={3} className="textarea textarea-bordered w-full" />
-                        </div>
-                    </div>
-                    <div className="modal-action">
-                        <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
-                        </button>
-                    </div>
-                </form>
+        // noValidate was on the original <form> and must stay: this form
+        // validates through Zod, so native constraint validation would block
+        // submit behind a browser tooltip instead of rendering the field error
+        // the board test asserts. Caught by the E2E run, not by jsdom.
+        <ModalDialogShell
+            noValidate
+            title={editing ? <Trans>Auftrag bearbeiten</Trans> : <Trans>Neuen Auftrag anlegen</Trans>}
+            onClose={onClose}
+            editing={false}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit(onSubmit)}
+            maxWidth="2xl"
+        >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control md:col-span-2">
+                    <label className="label"><span className="label-text font-bold"><Trans>Titel</Trans></span></label>
+                    <input required type="text" {...register('title')} className={`input input-bordered w-full ${errors.title ? 'input-error' : ''}`} />
+                    {errors.title && <span className="text-error text-xs mt-1">{errors.title.message}</span>}
+                </div>
+                <div className="form-control">
+                    <label className="label"><span className="label-text font-bold"><Trans>Lightroom-Katalog</Trans></span></label>
+                    <select {...register('lightroom_catalog')} className="select select-bordered w-full">
+                        <option value=""><Trans>Kein Katalog</Trans></option>
+                        {catalogOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                </div>
+                <div className="form-control">
+                    <label className="label"><span className="label-text font-bold"><Trans>Ziel-Galerie</Trans></span></label>
+                    <select {...register('target_gallery_id')} className="select select-bordered w-full">
+                        <option value=""><Trans>Keine</Trans></option>
+                        {galleries?.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                </div>
+                <div className="form-control">
+                    <label className="label"><span className="label-text font-bold"><Trans>Bilder gesamt</Trans></span></label>
+                    <input type="number" min="0" step="1" {...register('total_count')} className={`input input-bordered w-full ${errors.total_count ? 'input-error' : ''}`} />
+                    {errors.total_count && <span className="text-error text-xs mt-1">{errors.total_count.message}</span>}
+                </div>
+                <div className="form-control">
+                    <label className="label"><span className="label-text font-bold"><Trans>Bilder selektiert</Trans></span></label>
+                    <input type="number" min="0" step="1" {...register('selected_count')} className={`input input-bordered w-full ${errors.selected_count ? 'input-error' : ''}`} />
+                    {errors.selected_count && <span className="text-error text-xs mt-1">{errors.selected_count.message}</span>}
+                </div>
+                <div className="form-control">
+                    <label className="label"><span className="label-text font-bold"><Trans>Zuständig</Trans></span></label>
+                    <select {...register('assignee_id')} className="select select-bordered w-full">
+                        <option value=""><Trans>Keine Zuweisung</Trans></option>
+                        {assigneeOptions.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                </div>
+                <div className="form-control">
+                    <label className="label"><span className="label-text font-bold"><Trans>Status</Trans></span></label>
+                    <select {...register('status')} className="select select-bordered w-full">
+                        {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
+                </div>
+                <div className="form-control md:col-span-2">
+                    <label className="label"><span className="label-text font-bold"><Trans>Notiz</Trans></span></label>
+                    <textarea {...register('notes')} rows={3} className="textarea textarea-bordered w-full" />
+                </div>
             </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalDialogShell>
     );
 }

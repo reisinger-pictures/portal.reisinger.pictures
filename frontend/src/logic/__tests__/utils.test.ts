@@ -10,6 +10,9 @@ import {
     safeJsonParse,
     GalleryGroup,
     calcAge,
+    moveArrayItemUp,
+    moveArrayItemDown,
+    toSlug,
 } from '../utils';
 
 describe('formatMoney', () => {
@@ -242,5 +245,118 @@ describe('calcAge', () => {
 
     it('born 2000-01-01, reference 2000-12-31 → 0 (first year, not yet birthday)', () => {
         expect(calcAge(new Date('2000-01-01'), new Date('2000-12-31'))).toBe(0);
+    });
+});
+
+// The 2026-09-26 test audit found moveArrayItemUp/Down and toSlug untested while
+// the surrounding helpers had 37 tests. Both matter more than their size
+// suggests: the move functions reorder contract line items and discount tiers,
+// where an off-by-one is a money bug rather than a cosmetic one.
+
+describe('moveArrayItemUp', () => {
+    const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+
+    it('swaps the item with its predecessor', () => {
+        expect(moveArrayItemUp(items, 2)).toEqual([{ id: 'a' }, { id: 'c' }, { id: 'b' }]);
+    });
+
+    it('returns the same array for the first index, so no reorder is a no-op', () => {
+        expect(moveArrayItemUp(items, 0)).toBe(items);
+    });
+
+    it('returns the same array for an out-of-range index in both directions', () => {
+        expect(moveArrayItemUp(items, items.length)).toBe(items);
+        expect(moveArrayItemUp(items, -1)).toBe(items);
+    });
+
+    it('never mutates the input', () => {
+        const original = [...items];
+        moveArrayItemUp(items, 1);
+        expect(items).toEqual(original);
+    });
+
+    it('preserves element identity, not just deep equality', () => {
+        // Reordering a list of records must not clone them: identity is what
+        // React keys and downstream dirty-tracking rely on.
+        const moved = moveArrayItemUp(items, 2);
+        expect(moved[1]).toBe(items[2]);
+        expect(moved[2]).toBe(items[1]);
+    });
+
+    it('handles a single-element list', () => {
+        const single = [{ id: 'only' }];
+        expect(moveArrayItemUp(single, 0)).toBe(single);
+    });
+
+    it('handles an empty list', () => {
+        const empty: { id: string }[] = [];
+        expect(moveArrayItemUp(empty, 0)).toBe(empty);
+    });
+});
+
+describe('moveArrayItemDown', () => {
+    const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+
+    it('swaps the item with its successor', () => {
+        expect(moveArrayItemDown(items, 0)).toEqual([{ id: 'b' }, { id: 'a' }, { id: 'c' }]);
+    });
+
+    it('returns the same array for the last index', () => {
+        expect(moveArrayItemDown(items, items.length - 1)).toBe(items);
+    });
+
+    it('returns the same array for an out-of-range index in both directions', () => {
+        expect(moveArrayItemDown(items, -1)).toBe(items);
+        expect(moveArrayItemDown(items, items.length)).toBe(items);
+    });
+
+    it('never mutates the input', () => {
+        const original = [...items];
+        moveArrayItemDown(items, 1);
+        expect(items).toEqual(original);
+    });
+
+    it('round-trips with moveArrayItemUp', () => {
+        // The ordering guarantee the UI relies on: a step down followed by a
+        // step up returns the original order.
+        const down = moveArrayItemDown(items, 0);
+        expect(moveArrayItemUp(down, 1)).toEqual(items);
+    });
+});
+
+describe('toSlug', () => {
+    it('transliterates German umlauts and eszett', () => {
+        expect(toSlug('Müller & Sohn')).toBe('mueller-sohn');
+        expect(toSlug('Ärzte')).toBe('aerzte');
+        expect(toSlug('Ötzi')).toBe('oetzi');
+        expect(toSlug('Übermut')).toBe('uebermut');
+        expect(toSlug('Straße')).toBe('strasse');
+    });
+
+    it('collapses runs of non-alphanumerics into single hyphens', () => {
+        expect(toSlug('a--b')).toBe('a-b');
+        expect(toSlug('Gallery   Name')).toBe('gallery-name');
+    });
+
+    it('strips leading hyphens', () => {
+        expect(toSlug('  Leading')).toBe('leading');
+    });
+
+    it('keeps a trailing hyphen, which is current behaviour and possibly a defect', () => {
+        // Pinned rather than fixed. The regex only anchors at the start
+        // (/^-+/), so 'Trailing  ' yields 'trailing-'. toSlug feeds gallery
+        // slugs, so changing it could move existing gallery URLs. Whether a
+        // trailing hyphen should be stripped is a product decision, not a
+        // drive-by cleanup — and the backend runs makeUnique() over the result
+        // anyway. If this is ever changed, this test is the tripwire.
+        expect(toSlug('Trailing  ')).toBe('trailing-');
+    });
+
+    it('returns an empty string for empty input', () => {
+        expect(toSlug('')).toBe('');
+    });
+
+    it('returns an empty string when nothing survives transliteration', () => {
+        expect(toSlug('///')).toBe('');
     });
 });

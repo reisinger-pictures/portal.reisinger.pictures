@@ -35,6 +35,7 @@ import {
     type ModelProfileAnswer,
 } from '../../../logic/modelRegistration';
 import { useUI } from '../../components/UIContext';
+import ModalShell from '../../components/ModalShell';
 
 interface Props {
     model: ManagedModel | null;
@@ -287,19 +288,51 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
     };
 
     return (
-        <div className="modal modal-open z-50">
-            <div className="modal-box max-w-4xl max-h-90vh overflow-y-auto relative">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-
-                <div className="flex flex-wrap items-start gap-3 mb-1">
-                    <h3 className="font-bold text-2xl flex items-center gap-2 min-w-0 break-words">
-                        <span className="iconify mdi--account-details text-primary shrink-0"></span>
-                        {model.display_name ?? t`Unbenanntes Model`}
-                    </h3>
-                    <span className={`badge shrink-0 h-auto whitespace-normal ${modelLifecycleBadgeClass(model.lifecycle_status)}`}>
-                        {modelLifecycleLabel(model.lifecycle_status)}
-                    </span>
+        // The header splits into `title` (name + icon, shell keeps text-2xl via
+        // the inner span) and `secondaryAction` (lifecycle badge). The trailing
+        // `modal-action` becomes `footer` and keeps its own "Schließen" button.
+        // The shell also renders a labelled close button, so this dialog has two
+        // controls named "Schließen" — a header close and a footer close are
+        // ordinary together, and dropping the footer one to keep a test locator
+        // unambiguous would have removed a user-facing affordance to suit the
+        // test. The three CRM specs that close this dialog are scoped to the
+        // footer instead.
+        <ModalShell
+            title={<span className="text-2xl min-w-0 break-words">{model.display_name ?? t`Unbenanntes Model`}</span>}
+            icon="mdi--account-details"
+            onClose={onClose}
+            className="z-50"
+            boxClassName="max-w-4xl max-h-90vh overflow-y-auto"
+            secondaryAction={
+                <span className={`badge shrink-0 h-auto whitespace-normal ${modelLifecycleBadgeClass(model.lifecycle_status)}`}>
+                    {modelLifecycleLabel(model.lifecycle_status)}
+                </span>
+            }
+            footer={
+                <div className="modal-action">
+                    {isAdmin && (
+                        <div className="flex flex-wrap gap-2 mr-auto" data-testid="model-contact-sheet-actions">
+                            {contactSheetActions.map(action => (
+                                <button
+                                    key={action.variant}
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    disabled={isWorking}
+                                    onClick={() => handleContactSheet(action.variant)}
+                                    data-testid={action.testId}
+                                >
+                                    {isWorking
+                                        ? <span className="loading loading-spinner loading-xs"></span>
+                                        : <span className="iconify mdi--file-pdf-box"></span>}
+                                    {action.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Schließen</Trans></button>
                 </div>
+            }
+        >
                 {outdated && (
                     <div className="alert alert-warning shadow-sm mb-6" role="status">
                         <span className="iconify mdi--alert-outline text-xl"></span>
@@ -474,31 +507,6 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                         </button>
                     </div>
                 )}
-
-                <div className="modal-action">
-                    {isAdmin && (
-                        <div className="flex flex-wrap gap-2 mr-auto" data-testid="model-contact-sheet-actions">
-                            {contactSheetActions.map(action => (
-                                <button
-                                    key={action.variant}
-                                    type="button"
-                                    className="btn btn-outline btn-sm"
-                                    disabled={isWorking}
-                                    onClick={() => handleContactSheet(action.variant)}
-                                    data-testid={action.testId}
-                                >
-                                    {isWorking
-                                        ? <span className="loading loading-spinner loading-xs"></span>
-                                        : <span className="iconify mdi--file-pdf-box"></span>}
-                                    {action.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                    <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Schließen</Trans></button>
-                </div>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }

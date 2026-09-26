@@ -86,7 +86,9 @@ test.describe('Model-Profil-Zugang (Magic Link)', () => {
         // close button is labelled "Menü schließen" and is only rendered on
         // narrow viewports, so an unscoped substring match becomes a strict-mode
         // violation on mobile.
-        await page.locator('.modal-box').getByRole('button', { name: 'Schließen', exact: true }).click();
+        // The shell renders a labelled header close button and the footer has its
+        // own, so an unscoped 'Schließen' matches two. Scope to the footer.
+        await page.getByRole('dialog').locator('.modal-action').getByRole('button', { name: 'Schließen', exact: true }).click();
         await auth.logout();
 
         // 4. Model öffnet den Profil-Link (Gast), aktualisiert und bestätigt.

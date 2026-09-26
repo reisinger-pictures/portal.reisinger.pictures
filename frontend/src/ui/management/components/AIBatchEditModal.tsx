@@ -8,6 +8,7 @@ import { usePhoto } from '../../../logic/usePhoto';
 import { useUI } from '../../components/UIContext';
 import { LocationResult } from '../../../logic/useLocations';
 import { fetcher } from '../../../api';
+import ModalShell from '../../components/ModalShell';
 
 interface Props {
     isOpen: boolean;
@@ -222,22 +223,26 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
     };
 
     return (
-        <div className="modal modal-open">
-            <div className="modal-box w-11/12 max-w-7xl h-90vh flex flex-col relative bg-base-200">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <div className="flex justify-between items-center mb-2 mr-8">
-                    <h3 className="font-bold text-2xl flex items-center gap-2">
-                        <span className="iconify mdi--robot-outline text-primary"></span> <Trans>KI Beschriftung</Trans>
-                    </h3>
-                    <button
-                        onClick={handleGenerateAll}
-                        disabled={!isAvailable || isGeneratingAll}
-                        className="btn btn-primary btn-sm"
-                    >
-                        {isGeneratingAll ? <span className="loading loading-spinner loading-xs"></span> : <span className="iconify mdi--auto-fix"></span>}
-                        <Trans>Alle generieren (leere)</Trans>
-                    </button>
-                </div>
+        // ModalShell, not ModalDialogShell: there is no <form> and no submit
+        // handler anywhere in this dialog — it saves per row, not on submit.
+        // There is no `modal-action` footer either; the only header-right
+        // control is the batch button, which goes to `secondaryAction`.
+        <ModalShell
+            title={<span className="text-2xl"><Trans>KI Beschriftung</Trans></span>}
+            icon="mdi--robot-outline"
+            onClose={onClose}
+            boxClassName="w-11/12 max-w-7xl h-90vh flex flex-col bg-base-200"
+            secondaryAction={
+                <button
+                    onClick={handleGenerateAll}
+                    disabled={!isAvailable || isGeneratingAll}
+                    className="btn btn-primary btn-sm"
+                >
+                    {isGeneratingAll ? <span className="loading loading-spinner loading-xs"></span> : <span className="iconify mdi--auto-fix"></span>}
+                    <Trans>Alle generieren (leere)</Trans>
+                </button>
+            }
+        >
 
                 {isGeneratingAll && (
                     <div className="mb-4">
@@ -295,8 +300,6 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
                         );
                     })}
                 </div>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }

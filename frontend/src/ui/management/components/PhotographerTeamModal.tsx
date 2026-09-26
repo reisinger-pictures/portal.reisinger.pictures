@@ -4,6 +4,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
+import ModalShell from '../../components/ModalShell';
 import { Gallery, GalleryGroup } from '../../../logic/useGalleries';
 import { UserDetailed } from '../../../logic/useUsers';
 
@@ -65,12 +66,12 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
     };
 
     return (
-        <div className="modal modal-open">
-            <div className="modal-box max-w-2xl relative flex flex-col max-h-80vh">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
-                    <span className="iconify mdi--camera-account text-primary"></span> <Trans>Fotografen-Team</Trans>
-                </h3>
+        <ModalShell
+            title={<Trans>Fotografen-Team</Trans>}
+            icon="mdi--camera-account"
+            onClose={onClose}
+            boxClassName="max-w-2xl flex flex-col max-h-80vh"
+        >
                 <p className="text-sm opacity-70 mb-4">{isGroup ? <Trans>Ordner</Trans> : <Trans>Galerie</Trans>}: <strong>{item.name}</strong></p>
 
                 <div className="form-control w-full mb-6">
@@ -116,8 +117,6 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
                         <span><Trans>Dieser Bereich ist aktuell für <strong>alle Fotografen</strong> freigegeben. Du musst keine expliziten Zuweisungen vornehmen.</Trans></span>
                     </div>
                 )}
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }

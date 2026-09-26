@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import {InvoiceDiscount, InvoiceItem} from '../../../api';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
+import ModalShell from '../../components/ModalShell';
 import {calculateB2CFlexPrice, calculateShootingPrice, ShootingDiscount, DEFAULT_OUTDOOR_IMAGES_PER_HOUR} from '../../../logic/shootingCalculator';
 
 interface ShootingCalculatorModalProps {
@@ -99,16 +100,25 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
         onClose();
     };
 
+    // No <form> on purpose: the inputs live inside a daisyUI `tabs` block and
+    // "Berechnen & Hinzufügen" is a plain onClick button. Wrapping them in a
+    // form (ModalShell's `onFormSubmit`) would make Enter inside a text/number
+    // input submit the dialog, which is a behaviour change, not a migration.
     return (
-        <div className="modal modal-open">
-            <div className="modal-box relative max-w-lg">
-                <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-                        onClick={onClose}>✕
-                </button>
-                <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
-                    <span className="iconify mdi--calculator text-primary"></span>
-                    {calcMode === 'flex' ? <Trans>Flex Tarif Rechner</Trans> : <Trans>Standard Tarif Rechner</Trans>}
-                </h3>
+        <ModalShell
+            title={calcMode === 'flex' ? <Trans>Flex Tarif Rechner</Trans> : <Trans>Standard Tarif Rechner</Trans>}
+            icon="mdi--calculator"
+            onClose={onClose}
+            boxClassName="max-w-lg"
+            footer={
+                <div className="modal-action mt-6">
+                    <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
+                    <button type="button" className="btn btn-primary px-6" onClick={handleCalculate}><Trans>Berechnen &
+                        Hinzufügen</Trans>
+                    </button>
+                </div>
+            }
+        >
 
                 <div className="tabs tabs-lift">
                     <input type="radio" name="calc_tabs" className="tab" aria-label="Flex Tarif"
@@ -219,15 +229,6 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                         <div className="text-2xl font-mono font-bold text-primary">{finalPriceEuro.toFixed(2)} €</div>
                     </div>
                 </div>
-
-                <div className="modal-action mt-6">
-                    <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                    <button type="button" className="btn btn-primary px-6" onClick={handleCalculate}><Trans>Berechnen &
-                        Hinzufügen</Trans>
-                    </button>
-                </div>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }
