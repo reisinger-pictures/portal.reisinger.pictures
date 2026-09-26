@@ -439,13 +439,28 @@ PHP;
         $this->assertSame(3, substr_count($compose, 'user: "1000:1000"'));
         $this->assertStringContainsString('USER www-data', $dockerfile);
         $this->assertStringContainsString('USER www-data', $e2eDockerfile);
-        $this->assertStringContainsString('stat -c \'%u:%g\'', $compose);
+        // Schreibbarkeit statt Eigentum. 19-ftp 7.9 verbietet `chown -R` auf
+        // /home/webadmin/websites, ein Eigentumsvergleich waere also nicht
+        // erfuellbar. Geprueft wird das, was zaehlt: ob UID 1000 schreiben darf.
+        // Der explizite Negativ-Test haelt den unerfuellbaren Eigentumscheck
+        // draussen, falls ihn jemand zurueckholt.
+        $this->assertStringContainsString(
+            'printenv PHOTO_STORAGE_PATH | xargs -r -I{} test -w {}',
+            $compose
+        );
+        $this->assertStringNotContainsString("stat -c '%u:%g'", $compose);
 
+        // Die Startvorbedingungen pruefen die Variablen ueber `printenv | grep`
+        // statt ueber `case "$${VAR}"`. Grund ist Compose v5.0.2: es gibt jede
+        // Command-Substitution als `$$(...)` aus und reduziert `$$` in keiner
+        // YAML-Form, der Container-Shell expandiert `$$` dann zur PID und der
+        // Vergleich liefe gegen `1234{APP_ENV}`. Die Invariante ist unveraendert.
         foreach (['APP_KEY', 'JWT_SECRET', 'FILE_ENCRYPTION_KEY', 'ADMIN_EMAIL', 'ADMIN_PASSWORD', 'PHOTO_STORAGE_PATH'] as $variable) {
-            $this->assertStringContainsString('$${'.$variable.'}', $compose);
+            $this->assertStringContainsString('printenv '.$variable.' | grep -q .', $compose);
         }
-        $this->assertStringContainsString('case \"$${PHOTO_STORAGE_PATH}\" in', $compose);
-        $this->assertStringContainsString('/*) ;;', $compose);
+        // Zusaetzlich muss PHOTO_STORAGE_PATH absolut sein — das ist der
+        // frueheren `case`-Verzweigung mit `/*) ;;` nachempfunden.
+        $this->assertStringContainsString("printenv PHOTO_STORAGE_PATH | grep -q '^/'", $compose);
         $this->assertStringContainsString(
             'php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1',
             $compose

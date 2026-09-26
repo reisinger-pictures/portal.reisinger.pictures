@@ -345,11 +345,17 @@ class ProductionOperationsPolicyTest extends TestCase
         $this->assertStringContainsString('php artisan optimize || exit 1;', $compose);
         $this->assertStringContainsString('php artisan ops:validate-production || exit 1;', $compose);
         $this->assertStringContainsString('APP_ENV muss im Produktions-Stack production sein', $compose);
-        $this->assertStringContainsString('if [ ! -x /usr/local/bin/validate-production-env ]', $compose);
-        $this->assertStringContainsString('[ ! -x /usr/local/bin/portal-backend-supervisor ]', $compose);
-        $this->assertStringContainsString('Rebuild portal-base:8.5, push GHCR, update the pinned compose digest', $compose);
+        // Beide Binaries werden in einer Bedingung geprueft. Die frueheren
+        // zwei Einzelpruefungen sind darin aufgegangen; wichtiger als die Form
+        // ist, dass beide Namen vorkommen — fehlt eine, startet der Container
+        // ohne Preflight beziehungsweise ohne Supervisor.
+        $this->assertStringContainsString(
+            '[ -x /usr/local/bin/validate-production-env ] && [ -x /usr/local/bin/portal-backend-supervisor ]',
+            $compose
+        );
+        $this->assertStringContainsString('Rebuild portal-base:8.5, push GHCR, update the pinned compose tag', $compose);
         $this->assertStringContainsString('exec /usr/local/bin/portal-backend-supervisor', $compose);
-        $availabilityPosition = strpos($compose, 'if [ ! -x /usr/local/bin/validate-production-env ]');
+        $availabilityPosition = strpos($compose, '[ -x /usr/local/bin/validate-production-env ] &&');
         $preflightPosition = strpos($compose, '/usr/local/bin/validate-production-env || exit 1;');
         $cacheClearPosition = strpos($compose, 'php artisan cache:clear || exit 1;');
         $policyPosition = strpos($compose, 'php artisan ops:validate-production || exit 1;');
