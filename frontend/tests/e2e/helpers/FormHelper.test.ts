@@ -54,9 +54,12 @@ describe('FormHelper', () => {
         });
 
         expect(page.getByRole).toHaveBeenCalledWith('main');
+        // Anchored regex, not `exact`: the required marker is CSS-generated and
+        // counts towards the accessible name, so the field resolves as
+        // "Dein Name *". Pinning the literal would break as soon as the field
+        // stops being required.
         expect(mainLocator.getByRole).toHaveBeenNthCalledWith(1, 'textbox', {
-            name: 'Dein Name',
-            exact: true,
+            name: /^Dein Name/,
         });
         expect(mainLocator.getByRole).toHaveBeenNthCalledWith(2, 'textbox', {
             name: /^FTP Upload Ordner \(Slug\)/,

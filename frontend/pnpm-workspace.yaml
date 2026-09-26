@@ -4,7 +4,11 @@ overrides:
   react-router: 7.18.2
   nanoid: 3.3.18
   brace-expansion: 5.0.9
-  svgo: 4.0.2
+  # svgo is transitive via @iconify/tools <- @iconify/tailwind4 and was pinned
+  # to 4.0.2, which falls inside the vulnerable range >= 4.0.0, < 4.1.0 of
+  # GHSA-w27v-7q3p-w38r (high) and GHSA-4vpr-x523-8j87. @iconify/tools declares
+  # svgo: ^4.0.1, so 4.1.0 satisfies its own range — no forced resolution.
+  svgo: 4.1.0
   postcss: 8.5.23
   undici: 7.29.0
 allowBuilds:
