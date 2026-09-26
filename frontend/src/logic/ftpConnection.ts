@@ -12,7 +12,16 @@ export interface FtpConnection {
     configured: boolean;
     host: string | null;
     username: string | null;
-    path: string;
+    /**
+     * The folder the camera is told to write into, `/` for the account root.
+     *
+     * `null` means the deployment declared a folder the server refuses to
+     * confirm. The backend reports `configured: false` in that case, so the
+     * value is never rendered as a path — pointing a camera at a folder the
+     * server does not agree with is the silent failure this field exists to
+     * prevent.
+     */
+    path: string | null;
     sftp_port: number | null;
     ftps_port: number | null;
     pasv_port_start: number | null;
@@ -82,7 +91,7 @@ export function describeFtpConnection(connection: FtpConnection): FtpConnectionR
     if (connection.pasv_port_start !== null && connection.pasv_port_end !== null) {
         rows.push({ field: 'passive_ports', value: `${connection.pasv_port_start}\u2013${connection.pasv_port_end}` });
     }
-    if (connection.path !== '') {
+    if (connection.path !== null) {
         rows.push({ field: 'path', value: connection.path });
     }
 

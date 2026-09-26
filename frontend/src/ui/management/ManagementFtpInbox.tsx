@@ -1,9 +1,9 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import {Link} from 'react-router-dom';
 import {describeFtpConnection} from '../../logic/ftpConnection';
-import {useFtp} from '../../logic/useFtp';
+import {useFtp, type FtpAccountStatus} from '../../logic/useFtp';
 import {useProtectedGalleries} from '../../logic/useGalleries';
 import { useUI } from '../components/UIContext';
 import {FtpConnectionRows, FtpConnectionUnconfigured} from './FtpConnectionRows';
@@ -67,9 +67,15 @@ function FtpsHint({sftpPort, ftpsPort, tlsMode}: {sftpPort: number | null; ftpsP
  * every camera login fail no matter which password is typed, which is the silent
  * failure that looks like a wrong slug.
  */
-function AccountStatus({status, error}: {status: string; error: string | null}) {
-    if (status === 'pending') {
-        return (
+function AccountStatus({status, error}: {status: FtpAccountStatus; error: string | null}) {
+    // A record rather than an if-chain with a fallback. The old shape ended in
+    // "anything else is active", so a status the UI had never been taught
+    // rendered as *Konto aktiv* — the one thing a photographer must never be told
+    // about an account that does not work. Exhaustive by construction: a new
+    // member of `FtpAccountStatus` fails the build here instead of reaching a
+    // fallback.
+    const states: Record<FtpAccountStatus, ReactElement> = {
+        pending: (
             <div className="alert alert-warning shadow-sm mt-2" role="status">
                 <span className="iconify mdi--account-clock-outline text-xl"></span>
                 <div>
@@ -78,11 +84,18 @@ function AccountStatus({status, error}: {status: string; error: string | null}) 
                         zuerst die Zugangsdaten an.</Trans></p>
                 </div>
             </div>
-        );
-    }
-
-    if (status === 'error') {
-        return (
+        ),
+        revoked: (
+            <div className="alert alert-warning shadow-sm mt-2" role="status">
+                <span className="iconify mdi--account-off-outline text-xl"></span>
+                <div>
+                    <h3 className="font-bold"><Trans>Kamera-Konto entzogen</Trans></h3>
+                    <p className="text-sm"><Trans>Das Konto wurde entfernt, als die Fotografen-Rolle wegfiel. Die Kamera
+                        kann sich nicht mehr anmelden, bis das Konto erneut angelegt wird.</Trans></p>
+                </div>
+            </div>
+        ),
+        error: (
             <div className="alert alert-error shadow-sm mt-2" role="status">
                 <span className="iconify mdi--alert-circle-outline text-xl"></span>
                 <div>
@@ -90,14 +103,15 @@ function AccountStatus({status, error}: {status: string; error: string | null}) 
                     <p className="text-sm">{error ?? <Trans>Der Server nennt keinen Grund.</Trans>}</p>
                 </div>
             </div>
-        );
-    }
+        ),
+        active: (
+            <div className="flex items-center gap-2 mt-1">
+                <span className="badge badge-success badge-sm"><Trans>Konto aktiv</Trans></span>
+            </div>
+        ),
+    };
 
-    return (
-        <div className="flex items-center gap-2 mt-1">
-            <span className="badge badge-success badge-sm"><Trans>Konto aktiv</Trans></span>
-        </div>
-    );
+    return states[status];
 }
 
 export default function ManagementFtpInbox() {

@@ -118,12 +118,32 @@ describe('describeFtpConnection', () => {
         expect(rows).toHaveLength(6);
     });
 
-    it('drops the path row when the path is empty', () => {
-        // An empty target folder is not a value a camera can be pointed at.
-        const rows = describeFtpConnection(connection({path: ''}));
+    it('drops the path row when the deployment declared an unusable folder', () => {
+        // `null` means the deployment set FTP_UPLOAD_PATH to something the server
+        // refuses to confirm. A row is worse than no row here: the photographer
+        // would then copy a folder the import does not read, which looks like an
+        // empty inbox rather than an error.
+        const rows = describeFtpConnection(connection({path: null}));
 
         expect(rows.map(row => row.field)).not.toContain('path');
         expect(rows).toHaveLength(6);
+    });
+
+    it('keeps the account root as a real path, not as "nothing declared"', () => {
+        // `/` is the correct default and a value a camera has to be told
+        // explicitly (Canon calls it *Stammverzeichnis*). Dropping it would send
+        // the photographer to a wizard field with nothing to enter.
+        const rows = describeFtpConnection(connection({path: '/'}));
+
+        expect(rows.find(row => row.field === 'path')?.value).toBe('/');
+    });
+
+    it('keeps a configured subfolder verbatim', () => {
+        // The camera field takes the value as typed, so it must not be trimmed or
+        // rewritten into another spelling of the same folder.
+        const rows = describeFtpConnection(connection({path: '/shoots/2026-09'}));
+
+        expect(rows.find(row => row.field === 'path')?.value).toBe('/shoots/2026-09');
     });
 
     it('drops the TLS mode row when the deployment declares no mode', () => {
@@ -198,7 +218,7 @@ describe('describeFtpConnection', () => {
             configured: true,
             host: null,
             username: null,
-            path: '',
+            path: null,
             sftp_port: null,
             ftps_port: null,
             pasv_port_start: null,
