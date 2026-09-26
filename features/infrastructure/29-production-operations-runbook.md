@@ -23,9 +23,12 @@ script changes. It publishes to the **org namespace
 `ghcr.io/reisinger-pictures/portal-base`** via
 `OWNER: ${{ github.repository_owner }}`, which is the path every consumer
 (`deployment/docker-compose.yml`, `ci.yml`, `deployment/Dockerfile.e2e`) must
-therefore pin — pointing at any other namespace leaves the pinned digest on a
-stale image. Refreshing the digest consumed by the deployment compose file
-remains a release/rollout step and is not asserted by this repository change.
+therefore pin — pointing at any other namespace leaves the pinned tag on a
+stale image. Refreshing the artifact behind the tag follows from a
+`base-image.yml` rebuild, not from a manual digest update; whether that artifact
+is fresh enough is checked separately by `verify-image-freshness.sh` (INFRA-10,
+max. 14 Tage), and republishing is a release/rollout step that this repository
+does not assert.
 The compose bootstrap also fails closed if an old image does not contain the
 executable preflight and supervisor binaries.
 
@@ -92,15 +95,22 @@ path checks, then follows this order **before any migration or seed**:
 5. run migrations, seed, and admin provisioning;
 6. start Scout settings, the queue restart signal, and the supervisor.
 
-The compose file now pins
-`ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736`, pushed by the
-`base-image.yml` run of 2026-09-25 whose build log shows the preflight and
-supervisor copy/chmod steps. That is build-log evidence that step 1 can pass,
-not an observation of a started stack. The fail-closed gate stays in place: if a
-host ever resolves the pinned digest to an image without the two executables,
-startup stops at step 1 with an explicit rebuild/digest message and no
-migration, seed, or worker is started. This repository does not claim that the
-pinned image is deployable.
+The compose file pins the concrete tag
+`ghcr.io/reisinger-pictures/portal-base:8.5`, not an `@sha256` digest: since the
+owner decision of 2026-09-26 the digest pin was dropped, because it froze the
+deployment to one build while a base-image security fix stayed on the tag (see
+`deployment/image-pin-freshness.md`). The digest that was pinned until then,
+`…portal-base:8.5@sha256:d762d47c…`, came from the `base-image.yml` run of
+2026-09-25 whose build log shows the preflight and supervisor copy/chmod steps.
+That is build-log evidence that step 1 can pass, not an observation of a started
+stack — and under a tag it is evidence about one past artifact, not about what
+the tag resolves to now. The fail-closed gate stays in place: if a host ever
+resolves the pinned tag to an image without the two executables, startup stops
+at step 1 with an explicit rebuild/tag message and no migration, seed, or worker
+is started. A tag is a mutable pin, so the remaining barrier is the artifact
+age: `tests/infrastructure/verify-image-freshness.sh` fails once the artifact
+behind the tag is older than `MAX_IMAGE_PIN_AGE_DAYS` (14 days). This repository
+does not claim that the pinned image is deployable.
 
 `backend-supervisor.sh` performs these actions:
 
@@ -239,5 +249,5 @@ git diff --check
 ```
 
 These commands validate source and policy only. The base-image GHCR rebuild and
-push, the compose digest update, and live queue, SMTP, scheduler, health, and
-provider evidence remain external release/runtime work.
+push, the artifact age behind the consumed compose tag, and live queue, SMTP,
+scheduler, health, and provider evidence remain external release/runtime work.

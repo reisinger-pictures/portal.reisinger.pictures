@@ -24,7 +24,7 @@ status: active
 - **CSP & X-Frame-Options** werden im Caddyfile gesetzt (Block `portal.reisinger.pictures`). Das Brand-Favicon-Script ist eine statische Datei unter `/brand-favicon-rewrite.js` (siehe `frontend/public/brand-favicon-rewrite.js`), die über `script-src 'self'` abgedeckt ist — der früher nötige `sha256`-Hash des Inline-Scripts kann aus dem Caddyfile entfernt werden. Der Header wird nur noch geändert, wenn sich die übrige CSP-Policy ändert.
 
 ## 4. Caddy + PHP-FPM Architektur (Apache abgelöst)
-- **Basis-Image:** `ghcr.io/reisinger-pictures/portal-base:8.5` (Spezial-Image, gebaut per Cron aus diesem Repo — siehe `.github/workflows/base-image.yml`). Der Workflow publiziert über `OWNER: ${{ github.repository_owner }}` in den **Org-Namespace `ghcr.io/reisinger-pictures/`**; alle Verbraucher (Compose, `ci.yml`, `Dockerfile.e2e`, Doku) müssen denselben Namespace pinnen, sonst bleibt der gepinnte Digest auf einem veralteten Image stehen. Der Veröffentlichungs-/Freshness-Status des GHCR-Digests bleibt eine Release-/Betriebsprüfung.
+- **Basis-Image:** `ghcr.io/reisinger-pictures/portal-base:8.5` (Spezial-Image, gebaut per Cron aus diesem Repo — siehe `.github/workflows/base-image.yml`). Der Workflow publiziert über `OWNER: ${{ github.repository_owner }}` in den **Org-Namespace `ghcr.io/reisinger-pictures/`**; alle Verbraucher (Compose, `ci.yml`, `Dockerfile.e2e`, Doku) müssen denselben Namespace pinnen, sonst steht der gepinnte Tag auf einem Image, das nicht mehr neu gebaut wird. Gepinnt wird seit der Owner-Entscheidung 2026-09-26 über einen **konkreten Tag**, nicht über `@sha256` — ein Digest friert ein Image auf einen Build ein und bräuchte für jeden Patch-Release eine manuelle Aktualisierung (siehe `deployment/image-pin-freshness.md`, INFRA-10). Der verbleibende Sicherheitsnetz ist deshalb das Alter des Artefakts: `tests/infrastructure/verify-image-freshness.sh` löst den konsumierten Tag auf und schlägt fehl, sobald das Artefakt dahinter älter als `MAX_IMAGE_PIN_AGE_DAYS` (dokumentiert 14 Tage) ist.
 - **Webserver:** PHP-FPM statt Apache – Caddy spricht via FastCGI-Protokoll mit dem Backend
 - **File Delivery:** `X-Accel-Redirect` statt `X-Sendfile` – Caddy fängt den Header via `handle_response` ab und serviert Dateien direkt von der Festplatte
 - **Pfad-Mapping:** Der `PROXY_DELIVERY_HEADER` ist fest auf `X-Accel-Redirect` gesetzt. Der Pfad `/var/www/photos/...` wird in Caddy via `handle_path` auf das gemountete Volume `/srv/photos` umgeschrieben
@@ -132,16 +132,24 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   ungültige Werte beenden den Stack fail-closed. Lokale/CI-Fixtures mit
   `sync`/`array`/Mailpit werden nicht durch diese Produktionsregel
   fälschlich blockiert.
-- **Image-/Digest-Gate:** Der in `deployment/docker-compose.yml` gepinnte
-  `ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736` stammt aus
-  dem `base-image.yml`-Lauf vom 2026-09-25, dessen Build-Log die Kopier-Schritte
+- **Image-Gate:** `deployment/docker-compose.yml` pinnt heute
+  `ghcr.io/reisinger-pictures/portal-base:8.5` — **keinen** `@sha256`-Digest
+  mehr (Owner-Entscheidung 2026-09-26, siehe
+  `deployment/image-pin-freshness.md`). *Historie:* der bis dahin gepinnte
+  Digest `…portal-base:8.5@sha256:d762d47c…` stammte aus dem
+  `base-image.yml`-Lauf vom 2026-09-25, dessen Build-Log die Kopier-Schritte
   für `backend-supervisor.sh` und `validate-production-env.sh` ausweist; der
   frühere, auf den persönlichen Namespace zeigende Digest enthielt diese Skripte
-  nicht. Compose verweigert den Start weiterhin fail-closed mit einem expliziten
-  Rebuild-/GHCR-Push-/Digest-Hinweis, bevor `cache:clear`, Migration oder Seed
-  laufen. Dass das Image die Binaries enthält, ist Build-Log-Evidenz, **kein**
-  Live-Nachweis: ein tatsächlicher Start des Stacks bleibt ein externer
-  Release-/Betriebsschritt, und Readiness wird daraus nicht abgeleitet.
+  nicht. Beide Digests sind Build-Log-Evidenz für genau dieses eine
+  Artefakt und sagen nichts über das, was der Tag heute auflöst. Compose
+  verweigert den Start weiterhin fail-closed, wenn das aufgelöste Image die
+  beiden Binaries nicht enthält (Preflight mit explizitem
+  Rebuild-/GHCR-Push-/Tag-Hinweis), bevor `cache:clear`, Migration oder Seed
+  laufen. Dass das Image die Binaries enthält, bleibt damit **kein**
+  Live-Nachweis: ein tatsächlicher Start des Stacks ist ein externer
+  Release-/Betriebsschritt, und Readiness wird daraus nicht abgeleitet. Für die
+  Freshness des Artefakts ist das 14-Tage-Alter-Gate zuständig, nicht der
+  Pin-Wert.
 - **Worker-/Health-Vertrag:** `deployment/backend-supervisor.sh` überwacht den
   `queue:work`-Prozess im bestehenden Backend-Container, startet ihn nach
   einem Exit neu und schreibt PID-Marker. Der Compose-Healthcheck verlangt

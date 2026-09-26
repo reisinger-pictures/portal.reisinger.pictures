@@ -1,10 +1,12 @@
 # 28 — E2E-/Test-Image `portal-e2e` (CI)
 
 **Status:** Implementiert (Dockerfile und Rebuild-Workflow vorhanden; der
-E2E-Job in `ci.yml` nutzt das Image). Die hier dokumentierte Digest-Referenz
-ist eine Konfigurationsangabe, kein Nachweis, dass das veröffentlichte GHCR-
-Image frisch gebaut oder aktuell verfügbar ist; die Release-/Freshness-Prüfung
-bleibt unter CR-INF-017/CR-INF-018 offen.
+E2E-Job in `ci.yml` nutzt das Image). Die hier dokumentierte Tag-Referenz
+(`portal-e2e:1.62.1`, nie `latest`) ist eine Konfigurationsangabe, kein
+Nachweis, dass das veröffentlichte GHCR-Image frisch gebaut oder aktuell
+verfügbar ist. Das Alter des Artefakts hinter dem Tag wird maschinell geprüft
+(`tests/infrastructure/verify-image-freshness.sh`, INFRA-10); die
+Release-/Freshness-Prüfung bleibt unter CR-INF-017/CR-INF-018 offen.
 
 ## Problem
 
@@ -17,10 +19,10 @@ aktuellen Commits werden weiterhin im Job installiert.
 ## SOLL-Zustand
 
 1. **`deployment/Dockerfile.e2e`** ist ein Derivat von
-   `ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736`
+   `ghcr.io/reisinger-pictures/portal-base:8.5`
    (PHP-8.5-Prod-Runtime inklusive exiftool/ImageMagick/Extensions, Debian
    trixie) und enthält:
-   - Composer (Dist-Binary via `COPY --from=composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b`)
+   - Composer (Dist-Binary via `COPY --from=composer:2.10.3`)
    - Node.js 26 (offizielles Linux-Binary)
    - die in `frontend/package.json#packageManager` festgelegte pnpm-Version
    - Playwright-Chromium inklusive apt-Abhängigkeiten unter
@@ -30,9 +32,13 @@ aktuellen Commits werden weiterhin im Job installiert.
 2. **`.github/workflows/e2e-image.yml`** baut das Image bei Änderungen an
    `deployment/Dockerfile.e2e`, dem Workflow selbst oder
    `frontend/pnpm-lock.yaml` auf `main` sowie wöchentlich und manuell. Es
-   publiziert `:latest` und einen versionsgebundenen Tag für Debugging/Rollback;
-   `ci.yml` pinnt den konsumierten Image-Digest im Job, damit ein Run nicht
-   unbemerkt von einem Tag-Wechsel abhängt.
+   publiziert `:latest` und einen versionsgebundenen Tag (`portal-e2e:1.62.1`,
+   aus `frontend/package.json`); `ci.yml` pinnt im `container:`-Feld genau
+   diesen versionsgebundenen Tag, nie `latest`. Gepinnt wird nicht mehr über
+   `@sha256`: ein Digest-Pin friert ein Image auf einen Build ein und brauchte
+   für jeden Patch-Release eine manuelle Aktualisierung, sodass ein Base-Image-
+   Security-Fix auf dem Tag blieb, während der Job weiter das alte Artefakt
+   bootete (siehe `deployment/image-pin-freshness.md`, INFRA-10).
    **Namensraum-Invariante:** `e2e-image.yml` und `base-image.yml` publizieren
    beide über `OWNER: ${{ github.repository_owner }}`, also in den
    **Org-Namespace `ghcr.io/reisinger-pictures/`**. Jeder Konsument
@@ -41,14 +47,20 @@ aktuellen Commits werden weiterhin im Job installiert.
    `ghcr.io`-Namespace stillt den Rebuild aus, weil dort kein neues Image
    ankommt.
    **Rebuild-Reihenfolge:** Da `Dockerfile.e2e` per `FROM` auf den
-   digest-gepinnten `portal-base`-Digest zeigt, muss `base-image.yml`
-   **vorher** laufen. Ein `portal-e2e`-Build gegen einen veralteten
-   `portal-base`-Digest erbt dessen Layer und ist damit kein gültiger Rebuild —
-   der neue `portal-e2e`-Digest ist erst nach dem nächsten Lauf des
-   `e2e-image.yml`-Workflows gültig. `workflow_dispatch` baut gegen den
-   committeten Stand des Refs, nicht gegen den Working Tree.
+   `portal-base:8.5`-Tag zeigt, baut jeder `portal-e2e`-Lauf gegen das
+   Artefakt, das dieser Tag *zu diesem Zeitpunkt* auflöst. Soll das neue
+   `portal-e2e`-Artefakt einen neuen `portal-base` enthalten, muss
+   `base-image.yml` **vorher** laufen; ein Build gegen ein veraltetes
+   `portal-base`-Artefakt erbt dessen Layer und ist damit kein gültiger
+   Rebuild — ein neuer `portal-e2e`-Stand ist erst nach dem nächsten Lauf von
+   `e2e-image.yml` gültig. Das ist seit dem Wechsel auf Tags nicht mehr am
+   Pin-Wert ablesbar: `verify-image-freshness.sh` misst nur das `created` des
+   publizierten `portal-e2e`-Artefakts, nicht dessen geerbte Base. Die
+   Reihenfolge bleibt Betreiber-Verantwortung. `workflow_dispatch` baut gegen
+   den committeten Stand des Refs, nicht gegen den Working Tree.
 3. Der **`e2e`-Job in `ci.yml`** läuft im Test-Image
-   (`ghcr.io/reisinger-pictures/portal-e2e` mit dem in `ci.yml` gepinnten Digest):
+   (`ghcr.io/reisinger-pictures/portal-e2e:1.62.1`, der in `ci.yml` gepinnte
+   versionsgebundene Tag):
    - `composer install` → `php artisan key:generate` →
      `php artisan migrate --force` → `php artisan db:seed --force` →
      `php artisan db:seed --class=E2ELocationSeeder --force` →
@@ -136,7 +148,7 @@ Für eine kontrollierte Rückkehr auf einen Runner-Host kann der E2E-Job
 alternative Host-Semantik und den im Image enthaltenen Browser-cache nutzen:
 
 ```bash
-PORTAL_E2E_IMAGE='ghcr.io/reisinger-pictures/portal-e2e@sha256:<digest-from-ci.yml>'
+PORTAL_E2E_IMAGE='ghcr.io/reisinger-pictures/portal-e2e:1.62.1'  # Tag aus ci.yml `container.image`
 docker create --name pw-cache "$PORTAL_E2E_IMAGE"
 docker cp pw-cache:/ms-playwright "$HOME/ms-playwright"
 docker rm pw-cache

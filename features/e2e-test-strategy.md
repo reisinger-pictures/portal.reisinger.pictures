@@ -132,14 +132,17 @@ post-change check, not a replacement for the CI matrix. Every fresh CI E2E
 matrix database runs the same explicit, offline location-fixture seeder and Scout
 import before the backend server starts.
 
-The E2E job runs in the digest-pinned `ghcr.io/reisinger-pictures/portal-e2e`
-image (the exact digest is maintained in `ci.yml`) and installs the current
-application dependencies on the mounted workspace. The image supplies the
-environment and browser; it never supplies application code, `node_modules`, or
-`vendor`. The namespace is the GitHub org that owns this repository, which is
-also where `e2e-image.yml` publishes. This records the configured digest only;
-it does not assert that the published GHCR image has been freshly rebuilt or is
-currently available.
+The E2E job runs in the tag-pinned `ghcr.io/reisinger-pictures/portal-e2e`
+image (the concrete version tag `1.62.1` is maintained in `ci.yml`; the job
+never pulls `latest`) and installs the current application dependencies on the
+mounted workspace. The image supplies the environment and browser; it never
+supplies application code, `node_modules`, or `vendor`. The namespace is the
+GitHub org that owns this repository, which is also where `e2e-image.yml`
+publishes. This records the configured tag only; it does not assert that the
+published GHCR image has been freshly rebuilt or is currently available. A tag
+is a mutable pin, so artifact freshness is not visible in the pin: it is
+enforced separately by `tests/infrastructure/verify-image-freshness.sh`
+(`MAX_IMAGE_PIN_AGE_DAYS`, 14 days — `deployment/image-pin-freshness.md`).
 
 ## Test isolation and security rules
 
