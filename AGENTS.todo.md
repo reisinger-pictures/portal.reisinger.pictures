@@ -1993,8 +1993,8 @@ Erstmals das Screenshot-Harness auf die neuen Oberflaechen angewendet
 
 | Schwere | Stelle | Befund | Vorschlag |
 |---|---|---|---|
-| medium | `KameraEinrichtung.tsx` (Schritt 2) | Der Guide nennt **„Neues Kamera-Passwort"**, aber der Button heißt fuer `pending` **„Kamera-Zugang einrichten"**. Ein Fotograf, der dem Guide folgt, sucht einen Button, den es nicht gibt — und genau diese Diskrepanz hat den Slug-Wechsel-Blockade beheben sollen. | Beide Labels nennen, oder den zustandabhaehngigen Text erklären |
-| medium | `ManagementFtpInbox.tsx:57` | **„Fuer FTPS ist kein Verschluesselungsmodus hinterlegt — bitte den Support kontaktieren"**. Wird nur angezeigt, wenn der Modus fehlt (in Produktion gesetzt). „Support kontaktieren" ist fuer einen Fotografen eine Sackgasse: er kann eine Server-Konfiguration nicht aendern. | Neutralere Formulierung ohne Support-Weg, z. B. was fehlt und warum |
+| medium | `KameraEinrichtung.tsx` (Schritt 2) | Der Guide nennt **„Neues Kamera-Passwort"**, aber der Button heißt fuer `pending` **„Kamera-Zugang einrichten"**. Ein Fotograf, der dem Guide folgt, sucht einen Button, den es nicht gibt — und genau diese Diskrepanz hat den Slug-Wechsel-Blockade beheben sollen. | Beide Labels nennen, oder den zustandabhaehngigen Text erklären. **Erledigt 2026-09-26: der Guide nennt jetzt den pending-Button „Kamera-Zugang einrichten".** |
+| medium | `ManagementFtpInbox.tsx:57` | **„Fuer FTPS ist kein Verschluesselungsmodus hinterlegt — bitte den Support kontaktieren"**. Wird nur angezeigt, wenn der Modus fehlt (in Produktion gesetzt). „Support kontaktieren" ist fuer einen Fotografen eine Sackgasse: er kann eine Server-Konfiguration nicht aendern. | Neutralere Formulierung ohne Support-Weg, z. B. was fehlt und warum. **Erledigt 2026-09-26: neutrale Formulierung „Ohne diesen Modus kann die Kamera FTPS nicht aushandeln — nutze daher SFTP" (Inbox und Guide).** |
 | low | `photographer-dashboard` (Mobile) | Der lange Upload-Ordner-Pfad (`ftp_folder`) bricht ueber **drei Zeilen** um und quetscht die Karte | Zeilenumbruch kontrollieren (`break-all` nur fuer lange Pfade) oder kuerzer anzeigen |
 | low | Header (Mobile) | **„Reisinger Fot…"** abgeschnitten | Vorbestehend, nicht von dieser Runde — nur vermerkt |
 
@@ -2003,15 +2003,45 @@ die Status-Warnung (`pending`) und der Button sitzen in einer Zeile; die
 Abschnitte des Guides sind klar getrennt. Das FTPS-Modus-Problem und der
 Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
 
-- [ ] **`profile-ftp-slug.spec.ts` (E2E, 2 von 12 Faellen) — testseitig, kein
+**Folge-Runde 2026-09-26 (die drei Kernbefunde des Owners umgesetzt):**
+- [x] **Button-Ausrichtung Kamera-Konto** — die vorige Runde hatte „Warnung und
+  Button sitzen in einer Zeile" als Nicht-Beanstandung notiert, aber `items-center`
+  auf der hohen Warnbox zentrierte den Button vertikal gegen den Block. Jetzt
+  stehen Label und Aktion in einer eigenen `flex items-center justify-between`-
+  Zeile (`flex-wrap` fuer Mobile), die Status-Warnung rendert darunter.
+  Abnahme: Screenshot-Harness `photographer-dashboard` (Desktop + Mobile).
+- [x] **FTPS-Fallback ohne Support-Sackgasse** — Formulierung in
+  `ManagementFtpInbox.tsx` und im Guide-Content; der Fotograf kann eine
+  Server-Konfiguration nicht aendern, „Support kontaktieren" war ein toter Weg.
+- [x] **Kamera-Anleitung als Dialog** — Inhalt als `KameraEinrichtungContent`
+  (ohne eigenen `useFtp()`-Aufruf, `connection` als Prop) extrahiert; Dialog via
+  `ModalShell` (`max-w-5xl`, `max-h-90vh`, scrollbarer Body) aus der FTP-Inbox.
+  Route `/kamera-einrichtung` und `KameraEinrichtung.tsx` entfernt;
+  E2E-Spec auf Dialog umgestellt; Manifest-Route `kamera-einrichtung` entfernt.
+- [x] **Zusatz, gleicher Bereich:** Der Guide nannte noch „Neues Kamera-Passwort",
+  waehrend der pending-Button „Kamera-Zugang einrichten" heisst → Guide nennt jetzt
+  den zustandskorrekten Button.
+- [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
+  entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
+  ersetzt.
+- [x] **Vorbestehender Build-Fehler:** `tests/screenshots/seeds.ts` —
+  `PhotographerCredentials` als `interface` ist nicht zu `Record<string, unknown>`
+  assignable und liess `tsc -b`/`pnpm build` rot laufen → auf `type`-Alias
+  umgestellt.
+- [x] **Vorbestehender roter E2E:** `profile-ftp-slug.spec.ts` (2 Faelle) — der
+  Slug-Wechsel invalidierte den SWR-Cache von `/api/management/ftp/status` nicht,
+  die Dashboard-Anzeige zeigte den alten `ftp_folder`. Fix:
+  `useSWRConfig().mutate('/api/management/ftp/status', undefined, {revalidate:true})`
+  in `ProfileSettingsCard`; Vitest-Regression ergaenzt; `--grep @feature:ftp`
+  ist jetzt 12/12 gruen.
+
+- [x] **`profile-ftp-slug.spec.ts` (E2E, 2 von 12 Faellen) — testseitig, kein
   Produktionsfehler.** Der Slug-Wechsel persistiert (Backend-Test
   `FtpFirstSlugChangeTest` Zeile 90: `assertSame('j-doe', $after->ftp_slug)`),
   aber die Dashboard-Anzeige zeigt nach der SPA-Navigation den alten Wert.
-  Vermutung: SWR liefert den zwischengespeicherten Status, weil
-  `mutateUser()` den Status-Cache nicht invalidiert. Nicht weiter
-  verfolgt: Backend gruen (2718), der Zusammenhang ist plausibel, und der
-  kameraspezifische Pfad ist unabhaengig davon freigegeben. Als testseitiger
-  Rest vermerkt.
+  Ursache bestaetigt: SWR liefert den zwischengespeicherten Status, weil
+  `mutateUser()` den Status-Cache nicht invalidiert. **Behoben 2026-09-26** —
+  siehe Folge-Runde oben.
 - [ ] **`POST /api/management/ftp/status` ohne Auth liefert 500** (vorbestehend):
   Laravel sucht eine nicht existierende `login`-Route.
 - [ ] **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert, nicht
