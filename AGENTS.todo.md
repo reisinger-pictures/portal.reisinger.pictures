@@ -95,8 +95,11 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   (`^[a-z0-9]{16,24}$`, keine Sonderzeichen — Kameras können sie nicht
   eingeben), übergibt es per HTTPS an SFTPGo, **zeigt es einmal** an und
   verwirft es. Verloren → `resetPassword()`, nicht wiederherstellbar.
-  **Zu entscheiden:** ob die Fotografen ihr Passwort selbst ändern dürfen
-  (dann Confirm-Flow mit dem aktuellen Passwort) oder nur der Admin.
+  **Offen (Produktentscheidung, nicht Implementierung):** dürfen Fotografen ihr
+  Passwort selbst ändern (dann Confirm-Flow mit dem aktuellen Passwort) oder
+  nur der Admin? Nicht als Code-Task vergeben, bis das geklärt ist.
+  **Der Provisionierungsstatus selbst ist in P1-M30 festgelegt** (Spalte auf
+  `users`, kein Live-Query) — die frühere Unklarheit ist aufgelöst.
   **Tests:** PHPUnit für Erzeugung (Länge, Charset, keine Kollision nach
   `Str::random` + Prüfschleife) und dafür, dass im Request-Log/Response
   nach dem Show-once **kein** Klartext mehr auftaucht; Playwright-E2E für
@@ -136,8 +139,13 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   schon auf der Platte liegen, müssen auch dann importierbar sein, wenn der
   Dienst ausfällt. Umgekehrt braucht `FtpController::status()`
   (`:21-39`) eine Credential-/Konto-Anzeige, damit der Fotograf sieht „Konto
-  nicht provisioniert" statt eines leeren Inbox-Ordners. Aktuell liefert
-  `status()` nur `ftp_folder`, `file_count` und `current_target_gallery`.
+  nicht provisioniert" statt eines leeren Inbox-Ordners — Status aus der
+  Spalte aus P1-M30, **nicht** per Live-Query. Aktuell liefert `status()`
+  nur `ftp_folder`, `file_count` und `current_target_gallery`.
+  **Timeouts sind Pflicht** am SFTPGo-Client (`Http::timeout(5)` connect,
+  `Http::timeout(15)` total). Bei Timeout/Fehler **kein** 500er auf
+  `status()`, sondern der zuletzt bekannte Stand aus P1-M30 — der Fotograf
+  darf sehen, was das System weiß, auch wenn der Dienst ausfällt.
   **Tests:** PHPUnit für `status()` mit und ohne provisioniertes Konto, und
   ein Test, dass `process()` ohne SFTPGo-Kontakt weiterläuft.
 - [ ] **P1-M27 (P2) — Kamera-Protokoll ist ungeklärt und blockiert die
@@ -168,6 +176,52 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   sonst sieht ein Fotograf die Ordner einer anderen Marke. **Bewusst offen
   gelassen** — für einen Brand YAGNI, aber dokumentiert, damit es nicht
   übersehen wird.
+- [ ] **P1-M30 (P0) — Spalte für den Provisionierungsstatus auf `users`.**
+  **Festgelegt am 2026-09-26:** die Source of Truth ist eine Spalte, **kein**
+  Live-Query gegen SFTPGo. Begründung: `FtpController::status()` (`:21-39`)
+  ist ein Endpoint für den Fotografen; ein Live-Query würde die UI vom Dienst
+  abhängig machen, während P1-M26 verlangt, dass der Import ohne SFTPGo
+  weiterläuft. Beides zugleich ist nicht möglich. Zusätzlich würde ein
+  Live-Query im Lesepfad ein Secret auch für Read-Operationen erfordern —
+  das widerspricht dem Gewinn aus P1-M23.
+  **Schema (V041+, Reihe endet bei V040):** `ftp_account_status` enum
+  (`pending` / `active` / `error`), `ftp_provisioned_at` timestamp nullable,
+  `ftp_account_error` text nullable. **Backfill:** alle bestehenden
+  Fotografen auf `pending`, weil der Zustand unbekannt ist — sie wurden nie
+  über SFTPGo provisioniert. **Rollback:** reines Spalten-Drop, kein
+  Datenverlust, weil kein Passwort gespeichert wird (P1-M23).
+  **Behandlung als Cache:** löscht jemand den User in SFTPGo von Hand, ist die
+  Spalte veraltet. Deshalb ein expliziter `reconcileAccount()`-Pfad statt
+  einem stillen Live-Query im Lesepfad.
+  **Tests:** PHPUnit für Default `pending` bei Neuanlage, Übergänge
+  pending→active→error, und dass `status()` bei SFTPGo-Ausfall weiter den
+  gecachten Status liefert statt eines 500ers.
+- [ ] **P1-M31 (P0) — API-Key und Endpoint in den Stack, nicht ins Repo.**
+  `deployment/docker-compose.yml` ist **versioniert**; dort ausschließlich
+  `${SFTPGO_BASE_URL}` und `${SFTPGO_API_KEY}` als Platzhalter. Der Wert selbst
+  gehört in die **Portainer-Stack-Env**. Commit nur die Platzhalter. Das ist
+  exakt die Fehlerklasse aus C1–C4 (hartkodierte Secrets), die das Repo
+  historisch schon einmal getroffen hat.
+  **AGPL:** SFTPGo ist AGPL-3.0. Wir betreiben das offizielle, unveränderte
+  Image, damit haften keine Offenlegungspflichten für das Portal. **Daher
+  ausdrücklich kein selbstgebautes/patchtes Image** — das wäre eine andere
+  Rechtslage. Rechtlich ist das keine Anwaltsberatung, nur die technische
+  Konsequenz aus der Lizenz.
+  **API-Schema nicht raten:** Feldnamen sind nicht verifiziert. Quelle in
+  dieser Reihenfolge: `GET /openapi` an der laufenden Instanz (Swagger UI,
+  im Community-Build aktiv), dann `openapi.yaml` im Repo `drakkan/sftpgo`.
+  `enable_rest_api` im Compose **explizit setzen**, damit es eine bewusste
+  Entscheidung ist und nicht der Default.
+  **Tests:** PHPUnit, dass die Disk-/Config-Definition ohne Secret auskommt
+  (kein Literal in der versionierten Compose-Datei), plus ein
+  Konfigurations-Test auf die gesetzten Platzhalter.
+- [ ] **P1-M32 (P2) — Kameraneukonfiguration hat einen Owner.** Wenn SFTPGo
+  pure-ftpd ablöst, muss die Kamera neu konfiguriert werden: Host/Port, neues
+  Passwort, ggf. SFTP statt FTPS. Das ist **kein Code-Task** und gehört in
+  keinem Board-Eintrag, weil es bisher niemandem zugewiesen war. Vor dem
+  Umschalten muss benannt sein, wer das macht und ab wann gegen P1-M27
+  geprüft wird. Ohne diesen Schritt steht nach dem Umbau alles gleichzeitig
+  still.
 - [ ] **DOC — `features/infrastructure/13-ftp-brand-isolation.md:6`
   referenziert `FT-01` in `AGENTS.todo.md`; dieses Task existiert nicht mehr**
   (`grep FT-01` → 0 Treffer im Board). Das `FT-NN`-Schema ist historisch und
