@@ -1,0 +1,21 @@
+Connecting to 127.0.0.1:19890
+---
+Certificate chain
+ 0 s:CN = portal-ftp-transport-harness
+   i:CN = portal-ftp-transport-harness
+---
+No client certificate CA names sent
+SSL handshake has read 2542 bytes and written 1596 bytes
+Verification: OK
+---
+New, TLSv1.3, Cipher is TLS_AES_128_GCM_SHA256
+Protocol: TLSv1.3
+This TLS version forbids renegotiation.
+Compression: NONE
+Expansion: NONE
+No ALPN negotiated
+Early data was not sent
+Verify return code: 18 (self-signed certificate)
+    Protocol  : TLSv1.3
+    Cipher    : TLS_AES_128_GCM_SHA256
+    Verify return code: 18 (self-signed certificate)

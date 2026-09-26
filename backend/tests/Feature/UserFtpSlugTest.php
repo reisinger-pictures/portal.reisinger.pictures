@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Support\FtpSlug;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,19 @@ class UserFtpSlugTest extends TestCase
     {
         $user = User::factory()->create(['email' => 'Max.Mustermann@example.com']);
 
-        $this->assertSame('maxmustermann', $user->ftp_slug);
+        // P1-M21: a dot in the local part used to be dropped without a
+        // separator (`Str::slug()` -> `maxmustermann`), which silently collides
+        // with a photographer whose local part really is `maxmustermann`. The
+        // generated path now renders the separator the format spec allows.
+        $this->assertSame('max-mustermann', $user->ftp_slug);
+    }
+
+    public function test_generated_ftp_slug_satisfies_the_account_name_format(): void
+    {
+        $user = User::factory()->create(['email' => 'J.doe@Example.com']);
+
+        $this->assertSame('j-doe', $user->ftp_slug);
+        $this->assertTrue(FtpSlug::isValid((string) $user->ftp_slug));
     }
 
     public function test_ftp_slug_gets_a_counter_suffix_when_the_local_part_is_taken(): void

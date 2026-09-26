@@ -9,10 +9,29 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
+/**
+ * `ftp_slug` becomes the SFTPGo account name, so the persisted value has to match
+ * `^[a-z0-9][a-z0-9_-]{2,31}$` — the single source of truth for that is
+ * `backend/app/Support/FtpSlug.php` (P1-M21).
+ *
+ * The backend is authoritative and additionally normalises cosmetics (case,
+ * umlauts, whitespace) before validating. This gate deliberately asks for the
+ * *final* form instead of mirroring that normaliser: mirroring it would duplicate
+ * the rule across two languages, and letting a value change after it was saved is
+ * the one thing a login name must not do. A dot, an `@` or a slash therefore gets
+ * a field error rather than a quietly different account name.
+ */
+const FTP_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{2,31}$/;
+
 const createProfileSchema = () => z.object({
     name: z.string().min(1, t`Name ist erforderlich`),
     metadata_copyright: z.string().optional(),
-    ftp_slug: z.string().optional()
+    ftp_slug: z.string().optional().refine(
+        // An empty field means "leave the account name alone" — the field is
+        // optional and the endpoint is not called with a slug in that case.
+        (value) => value === undefined || value === '' || FTP_SLUG_PATTERN.test(value),
+        t`Nur Kleinbuchstaben, Ziffern, - und _, 3 bis 32 Zeichen, Start mit Buchstabe oder Ziffer.`
+    )
 });
 type ProfileFormValues = z.infer<ReturnType<typeof createProfileSchema>>;
 
@@ -32,7 +51,8 @@ export default function ProfileSettingsCard() {
         defaultValues: { name: '', metadata_copyright: '', ftp_slug: '' }
     });
 
-    const { formState: { isDirty } } = profileForm;
+    const { formState: { errors, isDirty } } = profileForm;
+    const ftpSlugError = errors.ftp_slug;
 
     useEffect(() => {
         // Nur beim initialen Laden hydrieren — ein bereits "dirty" Formular (User
@@ -73,7 +93,7 @@ export default function ProfileSettingsCard() {
                             type="text"
                             required
                             {...profileForm.register('name')}
-                            className={`input input-bordered w-full ${profileForm.formState.errors.name ? 'input-error' : ''}`}
+                            className={`input input-bordered w-full ${errors.name ? 'input-error' : ''}`}
                         />
                     </div>
                     
@@ -81,7 +101,7 @@ export default function ProfileSettingsCard() {
                         <div className="form-control">
                             <label className="label" htmlFor={ftpSlugInputId}>
                                 <span className="label-text font-bold">FTP Upload Ordner (Slug)</span>
-                                <span className="label-text-alt opacity-70">Der Ordnername für deine FTP-Uploads. Muss eindeutig sein.</span>
+                                <span className="label-text-alt opacity-70">Der FTP-Login für deine Kamera. Kleinbuchstaben, Ziffern, - und _, 3 bis 32 Zeichen. Muss eindeutig sein.</span>
                             </label>
                             <div className="join w-full">
                                 <span className="btn no-animation join-item bg-base-300 border-base-300 font-mono text-sm px-3 opacity-70 cursor-default">/</span>
@@ -89,10 +109,12 @@ export default function ProfileSettingsCard() {
                                     id={ftpSlugInputId}
                                     type="text"
                                     placeholder="z.B. max"
+                                    aria-invalid={ftpSlugError ? true : undefined}
                                     {...profileForm.register('ftp_slug')} 
-                                    className="input input-bordered join-item w-full font-mono text-sm"
+                                    className={`input input-bordered join-item w-full font-mono text-sm ${ftpSlugError ? 'input-error' : ''}`}
                                 />
                             </div>
+                            {ftpSlugError && <span className="text-error text-xs mt-1">{ftpSlugError.message}</span>}
                         </div>
                     )}
                     <div className="form-control">

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Casts\AsBrand;
 use App\Services\AuthorizationService;
 use App\Services\PurchaseService;
+use App\Support\FtpSlug;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
@@ -93,26 +93,41 @@ class User extends Authenticatable implements JWTSubject
     }
 
     /**
-     * Build a URL-safe slug from the email local part and append a counter until
-     * it is unused. Registration also retries on a unique violation, so the
-     * check-then-insert gap is safe under concurrency.
+     * Build a compliant, unique slug from the email local part and append a
+     * counter until it is unused. Registration also retries on a unique
+     * violation, so the check-then-insert gap is safe under concurrency.
+     *
+     * The local part is not under our control, so unlike the user-chosen write
+     * path this one may reduce characters that the format spec rejects (`j.doe`
+     * becomes `j-doe`). That is acceptable here and only here: these slugs are
+     * generated on insert, nobody typed them, and no stored value or directory
+     * references them yet. See App\Support\FtpSlug for the format and for the
+     * decision to leave non-conforming legacy values untouched.
      */
     protected static function nextAvailableFtpSlug(string $email): string
     {
-        $baseSlug = Str::slug(explode('@', $email)[0]) ?: 'user';
+        $baseSlug = FtpSlug::toValidBase(explode('@', $email)[0]);
         $ftpSlug = $baseSlug;
         $counter = 1;
         while (static::where('ftp_slug', $ftpSlug)->exists()) {
-            $ftpSlug = $baseSlug.$counter;
+            $ftpSlug = FtpSlug::withSuffix($baseSlug, (string) $counter);
             $counter++;
         }
 
         return $ftpSlug;
     }
 
+    /**
+     * The FTP account columns (`ftp_account_status`, `ftp_provisioned_at`,
+     * `ftp_account_error`, V041) are system-owned provisioning state and are
+     * deliberately absent from `$fillable` and `$visible`: they are written by
+     * the provisioning path, never by request input, and they are not part of
+     * the user payload the frontend consumes.
+     */
     protected $casts = [
         'can_edit_metadata' => 'boolean',
         'brand' => AsBrand::class,
+        'ftp_provisioned_at' => 'datetime',
     ];
 
     public function getJWTIdentifier()

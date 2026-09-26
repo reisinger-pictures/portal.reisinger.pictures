@@ -4223,6 +4223,10 @@ msgstr "Nur für redaktionelle Nutzung (Shop)"
 msgid "Nur Kleinbuchstaben, Zahlen, - und _"
 msgstr "Nur Kleinbuchstaben, Zahlen, - und _"
 
+#: src/ui/management/components/ProfileSettingsCard.tsx
+msgid "Nur Kleinbuchstaben, Ziffern, - und _, 3 bis 32 Zeichen, Start mit Buchstabe oder Ziffer."
+msgstr "Nur Kleinbuchstaben, Ziffern, - und _, 3 bis 32 Zeichen, Start mit Buchstabe oder Ziffer."
+
 #: src/logic/modelRegistration.ts
 #: src/ui/ModelProfileAccessView.tsx
 msgid "Nur öffentliche Fotos können als Hauptbild dienen."

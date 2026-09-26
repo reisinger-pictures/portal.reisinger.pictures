@@ -1,0 +1,139 @@
+# ===========================================================================
+# Test-Harness fuer den Datei-Transport (P1-M35 / P1-M38).
+#
+# ACHTUNG: Das ist ausdruecklich KEIN Produktionsstack. Die einzige
+# versionierte Compose-Datei fuer den Betrieb ist
+# `deployment/docker-compose.yml` — die wird von diesem Harness nicht
+# angefasst und nicht erweitert.
+#
+# Unterschiede zum Produktionsstack, bewusst und dokumentiert:
+#   * Alle Ports sind auf 127.0.0.1 gebunden (kein `0.0.0.0`).
+#   * Kein Host-Pfad `/home/webadmin/websites/ftp`. Das Kamera-Verzeichnis
+#     ist ein lokales, temporaeres Verzeichnis unter `.runtime/ftp`.
+#   * Kein benanntes Docker-Volume `sftpgo_data` auf einem Host-Pfad.
+#     Der Datenprovider (SQLite) liegt in `.runtime/data`, gemountet nach
+#     `/var/lib/sftpgo` — genau dem WorkingDir des Images.
+#   * Der Admin-Bootstrap braucht ZUSAETZLICH `CREATE_DEFAULT_ADMIN=true`.
+#     Ohne das startet SFTPGo ohne Admin-User und `/api/v2/token` gibt 401.
+#     Siehe README, Abschnitt "Konfigurationsbefunde".
+# ===========================================================================
+
+name: portal_ftp_transport_harness
+
+services:
+  sftpgo:
+    # Gepinnt auf die Minor-Reihe, identisch zum Produktionsstack
+    # (features/infrastructure/19-ftp-upload-pipeline.md 7.13).
+    image: drakkan/sftpgo:2.7.x
+    container_name: portal_ftp_harness_sftpgo
+    restart: "no"
+
+    # -------------------------------------------------------------------------
+    # Konfiguration von SFTPGo 2.6+ kommt aus der SQLite-Datenbank. Die
+    # ENV-Overrides mit doppeltem Unterstrich sind der einzige Weg, die
+    # Instanz OHNE Config-Datei und OHNE REST-Endpunkt zu konfigurieren:
+    # die REST-API v2 hat kein `/api/v2/config` (verifiziert gegen
+    # `GET /openapi/openapi.yaml` der laufenden Instanz).
+    #
+    # FTPD ist in der Default-Config deaktiviert (Port 0) — ohne diese
+    # Overrides gibt es KEIN FTPS. `ftpd.port` wird stillschweigend
+    # ignoriert, korrekt ist `ftpd.bindings[].port`.
+    # -------------------------------------------------------------------------
+    environment:
+      # --- Admin-Bootstrap -------------------------------------------------
+      # `SFTPGO_DEFAULT_ADMIN_*` allein reicht NICHT. Im Quellcode
+      # (internal/dataprovider/dataprovider.go, checkDatabase ->
+      # checkDefaultAdmin) wird der Default-Admin nur angelegt, wenn
+      # `data_provider.create_default_admin` true ist; der Default ist
+      # false. Ohne diese Zeile bleibt die `admins`-Tabelle leer und
+      # `/api/v2/token` antwortet 401.
+      # Der Viper-Key `data_provider.create_default_admin` wird ueber
+      # AutomaticEnv + KeyReplacer("." -> "__") zu dieser Variablen.
+      SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN: "true"
+      SFTPGO_DEFAULT_ADMIN_USERNAME: ${FTP_HARNESS_ADMIN_USERNAME:?FTP_HARNESS_ADMIN_USERNAME fehlt}
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: ${FTP_HARNESS_ADMIN_PASSWORD:?FTP_HARNESS_ADMIN_PASSWORD fehlt}
+      # `SFTPGO_DEFAULT_ADMIN_PERMISSIONS` existiert in 2.7.x NICHT mehr
+      # (internal/dataprovider/admin.go setFromEnv setzt immer `*`).
+      # Bewusst weggelassen, damit niemand eine wirkungslose Variable pflegt.
+
+      # --- FTPS, Binding 0: explizites TLS (AUTH TLS) auf Container-Port 989
+      # TLSMode 1 = AUTH TLS erforderlich (explizit), 2 = Implicit TLS.
+      # `curl --ftp-ssl-reqd` braucht Modus 1.
+      SFTPGO_FTPD__BINDINGS__0__PORT: "989"
+      SFTPGO_FTPD__BINDINGS__0__ADDRESS: "0.0.0.0"
+      SFTPGO_FTPD__BINDINGS__0__TLS_MODE: "1"
+      SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_FILE: /certs/ftps.crt
+      SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_KEY_FILE: /certs/ftps.key
+      SFTPGO_FTPD__BINDINGS__0__MIN_TLS_VERSION: "12"
+      # Passivkanal: die vom Server angekuendigte Adresse muss vom Host aus
+      # erreichbar sein. Auf macOS/Docker Desktop sind Container-IPs nicht
+      # routbar, deshalb wird 127.0.0.1 erzwungen. Im Produktionsbetrieb
+      # ist das genau der Punkt, an dem Firewall und `force_passive_ip`
+      # zusammenpassen muessen (19-ftp 7.13).
+      SFTPGO_FTPD__BINDINGS__0__FORCE_PASSIVE_IP: "127.0.0.1"
+      SFTPGO_FTPD__BINDINGS__0__DEBUG: "true"
+      # Kamera-Cipher-Override. Leer = SFTPGo-Default (Go crypto/tls).
+      # Das ist der Schalter, mit dem sich die Camera-Frage pruefen laesst,
+      # ohne das Image zu patchen (AGPL, 19-ftp 7.7).
+      SFTPGO_FTPD__BINDINGS__0__TLS_CIPHER_SUITES: ${FTP_HARNESS_FTPD_CIPHER_SUITES:-}
+
+      # --- FTPS, Binding 1: implizites TLS auf Container-Port 990
+      # Nicht von curl getestet (curl wuerde hier `--ftp-ssl` ohne
+      # `--ftp-ssl-reqd` brauchen), aber die Instanz muss beides koennen,
+      # weil nicht jede Kamera dasselbe FTPS spricht.
+      SFTPGO_FTPD__BINDINGS__1__PORT: "990"
+      SFTPGO_FTPD__BINDINGS__1__ADDRESS: "0.0.0.0"
+      SFTPGO_FTPD__BINDINGS__1__TLS_MODE: "2"
+      SFTPGO_FTPD__BINDINGS__1__CERTIFICATE_FILE: /certs/ftps.crt
+      SFTPGO_FTPD__BINDINGS__1__CERTIFICATE_KEY_FILE: /certs/ftps.key
+      SFTPGO_FTPD__BINDINGS__1__MIN_TLS_VERSION: "12"
+      SFTPGO_FTPD__BINDINGS__1__FORCE_PASSIVE_IP: "127.0.0.1"
+
+      # --- SFTP auf Container-Port 2022 -------------------------------------
+      SFTPGO_SFTPD__BINDINGS__0__PORT: "2022"
+      SFTPGO_SFTPD__BINDINGS__0__ADDRESS: "0.0.0.0"
+
+      # --- HTTP/Admin-API auf Container-Port 8080 ---------------------------
+      SFTPGO_HTTPD__BINDINGS__0__PORT: "8080"
+      SFTPGO_HTTPD__BINDINGS__0__ADDRESS: "0.0.0.0"
+
+      # --- Passiver Datenkanal ---------------------------------------------
+      # WICHTIG: Der Harness-Default ist bewusst NICHT der Produktionswert.
+      # Auf macOS liegt der Kernel-Ephemeralbereich bei 49152-65535; ein
+      # 101 Ports grosser Range auf 50000-50100 ist dort nicht bindbar
+      # ("address already in use"), weil Docker Desktop ihn nicht dauerhaft
+      # halten kann. Der Produktionswert 50000-50100 steht in
+      # `deployment/docker-compose.yml` und bleibt dort unveraendert.
+      # Der Harness nimmt denselben Containerbereich wie den Hostbereich,
+      # weil der Server im PASV genau den Port nennt, den er oeffnet.
+      SFTPGO_FTPD__PASSIVE_PORT_RANGE__START: "${FTP_HARNESS_PASV_PORT_START:-20000}"
+      SFTPGO_FTPD__PASSIVE_PORT_RANGE__END: "${FTP_HARNESS_PASV_PORT_END:-20050}"
+
+      SFTPGO_LOG_LEVEL: ${FTP_HARNESS_LOG_LEVEL:-info}
+
+    ports:
+      # Nur auf dem Loopback. Der Admin-Port ist bewusst NICHT 0.0.0.0.
+      - "127.0.0.1:${FTP_HARNESS_API_PORT:-18080}:8080"
+      - "127.0.0.1:${FTP_HARNESS_SFTP_PORT:-12222}:2022"
+      - "127.0.0.1:${FTP_HARNESS_FTPS_PORT:-19890}:989"
+      - "127.0.0.1:${FTP_HARNESS_FTPS_IMPLICIT_PORT:-19990}:990"
+      # Passive FTPS-Datenports. Ohne diese Range baut curl den TLS-Handshake
+      # erfolgreich auf und bricht erst beim Transfer ab — der haeufigste
+      # Stillschweizgrund (19-ftp 7.13).
+      - "127.0.0.1:${FTP_HARNESS_PASV_PORT_START:-20000}-${FTP_HARNESS_PASV_PORT_END:-20050}:${FTP_HARNESS_PASV_PORT_START:-20000}-${FTP_HARNESS_PASV_PORT_END:-20050}"
+
+    volumes:
+      # Datenprovider (SQLite sftpgo.db) + SSH-Hostkeys.
+      # /var/lib/sftpgo ist das WorkingDir des Images und damit das
+      # konfig-Defaultverzeichnis (`--config-dir` defaultet auf ".").
+      - ${FTP_HARNESS_RUNTIME_DIR:?FTP_HARNESS_RUNTIME_DIR fehlt}/data:/var/lib/sftpgo
+      # Kamera-Home. Ersetzt den Produktionspfad /home/webadmin/websites/ftp.
+      - ${FTP_HARNESS_RUNTIME_DIR:?FTP_HARNESS_RUNTIME_DIR fehlt}/ftp:/var/www/ftp
+      # Selbst erzeugtes FTPS-Zertifikat, read-only.
+      - ${FTP_HARNESS_RUNTIME_DIR:?FTP_HARNESS_RUNTIME_DIR fehlt}/certs:/certs:ro
+
+    # Non-root wie im Produktionsstack, damit `tests/infrastructure/
+    # verify-image-nonroot.sh` als CI-Gate gültig bleibt. Der Harness
+    # misst die effektive UID und stellt sie der Ziel-Ownership
+    # 1002-webgroup aus 19-ftp 7.9 gegenueber.
+    user: "1000:1000"

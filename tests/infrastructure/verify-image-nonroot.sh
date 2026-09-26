@@ -132,30 +132,30 @@ package settings. Treat this as a real failure: the non-root property of the \
 pinned image is UNVERIFIED until an anonymous inspect succeeds."
 }
 
-# Resolves the single pinned sha256 digest for $1 from the remaining files.
-# Emits the digest (sha256:...) on stdout; fails closed on zero or on a
+# Resolves the single pinned tag for $1 from the remaining files.
+# Emits the tag (e.g. "8.5") on stdout; fails closed on zero or on a
 # disagreement. Reads the repository's own pins, never a second hardcoded copy.
 resolve_pin() {
     local image_name="$1"
     shift
 
-    local digests=()
-    local digest
-    while IFS= read -r digest; do
-        [[ -n "$digest" ]] || continue
-        digests+=("$digest")
+    local tags=()
+    local tag
+    while IFS= read -r tag; do
+        [[ -n "$tag" ]] || continue
+        tags+=("$tag")
     done < <(
-        grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}(:[^[:space:]\"']+)?@sha256:[0-9a-f]{64}" "$@" \
-            | sed -E 's/.*@(sha256:[0-9a-f]{64})$/\1/' \
+        grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}(:[^[:space:]\"']+)?" "$@" \
+            | sed -E 's/.*:([^[:space:]@]+)$/\1/' \
             | sort -u
     )
 
-    ((${#digests[@]} > 0)) \
-        || fail "no digest-pinned ${image_name} reference found in the consumer files: $*"
-    ((${#digests[@]} == 1)) \
-        || fail "the pinned ${image_name} digests disagree, this gate cannot pick one: ${digests[*]}"
+    ((${#tags[@]} > 0)) \
+        || fail "no tag-pinned ${image_name} reference found in the consumer files: $*"
+    ((${#tags[@]} == 1)) \
+        || fail "the pinned ${image_name} tags disagree, this gate cannot pick one: ${tags[*]}"
 
-    printf '%s' "${digests[0]}"
+    printf '%s' "${tags[0]}"
 }
 
 # Verifies one consumed image: expected runtime user (from source), pinned
@@ -186,20 +186,20 @@ the pinned ${image_name} artifact would inherit it"
     printf 'source: %s declares USER %s\n' "${dockerfile#${ROOT_DIR}/}" "$expected_user"
 
     # 2. The reference is resolved from the repository's own pins. There is
-    # exactly one digest by construction, so this script can never drift away
+    # exactly one tag by construction, so this script can never drift away
     # from what the consumer actually boots.
-    local pinned_digest
-    pinned_digest="$(resolve_pin "$image_name" "${sources[@]}")"
+    local pinned_tag
+    pinned_tag="$(resolve_pin "$image_name" "${sources[@]}")"
 
     local pinned_reference
-    pinned_reference="$(grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}(:[^[:space:]\"']+)?@${pinned_digest}" \
+    pinned_reference="$(grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}:${pinned_tag}" \
         "${sources[@]}" | sort -u | head -n 1)"
     [[ -n "$pinned_reference" ]] || fail "could not reconstruct the pinned ${image_name} reference"
 
     local pinned_host pinned_path image_repository
     pinned_host="${pinned_reference%%/*}"
     pinned_path="${pinned_reference#*/}"
-    pinned_path="${pinned_path%@*}"
+    pinned_path="${pinned_path%:*}"
     # A v2 API path never carries a tag - and neither does a pull scope, which
     # is always repository:<owner>/<name>:pull. Keeping the tag here silently
     # turns every request into a 404.
@@ -210,7 +210,7 @@ the pinned ${image_name} artifact would inherit it"
     # header at all; a bearer token is only used if the registry itself hands one
     # out for the public pull scope.
     local manifest_url
-    manifest_url="$REGISTRY_BASE_URL/v2/$image_repository/manifests/$pinned_digest"
+    manifest_url="$REGISTRY_BASE_URL/v2/$image_repository/manifests/$pinned_tag"
     http_get "$manifest_url" -H "Accept: $MANIFEST_ACCEPT"
 
     if [[ "$HTTP_STATUS" == '401' ]]; then
@@ -243,14 +243,14 @@ print(token)' <"$BODY_FILE")" \
 
         http_get "$manifest_url" -H "Accept: $MANIFEST_ACCEPT" -H "Authorization: Bearer $anonymous_token"
         if [[ "$HTTP_STATUS" == '401' || "$HTTP_STATUS" == '403' ]]; then
-            fail_not_publicly_readable "$HTTP_STATUS" "fetching the manifest of ${pinned_digest}"
+            fail_not_publicly_readable "$HTTP_STATUS" "fetching the manifest of ${pinned_tag}"
         fi
     elif [[ "$HTTP_STATUS" == '403' ]]; then
         fail_not_publicly_readable "$HTTP_STATUS" 'fetching the manifest without credentials'
     fi
 
     if [[ "$HTTP_STATUS" == '404' ]]; then
-        fail "the pinned digest ${pinned_digest} is not published in ${pinned_host} (HTTP 404); \
+        fail "the pinned tag ${pinned_tag} is not published in ${pinned_host} (HTTP 404); \
 rebuild and push ${image_name} or correct the pin before this gate can prove anything"
     fi
     [[ "$HTTP_STATUS" == '200' ]] || fail "unexpected HTTP $HTTP_STATUS while fetching ${manifest_url}"
@@ -259,8 +259,8 @@ rebuild and push ${image_name} or correct the pin before this gate can prove any
     local served_digest
     served_digest="$(sed -nE 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*(sha256:[0-9a-f]{64}).*$/\1/p' \
         "$HEADER_FILE" | tr -d '\r' | tail -n 1)"
-    if [[ -n "$served_digest" && "$served_digest" != "$pinned_digest" ]]; then
-        fail "the registry served $served_digest while $pinned_digest was requested"
+    if [[ -n "$served_digest" && "$served_digest" != "$pinned_tag" ]]; then
+        fail "the registry served $served_digest while tag ${pinned_tag} was requested"
     fi
 
     # 4. A multi-platform image is published as an index; follow it to the
@@ -269,7 +269,7 @@ rebuild and push ${image_name} or correct the pin before this gate can prove any
     # comparing digests: a single-platform image resolves straight to a config.
     local resolved manifest_kind config_digest
     resolved="$(resolve_manifest_config)" \
-        || fail "could not resolve the image config digest from the manifest of ${pinned_digest}"
+        || fail "could not resolve the image config digest from the manifest of ${pinned_tag}"
     read -r manifest_kind config_digest <<<"$resolved"
 
     if [[ "$manifest_kind" == 'index' ]]; then
@@ -304,23 +304,23 @@ print((config.get("config") or {}).get("User") or "")' <"$BODY_FILE")" \
         'import json, sys; print(json.load(sys.stdin).get("created", "unknown"))' <"$BODY_FILE")"
 
     if [[ -z "$actual_user" ]]; then
-        fail "the pinned ${image_name} artifact ${pinned_digest} has an EMPTY Config.User, \
+        fail "the pinned ${image_name} artifact (tag ${pinned_tag}) has an EMPTY Config.User, \
 which means it runs as root (uid 0). This is the exact P1-I5 regression: a source \
 that declared 'USER www-data' while the published image ran as root. Rebuild \
 ${image_name} from a Dockerfile that sets USER before publishing."
     fi
     if is_root_identity "$actual_user"; then
-        fail "the pinned ${image_name} artifact ${pinned_digest} runs as root (Config.User=${actual_user}). \
+        fail "the pinned ${image_name} artifact (tag ${pinned_tag}) runs as root (Config.User=${actual_user}). \
 A root container is not an acceptable runtime: keep 'USER ${expected_user}' in \
 ${dockerfile#${ROOT_DIR}/} as the last USER instruction of the final stage and republish."
     fi
     if [[ "$actual_user" != "$expected_user" ]]; then
-        fail "the pinned ${image_name} artifact ${pinned_digest} runs as Config.User=${actual_user}, \
+        fail "the pinned ${image_name} artifact (tag ${pinned_tag}) runs as Config.User=${actual_user}, \
 but ${dockerfile#${ROOT_DIR}/} declares USER ${expected_user}. The published artifact does \
 not match the reviewed source; rebuild and republish from the current Dockerfile."
     fi
 
-    printf 'artifact: %s built %s\n' "$pinned_digest" "$image_created"
+    printf 'artifact: %s built %s\n' "$pinned_tag" "$image_created"
     printf 'PASS: pinned %s artifact runs as the non-root user %s\n' "$image_name" "$actual_user"
 }
 

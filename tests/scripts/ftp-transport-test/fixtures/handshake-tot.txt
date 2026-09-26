@@ -1,0 +1,15 @@
+Connecting to 127.0.0.1:19890
+connect: Connection refused
+connect:errno=111
+---
+no peer certificate available
+---
+No client certificate CA names sent
+SSL handshake has read 0 bytes and written 0 bytes
+Verification: OK
+---
+New, (NONE), Cipher is (NONE)
+Protocol:
+    Protocol  :
+    Cipher    : 0000
+    Verify return code: 0 (ok)

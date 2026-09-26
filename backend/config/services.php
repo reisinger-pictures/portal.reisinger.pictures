@@ -60,6 +60,22 @@ return [
         'session_prefix' => env('AI_SESSION_PREFIX', 'portal-'),
     ],
 
+    /*
+     * SFTPGo Admin-API (P1-M22). The base URL is the in-network address of the
+     * service; the API port is deliberately not published (feature doc 7.13).
+     * `SFTPGO_API_KEY` is preferred and comes from the Portainer stack env —
+     * the versioned compose only carries the placeholder (feature doc 7.7).
+     * Without an API key the client falls back to `GET /api/v2/token` with the
+     * SFTPGo admin credentials, the same ones
+     * `SFTPGO_DEFAULT_ADMIN_USERNAME`/`_PASSWORD` create.
+     */
+    'sftpgo' => [
+        'base_url' => env('SFTPGO_BASE_URL', 'http://sftpgo:8080'),
+        'api_key' => env('SFTPGO_API_KEY'),
+        'admin_username' => env('SFTPGO_ADMIN_USERNAME'),
+        'admin_password' => env('SFTPGO_ADMIN_PASSWORD'),
+    ],
+
     'accounting_email' => env('ACCOUNTING_EMAIL'),
 
     'proxy_delivery_header' => env('PROXY_DELIVERY_HEADER'),

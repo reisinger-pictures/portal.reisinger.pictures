@@ -1,6 +1,7 @@
-# PHP Version (digest pins the exact multi-platform image used for amd64 builds)
+# PHP Version (tag pins the minor series; digest pins would freeze to one build
+# and need manual updates per patch release)
 ARG PHP_VERSION=8.5
-FROM php:${PHP_VERSION}-fpm@sha256:cb0c75f188ef0a029e9c7f20a473cefac67e1e9fe3d257ed130fec141e95e244
+FROM php:${PHP_VERSION}-fpm
 
 # Database driver: mysql (default) or pgsql
 ARG DB_EXT=mysql
