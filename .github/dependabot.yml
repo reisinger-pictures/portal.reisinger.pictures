@@ -9,6 +9,17 @@ updates:
       minor-and-patch:
         applies-to: version-updates
         update-types: ["minor", "patch"]
+      # The @tiptap family shares its type surface: ChainedCommands, Commands
+      # and RawCommands are augmented by the extension packages through
+      # declaration merging on '@tiptap/core'. A PR that moves only
+      # @tiptap/core leaves those augmentations on a different module instance
+      # so the merged methods drop out of the type, breaking `tsc` with
+      # "Property 'toggleBold' does not exist on type 'ChainedCommands'".
+      # Grouping the family keeps every update in one lockstep PR.
+      tiptap:
+        applies-to: version-updates
+        patterns:
+          - "@tiptap/*"
   - package-ecosystem: composer
     directory: "/backend"
     schedule: {interval: "daily"}
