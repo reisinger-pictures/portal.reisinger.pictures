@@ -252,6 +252,10 @@ Ablösung als Parallelsystem plant, plant den Ausfall für den Fotografen.
   Bestandswerten: 7.11.
 - Der FTP-Ordner ist `ftp/<ftp_slug>`, konsistent mit `getInboxPath()`
   (`:151-156`).
+- **Jeder User hat einen eigenen SFTPGo-Account** mit Home `ftp/<slug>`.
+  Kein gemeinsamer User, kein `r1`-User. Die Kamera konfiguriert `/` als
+  Subpath und lädt direkt in das Home-Verzeichnis. **Die GUI-Auswahl des
+  Subfolders entfällt** — der User wählt keinen Unterordner mehr aus.
 
 ### 7.3 Passwort-Fluss: erzeugen, anzeigen, verwerfen
 
