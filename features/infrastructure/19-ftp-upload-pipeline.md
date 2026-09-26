@@ -269,6 +269,14 @@ Bind-Mount `-> /var/www/ftp` und Disk `ftp_inbox` als `driver=local` bleiben.
   die `status()`-Struktur und `process()` bleiben.
 - **Kein** `Storage::disk('sftp')` für den Import: Netzwerk-Roundtrip nach
   localhost pro Datei **plus** ein Credential im Portal für den eigenen Host.
+- **Getestete Version:** `drakkan/sftpgo:latest` war am 2026-09-26
+  `2.7.6-62ae9ba3` (Build 2026-09-18). Seit 2.6 liegt die Konfiguration in
+  der **Datenbank**, nicht mehr als JSON-Datei im Config-Verzeichnis — das
+  ändert den Seeding-Weg gegenüber der 2.5-Dokumentation. Für den Cutover ist
+  ein **gepinntes** Image statt `latest` verbindlich: die Konfigurationsform
+  und damit der Startvorgang können sich zwischen Minor-Versionen ändern, und
+  ein Rebuild, der den Startpfad verändert, fällt auf einem Server mit
+  laufendem Betrieb nicht auf, sondern erst beim Fotografen.
 - `FtpImportTest` muss nach dem Wechsel unverändert grün bleiben. P1-M25
   ergänzt einen Test, der festschreibt, dass `ftp_inbox` lokal bleibt.
 
