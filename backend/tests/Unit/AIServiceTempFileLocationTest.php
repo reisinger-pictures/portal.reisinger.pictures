@@ -7,6 +7,7 @@ use App\Models\Photo;
 use App\Services\AIService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\UsesIsolatedTempDirectory;
 use Tests\TestCase;
 
 /**
@@ -16,9 +17,13 @@ use Tests\TestCase;
  */
 class AIServiceTempFileLocationTest extends TestCase
 {
+    use UsesIsolatedTempDirectory;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->setUpIsolatedTempDirectory();
 
         config(['services.ai' => [
             'enabled' => true,
@@ -28,6 +33,13 @@ class AIServiceTempFileLocationTest extends TestCase
             'model' => 'gpt-4o',
             'temporary_prefix' => 'ai_img_unit_',
         ]]);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownIsolatedTempDirectory();
+
+        parent::tearDown();
     }
 
     public function test_temporary_image_is_created_inside_the_swept_app_temp_directory_and_removed(): void
@@ -58,7 +70,7 @@ class AIServiceTempFileLocationTest extends TestCase
 
         $this->assertNotNull($service->createdPath);
         $this->assertStringStartsWith(
-            storage_path('app/private/temp').DIRECTORY_SEPARATOR,
+            $this->isolatedTempDir('ai').DIRECTORY_SEPARATOR,
             $service->createdPath,
             'The temporary image must live under the directory swept by app:cleanup-temp.',
         );

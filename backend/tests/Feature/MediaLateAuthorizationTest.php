@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\UsesIsolatedTempDirectory;
 use Tests\TestCase;
 
 /**
@@ -25,16 +26,25 @@ use Tests\TestCase;
 class MediaLateAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
+    use UsesIsolatedTempDirectory;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->setUpIsolatedTempDirectory();
         config(['scout.driver' => 'null']);
         Storage::fake('photos');
         Cache::flush();
         BrandRegistry::clearCache();
         BrandRegistry::set(Brand::B2B);
         $this->withoutMiddleware(ThrottleRequests::class);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownIsolatedTempDirectory();
+
+        parent::tearDown();
     }
 
     public function test_order_zip_rechecks_refund_after_processing_and_emits_no_bytes_or_log(): void
@@ -58,6 +68,7 @@ class MediaLateAuthorizationTest extends TestCase
                 $transitioned = true;
                 $order->update(['status' => 'refunded']);
             },
+            $this->isolatedTempDir('photo_download'),
         );
         $this->app->instance(PhotoDownloadController::class, $controller);
 
@@ -96,6 +107,7 @@ class MediaLateAuthorizationTest extends TestCase
                 $transitioned = true;
                 $order->update(['status' => 'disputed']);
             },
+            $this->isolatedTempDir('photo_download'),
         );
         $this->app->instance(PhotoDownloadController::class, $controller);
 
@@ -222,13 +234,18 @@ final class LateAuthPhotoDownloadController extends PhotoDownloadController
         ImageProcessor $imageProcessor,
         MediaVisibilityService $mediaVisibility,
         private readonly \Closure $transition,
+        private readonly string $tempDirectory,
     ) {
         parent::__construct($imageProcessor, $mediaVisibility);
     }
 
     protected function injectMetadata($sourcePath, $photo, $userName, ?string $customConditions = null)
     {
-        $directory = storage_path('app/private/temp');
+        // Mirrors PhotoDownloadController::injectMetadata, so it has to write
+        // where the production code writes. The directory arrives through the
+        // constructor because this helper is a file-level class and cannot
+        // reach the test's $this.
+        $directory = $this->tempDirectory;
         if (! is_dir($directory)) {
             @mkdir($directory, 0755, true);
         }

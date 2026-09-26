@@ -10,19 +10,29 @@ use App\Services\OfferTokenService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Tests\Support\UsesIsolatedTempDirectory;
 use Tests\TestCase;
 
 class ManualDocumentTest extends TestCase
 {
     use RefreshDatabase;
+    use UsesIsolatedTempDirectory;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->setUpIsolatedTempDirectory();
         // Erforderliche Stammdaten für den PDF-Header/Footer
         Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
         Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
         Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'TESTAT11']);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownIsolatedTempDirectory();
+
+        parent::tearDown();
     }
 
     public function test_super_admin_can_generate_manual_document_with_discounts()
@@ -218,7 +228,7 @@ class ManualDocumentTest extends TestCase
         $this->assertStringNotContainsString('%SMART_DOC:', $pdfContent);
 
         // 2. Extract Offer
-        $tempPath = storage_path('app/private/temp/test_offer_jwt_'.uniqid().'.pdf');
+        $tempPath = $this->isolatedTempPath('test_offer_jwt_'.uniqid().'.pdf');
         if (! is_dir(dirname($tempPath))) {
             mkdir(dirname($tempPath), 0755, true);
         }
@@ -263,7 +273,7 @@ class ManualDocumentTest extends TestCase
             ->issue(['customer_name' => 'Expired'], now()->subDay());
         $pdfContent = $this->makeFakePdf("%OFFER_JWT:{$expiredJwt}%");
 
-        $tempPath = storage_path('app/private/temp/test_expired_offer_'.uniqid().'.pdf');
+        $tempPath = $this->isolatedTempPath('test_expired_offer_'.uniqid().'.pdf');
         if (! is_dir(dirname($tempPath))) {
             mkdir(dirname($tempPath), 0755, true);
         }
@@ -294,7 +304,7 @@ class ManualDocumentTest extends TestCase
 
         $pdfContent = $this->makeFakePdf('%SMART_DOC:legacy.legacy%');
 
-        $tempPath = storage_path('app/private/temp/test_legacy_'.uniqid().'.pdf');
+        $tempPath = $this->isolatedTempPath('test_legacy_'.uniqid().'.pdf');
         if (! is_dir(dirname($tempPath))) {
             mkdir(dirname($tempPath), 0755, true);
         }
