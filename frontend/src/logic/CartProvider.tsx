@@ -87,9 +87,14 @@ export function CartProvider({children}: CartProviderProps) {
     // Derived values: volume licensing pricing + totalAmount (licensing-mode-aware)
     const volumeLicensing = useVolumeLicensing(items);
     const totalAmount = calculateTotalAmount(items, volumeLicensing, quoteToken);
+    // A cart item whose gallery terms never resolve cannot be grouped, so the
+    // total above is knowingly short by that item. Expose the count so the
+    // summary can say "price pending" instead of showing a confidently wrong
+    // sum. The server recomputes the authoritative total at checkout.
+    const unresolvedItemCount = volumeLicensing.unresolvedItemCount ?? 0;
     const itemCount = items.length;
 
-    const contextValue = {items, quoteToken, addToCart, setQuoteToken, removeFromCart, clearCart, totalAmount, itemCount, volumeLicensing};
+    const contextValue = {items, quoteToken, addToCart, setQuoteToken, removeFromCart, clearCart, totalAmount, itemCount, volumeLicensing, unresolvedItemCount};
 
     return (
         <CartContext.Provider value={contextValue}>

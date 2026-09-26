@@ -150,6 +150,7 @@ describe('LicenseSelectorCard', () => {
             clearCart: vi.fn(),
             totalAmount: 0,
             itemCount: 0,
+            unresolvedItemCount: 0,
         });
 
         vi.mocked(useUI).mockReturnValue({
@@ -223,6 +224,7 @@ describe('LicenseSelectorCard', () => {
             clearCart: vi.fn(),
             totalAmount: 0,
             itemCount: 0,
+            unresolvedItemCount: 0,
         });
 
         vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });

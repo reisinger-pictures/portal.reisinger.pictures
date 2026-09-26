@@ -1,6 +1,6 @@
 import useSWR from 'swr';
 import {fetcher} from '../api';
-import {useLicenseTerms} from './useLicenseTerms';
+import {LICENSE_TERMS_LOADING_TIMEOUT_MS, useLicenseTerms} from './useLicenseTerms';
 
 export type LicensingMode = 'scope_licensing' | 'volume_licensing';
 
@@ -33,7 +33,14 @@ export function useLicensingModeStatus(galleryId?: string): LicensingModeStatus 
     const { data: galleryTerms, isLoading: galleryTermsLoading } = useSWR<{ pricing_strategy?: string }>(
         galleryKey,
         fetcher,
-        { revalidateOnFocus: false },
+        {
+            revalidateOnFocus: false,
+            // Bounded for the same reason as the brand terms: without this a
+            // request that never settles would hold the photo page on a
+            // spinner with no way to reach checkout. See
+            // LICENSE_TERMS_LOADING_TIMEOUT_MS.
+            loadingTimeout: LICENSE_TERMS_LOADING_TIMEOUT_MS,
+        },
     );
 
     const hasGalleryTerms = galleryTerms !== undefined && galleryTerms !== null;

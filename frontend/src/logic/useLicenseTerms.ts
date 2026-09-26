@@ -42,9 +42,25 @@ export interface LicenseTermsPayload {
     [key: string]: string | number | undefined;
 }
 
+/**
+ * Upper bound on how long a license-terms request may keep a caller in its
+ * "unresolved" state.
+ *
+ * SWR's `isLoading` only turns false once a fetch settles, so a request that
+ * never settles — a dead proxy, a dropped connection without a RST — would
+ * otherwise hold the volume-licensing UI on a spinner with no way to buy.
+ * `loadingTimeout` makes the state bounded: after this budget the hook reports
+ * "not loading" and the consumer falls back to the safe scope default, which
+ * is the higher server-authoritative price rather than a fabricated volume
+ * price. The request is still in flight and SWR will populate the real terms
+ * when it arrives.
+ */
+export const LICENSE_TERMS_LOADING_TIMEOUT_MS = 3000;
+
 export function useLicenseTerms() {
     const {data, isLoading, mutate} = useSWR<LicenseTerms>('/api/settings/license-terms', fetcher, {
-        revalidateOnFocus: false
+        revalidateOnFocus: false,
+        loadingTimeout: LICENSE_TERMS_LOADING_TIMEOUT_MS,
     });
 
     const updateTerms = async (payload: LicenseTermsPayload) => {

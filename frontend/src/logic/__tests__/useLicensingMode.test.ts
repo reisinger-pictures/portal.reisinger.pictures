@@ -13,6 +13,9 @@ vi.mock('../../api', () => ({
 
 vi.mock('../useLicenseTerms', () => ({
     useLicenseTerms: vi.fn(),
+    // The hook reads this budget to bound how long a hung request may hold the
+    // UI in its unresolved state, so the mock has to expose it too.
+    LICENSE_TERMS_LOADING_TIMEOUT_MS: 3000,
 }));
 
 import { useLicenseTerms } from '../useLicenseTerms';
