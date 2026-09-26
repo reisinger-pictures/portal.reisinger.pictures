@@ -26,13 +26,24 @@ export default function KameraEinrichtung() {
         return <div className="p-4"><span className="loading loading-spinner"></span></div>;
     }
 
-    const {host, username, sftp_port, ftps_port, pasv_port_start, pasv_port_end, ftps_tls_mode} = status.connection;
+    const {host, username, sftp_port, ftps_port, pasv_port_start, pasv_port_end, ftps_tls_mode, path} = status.connection;
     const missing = t`nicht konfiguriert`;
     const serverValue = host ?? missing;
     const userValue = username ?? missing;
     const sftpValue = sftp_port !== null ? String(sftp_port) : missing;
     const ftpsValue = ftps_port !== null ? String(ftps_port) : missing;
     const pasvValue = pasv_port_start !== null && pasv_port_end !== null ? `${pasv_port_start}\u2013${pasv_port_end}` : missing;
+
+    // Canons Assistent bietet neben `Stammverzeichnis` ein eigenes `Ordner
+    // wählen`. Der Zielordner kommt deshalb aus der Verbindung statt aus diesem
+    // Text: eine Anleitung, die „Stammverzeichnis" sagt, während der Import
+    // einen Unterordner liest, schickt den Upload an eine Stelle, die niemand
+    // importiert — und das sieht wie ein leerer Posteingang aus.
+    const targetFolder = path === null
+        ? missing
+        : path === '/'
+            ? <Trans>Stammverzeichnis</Trans>
+            : <><Trans>Ordner wählen</Trans>: <code className="font-mono">{path}</code></>;
 
     const menuSteps = [
         {step: '1\u20132', menu: 'Kommunikationsfunktionen → Bilder zum FTP-Server übertr. → OK', value: <Trans>Netzwerk ggf. erst aktivieren</Trans>},
@@ -45,7 +56,7 @@ export default function KameraEinrichtung() {
         {step: '10', menu: 'Benutzername, Kennwort (nur SFTP)', value: <><code className="font-mono">{userValue}</code> + das einmal angezeigte Passwort</>},
         {step: '11', menu: 'Passiver Modus (nur FTP/FTPS)', value: <Trans>Aktivieren</Trans>, emphasis: true},
         {step: '13', menu: 'Anmeldekennwort (nur FTP/FTPS)', value: <Trans>das einmal angezeigte Passwort</Trans>},
-        {step: '14', menu: 'Zielordner', value: <Trans>Stammverzeichnis</Trans>, emphasis: true},
+        {step: '14', menu: 'Zielordner', value: targetFolder, emphasis: true},
         {step: '15', menu: 'SET', value: <Trans>speichern; bei Rückfrage OK → Zielserver vertrauen</Trans>},
     ];
 

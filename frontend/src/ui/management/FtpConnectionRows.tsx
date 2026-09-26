@@ -81,11 +81,15 @@ export function FtpConnectionUnconfigured() {
  * table for an unconfigured server by forgetting the branch.
  */
 export function FtpConnectionBlock({connection}: {connection: FtpConnection}) {
-    const rows = describeFtpConnection(connection);
-
-    if (rows.length === 0) {
+    // `configured` statt „keine Zeilen": eine unvollstaendige Konfiguration
+    // kann trotzdem Werte liefern — Host und Ports stehen, der Zielordner ist
+    // kaputt. Eine Tabelle, die nur die Haelfte zeigt, ist schlimmer als der
+    // Hinweis: der Fotograf haette den Zielordner dann geraten.
+    if (!connection.configured) {
         return <FtpConnectionUnconfigured />;
     }
+
+    const rows = describeFtpConnection(connection);
 
     return <FtpConnectionRows rows={rows} />;
 }

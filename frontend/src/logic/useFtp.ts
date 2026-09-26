@@ -17,7 +17,7 @@ export interface FtpTargetGallery {
  * query against SFTPGo. So a photographer can always be told what the portal
  * knows, even while the service is unreachable.
  */
-export type FtpAccountStatus = 'pending' | 'active' | 'error';
+export type FtpAccountStatus = 'pending' | 'active' | 'revoked' | 'error';
 
 export interface FtpStatus {
     ftp_folder: string;
@@ -26,6 +26,9 @@ export interface FtpStatus {
     /**
      * `null` is not part of the contract — the column is NOT NULL with a default —
      * so the union is exhaustive and a UI switch can be checked at compile time.
+     * `revoked` means the account existed and was taken away when the photographer
+     * role was lost; the SFTPGo credential is gone, so the camera cannot log in
+     * until somebody provisions again.
      */
     ftp_account_status: FtpAccountStatus;
     /** ISO-8601, `null` while the account was never successfully provisioned. */
