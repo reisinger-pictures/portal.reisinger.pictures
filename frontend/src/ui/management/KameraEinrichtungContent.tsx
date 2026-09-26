@@ -1,32 +1,31 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import {Link} from 'react-router-dom';
-import {useFtp} from '../logic/useFtp';
-import {FtpConnectionBlock} from './management/FtpConnectionRows';
+import type {FtpConnection} from '../../logic/ftpConnection';
+import {FtpConnectionBlock} from './FtpConnectionRows';
 
 /**
  * The camera setup, in the order it has to be done.
  *
- * Every value a camera needs is rendered from `status.connection` — the same
- * response the inbox card reads — instead of being written out here. A page that
- * carried its own copy of host, ports and the TLS mode is a page that can be
+ * Every value a camera needs is rendered from the passed `connection` — the same
+ * response the inbox card reads — instead of being written out here. A guide that
+ * carried its own copy of host, ports and the TLS mode is a guide that can be
  * right while the server is configured differently, and the photographer has no
  * way to tell which one is lying. The Canon menu labels below are the opposite
  * case: they are product strings from the manual, fixed for a given camera body,
  * so they are literal and do not vary with the deployment.
  *
+ * This is content only, not a page: it deliberately has no `<main>`, no `<h1>`
+ * and no back link, because it now renders inside a dialog whose `ModalShell`
+ * owns the landmark, the accessible name and the close button. It also does not
+ * call `useFtp()` itself — the dialog container already holds the status and
+ * passes the connection down, so the content stays a pure function of its props.
+ *
  * The root-certificate procedure is deliberately absent. It is a fallback for
  * when `Vertrauenswürdige Zielserver` does not work, and it is only worth
  * freezing into a procedure once that has actually happened.
  */
-export default function KameraEinrichtung() {
-    const {status, isLoading} = useFtp();
-
-    if (isLoading || !status) {
-        return <div className="p-4"><span className="loading loading-spinner"></span></div>;
-    }
-
-    const {host, username, sftp_port, ftps_port, pasv_port_start, pasv_port_end, ftps_tls_mode, path} = status.connection;
+export default function KameraEinrichtungContent({connection}: {connection: FtpConnection}) {
+    const {host, username, sftp_port, ftps_port, pasv_port_start, pasv_port_end, ftps_tls_mode, path} = connection;
     const missing = t`nicht konfiguriert`;
     const serverValue = host ?? missing;
     const userValue = username ?? missing;
@@ -62,7 +61,7 @@ export default function KameraEinrichtung() {
 
     const errorRows = [
         {
-            message: <><strong>Error 41</strong> \u2014 keine Verbindung zum FTP-Server</>,
+            message: <><strong>Error 41</strong> — keine Verbindung zum FTP-Server</>,
             meaning: <Trans>TCP kommt nicht durch</Trans>,
             suspect: <Trans>Firewall für {ftpsValue} bzw. {sftpValue}; Passiver Modus auf Aktivieren</Trans>,
         },
@@ -72,7 +71,7 @@ export default function KameraEinrichtung() {
             suspect: <Trans>zuerst „Vertrauenswürdige Zielserver" auf Aktivieren</Trans>,
         },
         {
-            message: <><strong>Error 48</strong> \u2014 bleibt bestehen</>,
+            message: <><strong>Error 48</strong> — bleibt bestehen</>,
             meaning: <Trans>die Kamera verlangt ein Stammzertifikat</Trans>,
             suspect: <Trans>siehe den Hinweis zum Stammzertifikat unten</Trans>,
         },
@@ -96,20 +95,7 @@ export default function KameraEinrichtung() {
     ];
 
     return (
-        // This route renders outside DashboardLayout, so the page has to own its
-        // `main` landmark — without one there is no landmark to scope locators to
-        // on the one page a photographer follows step by step.
-        <main className="p-6 md:p-10 max-w-5xl mx-auto w-full">
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-                <Link to="/" className="btn btn-sm btn-ghost">
-                    <span className="iconify mdi--arrow-left text-lg"></span> <Trans>Zurück zum FTP Inbox</Trans>
-                </Link>
-            </div>
-
-            <h1 className="text-3xl md:text-4xl font-bold mb-2 flex items-center gap-3">
-                <span className="iconify mdi--camera text-primary"></span>
-                <Trans>Kamera einrichten</Trans>
-            </h1>
+        <>
             <p className="opacity-70 mb-8">
                 <Trans>Canon EOS R1 / R6 Mark II → Portal. Menüpfade und Nummerierung aus dem Canon-Handbuch,
                     Abschnitt „Übertragen von Bildern auf einen FTP-Server".</Trans>
@@ -117,7 +103,7 @@ export default function KameraEinrichtung() {
 
             <div className="card bg-base-200 border border-base-300 mb-6">
                 <div className="card-body">
-                    <h2 className="card-title text-xl"><Trans>1. Das Konto anlegen — es gibt noch keins</Trans></h2>
+                    <h3 className="card-title text-xl"><Trans>1. Das Konto anlegen — es gibt noch keins</Trans></h3>
                     <p className="text-sm">
                         <Trans>Vor dem Test existiert bewusst kein FTP-Konto. Dein FTP-Ordner-Slug ist nur der
                             Name; in SFTPGo wird nichts angelegt, bis die Zugangsdaten angefordert werden. Ein Konto
@@ -129,15 +115,15 @@ export default function KameraEinrichtung() {
                             Passwort.</Trans></li>
                         <li><Trans>Fordere die Zugangsdaten an: im Dashboard unter
                             <strong> FTP Inbox → Kamera-Konto</strong> auf
-                            <strong> „Neues Kamera-Passwort"</strong> klicken. Es sind drei Anforderungen pro Stunde
+                            <strong> „Kamera-Zugang einrichten"</strong> klicken. Es sind drei Anforderungen pro Stunde
                             möglich.</Trans></li>
                         <li><Trans>Notiere das Passwort sofort. Es wird genau einmal angezeigt, nicht gespeichert
                             und nicht wiederherstellbar. Bei Verlust gibt es nur ein neues, und das alte entfällt.</Trans></li>
                     </ol>
 
                     <div className="divider my-2"><Trans>Die Werte für die Kamera</Trans></div>
-                    <FtpConnectionBlock connection={status.connection} />
-                    {status.connection.configured && (
+                    <FtpConnectionBlock connection={connection} />
+                    {connection.configured && (
                         <p className="text-sm opacity-70 mt-2"><Trans>Reihenfolge nicht umstellen: erst Konto und
                             Passwort, dann Kamera. Wer zuerst die Kamera konfiguriert, hat noch kein gültiges
                             Passwort und wundert sich über Error 41.</Trans></p>
@@ -147,7 +133,7 @@ export default function KameraEinrichtung() {
 
             <div className="card bg-base-200 border border-base-300 mb-6">
                 <div className="card-body">
-                    <h2 className="card-title text-xl"><Trans>2. Verbindung in der Kamera einrichten</Trans></h2>
+                    <h3 className="card-title text-xl"><Trans>2. Verbindung in der Kamera einrichten</Trans></h3>
                     <div className="overflow-x-auto bg-base-100 rounded-box border border-base-300 shadow-sm">
                         <table className="table table-zebra w-full">
                             <thead>
@@ -201,8 +187,8 @@ export default function KameraEinrichtung() {
                                     Fehlerzeichen.</Trans></p>
                             )}
                             {ftps_tls_mode === null && (
-                                <p className="text-sm"><Trans>Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Frage den
-                                    Support nach der Einrichtung, bevor du FTPS verwendest.</Trans></p>
+                                <p className="text-sm"><Trans>Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Die Kamera
+                                    kann FTPS damit nicht aushandeln — nutze stattdessen SFTP.</Trans></p>
                             )}
                         </div>
                     </div>
@@ -222,7 +208,7 @@ export default function KameraEinrichtung() {
 
             <div className="card bg-base-200 border border-base-300 mb-6">
                 <div className="card-body">
-                    <h2 className="card-title text-xl"><Trans>3. Übertragen und importieren</Trans></h2>
+                    <h3 className="card-title text-xl"><Trans>3. Übertragen und importieren</Trans></h3>
                     <ol className="list-decimal list-inside space-y-2 text-sm">
                         <li><Trans>Bild auswählen: Bildauswahl/übertr. → Bild markieren → MENU → Übertrag. → OK.
                             Oder FTP-Übertragungseinstellungen → Autom. Übertragung → Aktivieren, dann geht jedes Bild
@@ -238,7 +224,7 @@ export default function KameraEinrichtung() {
 
             <div className="card bg-base-200 border border-base-300 mb-6">
                 <div className="card-body">
-                    <h2 className="card-title text-xl"><Trans>4. Drei stille Fehler</Trans></h2>
+                    <h3 className="card-title text-xl"><Trans>4. Drei stille Fehler</Trans></h3>
                     <p className="text-sm opacity-70"><Trans>Diese drei Fälle erzeugen keine Fehlermeldung in der Kamera.
                         Sie sehen nur nach Erfolg aus und kosten trotzdem den ganzen Test.</Trans></p>
 
@@ -275,7 +261,7 @@ export default function KameraEinrichtung() {
 
             <div className="card bg-base-200 border border-base-300 mb-6">
                 <div className="card-body">
-                    <h2 className="card-title text-xl"><Trans>5. Wenn es nicht klappt</Trans></h2>
+                    <h3 className="card-title text-xl"><Trans>5. Wenn es nicht klappt</Trans></h3>
                     <div className="overflow-x-auto bg-base-100 rounded-box border border-base-300 shadow-sm">
                         <table className="table table-zebra w-full">
                             <thead>
@@ -301,7 +287,7 @@ export default function KameraEinrichtung() {
 
             <div className="card bg-base-200 border border-base-300 mb-6">
                 <div className="card-body">
-                    <h2 className="card-title text-xl"><Trans>6. SFTP zuerst probieren</Trans></h2>
+                    <h3 className="card-title text-xl"><Trans>6. SFTP zuerst probieren</Trans></h3>
                     <p className="text-sm"><Trans>Beide Protokolle sind eingerichtet. SFTP ist der einfachere Weg: ein
                         Port, kein Zertifikat, keine passive Port-Range. FTPS ist der Rückweg für Kameras, die SFTP
                         nicht sprechen — und der braucht „Vertrauenswürdige Zielserver" und den Passiven Modus.</Trans></p>
@@ -317,9 +303,9 @@ export default function KameraEinrichtung() {
                     <p className="text-sm"><Trans>Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit
                         „Vertrauenswürdige Zielserver" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst
                         noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht
-                        trägt — frag den Support danach.</Trans></p>
+                        trägt.</Trans></p>
                 </div>
             </div>
-        </main>
+        </>
     );
 }
