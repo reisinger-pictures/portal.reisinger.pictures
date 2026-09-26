@@ -8,10 +8,29 @@ export interface FtpTargetGallery {
     brand?: string | null;
 }
 
+/**
+ * Account provisioning state, mirrored from the V041 columns on `users`.
+ *
+ * `pending` / `active` / `error` is a closed set: the backend reports the stored
+ * column verbatim, and the value is a cache that the portal maintains, not a live
+ * query against SFTPGo. So a photographer can always be told what the portal
+ * knows, even while the service is unreachable.
+ */
+export type FtpAccountStatus = 'pending' | 'active' | 'error';
+
 export interface FtpStatus {
     ftp_folder: string;
     file_count: number;
     current_target_gallery: FtpTargetGallery | null;
+    /**
+     * `null` is not part of the contract — the column is NOT NULL with a default —
+     * so the union is exhaustive and a UI switch can be checked at compile time.
+     */
+    ftp_account_status: FtpAccountStatus;
+    /** ISO-8601, `null` while the account was never successfully provisioned. */
+    ftp_provisioned_at: string | null;
+    /** Provider text for `error`, `null` in every other state. */
+    ftp_account_error: string | null;
 }
 
 export interface ProcessInboxResponse {

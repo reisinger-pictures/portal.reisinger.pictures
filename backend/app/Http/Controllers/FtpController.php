@@ -46,6 +46,29 @@ class FtpController extends Controller
         private readonly PhotoProcessingService $photoService,
     ) {}
 
+    /**
+     * The photographer's view of their own FTP state.
+     *
+     * The three provisioning fields come from the columns of V041 and are read
+     * **without contacting SFTPGo**, per feature doc 7.4/7.5: a live query in a
+     * read path would make this endpoint — and with it the UI — depend on a
+     * service that may be down, and would need a credential for a read. So the
+     * columns are the source of truth and are a cache, not a live view: they can
+     * be stale if the account is deleted by hand in SFTPGo, which is why
+     * reconciliation is an explicit path (`reconcileAccount()`, P1-M30) instead
+     * of a query hidden in here.
+     *
+     * The consequence is what P1-M26 asks for: an empty inbox is no longer the
+     * only thing the photographer can see. `pending` says "not provisioned yet"
+     * and `error` carries the reason, instead of both looking like an empty
+     * folder. No 500er on this path is possible from a service outage, because
+     * there is no service call — the worst case is a stale column.
+     *
+     * The provisioning columns are deliberately absent from the User model's
+     * `$visible` (they are system state, not part of the user payload), so they
+     * are read here as attributes and added to this response explicitly. The
+     * response is the contract the frontend reads; the user payload is not.
+     */
     public function status()
     {
         $user = auth('api')->user();
@@ -63,6 +86,9 @@ class FtpController extends Controller
             'ftp_folder' => '/'.($user->ftp_slug ?? $user->id),
             'file_count' => $fileCount,
             'current_target_gallery' => $user->currentFtpGallery ? new GalleryResource($user->currentFtpGallery) : null,
+            'ftp_account_status' => $user->ftp_account_status,
+            'ftp_provisioned_at' => $user->ftp_provisioned_at,
+            'ftp_account_error' => $user->ftp_account_error,
         ]);
     }
 

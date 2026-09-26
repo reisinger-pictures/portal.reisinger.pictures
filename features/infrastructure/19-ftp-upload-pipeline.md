@@ -267,6 +267,12 @@ Ablösung als Parallelsystem plant, plant den Ausfall für den Fotografen.
   ordnet über `process()` die Galerie zu. Das eliminiert das Problem, dass
   ein Fotograf Ordner eines anderen Brands sehen könnte — er sieht nur den
   Brand-Account.
+- **Namensautorität (P1-M34, entschieden 2026-09-26):** `users.ftp_slug` führt,
+  SFTPGo wird bei jeder Änderung nachgezogen. Ein Slug-Wechsel ist ein **Reset**:
+  Neuer Slug + neues Passwort, einmal angezeigt. Begründung: SFTPGo's
+  `PUT /api/v2/users/{username}` ersetzt das ganze User-Objekt (kein partielles
+  Update), also wäre Read-Modify-Write nötig — und das hat Race Conditions. Der
+  Reset vermeidet das und bleibt konsistent mit dem Show-once-Konzept.
 
 ### 7.3 Passwort-Fluss: erzeugen, anzeigen, verwerfen
 
@@ -352,6 +358,26 @@ Schema-/Backfill-/Rollback-Entscheidung):
   Hand gelöscht, ist sie veraltet. Deshalb ein expliziter
   `reconcileAccount()`-Pfad statt eines stillen Live-Query.
 
+**Umsetzung (P1-M26).** `FtpController::status()` gibt die drei Felder
+zusammen mit dem Bestand zurück:
+
+| Feld | Quelle | Bedeutung |
+|---|---|---|
+| `ftp_account_status` | `users.ftp_account_status` | `pending` / `active` / `error` |
+| `ftp_provisioned_at` | `users.ftp_provisioned_at` | letzter erfolgreicher Provision, ISO-8601 oder `null` |
+| `ftp_account_error` | `users.ftp_account_error` | Fehlertext zu `error`, sonst `null` |
+
+- **Kein SFTPGo-Kontakt.** Der Lesepfad ruft den Dienst nicht auf; der Wert
+  kommt aus der Spalte. Ein 500er aus dem Dienst kann hier prinzipiell nicht
+  entstehen — schlimmster Fall ist eine veraltete Spalte. Genau das ist der in
+  7.5 geforderte Verhalten: der Fotograf sieht, was das System weiß.
+- **Additiv.** `ftp_folder`, `file_count` und `current_target_gallery` bleiben
+  unverändert im Response; der Inbox-UI baut darauf auf.
+- **Frontend-Typ:** `FtpAccountStatus` in `frontend/src/logic/useFtp.ts` ist die
+  geschlossene Menge der drei Werte. `null` gehört nicht zum Vertrag (die Spalte
+  ist NOT NULL mit Default), deshalb ist der Union-Typ erschöpfend und ein
+  UI-`switch` ist zur Compile-Zeit vollständig.
+
 ### 7.5 Der Import darf nicht am Dienst hängen
 
 Dateien, die bereits in `ftp/<slug>` liegen, müssen auch dann importierbar
@@ -367,6 +393,7 @@ sein, wenn SFTPGo ausfällt. **`process()` hat keinen SFTPGo-Kontakt.**
   `timeout(5)->timeout(15)` — wie die frühere Fassung dieses Absatzes es
   nahelegte — setzt nur das Gesamtbudget und **verwirft** den Connect-Wert
   lautlos.
+- `process()` hat keinen SFTPGo-Kontakt und behält den Cache-Lock aus P1-M28.
 
 ### 7.6 Admin-API-Client
 
@@ -395,6 +422,77 @@ Admin-API. **Kein** FTP-/SFTP-Protokoll-Speak im Portal.
   einer verlorenen Antwort heraus erzeugt ein zweites Konto (409) statt eines
   sauberen Fehlers.
 
+### 7.6a Passwort-Reset: Rate-Limit und Audit-Trail (P1-M33)
+
+Die Show-once-Semantik aus 7.3 macht den Reset zum **einzigen**
+Recovery-Weg: das alte Passwort ist unwiederbringlich. Genau das macht ihn
+gefährlich — ein unbeschränkter Reset-Endpoint ist eine unbegrenzte Erzeugung
+gültiger Kamera-Zugangsdaten. 7.6 (M22) und 7.3 (M23) sichern ab, dass ein
+Passwort nicht ins Log gerät; **wie oft** zurückgesetzt wird, regeln sie nicht.
+
+**Endpoint.** `POST /api/management/ftp/reset-password` →
+`FtpCredentialController::resetPassword()`.
+
+- **Kein Request-Input außer dem authentifizierten Nutzer.** Das Konto ist
+  immer `auth('api')->user()`. Ein `user_id` im Payload wäre eine IDOR mit
+  Body: das Zurücksetzen der Kamera-Zugangsdaten einer anderen Person ist genau
+  der Missbrauch, den Quota und Audit-Trail sichtbar machen sollen — die Fläche
+  dafür wird gar nicht erst angeboten.
+- **Eigener Controller, nicht `FtpController`.** Letzterer ist die
+  Import-Pipeline, und 7.8 fixiert seine Form. Der Reset ist das Gegenteil — ein
+  reiner SFTPGo-Write — und hätte dem Import-Pfad sonst einen Grund gegeben,
+  sich zu ändern.
+- **Statusabbildung:** 429 mit `Retry-After` bei Quota, 422 bei
+  Portal-Vorbedingungen, 503 bei `not_configured`/`unreachable`, 404 bei
+  `not_found`, 409 bei `already_exists`, 502 sonst. Kein 500 aus dem Dienst —
+  der Fotograf muss wissen, ob sein Passwort sich geändert hat, denn es wird
+  **nicht** zurückgerollt.
+
+**Rate-Limit.** `FtpCredentialService::RESET_LIMIT_PER_HOUR = 3`, Fenster 3600 s,
+über `RateLimiter`, Schlüssel `ftp-password-reset:{userId}`.
+
+- **Pro Konto, nicht global.** Sonst könnte ein Fotograf den Recovery-Weg allen
+  anderen nehmen.
+- **Schlüssel ist die User-ID, nicht der Slug.** P1-M34 lässt offen, ob
+  `users.ftp_slug` oder der SFTPGo-Store führend ist; ein Slug-Schlüssel würde
+  bei einem Rename still ein frisches Kontingent gutschreiben.
+- **Konstante, kein Config-Wert.** Drei ist eine Sicherheitsregel aus dem Board,
+  keine Kapazitätseinstellung — und ein Wert in `config/app.php` könnte als `0`
+  ausgeliefert werden, was den Recovery-Weg still abschaltet.
+- **Abgelehnte Aufrufe zählen mit.** Ein gehämmerter Button verlängert das
+  Fenster dadurch nicht endlos — dieselbe bewusste Entscheidung wie in
+  `CheckoutRiskService`.
+- **Die Quota läuft ab.** Drei echte Versuche in einer Stunde sind ein
+  Support-Fall; ein Limiter, der nie vergisst, wäre ein Lockout.
+
+**Audit-Trail.** Migration **V042**, Tabelle `ftp_password_resets`
+(`FtpPasswordReset`):
+
+| Spalte | Typ | Bedeutung |
+|---|---|---|
+| `user_id` | FK `users` CASCADE | betroffenes Konto |
+| `ip` | varchar(45) nullable | Aufruferadresse |
+| `success` | boolean NOT NULL | Ausgang |
+| `reset_at` | timestamp NOT NULL | Zeitpunkt |
+
+- **Jeder Versuch schreibt eine Zeile, nicht nur der Erfolg.** Ein fehlgeschlagener
+  Reset ist die *interessantere* Zeile: ein Dienst, der dreimal 500 liefert, ist
+  ein Support-Fall, und ohne diese Zeilen bleibt die Beschwerde „Reset tut
+  nichts" spurlos. Erfasst sind auch Portal-Vorbedingungen, die den Dienst nie
+  erreichen.
+- **Ein 429 schreibt nichts.** Eine Ablehnung ist die *Verweigerung* eines
+  Versuchs, kein Versuch.
+- **Kein IP-Pflichtfeld.** Ein Console- oder Job-Reset hat keine Adresse, und ein
+  Platzhalter wäre in einer Audit-Tabelle eine Lüge.
+- **Keine Passwortspalte.** Die schreibende Methode bekommt Nutzer, IP und
+  Boolean — es gibt weder eine Spalte noch ein Argument, durch das ein
+  Passwort hindurchkäme.
+- **Fehlschlag der Audit-Zeile wird nicht geschluckt.** `Eloquent::create()`
+  liefert bei einem vetoenden `creating`-Listener ein *ungespeichertes* Modell
+  statt einer Exception; ohne `exists`-Prüfung wäre eine Rotation ohne Spur
+  unbemerkt geblieben. `FtpAuditWriteException` → 500 **ohne** Passwort im
+  Response: die Kamera läuft dann auf einem Passwort, das niemand notiert hat.
+
 ### 7.7 Credential-Haltung
 
 - `deployment/docker-compose.yml` ist **versioniert** und enthält
@@ -413,7 +511,11 @@ SFTPGo schreibt auf **denselben** Host-Pfad `/home/webadmin/websites/ftp`.
 Bind-Mount `-> /var/www/ftp` und Disk `ftp_inbox` als `driver=local` bleiben.
 
 - **`FtpController` wird nicht angefasst** — `getInboxPath()`, `setTarget()`,
-  die `status()`-Struktur und `process()` bleiben.
+  die `status()`-Struktur und `process()` bleiben. **Präzisierung 2026-09-26
+  (P1-M26):** `status()` liefert zusätzlich die drei Kontofelder aus 7.4.
+  Additiv — die bestehende Struktur und der Import-Pfad bleiben unberührt, und
+  der Lesepfad bekommt **keinen** SFTPGo-Kontakt. `FtpImportTest` und
+  `FtpInboxLocalDiskTest` bleiben unverändert grün.
 - **Kein** `Storage::disk('sftp')` für den Import: Netzwerk-Roundtrip nach
   localhost pro Datei **plus** ein Credential im Portal für den eigenen Host.
 - **Getestete Version:** `drakkan/sftpgo:latest` war am 2026-09-26

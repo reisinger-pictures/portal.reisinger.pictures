@@ -34,12 +34,13 @@ Nicht nach Schwere oder Familie — nach Abhängigkeit.
 | ~~P1-M27~~ | **Erledigt** — Kamera-Spec + Harness | FTP-Block |
 | FE-2 (halb) | i18n-Wächter braucht AST-Regel für ungewrapte Strings | unten |
 | P1-M24 | Ordner-Anlage und UID-Modell auf dem Host | FTP-Block |
-| P1-M33 | `resetPassword()` mit Rate-Limit und Audit-Trail | FTP-Block |
+| ~~P1-M26~~ | **Erledigt 2026-09-26** — `status()` zeigt den Provisionierungsstatus | FTP-Block |
+| ~~P1-M33~~ | **Erledigt 2026-09-26** — Reset mit Rate-Limit und Audit-Trail | FTP-Block |
 | TST-* (4) | Testqualitäts-Lücken, siehe Test-Audit | Test-Audit |
 
-**Priorität 2026-09-26: Live-Deployment.** M26/M33 sind nebensächlich. Ziel ist
-SFTPGo live zu schalten, pure-ftpd abzuschalten, und dann mit echten Kameras
-zu testen und zu korrigieren.
+**Priorität 2026-09-26: Live-Deployment.** Ziel ist SFTPGo live zu schalten,
+pure-ftpd abzuschalten, und dann mit echten Kameras zu testen und zu korrigieren.
+M26 und M33 sind inzwischen abgeschlossen.
 
 ### B. Braucht eine Entscheidung oder Betriebs-Evidenz
 
@@ -213,20 +214,29 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   festhalten, dass `ftp_inbox` ein **lokales** Verzeichnis ist — sonst
   „refaktoriert" jemand den Import auf `Storage::disk('sftp')` und es wird
   langsamer und geheimnisvoller.
-- [ ] **P1-M26 (P2) — Zustand und Fehlerbehandlung im Portal sichtbar.** Der
-  Import darf nicht daran hängen, dass SFTPGo erreichbar ist: Dateien, die
-  schon auf der Platte liegen, müssen auch dann importierbar sein, wenn der
-  Dienst ausfällt. Umgekehrt braucht `FtpController::status()`
-  (`:21-39`) eine Credential-/Konto-Anzeige, damit der Fotograf sieht „Konto
-  nicht provisioniert" statt eines leeren Inbox-Ordners — Status aus der
-  Spalte aus P1-M30, **nicht** per Live-Query. Aktuell liefert `status()`
-  nur `ftp_folder`, `file_count` und `current_target_gallery`.
-  **Timeouts sind Pflicht** am SFTPGo-Client (`Http::timeout(5)` connect,
-  `Http::timeout(15)` total). Bei Timeout/Fehler **kein** 500er auf
-  `status()`, sondern der zuletzt bekannte Stand aus P1-M30 — der Fotograf
-  darf sehen, was das System weiß, auch wenn der Dienst ausfällt.
-  **Tests:** PHPUnit für `status()` mit und ohne provisioniertes Konto, und
-  ein Test, dass `process()` ohne SFTPGo-Kontakt weiterläuft.
+- [x] **P1-M26 (2026-09-26, umgesetzt) — Zustand und Fehlerbehandlung im Portal
+  sichtbar.** Der Import darf nicht daran hängen, dass SFTPGo erreichbar ist.
+  Umgesetzt:
+  - `FtpController::status()` liefert zusätzlich `ftp_account_status`
+    (`pending`/`active`/`error`), `ftp_provisioned_at` (ISO-8601 oder `null`) und
+    `ftp_account_error` — aus den V041-Spalten, **ohne** SFTPGo-Kontakt. Ein
+    500er aus dem Dienst kann im Lesepfad damit prinzipiell nicht entstehen;
+    schlimmster Fall ist eine veraltete Spalte.
+  - Der Fotograf sieht damit „Konto nicht provisioniert" bzw. den Fehlertext
+    statt eines leeren Inbox-Ordners, der von „noch keine Fotos" ununterscheidbar
+    war.
+  - **Additiv:** `ftp_folder`, `file_count` und `current_target_gallery` bleiben
+    unverändert im Response — `FtpImportTest` bleibt unverändert grün.
+  - Frontend-Typ `FtpAccountStatus` in `useFtp.ts` als geschlossene Menge
+    (`null` gehört nicht zum Vertrag, die Spalte ist NOT NULL).
+  - **Timeouts** am SFTPGo-Client waren mit M22 bereits gesetzt
+    (`connectTimeout(5)` / `timeout(15)`).
+  - **Tests:** 8 PHPUnit-Fälle in `FtpProvisioningStatusTest`, darunter
+    `Http::assertNothingSent()` als Regressionsschutz gegen einen Live-Query im
+    Lesepfad, plus 4 Vitest-Fälle in `useFtp.test.ts`.
+  - **Noch offen (nicht Teil von M26):** die `reconcileAccount()`-Reconciliation
+    aus M30 ist weiter nicht implementiert; die Spalte bleibt damit ein Cache
+    gegenüber einem von Hand gelöschten SFTPGo-User. Doku: §7.4.
 - [x] **P1-M27 (P0, 2026-09-26 von P2 hochgestuft, jetzt beantwortet) — Kamera-Protokoll und Cipher-Kompatibilität.** Die Kamera-Spezifikation (Canon R6 Mark II) und der Harness-Befund zusammen beantworten die Frage:
   - **SFTP**: funktioniert mit SFTPGo-Defaults. `aes128-gcm@openssh.com` und `aes256-gcm@openssh.com` sind in der SSH-Cipher-Liste. Passwort-Authentifizierung supported.
   - **FTPS**: funktioniert mit SFTPGo-Defaults für 2 der 3 Kamera-Ciphers (`ECDHE-RSA-AES256-GCM-SHA384`, `ECDHE-RSA-AES128-GCM-SHA256`). Der dritte (`TLS_RSA_WITH_AES_256_GCM_SHA384`, RSA ohne ECDHE) fehlt — aber die Kamera sagt „typischerweise", nicht „zwingend". Der Override `FTPD_CIPHER_SUITES` macht `AES128-SHA` verfügbar, falls nötig.
@@ -415,28 +425,36 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   Umschalten muss benannt sein, wer das macht und ab wann gegen P1-M27
   geprüft wird. Ohne diesen Schritt steht nach dem Umbau alles gleichzeitig
   still.
-- [ ] **P1-M33 (neu, 2026-09-26) — `resetPassword()` braucht Rate-Limit und
+- [x] **P1-M33 (2026-09-26, umgesetzt) — `resetPassword()` mit Rate-Limit und
   Audit-Trail.** Durch die Show-once-Semantik aus M23 ist der Reset der **einzige**
-  Recovery-Weg; ein verlorenes Passwort ist nicht wiederherstellbar. M22 und M23
-  sichern ab, dass Passwörter nicht im Log landen — sie regeln nicht, **wie oft**
-  jemand zurücksetzt. Zu entscheiden: wer zurücksetzen darf (nur Admin oder auch
-  der Fotograf mit Bestätigung seines aktuellen Passworts), wie viele Resets pro
-  Konto und pro Zeitfenster zulässig sind, und ob jeder Reset geloggt wird. Ohne
-  das ist der Reset ein unbegrenzter, unbeobachteter Erzeugungshebel für
-  gültige Zugangsdaten.
-  **Tests:** PHPUnit, dass der Reset-Hebel pro Konto gedeckelt ist, und ein Test,
-  dass jeder Reset eine Auditzeile schreibt.
-- [ ] **P1-M34 (neu, 2026-09-26) — Autoritative Quelle für den Account-Namen
-  festlegen.** Mit M22 wird `users.ftp_slug` zum SFTPGo-Accountnamen, aber
-  SFTPGo führt einen **eigenen** User-Store. Damit existieren zwei Kopien, die
-  auseinanderlaufen können: ein im Portal umbenannter Slug ist in SFTPGo
-  weiterhin der alte Account. M21 stellt bereits die richtige Frage („Slug
-  umbenennen ist eine Fremdschlüssel-Änderung an `storage/app/private`"), trifft
-  aber nicht die vorgelagerte. Zu entscheiden: ist `users.ftp_slug` führend und
-  SFTPGo wird bei jeder Änderung nachgezogen, oder führt SFTPGo und das Portal
-  liest nur?
-  **Tests:** PHPUnit, der einen umbenannten Slug gegen SFTPGo abgleicht und einen
-  Dienstneustart mit abweichendem Store prüft.
+  Recovery-Weg; ein verlorenes Passwort ist nicht wiederherstellbar. Umgesetzt:
+  - **Rate-Limit** `FtpCredentialService::RESET_LIMIT_PER_HOUR = 3` pro Konto und
+    Stunde über `RateLimiter`, Schlüssel `ftp-password-reset:{userId}`. Der
+    4. Aufruf antwortet mit **429** + `Retry-After` und deutscher Meldung.
+    Abgelehnte Aufrufe zählen mit (kein endloses Fensterverschieben durch
+    Hämmern), und sie kontaktieren den Dienst nicht und schreiben keine
+    Auditzeile.
+  - **Audit-Trail** neue Tabelle `ftp_password_resets` (Migration **V042**,
+    `FtpPasswordReset`): `user_id`, `reset_at`, `ip` (nullable), `success`.
+    **Jeder** Versuch schreibt eine Zeile, auch der fehlgeschlagene — der ist
+    die interessantere Eintrag. Ein 429 schreibt keine, das ist die Verweigerung
+    eines Versuchs, kein Versuch.
+  - **Endpoint** `POST /api/management/ftp/reset-password` →
+    `FtpCredentialController` (bewusst **nicht** in `FtpController`, das ist laut
+    §7.8 unverändert zu halten). **Kein `user_id` im Request** — das Konto ist
+    immer der authentifizierte Nutzer, die Fläche für eine IDOR wird gar nicht
+    erst angeboten.
+  - **Fehlgeschlagene Audit-Zeile ist laut.** `FtpAuditWriteException` → 500 ohne
+    Passwort im Response; ein vetoender `creating`-Listener würde von
+    `Eloquent::create()` sonst als Erfolg durchgehen.
+  - **Tests:** 38 PHPUnit-Fälle in `FtpPasswordResetTest` (18),
+    `FtpPasswordResetEndpointTest` (11), `FtpPasswordResetMigrationTest` (9).
+  - **Offen (bleibt Produktentscheidung):** wer zurücksetzen darf. Aktuell wie
+    `status()`/`process()`: jeder Management-Rolle mit `api/management/ftp*`.
+    Ein Selbständerungs-Flow mit Bestätigung des aktuellen Passworts ist weiter
+    offen — siehe 7.3.
+  - Doku: `19-ftp-upload-pipeline.md` §7.6a.
+- [x] **P1-M34 (P0, 2026-09-26, entschieden) — Autoritative Quelle für den Account-Namen.** Entscheidung: **`users.ftp_slug` führt**, SFTPGo wird bei jeder Änderung nachgezogen. Der Slug ist änderbar aber `unique()`. Da wir das Passwort nicht speichern, ist ein Slug-Wechsel ein **Reset**: Neuer Slug + neues Passwort, einmal angezeigt. Konsistent mit dem Show-once-Konzept, keine Race Condition, keine versteckten Felder. Die Galerie-Zuordnung (0..1) über `current_ftp_gallery_id` bleibt unverändert.
 - [x] **DOC (2026-09-26, erledigt) — der verwaiste `FT-01`-Verweis ist
   aufgelöst.** `13-ftp-brand-isolation.md:6` referenzierte ein Task, das im
   Board nicht mehr existiert. Titel und Verweis zeigen jetzt auf Abschnitt 7

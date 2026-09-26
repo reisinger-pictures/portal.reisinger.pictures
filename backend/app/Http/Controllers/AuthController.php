@@ -251,6 +251,41 @@ class AuthController extends Controller
         );
 
         DB::transaction(function () use ($user, $validated) {
+            // P1-M34: Ein Slug-Wechsel ist ein Reset. Der alte SFTPGo-Account
+            // wird gelöscht, der neue Account mit einem neuen Passwort
+            // angelegt. Das Passwort wird einmal zurückgegeben, nicht
+            // gespeichert. Race Condition: SFTPGo's PUT ersetzt das ganze
+            // User-Objekt, also wäre Read-Modify-Write nötig — und das hat
+            // Race Conditions. Der Reset vermeidet das und bleibt konsistent
+            // mit dem Show-once-Konzept.
+            $oldSlug = $user->ftp_slug;
+            $newSlug = $validated['ftp_slug'] ?? null;
+
+            if ($newSlug && $oldSlug !== $newSlug) {
+                $credentialSvc = app(FtpCredentialService::class);
+
+                // 1. Alten Account löschen (falls vorhanden). Wenn SFTPGo
+                //    nicht erreichbar ist, abbrechen — der User soll nicht
+                //    aktualisiert werden, wenn der Account nicht gelöscht
+                //    wurde.
+                if ($oldSlug) {
+                    $credentialSvc->deleteUser($oldSlug);
+                }
+
+                // 2. User aktualisieren (neuer Slug)
+                $user->update($validated);
+                $user->photos()->searchable();
+
+                // 3. Neuen Account anlegen mit neuem Passwort
+                $password = $credentialSvc->provisionAndShow($user);
+
+                return response()->json([
+                    'success' => true,
+                    'ftp_password' => $password,
+                    'ftp_password_note' => 'Dieses Passwort wird nur einmal angezeigt. Speichere es sofort.',
+                ]);
+            }
+
             $user->update($validated);
             $user->photos()->searchable();
         });
