@@ -5,7 +5,7 @@ import {useAuth} from '../../logic/useAuth';
 import {usePermissions} from '../../logic/usePermissions';
 import {usePhoto} from '../../logic/usePhoto';
 import {useAI} from '../../logic/useAI';
-import {useLicensingMode} from '../../logic/useLicensingMode';
+import {useLicensingModeStatus} from '../../logic/useLicensingMode';
 import {useUI} from '../components/UIContext';
 import PhotoDetailView from '../PhotoDetailView';
 import {renderWithProviders} from '../../test-setup';
@@ -44,7 +44,7 @@ vi.mock('../../logic/useAI', () => ({
 }));
 
 vi.mock('../../logic/useLicensingMode', () => ({
-    useLicensingMode: vi.fn(),
+    useLicensingModeStatus: vi.fn(),
 }));
 
 vi.mock('../components/UIContext', () => ({
@@ -187,33 +187,48 @@ describe('PhotoDetailView licensing context', () => {
     });
 
     it('passes the displayed photo gallery ID when resolving a scope override', () => {
-        vi.mocked(useLicensingMode).mockReturnValue('scope_licensing');
+        vi.mocked(useLicensingModeStatus).mockReturnValue({mode: 'scope_licensing', isLoading: false});
 
         renderWithProviders(<PhotoDetailView />);
 
-        expect(useLicensingMode).toHaveBeenLastCalledWith('displayed-gallery');
+        expect(useLicensingModeStatus).toHaveBeenLastCalledWith('displayed-gallery');
         expect(screen.getByTestId('scope-selector')).toBeInTheDocument();
         expect(screen.queryByTestId('volume-selector')).not.toBeInTheDocument();
     });
 
     it('passes the displayed photo gallery ID when resolving a volume override', () => {
-        vi.mocked(useLicensingMode).mockReturnValue('volume_licensing');
+        vi.mocked(useLicensingModeStatus).mockReturnValue({mode: 'volume_licensing', isLoading: false});
 
         renderWithProviders(<PhotoDetailView />);
 
-        expect(useLicensingMode).toHaveBeenLastCalledWith('displayed-gallery');
+        expect(useLicensingModeStatus).toHaveBeenLastCalledWith('displayed-gallery');
         expect(screen.getByTestId('volume-selector')).toBeInTheDocument();
         expect(screen.queryByTestId('scope-selector')).not.toBeInTheDocument();
     });
 
+    // FE-1 regression: the wrong (scope) map must not be rendered — or be
+    // clickable — while the gallery's licensing terms are still unresolved.
+    it('renders a loader instead of a licensing map while terms are unresolved', () => {
+        vi.mocked(useLicensingModeStatus).mockReturnValue({mode: 'scope_licensing', isLoading: true});
+
+        renderWithProviders(<PhotoDetailView />);
+
+        expect(screen.getByTestId('licensing-loading')).toBeInTheDocument();
+        expect(screen.queryByTestId('scope-selector')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('volume-selector')).not.toBeInTheDocument();
+    });
+
     it('replaces the scope fallback with the volume card when licensing resolves', async () => {
-        let mode: 'scope_licensing' | 'volume_licensing' = 'scope_licensing';
-        vi.mocked(useLicensingMode).mockImplementation(() => mode);
+        let status: {mode: 'scope_licensing' | 'volume_licensing'; isLoading: boolean} = {
+            mode: 'scope_licensing',
+            isLoading: false,
+        };
+        vi.mocked(useLicensingModeStatus).mockImplementation(() => status);
 
         const view = renderWithProviders(<PhotoDetailView />);
         expect(screen.getByTestId('scope-selector')).toBeInTheDocument();
 
-        mode = 'volume_licensing';
+        status = {mode: 'volume_licensing', isLoading: false};
         view.rerender(<PhotoDetailView />);
 
         expect(await screen.findByTestId('volume-selector')).toBeInTheDocument();

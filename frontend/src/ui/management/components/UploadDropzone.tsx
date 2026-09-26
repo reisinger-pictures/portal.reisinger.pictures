@@ -19,6 +19,8 @@ export default function UploadDropzone({ galleryId, onUploadComplete }: Props) {
         if (!files) return;
         setUploading(true);
         let successCount = 0;
+        let failureCount = 0;
+        let lastErrorMessage: string | null = null;
         
         for (const file of Array.from(files)) {
             const formData = new FormData();
@@ -30,7 +32,10 @@ export default function UploadDropzone({ galleryId, onUploadComplete }: Props) {
                 await apiUpload<{ success?: boolean }>('/api/management/upload', formData);
                 successCount++;
             } catch (err) {
-                console.error(err);
+                // handleApiError throws for 4xx/5xx and the global callback only
+                // covers status 0, so the failure must be surfaced here.
+                failureCount++;
+                lastErrorMessage = err instanceof Error ? err.message : null;
             }
         }
         
@@ -38,6 +43,9 @@ export default function UploadDropzone({ galleryId, onUploadComplete }: Props) {
         if (successCount > 0) {
             showToast('success', t`${successCount} Bild(er) hochgeladen`);
             onUploadComplete();
+        }
+        if (failureCount > 0) {
+            showToast('error', lastErrorMessage ?? t`${failureCount} Bild(er) konnten nicht hochgeladen werden.`);
         }
     };
 

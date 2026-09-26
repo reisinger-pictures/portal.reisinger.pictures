@@ -119,6 +119,12 @@ export interface VolumeLicensingResult {
     /** Effective tier structure (configurable per brand/gallery). */
     tiers: VolumeTierConfig[];
     isVolumePricing: boolean;
+    /**
+     * True while the displayed gallery's descriptor (or the brand terms) is
+     * still unresolved. Callers must not present a price or enable
+     * add-to-cart until this is false.
+     */
+    isLoading: boolean;
     /** All effective pricing groups, including scope groups. */
     groups?: CartPricingGroup[];
     /** Sum of all scope and volume groups. */

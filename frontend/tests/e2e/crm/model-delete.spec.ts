@@ -25,13 +25,17 @@ test.describe('Model löschen (DSGVO)', () => {
         await auth.login(adminUser.email, adminUser.password);
         await sidebar.navigateTo('Models');
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
-        await page.getByLabel('Suche').fill(model.firstName);
+        await page.locator('#model-filter-q').fill(model.firstName);
 
         const card = page.locator('[data-testid^="model-card-"]').first();
         await expect(card).toBeVisible({ timeout: 15000 });
         await card.click();
         await expect(page.getByTestId('model-delete-zone')).toHaveCount(0);
-        await page.getByRole('button', { name: 'Schließen' }).click();
+        // Scope to the dialog and match the name exactly: the sidebar's mobile
+        // close button is labelled "Menü schließen" and is only rendered on
+        // narrow viewports, so an unscoped substring match becomes a strict-mode
+        // violation on mobile.
+        await page.locator('.modal-box').getByRole('button', { name: 'Schließen', exact: true }).click();
         await auth.logout();
 
         // Super-admin: delete the model for good.
@@ -39,7 +43,7 @@ test.describe('Model löschen (DSGVO)', () => {
         await auth.login(superUser.email, superUser.password);
         await sidebar.navigateTo('Models');
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
-        await page.getByLabel('Suche').fill(model.firstName);
+        await page.locator('#model-filter-q').fill(model.firstName);
 
         const cardAgain = page.locator('[data-testid^="model-card-"]').first();
         await expect(cardAgain).toBeVisible({ timeout: 15000 });
@@ -62,7 +66,7 @@ test.describe('Model löschen (DSGVO)', () => {
         await auth.login(superUser.email, superUser.password);
         await sidebar.navigateTo('Models');
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
-        await page.getByLabel('Suche').fill(model.firstName);
+        await page.locator('#model-filter-q').fill(model.firstName);
 
         const card = page.locator('[data-testid^="model-card-"]').first();
         await expect(card).toBeVisible({ timeout: 15000 });
@@ -81,7 +85,7 @@ test.describe('Model löschen (DSGVO)', () => {
 
         // Server-side persistence: reload the filtered list — the model is still there.
         await page.reload();
-        await expect(page.getByLabel('Suche')).toHaveValue(model.firstName);
+        await expect(page.locator('#model-filter-q')).toHaveValue(model.firstName);
         await expect(page.locator('[data-testid^="model-card-"]')).toHaveCount(1, { timeout: 15000 });
     });
 });

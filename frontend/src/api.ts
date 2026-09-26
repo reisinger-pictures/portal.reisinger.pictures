@@ -323,6 +323,13 @@ export interface ApiDownloadOptions extends ApiRequestOptions {
     method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     headers?: Record<string, string>;
     body?: BodyInit | null;
+    /**
+     * Override the default accept header. Binary downloads default to
+     * PDF/octet-stream, but image sources (e.g. AI metadata compression) must
+     * advertise an image type so a content-negotiating delivery layer does not
+     * answer with 406 or a non-image representation.
+     */
+    accept?: string;
 }
 
 /**
@@ -338,7 +345,7 @@ export const apiDownload = async (
 ): Promise<DownloadedFile> => {
     const requestOptions: RequestInit = {
         headers: {
-            'Accept': 'application/pdf, application/octet-stream',
+            'Accept': options.accept ?? 'application/pdf, application/octet-stream',
             ...options.headers
         },
         credentials: 'include',

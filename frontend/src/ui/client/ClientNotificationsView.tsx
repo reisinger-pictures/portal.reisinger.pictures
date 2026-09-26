@@ -26,16 +26,24 @@ export default function ClientNotificationsView() {
     const toggleOptIn = async (id: string, type: 'gallery' | 'group', currentValue: boolean) => {
         const endpoint = type === 'gallery' ? `/api/galleries/${id}/opt-in` : `/api/gallery-groups/${id}/opt-in`;
 
-        // Optimistic UI Update
-        const newData = { ...data } as PreferencesData;
-        if (type === 'gallery') {
-            const idx = newData.galleries.findIndex((g: PrefItem) => g.id === id);
-            if(idx > -1) newData.galleries[idx].wants_notifications = !currentValue;
-        } else {
-            const idx = newData.groups.findIndex((g: PrefItem) => g.id === id);
-            if(idx > -1) newData.groups[idx].wants_notifications = !currentValue;
+        // Optimistic UI update with fresh nested objects; the SWR cache value
+        // must never be mutated in place before `mutate` broadcasts it.
+        if (data) {
+            const nextData: PreferencesData = type === 'gallery'
+                ? {
+                    ...data,
+                    galleries: data.galleries.map(item => (
+                        item.id === id ? {...item, wants_notifications: !currentValue} : item
+                    )),
+                }
+                : {
+                    ...data,
+                    groups: data.groups.map(item => (
+                        item.id === id ? {...item, wants_notifications: !currentValue} : item
+                    )),
+                };
+            mutate(nextData, false);
         }
-        mutate(newData, false);
 
         try {
             await apiMutate(endpoint, 'POST', { wants_notifications: !currentValue });

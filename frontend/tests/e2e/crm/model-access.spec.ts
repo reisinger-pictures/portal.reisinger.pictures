@@ -68,7 +68,7 @@ test.describe('Model-Profil-Zugang (Magic Link)', () => {
         await auth.login(adminUser.email, adminUser.password);
         await sidebar.navigateTo('Models');
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
-        await page.getByLabel('Suche').fill(unique);
+        await page.locator('#model-filter-q').fill(unique);
 
         const card = page.locator('[data-testid^="model-card-"]').first();
         await expect(card).toBeVisible({ timeout: 15000 });
@@ -82,7 +82,11 @@ test.describe('Model-Profil-Zugang (Magic Link)', () => {
         const accessLink = await accessInput.inputValue();
         expect(accessLink).toContain('/model-profil/');
 
-        await page.getByRole('button', { name: 'Schließen' }).click();
+        // Scope to the dialog and match the name exactly: the sidebar's mobile
+        // close button is labelled "Menü schließen" and is only rendered on
+        // narrow viewports, so an unscoped substring match becomes a strict-mode
+        // violation on mobile.
+        await page.locator('.modal-box').getByRole('button', { name: 'Schließen', exact: true }).click();
         await auth.logout();
 
         // 4. Model öffnet den Profil-Link (Gast), aktualisiert und bestätigt.

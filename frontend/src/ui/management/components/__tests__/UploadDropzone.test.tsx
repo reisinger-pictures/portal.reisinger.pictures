@@ -46,4 +46,24 @@ describe('UploadDropzone', () => {
         expect(showToastMock).toHaveBeenCalledWith('success', '1 Bild(er) hochgeladen');
         expect(screen.queryByText('Lade hoch... Bitte warten.')).not.toBeInTheDocument();
     });
+
+    // FE-3 regression: a rejected upload (e.g. HTTP 422) must surface an error
+    // toast instead of silently no-oping.
+    it('shows the thrown error message and skips onUploadComplete when every file fails', async () => {
+        const user = userEvent.setup();
+        const onUploadComplete = vi.fn();
+        apiUploadMock.mockRejectedValue(new Error('Die Datei ist ungültig.'));
+        const {container} = renderWithProviders(
+            <UploadDropzone galleryId="gallery-1" onUploadComplete={onUploadComplete} />,
+        );
+        const input = container.querySelector('input[type="file"]');
+
+        const file = new File(['image'], 'photo.jpg', {type: 'image/jpeg'});
+        await user.upload(input as HTMLInputElement, file);
+
+        await waitFor(() => expect(apiUploadMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(showToastMock).toHaveBeenCalledWith('error', 'Die Datei ist ungültig.'));
+        expect(onUploadComplete).not.toHaveBeenCalled();
+        expect(showToastMock).not.toHaveBeenCalledWith('success', expect.anything());
+    });
 });

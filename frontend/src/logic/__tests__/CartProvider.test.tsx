@@ -54,6 +54,7 @@ describe('CartProvider quote metadata', () => {
             nextTierCount: 0,
             nextTierLabel: '',
             tiers: [],
+            isLoading: false,
         });
     });
 
@@ -80,6 +81,7 @@ describe('CartProvider quote metadata', () => {
             tiers: [{minQuantity: 0, priceCents: 5000}, {minQuantity: 2, priceCents: 4000}],
             groupedTotalCents: 8500,
             volumeSubtotalCents: 8000,
+            isLoading: false,
         });
 
         const {result} = renderHook(() => useCart(), {wrapper});

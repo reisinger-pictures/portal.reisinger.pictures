@@ -68,6 +68,22 @@ describe('apiDownload', () => {
         );
     });
 
+    // FE-5 regression: callers that download images must be able to override
+    // the PDF/octet-stream default accept header.
+    it('sends the caller-provided accept header for image downloads', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(pdfResponse('photo.jpg'));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await apiDownload('/api/photos/1/image', { accept: 'image/jpeg, image/png, image/*' });
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            '/api/photos/1/image',
+            expect.objectContaining({
+                headers: expect.objectContaining({ Accept: 'image/jpeg, image/png, image/*' }),
+            }),
+        );
+    });
+
     it('normalises a 422 response into a thrown ApiError', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(422, { message: 'Ungültige Variante.' })));
 

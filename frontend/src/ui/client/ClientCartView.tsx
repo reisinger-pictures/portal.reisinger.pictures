@@ -567,7 +567,7 @@ export default function ClientCartView() {
 
                                     {isFreeCheckout && (
                                          <div role="status" className="alert alert-success mb-6">
-                                             Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich.
+                                             <Trans>Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich.</Trans>
                                          </div>
                                      )}
 
@@ -628,7 +628,7 @@ export default function ClientCartView() {
                                         disabled={items.length === 0 || isSubmitting || (isImmediateStripeCheckout && turnstileRequired && (!turnstileSiteKey || !turnstileToken))}
                                     >
                                         {isSubmitting ? <span
-                                            className="loading loading-spinner"></span> : paymentRecoveryPending ? <Trans>Zahlung erneut prüfen</Trans> : (hasQuotes ? <Trans>Unverbindlich anfragen</Trans> : isFreeCheckout ? 'Kostenlos bestellen' : <Trans>Zahlungspflichtig bestellen</Trans>)}
+                                            className="loading loading-spinner"></span> : paymentRecoveryPending ? <Trans>Zahlung erneut prüfen</Trans> : (hasQuotes ? <Trans>Unverbindlich anfragen</Trans> : isFreeCheckout ? <Trans>Kostenlos bestellen</Trans> : <Trans>Zahlungspflichtig bestellen</Trans>)}
                                     </button>
                                 </form>
                             )}

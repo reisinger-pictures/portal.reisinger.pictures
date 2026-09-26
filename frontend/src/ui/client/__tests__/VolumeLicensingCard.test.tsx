@@ -90,6 +90,7 @@ describe('VolumeLicensingCard', () => {
                 {minQuantity: 0, priceCents: 6000},
                 {minQuantity: 3, priceCents: 4000},
             ],
+            isLoading: false,
         });
     });
 
@@ -119,5 +120,35 @@ describe('VolumeLicensingCard', () => {
             price: 6000,
         }));
         expect(onAddToCart).toHaveBeenCalledOnce();
+    });
+
+    // FE-1 regression: the add button must stay disabled and the price hidden
+    // until the displayed gallery's descriptor is resolved.
+    it('disables add-to-cart and hides the price while the descriptor is unresolved', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useVolumeLicensing).mockReturnValue({
+            isVolumePricing: false,
+            tierIndex: 0,
+            isMaxTier: false,
+            pricePerItemCents: 0,
+            totalCents: 0,
+            nextTierCount: 0,
+            nextTierLabel: '',
+            tiers: [{minQuantity: 0, priceCents: 6000}],
+            isLoading: true,
+        });
+
+        renderWithProviders(
+            <VolumeLicensingCard photo={photo} onAddToCart={onAddToCart} />,
+        );
+
+        const button = screen.getByRole('button', {name: 'In den Warenkorb'});
+        expect(button).toBeDisabled();
+        expect(screen.queryByText(formatMoney(0))).not.toBeInTheDocument();
+        expect(screen.getByTestId('volume-price-loading')).toBeInTheDocument();
+
+        await user.click(button);
+        expect(addToCart).not.toHaveBeenCalled();
+        expect(onAddToCart).not.toHaveBeenCalled();
     });
 });

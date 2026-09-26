@@ -16,7 +16,7 @@ export function CartProvider({children}: CartProviderProps) {
     const cartKey = `rp_cart_${user?.id ? btoa(String(user.id)) : 'guest'}`;
 
     const [cartState, setCartState] = useState(() => {
-        return loadCartState(localStorage.getItem(cartKey));
+        return loadCartState(cartKey);
     });
     const {items, quoteToken} = cartState;
     const loadingRef = useRef(false);
@@ -25,7 +25,7 @@ export function CartProvider({children}: CartProviderProps) {
     useEffect(() => {
         loadingRef.current = true;
         queueMicrotask(() => {
-            const result = loadCartState(localStorage.getItem(cartKey));
+            const result = loadCartState(cartKey);
             if (result.error === 'invalid-json') {
                 showToast('error', 'Warenkorb konnte nicht geladen werden.');
             }
