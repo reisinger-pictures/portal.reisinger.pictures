@@ -108,7 +108,10 @@ export class FormHelper {
 
     async fillProfileForm(params: FillProfileFormParams) {
         const main = this.page.getByRole('main');
-        if (params.name) await main.getByRole('textbox', {name: 'Dein Name', exact: true}).fill(params.name);
+        // Anchored regex, not `exact`: the required-field marker comes from CSS
+        // `.label-text::after`, and generated content counts towards the
+        // accessible name, so a required field is exposed as "Dein Name *".
+        if (params.name) await main.getByRole('textbox', {name: /^Dein Name/}).fill(params.name);
         if (params.ftpSlug) await main.getByRole('textbox', {name: /^FTP Upload Ordner \(Slug\)/}).fill(params.ftpSlug);
         if (params.copyright) await main.getByRole('textbox', {name: /^Standard-Urheber \(IPTC Copyright\)/}).fill(params.copyright);
     }
