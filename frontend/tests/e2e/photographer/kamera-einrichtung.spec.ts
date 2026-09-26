@@ -170,7 +170,7 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
         // fails every camera login regardless of the password.
         await expect(accountCard.getByText('Kamera-Konto noch nicht angelegt')).toBeVisible();
 
-        await accountCard.getByRole('button', { name: 'Neues Kamera-Passwort' }).click();
+        await accountCard.getByTestId('ftp-credentials-button').click();
 
         await expect(main.getByText(password)).toBeVisible();
         await expect(main.getByText(passwordNotice)).toBeVisible();
@@ -205,7 +205,7 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
         await sidebar.navigateTo('Dashboard');
 
         const main = page.getByRole('main');
-        await main.getByRole('button', { name: 'Neues Kamera-Passwort' }).click();
+        await main.getByTestId('ftp-credentials-button').click();
 
         // The toast container is global (`toast-global`) and sits outside `main`,
         // so it is addressed from the page — the same as every other toast
