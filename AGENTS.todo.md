@@ -1984,6 +1984,25 @@ alle mit Regressionstest:
   Frontend-Dist) und danach `docker restart portal_backend` auf dem Host —
   die Reihenfolge steht jetzt als Regel in `AGENTS.md` §13, weil PHP die
   kompilierten Klassen im Prozess haelt und ein rsync das nicht aendert.
+### UI-Review 2026-09-26 — Screenshot-Verifikation der neuen Oberflaechen
+
+Erstmals das Screenshot-Harness auf die neuen Oberflaechen angewendet
+(`tests/screenshots/`, Manifest um `kamera-einrichtung` und
+`photographer-dashboard` erweitert, inkl. Fotografen-Auth). 4 Aufnahmen
+(je Desktop/Mobile), alle Seiten rendern korrekt, keine kritischen Befunde.
+
+| Schwere | Stelle | Befund | Vorschlag |
+|---|---|---|---|
+| medium | `KameraEinrichtung.tsx` (Schritt 2) | Der Guide nennt **„Neues Kamera-Passwort"**, aber der Button heißt fuer `pending` **„Kamera-Zugang einrichten"**. Ein Fotograf, der dem Guide folgt, sucht einen Button, den es nicht gibt — und genau diese Diskrepanz hat den Slug-Wechsel-Blockade beheben sollen. | Beide Labels nennen, oder den zustandabhaehngigen Text erklären |
+| medium | `ManagementFtpInbox.tsx:57` | **„Fuer FTPS ist kein Verschluesselungsmodus hinterlegt — bitte den Support kontaktieren"**. Wird nur angezeigt, wenn der Modus fehlt (in Produktion gesetzt). „Support kontaktieren" ist fuer einen Fotografen eine Sackgasse: er kann eine Server-Konfiguration nicht aendern. | Neutralere Formulierung ohne Support-Weg, z. B. was fehlt und warum |
+| low | `photographer-dashboard` (Mobile) | Der lange Upload-Ordner-Pfad (`ftp_folder`) bricht ueber **drei Zeilen** um und quetscht die Karte | Zeilenumbruch kontrollieren (`break-all` nur fuer lange Pfade) oder kuerzer anzeigen |
+| low | Header (Mobile) | **„Reisinger Fot…"** abgeschnitten | Vorbestehend, nicht von dieser Runde — nur vermerkt |
+
+**Nicht Beanstandungen:** Die Verbindungstabelle rendert auf beiden Viewports sauber;
+die Status-Warnung (`pending`) und der Button sitzen in einer Zeile; die
+Abschnitte des Guides sind klar getrennt. Das FTPS-Modus-Problem und der
+Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
+
 - [ ] **`profile-ftp-slug.spec.ts` (E2E, 2 von 12 Faellen) — testseitig, kein
   Produktionsfehler.** Der Slug-Wechsel persistiert (Backend-Test
   `FtpFirstSlugChangeTest` Zeile 90: `assertSame('j-doe', $after->ftp_slug)`),
