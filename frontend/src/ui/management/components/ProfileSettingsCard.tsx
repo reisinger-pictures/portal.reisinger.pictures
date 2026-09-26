@@ -1,6 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useEffect, useId, useState } from 'react';
+import { useSWRConfig } from 'swr';
 import { useAuth } from '../../../logic/useAuth';
 import { usePermissions } from '../../../logic/usePermissions';
 import { apiMutate } from '../../../api';
@@ -56,6 +57,7 @@ interface ProfileUpdateResponse {
 export default function ProfileSettingsCard() {
     "use no memo";
     const { user, mutate: mutateUser } = useAuth();
+    const { mutate: mutateCache } = useSWRConfig();
     const { isPhotographer } = usePermissions();
     const { showToast } = useUI();
     const profileFormId = useId();
@@ -94,6 +96,15 @@ export default function ProfileSettingsCard() {
 
             const response = await apiMutate<ProfileUpdateResponse>('/api/auth/profile', 'PUT', payload);
             await mutateUser();
+
+            // A slug change also changes `ftp_folder`, which the FTP inbox reads
+            // from GET /api/management/ftp/status under its own SWR key. Without
+            // this invalidation the dashboard re-mounts inside SWR's deduping
+            // window and serves the stale folder it cached at login — the
+            // photographer then sees the old account name next to the new one.
+            if (isPhotographer) {
+                await mutateCache('/api/management/ftp/status', undefined, { revalidate: true });
+            }
 
             // A slug change is a password reset: the backend hands the new camera
             // password over exactly once. Dropping it here is the bug this branch
