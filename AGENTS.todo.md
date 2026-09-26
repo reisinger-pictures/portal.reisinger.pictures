@@ -154,16 +154,62 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   SFTPGo nicht anbietet, sind M21–M26 und M28 umsonst gebaut. **Daher
   ZUERST und parallel zu M22, nicht danach.** Ein Absturz dieses Punktes
   invalidiert den Stack, nicht nur sich selbst.
-  Abnahme.** Es ist **nicht verifiziert**, ob die konkrete Kamera FTPS mit
+  Es ist **nicht verifiziert**, ob die konkrete Kamera FTPS mit
   GCM oder CBC/SHA1 braucht. Mit pure-ftpd war `AES128-SHA` nachweislich
   nicht aktivierbar (verifiziert 2026-09-26); SFTPGo ist Go/`crypto/tls` und
   **müsste** es können, aber das ist ungetestet. Solange offen, gilt der
-  Kamera-User `florian` als **UZugangsersatzweg für den Betrieb**, nicht als
+  Kamera-User `florian` als **Betriebs-Workaround**, nicht als
   Beweis, dass die Kamera funktioniert.
   **Testmethode:** Cipher-Liste des laufenden SFTPGo gegen
   `openssl s_client -cipher …` prüfen, dann mit echter Kamera testen. Bei
   SFTP-Unterstützung der Kamera ist SFTP vorzuziehen — moderne Ciphers, und
   SFTPGo bietet FTPS und SFTP auf demselben Port.
+  **Stand der Verifikation (2026-09-26):** Die Cipher-Messung ist **nicht**
+  durchgeführt — **nicht** weil sie unmöglich ist, sondern weil die Sonde
+  dreimal an der Konfiguration scheiterte. Belegte Zwischenbefunde:
+  SFTPGo 2.7.6-62ae9ba3; `--config-dir` defaultet auf `.` (= `/var/lib/sftpgo`),
+  das Image meldet aber `config file used: "/etc/sftpgo/sftpgo.json"`. FTPS-Bindings
+  liegen unter `ftpserver.bindings[].port`, nicht `ftpserver.port`. Solange die
+  Bindung nicht steht, liefert `openssl s_client` **0 gelesene Bytes** und ein
+  leeres Ergebnis — **das ist als „Cipher nicht angeboten" zu lesen ist ein
+  Fehlschluss.** Vor der nächsten Messung Config-Weg klären (siehe P1-M35).
+- [ ] **P1-M35 (P0, neu 2026-09-26) — Konfigurationsweg der SFTPGo-Instanz
+  klären, bevor weiter gemessen oder deployed wird.** Ohne funktionierende
+  Konfiguration ist **jede** Aussage über die Ciphers wertlos — das ist in
+  drei Sondenversuchen praktisch bestätigt worden. Zu klären:
+  (a) **Config-Verzeichnis**: das Image meldet `/etc/sftpgo/sftpgo.json`,
+  `--config-dir` defaultet aber auf `.`; was gewinnt in der Portainer-Stack?
+  (b) **Datenprovider**: der Default ist `sqlite` mit `Name:sftpgo.db` **relativ
+  zum Config-Verzeichnis**; ein nicht persistiertes oder falsch gemountetes
+  Verzeichnis ergibt `no such table: schema_version` und **keinen** Admin-User
+  (`CreateDefaultAdmin:false`), damit 401 auf `/api/v2/token` — die
+  Provisionierung aus M22 kann dann nicht laufen.
+  (c) **Admin-Bootstrap**: `SFTPGO_DEFAULT_ADMIN_USERNAME`/`_PASSWORD` müssen
+  greifen, sonst gibt es keinen API-Zugang.
+  **Konsequenz für M22:** die Client-Implementierung darf **keine** Annahme
+  über Erreichbarkeit oder Seed-Zustand treffen; ein nicht erreichbarer Dienst
+  muss ein sauberer Fehlerpfad sein, kein 500er (vgl. 7.5 im Feature-Doc).
+  **Tests:** PHPUnit mit gemocktem HTTP deckt den 401-Fall bereits ab; zusätzlich
+  ein Smoke-Test gegen die reale Instanz, der die Cipher-Liste als Fixture
+  festschreibt, damit M27 später nicht erneut von einer defekten Sonde
+  ausgeht.
+- [ ] **P1-M36 (P0, neu 2026-09-26) — Ablösung eines **laufenden** FTP-Servers,
+  nicht Parallelbetrieb.** `pure-ftpd` läuft heute und bedient einen Fotografen;
+  SFTPGo **ersetzt** ihn. Damit ist der Plan kein Greenfield-Aufbau, sondern ein
+  Schnitt mit laufendem Betrieb. Zu beachten: der reale Datenbestand auf
+  `/home/webadmin/websites/ftp` ist der einzige Ort, an dem die Fotos liegen —
+  ein Fehler im Cutover ist **nicht** durch einen zweiten Stack reversibel,
+  solange die Dateien nur einmal existieren. **Vor** dem Umschalten verbindlich:
+  (a) Sicherung des gesamten `ftp`-Baums (inkl. `1002:webgroup`, `2775`/setgid)
+  und **Nachweis**, dass ein Restore geprüft wurde; (b) Fotograf muss den
+  neuen Zugang mit **echter Kamera** bestätigt haben, nicht mit einem
+  Desktop-Client (§7.10 Schritt 6); (c) erst dann `pure-ftpd` stilllegen,
+  **nicht** vorher; (d) Aufbewahrung des alten Zugangs bis der erste reale
+  Import mit der Kamera durchgelaufen ist.
+  **Tests:** Kein automatisierter Test sinnvoll — das ist ein Runbook. Ergo:
+  Checkliste in `features/infrastructure/19-ftp-upload-pipeline.md` als
+  §7.12 „Cutover-Runbook“ mit den Schritten (a)–(d) und einem
+  **Rollback-Fenster**, in dem beide Stacks laufen dürfen.
 - [ ] **P1-M28 (P2) — `FtpController::process()` hat keinen Concurrency-Guard.**
   `features/infrastructure/19-ftp-upload-pipeline.md:129` hält fest: kein
   Lock, doppelte Verarbeitung derselben Datei möglich, Annahme
@@ -254,6 +300,42 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   Board nicht mehr existiert. Titel und Verweis zeigen jetzt auf Abschnitt 7
   in `19-ftp-upload-pipeline.md` und auf P1-M21 bis P1-M32. Das `FT-NN`-Schema
   bleibt nur noch im Changelog von 13 als Historie stehen.
+
+- [ ] **DOC-13 (neu 2026-09-26) — IDs im Board sind doppelt vergeben.** Zwei
+  Nummernräume kollidieren, nicht einer.
+
+  **(a) Fünf P1-M-IDs:** `P1-M9`, `P1-M11`, `P1-M14`, `P1-M15` und `P1-M16`
+  definieren je **zwei verschiedene Befunde** (Zeilen 774ff. gegen 1300ff.).
+  Das ist keine Dublette, sondern eine Kollision aus zwei getrennten
+  Erfassungswellen — die LOW-Positionen (774ff.) und die späteren
+  Verifikationspositionen (1300ff.) teilen sich die Nummer.
+  **Warum das zählt:** ein Verweis auf „P1-M15" ist nicht auflösbar, und jede
+  Auswertung, die eine ID als Schlüssel nutzt, verwechselt zwei Themen. Bei
+  M15 ist das konkret gefährlich — der LOW-Befund (brand-fremde Gruppe) und der
+  P0-Befund (Brand-Guard) wurden als *dasselbe* Item geführt. Das ist vermutlich
+  auch die Ursache der in DOC-12 notierten Falschmeldung zu P1-M15.
+  **Zu entscheiden:** die zweite Welle umnummerieren (mit Cross-Reference an der
+  alten ID, damit alte Verweise nicht ins Leere zeigen) **oder** ein
+  `P1-M9a`/`P1-M9b`-Schema einführen. Keine stille Umnummerierung.
+  **Prüfbare Invariante:**
+  `grep -oE "^- \[.\] \*\*P1-M[0-9]+" AGENTS.todo.md | grep -oE "P1-M[0-9]+" |
+  sort | uniq -d` muss **leer** sein.
+  **Nicht Teil dieses Commits:** die Umbenennung ist eine inhaltliche
+  Entscheidung und wird nicht mit einer Verifikations- oder Doku-Änderung
+  vermischt.
+
+  **(b) Fünf DOC-IDs, gleiches Muster:** `DOC-3`, `DOC-4`, `DOC-6`, `DOC-7` und
+  `DOC-8` sind je zweimal definiert — einmal in der Sektion „Offene
+  Dokumentations-Wahrheit" (ab Z. 304) und einmal in der späteren
+  Verifikationsliste (ab Z. 630). Die späteren Einträge tragen im Titel ein
+  Erledigungsdatum, sind also **nicht** dieselbe Position, sondern eine
+  Abschlussnotiz. Folge: „DOC-8 ist offen" und „DOC-8 ist erledigt" sind beide
+  im Board gleichzeitig belegbar.
+
+  **Gemeinsame Ursache:** zwei unabhängige Erfassungswellen haben beide bei 1
+  begonnen, ohne dass ein ID-Schema vergeben wurde. Deshalb ist die Korrektur
+  eine **sprechende Säule** (Konvention: `DOC-<n>` für offene Positionen,
+  `DOC-<n>#close` für Abschlussnotizen) und nicht bloß ein Umnummerieren.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
