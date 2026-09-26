@@ -148,7 +148,12 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   darf sehen, was das System weiß, auch wenn der Dienst ausfällt.
   **Tests:** PHPUnit für `status()` mit und ohne provisioniertes Konto, und
   ein Test, dass `process()` ohne SFTPGo-Kontakt weiterläuft.
-- [ ] **P1-M27 (P2) — Kamera-Protokoll ist ungeklärt und blockiert die
+- [ ] **P1-M27 (P0, **2026-09-26 von P2 hochgestuft**) — Kamera-Protokoll ist ungeklärt und
+  blockiert die Abnahme.** Das ist die einzige Unbekannte, die die
+  Grundsatzentscheidung kippen kann: verlangt die Kamera einen Cipher, den
+  SFTPGo nicht anbietet, sind M21–M26 und M28 umsonst gebaut. **Daher
+  ZUERST und parallel zu M22, nicht danach.** Ein Absturz dieses Punktes
+  invalidiert den Stack, nicht nur sich selbst.
   Abnahme.** Es ist **nicht verifiziert**, ob die konkrete Kamera FTPS mit
   GCM oder CBC/SHA1 braucht. Mit pure-ftpd war `AES128-SHA` nachweislich
   nicht aktivierbar (verifiziert 2026-09-26); SFTPGo ist Go/`crypto/tls` und
@@ -222,6 +227,28 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   Umschalten muss benannt sein, wer das macht und ab wann gegen P1-M27
   geprüft wird. Ohne diesen Schritt steht nach dem Umbau alles gleichzeitig
   still.
+- [ ] **P1-M33 (neu, 2026-09-26) — `resetPassword()` braucht Rate-Limit und
+  Audit-Trail.** Durch die Show-once-Semantik aus M23 ist der Reset der **einzige**
+  Recovery-Weg; ein verlorenes Passwort ist nicht wiederherstellbar. M22 und M23
+  sichern ab, dass Passwörter nicht im Log landen — sie regeln nicht, **wie oft**
+  jemand zurücksetzt. Zu entscheiden: wer zurücksetzen darf (nur Admin oder auch
+  der Fotograf mit Bestätigung seines aktuellen Passworts), wie viele Resets pro
+  Konto und pro Zeitfenster zulässig sind, und ob jeder Reset geloggt wird. Ohne
+  das ist der Reset ein unbegrenzter, unbeobachteter Erzeugungshebel für
+  gültige Zugangsdaten.
+  **Tests:** PHPUnit, dass der Reset-Hebel pro Konto gedeckelt ist, und ein Test,
+  dass jeder Reset eine Auditzeile schreibt.
+- [ ] **P1-M34 (neu, 2026-09-26) — Autoritative Quelle für den Account-Namen
+  festlegen.** Mit M22 wird `users.ftp_slug` zum SFTPGo-Accountnamen, aber
+  SFTPGo führt einen **eigenen** User-Store. Damit existieren zwei Kopien, die
+  auseinanderlaufen können: ein im Portal umbenannter Slug ist in SFTPGo
+  weiterhin der alte Account. M21 stellt bereits die richtige Frage („Slug
+  umbenennen ist eine Fremdschlüssel-Änderung an `storage/app/private`"), trifft
+  aber nicht die vorgelagerte. Zu entscheiden: ist `users.ftp_slug` führend und
+  SFTPGo wird bei jeder Änderung nachgezogen, oder führt SFTPGo und das Portal
+  liest nur?
+  **Tests:** PHPUnit, der einen umbenannten Slug gegen SFTPGo abgleicht und einen
+  Dienstneustart mit abweichendem Store prüft.
 - [ ] **DOC — `features/infrastructure/13-ftp-brand-isolation.md:6`
   referenziert `FT-01` in `AGENTS.todo.md`; dieses Task existiert nicht mehr**
   (`grep FT-01` → 0 Treffer im Board). Das `FT-NN`-Schema ist historisch und
