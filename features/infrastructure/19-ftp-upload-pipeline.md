@@ -145,6 +145,44 @@ Gallery assignment is purely explicit via `setTarget()`:
 > **Verknüpfte Tasks:** P1-M21 bis P1-M32 in `AGENTS.todo.md`.
 > Infrastruktur-Seite: `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e.
 
+### 7.0 Stack-Zuordnung
+
+**SFTPGo ist ein Service im bestehenden Portal-Compose**
+(`deployment/docker-compose.yml`), **kein eigener Stack.** Festgelegt
+2026-09-26.
+
+Dafür:
+
+- **Ein `env_file` für den Stack.** `SFTPGO_BASE_URL` und `SFTPGO_API_KEY`
+  liegen neben den bestehenden Variablen in der Portainer-Stack-Env; im
+  versionierten Compose nur die Platzhalter (7.7).
+- **Die Admin-API muss nicht nach außen publiziert werden.** `backend` und
+  `sftpgo` hängen an `webnet` und sprechen sich über den Service-Namen an
+  (`http://sftpgo:8080`). Nur der Kamera-Port wird auf dem Host veröffentlicht.
+  Das ist ein Sicherheitsgewinn gegenüber einem eigenen Stack.
+- **Ein `docker compose up -d` für beides**, ein Rollback-Punkt.
+
+Dagegen — bewusst in Kauf genommen:
+
+- **Gekoppelte Lebensdauer.** `up -d` startet beides, `down` stoppt beides.
+  Ein defektes SFTPGo-Image blockiert damit den Portal-Deploy. Deshalb: **kein
+  `depends_on` vom `backend` auf `sftpgo`**, und der `restart: unless-stopped`
+  ist bewusst unabhängig. Der Import darf den Dienst nicht brauchen (7.5) —
+  das ist die Voraussetzung dafür, dass die Kopplung nur den Deploy betrifft
+  und nicht den Betrieb.
+- **Ein geteiltes Datenverzeichnis mit `backend`:** der Bind-Mount
+  `/home/webadmin/websites/ftp` (`:75`) wird von beiden genutzt. Die
+  Ownership-Regeln in 7.9 gelten damit für beide Seiten.
+
+**Noch zu klären:** das SFTPGo-Datenverzeichnis (Accounts, Zertifikate) wird
+ein benanntes Volume im Portal-Namespace. Die bestehende Sicherung
+(`/usr/local/bin/volume-backup.sh`) sichert `SRC_WEBSITES` plus eine **feste
+Liste benannter Volumes** und würde es **nicht** erfassen. Vor dem ersten
+Deploy muss das Volume dort eingetragen werden — Quelltext dafür ist
+`~/dev/strato-vps/proposed/backup.sh`. Die Fotos selbst liegen im Bind-Mount
+und sind über `SRC_WEBSITES` bereits abgedeckt; ungesichert bliebe nur die
+Kontodatenbank.
+
 ### 7.1 Ausgangslage und Bewegungsgründe
 
 Bis 2026-09-26 war der externe Dienst `pure-ftpd` mit **einem** pauschalen
@@ -346,8 +384,12 @@ siehe §7.12, denn der Betrieb läuft während des Wechsels weiter.
 **Kamera-Protokoll (blockiert die Abnahme).** Ob die konkrete Kamera FTPS mit
 GCM oder CBC/SHA1 braucht, ist **ungeklärt**. Testmethode: Cipher-Liste des
 laufenden SFTPGo mit `openssl s_client -cipher …` prüfen, dann mit echter
-Kamera. Unterstützt die Kamera SFTP, ist SFTP vorzuziehen — moderne Ciphers,
-und SFTPGo bietet FTPS und SFTP auf demselben Port. Der User `florian` unter
+Kamera. Unterstützt die Kamera SFTP, ist SFTP vorzuziehen — moderne Ciphers.
+**Achtung:** SFTPGo lauscht für SFTP und FTPS auf **getrennten Ports**
+(`sshd`/`ftpd` mit eigener `address`), sie teilen sich keinen. Für FTPS wird
+`AUTH TLS` auf dem normalen FTP-Port unterstützt, also explizites FTPS ohne
+zusätzlichen Port. Die Portwahl ist Teil des Portal-Stacks — die Firewall
+dokumentiert `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e. Der User `florian` unter
 `pure-ftpd` gilt bis dahin als **Betriebs-Workaround, kein Beweis**.
 
 **Stand 2026-09-26: die Messung steht noch aus.** Sie ist nicht gescheitert,
