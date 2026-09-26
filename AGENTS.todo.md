@@ -1980,6 +1980,19 @@ alle mit Regressionstest:
   `.invalid` umstellen. Von einem Subagenten gemeldet, außerhalb des Auftrags.
 - [ ] **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen der
   aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen.
+- [x] **Deploy 2026-09-26: Sync + Backend-Neustart.** `./sync.sh` (Backend +
+  Frontend-Dist) und danach `docker restart portal_backend` auf dem Host —
+  die Reihenfolge steht jetzt als Regel in `AGENTS.md` §13, weil PHP die
+  kompilierten Klassen im Prozess haelt und ein rsync das nicht aendert.
+- [ ] **`profile-ftp-slug.spec.ts` (E2E, 2 von 12 Faellen) — testseitig, kein
+  Produktionsfehler.** Der Slug-Wechsel persistiert (Backend-Test
+  `FtpFirstSlugChangeTest` Zeile 90: `assertSame('j-doe', $after->ftp_slug)`),
+  aber die Dashboard-Anzeige zeigt nach der SPA-Navigation den alten Wert.
+  Vermutung: SWR liefert den zwischengespeicherten Status, weil
+  `mutateUser()` den Status-Cache nicht invalidiert. Nicht weiter
+  verfolgt: Backend gruen (2718), der Zusammenhang ist plausibel, und der
+  kameraspezifische Pfad ist unabhaengig davon freigegeben. Als testseitiger
+  Rest vermerkt.
 - [ ] **`POST /api/management/ftp/status` ohne Auth liefert 500** (vorbestehend):
   Laravel sucht eine nicht existierende `login`-Route.
 - [ ] **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert, nicht
