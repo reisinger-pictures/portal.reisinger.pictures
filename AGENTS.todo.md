@@ -1792,6 +1792,74 @@ alle mit Regressionstest:
   nicht umgesetzt).
 
 
+### Nachtrag 2026-09-26, nach dem ersten produktiven Deploy
+
+- [x] **P1-M46 (P0) — Die veroeffentlichten Ports hatten keinen Listener.**
+  SFTPGo 2.7 bindet SSH auf **2022**, nicht 2222; der FTP-Daemon ist per Default
+  aus (`ftpd.bindings[].port = 0`). `2222:2222` und `989:989` banden Host-Ports,
+  auf denen im Container nichts antwortete — der Host sendete RST. Im tcpdump
+  sieht ein eingehender SYN mit RST-Antwort wie eine gesperrte Firewall aus, also
+  wurde zuerst die Firewall verdächtigt. Fünf Ursachen, jede davon mit
+  unauffälliger Konfiguration: falscher Container-Port, fehlende FTPD-Bindung,
+  falsches Env-Präfix (`SFTPGO_FTP__` statt `SFTPGO_FTPD__`, der Abschnitt heißt
+  seit 2.6 `ftpd` und der falsche Name wird kommentarlos ignoriert), fehlendes
+  Zertifikat (2.7 erzeugt keines, im Gegensatz zu 19-ftp 7.9) und `exec sftpgo`
+  ohne `serve` (druckt nur die Hilfe, Exit 0). Gate:
+  `compose-entrypoint-contract.sh`.
+- [x] **P1-M47 (P1) — `TLS_MODE` war geraten.** Korrekt ist **1 = explizit**
+  (`AUTH TLS`), weil eine Canon-Kamera direkt nach dem Verbindungsaufbau
+  `AUTH TLS` sendet und implizites FTPS nicht zuverlässig unterstützt
+  (cam.start.canon UG-06_Network_0060). Der Klartext-Greeting, der initially
+  wie ein Fehler aussah, ist genau dieses Modus funktionierend. Eine
+  TLS-Obergrenze wurde kurz eingebaut und auf Owner-Einwand wieder entfernt —
+  Go handelt mit einem älteren Client selbst herunter, eine Obergrenze nimmt
+  nur Fähigkeit weg.
+- [x] **P1-M48 (P1) — Cipher-Liste gemessen, gegen die laufende Instanz.**
+  SFTP (2222): `aes128-gcm@openssh.com`, `aes128-ctr`, `aes256-gcm@openssh.com`,
+  `chacha20-poly1305@openssh.com` alle akzeptiert. FTPS (989) explizit: TLS 1.2
+  **und** 1.3, `ECDHE-RSA-AES128-GCM-SHA256` und `ECDHE-RSA-AES256-GCM-SHA384`
+  — die beiden Cipher, die Canons Doku nennt. `AES128-SHA`, `AES256-SHA`, DHE
+  und TLS 1.0/1.1 werden **nicht** angeboten; nach der Canon-Doku ist das kein
+  Mangel. **Kein `TLS_CIPHER_SUITES`-Override nötig**, die Transportschwächung
+  hätte keinen bekannten Nutzen gekauft.
+- [x] **P1-M49 (P0) — Fehlender Import in `AuthController`.**
+  `app(FtpCredentialService::class)` ohne `use`-Anweisung löste auf
+  `App\Http\Controllers\FtpCredentialService` auf. Jedes Profil-Update mit
+  `ftp_slug`-Wechsel scheiterte an einer `BindingResolutionException`, also im
+  Login-Pfad. Die acht Testfehlschläge, die es verursachte, waren hinter dieser
+  Exception verborgen.
+- [x] **Verifikationsregel (Owner, 2026-09-26):** Tests laufen gegen **lokale**
+  Ziele, niemals gegen `reisinger.pictures` oder Container des Produktionsstacks.
+  Für SFTPGo existiert die etablierte lokale Harness
+  `tests/scripts/ftp-transport-test/` (`up.sh`, `down.sh`, `verify.sh`,
+  `self-test.sh`). Fixture-Hostnamen sind reservierte `.invalid`-Domains
+  (RFC 2606), damit ein versehentlich vergessenes `vi.stubGlobal('fetch')` nichts
+  erreicht. Ausnahme mit Grund: `useBrand.test.ts` braucht den echten Host, weil
+  die Markenerkennung domain-abhängig ist.
+
+**Offen:**
+
+- [ ] **P1-M32 — echter Kamera-Test.** Weiterhin der einzige offene
+  Schrittpunkt. Zusätzlich zur Upload-Prüfung: das Zertifikat
+  (`/var/lib/sftpgo/ftps/cert.pem` im Container) muss als `.CER`/`.CRT`/`.PEM`
+  auf die Speicherkarte, und in der Kamera „Zielserver vertrauen → Aktivieren"
+  (sonst Error 48, cam.start.canon UG-06_Network_0230).
+- [ ] **Zertifikat aus der GUI herunterladbar machen.** Der Fotograf braucht die
+  Datei für die Speicherkarte; heute liegt sie nur im Container.
+- [ ] **`useBrandSettings.test.ts`** nutzt `reisinger.pictures` als Fixture ohne
+  semantischen Grund (anders als `useBrand.test.ts`, wo es zwingend ist) — auf
+  `.invalid` umstellen. Von einem Subagenten gemeldet, außerhalb des Auftrags.
+- [ ] **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen der
+  aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen.
+- [ ] **`POST /api/management/ftp/status` ohne Auth liefert 500** (vorbestehend):
+  Laravel sucht eine nicht existierende `login`-Route.
+- [ ] **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert, nicht
+  umgesetzt).
+- [ ] **`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN`** ist im Compose ein
+  Container-Wert ohne Secret-Bezug, wird aber über die Ports-Liste geführt; bei
+  einem späteren Aufräumen prüfen, ob es in die Stack-Env gehört.
+
+
 **Verifikation / Übergabe**
 - [x] Operations/Docs-Pass hat die vorhandenen Migrations-, Backend-, Frontend- und Testdateien inventarisiert und die Deployment-Migrations-/Seed-Reihenfolge dokumentarisch korrigiert; dies ersetzt weder Code-Review noch Testläufe und behauptet keine neuen Application-Tests.
 - [ ] Diff-Review gegen `features/security/card-testing-protection.md` (V036 separat, keine Secrets/PII, keine ungeprüften Stripe-/Turnstile-Bypässe) durch separaten Reviewer.
