@@ -52,6 +52,42 @@
       Range; SFTP nicht
 - [ ] **8080/tcp** **nicht** offen (Admin-API — nur intern)
 
+> **Firewall bleibt manuell, bewusst (Owner-Entscheidung 2026-09-26).** Keine
+> Automatisierung: ein Container ändert die Host-Firewall nur mit
+> `host`-Netzwerk + `NET_ADMIN` — ein privileged Container, der bei
+> Fehlkonfiguration bestehende Regeln überschreibt statt nur zu ergänzen. Der
+> Aufwand steht in keinem Verhältnis zu drei einmaligen Zeilen.
+>
+> ```bash
+> ufw allow 2222:2222/tcp     comment 'SFTPGo SFTP'
+> ufw allow 989:989/tcp       comment 'SFTPGo FTPS'
+> ufw allow 50000:50100/tcp   comment 'SFTPGo passive FTPS'
+> # 8080/tcp bleibt ZU.
+> ```
+>
+> Prüfung von **außen** (lokal sagt der Container immer „offen"):
+>
+> ```bash
+> nc -zv reisinger.pictures 2222
+> nc -zv reisinger.pictures 989
+> nc -zv reisinger.pictures 8080   # MUSS fehlschlagen
+> ```
+
+### 3a. Ordner-Anlage — automatisch, kein Handschritt
+
+`php artisan ftp:provision-folders --fix-permissions` läuft im
+`backend`-Entrypoint bei **jedem** `up -d`, direkt nach der Migration. Legt
+`ftp/<slug>` für jeden Fotografen an und setzt das **setgid-Bit** (2775) — ohne
+setgid landet ein Upload in der Gruppe des SFTPGo-Prozesses statt in
+`webgroup`, und der Import kann die Datei nicht lesen. Idempotent, also
+gefahrlos bei jedem Deploy.
+
+Slugs, die die Formatregel verletzen (Bestand vor P1-M21), werden übersprungen
+und geloggt — sie bekommen ihren Ordner mit dem nächsten Slug-Reset (P1-M34).
+
+**Nach einem neuen Fotografen:** `docker compose exec backend php artisan
+ftp:provision-folders` — oder einfach das nächste `up -d`.
+
 ## 4. Kamera-Konfiguration (nach Stack-Start)
 
 - [ ] **SFTP testen:** Kamera → `ftp_slug`@host:2222, Passwort aus Portal

@@ -235,6 +235,12 @@ services:
       php artisan optimize || exit 1;
       php artisan ops:validate-production || exit 1;
       php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1;
+      # P1-M24: die Inbox-Ordner pro Fotograf anlegen. SFTPGo legt sie nicht
+      # selbst an ("you have to create the folder on disk yourself"), ohne sie
+      # kann die Kamera nicht hochladen. Idempotent, also bei jedem Deploy
+      # gefahrlos laufend. --fix-permissions setzt das setgid-Bit, ohne das
+      # ein Upload in der falschen Gruppe landet und der Import ihn nicht liest.
+      php artisan ftp:provision-folders --fix-permissions || exit 1;
       php artisan scout:sync-index-settings || exit 1;
       php artisan queue:restart || exit 1;
       echo 'Starte Supervisor...';
