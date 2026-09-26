@@ -260,6 +260,13 @@ Ablösung als Parallelsystem plant, plant den Ausfall für den Fotografen.
   Ordner auf dem Host (`ftp/<slug>`), auf den er eingeschränkt ist. SFTPGo
   konfiguriert das als `home_dir` — der User sieht nur sein eigenes
   Verzeichnis, nicht die anderer User. Das ist die Isolationsgrenze.
+- **Brand-Scope (P1-M29, entschieden 2026-09-26):** Ein SFTPGo-Account pro
+  Brand, nicht pro User. Nur Super-Admin verwaltet den Account. Die
+  Galerie-Zuordnung (0..1) über `current_ftp_gallery_id` bleibt das
+  Zuordnungsinstrument: Ein Fotograf lädt in den Brand-Account, das Portal
+  ordnet über `process()` die Galerie zu. Das eliminiert das Problem, dass
+  ein Fotograf Ordner eines anderen Brands sehen könnte — er sieht nur den
+  Brand-Account.
 
 ### 7.3 Passwort-Fluss: erzeugen, anzeigen, verwerfen
 
