@@ -45,6 +45,70 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   gefixt, aber `check-i18n.mjs` erkennt einen **ungewrappten** String nicht: er
   wird nie extrahiert, also nie gesehen. Es braucht eine AST-Regel für
   benutzersichtbare Strings außerhalb der Lingui-Makros.
+- [ ] **P1-M17 (P0) — `users.ftp_slug` ist noch kein FTP-Username und hat
+  keinerlei Zeichen-Validierung.** `AuthController.php:230` erlaubt
+  `string|max:255|unique` mit vorheriger `Str::slug()`-Normalisierung
+  (`:221-225`). FTP-Usernamen dürfen aber weder Punkt noch `@` noch Slash
+  enthalten, und pure-ftpd hat harte Längengrenzen. Sobald `ftp_slug` als
+  FTP-Accountname verwendet wird (P1-M18), muss ein Muster wie
+  `^[a-z0-9][a-z0-9_-]{2,31}$` erzwungen werden — inkl. Fehlerpfad für
+  bestehende Slugs, die das verletzen. **Tests:** PHPUnit für die
+  Validierungsregel (Slug-Äquivalente bleiben gültig, `a.b`/`a@b`/`a/b`/
+  zu lang werden abgelehnt, Uniqueness greift weiterhin) + Playwright-E2E
+  für den Fehlerhinweis in `ProfileSettingsCard.tsx:82-92`.
+- [ ] **P1-M18 (P1) — pro Fotograf ein FTP-User, Passwörter von der
+  Applikation verwaltet.** Heute existiert genau **ein** pauschaler
+  Server-User (`webadmin`) mit einem fest auf dem Server hinterlegten
+  Passwort, der auf den **gesamten** Website-Baum zeigt. Das ist zu breit:
+  jeder mit dem Passwort kann in jede Site schreiben.
+  Das Datenmodell ist bereits da, es fehlt nur die Server-Anbindung:
+  `users.ftp_slug` (unique, selbst wählbar, `V001:62`) ist der natürliche
+  FTP-Username, und `FtpController::getInboxPath()`
+  (`app/Http/Controllers/FtpController.php:151-156`) liest bereits pro
+  Fotograf aus `Storage::disk('ftp_inbox')->path($user->ftp_slug)` — der
+  Ordnername auf dem Server muss also nur dem Slug entsprechen.
+  **Umsetzung:**
+  1. Tabelle `ftp_credentials` (**V041+**, siehe `backend/AGENTS.md`: vorab
+     Schema-/Backfill-/Rollback-Entscheidung dokumentieren): `user_id` FK,
+     `password` als **`text`** mit `'encrypted'`-Cast — Muster
+     `ModelProfile.php:55-62`; dort ist in `V034:11-16` ausdrücklich
+     vermerkt, dass `json`/`varchar` mit Ciphertext **nicht** funktioniert.
+  2. `$hidden` für jede Serialisierung + Show-once beim Rotieren — Muster
+     `ContractSigner.php:29-39` (`personal_token`).
+  3. Key aus `FILE_ENCRYPTION_KEY` (nicht `APP_KEY`), Rotation über
+     `FILE_ENCRYPTION_PREVIOUS_KEYS` — Muster `ModelFileStore.php:11-26`.
+  4. Serverseitig `pure-pw useradd` pro Slug, Home = `ftp/<slug>`, danach
+     Container-Restart. **pure-ftpd liest die puredb nur beim Start**
+     (verifiziert 2026-09-26) — das ist der Grund, warum die puredb in
+     `/config` persistiert liegt.
+  5. **Kein Eigenbau:** `AGENTS.md` §9 verbietet Eigenbau-Kryptografie für
+     Security-Critical.
+  **Tests:** PHPUnit für Verschlüsselung at rest (DB-Dump enthält das
+  Klartext-Passwort nicht), Show-once-Semantik, Rotation mit
+  `FILE_ENCRYPTION_PREVIOUS_KEYS`, und die Gleichheit
+  `FtpController::getInboxPath()` == FTP-Home. Playwright-E2E für
+  Anzeige/Rotation im `ProfileSettingsCard`.
+- [ ] **P1-M19 (P1) — `FtpController::process()` hat keinen Concurrency-Guard.**
+  `features/infrastructure/19-ftp-upload-pipeline.md:129` hält fest: kein
+  Lock, doppelte Verarbeitung derselben Datei möglich, Annahme
+  "single-user access". Sobald mehrere Fotografen parallel importieren
+  (P1-M18), ist das keine Annahme mehr, sondern ein Fehler. **Tests:**
+  PHPUnit mit zwei konkurrierenden `process()`-Aufrufen auf dieselbe Datei
+  muss genau eine `Photo`-Zeile und eine `unlink()`-Aktion ergeben.
+- [ ] **P1-M20 (P2) — Brand-Scope der FTP-Credentials.** `ftp_slug` ist
+  user-level, nicht brand-level
+  (`features/infrastructure/25-brand-separation-matrix.md:33`). Der
+  `Brand`-Enum hat aktuell nur einen Fall (`app/Enums/Brand.php:12-15`), das
+  Schema ist also faktisch Single-Tenant. Sobald ein zweiter Brand dazukommt,
+  braucht `ftp_credentials` eine `brand`-Spalte analog
+  `ModelRegistrationInvite.php:28`. **Bewusst offen gelassen** — eine Spalte
+  für einen einzigen Brand ist YAGNI, das Risiko aber dokumentiert, damit es
+  nicht übersehen wird.
+- [ ] **DOC — `features/infrastructure/13-ftp-brand-isolation.md:6`
+  referenziert `FT-01` in `AGENTS.todo.md`; dieses Task existiert nicht mehr**
+  (`grep FT-01` → 0 Treffer im Board). Das `FT-NN`-Schema ist historisch und
+  sollte durch einen Verweis auf P1-M17/P1-M18 ersetzt werden, sonst sucht
+  niemand die Fortsetzung.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
