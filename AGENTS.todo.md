@@ -2010,6 +2010,11 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
   stehen Label und Aktion in einer eigenen `flex items-center justify-between`-
   Zeile (`flex-wrap` fuer Mobile), die Status-Warnung rendert darunter.
   Abnahme: Screenshot-Harness `photographer-dashboard` (Desktop + Mobile).
+  **Skill-Konsequenz:** die Checkliste (`agents-skills`, `ui-review`) deckte
+  Ausrichtung unter §2 („Elements align on a grid; no arbitrary offsets") bereits
+  ab — der Fehler war ein Review-Versaeumnis, kein Skill-Loch. Der Fall ist dort
+  trotzdem explizit gemacht worden (`18e6503`: Label ueber hohem Statusblock →
+  Aktion auf die Labellinie, nicht gegen den Block zentrieren).
 - [x] **FTPS-Fallback ohne Support-Sackgasse** — Formulierung in
   `ManagementFtpInbox.tsx` und im Guide-Content; der Fotograf kann eine
   Server-Konfiguration nicht aendern, „Support kontaktieren" war ein toter Weg.
@@ -2035,13 +2040,20 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
   in `ProfileSettingsCard`; Vitest-Regression ergaenzt; `--grep @feature:ftp`
   ist jetzt 12/12 gruen.
 
-- [x] **`profile-ftp-slug.spec.ts` (E2E, 2 von 12 Faellen) — testseitig, kein
-  Produktionsfehler.** Der Slug-Wechsel persistiert (Backend-Test
-  `FtpFirstSlugChangeTest` Zeile 90: `assertSame('j-doe', $after->ftp_slug)`),
-  aber die Dashboard-Anzeige zeigt nach der SPA-Navigation den alten Wert.
-  Ursache bestaetigt: SWR liefert den zwischengespeicherten Status, weil
-  `mutateUser()` den Status-Cache nicht invalidiert. **Behoben 2026-09-26** —
-  siehe Folge-Runde oben.
+- [x] **`profile-ftp-slug.spec.ts` (E2E, 2 von 12 Faellen) — echter
+  Frontend-Fehler, NICHT testseitig** (frühere Einordnung „testseitig, kein
+  Produktionsfehler" war falsch und wurde am 2026-09-26 widerlegt). Der
+  Slug-Wechsel persistiert (Backend-Test `FtpFirstSlugChangeTest` Zeile 90:
+  `assertSame('j-doe', $after->ftp_slug)`; `ftp_folder` wird zeilenfrisch aus
+  `ftp_slug` abgeleitet), aber die Dashboard-Anzeige zeigt nach der
+  SPA-Navigation den alten `ftp_folder` **und** den alten Kontostatus. Ursache
+  belegt: `ProfileSettingsCard` invalidierte `GET /api/management/ftp/status`
+  nie — nur den Auth-Key — und SWRs 2-s-`dedupingInterval` schluckte die
+  Remount-Revalidierung. Beleg aus dem Access-Log (`/tmp/e2e-serve.log`): in der
+  gesamten 15-s-Wartezeit nach `PUT /api/auth/profile` **kein einziger**
+  Status-Request. Nutzerwirkung: der Fotograf sieht direkt nach dem Slug-Wechsel
+  den alten Upload-Ordner — genau den Ordner, den die Anleitung ihm als
+  Zielordner nennt. **Behoben 2026-09-26** in `5b57336` — siehe Folge-Runde oben.
 - [ ] **`POST /api/management/ftp/status` ohne Auth liefert 500** (vorbestehend):
   Laravel sucht eine nicht existierende `login`-Route.
 - [ ] **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert, nicht
