@@ -86,6 +86,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Shared Temp Directory
+    |--------------------------------------------------------------------------
+    |
+    | Scratch directory for downloads, archives and in-flight processing.
+    | It is deliberately configurable so tests can point a test class at its
+    | own directory. The default is a single absolute path, and paratest runs
+    | different test classes in separate worker processes at the same time,
+    | so any class that sweeps this directory — app:cleanup-temp empties it
+    | wholesale — deletes the fixtures of a concurrently running class.
+    |
+    */
+
+    'temp_dir' => storage_path('app/private/temp'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Symbolic Links
     |--------------------------------------------------------------------------
     |
