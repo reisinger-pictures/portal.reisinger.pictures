@@ -137,7 +137,7 @@ class PhotoDownloadController extends Controller
 
     protected function injectMetadata($sourcePath, $photo, $userName, ?string $customConditions = null)
     {
-        $tempDir = storage_path('app/private/temp');
+        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
         if (! is_dir($tempDir)) {
             mkdir($tempDir, 0755, true);
         }
@@ -307,7 +307,7 @@ class PhotoDownloadController extends Controller
             abort(404, 'Datei nicht gefunden oder noch nicht verarbeitet.');
         }
 
-        $tempDir = storage_path('app/private/temp');
+        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
         if (! is_dir($tempDir) && ! @mkdir($tempDir, 0755, true) && ! is_dir($tempDir)) {
             abort(500, 'Bildverarbeitung fehlgeschlagen.');
         }
@@ -537,7 +537,7 @@ class PhotoDownloadController extends Controller
         string $baseStoragePath,
         string $userName,
     ): array {
-        $tempDir = storage_path('app/private/temp');
+        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
         if (! is_dir($tempDir) && ! @mkdir($tempDir, 0755, true) && ! is_dir($tempDir)) {
             abort(500, 'ZIP-Vorbereitung fehlgeschlagen.');
         }
@@ -935,7 +935,7 @@ class PhotoDownloadController extends Controller
         string $userName,
         ?string $customConditions,
     ): array {
-        $tempDir = storage_path('app/private/temp');
+        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
         if (! is_dir($tempDir) && ! @mkdir($tempDir, 0755, true) && ! is_dir($tempDir)) {
             abort(500, 'ZIP-Vorbereitung fehlgeschlagen.');
         }

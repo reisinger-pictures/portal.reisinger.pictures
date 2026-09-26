@@ -470,7 +470,7 @@ class AIService
      */
     protected function createTemporaryFile(): string
     {
-        $directory = storage_path('app/private/temp');
+        $directory = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
         if (! is_dir($directory) && ! @mkdir($directory, 0755, true) && ! is_dir($directory)) {
             $directory = sys_get_temp_dir();
         }

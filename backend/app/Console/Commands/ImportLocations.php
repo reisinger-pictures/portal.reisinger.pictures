@@ -71,7 +71,7 @@ class ImportLocations extends Command
         $this->cleanupFailureCount = 0;
         $this->info('Starte Import der Location-Daten für Smart Assistance...');
 
-        $tempDir = (string) config('filesystems.temp_dir');
+        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
         if (! $this->ensureDirectory($tempDir, 'temp_directory')) {
             $this->error('Temporäres Importverzeichnis konnte nicht vorbereitet werden.');
 

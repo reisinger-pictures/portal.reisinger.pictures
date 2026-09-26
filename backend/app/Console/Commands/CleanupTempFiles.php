@@ -30,7 +30,7 @@ class CleanupTempFiles extends Command
         $this->failedCount = 0;
         $this->failureDetails = [];
 
-        $tempDir = storage_path('app/private/temp');
+        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
 
         if (is_dir($tempDir)) {
             try {
