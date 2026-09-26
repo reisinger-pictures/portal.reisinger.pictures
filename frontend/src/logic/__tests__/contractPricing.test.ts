@@ -2,16 +2,20 @@ import { describe, expect, it } from 'vitest';
 import type {InvoiceDiscount, InvoiceItem} from '../../api';
 import type {ManualInvoiceWireLine} from '../contractPricing';
 import {
+    calculateContractTotal,
     calculateEditorContractTotal,
     calculateEditorDiscountAmounts,
     calculateEditorInvoiceTotal,
     calculateEditorItemTotal,
     calculateEditorManualInvoiceSubtotal,
+    calculateEditorSubtotal,
     calculateManualInvoiceWireLineTotal,
     calculateWireLineTotal,
     fixedPointToMajorUnits,
     formatBasisPointsAsPercent,
     CONTRACT_MAX_SAFE_INTEGER,
+    CONTRACT_PERCENT_SCALE,
+    CONTRACT_SNAPSHOT_SCALE,
     MANUAL_QUANTITY_SCALE,
     normalizeContractSnapshot,
     normalizeContractSnapshotForWrite,
@@ -346,5 +350,119 @@ describe('authoritative contract pricing', () => {
                 price: CONTRACT_MAX_SAFE_INTEGER,
             },
         ])).toThrow('Der Vertragsbetrag ist ungültig.');
+    });
+});
+
+// The 2026-09-26 test audit found four exports of this money module unreferenced
+// by any test: the two fixed-point scales, calculateContractTotal, and
+// calculateEditorSubtotal. The module has 13 tests overall, so these were not
+// cheap to miss — the scales are the rounding contract the whole module rests
+// on, and calculateContractTotal is the base variant the editor helpers are
+// defined in terms of.
+
+describe('fixed-point scales', () => {
+    it('pins the snapshot scale to minor units', () => {
+        // Money is stored in cents, so this scale is what separates 10.00 EUR
+        // from 10 cents. Changing it silently would rescale every stored
+        // contract, and no type would complain.
+        expect(CONTRACT_SNAPSHOT_SCALE).toBe(100);
+    });
+
+    it('pins the percent scale to basis points', () => {
+        // 10_000 basis points = 100 percent, so 12.5 percent is 125_000.
+        expect(CONTRACT_PERCENT_SCALE).toBe(10_000);
+    });
+
+    it('keeps percent resolution divisible by the money scale', () => {
+        // Otherwise a discount could express a precision the money scale
+        // cannot represent, and rounding would become order-dependent.
+        expect(CONTRACT_PERCENT_SCALE % CONTRACT_SNAPSHOT_SCALE).toBe(0);
+    });
+
+    it('is the divisor the percent formatter actually uses', () => {
+        // formatBasisPointsAsPercent renders whole = abs / 100, so it assumes
+        // a scale of exactly 100 units per percent. Pin the two together.
+        expect(formatBasisPointsAsPercent(CONTRACT_PERCENT_SCALE)).toBe('100%');
+        expect(formatBasisPointsAsPercent(CONTRACT_PERCENT_SCALE / 8)).toBe('12.5%');
+    });
+});
+
+describe('calculateContractTotal', () => {
+    const line = (qty: number, price: number) => ({
+        type: 'item', description: 'Leistung', notes: '', qty, price,
+    });
+
+    it('sums price times quantity across lines', () => {
+        const snapshot = normalizeContractSnapshot([line(1, 10_000), line(3, 5_000)], []);
+        // 100.00 EUR + 3 x 50.00 EUR
+        expect(calculateContractTotal(snapshot)).toBe(25_000);
+    });
+
+    it('returns zero for no lines', () => {
+        expect(calculateContractTotal(normalizeContractSnapshot([], []))).toBe(0);
+    });
+
+    it('ignores a stale row_total', () => {
+        // The wire snapshot is the authority; a cached row_total must not
+        // change the money.
+        const snapshot = normalizeContractSnapshot(
+            [{ ...line(2, 5_000), row_total: 1 }],
+            [],
+        );
+        expect(calculateContractTotal(snapshot)).toBe(10_000);
+    });
+
+    it('is the value the editor helper delegates to', () => {
+        // calculateEditorContractTotal is defined as this function applied to a
+        // serialized snapshot. If the two diverged, a contract edited in the UI
+        // would total differently from the signed one, which is precisely the
+        // defect a contract must never have.
+        const items: InvoiceItem[] = [
+            { type: 'item', description: 'A', notes: '', qty: 2, price: 2_500 },
+            { type: 'item', description: 'B', notes: '', qty: 1, price: 10_000 },
+        ];
+        const discounts: InvoiceDiscount[] = [
+            { type: 'discount_percent', description: '10%', notes: '', price: 10 },
+        ];
+
+        expect(calculateEditorContractTotal(items, discounts))
+            .toBe(calculateContractTotal(serializeContractSnapshot(items, discounts)));
+    });
+});
+
+describe('calculateEditorSubtotal', () => {
+    // Editor lines carry major units, the wire snapshot carries minor units.
+    // toSnapshotValue applies CONTRACT_SNAPSHOT_SCALE on the way in, so an
+    // editor price of 100 means 100.00 EUR and the result comes back in cents.
+    // Getting this backwards is a 100x money error, so the scale is pinned here
+    // rather than left implicit.
+    const item = (qty: number, euros: number, description = 'Leistung'): InvoiceItem => ({
+        type: 'item', description, notes: '', qty, price: euros,
+    });
+
+    it('sums price times quantity and returns minor units', () => {
+        // 100.00 EUR + 2 x 30.00 EUR = 160.00 EUR = 16000 cents
+        expect(calculateEditorSubtotal([item(1, 100), item(2, 30)])).toBe(16_000);
+    });
+
+    it('returns zero for no items', () => {
+        expect(calculateEditorSubtotal([])).toBe(0);
+    });
+
+    it('ignores a stale row_total', () => {
+        // 2 x 50.00 EUR; a cached row_total of 1 cent must not win.
+        expect(calculateEditorSubtotal([{ ...item(2, 50), row_total: 1 }])).toBe(10_000);
+    });
+
+    it('is never lower than the total once a discount applies', () => {
+        // The relationship the invoice UI relies on: a discount reduces the
+        // total and can never raise it.
+        const items = [item(1, 100), item(2, 30)];
+        const discounts: InvoiceDiscount[] = [
+            { type: 'discount_percent', description: '10%', notes: '', price: 10 },
+        ];
+
+        expect(calculateEditorSubtotal(items))
+            .toBeGreaterThanOrEqual(calculateEditorContractTotal(items, discounts));
     });
 });

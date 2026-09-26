@@ -1,7 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Guest Public Gallery Access (G5)', () => {
-    test('Guest can view public galleries without authentication', { tag: ['@smoke', '@feature:guest'] }, async ({ page }) => {
+    // Renamed 2026-09-26: the name claimed this opened a public gallery, and it
+    // never did. It verifies the unauthenticated landing page and that the guest
+    // sidebar exposes exactly one email and one password field, which is a real
+    // check — a duplicated field would be the same class of defect as the
+    // accessible-name bugs fixed earlier. Kept as @smoke: the test body is
+    // worth something, only its name was wrong. The actual gap — no spec opens
+    // a public gallery as a guest — is recorded in AGENTS.todo.md.
+    test('Guest landing page is reachable and the login form is unambiguous', { tag: ['@smoke', '@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
 
         await expect(page.getByRole('main').getByRole('heading', { name: 'Neueste Entdeckungen' }).first()).toBeVisible({ timeout: 10000 });

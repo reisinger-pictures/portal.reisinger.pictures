@@ -16,7 +16,7 @@ import { apiMutate, apiUpload } from '../../api';
 import { useModelRegistration } from '../useModelRegistration';
 import { useModelInvites, buildCreateInviteBody, inviteLinkFromCreate } from '../useModelInvites';
 import { updateModelProfileAccess } from '../modelRegistration';
-import { useModels, buildModelsQuery, ageProofDownloadUrl, deleteModel, isModelOutdated, parseModelFilters, serializeModelFilters, lifecycleFilterValues, isRestrictedLifecycleFilter } from '../useModels';
+import { useModels, buildModelsQuery, ageProofDownloadUrl, modelPhotoDownloadUrl, deleteModel, isModelOutdated, parseModelFilters, serializeModelFilters, lifecycleFilterValues, isRestrictedLifecycleFilter } from '../useModels';
 
 const mutate = vi.fn();
 
@@ -259,6 +259,11 @@ describe('useModels helpers', () => {
 
     it('builds the auth-gated age proof download url', () => {
         expect(ageProofDownloadUrl('abc')).toBe('/api/management/models/abc/age-proof');
+        // The photo download URL was the one export of this module no test
+        // touched. It is the file-delivery path: if it silently broke, downloads
+        // would 404 at runtime and no unit test would notice, because the value
+        // is assembled by string interpolation that TypeScript cannot check.
+        expect(modelPhotoDownloadUrl('abc', 'p1')).toBe('/api/management/models/abc/photos/p1');
     });
 
     it('deletes a model customer via the management endpoint (DSGVO)', async () => {

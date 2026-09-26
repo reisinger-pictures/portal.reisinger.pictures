@@ -186,7 +186,7 @@ describe('ManagementOrdersView', () => {
             }),
         );
         expect(showToast).toHaveBeenCalledWith('success', 'Angebot per E-Mail gesendet!');
-        expect(mutate).toHaveBeenCalled();
+        expect(mutate).toHaveBeenCalledTimes(1);
     });
 
     it('does not label the rights field as optional', async () => {
