@@ -63,6 +63,16 @@ test.describe('FTP login format on the profile form', () => {
 
         await expect(page.locator('.toast')).toContainText('Profil aktualisiert');
 
+        // A slug change is a password reset: the backend deletes the old SFTPGo
+        // account, provisions a new one and returns the fresh password exactly
+        // once. Asserting it here is what makes this spec cover the *working*
+        // account, not just the saved slug — dropping the password in the form
+        // was a production bug (a working account nobody could log into). The
+        // E2E stack provides a real SFTPGo for this path; without it the request
+        // fails closed and this assertion cannot pass.
+        await expect(main.getByText('Neues Kamera-Passwort')).toBeVisible();
+        await expect(main.getByText('Dieses Passwort wird nur einmal angezeigt. Speichere es sofort.')).toBeVisible();
+
         // Read the value back from a different view instead of re-asserting the
         // field: the hydration effect re-populates the input, so a DOM-only
         // assertion would pass even if nothing had been persisted.

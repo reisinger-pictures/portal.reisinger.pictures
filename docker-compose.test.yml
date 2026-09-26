@@ -9,5 +9,32 @@ services:
     ports: ["7701:7700"]
     volumes: ["search_data_test:/meili_data"]
 
+  # Real SFTPGo for the isolated E2E backend. A slug change provisions (or, on a
+  # rename, re-provisions) a camera account and hands the password back exactly
+  # once; that path is fail-closed when the service is unreachable, so an E2E
+  # stack without it could only ever prove the refusal. The image is the same
+  # minor series as production (features/infrastructure/19-ftp-upload-pipeline.md
+  # 7.13); only the admin API is needed, because the portal never speaks FTP
+  # itself. No FTPS/SFTP bindings and no certificate: those are transport
+  # concerns covered by tests/scripts/ftp-transport-test.
+  sftpgo:
+    image: drakkan/sftpgo:2.7.x
+    container_name: portal_sftpgo_test
+    restart: unless-stopped
+    environment:
+      # The admin only exists when BOTH halves are set: the *_DEFAULT_ADMIN_*
+      # pair is ignored while `data_provider.create_default_admin` defaults to
+      # false. Without this line /api/v2/token answers 401 and provisioning
+      # fails closed (documented in the transport harness README).
+      SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN: "true"
+      SFTPGO_DEFAULT_ADMIN_USERNAME: e2e
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: e2e-sftpgo-admin-2026
+      # Admin API only. The portal reaches it over plain HTTP.
+      SFTPGO_HTTPD__BINDINGS__0__PORT: "8080"
+      SFTPGO_HTTPD__BINDINGS__0__ADDRESS: "0.0.0.0"
+    # Loopback only, on 18081 so it cannot collide with the transport harness
+    # (18080) or a local dev service.
+    ports: ["127.0.0.1:18081:8080"]
+
 volumes:
   search_data_test:

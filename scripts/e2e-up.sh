@@ -7,7 +7,7 @@
 # von E2E-Tests unberührt bleibt.
 #
 # Ablauf (idempotent):
-#   1. Test-Services starten  (docker-compose.test.yml: Meili 7701)
+#   1. Test-Services starten  (docker-compose.test.yml: Meili 7701 + SFTPGo Admin-API 18081)
 #   2. backend/.env.e2e generieren (aus backend/.env, Secrets werden übernommen)
 #   3. Eigene SQLite-DB anlegen + migrieren + seeden (env=e2e)
 #   4. Deterministische E2E-Location-Fixtures laden + Scout-Index aktualisieren
@@ -38,6 +38,15 @@ readonly E2E_MEILISEARCH_HEALTH_URL="${E2E_MEILISEARCH_HEALTH_URL:-http://127.0.
 readonly E2E_MEILISEARCH_READY_TIMEOUT_SECONDS="${E2E_MEILISEARCH_READY_TIMEOUT_SECONDS:-60}"
 readonly E2E_MEILISEARCH_REQUEST_TIMEOUT_SECONDS="${E2E_MEILISEARCH_REQUEST_TIMEOUT_SECONDS:-2}"
 readonly E2E_MEILISEARCH_READY_POLL_SECONDS="${E2E_MEILISEARCH_READY_POLL_SECONDS:-1}"
+# SFTPGo Admin API for the camera-account provisioning path. The slug change is
+# fail-closed, so a spec that renames an ftp_slug needs a reachable service; the
+# admin endpoint alone is enough (the portal never speaks FTP itself). See
+# docker-compose.test.yml for the container and the admin bootstrap.
+readonly E2E_SFTPGO_BASE_URL="${E2E_SFTPGO_BASE_URL:-http://127.0.0.1:18081}"
+readonly E2E_SFTPGO_HEALTH_URL="${E2E_SFTPGO_HEALTH_URL:-${E2E_SFTPGO_BASE_URL}/healthz}"
+readonly E2E_SFTPGO_ADMIN_USERNAME="${E2E_SFTPGO_ADMIN_USERNAME:-e2e}"
+readonly E2E_SFTPGO_ADMIN_PASSWORD="${E2E_SFTPGO_ADMIN_PASSWORD:-e2e-sftpgo-admin-2026}"
+readonly E2E_SFTPGO_READY_TIMEOUT_SECONDS="${E2E_SFTPGO_READY_TIMEOUT_SECONDS:-60}"
 
 log()  { printf '[e2e-up] %s\n' "$*"; }
 fail() { printf '[e2e-up] FEHLER: %s\n' "$*" >&2; exit 1; }
@@ -75,6 +84,26 @@ if ! MEILISEARCH_HEALTH_URL="$E2E_MEILISEARCH_HEALTH_URL" \
     fail "Meilisearch did not become ready within ${E2E_MEILISEARCH_READY_TIMEOUT_SECONDS}s; aborting E2E setup."
 fi
 
+# SFTPGo readiness is part of the E2E contract, not an optional extra: the
+# profile slug-change specs exercise real provisioning, and a service that is
+# merely "starting" would make those specs fail with a misleading toast. The
+# check is bounded and bounded-fails, same as the Meilisearch check.
+log "Warte auf SFTPGo Admin-API (bounded readiness check) ..."
+sftpgo_ready=0
+for _ in $(seq 1 "$E2E_SFTPGO_READY_TIMEOUT_SECONDS"); do
+    if curl -sf -o /dev/null "$E2E_SFTPGO_HEALTH_URL"; then
+        sftpgo_ready=1
+        break
+    fi
+    sleep 1
+done
+if [ "$sftpgo_ready" != "1" ]; then
+    log "SFTPGo readiness diagnostics:"
+    docker compose -f "$ROOT/docker-compose.test.yml" ps sftpgo || true
+    docker compose -f "$ROOT/docker-compose.test.yml" logs --no-color --tail 50 sftpgo || true
+    fail "SFTPGo did not become ready within ${E2E_SFTPGO_READY_TIMEOUT_SECONDS}s; aborting E2E setup."
+fi
+
 # --- 2. .env.e2e aus .env ableiten (Safe-Patching mit Validierung) ---------
 [ -f "$BACKEND/.env" ] || fail "backend/.env fehlt — bitte zuerst lokal einrichten (README Quickstart)."
 
@@ -108,6 +137,21 @@ set_env MAIL_REQUIRE_TLS "false"
 set_env MAIL_FROM_ADDRESS "test@reisinger.pictures"
 set_env AUTH_THROTTLE_LIMIT "1000"
 set_env MODEL_REGISTRATION_THROTTLE_LIMIT "1000"
+
+# Camera-account provisioning (SFTPGo Admin API). The profile slug-change specs
+# exercise the real provisioning path instead of only its fail-closed refusal,
+# so the isolated backend points at the test SFTPGo started above. Credentials
+# name the admin that docker-compose.test.yml creates; no API key is used so the
+# JWT fallback (config/services.php) is the exercised path.
+set_env SFTPGO_BASE_URL "$E2E_SFTPGO_BASE_URL"
+set_env SFTPGO_API_KEY ""
+set_env SFTPGO_ADMIN_USERNAME "$E2E_SFTPGO_ADMIN_USERNAME"
+set_env SFTPGO_ADMIN_PASSWORD "$E2E_SFTPGO_ADMIN_PASSWORD"
+# `FtpCredentialService::homeDirectoryFor()` derives the camera home from the
+# ftp_inbox disk root and refuses anything that is not absolute. The repository
+# default (`FTP_STORAGE_PATH=ftp`) is relative, which would make provisioning
+# fail after a successful SFTPGo call — a 500 that looks like a service problem.
+set_env FTP_STORAGE_PATH "/tmp/portal-e2e-ftp"
 
 # Checkout defense overrides for the isolated E2E backend. The account-age
 # gate and dedicated checkout limiters stay test-only; the risk thresholds
