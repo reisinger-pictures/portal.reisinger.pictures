@@ -225,7 +225,7 @@ export default function ManagementFtpInbox() {
                         <p className="text-sm opacity-70"><Trans>Zugangsdaten für die Kamera</Trans></p>
                         <AccountStatus status={status.ftp_account_status} error={status.ftp_account_error} />
                     </div>
-                    <button onClick={handleResetCredentials} disabled={resetting} className="btn btn-primary">
+                    <button onClick={handleResetCredentials} disabled={resetting} data-testid="ftp-credentials-button" className="btn btn-primary">
                         {resetting
                             ? <span className="loading loading-spinner loading-sm"></span>
                             : <span className="iconify mdi--key-outline text-lg"></span>}
