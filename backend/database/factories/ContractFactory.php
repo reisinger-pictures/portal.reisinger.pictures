@@ -13,13 +13,12 @@ class ContractFactory extends Factory
 {
     public function definition(): array
     {
-        $types = ['Lizenz', 'Freigabe', 'Kooperation'];
         $itemCount = $this->faker->numberBetween(1, 3);
 
         $items = [];
         for ($i = 0; $i < $itemCount; $i++) {
             $items[] = [
-                'type' => $this->faker->randomElement($types),
+                'type' => 'item',
                 'description' => $this->faker->sentence(),
                 'notes' => $this->faker->optional(0.5)->sentence(),
                 'qty' => $this->faker->numberBetween(1, 10),
@@ -49,7 +48,7 @@ class ContractFactory extends Factory
         $discounts = [];
         if ($this->faker->boolean(40)) {
             $discounts[] = [
-                'type' => $this->faker->randomElement(['Prozent', 'Fixbetrag', 'Rabattcode']),
+                'type' => $this->faker->randomElement(['discount_percent', 'discount_fixed']),
                 'description' => $this->faker->sentence(),
                 'notes' => $this->faker->optional(0.5)->sentence(),
                 'price' => $this->faker->numberBetween(500, 50000),
@@ -58,7 +57,7 @@ class ContractFactory extends Factory
 
         $termsHtml = null;
         if ($this->faker->boolean(80)) {
-            $termsHtml = '<p>' . implode('</p><p>', $this->faker->paragraphs(3)) . '</p>';
+            $termsHtml = '<p>'.implode('</p><p>', $this->faker->paragraphs(3)).'</p>';
         }
 
         return [

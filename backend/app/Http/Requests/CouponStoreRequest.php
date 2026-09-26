@@ -47,7 +47,8 @@ class CouponStoreRequest extends FormRequest
             'max_uses_per_account' => 'nullable|integer|min:1',
             'expires_at' => 'nullable|date',
             'active' => 'boolean',
-            'used_count' => 'nullable|integer|min:0',
+            // Server-owned redemption counter; clients must never seed or reset it.
+            'used_count' => 'prohibited',
         ];
 
         if ($isPhotographer) {

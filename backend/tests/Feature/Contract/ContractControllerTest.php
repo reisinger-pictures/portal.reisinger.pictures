@@ -2,15 +2,22 @@
 
 namespace Tests\Feature\Contract;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\Brand;
+use App\Exceptions\ContractCloseConflictException;
+use App\Mail\ContractClosedMail;
 use App\Models\Contract;
 use App\Models\ContractSigner;
-use App\Enums\Brand;
+use App\Models\Role;
+use App\Models\User;
+use App\Services\ContractPricingService;
 use App\Support\BrandRegistry;
+use App\Support\PersistedMoney;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
 
 class ContractControllerTest extends TestCase
 {
@@ -21,6 +28,7 @@ class ContractControllerTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => 'super_admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
@@ -29,12 +37,14 @@ class ContractControllerTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => 'admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function authHeaders(User $user): array
     {
         $token = auth('api')->login($user);
+
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }
 
@@ -75,6 +85,409 @@ class ContractControllerTest extends TestCase
             'brand' => 'rp',
             'status' => 'draft',
         ]);
+    }
+
+    public function test_store_rejects_mixed_item_and_discount_placement_before_persistence(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'discount_percent',
+                'description' => 'Nicht erlaubt',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 1000,
+            ]],
+            'discounts' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('contracts', 0);
+    }
+
+    public function test_store_rejects_integer_like_contract_prices_before_persistence(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Leistung',
+                'qty' => 1,
+                'price' => '1000',
+            ]],
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('contracts', 0);
+    }
+
+    /**
+     * @return array<string, array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>}>
+     */
+    public static function pricingOverflowPayloadProvider(): array
+    {
+        $maximum = ContractPricingService::MAX_SAFE_INTEGER;
+
+        return [
+            'product overflow' => [
+                [[
+                    'type' => 'item',
+                    'description' => 'Produkt',
+                    'qty' => 2,
+                    'price' => $maximum,
+                ]],
+                [],
+            ],
+            'running total overflow' => [
+                [
+                    [
+                        'type' => 'item',
+                        'description' => 'Summenlauf 1',
+                        'qty' => 1,
+                        'price' => $maximum,
+                    ],
+                    [
+                        'type' => 'item',
+                        'description' => 'Summenlauf 2',
+                        'qty' => 1,
+                        'price' => 1,
+                    ],
+                ],
+                [],
+            ],
+            'percentage overflow' => [
+                [[
+                    'type' => 'item',
+                    'description' => 'Basis',
+                    'qty' => 1,
+                    'price' => $maximum,
+                ]],
+                [[
+                    'type' => 'discount_percent',
+                    'description' => 'Überlauf',
+                    'price' => $maximum,
+                ]],
+            ],
+        ];
+    }
+
+    #[DataProvider('pricingOverflowPayloadProvider')]
+    public function test_store_rejects_authoritative_pricing_overflow_before_persistence(
+        array $items,
+        array $discounts,
+    ): void {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => $items,
+            'discounts' => $discounts,
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('items');
+        $this->assertDatabaseCount('contracts', 0);
+    }
+
+    #[DataProvider('pricingOverflowPayloadProvider')]
+    public function test_update_rejects_authoritative_pricing_overflow_before_mutation(
+        array $items,
+        array $discounts,
+    ): void {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'draft',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Original',
+                'qty' => 1,
+                'price' => 100,
+            ]],
+            'discounts' => [],
+        ]);
+        $originalItems = $contract->items;
+
+        $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
+            'items' => $items,
+            'discounts' => $discounts,
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('items');
+        $contract->refresh();
+        $this->assertSame($originalItems, $contract->items);
+        $this->assertSame(0, $contract->content_version);
+    }
+
+    public function test_store_accepts_the_persisted_money_ceiling_boundary(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $boundary = PersistedMoney::MAX_CENTS;
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Grenzwert',
+                'qty' => 1,
+                'price' => $boundary,
+            ]],
+            'discounts' => [],
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('contracts', [
+            'status' => 'draft',
+            'items' => json_encode([[
+                'type' => 'item',
+                'description' => 'Grenzwert',
+                'qty' => 1,
+                'price' => $boundary,
+            ]]),
+        ]);
+    }
+
+    public function test_store_rejects_persisted_money_overflow_without_persistence(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+
+        $response = $this->withHeaders($headers)->postJson('/api/management/contracts', [
+            'available_roles' => ['Model'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Zu groß',
+                'qty' => 1,
+                'price' => PersistedMoney::MAX_CENTS + 1,
+            ]],
+            'discounts' => [],
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('items');
+        $this->assertDatabaseCount('contracts', 0);
+    }
+
+    public function test_open_rejects_persisted_money_overflow_without_changing_contract_state(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'type' => 'contract',
+            'status' => 'draft',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Zu groß',
+                'qty' => 1,
+                'price' => PersistedMoney::MAX_CENTS + 1,
+            ]],
+            'discounts' => [],
+            'join_token' => null,
+        ]);
+
+        $response = $this->withHeaders($headers)->postJson("/api/management/contracts/{$contract->id}/open");
+
+        $response->assertStatus(422);
+        $contract->refresh();
+        $this->assertSame('draft', $contract->status);
+        $this->assertNull($contract->join_token);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+    }
+
+    public function test_close_rejects_persisted_money_overflow_without_partial_accounting_state(): void
+    {
+        Mail::fake();
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'type' => 'contract',
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'billing_details' => ['email' => 'boundary@example.com'],
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Zu groß',
+                'qty' => 1,
+                'price' => PersistedMoney::MAX_CENTS + 1,
+            ]],
+            'discounts' => [],
+        ]);
+
+        $response = $this->withHeaders($headers)->postJson("/api/management/contracts/{$contract->id}/close");
+
+        $response->assertStatus(422);
+        $contract->refresh();
+        $this->assertSame('active', $contract->status);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+    }
+
+    public function test_partial_update_keeps_omitted_snapshot_arrays_and_canonicalizes_both_partitions(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'draft',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Leistung',
+                'notes' => '',
+                'qty' => 2,
+                'price' => 5000,
+            ]],
+            'discounts' => [[
+                'type' => 'discount_fixed',
+                'description' => 'Rabatt',
+                'notes' => '',
+                'price' => 500,
+            ]],
+        ]);
+
+        $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Aktualisierte Leistung',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 8000,
+            ]],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('contract.items.0.price', 8000);
+        $response->assertJsonPath('contract.discounts.0.price', 500);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'items' => json_encode([[
+                'type' => 'item',
+                'description' => 'Aktualisierte Leistung',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 8000,
+            ]]),
+            'discounts' => json_encode([[
+                'type' => 'discount_fixed',
+                'description' => 'Rabatt',
+                'notes' => '',
+                'price' => 500,
+            ]]),
+        ]);
+    }
+
+    public function test_update_fails_closed_when_a_legacy_mixed_snapshot_would_be_reordered(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'draft',
+            'brand' => Brand::B2B,
+            'items' => [
+                ['type' => 'discount_percent', 'description' => 'Rabatt', 'price' => 1000],
+                ['type' => 'item', 'description' => 'Leistung', 'qty' => 1, 'price' => 10000],
+            ],
+            'discounts' => [],
+        ]);
+
+        // The legacy read path preserves source order, so the percentage is
+        // applied to a zero base and the authoritative total is 10000.
+        $show = $this->withHeaders($headers)->getJson("/api/management/contracts/{$contract->id}");
+        $show->assertOk();
+        $show->assertJsonPath('contract.total', 10000);
+
+        $beforeItems = $contract->items;
+        $beforeDiscounts = $contract->discounts;
+        $beforeVersion = $contract->content_version;
+
+        // A full editor save always sends the canonical partitions. Moving the
+        // discount after the item would silently change the total to 9000.
+        $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
+            'items' => [
+                ['type' => 'item', 'description' => 'Leistung', 'qty' => 1, 'price' => 10000],
+            ],
+            'discounts' => [
+                ['type' => 'discount_percent', 'description' => 'Rabatt', 'price' => 1000],
+            ],
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('items');
+        $contract->refresh();
+        $this->assertSame($beforeItems, $contract->items);
+        $this->assertSame($beforeDiscounts, $contract->discounts);
+        $this->assertSame($beforeVersion, $contract->content_version);
+    }
+
+    public function test_management_contract_never_exposes_a_signer_personal_token(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create(['status' => 'draft', 'brand' => Brand::B2B]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'must-not-leak-token',
+            'status' => 'joined',
+        ]);
+
+        $show = $this->withHeaders($headers)->getJson("/api/management/contracts/{$contract->id}");
+        $show->assertOk();
+        $this->assertArrayNotHasKey('personal_token', $show->json('contract.signers.0'));
+
+        $index = $this->withHeaders($headers)->getJson('/api/management/contracts');
+        $index->assertOk();
+
+        $this->assertStringNotContainsString('must-not-leak-token', $show->getContent());
+        $this->assertStringNotContainsString('must-not-leak-token', $index->getContent());
+    }
+
+    public function test_active_contract_content_and_version_are_persisted_atomically(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'terms_html' => '<p>Original</p>',
+            'content_version' => 0,
+        ]);
+
+        // Fail exactly between the content UPDATE and the version increment.
+        // Without a single transaction the content write would already be
+        // committed and only the version would be lost.
+        $thrown = false;
+        Contract::updated(function (Contract $updatedContract) use ($contract, &$thrown): void {
+            if ($thrown || $updatedContract->getKey() !== $contract->getKey()) {
+                return;
+            }
+
+            $thrown = true;
+            throw new \RuntimeException('simulated failure between content and version');
+        });
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
+                'terms_html' => '<p>Changed</p>',
+            ]);
+            $this->fail('Expected the simulated failure to propagate.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('simulated failure between content and version', $exception->getMessage());
+        } finally {
+            Event::forget('eloquent.updated: '.Contract::class);
+        }
+
+        $contract->refresh();
+        $this->assertSame('<p>Original</p>', $contract->terms_html);
+        $this->assertSame(0, $contract->content_version);
     }
 
     public function test_non_super_admin_cannot_create(): void
@@ -122,9 +535,11 @@ class ContractControllerTest extends TestCase
         $user = $this->createSuperAdmin();
         $headers = $this->authHeaders($user);
         $contract = Contract::factory()->create(['status' => 'active', 'brand' => Brand::B2B]);
-        $contract->signers()->create(
-            \App\Models\ContractSigner::factory()->make(['status' => 'signed', 'signed_at' => now()])->toArray()
-        );
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'status' => 'signed',
+            'signed_at' => now(),
+        ]);
 
         $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
             'available_roles' => ['Model'],
@@ -162,6 +577,111 @@ class ContractControllerTest extends TestCase
             'id' => $contract->id,
             'status' => 'closed',
         ]);
+    }
+
+    public function test_repeated_management_close_is_idempotent(): void
+    {
+        Mail::fake();
+
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Manueller Abschluss',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => [
+                'name' => 'Rechnung',
+                'email' => 'management-close@example.com',
+            ],
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'email' => 'management-close@example.com',
+            'status' => 'signed',
+        ]);
+
+        $first = $this->withHeaders($headers)
+            ->postJson("/api/management/contracts/{$contract->id}/close");
+        $first->assertOk();
+
+        $second = $this->withHeaders($headers)
+            ->postJson("/api/management/contracts/{$contract->id}/close");
+        $second->assertOk();
+
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('invoice_snapshots', 1);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'closed',
+        ]);
+        Mail::assertQueued(ContractClosedMail::class, 1);
+    }
+
+    public function test_close_transition_conflict_returns_a_generic_retryable_response(): void
+    {
+        Mail::fake();
+
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Konkurrenz',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => ['email' => 'close-conflict@example.com'],
+        ]);
+        $competingWriterRan = false;
+        $targetReadCount = 0;
+
+        // Deterministically model a competing conditional writer after the
+        // close service has entered its locked-read boundary. The first target
+        // read is the controller's pre-lock lookup; the second is the service's
+        // row-lock read.
+        Contract::retrieved(function (Contract $loadedContract) use ($contract, &$competingWriterRan, &$targetReadCount): void {
+            if ($loadedContract->getKey() !== $contract->getKey()) {
+                return;
+            }
+
+            $targetReadCount++;
+            if ($competingWriterRan || $targetReadCount !== 2) {
+                return;
+            }
+
+            $competingWriterRan = true;
+            DB::table('contracts')
+                ->where('id', $contract->getKey())
+                ->where('status', 'active')
+                ->update(['status' => 'cancelled']);
+        });
+
+        $response = $this->withHeaders($headers)
+            ->postJson("/api/management/contracts/{$contract->id}/close");
+
+        $response->assertStatus(409);
+        $response->assertJson([
+            'error' => ContractCloseConflictException::RETRY_MESSAGE,
+        ]);
+        $this->assertTrue($competingWriterRan);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'cancelled',
+        ]);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+        Mail::assertNothingQueued();
     }
 
     public function test_cannot_close_draft_contract(): void

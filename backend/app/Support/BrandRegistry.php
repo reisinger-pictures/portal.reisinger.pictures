@@ -4,6 +4,8 @@ namespace App\Support;
 
 use App\Enums\Brand;
 use App\Models\Contract;
+use App\Models\Gallery;
+use App\Models\GalleryGroup;
 use App\Models\Order;
 use App\Services\BrandSettingsService;
 use App\Values\BrandConfig;
@@ -68,7 +70,164 @@ class BrandRegistry
 
     public static function currentId(): string
     {
-        return self::config()?->id ?? Brand::B2B->value;
+        return self::currentIdOrNull() ?? Brand::B2B->value;
+    }
+
+    /**
+     * Return the active brand id without applying the B2B fallback.
+     *
+     * Public resources are host-bound.  A missing context is therefore not the
+     * same thing as the default `rp` context and must not silently widen access
+     * to every brand.
+     */
+    public static function currentIdOrNull(): ?string
+    {
+        $config = self::config();
+        if ($config === null) {
+            return null;
+        }
+
+        $id = trim($config->id);
+
+        return $id !== '' ? $id : null;
+    }
+
+    /**
+     * Normalize a persisted/cast brand value to its raw id.
+     */
+    public static function normalizeId(mixed $brand): ?string
+    {
+        if ($brand instanceof \BackedEnum) {
+            $brand = $brand->value;
+        }
+
+        if ($brand === null) {
+            return null;
+        }
+
+        $id = trim((string) $brand);
+
+        return $id !== '' ? $id : null;
+    }
+
+    /**
+     * Check a resource against the request's active host brand.
+     *
+     * Unlike actor authorization, public URLs do not have a cross-brand mode:
+     * both the active context and the resource must have the same non-empty
+     * brand.  This intentionally rejects legacy null-brand resources.
+     */
+    public static function resourceMatchesCurrent(mixed $resourceBrand): bool
+    {
+        return self::resourceMatchesBrand($resourceBrand, self::currentIdOrNull());
+    }
+
+    /**
+     * Compare a persisted brand value with an explicit expected brand.
+     *
+     * Keeping the comparison in one place prevents callers from mixing enum,
+     * string, and null representations.  A null expected brand is never a
+     * match: callers that intentionally support cross-brand actors must make
+     * that decision before invoking this method.
+     */
+    public static function resourceMatchesBrand(mixed $resourceBrand, mixed $expectedBrand): bool
+    {
+        $resource = self::normalizeId($resourceBrand);
+        $expected = self::normalizeId($expectedBrand);
+
+        return $resource !== null && $expected !== null && $resource === $expected;
+    }
+
+    /**
+     * Check a gallery group and its complete parent chain against a brand.
+     *
+     * Group-level checks are needed in addition to gallery-level checks: a
+     * brand-bound management user must not be able to manage a group whose
+     * parent is foreign or brand-less.  Missing parents and cycles fail closed
+     * so a legacy/corrupt tree cannot widen access.
+     */
+    public static function galleryGroupTreeMatchesBrand(?GalleryGroup $group, mixed $expectedBrand): bool
+    {
+        if (! $group instanceof GalleryGroup || ! self::resourceMatchesBrand($group->brand, $expectedBrand)) {
+            return false;
+        }
+
+        $visited = [];
+        $depth = 0;
+        $current = $group;
+
+        while ($current instanceof GalleryGroup) {
+            // AUTH-5: bound the ancestor walk to one lookup per level so an
+            // over-deep (or corrupt) hierarchy cannot pin the request. A cycle
+            // fails closed through the visited set below; exceeding the shared
+            // traversal depth budget fails closed here.
+            if ($depth++ > GalleryGroupSubtree::MAX_DEPTH) {
+                return false;
+            }
+
+            $id = $current->getKey();
+            if ($id === null || $id === '') {
+                return false;
+            }
+
+            $key = (string) $id;
+            if (isset($visited[$key]) || ! self::resourceMatchesBrand($current->brand, $expectedBrand)) {
+                return false;
+            }
+            $visited[$key] = true;
+
+            $parentId = $current->parent_id;
+            if ($parentId === null || $parentId === '') {
+                return true;
+            }
+
+            $current = GalleryGroup::find($parentId);
+        }
+
+        return false;
+    }
+
+    /**
+     * Check a gallery group and its complete parent chain against the current
+     * host brand.  This is the group-shaped counterpart of
+     * galleryTreeMatchesCurrent() and is used by management surfaces.
+     */
+    public static function galleryGroupTreeMatchesCurrent(?GalleryGroup $group): bool
+    {
+        return self::galleryGroupTreeMatchesBrand($group, self::currentIdOrNull());
+    }
+
+    /**
+     * Check a gallery and its complete parent-group chain against an explicit
+     * brand.  A gallery's own brand is not sufficient: legacy rows can still
+     * be attached to a foreign or null-brand group.
+     *
+     * The expected brand is explicit so management authorization can use the
+     * acting user's brand while public surfaces use the host brand.  The
+     * current-host wrapper below remains fail-closed when no context exists.
+     */
+    public static function galleryTreeMatchesBrand(?Gallery $gallery, mixed $expectedBrand): bool
+    {
+        if (! $gallery instanceof Gallery || ! self::resourceMatchesBrand($gallery->brand, $expectedBrand)) {
+            return false;
+        }
+
+        $groupId = $gallery->gallery_group_id;
+        if ($groupId === null || $groupId === '') {
+            return true;
+        }
+
+        return self::galleryGroupTreeMatchesBrand(GalleryGroup::find($groupId), $expectedBrand);
+    }
+
+    /**
+     * Check a gallery and its complete parent-group chain against the active
+     * host brand.  Public URLs have no cross-brand mode, so a super-admin
+     * actor must not change the result for this host-bound guard.
+     */
+    public static function galleryTreeMatchesCurrent(?Gallery $gallery): bool
+    {
+        return self::galleryTreeMatchesBrand($gallery, self::currentIdOrNull());
     }
 
     public static function prefix(): string

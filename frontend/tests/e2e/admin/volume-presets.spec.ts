@@ -77,6 +77,86 @@ test.describe('Volume-Licensing Presets Admin Workflow', () => {
         await expect(firstRow2).toBeHidden();
     });
 
+    test('Management gallery resolves both gallery override directions with its displayed ID', { tag: ['@feature:admin:volume-pricing', '@regression'] }, async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        const photographer = await helper.createIsolatedUser('photographer');
+        await auth.login(photographer.email, photographer.password);
+
+        const suffix = Math.random().toString(36).substring(2, 8);
+        const createGallery = async (name: string, licensingMode: 'scope_licensing' | 'volume_licensing') => {
+            const response = await page.request.post('/api/management/galleries', {
+                data: {
+                    name,
+                    slug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${suffix}`,
+                    type: 'delivery',
+                    is_public: true,
+                    licensing_mode: licensingMode,
+                },
+                headers: {
+                    Accept: 'application/json',
+                    Referer: 'http://localhost:4321/',
+                },
+            });
+            expect(response.ok(), await response.text()).toBeTruthy();
+            const body = await response.json() as {
+                gallery?: {
+                    id?: string;
+                    name?: string;
+                    effective_licensing_mode?: string;
+                };
+            };
+            expect(body.gallery?.name).toBe(name);
+            expect(body.gallery?.effective_licensing_mode).toBe(licensingMode);
+            const id = body.gallery?.id;
+            if (!id) throw new Error(`Gallery ${name} was created without an id`);
+            helper.trackGallery(id);
+            return id;
+        };
+
+        const volumeGalleryId = await createGallery(`E2E Volume Override ${suffix}`, 'volume_licensing');
+        const scopeGalleryId = await createGallery(`E2E Scope Override ${suffix}`, 'scope_licensing');
+
+        // DashboardLayout has already populated the SWR gallery tree before
+        // the API fixtures were created. Reload so the fresh brand-scoped tree
+        // is fetched before looking for the gallery link.
+        await page.reload();
+        await expect(page.getByRole('main')).toBeVisible();
+        await sidebar.navigateTo('Galerien');
+        const main = page.getByRole('main');
+        let termsRequest = page.waitForRequest(request => {
+            const url = new URL(request.url());
+            return url.pathname === '/api/settings/license-terms'
+                && url.searchParams.get('gallery_id') === volumeGalleryId;
+        });
+        const volumeGalleryLink = main.getByRole('link', {
+            name: new RegExp(`E2E Volume Override ${suffix}`),
+        });
+        await expect(volumeGalleryLink).toBeVisible();
+        await volumeGalleryLink.click();
+        await termsRequest;
+        await expect(main.getByRole('tab', { name: 'Coupons' })).toBeVisible();
+
+        // Reload clears the SPA cache before the second explicit gallery
+        // override is resolved. Both responses come from the real backend.
+        await page.reload();
+        await expect(main.getByRole('tab', { name: 'Coupons' })).toBeVisible();
+        await sidebar.navigateTo('Galerien');
+
+        termsRequest = page.waitForRequest(request => {
+            const url = new URL(request.url());
+            return url.pathname === '/api/settings/license-terms'
+                && url.searchParams.get('gallery_id') === scopeGalleryId;
+        });
+        const scopeGalleryLink = main.getByRole('link', {
+            name: new RegExp(`E2E Scope Override ${suffix}`),
+        });
+        await expect(scopeGalleryLink).toBeVisible();
+        await scopeGalleryLink.click();
+        await termsRequest;
+        await expect(main.getByRole('tab', { name: 'Coupons' })).toHaveCount(0);
+    });
+
     test('Gallery modal offers preset selection in volume mode and persists it', { tag: ['@feature:admin:volume-pricing'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

@@ -9,7 +9,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-const resetSchema = z.object({
+const createResetSchema = () => z.object({
     password: z.string().min(8, t`Das Passwort muss mindestens 8 Zeichen lang sein.`),
     passwordConfirm: z.string()
 }).refine((data) => data.password === data.passwordConfirm, {
@@ -17,7 +17,7 @@ const resetSchema = z.object({
     path: ["passwordConfirm"],
 });
 
-type ResetFormValues = z.infer<typeof resetSchema>;
+type ResetFormValues = z.infer<ReturnType<typeof createResetSchema>>;
 
 export default function ResetPassword() {
     "use no memo";
@@ -28,6 +28,7 @@ export default function ResetPassword() {
     const { mutate } = useSWRConfig();
 
     const [globalError, setGlobalError] = useState('');
+    const resetSchema = createResetSchema();
 
     const {
         register,
@@ -39,8 +40,34 @@ export default function ResetPassword() {
 
     useEffect(() => {
         // Sicherheitsmaßnahme: Eventuell hängengebliebene Cookies/Sessions serverseitig löschen,
-        // bevor das Passwort-Reset-Formular abgeschickt wird.
-        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch((e: unknown) => { setGlobalError(e instanceof Error ? e.message : t`Session konnte nicht zurückgesetzt werden.`); });
+        // bevor das Passwort-Reset-Formular abgeschickt wird. This is deliberately
+        // best-effort: a non-OK logout is surfaced, but does not make the reset
+        // request itself unavailable.
+        const controller = new AbortController();
+        let cancelled = false;
+
+        const resetSession = async () => {
+            try {
+                const response = await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include',
+                    signal: controller.signal
+                });
+                if (cancelled || controller.signal.aborted) return;
+                if (!response.ok) {
+                    setGlobalError(t`Session konnte nicht zurückgesetzt werden.`);
+                }
+            } catch (error: unknown) {
+                if (cancelled || controller.signal.aborted) return;
+                setGlobalError(error instanceof Error ? error.message : t`Session konnte nicht zurückgesetzt werden.`);
+            }
+        };
+
+        void resetSession();
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
     }, []);
 
     const onSubmit = async (data: ResetFormValues) => {

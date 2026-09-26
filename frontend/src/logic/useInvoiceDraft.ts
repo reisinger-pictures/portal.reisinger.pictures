@@ -1,8 +1,13 @@
 import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {useUI} from '../ui/components/UIContext';
-import {DocumentFormData, InvoiceDiscount, InvoiceItem} from '../api';
+import {apiDownload, DocumentFormData, InvoiceDiscount, InvoiceItem} from '../api';
 import {formatDateToDE, formatLocaleDate, moveArrayItemUp, moveArrayItemDown} from './utils';
+import {
+    calculateEditorInvoiceTotal,
+    calculateEditorManualInvoiceSubtotal,
+    serializeManualInvoiceLines,
+} from './contractPricing';
 
 /**
  * Check if an InvoiceItem is an empty placeholder row (type=item, description+notes blank,
@@ -17,6 +22,39 @@ export function isEmptyRow(i: InvoiceItem): boolean {
         return !i.description.trim() && !i.notes.trim() && i.price === 0;
     }
     return false;
+}
+
+function getApiErrorInfo(error: unknown): Record<string, unknown> | null {
+    if (typeof error !== 'object' || error === null || !('info' in error)) return null;
+    const info = error.info;
+    if (typeof info !== 'object' || info === null) return null;
+    return info as Record<string, unknown>;
+}
+
+function getInvoiceErrorMessage(error: unknown, fallback: string): string {
+    const info = getApiErrorInfo(error);
+    if (info) {
+        if (typeof info.message === 'string' && info.message) return info.message;
+        if (typeof info.error === 'string' && info.error) return info.error;
+        if (typeof info.errors === 'object' && info.errors !== null) {
+            const firstError = Object.values(info.errors)[0];
+            if (Array.isArray(firstError) && typeof firstError[0] === 'string') {
+                return firstError[0];
+            }
+        }
+    }
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function getInvoiceTotals(items: InvoiceItem[], discounts: InvoiceDiscount[]): {subtotal: number; total: number} {
+    try {
+        return {
+            subtotal: calculateEditorManualInvoiceSubtotal(items) / 100,
+            total: calculateEditorInvoiceTotal(items, discounts) / 100,
+        };
+    } catch {
+        return {subtotal: 0, total: 0};
+    }
 }
 
 export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
@@ -124,12 +162,9 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
     };
 
     const moveItemDown = (index: number) => {
-        setItems(prev => {
-            if (index === prev.length - 1) return prev;
-            const result = moveArrayItemDown(prev, index);
-            markDirty();
-            return result;
-        });
+        if (index === items.length - 1) return;
+        markDirty();
+        setItems(prev => moveArrayItemDown(prev, index));
     };
 
     const addDiscount = () => {
@@ -203,29 +238,14 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
         e.preventDefault();
         setIsGenerating(true);
         try {
-            const res = await fetch('/api/management/invoices/manual', {
+            const { blob } = await apiDownload('/api/management/invoices/manual', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-                credentials: 'include',
                 body: JSON.stringify({
                     ...formData,
-                    items: [...items, ...discounts.map(d => ({...d, qty: 1}))].map((i: InvoiceItem | InvoiceDiscount) => ({
-                        ...i,
-                        price: i.type === 'discount_percent' ? Number((i.price * 100).toFixed(4)) : Math.round(i.price * 100),
-                    })),
+                    items: serializeManualInvoiceLines(items, discounts),
                 }),
             });
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                let niceMsg = errData.message || errData.error || t`Fehler beim Generieren (Bitte Eingaben prüfen).`;
-                if (errData.errors) {
-                    const firstErr = Object.values(errData.errors)[0];
-                    if (Array.isArray(firstErr)) niceMsg = firstErr[0];
-                }
-                if (niceMsg.includes('items.') && niceMsg.includes('description')) niceMsg = t`Bitte alle Titel/Namen bei den Leistungen ausfüllen.`;
-                throw new Error(niceMsg);
-            }
-            const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -236,19 +256,34 @@ export function useInvoiceDraft(type: 'invoice' | 'offer' = 'invoice') {
             setIsDirty(false);
             setUnsavedChanges(false);
             showToast('success', t`Dokument wurde erstellt.`);
-        } catch (err: unknown) {
-            showToast('error', err instanceof Error ? err.message : t`Fehler`);
+        } catch (error: unknown) {
+            let niceMsg = getInvoiceErrorMessage(error, t`Fehler beim Generieren (Bitte Eingaben prüfen).`);
+            if (niceMsg.includes('items.') && niceMsg.includes('description')) niceMsg = t`Bitte alle Titel/Namen bei den Leistungen ausfüllen.`;
+            showToast('error', niceMsg);
         }
         setIsGenerating(false);
     };
 
-    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    const total = discounts.reduce(
-        (t, d) => (d.type === 'discount_percent' ? t * (1 - d.price / 100) : t - d.price),
-        subtotal,
+    const {subtotal, total} = getInvoiceTotals(items, discounts);
+    const hasInvalidItems = items.some(i =>
+        i.type !== 'item'
+        || !i.description.trim()
+        || i.qty <= 0
+        || !Number.isFinite(i.price)
+        || i.price < 0,
+    ) || discounts.some(d =>
+        (d.type !== 'discount_fixed' && d.type !== 'discount_percent')
+        || !d.description.trim()
+        || !Number.isFinite(d.price)
+        || d.price < 0,
     );
-    const hasInvalidItems = items.some(i => !i.description.trim() || i.qty <= 0) || discounts.some(d => !d.description.trim());
-    const isFormValid = items.length > 0 && total >= 0 && !hasInvalidItems;
+    let canSerialize = true;
+    try {
+        serializeManualInvoiceLines(items, discounts);
+    } catch {
+        canSerialize = false;
+    }
+    const isFormValid = items.length > 0 && !hasInvalidItems && canSerialize;
 
     return {
         // State

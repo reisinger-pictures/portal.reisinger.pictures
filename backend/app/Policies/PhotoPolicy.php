@@ -34,7 +34,7 @@ class PhotoPolicy
             && $svc->canAccessGallery($user, $photo->gallery_id);
 
         $isGuestWithTransientRights = $photo->gallery->allow_client_metadata_edit
-            && in_array($photo->gallery_id, $user->transient_meta_galleries ?? []);
+            && in_array((string) $photo->gallery_id, $svc->getActiveTransientMetaGalleryIds($user), true);
 
         return $isClientWithRights || $isGuestWithTransientRights;
     }

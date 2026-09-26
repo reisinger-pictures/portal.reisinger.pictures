@@ -34,7 +34,7 @@ class PurchasePendingPaymentAccessTest extends TestCase
      */
     private function makeAccessibleOrder(string $status): array
     {
-        $user = User::factory()->create(['flatrate_level' => 'none']);
+        $user = User::factory()->create(['flatrate_level' => 'none', 'brand' => 'rp']);
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
@@ -48,12 +48,14 @@ class PurchasePendingPaymentAccessTest extends TestCase
             'user_id' => $user->id,
             'status' => $status,
             'is_quote_request' => false,
+            'brand' => 'rp',
             'total_amount' => 5000,
         ]);
 
         InvoiceSnapshot::create([
             'order_id' => $order->id,
             'invoice_number' => 'INV-'.uniqid(),
+            'brand' => 'rp',
             'customer_details' => [
                 'name' => $user->name,
                 'items' => [

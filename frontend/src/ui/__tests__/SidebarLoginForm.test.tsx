@@ -29,17 +29,21 @@ describe('SidebarLoginForm', () => {
         });
     });
 
-    it('renders login form with email and password fields', () => {
+    it('renders login form with programmatically labelled email and password fields', () => {
         renderForm();
-        expect(screen.getByPlaceholderText('E-Mail Adresse')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('Passwort')).toBeInTheDocument();
+        const email = screen.getByLabelText('E-Mail Adresse');
+        const password = screen.getByLabelText('Passwort');
+        expect(email).toHaveAttribute('placeholder', 'E-Mail Adresse');
+        expect(password).toHaveAttribute('placeholder', 'Passwort');
+        expect(email).toHaveAttribute('id', 'sidebar-login-email');
+        expect(password).toHaveAttribute('id', 'sidebar-login-password');
         expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument();
     });
 
     it('marks email and password as required', () => {
         renderForm();
-        expect(screen.getByPlaceholderText('E-Mail Adresse')).toBeRequired();
-        expect(screen.getByPlaceholderText('Passwort')).toBeRequired();
+        expect(screen.getByLabelText('E-Mail Adresse')).toBeRequired();
+        expect(screen.getByLabelText('Passwort')).toBeRequired();
     });
 
     it('shows validation error for empty email', async () => {

@@ -11,7 +11,8 @@ test.describe('Guest Public Gallery Access (G5)', () => {
 
         await expect(page.locator('main')).toBeVisible();
 
-        const loginForm = page.locator('aside').locator('input[placeholder="E-Mail Adresse"]');
-        expect(await loginForm.count()).toBe(1);
+        const loginForm = page.getByRole('complementary');
+        await expect(loginForm.getByRole('textbox', { name: 'E-Mail Adresse' })).toHaveCount(1);
+        await expect(loginForm.getByLabel('Passwort', { exact: true })).toHaveCount(1);
     });
 });

@@ -1,4 +1,4 @@
-import {Navigate, Route, Routes, useParams} from 'react-router-dom';
+import {Navigate, Route, Routes, useLocation, useParams} from 'react-router-dom';
 import ErrorMessage from './ui/components/ErrorMessage';
 import {useAuth} from './logic/useAuth';
 import {usePermissions} from './logic/usePermissions';
@@ -38,9 +38,15 @@ const ClientOrdersView = lazy(() => import('./ui/client/ClientOrdersView'));
 
 interface ProtectedRouteProps { children: React.ReactNode; requiredFeature?: 'b2b' }
 
-function ProtectedRoute({children, requiredFeature}: ProtectedRouteProps) {
+export function ProtectedRoute({children, requiredFeature}: ProtectedRouteProps) {
+    const location = useLocation();
     const {user, isLoading, isError} = useAuth();
     const {canAccessB2BFeatures} = usePermissions();
+    const canonicalPath = location.pathname.replace(/\/+$/, '') || '/';
+
+    if (canonicalPath !== location.pathname) {
+        return <Navigate to={`${canonicalPath}${location.search}${location.hash}`} replace/>;
+    }
     if (isLoading) return <div className="flex h-screen items-center justify-center"><span
         data-testid="app-loader" className="loading loading-spinner loading-lg text-primary"></span></div>;
     if (isError || !user) return <Navigate to="/" replace/>;

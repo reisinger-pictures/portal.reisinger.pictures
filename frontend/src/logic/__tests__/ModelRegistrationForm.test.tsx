@@ -3,7 +3,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test-setup';
 import { RegistrationForm } from '../../ui/ModelRegistrationView';
-import type { ModelRegistrationCheck } from '../modelRegistration';
+import { MAX_PERSONS_PER_REGISTRATION, type ModelRegistrationCheck } from '../modelRegistration';
 
 const catalog: ModelRegistrationCheck = {
     brand: 'rp',
@@ -89,6 +89,45 @@ describe('RegistrationForm person state', () => {
     it('hides the remove action when only one person remains', () => {
         renderForm({ submit });
         expect(screen.queryByRole('button', { name: /entfernen/i })).not.toBeInTheDocument();
+    });
+
+    it('stops at the person limit and prevents an over-limit append', async () => {
+        const user = userEvent.setup();
+        renderForm({ submit });
+        const addButton = screen.getByTestId('add-person');
+
+        for (let index = 1; index < MAX_PERSONS_PER_REGISTRATION; index += 1) {
+            await user.click(addButton);
+        }
+
+        expect(screen.getAllByTestId(/^model-person-\d+$/)).toHaveLength(MAX_PERSONS_PER_REGISTRATION);
+        expect(addButton).toBeDisabled();
+        expect(screen.getByRole('status')).toHaveTextContent(
+            `Maximal ${MAX_PERSONS_PER_REGISTRATION} Personen pro Registrierung.`,
+        );
+
+        await user.click(addButton);
+        expect(screen.getAllByTestId(/^model-person-\d+$/)).toHaveLength(MAX_PERSONS_PER_REGISTRATION);
+    });
+
+    it('resets a full act and reopens multi-person entry', async () => {
+        const user = userEvent.setup();
+        renderForm({ submit });
+        const addButton = screen.getByTestId('add-person');
+
+        for (let index = 1; index < MAX_PERSONS_PER_REGISTRATION; index += 1) {
+            await user.click(addButton);
+        }
+        expect(addButton).toBeDisabled();
+
+        await user.click(screen.getByRole('radio', { name: 'Eine Person' }));
+        expect(screen.getAllByTestId(/^model-person-\d+$/)).toHaveLength(1);
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(addButton).not.toBeDisabled();
+
+        await user.click(screen.getByRole('radio', { name: 'Mehrere Personen' }));
+        expect(screen.getAllByTestId(/^model-person-\d+$/)).toHaveLength(2);
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 
     it('shows the manager consent only for the manager person and hides the radio for a single person', async () => {

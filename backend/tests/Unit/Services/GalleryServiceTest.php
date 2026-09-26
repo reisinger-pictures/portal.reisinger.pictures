@@ -25,12 +25,35 @@ class GalleryServiceTest extends TestCase
 
     private SlugService|Stub $slugService;
 
+    private ?User $actor = null;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->slugService = $this->createStub(SlugService::class);
         $this->service = new GalleryService($this->slugService);
+    }
+
+    /**
+     * A persisted cross-brand Super-Admin — the most permissive actor
+     * `updateGallery()` accepts.
+     *
+     * P1-M15 made the actor a required, non-nullable argument: an earlier
+     * `?User $user = null` default silently disabled every identity and brand
+     * check for callers that forgot it. These unit tests therefore pass the
+     * real actor instead of relying on a default; a trusted cross-brand
+     * Super-Admin keeps the field-mapping assertions below free of
+     * authorization concerns.
+     */
+    private function actor(): User
+    {
+        return $this->actor ??= tap(
+            User::factory()->create(['brand' => null]),
+            function (User $user): void {
+                $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+            }
+        );
     }
 
     // ─── storeGroup() ───────────────────────────────────────────────
@@ -146,6 +169,41 @@ class GalleryServiceTest extends TestCase
         $this->assertSame('neuer-slug-1', $updated->slug);
     }
 
+    public function test_update_group_synchronizes_org_pivot_and_explicit_null_clears_it(): void
+    {
+        $group = GalleryGroup::factory()->create([
+            'name' => 'Original',
+            'slug' => 'original',
+        ]);
+        $orgA = Org::factory()->create();
+        $orgB = Org::factory()->create();
+        $group->orgs()->attach($orgA->id);
+
+        $this->service->updateGroup($group, [
+            'name' => 'Original',
+            'org_id' => $orgB->id,
+        ]);
+
+        $this->assertDatabaseMissing('gallery_group_org', [
+            'gallery_group_id' => $group->id,
+            'org_id' => $orgA->id,
+        ]);
+        $this->assertDatabaseHas('gallery_group_org', [
+            'gallery_group_id' => $group->id,
+            'org_id' => $orgB->id,
+        ]);
+
+        $this->service->updateGroup($group, [
+            'name' => 'Original',
+            'org_id' => null,
+        ]);
+
+        $this->assertDatabaseMissing('gallery_group_org', [
+            'gallery_group_id' => $group->id,
+            'org_id' => $orgB->id,
+        ]);
+    }
+
     // ─── storeGallery() ─────────────────────────────────────────────
 
     public function test_store_gallery_creates_gallery_with_basic_data(): void
@@ -200,6 +258,63 @@ class GalleryServiceTest extends TestCase
         $this->assertFalse($gallery->is_public);
         $this->assertFalse($gallery->is_live);
         $this->assertSame('selection', $gallery->type);
+    }
+
+    public function test_store_gallery_selection_cannot_inherit_public_or_free_download_from_group(): void
+    {
+        $group = GalleryGroup::factory()->create([
+            'is_public' => true,
+            'is_free_download' => true,
+        ]);
+        $this->slugService->method('makeUnique')->willReturn('selection-inherited');
+
+        $gallery = $this->service->storeGallery([
+            'name' => 'Selection in permissive group',
+            'type' => 'selection',
+            'gallery_group_id' => $group->id,
+            'is_public' => true,
+            'is_free_download' => true,
+        ], null);
+
+        $this->assertFalse($gallery->is_public);
+        $this->assertFalse($gallery->is_free_download);
+        $this->assertFalse($gallery->effective_is_public);
+        $this->assertFalse($gallery->effective_is_free_download);
+    }
+
+    public function test_update_gallery_selection_cannot_set_public_or_free_download(): void
+    {
+        $gallery = Gallery::factory()->create([
+            'type' => 'selection',
+            'is_public' => false,
+            'is_free_download' => false,
+        ]);
+
+        $updated = $this->service->updateGallery($gallery, [
+            'is_public' => true,
+            'is_free_download' => true,
+            'is_live' => true,
+        ], $this->actor());
+
+        $this->assertFalse($updated->is_public);
+        $this->assertFalse($updated->is_free_download);
+        $this->assertFalse($updated->is_live);
+    }
+
+    public function test_selection_model_boundary_blocks_direct_flag_updates(): void
+    {
+        $gallery = Gallery::factory()->create(['type' => 'selection']);
+
+        $gallery->update([
+            'is_public' => true,
+            'is_free_download' => true,
+            'is_live' => true,
+        ]);
+
+        $gallery->refresh();
+        $this->assertFalse($gallery->is_public);
+        $this->assertFalse($gallery->is_free_download);
+        $this->assertFalse($gallery->is_live);
     }
 
     public function test_store_gallery_assigns_photographer_via_sync(): void
@@ -287,7 +402,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'name' => 'Updated Name',
-        ]);
+        ], $this->actor());
 
         $this->assertSame('Updated Name', $updated->name);
         $this->assertDatabaseHas('galleries', [
@@ -309,7 +424,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'slug' => 'new-slug',
-        ]);
+        ], $this->actor());
 
         $this->assertSame('new-slug-1', $updated->slug);
     }
@@ -325,7 +440,7 @@ class GalleryServiceTest extends TestCase
 
         $this->service->updateGallery($gallery, [
             'name' => 'New Name',
-        ]);
+        ], $this->actor());
     }
 
     public function test_update_gallery_selection_type_forces_is_live_and_is_public_false(): void
@@ -339,11 +454,55 @@ class GalleryServiceTest extends TestCase
         $updated = $this->service->updateGallery($gallery, [
             'type' => 'selection',
             'name' => 'Now Selection',
-        ]);
+        ], $this->actor());
 
         $this->assertFalse($updated->is_live);
         $this->assertFalse($updated->is_public);
         $this->assertSame('selection', $updated->type);
+    }
+
+    public function test_update_gallery_applies_parent_visibility_policy(): void
+    {
+        $privateGroup = GalleryGroup::factory()->create(['is_public' => false]);
+        $publicGroup = GalleryGroup::factory()->create(['is_public' => true]);
+
+        Gallery::withoutSyncingToSearch(function () use ($privateGroup, $publicGroup): void {
+            $gallery = Gallery::factory()->create([
+                'type' => 'delivery',
+                'is_public' => false,
+            ]);
+
+            $updated = $this->service->updateGallery($gallery, [
+                'gallery_group_id' => $privateGroup->id,
+                'is_public' => true,
+            ], $this->actor());
+            $this->assertFalse($updated->is_public);
+
+            $updated = $this->service->updateGallery($updated, [
+                'gallery_group_id' => $publicGroup->id,
+                'is_public' => false,
+            ], $this->actor());
+            $this->assertTrue($updated->is_public);
+        });
+    }
+
+    public function test_update_gallery_preserves_explicit_visibility_for_non_enforcing_parent(): void
+    {
+        $group = GalleryGroup::factory()->create(['is_public' => null]);
+
+        Gallery::withoutSyncingToSearch(function () use ($group): void {
+            $gallery = Gallery::factory()->create([
+                'type' => 'delivery',
+                'is_public' => false,
+                'gallery_group_id' => $group->id,
+            ]);
+
+            $updated = $this->service->updateGallery($gallery, [
+                'is_public' => true,
+            ], $this->actor());
+
+            $this->assertTrue($updated->is_public);
+        });
     }
 
     public function test_update_gallery_converts_null_booleans_to_false(): void
@@ -354,7 +513,7 @@ class GalleryServiceTest extends TestCase
             'is_free_download' => null,
             'is_editorial_only' => null,
             'is_hidden' => null,
-        ]);
+        ], $this->actor());
 
         $this->assertFalse($updated->is_free_download);
         $this->assertFalse($updated->is_editorial_only);
@@ -367,7 +526,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'password' => 'new-password',
-        ]);
+        ], $this->actor());
 
         $this->assertNotNull($updated->password_hash);
         $this->assertTrue(Hash::check('new-password', $updated->password_hash));
@@ -379,7 +538,7 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'expires_at' => '2027-06-15',
-        ]);
+        ], $this->actor());
 
         $this->assertNotNull($updated->expires_at);
         $this->assertSame('2027-06-15 23:59:59', $updated->expires_at->format('Y-m-d H:i:s'));
@@ -398,43 +557,51 @@ class GalleryServiceTest extends TestCase
 
         $updated = $this->service->updateGallery($gallery, [
             'name' => 'Updated Name',
-        ]);
+        ], $this->actor());
 
         $this->assertSame('original-slug', $updated->slug);
     }
 
+    /**
+     * Regression for P1-M1: an omitted optional org_ids field must preserve the
+     * existing pivot assignments instead of being interpreted as an empty list.
+     */
     public function test_update_gallery_keeps_orgs_when_org_ids_absent(): void
     {
-        $gallery = Gallery::factory()->create(['is_live' => false]);
-        $org = Org::factory()->create();
-        $gallery->orgs()->attach($org->id);
+        Gallery::withoutSyncingToSearch(function (): void {
+            $gallery = Gallery::factory()->create(['is_live' => false]);
+            $org = Org::factory()->create();
+            $gallery->orgs()->attach($org->id);
 
-        $updated = $this->service->updateGallery($gallery, ['is_live' => true]);
+            $updated = $this->service->updateGallery($gallery, ['is_live' => true], $this->actor());
 
-        $this->assertTrue($updated->is_live);
-        $this->assertDatabaseHas('gallery_org', [
-            'gallery_id' => $gallery->id,
-            'org_id' => $org->id,
-        ]);
+            $this->assertTrue($updated->is_live);
+            $this->assertDatabaseHas('gallery_org', [
+                'gallery_id' => $gallery->id,
+                'org_id' => $org->id,
+            ]);
+        });
     }
 
     public function test_update_gallery_syncs_orgs_when_org_ids_provided(): void
     {
-        $gallery = Gallery::factory()->create();
-        $orgA = Org::factory()->create();
-        $orgB = Org::factory()->create();
-        $gallery->orgs()->attach($orgA->id);
+        Gallery::withoutSyncingToSearch(function (): void {
+            $gallery = Gallery::factory()->create();
+            $orgA = Org::factory()->create();
+            $orgB = Org::factory()->create();
+            $gallery->orgs()->attach($orgA->id);
 
-        $this->service->updateGallery($gallery, ['org_ids' => [$orgB->id]]);
+            $this->service->updateGallery($gallery, ['org_ids' => [$orgB->id]], $this->actor());
 
-        $this->assertDatabaseMissing('gallery_org', [
-            'gallery_id' => $gallery->id,
-            'org_id' => $orgA->id,
-        ]);
-        $this->assertDatabaseHas('gallery_org', [
-            'gallery_id' => $gallery->id,
-            'org_id' => $orgB->id,
-        ]);
+            $this->assertDatabaseMissing('gallery_org', [
+                'gallery_id' => $gallery->id,
+                'org_id' => $orgA->id,
+            ]);
+            $this->assertDatabaseHas('gallery_org', [
+                'gallery_id' => $gallery->id,
+                'org_id' => $orgB->id,
+            ]);
+        });
     }
 
     public function test_update_gallery_ignores_null_slug(): void
@@ -448,7 +615,7 @@ class GalleryServiceTest extends TestCase
         $updated = $this->service->updateGallery($gallery, [
             'slug' => null,
             'name' => 'Name stays',
-        ]);
+        ], $this->actor());
 
         $this->assertSame('keep-me', $updated->slug);
         $this->assertSame('Name stays', $updated->name);

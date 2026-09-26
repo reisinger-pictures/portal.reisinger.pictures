@@ -2,14 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\GalleryTreeService;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class GalleryTreeServiceTest extends TestCase
@@ -21,18 +24,28 @@ class GalleryTreeServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // PROZESSGLOBALER file-Cache (CACHE_STORE=file) — Key 'gallery_tree_admin'
-        // persistiert über Tests. Zwingend zwischen Tests resetten (BK-01-Erfahrung).
+        // Brand-specific tree keys persist across tests because the file cache
+        // is process-global. Reset it between tests (BK-01 lesson).
         Cache::flush();
-        $this->service = new GalleryTreeService();
+        $this->service = new GalleryTreeService;
     }
 
-    private function makeAdmin(): User
+    private function makeAdmin(Brand|string|null $brand = 'rp', UserRole $role = UserRole::ADMIN): User
     {
-        $admin = User::factory()->create();
-        $role = Role::firstOrCreate(['name' => UserRole::ADMIN->value]);
+        $admin = User::factory()->create(['brand' => $brand]);
+        $role = Role::firstOrCreate(['name' => $role->value]);
         $admin->roles()->syncWithoutDetaching([$role->id]);
+
         return $admin;
+    }
+
+    private function adminTreeCacheKey(User $admin): string
+    {
+        $brand = $admin->brand instanceof Brand
+            ? $admin->brand->value
+            : (string) $admin->brand;
+
+        return 'gallery_tree_admin_'.$brand;
     }
 
     private function assertTreeStructure(array $tree): void
@@ -90,7 +103,7 @@ class GalleryTreeServiceTest extends TestCase
 
     public function test_get_admin_tree_nested_three_levels_reflected_recursively(): void
     {
-        $admin = $this->makeAdmin();
+        $admin = $this->makeAdmin(null, UserRole::SUPER_ADMIN);
         $level1 = GalleryGroup::factory()->create();
         $level2 = GalleryGroup::factory()->create(['parent_id' => $level1->id]);
         $level3 = GalleryGroup::factory()->create(['parent_id' => $level2->id]);
@@ -98,6 +111,11 @@ class GalleryTreeServiceTest extends TestCase
             'gallery_group_id' => $level3->id,
             'type' => 'selection',
         ]);
+
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
 
         $tree = $this->service->getAdminTree($admin);
 
@@ -110,6 +128,10 @@ class GalleryTreeServiceTest extends TestCase
         $this->assertSame($level3->id, $root['children'][0]['children'][0]['id']);
         $this->assertCount(1, $root['children'][0]['children'][0]['galleries']);
         $this->assertSame($deepGallery->id, $root['children'][0]['children'][0]['galleries'][0]['id']);
+        $this->assertCount(0, array_filter(
+            $queries,
+            fn (string $query): bool => str_contains($query, '"gallery_groups"."id" = ? limit 1'),
+        ), 'Serializing effective group attributes and gallery full paths must not lazy-load parents.');
     }
 
     // =====================================================================
@@ -186,12 +208,10 @@ class GalleryTreeServiceTest extends TestCase
 
     public function test_get_admin_tree_cache_hit_returns_stub_exactly(): void
     {
-        // REVIEW: Cache 'gallery_tree_admin' ist PROZESSGLOBAL und user-unabhängig.
-        // Der Service cached den VOLL Baum (ungefiltert) — Filterung passiert danach
-        // im Speicher. Hier wird der Hit-Pfad isoliert bewiesen, indem wir den
-        // Cache mit einem Stub befüllen und prüfen, dass rememberForever exakt
-        // diesen Stub zurückliefert (unabhängig von der realen DB).
+        // The brand-specific cache contains the full tree; filtering happens
+        // afterwards in memory. This isolates the cache-hit path.
         $admin = $this->makeAdmin();
+        $cacheKey = $this->adminTreeCacheKey($admin);
         GalleryGroup::factory()->create(); // existiert, soll aber durch Stub verdeckt werden
 
         $stubTree = [
@@ -202,7 +222,7 @@ class GalleryTreeServiceTest extends TestCase
                 ['id' => 'stub-gallery-id', 'name' => 'Stub Gallery'],
             ],
         ];
-        Cache::put('gallery_tree_admin', $stubTree);
+        Cache::put($cacheKey, $stubTree);
 
         $tree = $this->service->getAdminTree($admin);
 
@@ -217,16 +237,18 @@ class GalleryTreeServiceTest extends TestCase
     public function test_get_admin_tree_cache_miss_after_clear_rebuilds_from_db(): void
     {
         $admin = $this->makeAdmin();
+        $cacheKey = $this->adminTreeCacheKey($admin);
         $group = GalleryGroup::factory()->create();
         Gallery::factory()->create(['gallery_group_id' => $group->id]);
 
-        // Erster Build füllt den Cache
+        // The first build fills the brand-specific cache.
         $tree1 = $this->service->getAdminTree($admin);
         $this->assertCount(1, $tree1['groups']);
+        $this->assertNotNull(Cache::get($cacheKey));
 
         // clearCache → Cache vergessen
         $this->service->clearCache();
-        $this->assertNull(Cache::get('gallery_tree_admin'));
+        $this->assertNull(Cache::get($cacheKey));
 
         // Neue Gruppe nach Forget hinzufügen — muss sichtbar werden (Miss-Pfad)
         $newGroup = GalleryGroup::factory()->create();
@@ -246,14 +268,30 @@ class GalleryTreeServiceTest extends TestCase
     public function test_clear_cache_forgets_gallery_tree_admin_key(): void
     {
         $admin = $this->makeAdmin();
+        $cacheKey = $this->adminTreeCacheKey($admin);
         GalleryGroup::factory()->create();
         $this->service->getAdminTree($admin);
 
-        $this->assertNotNull(Cache::get('gallery_tree_admin'));
+        $this->assertNotNull(Cache::get($cacheKey));
 
         $this->service->clearCache();
 
+        $this->assertNull(Cache::get($cacheKey));
+    }
+
+    public function test_admin_tree_cache_scope_and_clear_cache_handle_enum_backed_brand(): void
+    {
+        $admin = $this->makeAdmin();
+        GalleryGroup::factory()->create(['brand' => Brand::B2B]);
+
+        $this->service->getAdminTree($admin);
+
+        $this->assertNotNull(Cache::get('gallery_tree_admin_rp'));
         $this->assertNull(Cache::get('gallery_tree_admin'));
+
+        $this->service->clearCache();
+
+        $this->assertNull(Cache::get('gallery_tree_admin_rp'));
     }
 
     // =====================================================================
@@ -357,19 +395,20 @@ class GalleryTreeServiceTest extends TestCase
 
     public function test_get_admin_tree_subsequent_call_uses_cache_no_db_rebuild(): void
     {
-        // REVIEW: Der Cache ist user-unabhängig (immer der VOLL Baum).
-        // Ein zweiter Call liefert denselben vollen Baum aus dem Cache.
+        // The cache is brand-specific; a second call returns the same full
+        // tree from that key.
         $admin = $this->makeAdmin();
+        $cacheKey = $this->adminTreeCacheKey($admin);
         GalleryGroup::factory()->create();
         Gallery::factory()->create(['gallery_group_id' => null]);
 
         $tree1 = $this->service->getAdminTree($admin);
-        $cachedSnapshot = Cache::get('gallery_tree_admin');
+        $cachedSnapshot = Cache::get($cacheKey);
 
         $tree2 = $this->service->getAdminTree($admin);
 
         // Zweiter Call liefert denselben Baum — Cache wurde nicht neu gebaut
-        $this->assertSame($cachedSnapshot, Cache::get('gallery_tree_admin'));
+        $this->assertSame($cachedSnapshot, Cache::get($cacheKey));
         $this->assertCount(1, $tree1['groups']);
         $this->assertCount(1, $tree2['groups']);
     }

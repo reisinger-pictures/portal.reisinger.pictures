@@ -18,17 +18,17 @@ export function useVolumePresets() {
         await mutate();
     };
 
-    const updatePreset = async (id: string, payload: VolumePresetPayload) => {
+    const updatePreset = async (id: number, payload: VolumePresetPayload) => {
         await apiMutate(`/api/management/settings/volume-presets/${id}`, 'PUT', payload);
         await mutate();
     };
 
-    const deletePreset = async (id: string) => {
+    const deletePreset = async (id: number) => {
         await apiMutate(`/api/management/settings/volume-presets/${id}`, 'DELETE');
         await mutate();
     };
 
-    const setDefaultPreset = async (id: string) => {
+    const setDefaultPreset = async (id: number) => {
         await apiMutate(`/api/management/settings/volume-presets/${id}/default`, 'POST', {});
         await mutate();
     };

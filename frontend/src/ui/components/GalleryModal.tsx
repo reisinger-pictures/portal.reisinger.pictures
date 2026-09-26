@@ -4,10 +4,10 @@ import { useUI } from './UIContext';
 import { useEffect } from 'react';
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useFocusTrap } from '../../logic/useFocusTrap';
 import { useForm, useWatch } from 'react-hook-form';
 import useSWR from 'swr';
 import { fetcher } from '../../api';
+import type { VolumePresetsResponse } from '../../logic/useVolumePresets';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toSlug } from '../../logic/utils';
@@ -19,6 +19,7 @@ const createGallerySchema = () => z.object({
     slug: z.string(),
     type: z.enum(['selection', 'delivery']),
     is_public: z.boolean(),
+    visibility_intent: z.boolean(),
     is_live: z.boolean(),
     gallery_group_id: z.string(),
     password: z.string().optional(),
@@ -31,6 +32,16 @@ const createGallerySchema = () => z.object({
     volume_preset_id: z.string().optional()
 });
 type GalleryFormValues = z.infer<ReturnType<typeof createGallerySchema>>;
+
+const resolveForcedVisibility = (
+    type: GalleryFormValues['type'],
+    galleryGroupId: string,
+    availableGroups: FlatGroup[]
+): boolean | null => {
+    if (type === 'selection') return false;
+
+    return availableGroups.find(group => group.id === (galleryGroupId === '' ? null : galleryGroupId))?.is_public ?? null;
+};
 
 interface Props {
     isOpen: boolean;
@@ -53,7 +64,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     const { register, handleSubmit, reset, setValue, control, formState: { isSubmitting, dirtyFields } } = useForm<GalleryFormValues>({
         resolver: zodResolver(gallerySchema),
         defaultValues: {
-            name: '', slug: '', type: 'delivery', is_public: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', org_ids: [], is_free_download: false, is_editorial_only: false, is_hidden: false, licensing_mode: '', volume_preset_id: ''
+            name: '', slug: '', type: 'delivery', is_public: false, visibility_intent: false, is_live: false, gallery_group_id: '', password: '', expires_at: '', org_ids: [], is_free_download: false, is_editorial_only: false, is_hidden: false, licensing_mode: '', volume_preset_id: ''
         }
     });
 
@@ -64,8 +75,9 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 org_ids: editingGallery?.org_ids || [],
                 slug: editingGallery?.slug || '',
                 type: editingGallery?.type || 'delivery',
-                is_public: editingGallery?.is_public || false,
-                is_live: editingGallery?.is_live || false,
+                is_public: editingGallery?.is_public ?? false,
+                visibility_intent: editingGallery?.is_public ?? false,
+                is_live: editingGallery?.is_live ?? false,
                 gallery_group_id: editingGallery?.gallery_group_id || defaultGroupId || '',
                 password: '',
                 expires_at: editingGallery?.expires_at ? editingGallery.expires_at.split('T')[0] : '',
@@ -73,7 +85,13 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                 is_editorial_only: !!editingGallery?.is_editorial_only,
                 is_hidden: !!editingGallery?.is_hidden,
                 licensing_mode: editingGallery?.licensing_mode || '',
-                volume_preset_id: editingGallery?.volume_preset_id || ''
+                // `volume_preset_id` is a bigint primary key and arrives as a
+                // JSON number; the select is a form field, so normalise it to
+                // its decimal string here (a raw number would fail `z.string()`
+                // and block the save of a gallery that has a preset assigned).
+                volume_preset_id: editingGallery?.volume_preset_id != null
+                    ? String(editingGallery.volume_preset_id)
+                    : ''
             });
         }
     }, [isOpen, editingGallery, reset, defaultGroupId]);
@@ -81,30 +99,36 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     const watchType = useWatch({ control, name: 'type' });
     const watchGroupId = useWatch({ control, name: 'gallery_group_id' });
     const watchIsPublic = useWatch({ control, name: 'is_public' });
+    const watchVisibilityIntent = useWatch({ control, name: 'visibility_intent' });
     const watchOrgIds = useWatch({ control, name: 'org_ids' });
     const watchLicensingMode = useWatch({ control, name: 'licensing_mode' });
 
-    const { data: presets } = useSWR<{ presets: Array<{ id: string; name: string; is_default: boolean }> }>('/api/management/settings/volume-presets', fetcher);
+    const { data: presets } = useSWR<VolumePresetsResponse>('/api/management/settings/volume-presets', fetcher);
     const volumePresets = watchLicensingMode === 'volume_licensing' ? presets?.presets : undefined;
 
-    const selectedParent = availableGroups.find(g => g.id === (watchGroupId === '' ? null : watchGroupId));
-    let isVisibilityForced = selectedParent?.is_public !== undefined && selectedParent?.is_public !== null;
-    let forcedVisibility = selectedParent?.is_public;
+    const forcedVisibility = resolveForcedVisibility(watchType, watchGroupId, availableGroups);
+    const isVisibilityForced = forcedVisibility !== null;
+    const effectiveVisibility = forcedVisibility ?? watchVisibilityIntent;
 
-    if (watchType === 'selection') {
-        isVisibilityForced = true;
-        forcedVisibility = false;
-    }
-
-    // Sync the forced (disabled) visibility into the form value so a submit can
-    // never send a privacy that the UI is not actually showing.
+    // Keep the effective, displayed value in RHF while retaining the user's
+    // explicit choice separately. Removing a forcing parent/type therefore
+    // restores the original intent instead of leaking the forced value back.
     useEffect(() => {
-        if (!isVisibilityForced) return;
-        setValue('is_public', forcedVisibility ?? false);
-    }, [isVisibilityForced, forcedVisibility, setValue]);
+        if (watchIsPublic !== effectiveVisibility) {
+            setValue('is_public', effectiveVisibility);
+        }
+    }, [effectiveVisibility, setValue, watchIsPublic]);
+
+    const setExplicitVisibility = (isPublic: boolean) => {
+        setValue('visibility_intent', isPublic, { shouldDirty: true });
+        setValue('is_public', isPublic, { shouldDirty: true });
+    };
 
     const onSubmit = async (data: GalleryFormValues) => {
         const pId = data.gallery_group_id === '' ? null : data.gallery_group_id;
+        // Resolve again at submit time so a forced value is sent even if the
+        // browser submits in the narrow window before the synchronization effect.
+        const isPublic = resolveForcedVisibility(data.type, data.gallery_group_id, availableGroups) ?? data.visibility_intent;
         const metaOpts = { 
             is_free_download: data.is_free_download,
             is_editorial_only: data.is_editorial_only,
@@ -115,10 +139,10 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
         try {
             if (editingGallery) {
-                await onUpdate(editingGallery.id, data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts, data.org_ids);
+                await onUpdate(editingGallery.id, data.name, data.slug, data.type, data.is_live, isPublic, pId, data.password, data.expires_at, metaOpts, data.org_ids);
                 showToast('success', t`Galerie erfolgreich aktualisiert.`);
             } else {
-                await onCreate(data.name, data.slug, data.type, data.is_live, data.is_public, pId, data.password, data.expires_at, metaOpts, data.org_ids);
+                await onCreate(data.name, data.slug, data.type, data.is_live, isPublic, pId, data.password, data.expires_at, metaOpts, data.org_ids);
                 showToast('success', t`Galerie erfolgreich erstellt.`);
             }
             onClose();
@@ -140,8 +164,6 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         }
     };
 
-    const modalRef = useFocusTrap<HTMLDialogElement>(isOpen && !isLoading);
-
     if (!isOpen) return null;
     if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
@@ -154,7 +176,6 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
             editing={!!editingGallery}
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
-            modalRef={modalRef}
             maxWidth="2xl"
             secondaryAction={!editingGallery ? (
                 <button type="button" className="btn btn-xs btn-outline" onClick={() => { onClose(); onOpenGroupModal(); }}>
@@ -164,8 +185,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
         >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold"><Trans>Name der Galerie</Trans></span></label>
-                    <input type="text" {...register('name')}
+                    <label className="label" htmlFor="gallery-name"><span className="label-text font-bold"><Trans>Name der Galerie</Trans></span></label>
+                    <input id="gallery-name" type="text" {...register('name')}
                            onChange={(e) => {
                                setValue('name', e.target.value, { shouldDirty: true });
                                if (!editingGallery && !dirtyFields.slug && e.target.value) {
@@ -182,8 +203,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold"><Trans>Galerie-Typ</Trans></span></label>
-                    <select {...register('type')}
+                    <label className="label" htmlFor="gallery-type"><span className="label-text font-bold"><Trans>Galerie-Typ</Trans></span></label>
+                    <select id="gallery-type" {...register('type')}
                             onChange={(e) => {
                                 setValue('type', e.target.value as 'delivery' | 'selection', { shouldDirty: true });
                                 if (e.target.value === 'selection') {
@@ -197,8 +218,15 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                     </select>
                 </div>
                 <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold"><Trans>Sichtbarkeit</Trans></span></label>
-                    <select disabled={isVisibilityForced} value={isVisibilityForced ? (forcedVisibility ? 'true' : 'false') : (watchIsPublic ? 'true' : 'false')} onChange={e => setValue('is_public', e.target.value === 'true')} className="select select-bordered w-full">
+                    <label className="label" htmlFor="gallery-visibility"><span className="label-text font-bold"><Trans>Sichtbarkeit</Trans></span></label>
+                    <select
+                        id="gallery-visibility"
+                        name="is_public"
+                        disabled={isVisibilityForced}
+                        value={effectiveVisibility ? 'true' : 'false'}
+                        onChange={e => setExplicitVisibility(e.target.value === 'true')}
+                        className="select select-bordered w-full"
+                    >
                         <option value="false"><Trans>Privat (Nur mit Link / Passwort)</Trans></option>
                         <option value="true"><Trans>Öffentlich (Für alle sichtbar)</Trans></option>
                     </select>
@@ -241,8 +269,8 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
             </div>
 
             <div className="form-control w-full mb-4">
-                <label className="label"><span className="label-text font-bold"><Trans>In welchem Ordner soll die Galerie liegen?</Trans></span></label>
-                <select {...register('gallery_group_id')} className="select select-bordered w-full">
+                <label className="label" htmlFor="gallery-group"><span className="label-text font-bold"><Trans>In welchem Ordner soll die Galerie liegen?</Trans></span></label>
+                <select id="gallery-group" {...register('gallery_group_id')} className="select select-bordered w-full">
                     <option value="">-- <Trans>Oberste Ebene (Root)</Trans> --</option>
                     {availableGroups.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
                 </select>
@@ -263,7 +291,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
                     <select {...register('volume_preset_id')} className="select select-bordered w-full">
                         <option value=""><Trans>Brand-Standard</Trans></option>
                         {volumePresets?.map(p => (
-                            <option key={p.id} value={p.id}>
+                            <option key={p.id} value={String(p.id)}>
                                 {p.name}{p.is_default ? ' (Standard)' : ''}
                             </option>
                         ))}

@@ -2,16 +2,27 @@ name: CI
 
 # Push auf ALLE Branches (inkl. Dependabot-Branches wie
 # dependabot/npm_and_yarn/frontend/...): Dependabot-ausgelöste pull_request-Runs
-# erhalten KEINE Secrets und nur read-only GITHUB_TOKEN (werden wie Fork-PRs
-# behandelt). Da E2E Stripe-Test-Keys braucht, läuft die komplette CI-Logik über
-# `push`, damit Secrets verfügbar sind. `pull_request` deckt normale PRs ab.
+# erhalten KEINE Secrets und nur read-only GITHUB_TOKEN. Deren secret-dependent
+# E2E-/Aggregate-Gate wird deshalb explizit übersprungen; der Push-Lauf auf
+# demselben Head-SHA bleibt der autoritative Gate. `pull_request` deckt
+# normale Same-Repo-PRs weiterhin fail-closed ab.
 on:
   push:
   pull_request:
 
-# Least privilege: CI only reads the repository. Container images are pulled
-# anonymously from public GHCR (no `packages` scope needed) and artifact
-# uploads use the runner's runtime token.
+# Least privilege: CI only reads the repository. Secrets are passed directly to
+# the jobs that need them and are never printed, fingerprinted, or written to
+# artifacts. E2E output is limited to the sanitized step summary: Playwright
+# reports, traces, screenshots, videos, and test-results are never uploaded.
+#
+# GHCR-Sichtbarkeit ist eine harte Voraussetzung, kein Komfort: Die Container-
+# Images werden anonym gezogen, also OHNE `packages`-Scope und OHNE
+# docker-login (Least Privilege). Das ist technisch nicht umgehbar, weil das
+# E2E-Job-`container:`-Image vom Runner VOR dem ersten Step gepullt wird — ein
+# Login-Step im Job käme zu spät. Solange `portal-base`/`portal-e2e` im
+# Org-Namespace privat sind, bricht der Pull mit `unauthorized` ab (Exit 125)
+# und die betroffenen Jobs laufen nie. Der Org-Owner muss beide Pakete auf
+# `public` setzen; siehe AGENTS.todo.md.
 permissions:
   contents: read
 
@@ -20,6 +31,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  security-contract:
+    name: CI security contract
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Verify workflow and artifact security invariants
+        run: bash tests/infrastructure/ci-security-contract.sh
+      # CR-INF-001/CR-INF-014: the 413-line rclone sync regression was never
+      # executed by anything. It is self-contained (mktemp) and fails closed on
+      # private-storage exclusions, root SQLite exclusion and partial-sync
+      # propagation, so it belongs next to the other infrastructure contracts.
+      - name: Verify rclone sync exclusions and failure propagation
+        run: bash tests/infrastructure/rclone-sync-regression.sh
+      # P1-I5: the pinned base image must not run as root. This inspects the
+      # published artifact anonymously - a source-only 'USER www-data' check is
+      # not evidence, because the digest production pinned until d7f3596 was
+      # built before that line existed and ran as uid 0. A private package
+      # answers 401/403 and FAILS this step on purpose; it never degrades to a
+      # skip. See tests/infrastructure/verify-image-nonroot.sh.
+      - name: Verify the pinned base image is not a root image
+        run: bash tests/infrastructure/verify-image-nonroot.sh
+      # INFRA-6: the plugin harness must fail closed (non-zero) when neither
+      # python3 nor lua is available instead of reporting success after zero
+      # checks.
+      - name: Verify the Lightroom plugin harness fails closed
+        run: bash tests/infrastructure/plugin-harness-fail-closed.sh
+      # INFRA-10: the consumer pins must stay within the documented maximum age
+      # of the digest the mutable tag currently points at, otherwise security
+      # fixes published to GHCR never reach CI/production.
+      - name: Verify the pinned images are fresh
+        run: bash tests/infrastructure/verify-image-freshness.sh
+      # The freshness policy itself is regression-tested against a fixture
+      # registry (stale pin must fail, fresh pin must pass).
+      - name: Verify the image pin freshness gate
+        run: bash tests/infrastructure/image-pin-freshness-regression.sh
+
   backend:
     name: Backend (PHPUnit)
     runs-on: ubuntu-latest
@@ -28,7 +77,7 @@ jobs:
         working-directory: backend
     services:
       meilisearch:
-        image: getmeili/meilisearch:v1.48.3
+        image: getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29
         ports:
           - 7701:7700
         env:
@@ -37,15 +86,25 @@ jobs:
       mailpit:
         # phpunit.xml sendet via SMTP auf 127.0.0.1:1025; MailpitAssertions.php
         # liest Mails ueber die HTTP-API auf 127.0.0.1:8025 (hardcodiert).
-        image: axllent/mailpit
+        image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
         ports:
           - 1025:1025
           - 8025:8025
     steps:
-      - uses: actions/checkout@v7
-      # PHP-Tests laufen im Prod-Image ghcr.io/reisi007/portal-base:8.5 (PHP 8.5 +
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Wait for Meilisearch
+        # PHPUnit includes live Scout coverage. A started service container is
+        # not necessarily ready to accept the first index request.
+        working-directory: ${{ github.workspace }}
+        env:
+          MEILISEARCH_HEALTH_URL: http://127.0.0.1:7701/health
+          MEILISEARCH_READY_TIMEOUT_SECONDS: "60"
+          MEILISEARCH_REQUEST_TIMEOUT_SECONDS: "2"
+          MEILISEARCH_READY_POLL_SECONDS: "1"
+        run: bash scripts/wait-for-meilisearch.sh
+      # PHP-Tests laufen im digest-gepinnten Prod-Image portal-base (PHP 8.5 +
       # exiftool + alle App-Extensions) - identisch zur Prod-Runtime. Composer
-      # kommt wie in Prod ueber das offizielle composer:latest-Image. Die
+      # kommt wie in Prod aus einem digest-gepinnten offiziellen Image. Die
       # CI-Env (Meili/Mail/JWT/Admin) steht in backend/.env.ci und wird als
       # `.env` eingespielt. Die Tests laufen via phpunit.xml auf SQLite
       # `:memory:` (kein DB-Service noetig). `--network host` -> Dienste bleiben
@@ -56,19 +115,19 @@ jobs:
             --network host \
             -v "${{ github.workspace }}:/app" \
             -w /app/backend \
-            ghcr.io/reisi007/portal-base:8.5 \
+            ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736 \
             sleep infinity
           until docker exec php php -v > /dev/null 2>&1; do sleep 1; done
       - name: Prepare environment
         run: cp .env.ci .env
       - name: Install dependencies
-        # Prod-Nutzung: `composer install --ignore-platform-reqs` (composer:latest)
+        # Prod-Nutzung: `composer install --ignore-platform-reqs` (digest-gepinnt)
         run: |
           docker run --rm \
             --network host \
             -v "${{ github.workspace }}:/app" \
             -w /app/backend \
-            composer install --ignore-platform-reqs --no-interaction --optimize-autoloader
+            composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
         run: docker exec php php artisan key:generate
       - name: Run PHPUnit
@@ -134,61 +193,64 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
-      - name: Fingerprint Stripe publishable key (debug)
-        env:
-          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
-          STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
-        run: |
-          echo "vite_pk_md5: $(printf '%s' "${VITE_STRIPE_PUBLIC_KEY}" | md5sum | cut -d' ' -f1)"
-          echo "vite_pk_len: ${#VITE_STRIPE_PUBLIC_KEY}"
-          echo "vite_pk_prefix: ${VITE_STRIPE_PUBLIC_KEY:0:12}"
-          echo "vite_pk_last4: ${VITE_STRIPE_PUBLIC_KEY: -4}"
-          echo "stripe_key_md5: $(printf '%s' "${STRIPE_KEY}" | md5sum | cut -d' ' -f1)"
-          echo "stripe_key_len: ${#STRIPE_KEY}"
-          echo "stripe_key_prefix: ${STRIPE_KEY:0:12}"
-          echo "stripe_key_placeholder: $(echo "$STRIPE_KEY" | grep -c 'ci_placeholder' || true)"
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
         with:
           package_json_file: frontend/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 26
+          node-version: 26.7.0
+          check-latest: false
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Verify Node runtime
+        run: test "$(node --version)" = "v26.7.0"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Lint
         run: pnpm lint
+      - name: Lint E2E
+        run: pnpm lint:e2e
+      - name: Type-check E2E-inclusive test sources
+        run: pnpm exec tsc -p tsconfig.tests.json --noEmit --pretty false
       # prebuild (tsc -b + check-i18n) läuft automatisch vor `pnpm build`
       - name: Build
         run: pnpm build
+        env:
+          # Public build configuration only; never expose TURNSTILE_SECRET here.
+          # Set the repository variable to enable the production build gate.
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          TURNSTILE_BUILD_REQUIRED: ${{ vars.TURNSTILE_BUILD_REQUIRED || 'false' }}
       - name: Unit tests
         run: pnpm test:run
 
   e2e:
-    # 3 Projekt-Shards je (Desktop / Mobile, je --workers=2) + 1 dedizierter,
-    # strikt serieller Shard (--workers=1). Seriell laufen:
-    #  * Kanban-Tests: teilen sich das Board; unter voller Parallelitaet
-    #    kollidieren Drag&Drop/Status-Select (Layout-Shift) und
-    #    waitForResponse-Timeout (Slow-Response bei Backend-Last).
+    # 3 Projekt-Shards je (Desktop / Mobile; 1/3 und 3/3 mit --workers=2,
+    # der client/checkout-lastige 2/3 mit --workers=1) + 1 dedizierter,
+    # strikt serieller Matrix-Eintrag (--workers=1). Seriell laufen:
+    #  * Board-Suites: teilen sich bekannte Board-/Settings-Zustände; unter
+    #    voller Parallelität kollidieren Drag&Drop/Status-Select und
+    #    Settings-Roundtrips. project-clear-fields und brand-settings verwenden
+    #    ebenfalls serialen Testmodus.
     #  * billing-details.spec.ts: schreibt globale (brand-weite) Bankdaten-Settings
     #    in /api/management/settings/billing-details. Desktop- UND Mobile-Shard
-    #    fuhren dieselben Tests parallel gegen dieselbe DB -> gegenzeitige
-    #    Ueberschreibung (nach Reload steht ein anderer Inhaber/IBAN da; die
+    #    führen dieselben Tests parallel gegen dieselbe DB -> gegenzeitige
+    #    Überschreibung (nach Reload steht ein anderer Inhaber/IBAN da; die
     #    IBAN-Validierung sieht fremde Daten). Im Serial-Shard (workers=1) gibt es
     #    keinen parallelen Schreiber.
     # --project grenzt die Shards an Projektgrenzen ab (--shard splittet Dateien
-    # global ueber BEIDE Projekte und ist dafuer ungeeignet). Serielle Dateien
-    # werden grundsaetzlich einzeln im Serial-Shard isoliert.
+    # global über BEIDE Projekte und ist dafür ungeeignet). Die fünf unten
+    # ausgewählten Specs werden im Serial-Shard isoliert.
     name: E2E (Playwright) — ${{ matrix.name }}
     # Job-level `if` darf KEINEN secrets-Context lesen (offizielle Context
-    # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Secrets
-    # existieren nur bei push (inkl. dependabot-Branches) und bei PRs aus dem
-    # eigenen Repo (fork == false). Fork-PRs werden übersprungen - dort sind
-    # Secrets ohnehin nie verfügbar. Das tatsächliche Fehlen der Secrets wird
-    # im ersten Step geprüft (dort ist der secrets-Context erlaubt).
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
+    # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Push runs
+    # (including Dependabot branches) are authoritative. Dependabot's
+    # pull_request event is intentionally skipped because its secret-dependent
+    # E2E environment is unavailable; its push run remains the sole E2E gate.
+    # Fork PRs are also skipped, while normal same-repository PRs stay enabled.
+    # The actual missing-secret check remains in the first step below.
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false)
     runs-on: ubuntu-latest
     # Gesamter E2E-Job laeuft im Test-Image portal-e2e (portal-base + Node/
     # pnpm/Composer + Playwright-Chromium vorinstalliert) -> kein Browser-
@@ -197,24 +259,41 @@ jobs:
     # meili/mailpit) sind per Service-Name erreichbar. Details: features/
     # infrastructure/28-ci-test-image.md.
     container:
-      image: ghcr.io/reisi007/portal-e2e:latest
+      image: ghcr.io/reisinger-pictures/portal-e2e@sha256:c09b2f8e2cb93be6d84f9917c33072cc171b941ce8c0933c9390570b48295aaf
+      # INFRA-2: the runner mounts the host workspace at $GITHUB_WORKSPACE and
+      # runs steps inside this container. Dockerfile.e2e ends in
+      # `USER www-data` (uid 1000), so without this override actions/checkout,
+      # pnpm install, composer install and `artisan key:generate` would write as
+      # uid 1000 into a workspace owned by the host runner user -> EACCES and a
+      # red job. CI is ephemeral, so running the job as root here is safe and
+      # intentional. The non-root runtime guarantee belongs to the *production*
+      # artifacts: deployment/Dockerfile's `USER www-data` plus the compose
+      # `user: "1000:1000"` (asserted by InfrastructureSupplyChainPolicyTest and
+      # tests/infrastructure/verify-image-nonroot.sh). Never drop this option
+      # without also making the mounted workspace writable by uid 1000.
+      options: --user root
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Desktop/Mobile je in 3 Sub-Shards geteilt (--shard=x/3), damit der
-          # Critical Path (~12 min Testausfuehrung je Projekt-Shard, gemessen
-          # 2026-08-19) auf ~4 min gedrittelt wird. Playwright shardet nach
-          # Datei-REIHENFOLGE, nicht Laufzeit -> nach dem ersten Lauf die
-          # Shard-Dauern vergleichen und bei Schieflage per Untergruppen
-          # (grep) nachbalancieren.
-          - {name: 'Desktop (1/3)', slug: 'desktop-1', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=1/3'}
-          - {name: 'Desktop (2/3)', slug: 'desktop-2', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=2/3'}
-          - {name: 'Desktop (3/3)', slug: 'desktop-3', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=3/3'}
-          - {name: 'Mobile (1/3)', slug: 'mobile-1', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=1/3'}
-          - {name: 'Mobile (2/3)', slug: 'mobile-2', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=2/3'}
-          - {name: 'Mobile (3/3)', slug: 'mobile-3', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|billing-details" --workers=2 --shard=3/3'}
-          - {name: 'serial (kanban, billing)', slug: 'kanban', args: '--grep "projects-board|production-board|billing-details" --workers=1'}
+          # Desktop/Mobile je in 3 Sub-Shards geteilt (`--shard=x/3`) plus
+          # ein dedizierter serieller Matrix-Eintrag für die isolierten
+          # Board-/Settings-Suites. Die gewählten Worker-Zahlen und der
+          # 2/3-Eintrag sind eine
+          # Abbauentscheidung für die aktuelle Suite; historische Timing-Werte
+          # sind keine Garantie. Die 120s/Test- und 1500s/Global-Budgets
+          # bleiben getrennte, begrenzte Limits, damit echte Hänger weiterhin
+          # fehlschlagen.
+          # Playwright shardet nach Datei-Reihenfolge, nicht Laufzeit -> nach
+          # einem Lauf die Entry-Dauern messen und nur bei aktuellem Bedarf
+          # anhand stabiler Gruppen nachbalancieren.
+          - {name: 'Desktop (1/3)', slug: 'desktop-1', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|project-clear-fields|brand-settings|billing-details" --workers=2 --shard=1/3'}
+          - {name: 'Desktop (2/3)', slug: 'desktop-2', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|project-clear-fields|brand-settings|billing-details" --workers=1 --shard=2/3'}
+          - {name: 'Desktop (3/3)', slug: 'desktop-3', args: '--project="Desktop Chrome" --grep-invert "projects-board|production-board|project-clear-fields|brand-settings|billing-details" --workers=2 --shard=3/3'}
+          - {name: 'Mobile (1/3)', slug: 'mobile-1', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|project-clear-fields|brand-settings|billing-details" --workers=2 --shard=1/3'}
+          - {name: 'Mobile (2/3)', slug: 'mobile-2', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|project-clear-fields|brand-settings|billing-details" --workers=1 --shard=2/3'}
+          - {name: 'Mobile (3/3)', slug: 'mobile-3', args: '--project="Mobile Chrome" --grep-invert "projects-board|production-board|project-clear-fields|brand-settings|billing-details" --workers=2 --shard=3/3'}
+          - {name: 'serial (isolated suites)', slug: 'kanban', args: '--grep "projects-board|production-board|project-clear-fields|brand-settings|billing-details" --workers=1'}
     env:
       # Zuordnung spiegelt backend/.env (lokales, funktionierendes E2E-Setup):
       # STRIPE_KEY = pk_test (publishable), STRIPE_SECRET = sk_test (secret key).
@@ -225,13 +304,24 @@ jobs:
       JWT_SECRET: 2d093d84542d70f133a1689afb5866bed31edd1b520ce8c02ea9d25559fb0834
       ADMIN_EMAIL: admin@example.com
       ADMIN_PASSWORD: admin
+      # Offizielle Cloudflare-Dummy-Keys (immer erfolgreich) fuer den
+      # Risk-Triggered-Turnstile-E2E-Test. Die User-Schwelle bleibt bei 3;
+      # IP-Schwelle hoch, weil alle E2E-Worker dieselbe Runner-IP nutzen.
+      TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET: 1x0000000000000000000000000000000AA
+      TURNSTILE_ALLOWED_HOSTNAMES: localhost,example.com
+      TURNSTILE_USER_THRESHOLD_PER_HOUR: 3
+      TURNSTILE_IP_THRESHOLD_PER_HOUR: 1000
+      # Isolated E2E buyers are created immediately before checkout; disable
+      # the production new-account delay so the risk threshold is what triggers.
+      STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS: 0
       # Mailpit-API fuer die E2E-Helper (MailpitHelper.ts liest MAILPIT_API_URL;
       # Default waere localhost:8025). Container-Modus: Dienste sind nur per
       # Service-Name erreichbar, nicht via 127.0.0.1.
       MAILPIT_API_URL: http://mailpit:8025/api/v1
     services:
       mariadb:
-        image: mariadb:11.4
+        image: mariadb:11.4@sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b
         ports:
           - 3307:3306
         env:
@@ -245,19 +335,29 @@ jobs:
           --health-timeout=5s
           --health-retries=10
       meilisearch:
-        image: getmeili/meilisearch:v1.48.3
+        image: getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29
         ports:
           - 7701:7700
         env:
           MEILI_MASTER_KEY: test_meili_secret
           MEILI_ENV: development
       mailpit:
-        image: axllent/mailpit
+        image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
         ports:
           - 8025:8025
           - 1025:1025
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Wait for Meilisearch
+        # GitHub service containers are started before the job, but their
+        # readiness is not guaranteed. Keep Scout setup behind the same bounded
+        # health contract as the local Compose harness.
+        env:
+          MEILISEARCH_HEALTH_URL: http://meilisearch:7700/health
+          MEILISEARCH_READY_TIMEOUT_SECONDS: "60"
+          MEILISEARCH_REQUEST_TIMEOUT_SECONDS: "2"
+          MEILISEARCH_READY_POLL_SECONDS: "1"
+        run: bash scripts/wait-for-meilisearch.sh
       - name: Ensure Stripe test keys are configured
         env:
           STRIPE_SECRET_SET: ${{ secrets.STRIPE_SECRET != '' }}
@@ -269,9 +369,9 @@ jobs:
       - name: Validate Stripe API key (read + write)
         env:
           STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
-          # Eindeutiger Idempotency-Key pro Shard: alle 5 E2E-Shards desselben
-          # Runs teilen sich GITHUB_RUN_ID -> parallele Requests mit identischem
-          # Key -> Stripe 409 (idempotency_key_in_use). Fix: 2026-08-19.
+          # Eindeutiger Idempotency-Key pro Matrix-Eintrag: alle sieben
+          # E2E-Einträge desselben Runs teilen sich GITHUB_RUN_ID -> parallele
+          # Requests mit identischem Key -> Stripe 409 (idempotency_key_in_use).
           IDEMPOTENCY_KEY: pi_ci_validate_${GITHUB_RUN_ID}_${{ matrix.slug }}
         run: |
           HTTP_CODE=$(curl -sS -o /tmp/stripe-balance.json -w '%{http_code}' \
@@ -294,8 +394,9 @@ jobs:
             exit 1
           fi
           echo "Stripe write (payment_intents create) OK"
-      # Der komplette Job laeuft im Test-Image ghcr.io/reisi007/portal-e2e:latest
-      # (portal-base + Node/pnpm/Composer + Playwright-Chromium vorinstalliert) ->
+      # Der komplette Job laeuft im digest-gepinnten Test-Image
+      # ghcr.io/reisinger-pictures/portal-e2e (portal-base + Node/pnpm/Composer +
+      # Playwright-Chromium vorinstalliert) ->
       # kein Browser-Download, kein apt-Deps-Setup pro Run. App-Code wird vom
       # Runner gemountet; Dependencies werden pro Commit frisch installiert
       # (Invariante: nie node_modules/vendor einbacken).
@@ -318,7 +419,7 @@ jobs:
           grep -q '^MAIL_HOST=mailpit$' .env
       - name: Install backend dependencies
         working-directory: backend
-        # Composer ist im Image (COPY --from=composer:2); kein separater
+        # Composer ist im Image (digest-gepinntes COPY --from); kein separater
         # composer:-Container mehr noetig.
         run: composer install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
@@ -330,11 +431,24 @@ jobs:
       - name: Seed database
         working-directory: backend
         # Full Seed: erzeugt den von den E2E-Specs erwarteten
-        # admin@example.com mit allen Rollen + Katalog. DatabaseSeeder ruft
-        # am Ende app:import-locations auf (Geonames-Download via HTTP).
+        # admin@example.com mit allen Rollen + Katalog. Der Basiseeder bleibt
+        # netzwerkfrei; deterministische Location-Fixtures folgen explizit.
         run: php artisan db:seed --force
+      - name: Seed E2E location fixtures
+        working-directory: backend
+        # Bewusst ein eigener, expliziter E2E-Schritt: keine GeoNames-Downloads
+        # im Basiseeder und kein Import im Produktions-Start. Der Index wird vor
+        # dem Location-Import geleert und anschließend mit den Projekt-Settings
+        # neu aufgebaut, damit die frische E2E-Datenbank reproduzierbar ist.
+        run: |
+          php artisan db:seed --class=E2ELocationSeeder --force
+          php artisan scout:flush 'App\Models\Location'
+          php artisan scout:sync-index-settings
+          php artisan scout:import 'App\Models\Location'
       - name: Start backend server
         working-directory: backend
+        env:
+          CI: "1"
         # WICHTIG: `--no-reload` NICHT entfernen! Laravels ServeCommand filtert
         # sonst alle Env-Vars heraus, die nicht in `$passthroughVariables`
         # stehen (APP_ENV, PATH, XDEBUG, ...). STRIPE_SECRET kommt aus den
@@ -343,14 +457,18 @@ jobs:
         run: |
           php artisan serve --host=127.0.0.1 --port=8000 --no-reload > /tmp/php-serve.log 2>&1 &
           timeout 60s bash -c 'until curl -sf http://127.0.0.1:8000/api/ping > /dev/null; do sleep 1; done'
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
         with:
           package_json_file: frontend/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 26
+          node-version: 26.7.0
+          check-latest: false
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Verify Node runtime
+        working-directory: frontend
+        run: test "$(node --version)" = "v26.7.0"
       - name: Install frontend dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile
@@ -372,13 +490,17 @@ jobs:
           # Publik-Key = VITE_STRIPE_PUBLIC_KEY, sonst Fallback auf STRIPE_KEY
           # (pk_test - Zuordnung entspricht backend/.env, siehe oben)
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY || secrets.STRIPE_KEY }}
+          # Matched with the official always-pass backend dummy key above.
+          VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       - name: Run E2E tests
         working-directory: frontend
-        # `list`-Reporter fuer stdout-Zusammenfassung, `html` bleibt fuer den
-        # Artifact-Upload. pipefail -> rote Tests scheitern den Step.
+        # SECURITY: use only the list reporter. Playwright HTML reports,
+        # test-results, traces, screenshots, and videos may contain cookies or
+        # test data and are never uploaded by this workflow. The step summary
+        # below is the intentionally sanitized CI output.
         run: |
           set -o pipefail
-          pnpm test:e2e ${{ matrix.args }} --reporter=list,html 2>&1 | tee /tmp/e2e.log
+          pnpm test:e2e ${{ matrix.args }} --reporter=list 2>&1 | tee /tmp/e2e.log
         env:
           CI: "1"
           ADMIN_EMAIL: admin@example.com
@@ -430,18 +552,35 @@ jobs:
               echo "</details>"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload Playwright report
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-${{ matrix.slug }}
-          path: frontend/playwright-report
-          retention-days: 7
-      - name: Upload Playwright test results
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-test-results-${{ matrix.slug }}
-          path: frontend/test-results
-          retention-days: 7
+      # SECURITY: No Playwright artifacts are uploaded. Reports and test-results
+      # can contain browser storage, cookies, screenshots, or request data.
+
+  ci-gate:
+    # The event suffix is part of the check-run identity. Dependabot creates
+    # both a push run and a pull_request run for the same head SHA; distinct
+    # names keep the PR aggregate usable without making the push aggregate
+    # wait on (or be poisoned by) the PR-side jobs.
+    name: CI gate (${{ github.event_name }})
+    # Keep the fail-closed always() gate for push and normal PRs. The
+    # Dependabot pull_request aggregate is intentionally skipped together with
+    # its secret-dependent E2E job; the push aggregate is authoritative.
+    if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]')) }}
+    needs:
+      - security-contract
+      - backend
+      - frontend
+      - e2e
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI dependency to succeed
+        env:
+          SECURITY_CONTRACT_RESULT: ${{ needs.security-contract.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          set -euo pipefail
+          [[ "$SECURITY_CONTRACT_RESULT" == "success" ]]
+          [[ "$BACKEND_RESULT" == "success" ]]
+          [[ "$FRONTEND_RESULT" == "success" ]]
+          [[ "$E2E_RESULT" == "success" ]]

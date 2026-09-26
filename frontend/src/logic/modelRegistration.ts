@@ -82,6 +82,13 @@ export type PhotoVisibility = 'public' | 'internal';
 
 export const MAX_PHOTOS_PER_PERSON = 5;
 
+/**
+ * Client-side sanity cap for the public registration form. The feature/API
+ * contract remains 1..n persons; this only prevents an unbounded field array
+ * from degrading the browser and does not define a server-side limit.
+ */
+export const MAX_PERSONS_PER_REGISTRATION = 10;
+
 export interface PersonPhotoUpload {
     /** Stable client-side key for drag & drop reordering. */
     id: string;
@@ -137,6 +144,7 @@ export interface ModelProfileAccess {
     lifecycle_status: string;
     categories: RegistrationCategory[];
     sections: Record<string, RegistrationSection>;
+    acts: ModelProfileAccessAct[];
     photos: ModelProfileAccessPhoto[];
     expires_at: string | null;
 }
@@ -146,6 +154,37 @@ export interface ModelProfileAccessPhoto {
     visibility: PhotoVisibility;
     is_primary: boolean;
     mime_type: string | null;
+}
+
+/** A member of an owner's act, as exposed by the magic-link payload. */
+export interface ModelProfileAccessMember {
+    customer_id: string;
+    name: string | null;
+    is_manager: boolean;
+}
+
+/**
+ * An act the token owner belongs to. `is_manager` tells the owner whether the
+ * management hand-over UI applies; `members` powers the target selection.
+ */
+export interface ModelProfileAccessAct {
+    id: string;
+    act_type: string;
+    person_count: number;
+    is_manager: boolean;
+    manager_customer_id: string | null;
+    manager_name: string | null;
+    members: ModelProfileAccessMember[];
+}
+
+export interface ModelProfileTransferResult {
+    success: true;
+    act: ModelProfileAccessAct;
+}
+
+/** Members eligible as a new manager: everyone except the current manager. */
+export function managerTransferCandidates(act: ModelProfileAccessAct): ModelProfileAccessMember[] {
+    return act.members.filter(member => member.customer_id !== act.manager_customer_id);
 }
 
 export interface ModelProfileUpdateResult {
@@ -777,7 +816,8 @@ export function createRegistrationSchema(catalog: ModelRegistrationCheck) {
                             .max(MAX_PHOTOS_PER_PERSON, t`Maximal 5 Fotos pro Person.`),
                     }),
                 )
-                .min(1, t`Mindestens eine Person muss erfasst werden.`),
+                .min(1, t`Mindestens eine Person muss erfasst werden.`)
+                .max(MAX_PERSONS_PER_REGISTRATION, t`Maximal 10 Personen pro Registrierung.`),
             act_answers: z.record(z.string(), z.unknown()),
             manager_index: z.number().int().min(0),
         })
@@ -1067,6 +1107,23 @@ export function updateModelProfileAccess(
 
 export function confirmModelProfileAccess(token: string): Promise<ModelProfileConfirmResult> {
     return apiMutate<ModelProfileConfirmResult>(`${modelProfileUrl(token)}/confirm`, 'POST', {});
+}
+
+/**
+ * Hand management of one of the owner's acts to a member. Only the current
+ * manager may call this; the backend answers 403 (not manager) or 422 (target
+ * not a member / self).
+ */
+export function transferModelProfileManager(
+    token: string,
+    actId: string,
+    newManagerCustomerId: string,
+): Promise<ModelProfileTransferResult> {
+    return apiMutate<ModelProfileTransferResult>(
+        `${modelProfileUrl(token)}/transfer-manager`,
+        'POST',
+        { act_id: actId, new_manager_customer_id: newManagerCustomerId },
+    );
 }
 
 export function fetchMyModels(): Promise<MyModel[]> {

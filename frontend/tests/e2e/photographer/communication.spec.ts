@@ -66,11 +66,7 @@ test.describe('Communication Workflow (Flows E, F)', () => {
         await sidebar.navigateTo('Galerien');
 
         // Navigate to gallery and reload to clear SWR cache
-        const galLink = page.locator('main').locator('a').filter({ hasText: galleryName }).first();
-        await expect(galLink).toBeVisible();
-        await galLink.scrollIntoViewIfNeeded();
-        await galLink.evaluate(el => (el as HTMLElement).click());
-        await expect(page.getByRole('heading', { name: galleryName })).toBeVisible();
+        await galleryHelper.openGallery(galleryName);
         await page.reload();
 
         // Assert email button is now enabled

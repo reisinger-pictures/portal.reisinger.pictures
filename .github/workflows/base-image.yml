@@ -5,6 +5,8 @@ on:
     branches: [ "main" ]
     paths:
       - 'deployment/Dockerfile'
+      - 'deployment/backend-supervisor.sh'
+      - 'deployment/validate-production-env.sh'
       - '.github/workflows/base-image.yml'
   schedule:
     - cron: '0 1 * * *'
@@ -22,24 +24,30 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
 
       - name: Build and Push portal-base Image (amd64)
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: deployment
           push: true
           platforms: linux/amd64
+          # INFRA-10: attach signed build provenance and an SBOM so the
+          # published digest is auditable and not just a mutable tag. The
+          # consumer pin freshness is enforced separately by
+          # tests/infrastructure/verify-image-freshness.sh.
+          provenance: true
+          sbom: true
           build-args: |
             PHP_VERSION=8.5
             DB_EXT=mysql

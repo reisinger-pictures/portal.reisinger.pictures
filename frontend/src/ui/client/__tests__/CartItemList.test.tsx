@@ -243,6 +243,108 @@ describe('CartItemList', () => {
         expect(screen.getByText('Deine Lizenzen')).toBeInTheDocument();
     });
 
+    it('shows custom prices for two volume groups and keeps scope prices separate', () => {
+        const scopeItem: CartItem = {...mockItems[0], photoId: 'scope', galleryId: 'scope-gallery', price: 500};
+        const presetAItem: CartItem = {...mockItems[0], photoId: 'preset-a', galleryId: 'gallery-a', price: 0};
+        const presetBItem: CartItem = {...mockItems[1], photoId: 'preset-b', galleryId: 'gallery-b', price: 0};
+        const groups = [
+            {
+                key: 'scope_licensing|default', licensingMode: 'scope_licensing' as const,
+                presetId: 'default', presetName: null, items: [scopeItem], itemIds: ['scope'],
+                totalCents: 500, pricePerItemCents: null, tiers: [], tierIndex: 0, isMaxTier: false,
+                nextTierCount: 0, nextTierLabel: '', isVolumePricing: false, itemPriceCents: {},
+            },
+            {
+                key: 'volume_licensing|preset-a', licensingMode: 'volume_licensing' as const,
+                presetId: 'preset-a', presetName: 'Preset A', items: [presetAItem], itemIds: ['preset-a'],
+                totalCents: 4000, pricePerItemCents: 4000, tiers: [{minQuantity: 0, priceCents: 4000}],
+                tierIndex: 0, isMaxTier: true, nextTierCount: 0, nextTierLabel: '', isVolumePricing: true,
+                itemPriceCents: {'preset-a': 4000},
+            },
+            {
+                key: 'volume_licensing|preset-b', licensingMode: 'volume_licensing' as const,
+                presetId: 'preset-b', presetName: 'Preset B', items: [presetBItem], itemIds: ['preset-b'],
+                totalCents: 7000, pricePerItemCents: 7000, tiers: [{minQuantity: 0, priceCents: 7000}],
+                tierIndex: 0, isMaxTier: true, nextTierCount: 0, nextTierLabel: '', isVolumePricing: true,
+                itemPriceCents: {'preset-b': 7000},
+            },
+        ];
+        renderList({
+            items: [scopeItem, presetAItem, presetBItem],
+            totalAmount: 11500,
+            volumeLicensing: {
+                tierIndex: 0, isMaxTier: true, pricePerItemCents: 4000, totalCents: 11000,
+                nextTierCount: 0, nextTierLabel: '', tiers: [], isVolumePricing: true, groups,
+                groupedTotalCents: 11500, volumeSubtotalCents: 11000,
+                volumeItemPrices: {'preset-a': 4000, 'preset-b': 7000},
+            },
+        });
+
+        expect(screen.getByTestId('volume-pricing-group-preset-a')).toHaveTextContent('Preset A');
+        expect(screen.getByTestId('volume-pricing-group-preset-b')).toHaveTextContent('Preset B');
+        expect(screen.getAllByText(formatMoney(4000)).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(formatMoney(7000)).length).toBeGreaterThan(0);
+        expect(screen.getByText(formatMoney(500))).toBeInTheDocument();
+    });
+
+    it('keeps explicit scope groups on their server item prices even if legacy flags are inconsistent', () => {
+        const scopeGroups = [{
+            key: 'scope_licensing|default',
+            licensingMode: 'scope_licensing' as const,
+            presetId: 'default',
+            presetName: null,
+            items: mockItems,
+            itemIds: mockItems.map(item => item.photoId),
+            totalCents: 4000,
+            pricePerItemCents: null,
+            tiers: [],
+            tierIndex: 0,
+            isMaxTier: false,
+            nextTierCount: 0,
+            nextTierLabel: '',
+            isVolumePricing: false,
+            itemPriceCents: {},
+        }];
+
+        renderList({
+            items: mockItems,
+            totalAmount: 4000,
+            volumeLicensing: {
+                tierIndex: 0,
+                isMaxTier: false,
+                pricePerItemCents: 9999,
+                totalCents: 0,
+                nextTierCount: 0,
+                nextTierLabel: '',
+                tiers: [],
+                isVolumePricing: true,
+                groups: scopeGroups,
+                groupedTotalCents: 4000,
+            },
+        });
+
+        expect(screen.queryByTestId('volume-pricing-groups')).not.toBeInTheDocument();
+        expect(screen.getByText(formatMoney(mockItems[0].price))).toBeInTheDocument();
+        expect(screen.getByText(formatMoney(mockItems[1].price))).toBeInTheDocument();
+        expect(screen.queryByText(formatMoney(9999))).not.toBeInTheDocument();
+    });
+
+    it('shows the server-consistent discount and net total', () => {
+        renderList({
+            items: mockItems,
+            totalAmount: 6000,
+            discountAmount: 1500,
+            netTotalAmount: 4500,
+        });
+
+        expect(screen.getByTestId('cart-subtotal')).toHaveTextContent('Zwischensumme: 60.00 €');
+        expect(screen.getByTestId('cart-discount')).toHaveTextContent('Rabatt: −15.00 €');
+        expect(screen.getByTestId('cart-discount-note')).toHaveTextContent(
+            'Der Rabatt wird auf den serverberechneten Warenkorb angewendet.',
+        );
+        expect(screen.getByTestId('cart-total')).toHaveTextContent('45.00 €');
+    });
+
     it('shows mock data tax notice', () => {
         renderList();
 

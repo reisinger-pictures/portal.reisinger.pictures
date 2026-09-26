@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,19 +9,18 @@ import AutocompleteInput from '../../components/AutocompleteInput';
 import { Customer } from '../../../api';
 import { Project, ProjectInput } from '../../../logic/useProjectsBoard';
 import { useUsers } from '../../../logic/useUsers';
-
-const priceMessage = t`Bitte einen gültigen Betrag eingeben`;
+import { useFocusTrap } from '../../../logic/useFocusTrap';
 
 export interface BoardStatusOption { value: string; label: string; }
 
-const projectSchema = z.object({
+const createProjectSchema = () => z.object({
     client_name: z.string().min(1, t`Kundenname ist erforderlich`),
     email: z.string().email(t`Bitte eine gültige E-Mail angeben`).optional().or(z.literal('')),
     phone: z.string().optional(),
     package: z.string().optional(),
     price_eur: z.string().optional().refine(
         (val) => val === undefined || val === '' || (!Number.isNaN(Number(val)) && Number(val) >= 0),
-        { message: priceMessage }
+        { message: t`Bitte einen gültigen Betrag eingeben` }
     ),
     payment_status: z.string().optional(),
     status: z.string().optional(),
@@ -29,7 +28,13 @@ const projectSchema = z.object({
     notes: z.string().optional(),
 });
 
-type ProjectFormValues = z.infer<typeof projectSchema>;
+type ProjectFormValues = z.infer<ReturnType<typeof createProjectSchema>>;
+
+const createPaymentOptions = (): BoardStatusOption[] => [
+    { value: 'open', label: t`Offen` },
+    { value: 'partly_paid', label: t`Teilbezahlt` },
+    { value: 'paid', label: t`Bezahlt` },
+];
 
 interface Props {
     isOpen: boolean;
@@ -41,14 +46,10 @@ interface Props {
     initial?: { client_name?: string; email?: string };
 }
 
-const paymentOptions = [
-    { value: 'open', label: t`Offen` },
-    { value: 'partly_paid', label: t`Teilbezahlt` },
-    { value: 'paid', label: t`Bezahlt` },
-];
-
 export default function ProjectModal({ isOpen, onClose, editing, onSave, initial, defaultStatus, statusOptions }: Props) {
     "use no memo";
+    const projectSchema = createProjectSchema();
+    const paymentOptions = createPaymentOptions();
     const { register, control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<ProjectFormValues>({
         resolver: zodResolver(projectSchema),
         defaultValues: {
@@ -82,6 +83,9 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
         }
     }, [isOpen, editing, initial, defaultStatus, reset]);
 
+    const titleId = useId();
+    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
+
     if (!isOpen) return null;
 
     const onSubmit = async (data: ProjectFormValues) => {
@@ -91,13 +95,11 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
             email: data.email || '',
             phone: data.phone || null,
             package: data.package || null,
-            price_cents: priceEur != null ? Math.round(priceEur * 100) : undefined,
+            price_cents: priceEur != null ? Math.round(priceEur * 100) : null,
             payment_status: data.payment_status || 'open',
+            assignee_id: data.assignee_id || null,
             notes: data.notes || null,
         };
-        if (data.assignee_id) {
-            input.assignee_id = data.assignee_id;
-        }
         const payload: ProjectInput & { status?: string } = { ...input, status: data.status || undefined };
         try {
             await onSave(payload);
@@ -108,10 +110,16 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
     };
 
     return (
-        <div className="modal modal-open">
+        <div
+            className="modal modal-open"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+        >
             <div className="modal-box max-w-2xl">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-6">
+                <h3 id={titleId} className="font-bold text-xl mb-6">
                     {editing ? <Trans>Projekt bearbeiten</Trans> : <Trans>Neues Projekt anlegen</Trans>}
                 </h3>
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>

@@ -33,13 +33,13 @@ const couponTypeLabel = (type: Coupon['type']): string => {
     }
 };
 
-const SCOPE_LABELS: Record<Coupon['scope_type'], string> = {
+const createScopeLabels = (): Record<Coupon['scope_type'], string> => ({
     global: t`Global`,
     gallery: t`Galerie`,
     meta_gallery: t`Meta-Galerie`,
     photographer: t`Fotograf`,
     organisation: t`Organisation`,
-};
+});
 
 const formatValue = (coupon: Coupon): string => {
     const numeric = Number(coupon.value);
@@ -89,6 +89,7 @@ export default function ManagementCouponsView() {
     );
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+    const scopeLabels = createScopeLabels();
 
     const openCreate = () => {
         setEditingCoupon(null);
@@ -247,7 +248,7 @@ export default function ManagementCouponsView() {
                                         </span>
                                     </td>
                                     <td className="font-mono">{formatValue(coupon)}</td>
-                                    <td>{SCOPE_LABELS[coupon.scope_type]}</td>
+                                    <td>{scopeLabels[coupon.scope_type]}</td>
                                     <td className="font-mono">{formatUsage(coupon)}</td>
                                     <td>{formatExpiry(coupon.expires_at)}</td>
                                     <td>

@@ -7,7 +7,7 @@ import {calculateUpgradePrice} from '../../../logic/pricingLogic';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 
-const licenseSettingsSchema = z.object({
+const createLicenseSettingsSchema = () => z.object({
     base_price: z.number().min(0, t`Muss positiv sein`),
     mult_commercial: z.number().min(0),
     mult_international: z.number().min(0),
@@ -26,12 +26,13 @@ const licenseSettingsSchema = z.object({
     term_web: z.string().optional()
 });
 
-type LicenseSettingsFormValues = z.infer<typeof licenseSettingsSchema>;
+type LicenseSettingsFormValues = z.infer<ReturnType<typeof createLicenseSettingsSchema>>;
 
 export default function LicenseSettingsCard() {
     "use no memo";
     const {terms, updateTerms, isLoading} = useLicenseTerms();
     const {showToast} = useUI();
+    const licenseSettingsSchema = createLicenseSettingsSchema();
 
     const {register, handleSubmit, reset, control, formState} = useForm<LicenseSettingsFormValues>({
         resolver: zodResolver(licenseSettingsSchema),

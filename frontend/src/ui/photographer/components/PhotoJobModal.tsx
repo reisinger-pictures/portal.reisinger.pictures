@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useUI } from '../../components/UIContext';
-import { PhotoJob, PhotoJobInput } from '../../../logic/useProductionBoard';
+import { BoardUser, PhotoJob, PhotoJobInput } from '../../../logic/useProductionBoard';
 import { useUsers } from '../../../logic/useUsers';
 import { useProtectedGalleries } from '../../../logic/useGalleries';
 import { useLightroomCatalogs } from '../../../logic/useLightroomCatalogs';
@@ -19,28 +19,47 @@ function collectGalleries(groups: { galleries?: Gallery[]; children?: GalleryGro
     }
     return acc;
 }
-const countMessage = t`Bitte eine gültige Anzahl eingeben`;
+
+type AssigneeOption = Pick<BoardUser, 'id' | 'name'>;
+
+function mergeAssigneeOptions(
+    users: readonly AssigneeOption[] | undefined,
+    currentAssignee: AssigneeOption | null,
+): AssigneeOption[] {
+    const availableUsers = users ?? [];
+    if (!currentAssignee || availableUsers.some(({ id }) => id === currentAssignee.id)) {
+        return [...availableUsers];
+    }
+
+    // Photographers cannot read the management user list. Keep an already
+    // authorized board assignee visible so editing and explicitly clearing it
+    // remain possible without widening that endpoint's permissions.
+    return [...availableUsers, currentAssignee];
+}
 
 export interface BoardStatusOption { value: string; label: string; }
 
-const photoJobSchema = z.object({
-    title: z.string().min(1, t`Titel ist erforderlich`),
-    lightroom_catalog: z.string().optional(),
-    total_count: z.string().optional().refine(
-        (val) => val === undefined || val === '' || (Number.isInteger(Number(val)) && Number(val) >= 0),
-        { message: countMessage }
-    ),
-    selected_count: z.string().optional().refine(
-        (val) => val === undefined || val === '' || (Number.isInteger(Number(val)) && Number(val) >= 0),
-        { message: countMessage }
-    ),
-    target_gallery_id: z.string().optional(),
-    status: z.string().optional(),
-    assignee_id: z.string().optional(),
-    notes: z.string().optional(),
-});
+const createPhotoJobSchema = () => {
+    const countMessage = t`Bitte eine gültige Anzahl eingeben`;
+    return z.object({
+        title: z.string().min(1, t`Titel ist erforderlich`),
+        lightroom_catalog: z.string().optional(),
+        total_count: z.string().optional().refine(
+            (val) => val === undefined || val === '' || (Number.isInteger(Number(val)) && Number(val) >= 0),
+            { message: countMessage }
+        ),
+        selected_count: z.string().optional().refine(
+            (val) => val === undefined || val === '' || (Number.isInteger(Number(val)) && Number(val) >= 0),
+            { message: countMessage }
+        ),
+        target_gallery_id: z.string().optional(),
+        status: z.string().optional(),
+        assignee_id: z.string().optional(),
+        notes: z.string().optional(),
+    });
+};
 
-type PhotoJobFormValues = z.infer<typeof photoJobSchema>;
+type PhotoJobFormValues = z.infer<ReturnType<typeof createPhotoJobSchema>>;
 
 interface Props {
     isOpen: boolean;
@@ -53,6 +72,7 @@ interface Props {
 
 export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaultStatus, statusOptions }: Props) {
     "use no memo";
+    const photoJobSchema = createPhotoJobSchema();
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PhotoJobFormValues>({
         resolver: zodResolver(photoJobSchema),
         defaultValues: {
@@ -68,6 +88,8 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
     });
     const { showToast } = useUI();
     const { users } = useUsers();
+    const currentAssignee = editing?.assignee ?? null;
+    const assigneeOptions = mergeAssigneeOptions(users, currentAssignee);
     const { tree } = useProtectedGalleries();
     const { lightroomCatalogs, error: catalogsError } = useLightroomCatalogs();
     const galleries = tree ? [...(tree.root_galleries ?? []), ...collectGalleries(tree.groups ?? [], [])] : undefined;
@@ -91,19 +113,17 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
     if (!isOpen) return null;
 
     const onSubmit = async (data: PhotoJobFormValues) => {
-        const total = data.total_count === undefined || data.total_count === '' ? undefined : Number(data.total_count);
-        const selected = data.selected_count === undefined || data.selected_count === '' ? undefined : Number(data.selected_count);
+        const total = data.total_count === undefined || data.total_count === '' ? 0 : Number(data.total_count);
+        const selected = data.selected_count === undefined || data.selected_count === '' ? 0 : Number(data.selected_count);
         const input: PhotoJobInput = {
             title: data.title,
             lightroom_catalog: data.lightroom_catalog || null,
             total_count: total,
             selected_count: selected,
             target_gallery_id: data.target_gallery_id || null,
+            assignee_id: data.assignee_id || null,
             notes: data.notes || null,
         };
-        if (data.assignee_id) {
-            input.assignee_id = data.assignee_id;
-        }
         const payload: PhotoJobInput & { status?: string } = { ...input, status: data.status || undefined };
         try {
             await onSave(payload);
@@ -155,7 +175,7 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
                             <label className="label"><span className="label-text font-bold"><Trans>Zuständig</Trans></span></label>
                             <select {...register('assignee_id')} className="select select-bordered w-full">
                                 <option value=""><Trans>Keine Zuweisung</Trans></option>
-                                {users?.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                {assigneeOptions.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                             </select>
                         </div>
                         <div className="form-control">

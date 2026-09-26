@@ -33,7 +33,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Extract build args from repository
         id: versions
@@ -46,17 +46,17 @@ jobs:
           echo "pnpm_version=${PNPM_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
 
       - name: Build and Push portal-e2e Image (amd64)
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: deployment
           file: deployment/Dockerfile.e2e
@@ -67,6 +67,9 @@ jobs:
             PNPM_VERSION=${{ steps.versions.outputs.pnpm_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # INFRA-10: signed provenance + SBOM for the published e2e digest.
+          provenance: true
+          sbom: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-e2e:latest
             ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-e2e:${{ steps.versions.outputs.playwright_version }}

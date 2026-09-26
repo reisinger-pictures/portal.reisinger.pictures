@@ -1,6 +1,18 @@
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../api';
 
+/**
+ * Scalar setting values of `/api/settings/license-terms`.
+ *
+ * The index signature only describes the *scalar* settings this response
+ * carries. `volume_pricing` is the one object-valued member and is therefore
+ * NOT covered by it: it holds `preset_id` (a number) plus a tier list. Any
+ * consumer of the volume preset must validate that member through
+ * `parseEffectiveLicenseTerms()` from `useVolumeLicensing` instead of trusting
+ * this type — the previous blind cast of this interface to a volume-pricing
+ * shape is what let a numeric `preset_id` reach a `.trim()` call and crash the
+ * photo page.
+ */
 export interface LicenseTerms {
     calc_base_price?: string;
     calc_hourly_rate?: string;

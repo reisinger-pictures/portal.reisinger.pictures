@@ -8,34 +8,52 @@ import { fetchSignContract, sendPageExit, submitSign, SignContractResponse } fro
 import { useContractHeartbeat } from '../logic/useContractHeartbeat';
 import { calcAge } from '../logic/utils';
 import { sanitizeHtml } from '../logic/sanitizeHtml';
+import {
+    calculateContractTotal,
+    calculateWireLineTotal,
+    formatBasisPointsAsPercent,
+    normalizeContractSnapshot,
+} from '../logic/contractPricing';
 
 function formatMoney(cents: number): string {
     return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
 
 type ContractItem = SignContractResponse['contract']['items'][number];
-type ContractDiscount = SignContractResponse['contract']['discounts'][number];
 
-/**
- * Mirrors the backend snapshot semantics (`ContractCloseService::close`):
- * discounts are applied in order to a running subtotal. A `discount_percent`
- * stores its rate as basis points (`percent × 100`, e.g. 10% => 1000) and is
- * subtracted as `round(subtotal × price / 10000)`.
- */
-function calcContractTotal(items: ContractItem[], discounts: ContractDiscount[]): number {
-    let subtotal = items.reduce((sum, item) => sum + (item.row_total ?? item.price * item.qty), 0);
-    for (const discount of discounts) {
-        if (discount.type === 'discount_fixed') {
-            subtotal -= discount.price;
-        } else if (discount.type === 'discount_percent') {
-            subtotal -= Math.round(subtotal * discount.price / 10000);
-        }
+function contractItemTotal(item: ContractItem): number {
+    return calculateWireLineTotal([item]);
+}
+
+function resolveContractTotal(contract: SignContractResponse['contract']): number {
+    if (typeof contract.total === 'number' && Number.isSafeInteger(contract.total) && contract.total >= 0) {
+        return contract.total;
     }
-    return Math.max(0, subtotal);
+
+    // Explicit compatibility boundary for responses predating contract.total.
+    // The shared normalizer also rejects unknown/malformed legacy lines.
+    const snapshot = normalizeContractSnapshot(contract.items, contract.discounts);
+    return calculateContractTotal(snapshot);
+}
+
+function ContractLoadingView() {
+    return <PageLayout>
+        <div className="flex h-full items-center justify-center"><span
+            className="loading loading-spinner loading-lg text-primary"></span></div>
+    </PageLayout>;
 }
 
 export default function ContractSignView() {
     const { token } = useParams<{ token: string }>();
+
+    if (!token) return <ContractLoadingView />;
+
+    // A personal token identifies a separate consent/signing scope. Remounting
+    // this boundary prevents any state or in-flight result from crossing tokens.
+    return <ContractSignTokenView key={token} token={token} />;
+}
+
+function ContractSignTokenView({ token }: { token: string }) {
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(true);
@@ -49,14 +67,20 @@ export default function ContractSignView() {
     const pageExitSent = useRef(false);
 
     useEffect(() => {
-        if (!token) return;
+        let active = true;
         fetchSignContract(token)
             .then(result => {
+                if (!active) return;
                 setData(result);
                 setContentVersion(result.contract.content_version);
                 setLoading(false);
             })
-            .catch(err => { setError(err.message); setLoading(false); });
+            .catch((err: unknown) => {
+                if (!active) return;
+                setError(err instanceof Error ? err.message : String(err));
+                setLoading(false);
+            });
+        return () => { active = false; };
     }, [token]);
 
     const handleStale = () => setIsStale(true);
@@ -91,10 +115,7 @@ export default function ContractSignView() {
         }
     };
 
-    if (loading) return <PageLayout>
-        <div className="flex h-full items-center justify-center"><span
-            className="loading loading-spinner loading-lg text-primary"></span></div>
-    </PageLayout>;
+    if (loading) return <ContractLoadingView />;
 
     if (error && !data) return (
         <PageLayout>
@@ -125,7 +146,7 @@ export default function ContractSignView() {
 
     const items = data?.contract.items ?? [];
     const discounts = data?.contract.discounts ?? [];
-    const grandTotal = calcContractTotal(items, discounts);
+    const grandTotal = data ? resolveContractTotal(data.contract) : 0;
 
     return (
         <PageLayout>
@@ -180,7 +201,7 @@ export default function ContractSignView() {
                                                 </td>
                                                 <td className="text-right">{item.qty}</td>
                                                 <td className="text-right">{formatMoney(item.price)}</td>
-                                                <td className="text-right">{formatMoney(item.row_total ?? (item.price * item.qty))}</td>
+                                                <td className="text-right">{formatMoney(contractItemTotal(item))}</td>
                                             </tr>
                                         ))}
                                         {discounts.length > 0 && (
@@ -190,7 +211,7 @@ export default function ContractSignView() {
                                             <tr key={`d-${i}`}>
                                                 <td colSpan={2}>{d.description}</td>
                                                 <td className="text-right text-error">
-                                                    {d.type === 'discount_percent' ? `${d.price / 100}%` : formatMoney(d.price)}
+                                                    {d.type === 'discount_percent' ? formatBasisPointsAsPercent(d.price) : formatMoney(d.price)}
                                                 </td>
                                                 <td className="text-right text-error">-</td>
                                             </tr>

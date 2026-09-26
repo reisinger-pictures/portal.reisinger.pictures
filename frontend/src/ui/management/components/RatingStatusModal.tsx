@@ -2,12 +2,17 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useEffect, useState } from 'react';
 import ErrorMessage from '../../components/ErrorMessage';
-import { RatingData } from '../../../api';
+import { fetcher, RatingData } from '../../../api';
 
 interface Props {
     galleryId: string;
     isOpen: boolean;
     onClose: () => void;
+}
+
+interface RatingStatusResponse {
+    users: RatingData[];
+    total_photos: number;
 }
 
 
@@ -28,16 +33,10 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
             setIsLoading(true);
             setError(false);
             try {
-                const headers = { 'Accept': 'application/json' };
-                const [resExport, resStatus] = await Promise.all([
-                    fetch('/api/management/galleries/' + galleryId + '/export', { headers, credentials: 'include' }),
-                    fetch('/api/management/galleries/' + galleryId + '/rating-status', { headers, credentials: 'include' })
+                const [dataExport, dataStatus] = await Promise.all([
+                    fetcher<RatingData[]>(`/api/management/galleries/${galleryId}/export`),
+                    fetcher<RatingStatusResponse>(`/api/management/galleries/${galleryId}/rating-status`)
                 ]);
-
-                if (!resExport.ok || !resStatus.ok) throw new Error('API Error');
-
-                const dataExport = await resExport.json();
-                const dataStatus = await resStatus.json();
 
                 if (isMounted) {
                     setRatingsData(dataExport);

@@ -1,8 +1,10 @@
 # Model-Profile Iteration (Single-Katalog v1, Form/UX, Lifecycle, Admin, Sicherheit)
 
-**Status:** SOLL — **implementiert** (Backend P1+P2, Frontend P3, 2026-09-19). Baut auf
-[`05-model-registration.md`](05-model-registration.md) auf. Diese Datei beschreibt
-den Zielzustand; Umsetzungs-Nachtrag + Contract-Erweiterung in §8.
+**Status:** Current SOLL — **implementiert** (Backend/Frontend, V033–V035;
+reviewed 2026-09-24). Baut auf
+[`05-model-registration.md`](05-model-registration.md) auf. Dieses Dokument ist
+der aktuelle Ziel- und Ist-Vertrag; §6 enthält den Decision-Log und §8 den
+inzwischen implementierten Contract-Nachtrag.
 
 **Grundlage:** `AGENTS.todo.md` → Block „Model-Profile Iteration (User-Feedback
 2026-09-19, erfasst — einzuplanen)". Die Nummerierung dieses Dokuments folgt der
@@ -18,11 +20,11 @@ kompakte Details umgestellt, und die Sicherheit der Bildspeicherung wird belegt.
 
 **Nicht Teil dieses Dokuments** (separate Blöcke in `AGENTS.todo.md`):
 
-- **Model-Zugang / Profil-Magic-Link / „Meine Profile"** — eigener Anforderungsblock
-  (2026-09-19). Dieses Dokument setzt nur die Lifecycle-Semantik auf, die den
-  dortigen Magic Link als Aktionsweg voraussetzt.
 - Screenshot-/Vision-Findings F1–F4, E2E-SQLite-Flakiness, Personenzahl-Sanity-Limit
   (in `05-model-registration.md` bzw. `AGENTS.todo.md` geführt).
+- **Model-Zugang / Profil-Magic-Link / „Meine Profile"** war ursprünglich ein
+  separater Anforderungsblock; der Zugangs- und Owner-Update-Vertrag ist inzwischen
+  in §8.2 dieses Dokuments als aktueller SOLL festgehalten.
 
 **Leitprinzip:** Es gibt **einen** Katalog (`CURRENT = 'v1'`). Beim Speichern
 wird der `catalog_version`-Stand im Answers-Snapshot festgehalten, damit ein
@@ -46,15 +48,16 @@ künftiger Katalogstand sauber versionierbar bleibt.
 - `catalog_version` wird weiterhin im Answers-Snapshot gespeichert und im
   öffentlichen `check`-Payload geliefert (= `v1`), damit ein künftiger
   Katalogstand sauber versionierbar bleibt.
-- Begründung: Das Feature ist nicht live, es existieren keine schützenswerten
-  Alt-Snapshots. Ein Versionssplit wäre reine Komplexität.
+- Die Entscheidung wurde vor dem Live-Rollout getroffen: Es gab zu diesem Zeitpunkt
+  keine schützenswerten Alt-Snapshots. Für neue und aktualisierte Profile bleibt
+  `v1` der einzige Katalog; ein späterer Versionssplit wäre eine neue Entscheidung.
 
 ### 1.2 Änderungen gegenüber dem bisherigen Stand (verbindlich)
 
 | Anforderung | bisher | Single-v1 (SOLL) |
 |---|---|---|
-| **Erotik** | Kategorie `erotik` mit Alterstor | **entfernt** (entschieden 2026-09-19, §7.1) |
-| **Fashion / Business / Portrait** | drei getrennte Kategorien | **bleiben getrennt** (entschieden 2026-09-19, §7.2) |
+| **Erotik** | Kategorie `erotik` mit Alterstor | **entfernt** (entschieden 2026-09-19, §6.1) |
+| **Fashion / Business / Portrait** | drei getrennte Kategorien | **bleiben getrennt** (entschieden 2026-09-19, §6.2) |
 | **Bereitschaft** | existiert nicht | neue, **vor** der Erfahrung abgefragte Dimension pro Kategorie (5 Stufen, §1.3) |
 | **Stock-Fotos** | existiert nicht | eigene Bereitschaftsfrage `willingness_stock` (5 Stufen) |
 | **Altersnachweis** | nur bei `bikini`/`akt`/`erotik` | **immer Pflicht** je Person (Anforderung §3.8) |
@@ -85,16 +88,16 @@ Neue, ordinale Skala mit stabilen Codes (Anzeige über deutsche Labels):
 - **Admin-Suche/Priorisierung:** filterbar nach Stufe(n) und **sortierbar** nach
   Bereitschaft (höchster Ordinalwert zuerst) für eine gewählte Kategorie
   (Anforderung §5.3).
-- Ob Bereitschaft und Erfahrung zu einer kombinierten Frage verschmolzen werden,
-  ist als Alternative zulässig („ggf. kombiniert", §7.6).
+- Die Entscheidung ist umgesetzt: Bereitschaft und Erfahrung bleiben getrennte
+  Fragen. Eine kombinierte Frage war eine historische Alternative, nicht der
+  aktuelle Contract.
 
 ### 1.4 Migrationsmatrix Alt-Snapshots — **entfällt**
 
 **Entfällt (entschieden 2026-09-19).** Es gibt keinen v1/v2-Split und keine
-schützenswerten Alt-Snapshots (Feature nicht live). `agency` → `agency_name` ist
-schlicht der neue Feldname in **einem** Katalog; eine Mapping-/Merge-Regel
-(„höchster Ordinalwert") wird nicht benötigt. `age_proof_required` ist für neue
-Submits immer `true` (§2.8).
+Migration von Alt-Snapshots. `agency` → `agency_name` ist schlicht der neue
+Feldname in **einem** Katalog; eine Mapping-/Merge-Regel wird nicht benötigt.
+`age_proof_required` ist für jedes aktuelle Submit/Update `true` (§2.8).
 
 ### 1.5 Such-/Filterkompatibilität
 
@@ -139,7 +142,7 @@ die Schema-Factory in `frontend/src/logic/modelRegistration.ts`.
   Logik.
 - Validierung bleibt: Datum in der Vergangenheit, Pflichtfeld. Ein
   Mindestalter als **harte** Regel ist nicht Teil der Anforderung (offene Frage
-  Minderjährigkeit §7.10).
+  Minderjährigkeit §6.10).
 
 ### 2.3 Kontaktweg-Validierung (UI-seitig)
 
@@ -162,36 +165,39 @@ Regeln:
   Auswahl entfernt.
 - Die Schema-Factory spiegelt die Regel in `superRefine` (Fehlermeldung am
   Multiselect), damit serverseitige 422-Fehler konsistent gemappt werden.
-- Die UI-Kontrolle ist die geforderte Absicherung. Eine **spiegelnde
-  Server-Validierung** ist als Defense-in-Depth vorgesehen, damit dieselbe Regel
-  nicht nur clientseitig gilt.
+- Die UI-Kontrolle bleibt die erste UX-Schicht; der Server spiegelt dieselbe
+  Regel in `ModelQuestionnaire::contactChannelErrors()` als Defense-in-Depth.
+  Ein ungültiger Kanal-Feld-Key wird als 422 zurückgegeben.
 
 ### 2.4 Personen-Fotos (max. 5/Person, öffentlich vs. intern)
 
-Neue Upload-Funktion je Person (nicht je Act).
+Die Foto-Funktion ist **umgesetzt** und Teil des aktuellen Single-v1-Contracts.
 
 - **Anzahl:** maximal 5 Fotos pro Person, **server-autoritativ** (der 6.
-  Upload wird mit 422 und klarem Feld-Key abgelehnt); clientseitig wird das
-  Hinzufügen nach 5 gesperrt.
-- **Typen/Größe:** jpg/jpeg/png/webp; Größenlimit analog Altersnachweis
-  (10 MB) — exakter Wert offene Detailfrage §7.11.
+  Upload wird mit 422 und klarem Feld-Key `persons.<i>.photos` abgelehnt);
+  clientseitig wird das Hinzufügen nach 5 gesperrt.
+- **Typen/Größe:** `jpg/jpeg/png/webp`, jeweils maximal 10 MB. Der Altersnachweis
+  akzeptiert zusätzlich PDF; Fotos nicht.
 - **Sichtbarkeit je Foto:** `public` oder `internal`. Default = **`internal`**
   (Privacy-first); `public` erfordert eine explizite Umschaltung und ist von
   einer Foto-/Veröffentlichungs-Einwilligung gedeckt (§2.9).
-- **Hauptbild:** genau ein Foto pro Profil ist als `is_primary` markierbar
-  (Admin-Auswahl, §5.2). Ohne explizite Wahl greift das erste `public`-Foto,
-  sonst ein Platzhalter.
-- **Speicherung/Delivery:** private Disk + auth-gated Endpunkt (Details §6).
-  Personen-Fotos werden zusätzlich EXIF-/GPS-bereinigt.
-- **Löschen:** entfernt die Datei von der privaten Disk; Löschen des
-  Hauptbilds setzt `is_primary` zurück.
-- **Datenmodell (SOLL):** eigene Entität, z. B. `model_photos`
-  (`id`, `model_profile_id`, `customer_id`, `path`, `original_name`,
-  `mime_type`, `size_bytes`, `visibility`, `is_primary`, `position`,
-  `created_at`).
-- **Multipart-Vertrag:** `persons[i][photos][j][file]` plus
-  `persons[i][photos][j][visibility]`; das genaue Wire-Format wird mit dem
-  API-Vertrag in `05-model-registration.md` festgeschrieben.
+- **Hauptbild:** höchstens ein Foto pro Profil ist `is_primary`; ein Primary muss
+  `public` sein. Beim Submit wird der erste neue Public-Foto oder — wenn kein
+  neues Public-Foto existiert — ein bestehendes Public-Foto zum Primary; ohne
+  Public-Foto bleibt das Feld leer. Der Owner kann den Primary über das
+  Update-Contract explizit setzen oder mit `is_primary=false` auflösen.
+- **Speicherung/Delivery:** Dateien liegen verschlüsselt auf der privaten
+  `local`-Disk; Management-Download und Contact Sheet entschlüsseln sie nur
+  serverseitig. Personen-Fotos werden vor der Ablage EXIF-/GPS-bereinigt.
+- **Löschen:** Management-Löschung entfernt die Datei und den DB-Eintrag; ein
+  gelöschtes Primary-Foto setzt `is_primary` zurück.
+- **Datenmodell:** `model_photos` (`id`, `model_profile_id`, `customer_id`,
+  `path`, `original_name`, `mime_type`, `size_bytes`, `visibility`,
+  `is_primary`, `position`, timestamps).
+- **Submit-Wire-Format:** `persons[i][photos][j][file]`,
+  `persons[i][photos][j][visibility]` und
+  `persons[i][photos][j][is_primary]`. Nicht-sequelle Foto-Indizes sind erlaubt;
+  der Server verknüpft Metadaten und Datei über denselben Schlüssel.
 
 ### 2.5 Aussehen & Maße
 
@@ -199,7 +205,7 @@ Neue Upload-Funktion je Person (nicht je Act).
   (Collapsible), damit sie wahrgenommen, aber nicht als Pflichtblock erlebt
   wird.
 - Alternative/zusätzlich: Feldumfang reduzieren. **Welche** Felder entfallen,
-  ist offene Entscheidung §7.7; Datenverlust bei Neuerfassung ist dabei
+  ist offene Entscheidung §6.7; Datenverlust bei Neuerfassung ist dabei
   beabsichtigt.
 
 ### 2.6 Bereitschaft vor Erfahrung + Stock
@@ -247,7 +253,7 @@ Neue Upload-Funktion je Person (nicht je Act).
 - Links öffnen in neuem Tab (`target="_blank"` + `rel="noopener noreferrer"`).
 - AGB-Seite ist unter `/license-terms` vorhanden; ein eigener
   „AGB"-Pfad existiert nicht. Sollte ein separater AGB-Link gewünscht sein, ist
-  das eine reine Routing-Frage (§7.12).
+  das eine reine Routing-Frage (§6.12).
 
 ---
 
@@ -263,8 +269,8 @@ Neue Upload-Funktion je Person (nicht je Act).
 
 ### 3.2 Timer & Anker
 
-- **Anker** ist `model_profiles.last_confirmed_at` (neues Feld). Gesetzt bei
-  Erst-Submit und bei jeder Bestätigung/Aktualisierung.
+- **Anker** ist `model_profiles.last_confirmed_at`; er wird beim Erst-Submit und
+  bei jeder Bestätigung/Aktualisierung gesetzt.
 - **„Updaten"-Klick setzt den Timer auf 0 — auch ohne Änderung.** Dafür werden
   zwei getrennte Aktionen definiert:
   - **Bestätigen** (`confirm`): setzt `last_confirmed_at = now`, **ohne**
@@ -279,15 +285,15 @@ Neue Upload-Funktion je Person (nicht je Act).
 
 ### 3.3 Mail-Regeln
 
-- **Nach 12 Monaten** Update-Mail mit Magic Link auf das Profil (Aktionsweg
-  aus dem separaten „Model-Zugang"-Block, Token-TTL 24 h).
-- Vorschlag (offene Detailfrage §7.13):
+- **Implementierte Reminder-Kadenz:**
   - T+12 Monate: Reminder 1.
   - T+13 Monate (Eintritt `inactive`): Reminder 2.
   - T+14 Monate: letzte Warnung vor `expired`.
+  - Der tägliche Lifecycle-Command setzt jede Stufe idempotent; ohne
+    Kontaktadresse wird sie nicht als versendet markiert.
 - **Empfänger:** die gespeicherte Kontakt-E-Mail der Person. Existiert keine,
-  wird **keine** Mail versendet (konsistent zum Invite-Flow); der Admin sieht
-  den Zustand „kein Kontaktweg".
+  wird **keine** Mail versendet; der Admin sieht den Zustand „kein Kontaktweg".
+  Die Erinnerung enthält einen 24-Stunden-Profil-Magic-Link.
 - **Brand-aware:** Mail wird mit der Marke des Profils gerendert.
 - **Idempotenz:** pro Stufe wird höchstens einmal gesendet
   (`last_reminder_stage`/`last_reminder_at`); ein täglicher Scheduler-Job
@@ -307,8 +313,9 @@ und wird direkt aus dem Submit-Kontext gespeist.
 
 - `active` / `inactive` / `expired` werden als Badge dargestellt und sind
   filterbar (§5.3).
-- `inactive`/`expired` sind in der Standard-Übersicht gedämpft bzw. nur über
-  Filter/„auch inaktive anzeigen" sichtbar (genaue Default-Sicht §7.14).
+- Der aktuelle Vertrag ist: **Default `active`**. `lifecycle_status=inactive`
+  oder `all` ist nur für Super-Admin erlaubt; für andere Management-Rollen
+  antwortet der Endpoint fail-closed mit 403.
 
 ### 3.5 Löschung / Aufbewahrung
 
@@ -372,102 +379,117 @@ Belegbarer Ist-Zustand und SOLL für die neue Foto-Funktion.
 
 ### 5.1 Ist-Zustand Altersnachweis (belegt)
 
-- Ablage auf der **privaten `local`-Disk** (`storage/app/private`), Pfad
-  `model-age-proofs/{customer_id}/`, Dateiname vom Storage vergeben.
+- Ablage **verschlüsselt** auf der privaten `local`-Disk
+  (`storage/app/private`), Pfad `model-age-proofs/{customer_id}/`, Dateiname vom
+  Storage vergeben.
 - **Kein** `public`-Storage; keine direkt aufrufbare URL.
 - Download ausschließlich über `ModelManagementController::ageProof`
   (`management`-Middleware + Gate `isAdmin`, brand-gescoped).
 - Validierung beim Upload: Datei/MIME + max. 10 MB (Submit-Regeln).
-- Orphan-Cleanup bei Transaktions-Rollback (Regressionstest R2 vorhanden).
+- Orphan-Cleanup bei Transaktions-Rollback und bei Ersetzen des alten Proofs.
 
-### 5.2 SOLL Personen-Fotos
+### 5.2 Ist-Zustand Personen-Fotos
 
-- Analog private Disk, z. B. `model-photos/{customer_id}/`, random Filesnamen,
-  kein user-kontrollierter Pfadanteil.
-- Delivery nur über auth-gated, brand-gescopten Endpunkt.
-- MIME-/Typ-/Größenvalidierung; **EXIF/GPS-Stripping** (Re-Encoding), bevor die
-  Datei abgelegt oder ausgeliefert wird.
-- Anzahl serverseitig geprüft (max. 5), nicht nur clientseitig.
-- Beim Löschen/Zustandswechsel werden Dateien mitentfernt (keine Waisen).
+- Personen-Fotos werden analog unter `model-photos/{customer_id}/` mit
+  zufälligem Dateinamen **verschlüsselt** abgelegt; der Pfad ist nicht
+  user-kontrolliert.
+- Delivery nur über auth-gated, brand-gescopte Management-Endpunkte; der
+  Contact Sheet-Service entschlüsselt serverseitig für das PDF.
+- MIME-/Typ-/Größenvalidierung und **EXIF/GPS-Stripping** (Re-Encoding) erfolgen
+  vor der Verschlüsselung.
+- Die Anzahl wird serverseitig geprüft (max. 5 pro Person).
+- Beim Löschen/Zustandswechsel werden die Dateien mitentfernt (keine Waisen).
 
-### 5.3 Verschlüsselung at rest
+### 5.3 Verschlüsselung at rest (umgesetzt)
 
-- **App-seitig ist keine Verschlüsselung at rest implementiert.** Der aktuelle
-  Formulartext („ausschließlich verschlüsselt auf einem privaten Speicher")
-  ist damit **nicht korrekt** und muss bis zur Umsetzung angepasst werden.
-- Ob verschlüsselte Ablage eingeführt wird, ist offene Entscheidung §7.4
-  (Mechanismus: Laravel-eigener verschlüsselter Filesystem-Treiber/Volume;
-  Auswirkungen auf Streaming, Re-Encoding und Delivery).
-- Unabhängig davon bleibt „privat + auth-gated" die Grundabsicherung.
+- Altersnachweis und Personen-Fotos werden über
+  `ercsctt/laravel-file-encryption` mit AES-256-GCM verschlüsselt; der eigene
+  Key kommt aus `FILE_ENCRYPTION_KEY` (nicht `APP_KEY`), Previous-Keys werden
+  für Rotation unterstützt.
+- `model_profiles.answers` wird mit Laravel `encrypted:array` gespeichert;
+  V034 änderte die Spalte dafür von JSON auf Text.
+- Rasterbilder werden nach Möglichkeit GD-re-encoded, um EXIF/GPS zu entfernen;
+  PDF-/ unbekannte Dateitypen bleiben inhaltlich unverändert, werden aber
+  ebenfalls verschlüsselt.
+- „Privat + auth-gated" bleibt zusätzlich erforderlich; Verschlüsselung ersetzt
+  weder Authorization noch Audit-Logging.
 
-### 5.4 Zugriffsprotokollierung
+### 5.4 Zugriffsprotokollierung (umgesetzt)
 
-- Jeder Download von Altersnachweis/Fotos sollte protokolliert werden
-  (wer/wann/welches Profil) — DSGVO-Rechenschaft, konsistent zu den
-  bestehenden Delivery-Audit-Logs.
+- Altersnachweis-/Foto-Downloads werden über `model.file.download` mit User,
+  Model-Profil, Customer und Foto protokolliert; Contact-Sheet-Exporte über
+  `model.contact_sheet.export` ohne PII im Log.
 
 ### 5.5 Bedrohungsmodell (Kurz)
 
 | Szenario | Wirkung heute | Gegenmaßnahme |
 |---|---|---|
-| DB-Leak | keine Bilder (separater Storage) | Trennung beibehalten |
-| Storage-Leak | Bilder lesbar | Verschlüsselung at rest (§7.4), Host-Härtung |
-| Erratene ID/URL | kein Zugriff | auth-gated + Brand-Scope, random Pfade |
-| Admin-Missbrauch | Zugriff möglich | minimale Admin-Rollen, Audit-Log |
-| Verwaiste Dateien | Speicherrest | Rollback-Cleanup + Lifecycle-Löschung |
+| DB-Leak | keine Bilddateien; Answers-Snapshot ist verschlüsselt | Trennung + `encrypted:array` beibehalten |
+| Storage-Leak | Ciphertext ohne Key; Key-/Host-Kompromittierung bleibt ein Risiko | File-Encryption-Key, Host-Härtung, Rotation |
+| Erratene ID/URL | kein Zugriff | auth-gated + Brand-Scope + zufällige Pfade |
+| Admin-Missbrauch | Zugriff möglich | minimale Rollen, Audit-Log, minimaler Exportumfang |
+| Verwaiste Dateien | Speicherrest möglich nach Crash | Rollback-/Lifecycle-Cleanup und `.plain-*`-Sweep |
 
 ---
 
-## 6. Offene Entscheidungen (explizit)
+## 6. Entscheidungs- und Restpunkt-Log
 
-| # | Entscheidung | Auswirkung |
+Die Nummern in diesem Log sind Entscheidungs-IDs, keine Markdown-Überschriften.
+Technisch umgesetzte Punkte sind als solche markiert; offene Punkte dürfen den
+aktuellen Vertrag nicht als „noch nicht implementiert" missverständlich
+darstellen.
+
+| ID | Entscheidung / Status | Auswirkung |
 |---|---|---|
-| 7.1 | ✅ **Entschieden (2026-09-19): Erotik entfernt.** | Kategorie/Filter ohne `erotik`; kein Altbestand. |
-| 7.2 | ✅ **Entschieden (2026-09-19): Fashion/Editorial, Business/Corporate und Portrait bleiben getrennt.** | Kein Merge, keine „höchster Ordinalwert"-Regel nötig. |
-| 7.3 | ✅ **Entschieden (2026-09-19): Agentur-Feld bleibt, strukturiert als `agency_name` (text) + `agency_link` (url), beide optional.** | Kein Alt-Snapshot-Mapping (Single-Katalog). |
-| 7.4 | ✅ **Entschieden (2026-09-19): Verschlüsselung at rest umgesetzt** — Paket `ercsctt/laravel-file-encryption` (AES-256-GCM) mit eigenem `FILE_ENCRYPTION_KEY`; `model_profiles.answers` via Laravel `encrypted:array`. | §5, §8.1 |
-| 7.5 | ✅ **Entschieden (2026-09-19): `expired` = Hard-Delete** (Zeilen + Dateien, gemeinsame Routine mit DSGVO-Delete, Audit `expired`). Aufbewahrungsfrist Altersnachweis entfällt mit dem Profil. | §3.5, DSGVO, Storage |
-| 7.6 | **Bereitschaft getrennt oder kombiniert mit Erfahrung?** Stabile Codes vs. deutsche Werte? | Formular-UX, Admin-Sortierung, Snapshot |
-| 7.7 | **Aussehen & Maße:** nur zuklappen oder Feldumfang reduzieren (welche)? | Katalog (Single-v1), Datenmodell |
-| 7.8 | **Sichtbarkeit `public`:** nur intern/Portfolio oder echte Veröffentlichung? | Einwilligungstext, Delivery |
-| 7.9 | ~~**Altersnachweis bei Migration**~~ — **gegenstandslos** (Single-Katalog, keine Migration). | — |
-| 7.10 | **Minderjährigkeit:** harte Mindestalters-/Erziehungsberechtigten-Regel nötig? | Validierung, Rechtsseiten |
-| 7.11 | **Foto-Limits:** exakte Größe/Typen und Anzahl (5 bestätigt?) | Upload-Validierung |
-| 7.12 | **AGB-Link:** eigener `/agb`-Pfad oder bestehende `/license-terms`? | Routing, Rechtstext |
-| 7.13 | **Reminder-Kadenz** (T+12/13/14) bestätigen? | Scheduler, Mail-Texte |
-| 7.14 | **Default-Sicht** der Übersicht: inaktive ein-/ausblenden? | Admin-UX |
-| 7.15 | ~~**Invite-Versionswechsel**~~ — **gegenstandslos** (Single-Katalog, kein Versionswechsel). | — |
+| 6.1 | ✅ **Entschieden (2026-09-19): Erotik entfernt.** | Kategorie/Filter ohne `erotik`; kein Altbestand. |
+| 6.2 | ✅ **Entschieden (2026-09-19): Fashion/Editorial, Business/Corporate und Portrait bleiben getrennt.** | Kein Merge, keine „höchster Ordinalwert"-Regel nötig. |
+| 6.3 | ✅ **Entschieden (2026-09-19): Agentur-Feld bleibt, strukturiert als `agency_name` (text) + `agency_link` (url), beide optional.** | Kein Alt-Snapshot-Mapping (Single-Katalog). |
+| 6.4 | ✅ **Entschieden und umgesetzt (2026-09-19): Verschlüsselung at rest** — Paket `ercsctt/laravel-file-encryption` (AES-256-GCM) mit eigenem `FILE_ENCRYPTION_KEY`; `model_profiles.answers` via Laravel `encrypted:array`. | §5, §8.1 |
+| 6.5 | ✅ **Entschieden und umgesetzt (2026-09-19): `expired` = Hard-Delete** (Zeilen + Dateien, gemeinsame Routine mit DSGVO-Delete, Audit `expired`). | §3.5, DSGVO, Storage |
+| 6.6 | ✅ **Umgesetzt:** getrennte Bereitschaft- und Erfahrungsfragen mit stabilen Codes. | §1.3; die frühere Alternative „kombiniert" ist nicht der Current Contract. |
+| 6.7 | **Offen:** Welche optionalen Aussehen-/Maß-Felder entfallen? | Katalogpflege; die aktuelle UI klappt die Sektion standardmäßig auf. |
+| 6.8 | ✅ **Technischer Contract umgesetzt:** `public|internal`, Default `internal`, Primary nur `public`; die Produktfrage, wer welche öffentlichen Fotos freigibt, bleibt eine Governance-/Einwilligungsentscheidung. | §2.4, §5.2 |
+| 6.9 | ~~**Altersnachweis bei Migration**~~ — **gegenstandslos** (Single-Katalog, keine Migration). | — |
+| 6.10 | **Offen:** harte Mindestalters-/Erziehungsberechtigten-Regel. | Validierung, Rechtsseiten |
+| 6.11 | ✅ **Technische Limits umgesetzt:** maximal 5 Fotos, jpg/jpeg/png/webp, 10 MB; Scope-Erweiterungen bleiben eine separate Entscheidung. | §2.4 |
+| 6.12 | **Offen:** eigener `/agb`-Pfad oder bestehender `/license-terms`-Link. | Routing, Rechtstext |
+| 6.13 | ✅ **Umgesetzt:** T+12/13/14-Reminder, idempotent und brand-aware. | §3.3 |
+| 6.14 | ✅ **Umgesetzt:** Default `active`; `inactive|all` nur für Super-Admin, sonst 403. | §3.4 |
+| 6.15 | ~~**Invite-Versionswechsel**~~ — **gegenstandslos** (Single-Katalog, kein Versionswechsel). | — |
 
 ---
 
 ## 7. Related
 
-- [`05-model-registration.md`](05-model-registration.md) — v1-SOLL und
-  eingefrorener API-Vertrag (Referenz, wird nicht umgeschrieben).
+- [`05-model-registration.md`](05-model-registration.md) — v1-Registrierung und
+  öffentlicher Multipart-Wire-Contract.
 - [`04-birthdate-age-verification.md`](04-birthdate-age-verification.md) —
   Altersberechnung für §2.2.
-- `AGENTS.todo.md` — Ausgangs-Anforderungsblock, Test-/Umsetzungs-TODOs.
-- Separater Block „Model-Zugang: Profile einsehen/aktualisieren" — liefert den
-  in §3 vorausgesetzten Magic-Link-/„Meine Profile"-Aktionsweg.
+- [`07-model-contact-sheet-export.md`](07-model-contact-sheet-export.md) —
+  aktueller PDF-Export für interne/externe Varianten.
+- `AGENTS.todo.md` — Ausgangs-Anforderungsblock und Verifikations-TODOs.
+- Profile-Magic-Link, „Meine Profile" und Owner-Updates sind in §8.2 als
+  aktueller Contract dokumentiert.
 
 ---
 
 ## 8. Nachtrag P3 (2026-09-19) — Entscheidungen & Contract
 
-Nur Ergänzung, kein Rewrite der obigen Spezifikation.
+Die folgenden Angaben präzisieren den aktuellen Contract; sie ersetzen keine
+älteren, ausdrücklich als historisch markierten Entscheidungen.
 
-### 8.1 Entschiedene offene Punkte (§7.1–7.4)
+### 8.1 Entschiedene offene Punkte (§6.1–6.4)
 
-- **§7.1 — entschieden:** `erotik` ist aus dem Katalog **entfernt**
+- **§6.1 — entschieden:** `erotik` ist aus dem Katalog **entfernt**
   (`SHOOTING_CATEGORIES`, Single-Katalog `v1`). Es gibt keine eingefrorene
   Alt-Definition und keine Alt-Snapshots.
-- **§7.2 — entschieden:** Fashion/Editorial und Business/Corporate bleiben
+- **§6.2 — entschieden:** Fashion/Editorial und Business/Corporate bleiben
   **getrennt** (kein Merge, auch nicht mit Portrait). Damit gibt es keine
   Merge-/Migrationsregel.
-- **§7.3 — entschieden:** Agentur ist strukturiert: `agency_name` (text) +
+- **§6.3 — entschieden:** Agentur ist strukturiert: `agency_name` (text) +
   `agency_link` (url), beide optional. Ein Mapping `agency` → `agency_name`
   entfällt (Single-Katalog; kein Altwert).
-- **§7.4 — entschieden:** Verschlüsselung at rest ist implementiert über das
+- **§6.4 — entschieden:** Verschlüsselung at rest ist implementiert über das
   Paket **`ercsctt/laravel-file-encryption`** mit **eigenem Key**;
   `model_profiles.answers` nutzt Laravel `encrypted:array` (V034: `json` → `text`).
   Der Formulartext „verschlüsselt auf privatem Speicher" ist damit korrekt.
@@ -478,8 +500,9 @@ Nur Ergänzung, kein Rewrite der obigen Spezifikation.
 |---|---|---|
 | `GET` | `/api/me/models` | „Meine Profile" (auth, owner-gescoped, brand-gescoped). |
 | `GET` | `/api/model-profil/{token}` | Profil lesen (Token = Credential; `404` unbekannt, `410` widerrufen/abgelaufen). |
-| `POST` | `/api/model-profil/{token}` | Profil aktualisieren (`{answers}`; validiert gegen `CURRENT = 'v1'`, schreibt Snapshot + `last_confirmed_at`). |
+| `POST` | `/api/model-profil/{token}` | Owner-Update als `multipart/form-data`: `answers` (validiert gegen `CURRENT = 'v1'`), optional `age_proof` (bei vorhandenem Proof optional, sonst erforderlich) und `photos[i][id|visibility|is_primary]`; schreibt Snapshot + `last_confirmed_at`. |
 | `POST` | `/api/model-profil/{token}/confirm` | Bestätigen **ohne** Snapshot-Änderung/Katalog-Bump (Timer-Reset, §3.2). |
+| `POST` | `/api/model-profil/{token}/transfer-manager` | Nur der aktuelle Act-Manager darf `{act_id, new_manager_customer_id}` übertragen; das Ziel muss Mitglied desselben Acts sein. |
 | `POST` | `/api/management/models/{customer}/access-link` | 24h-Profil-Link ausstellen/rotieren → `201 {success, link, expires_at}`. |
 | `DELETE` | `/api/management/models/{customer}/access-link` | Aktiven Profil-Link widerrufen. |
 | `GET` | `/api/management/models/{id}/photos/{photoId}` | auth-gated, brand-gescopter Foto-Download (verschlüsselt at rest). |
@@ -490,6 +513,12 @@ Nur Ergänzung, kein Rewrite der obigen Spezifikation.
 `persons[i][photos][j][file]` + `persons[i][photos][j][visibility]`
 (`public|internal`, Default `internal`) + `persons[i][photos][j][is_primary]`;
 max. **5 pro Person** (server-autoritativ, 422-Feld-Key `persons.i.photos`).
+
+**Owner-Foto-Update:** Der Owner-Endpunkt lädt über diesen Submit-Vertrag **keine
+neuen Fotos** hoch. Er sendet für bestehende Fotos nur IDs und kann `visibility`
+sowie `is_primary` ändern; ein Primary muss `public` sein, ein explizites
+`is_primary=false` auf dem aktuellen Primary löscht es. Datei-Upload und
+Altersnachweis-Re-Upload bleiben die einzigen Datei-Felder dieses Owner-Requests.
 
 **Admin-Suche (Single-Katalog):** `category[]` (Multi-Select, ODER);
 `willingness_<key>=<level>` als **Mindest-Schwelle** (Ordinal ≥ Level, ODER über

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\VolumePreset;
 use App\Models\VolumePresetTier;
 use App\Services\CouponService;
+use App\Support\BrandRegistry;
 
 /**
  * Retroactive volume pricing using a configurable volume preset.
@@ -21,7 +22,9 @@ use App\Services\CouponService;
  * tier prices are non-monotonic/duplicate. In both cases the breakdown sums to
  * the qualifying tier price, so item lines and total stay consistent.
  *
- * Quote items are 0 cents and do not count toward the volume tier.
+ * Quote items are 0 cents and do not count toward the volume tier. A volume
+ * purchase grants the supported `original` entitlement tier; `volume` is a
+ * pricing mode, not a persisted download tier.
  */
 class VolumeLicensingStrategy implements PricingStrategy
 {
@@ -55,8 +58,10 @@ class VolumeLicensingStrategy implements PricingStrategy
 
         [$qualifyingIndex] = $this->resolveTierIndex($nonQuoteCount);
         $perImagePriceCents = $this->basePriceCents();
+        $effectivePriceCents = $this->effectivePriceCents($qualifyingIndex);
 
         $pricedItems = [];
+        $couponPricedItems = [];
         $totalCents = 0;
 
         foreach ($items as $item) {
@@ -65,25 +70,31 @@ class VolumeLicensingStrategy implements PricingStrategy
             $photo = Photo::find($itemId);
             $galleryId = $photo?->gallery_id ?? null;
 
-            if (!empty($item['is_quote'])) {
+            if (! empty($item['is_quote'])) {
                 $pricedItems[] = [
                     'itemId' => $itemId,
                     'priceCents' => 0,
-                    'tier' => 'volume',
+                    'tier' => 'original',
                     'useCaseName' => 'Anfrage',
                     'modifierNames' => [],
                     'galleryId' => $galleryId,
                 ];
+
                 continue;
             }
 
-            $pricedItems[] = [
+            $pricedItem = [
                 'itemId' => $itemId,
                 'priceCents' => $perImagePriceCents,
-                'tier' => 'volume',
+                'tier' => 'original',
                 'useCaseName' => 'Volume Lizenz',
                 'modifierNames' => [],
                 'galleryId' => $galleryId,
+            ];
+            $pricedItems[] = $pricedItem;
+            $couponPricedItems[] = [
+                ...$pricedItem,
+                'priceCents' => $effectivePriceCents,
             ];
             $totalCents += $perImagePriceCents;
         }
@@ -101,38 +112,35 @@ class VolumeLicensingStrategy implements PricingStrategy
             'discountCents' => 0,
             'couponId' => null,
             'tier_breakdown' => $tierBreakdown,
+            // Invoice item lines remain at the base price and show the tier
+            // discount separately. Coupon math uses the effective qualifying
+            // price instead, so max_items/packages cannot re-use base prices.
+            'coupon_items' => $couponPricedItems,
+            'coupon_item_count' => count($couponPricedItems),
         ];
 
-        // Apply coupon if a code is provided and CouponService is available
+        // Apply coupon if a code is provided and CouponService is available.
+        // Scope validation must consider every priced item in this group; a
+        // gallery-scoped coupon is valid when any item belongs to its scope.
         if ($couponCode !== null && $this->couponService !== null) {
-            $brand = \App\Support\BrandRegistry::current();
+            $brand = BrandRegistry::current();
             if ($brand !== null) {
-                $galleryId = null;
-                $metaGalleryId = null;
-                foreach ($items as $item) {
-                    if (!empty($item['id']) && empty($item['is_quote'])) {
-                        $photo = \App\Models\Photo::find($item['id']);
-                        if ($photo && $photo->gallery) {
-                            $galleryId = (int) $photo->gallery_id;
-                            $metaGalleryId = $photo->gallery->gallery_group_id
-                                ? (int) $photo->gallery->gallery_group_id
-                                : null;
-                            break;
-                        }
-                    }
-                }
+                [$galleryIds, $metaGalleryIds] = $this->couponScopeIds($items);
 
-                [$coupon, $error] = $this->couponService->findValidCoupon(
+                [$coupon] = $this->couponService->findValidCoupon(
                     $couponCode,
                     $brand,
-                    $galleryId,
-                    $metaGalleryId,
-                    $user->id,
+                    $galleryIds,
+                    $metaGalleryIds,
+                    $user->getKey(),
                 );
 
                 if ($coupon !== null) {
-                    $applied = $this->couponService->applyCoupon($coupon, $result['items'], $result['totalCents']);
-                    $result['items'] = $applied['items'];
+                    $applied = $this->couponService->applyCoupon(
+                        $coupon,
+                        $result['coupon_items'],
+                        $result['totalCents'],
+                    );
                     $result['totalCents'] = $applied['totalCents'];
                     $result['discountCents'] = $applied['discountCents'];
                     $result['couponId'] = $coupon->id;
@@ -147,6 +155,53 @@ class VolumeLicensingStrategy implements PricingStrategy
     public function supportsCoupons(): bool
     {
         return true;
+    }
+
+    /**
+     * Resolve all gallery and meta-gallery IDs represented by the priced items.
+     *
+     * @return array{0: array<int, string>|null, 1: array<int, string>|null}
+     */
+    private function couponScopeIds(array $items): array
+    {
+        $photoIds = [];
+        foreach ($items as $item) {
+            if (! empty($item['is_quote'])) {
+                continue;
+            }
+
+            $photoId = $item['id'] ?? null;
+            if ($photoId !== null && $photoId !== '') {
+                $photoIds[] = $photoId;
+            }
+        }
+
+        if ($photoIds === []) {
+            return [null, null];
+        }
+
+        $photos = Photo::with('gallery')
+            ->whereIn('id', array_values(array_unique($photoIds)))
+            ->get();
+
+        $galleryIds = [];
+        $metaGalleryIds = [];
+        foreach ($photos as $photo) {
+            if ($photo->gallery_id !== null) {
+                $galleryIds[] = (string) $photo->gallery_id;
+            }
+            if ($photo->gallery?->gallery_group_id !== null) {
+                $metaGalleryIds[] = (string) $photo->gallery->gallery_group_id;
+            }
+        }
+
+        $galleryIds = array_values(array_unique($galleryIds));
+        $metaGalleryIds = array_values(array_unique($metaGalleryIds));
+
+        return [
+            $galleryIds === [] ? null : $galleryIds,
+            $metaGalleryIds === [] ? null : $metaGalleryIds,
+        ];
     }
 
     /**
@@ -183,6 +238,23 @@ class VolumeLicensingStrategy implements PricingStrategy
     private function basePriceCents(): int
     {
         return count($this->tiers) > 0 ? $this->tiers[0]->price_cents : 0;
+    }
+
+    /**
+     * Return the effective per-item price after the retroactive volume tier.
+     * Pathological higher-than-base tiers are clamped to the base price, just
+     * like the invoice breakdown and total calculation.
+     */
+    private function effectivePriceCents(int $qualifyingIndex): int
+    {
+        if ($this->tiers === []) {
+            return 0;
+        }
+
+        $basePrice = $this->basePriceCents();
+        $qualifyingPrice = (int) $this->tiers[$qualifyingIndex]->price_cents;
+
+        return max(0, min($basePrice, $qualifyingPrice));
     }
 
     /**
@@ -255,7 +327,7 @@ class VolumeLicensingStrategy implements PricingStrategy
     {
         return [
             'type' => 'discount_fixed',
-            'filename' => 'Mengenrabatt ab ' . $minQuantity . ' Bildern',
+            'filename' => 'Mengenrabatt ab '.$minQuantity.' Bildern',
             'notes' => sprintf('%d × -%s €', $nonQuoteCount, number_format($diffPerItem / 100, 2, ',', '.')),
             'price' => -$diffPerItem,
             'qty' => $nonQuoteCount,

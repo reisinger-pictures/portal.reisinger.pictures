@@ -16,7 +16,7 @@ import { apiMutate, apiUpload } from '../../api';
 import { useModelRegistration } from '../useModelRegistration';
 import { useModelInvites, buildCreateInviteBody, inviteLinkFromCreate } from '../useModelInvites';
 import { updateModelProfileAccess } from '../modelRegistration';
-import { useModels, buildModelsQuery, ageProofDownloadUrl, deleteModel, isModelOutdated, parseModelFilters, serializeModelFilters } from '../useModels';
+import { useModels, buildModelsQuery, ageProofDownloadUrl, deleteModel, isModelOutdated, parseModelFilters, serializeModelFilters, lifecycleFilterValues, isRestrictedLifecycleFilter } from '../useModels';
 
 const mutate = vi.fn();
 
@@ -198,6 +198,20 @@ describe('useModels helpers', () => {
         expect(buildModelsQuery({ lifecycle_status: 'all' })).toBe('?lifecycle_status=all');
     });
 
+    it('exposes inactive/all lifecycle filter options to super-admins only', () => {
+        expect(lifecycleFilterValues(true)).toEqual(['', 'inactive', 'all']);
+        expect(lifecycleFilterValues(false)).toEqual(['']);
+    });
+
+    it('flags inactive/all as restricted for non-super-admins', () => {
+        expect(isRestrictedLifecycleFilter('inactive', false)).toBe(true);
+        expect(isRestrictedLifecycleFilter('all', false)).toBe(true);
+        expect(isRestrictedLifecycleFilter('', false)).toBe(false);
+        expect(isRestrictedLifecycleFilter(undefined, false)).toBe(false);
+        expect(isRestrictedLifecycleFilter('inactive', true)).toBe(false);
+        expect(isRestrictedLifecycleFilter('all', true)).toBe(false);
+    });
+
     it('serialises and trims active filters', () => {
         expect(buildModelsQuery({ q: ' maria ', gender: 'female', category: [], age_min: '20' }))
             .toBe('?q=maria&gender=female&age_min=20');
@@ -205,9 +219,15 @@ describe('useModels helpers', () => {
             .toBe('?category%5B%5D=bikini&category%5B%5D=akt');
     });
 
-    it('omits the threshold when "Egal" (no willingness params)', () => {
-        expect(buildModelsQuery({ willingness_categories: ['bikini'] })).toBe('');
-        expect(buildModelsQuery({ willingness_categories: ['bikini'], willingness_level: '' })).toBe('');
+    it('persists selected categories as a meta list while "Egal" (no threshold)', () => {
+        // Without a level the per-category params cannot carry the selection;
+        // the meta list keeps the threshold slider enabled until a level is set.
+        expect(buildModelsQuery({ willingness_categories: ['bikini'] }))
+            .toBe('?willingness_category%5B%5D=bikini');
+        expect(buildModelsQuery({ willingness_categories: ['bikini'], willingness_level: '' }))
+            .toBe('?willingness_category%5B%5D=bikini');
+        expect(parseModelFilters(new URLSearchParams('willingness_category%5B%5D=bikini&willingness_category%5B%5D=sport')))
+            .toEqual({ willingness_categories: ['bikini', 'sport'] });
     });
 
     it('round-trips filters through the URL params', () => {

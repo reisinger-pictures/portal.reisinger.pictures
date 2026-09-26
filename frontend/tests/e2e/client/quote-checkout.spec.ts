@@ -31,7 +31,9 @@ test.describe('Quote Checkout Workflow', () => {
     });
 
     test('Client completes Stripe checkout with quote token', { tag: ['@feature:quote', '@regression'] }, async ({ page, request }) => {
-        test.setTimeout(90000);
+        // The UI waits for the same owner-scoped order status poll (up to 60s)
+        // that production uses before reporting a successful payment.
+        test.setTimeout(120000);
         const auth = new AuthHelper(page);
         const modal = new ModalHelper(page);
         const form = new FormHelper(page, modal);
@@ -57,6 +59,7 @@ test.describe('Quote Checkout Workflow', () => {
 
         // Galerie dem Buyer zuweisen (power_user-Rolle)
         const rolesRes = await request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken } });
+        expect(rolesRes.ok()).toBeTruthy();
         const rolesData = await rolesRes.json();
         const roles = Array.isArray(rolesData) ? rolesData : (rolesData.data || []);
         const powerUserRoleId = roles.find((r: { name: string }) => r.name === 'power_user')?.id;
@@ -126,20 +129,48 @@ test.describe('Quote Checkout Workflow', () => {
         expect(orderId).toBeTruthy();
 
         // --- 5. Stripe-Zahlung (Visa 4242) ---
-        await expect(page.locator('h2:has-text("Zahlung abschließen")')).toBeVisible({ timeout: 15000 });
+        const main = page.getByRole('main');
+        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({ timeout: 15000 });
 
         const stripeFrames = await StripeHelper.resolveStripeIframes(page);
 
         await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa, stripeFrames);
         await expect(page.getByRole('button', { name: 'Jetzt bezahlen' })).toBeEnabled({ timeout: 10000 });
         const payButton = page.getByRole('button', { name: 'Jetzt bezahlen' });
+        const paidOrderResponsePromise = page.waitForResponse(async response => {
+            const responseUrl = new URL(response.url());
+            if (responseUrl.pathname !== `/api/orders/${orderId}` || response.request().method() !== 'GET') {
+                return false;
+            }
+            if (!response.ok()) return false;
+
+            const order: unknown = await response.json();
+            return typeof order === 'object'
+                && order !== null
+                && (order as { status?: unknown }).status === 'paid';
+        }, { timeout: 60000 });
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
-        await expect(page.locator('.toast')).toContainText(/Zahlung erfolgreich/i, { timeout: 15000 });
+        // Webhook delivery is not deterministic in the disposable E2E stack.
+        // Transition the real order through the management API and let the
+        // browser poll the actual order resource; the polling/refresh contract
+        // itself remains covered by StripeCheckoutForm Vitest.
+        const paidResponse = await request.put(`/api/management/orders/${orderId}/status`, {
+            data: {status: 'paid'},
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Cookie: helper.getAdminToken(),
+            },
+        });
+        expect(paidResponse.ok(), await paidResponse.text()).toBeTruthy();
 
-        await page.goto('/cart?redirect_status=succeeded');
+        // Stripe confirmation precedes the server-authoritative paid state.
+        // Wait for the authenticated status poll before checking the success toast.
+        await paidOrderResponsePromise;
+        await expect(page.getByRole('alert').filter({hasText: /Zahlung erfolgreich/i})).toBeVisible({ timeout: 15000 });
 
         await expect(page).toHaveURL(/.*\/orders/, { timeout: 15000 });
-        await expect(page.locator('h1:has-text("Meine Einkäufe & Lizenzen")')).toBeVisible();
+        await expect(page.getByRole('main').getByRole('heading', {name: 'Meine Einkäufe & Lizenzen'})).toBeVisible();
     });
 });

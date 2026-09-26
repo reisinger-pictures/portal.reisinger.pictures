@@ -3,15 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Brand;
+use App\Mail\ModelProfileUpdatedMail;
+use App\Models\Act;
+use App\Models\ActMember;
 use App\Models\Customer;
 use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
+use App\Models\ModelRegistrationInvite;
+use App\Services\CustomerSearchSyncService;
+use App\Services\ModelFileCleanupService;
 use App\Services\ModelFileStore;
+use App\Services\ModelPhotoPrimaryService;
 use App\Services\ModelQuestionnaire;
+use App\Support\ActorIdentity;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -28,6 +37,9 @@ class ModelProfileAccessController extends Controller
     public function __construct(
         private readonly ModelQuestionnaire $questionnaire,
         private readonly ModelFileStore $fileStore,
+        private readonly ModelFileCleanupService $fileCleanup,
+        private readonly ModelPhotoPrimaryService $photoPrimary,
+        private readonly CustomerSearchSyncService $searchSync,
     ) {}
 
     public function show(string $token)
@@ -122,26 +134,52 @@ class ModelProfileAccessController extends Controller
 
         try {
             // All metadata writes are atomic; the encrypted file store stays
-            // outside the transaction and is cleaned up on failure below.
-            DB::transaction(function () use ($profile, $photoUpdates, $customer, $answers, $accessToken): void {
-                $profile->save();
-                $this->persistPhotoUpdates($photoUpdates, $profile);
-                $this->applyCustomerFields($customer, $answers);
-                $this->touch($accessToken);
-            });
+            // outside the transaction and is cleaned up on failure below. The
+            // photo service keeps the profile/cache lock around the complete
+            // owner transaction, including these later writes, until commit.
+            $this->photoPrimary->updateOwner(
+                $profile,
+                $photoUpdates,
+                function () use ($profile, $customer, $answers, $accessToken): void {
+                    if ($profile->save() !== true) {
+                        throw new \RuntimeException('Model profile update was cancelled.');
+                    }
+                    $this->searchSync->withoutSync(function () use ($customer, $answers): void {
+                        $this->applyCustomerFields($customer, $answers);
+                    });
+                    $this->touch($accessToken);
+                },
+            );
         } catch (\Throwable $exception) {
             // Never orphan a freshly stored proof on a failed metadata write.
             if ($storedAgeProof !== null) {
-                $this->fileStore->delete($storedAgeProof);
+                $this->fileCleanup->immediately(
+                    $storedAgeProof,
+                    'profile_update_rollback',
+                    $customer->id,
+                );
             }
 
             throw $exception;
         }
 
+        // The transaction has committed. Scout now reads the canonical customer
+        // row in a retryable job, so a later failure cannot roll the DB back or
+        // publish the pre-commit address.
+        $this->searchSync->defer($customer);
+
         // Replaced proof: drop the superseded file only after the new path stuck.
         if ($storedAgeProof !== null && $previousAgeProof && $previousAgeProof !== $storedAgeProof) {
-            $this->fileStore->delete($previousAgeProof);
+            $this->fileCleanup->afterCommit(
+                $previousAgeProof,
+                'profile_proof_replaced',
+                $customer->id,
+            );
         }
+
+        // Notify the inviting admin only after the transaction committed, so a
+        // rollback can never send a notification for data that was never stored.
+        $this->notifyInviter($profile, $customer);
 
         return response()->json([
             'success' => true,
@@ -156,12 +194,19 @@ class ModelProfileAccessController extends Controller
     public function mine(Request $request)
     {
         $user = auth('api')->user();
+        if (! ActorIdentity::isRegistered($user)) {
+            return response()->json([
+                'error' => 'Meine Profile sind nur für registrierte Konten verfügbar.',
+            ], 403);
+        }
 
+        $ownerId = ActorIdentity::registeredId($user);
+        $ownerBrand = $user->brand instanceof Brand ? $user->brand->value : $user->brand;
         $query = ModelProfile::query()
             ->with(['customer.modelAccessTokens', 'photos'])
-            ->whereHas('customer', function ($customer) use ($user): void {
-                $customer->where('user_id', $user->id)->where('is_model', true);
-                $brand = $user->brand instanceof Brand ? $user->brand->value : $user->brand;
+            ->whereHas('customer', function ($customer) use ($ownerId, $ownerBrand): void {
+                $customer->where('user_id', $ownerId)->where('is_model', true);
+                $brand = $ownerBrand;
                 if ($brand !== null) {
                     $customer->where('brand', $brand);
                 }
@@ -170,6 +215,68 @@ class ModelProfileAccessController extends Controller
         $profiles = $query->orderByDesc('updated_at')->get();
 
         return response()->json($profiles->map(fn (ModelProfile $profile) => $this->serializeMine($profile)));
+    }
+
+    /**
+     * Hand management of one of the owner's acts to another member.
+     *
+     * Guards: the token owner must be the act's current manager (403 otherwise)
+     * and the target must be a member of the same act (422). Only the manager
+     * acts here — no super-admin involvement.
+     */
+    public function transferManager(Request $request, string $token)
+    {
+        $accessToken = $this->resolveToken($token);
+        $profile = $this->profileFor($accessToken);
+        $customer = $profile->customer;
+
+        $validated = Validator::make($request->all(), [
+            'act_id' => ['required', 'uuid'],
+            'new_manager_customer_id' => ['required', 'uuid'],
+        ])->validate();
+
+        $act = Act::where('id', $validated['act_id'])->first();
+
+        if ($act === null || $act->manager_customer_id !== $customer->id) {
+            abort(response()->json(['error' => 'Nur der aktuelle Manager kann die Verwaltung abgeben.'], 403));
+        }
+
+        $newManagerId = $validated['new_manager_customer_id'];
+
+        if ($newManagerId === $customer->id) {
+            throw ValidationException::withMessages([
+                'new_manager_customer_id' => 'Du bist bereits Manager dieses Acts.',
+            ]);
+        }
+
+        $isMember = ActMember::where('act_id', $act->id)
+            ->where('customer_id', $newManagerId)
+            ->exists();
+
+        if (! $isMember) {
+            throw ValidationException::withMessages([
+                'new_manager_customer_id' => 'Die gewählte Person gehört nicht zu diesem Act.',
+            ]);
+        }
+
+        DB::transaction(function () use ($act, $newManagerId): void {
+            // Exactly one manager per act.
+            ActMember::where('act_id', $act->id)->update(['role' => 'member']);
+            ActMember::where('act_id', $act->id)
+                ->where('customer_id', $newManagerId)
+                ->update(['role' => 'manager']);
+
+            $act->forceFill(['manager_customer_id' => $newManagerId])->save();
+        });
+
+        $this->touch($accessToken);
+
+        $act->refresh()->load(['manager', 'members.customer']);
+
+        return response()->json([
+            'success' => true,
+            'act' => $this->serializeAct($act, $customer->id),
+        ]);
     }
 
     private function resolveToken(string $token): ModelAccessToken
@@ -208,6 +315,45 @@ class ModelProfileAccessController extends Controller
     }
 
     /**
+     * Mail the admin who invited this model. A customer can belong to several
+     * acts, and the invite may hang on any of them, so the inviter is resolved
+     * over ALL acts of the customer (Customer → Acts → latest Invite). The
+     * invite's own act provides the act metadata in the mail. Without a usable
+     * act/invite (e.g. an admin-created profile) the update simply sends no
+     * notification — it is not an error.
+     */
+    private function notifyInviter(ModelProfile $profile, Customer $customer): void
+    {
+        $actIds = $customer->acts()->pluck('acts.id');
+        if ($actIds->isEmpty()) {
+            return;
+        }
+
+        $invite = ModelRegistrationInvite::query()
+            ->whereIn('act_id', $actIds)
+            ->whereNotNull('invited_by')
+            ->with(['inviter', 'act'])
+            ->latest()
+            ->first();
+
+        $inviter = $invite?->inviter;
+        $act = $invite?->act;
+        if ($inviter === null || $act === null) {
+            return;
+        }
+
+        Mail::to($inviter->email)->queue(new ModelProfileUpdatedMail(
+            $inviter->name,
+            $customer->name ?? '',
+            $act->act_type,
+            $act->person_count,
+            $customer->id,
+            now()->format('d.m.Y H:i'),
+            Brand::tryFrom($profile->brandValue() ?? ''),
+        ));
+    }
+
+    /**
      * @param  array<string, mixed>  $answers
      */
     private function applyCustomerFields(Customer $customer, array $answers): void
@@ -216,13 +362,20 @@ class ModelProfileAccessController extends Controller
 
         $customer->fill(array_filter([
             'name' => $name !== '' ? $name : $customer->name,
+            // The profile snapshot is the encrypted source of the submitted
+            // answers; keep the canonical customer record in the same
+            // transaction so lifecycle/contact-sheet/search consumers cannot
+            // drift to an older address.
+            'email' => $answers['email'] ?? $customer->email,
             'street' => $answers['street'] ?? null,
             'zip' => $answers['zip'] ?? null,
             'city' => $answers['city'] ?? null,
             'country' => $answers['country'] ?? null,
             'birthdate' => $answers['birthdate'] ?? null,
         ], static fn ($value) => $value !== null && $value !== ''));
-        $customer->save();
+        if ($customer->save() !== true) {
+            throw new \RuntimeException('Model customer update was cancelled.');
+        }
     }
 
     /**
@@ -233,13 +386,18 @@ class ModelProfileAccessController extends Controller
      * primary clears it (no primary) instead of failing — so a single public
      * photo can be demoted to internal without a replacement.
      *
-     * @return array{visibility: array<string, string>, primary: ?string, clear: bool}
+     * @return array{visibility: array<string, string>, primary: ?string, clear: bool, primary_error_key: ?string}
      */
     private function resolvePhotoUpdates(Request $request, ModelProfile $profile): array
     {
         $changes = (array) $request->input('photos', []);
         if ($changes === []) {
-            return ['visibility' => [], 'primary' => null, 'clear' => false];
+            return [
+                'visibility' => [],
+                'primary' => null,
+                'clear' => false,
+                'primary_error_key' => null,
+            ];
         }
 
         $owned = $profile->photos()->get()->keyBy('id');
@@ -292,19 +450,28 @@ class ModelProfileAccessController extends Controller
 
         if ($requestedPrimaryId !== null) {
             $primaryId = $requestedPrimaryId;
-        } elseif ($clearPrimary) {
-            $primaryId = null;
         } else {
-            $primaryId = $currentPrimaryId;
+            // A visibility-only request must not implicitly re-elect the
+            // current primary. The service will still validate/repair the
+            // persisted primary set under the same profile lock.
+            $primaryId = null;
         }
 
-        // "Primary must be public" only applies when a primary remains set.
+        $primaryErrorKey = null;
+
+        // "Primary must be public" only applies when this request explicitly
+        // sets a primary. The service performs the invariant check again after
+        // applying visibility changes for legacy/concurrent states.
         if ($primaryId !== null) {
             $resolved = $visibility[$primaryId] ?? $owned->get($primaryId)->visibility;
-            if ($resolved !== ModelPhoto::VISIBILITY_PUBLIC) {
-                $key = $requestedPrimaryIndex !== null ? "photos.{$requestedPrimaryIndex}.is_primary" : 'photos';
+            $primaryErrorKey = $requestedPrimaryIndex !== null
+                ? "photos.{$requestedPrimaryIndex}.is_primary"
+                : 'photos';
 
-                throw ValidationException::withMessages([$key => 'Das Hauptbild muss öffentlich sein.']);
+            if ($resolved !== ModelPhoto::VISIBILITY_PUBLIC) {
+                throw ValidationException::withMessages([
+                    $primaryErrorKey => 'Das Hauptbild muss öffentlich sein.',
+                ]);
             }
         }
 
@@ -312,28 +479,8 @@ class ModelProfileAccessController extends Controller
             'visibility' => $visibility,
             'primary' => $primaryId,
             'clear' => $primaryId === null && $clearPrimary,
+            'primary_error_key' => $primaryErrorKey,
         ];
-    }
-
-    /**
-     * @param  array{visibility: array<string, string>, primary: ?string, clear: bool}  $updates
-     */
-    private function persistPhotoUpdates(array $updates, ModelProfile $profile): void
-    {
-        foreach ($updates['visibility'] as $id => $visibility) {
-            ModelPhoto::where('model_profile_id', $profile->id)
-                ->where('id', $id)
-                ->update(['visibility' => $visibility]);
-        }
-
-        if ($updates['primary'] !== null) {
-            ModelPhoto::where('model_profile_id', $profile->id)->update(['is_primary' => false]);
-            ModelPhoto::where('model_profile_id', $profile->id)
-                ->where('id', $updates['primary'])
-                ->update(['is_primary' => true]);
-        } elseif (! empty($updates['clear'])) {
-            ModelPhoto::where('model_profile_id', $profile->id)->update(['is_primary' => false]);
-        }
     }
 
     private function toBoolean(mixed $value): bool
@@ -370,6 +517,7 @@ class ModelProfileAccessController extends Controller
             'lifecycle_status' => $profile->lifecycleStatus(),
             'categories' => $this->questionnaire->categoriesPayload(),
             'sections' => $this->questionnaire->sections(),
+            'acts' => $customer !== null ? $this->serializeActs($customer) : [],
             'photos' => $profile->photos->map(fn (ModelPhoto $photo) => [
                 'id' => $photo->id,
                 'visibility' => $photo->visibility,
@@ -377,6 +525,48 @@ class ModelProfileAccessController extends Controller
                 'mime_type' => $photo->mime_type,
             ])->values(),
             'expires_at' => $accessToken->expires_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Acts the token owner belongs to, with the current manager and members.
+     * Members are only exposed inside this owner-scoped magic-link context; the
+     * owner needs the member list to hand management over.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function serializeActs(Customer $customer): array
+    {
+        $acts = Act::query()
+            ->with(['manager', 'members.customer'])
+            ->whereHas('members', fn ($query) => $query->where('customer_id', $customer->id))
+            ->orderByDesc('submitted_at')
+            ->get();
+
+        return $acts->map(fn (Act $act) => $this->serializeAct($act, $customer->id))->values()->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeAct(Act $act, string $viewerCustomerId): array
+    {
+        return [
+            'id' => $act->id,
+            'act_type' => $act->act_type,
+            'person_count' => (int) $act->person_count,
+            'is_manager' => $act->manager_customer_id === $viewerCustomerId,
+            'manager_customer_id' => $act->manager_customer_id,
+            'manager_name' => $act->manager?->name,
+            'members' => $act->members
+                ->sortBy('position')
+                ->values()
+                ->map(fn (ActMember $member) => [
+                    'customer_id' => $member->customer_id,
+                    'name' => $member->customer?->name,
+                    'is_manager' => $member->customer_id === $act->manager_customer_id,
+                ])
+                ->all(),
         ];
     }
 

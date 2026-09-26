@@ -14,7 +14,7 @@ export interface Project {
     email: string;
     phone: string | null;
     package: string | null;
-    price_cents: number;
+    price_cents: number | null;
     payment_status: string;
     linked_photo_job_id: string | null;
     notes: string | null;
@@ -25,9 +25,9 @@ export interface ProjectInput {
     email?: string;
     phone?: string | null;
     package?: string | null;
-    price_cents?: number;
+    price_cents?: number | null;
     payment_status?: string;
-    assignee_id?: string;
+    assignee_id?: string | null;
     notes?: string | null;
 }
 

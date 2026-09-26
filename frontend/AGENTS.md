@@ -47,6 +47,10 @@ E2E (Playwright):
 - Nur spezifisches Feature, z. B. checkout: `cd frontend && npx playwright test --grep @feature:checkout`
 - Nur fehlgeschlagene wiederholen: `cd frontend && npx playwright test --last-failed`
 
+Jeder neue E2E-Test benötigt mindestens einen funktionalen Tag (`@smoke`,
+`@regression` oder `@feature:<name>`); `@mobile` ist nur ein zusätzlicher
+Device-Tag und ersetzt keinen funktionalen Tag.
+
 E2E Workflow:
 
 1. Nach jedem Code-Change: `pnpm test:e2e:smoke`
@@ -57,7 +61,7 @@ E2E Workflow:
    - Fehlerursache (wenn bekannt)
    - `flaky` tag im Commit/PR
 
-Bug-Fixing: Bei fehlschlagenden E2E-Tests `npx playwright test --last-failed` wiederholt ausführen, bis alle grün sind.
+Bug-Fixing: Einen fokussierten Fehlschlag mit `npx playwright test --last-failed` wiederholen. Pro fehlschlagendem Test sind maximal drei Fix-Versuche erlaubt; nach dem dritten erfolglosen Versuch die Ursachenanalyse an den Benutzer zurückgeben und nicht weiterloopen.
 
 E2E Timeout Policy (STRICT):
 
@@ -65,7 +69,16 @@ E2E Timeout Policy (STRICT):
 - Timeout auf das Doppelte setzen (z. B. 7 min gemessen → 15 min Timeout)
 - Diese Regel und die Laufzeit in AGENTS.todo.md dokumentieren
 - Bei Änderungen an E2E-Tests neu messen und aktualisieren
-- Aktuelle Laufzeit (05.07.2026): ~7 min → Timeout: 15 min (900000 ms)
+- **Explizite Ausnahme (User-Entscheidung, 2026-09-25):** Die gemessene
+  langsamste parallele CI-Baseline beträgt 17m09s (Run `36035927250`; der
+  serielle Lauf benötigte 6m51s). Der ausdrücklich freigegebene
+  `globalTimeout` bleibt deshalb **25 Minuten (`1500000` ms)**; das wäre
+  bewusst **keine** Verdopplung der 17m09s (34m18s), sondern ein begrenzter
+  Sicherheits-Cap mit 7m51s Puffer zum gemessenen Maximum. Der
+  Per-Test-Timeout bleibt **120s (`120000` ms)**. Diese Ausnahme darf nicht
+  stillschweigend geändert werden; nach E2E-Änderungen braucht es eine neue
+  Messung und eine explizite User-Freigabe. Die Herleitung und der fehlende
+  lokale Playwright-Nachweis stehen auditable in `AGENTS.todo.md`.
 
 ## STRICT Frontend Rules
 

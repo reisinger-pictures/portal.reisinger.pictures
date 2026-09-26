@@ -16,7 +16,8 @@ import { apiMutate, fetcher } from '../../api';
 
 const mockPresets = {
     presets: [
-        { id: 'p1', name: 'Standard', is_default: true, tiers: [{ position: 0, min_quantity: 0, price_cents: 3000 }] },
+        // `id` is the numeric `volume_presets.id` primary key on the wire.
+        { id: 1, name: 'Standard', is_default: true, tiers: [{ position: 0, min_quantity: 0, price_cents: 3000 }] },
     ],
 };
 
@@ -84,8 +85,8 @@ describe('useVolumePresets', () => {
         vi.mocked(apiMutate).mockResolvedValue({} as never);
 
         const { result } = renderHook(() => useVolumePresets());
-        await result.current.updatePreset('p1', { name: 'Neu', tiers: [{ min_quantity: 0, price_cents: 1000 }] });
-        expect(apiMutate).toHaveBeenCalledWith('/api/management/settings/volume-presets/p1', 'PUT', {
+        await result.current.updatePreset(1, { name: 'Neu', tiers: [{ min_quantity: 0, price_cents: 1000 }] });
+        expect(apiMutate).toHaveBeenCalledWith('/api/management/settings/volume-presets/1', 'PUT', {
             name: 'Neu',
             tiers: [{ min_quantity: 0, price_cents: 1000 }],
         });
@@ -102,8 +103,8 @@ describe('useVolumePresets', () => {
         } as never);
 
         const { result } = renderHook(() => useVolumePresets());
-        await result.current.setDefaultPreset('p1');
-        expect(apiMutate).toHaveBeenCalledWith('/api/management/settings/volume-presets/p1/default', 'POST', {});
+        await result.current.setDefaultPreset(1);
+        expect(apiMutate).toHaveBeenCalledWith('/api/management/settings/volume-presets/1/default', 'POST', {});
         expect(mutate).toHaveBeenCalled();
     });
 });

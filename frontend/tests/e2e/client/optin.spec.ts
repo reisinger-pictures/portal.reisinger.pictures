@@ -21,6 +21,38 @@ test.describe('Client Notifications Opt-In', () => {
         if (helper) await helper.teardown();
     });
 
+    test('Cart navigation is exposed as a keyboard-operable link', { tag: ['@feature:client:optin', '@regression', '@mobile'] }, async ({ page }) => {
+        const auth = new AuthHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        const menuButton = page.getByRole('button', { name: 'Menü öffnen' });
+        await expect(page.locator('#dashboard-sidebar')).toHaveCount(1);
+        if (await menuButton.isVisible()) {
+            await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+            await expect(menuButton).toHaveAttribute('aria-controls', 'dashboard-sidebar');
+            await menuButton.focus();
+            await page.keyboard.press('Enter');
+            await expect(page.getByRole('button', { name: 'Menü schließen' })).toBeVisible();
+            await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+        }
+
+        const cartLink = page.getByRole('complementary').getByRole('link', { name: 'Warenkorb' });
+        await expect(cartLink).toHaveAttribute('href', '/cart');
+        await cartLink.focus();
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(/\/cart$/);
+    });
+
+    test('Notification preferences are discoverable from the account navigation', { tag: ['@feature:client:notifications', '@regression'] }, async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        await sidebar.navigateTo('Benachrichtigungen');
+        await expect(page).toHaveURL(/\/notifications$/);
+        await expect(page.getByRole('heading', { name: 'Benachrichtigungen' })).toBeVisible();
+    });
+
     test('Client can toggle email notifications in gallery view', { tag: ['@feature:client:optin'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

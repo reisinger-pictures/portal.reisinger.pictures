@@ -1,8 +1,9 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import {useState} from 'react';
+import {useId, useState} from 'react';
 import {Role, UserDetailed, UserRole} from '../../../logic/useUsers';
 import {FlatGroup, Gallery} from '../../../logic/useGalleries';
+import { useFocusTrap } from '../../../logic/useFocusTrap';
 
 interface UserPermissionsModalProps {
     user: UserDetailed;
@@ -31,6 +32,9 @@ export default function UserPermissionsModal({
     const [flatrateLevel, setFlatrateLevel] = useState<string>(user.flatrate_level || 'none');
     const [brand, setBrand] = useState<string | null>(user.brand ?? null);
     const [canPurchaseUpgrades, setCanPurchaseUpgrades] = useState<boolean>(user.can_purchase_upgrades ?? false);
+    const [isSaving, setIsSaving] = useState(false);
+    const titleId = useId();
+    const dialogRef = useFocusTrap<HTMLDivElement>(true, { onEscape: onClose });
 
     const selectedRoleNames = (roles ?? [])
         .filter(r => selRoles.includes(r.id))
@@ -63,16 +67,32 @@ export default function UserPermissionsModal({
         }
     };
 
-    const handleSave = () => {
-        onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand, canPurchaseUpgrades);
+    const handleSave = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            await onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand, canPurchaseUpgrades);
+        } catch {
+            // The parent reports the API error; retain the selected permissions.
+            setIsSaving(false);
+            return;
+        }
+        setIsSaving(false);
+        onClose();
     };
 
     const userNameEdit = user.name;
     return (
-        <div className="modal modal-open">
+        <div
+            className="modal modal-open"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+        >
             <div className="modal-box max-w-4xl relative">
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-2xl mb-1"><Trans>{userNameEdit} bearbeiten</Trans></h3>
+                <h3 id={titleId} className="font-bold text-2xl mb-1"><Trans>{userNameEdit} bearbeiten</Trans></h3>
                 <p className="opacity-70 mb-6 flex items-center gap-2">
                     <span className="iconify mdi--email-outline"></span> {user.email}
                 </p>
@@ -174,7 +194,7 @@ export default function UserPermissionsModal({
 
                 <div className="modal-action col-span-full mt-6">
                     <button className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                    <button className="btn btn-primary" onClick={handleSave}><Trans>Speichern</Trans></button>
+                    <button className="btn btn-primary" type="button" disabled={isSaving} onClick={handleSave}><Trans>Speichern</Trans></button>
                 </div>
             </div>
             <div className="modal-backdrop"></div>

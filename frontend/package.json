@@ -3,14 +3,18 @@
     "private": true,
     "version": "1.0.0",
     "type": "module",
+    "engines": {
+        "node": ">=26.7.0 <27"
+    },
     "packageManager": "pnpm@11.23.0",
     "scripts": {
         "dev": "vite",
-        "prebuild": "tsc -b && node scripts/check-i18n.mjs",
+        "prebuild": "node scripts/check-turnstile-build.mjs && tsc -b && node scripts/check-i18n.mjs",
         "build": "vite build",
         "preview": "vite preview",
         "lint": "eslint . --max-warnings 0",
         "lint:fix": "eslint . --fix --max-warnings 0",
+        "lint:e2e": "eslint --no-ignore tests/e2e --max-warnings 0",
         "test:e2e": "playwright test",
         "test:e2e:smoke": "playwright test --grep @smoke",
         "test:e2e:grep": "playwright test --grep",

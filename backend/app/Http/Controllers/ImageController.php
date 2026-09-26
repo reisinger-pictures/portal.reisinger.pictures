@@ -76,7 +76,7 @@ class ImageController extends Controller
             $meta['title'] = $originalName;
         }
 
-        return DB::transaction(function () use ($file, $gallery, $user, $extension, $targetDir, $thumbsDir, $isLrUpload, $lrUuid, $request, $meta) {
+        return DB::transaction(function () use ($file, $gallery, $user, $extension, $targetDir, $thumbsDir, $isLrUpload, $lrUuid, $originalName, $request, $meta) {
 
             $query = Photo::where('gallery_id', $gallery->id);
             if ($isLrUpload) {
@@ -110,8 +110,7 @@ class ImageController extends Controller
             $targetPath = Storage::disk('photos')->path($targetDir.'/'.$filename);
             $thumbPath = Storage::disk('photos')->path($thumbsDir.'/'.md5($filename.'1024').'.webp');
 
-            $photoModel = new Photo;
-            $filteredMeta = array_intersect_key($meta, array_flip($photoModel->getFillable()));
+            $filteredMeta = array_intersect_key($meta, array_flip((new Photo)->getFillable()));
 
             if ($existingPhoto) {
                 $existingPhoto->fill(array_merge([
@@ -120,13 +119,17 @@ class ImageController extends Controller
                 ], $filteredMeta))->save();
                 $photo = $existingPhoto;
             } else {
-                $photo = new Photo;
-                $photo->fill(array_merge([
-                    'id' => $photoId,
-                    'gallery_id' => $gallery->id,
-                    'lr_uuid' => $lrUuid,
-                    'user_id' => $user->id,
-                ], $filteredMeta))->save();
+                // The identifier doubles as the stored file name, so it has to
+                // exist before the row does. `id` is not fillable, so it goes
+                // through the explicit creation API rather than mass assignment.
+                $photo = Photo::createWithId(
+                    array_merge([
+                        'gallery_id' => $gallery->id,
+                        'lr_uuid' => $lrUuid,
+                        'user_id' => $user->id,
+                    ], $filteredMeta),
+                    $photoId,
+                );
             }
 
             return response()->json(['success' => true, 'photo_id' => $photo->id]);

@@ -1,10 +1,21 @@
-import {describe, it, expect} from 'vitest';
+import {afterEach, describe, it, expect, vi} from 'vitest';
 import {renderHook, act} from '@testing-library/react';
 import {useInvoiceDraft, isEmptyRow} from '../useInvoiceDraft';
 import {UIContext} from '../../ui/components/UIContext';
-import type {ReactNode} from 'react';
+import {StrictMode, type FormEvent, type ReactNode} from 'react';
 import type {UIContextType} from '../../ui/components/UIContext';
-import type {InvoiceItem, InvoiceDiscount} from '../../api';
+import {apiDownload, type InvoiceItem, type InvoiceDiscount} from '../../api';
+
+vi.mock('../../api', async importOriginal => {
+    const actual = await importOriginal<typeof import('../../api')>();
+    return {...actual, apiDownload: vi.fn()};
+});
+
+afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+});
 
 const noopToast: UIContextType = {
     showToast: () => {},
@@ -13,10 +24,10 @@ const noopToast: UIContextType = {
     setUnsavedChanges: () => {},
 };
 
-function createWrapper() {
+function createWrapper(value: UIContextType = noopToast) {
     return function Wrapper({children}: {children: ReactNode}) {
         return (
-            <UIContext.Provider value={noopToast}>
+            <UIContext.Provider value={value}>
                 {children}
             </UIContext.Provider>
         );
@@ -187,5 +198,80 @@ describe('loadExtractedData', () => {
         expect(result.current.formData.customer_email).toBe('max@example.com');
         expect(result.current.formData.customer_uid).toBe('DE123456789');
         expect(result.current.formData.terms_html).toBe('<p>Zahlungsbedingungen</p>');
+    });
+});
+
+describe('manual invoice serialization', () => {
+    it('sends a quarter quantity as explicit hundredths', async () => {
+        vi.mocked(apiDownload).mockResolvedValue({
+            blob: new Blob(['invoice'], {type: 'application/pdf'}),
+            filename: null,
+        });
+        vi.stubGlobal('URL', {createObjectURL: vi.fn(() => 'blob:invoice')});
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+        const {result} = renderHook(() => useInvoiceDraft('invoice'), {wrapper: createWrapper()});
+        act(() => {
+            result.current.loadExtractedData({
+                items: [{...filledRow, qty: 0.25}],
+                discounts: [],
+            });
+        });
+
+        const event = {preventDefault: vi.fn()} as unknown as FormEvent;
+        await act(async () => {
+            await result.current.handleDownload(event);
+        });
+
+        const request = vi.mocked(apiDownload).mock.calls[0]?.[1];
+        if (!request || typeof request.body !== 'string') {
+            throw new Error('Manual invoice request body was not captured.');
+        }
+        const payload = JSON.parse(request.body) as {items: Array<{qty: number; quantity_scale: number}>};
+        expect(payload.items[0]).toEqual(expect.objectContaining({
+            qty: 25,
+            quantity_scale: 100,
+        }));
+    });
+});
+
+describe('item move dirty state', () => {
+    it('marks a clean item move only once in StrictMode', async () => {
+        vi.mocked(apiDownload).mockResolvedValue({
+            blob: new Blob(['invoice'], {type: 'application/pdf'}),
+            filename: null,
+        });
+        vi.stubGlobal('URL', {createObjectURL: vi.fn(() => 'blob:invoice')});
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+        const setUnsavedChanges = vi.fn();
+        const value: UIContextType = {...noopToast, setUnsavedChanges};
+        const wrapper = ({children}: {children: ReactNode}) => (
+            <StrictMode>
+                <UIContext.Provider value={value}>{children}</UIContext.Provider>
+            </StrictMode>
+        );
+        const {result} = renderHook(() => useInvoiceDraft('invoice'), {wrapper});
+
+        act(() => {
+            result.current.loadExtractedData({items: [filledRow, anotherFilledRow], discounts: []});
+        });
+        // The successful download is the public clean-state reset; the move below is the
+        // first dirty operation after that reset.
+        const event = {preventDefault: vi.fn()} as unknown as FormEvent;
+        await act(async () => {
+            await result.current.handleDownload(event);
+        });
+
+        expect(result.current.items).toEqual([filledRow, anotherFilledRow]);
+        expect(result.current.isDirty).toBe(false);
+        setUnsavedChanges.mockClear();
+
+        act(() => { result.current.moveItemDown(0); });
+
+        expect(result.current.items).toEqual([anotherFilledRow, filledRow]);
+        expect(result.current.isDirty).toBe(true);
+        expect(setUnsavedChanges).toHaveBeenCalledTimes(1);
+        expect(setUnsavedChanges).toHaveBeenCalledWith(true);
     });
 });

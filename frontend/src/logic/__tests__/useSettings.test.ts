@@ -8,6 +8,7 @@ vi.mock('swr', () => ({
 
 vi.mock('../../api', () => ({
     fetcher: vi.fn(),
+    apiUpload: vi.fn(),
 }));
 
 vi.mock('../usePermissions', () => ({
@@ -16,6 +17,7 @@ vi.mock('../usePermissions', () => ({
 
 import useSWR from 'swr';
 import {usePermissions} from '../usePermissions';
+import {apiUpload} from '../../api';
 
 describe('useSettings.updateWatermark', () => {
     const mutate = vi.fn();
@@ -29,6 +31,7 @@ describe('useSettings.updateWatermark', () => {
             mutate,
         } as never);
         vi.mocked(usePermissions).mockReturnValue({isAdmin: true} as never);
+        vi.mocked(apiUpload).mockResolvedValue({success: true});
     });
 
     afterEach(() => {
@@ -36,16 +39,16 @@ describe('useSettings.updateWatermark', () => {
     });
 
     it('revalidates the watermark settings after a successful upload', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ok: true}));
-
+        const formData = new FormData();
         const {result} = renderHook(() => useSettings());
-        await result.current.updateWatermark(new FormData());
+        await result.current.updateWatermark(formData);
 
+        expect(apiUpload).toHaveBeenCalledWith('/api/management/settings/watermark', formData);
         expect(mutate).toHaveBeenCalledTimes(1);
     });
 
     it('throws and does not revalidate when the server responds with an error', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ok: false, status: 500}));
+        vi.mocked(apiUpload).mockRejectedValueOnce(new Error('Serverfehler'));
 
         const {result} = renderHook(() => useSettings());
         await expect(result.current.updateWatermark(new FormData())).rejects.toThrow('Fehler beim Speichern');

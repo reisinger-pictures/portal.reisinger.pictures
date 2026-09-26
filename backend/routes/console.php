@@ -4,6 +4,10 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
+// Keep scheduler mutexes on the configured shared store. The production
+// operations policy rejects file/array stores when onOneServer() is used.
+Schedule::useCache(config('cache.default'));
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
@@ -20,6 +24,13 @@ Schedule::command('app:cleanup-derivatives')->dailyAt('05:00')->withoutOverlappi
 
 // Temp-Dateien (alte Skalierungs-Caches & Artefakte) bereinigen
 Schedule::command('app:cleanup-temp')->dailyAt('02:30')->withoutOverlapping()->onOneServer();
+
+// GeoNames- und Länderdaten einmal pro Woche aktualisieren. Der Import darf
+// weder den Seed-Gate blockieren noch bei jedem Container-Neustart laufen.
+Schedule::command('app:import-locations')->weeklyOn(1, '03:30')->withoutOverlapping()->onOneServer();
+
+// Stripe: cancel incomplete PaymentIntents abandoned by abandoned checkouts
+Schedule::command('stripe:cancel-stale-payment-intents')->hourly()->withoutOverlapping()->onOneServer();
 
 // Model-Lifecycle: Reminder-Mails T+12/13/14 Monate (idempotent, brand-aware)
 Schedule::command('app:process-model-lifecycle')->dailyAt('07:00')->withoutOverlapping()->onOneServer();

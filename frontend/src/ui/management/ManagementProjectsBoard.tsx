@@ -12,7 +12,7 @@ import KanbanBoard, { KanbanColumnDef } from '../components/KanbanBoard';
 import ErrorMessage from '../components/ErrorMessage';
 import ProjectModal from './components/ProjectModal';
 
-const columns: KanbanColumnDef[] = [
+const createProjectColumns = (): KanbanColumnDef[] => [
     { status: 'anfrage', label: t`Anfrage` },
     { status: 'angebot', label: t`Angebot` },
     { status: 'beauftragt', label: t`Beauftragt` },
@@ -42,6 +42,7 @@ export default function ManagementProjectsBoard({ embedded = false }: Management
     const isDesktop = useIsDesktop();
     const disallowDrag = !isSuperAdmin || !isDesktop;
     const { showToast, confirm } = useUI();
+    const columns = createProjectColumns();
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Project | null>(null);
@@ -144,7 +145,7 @@ export default function ManagementProjectsBoard({ embedded = false }: Management
             {item.phone && <div className="text-xs opacity-60">{item.phone}</div>}
             {item.package && <div className="text-xs opacity-70">{item.package}</div>}
             <div className="flex flex-wrap items-center gap-1 mt-1">
-                {item.price_cents > 0 && <span className="font-bold text-sm">{formatMoney(item.price_cents)}</span>}
+                {item.price_cents != null && item.price_cents > 0 && <span className="font-bold text-sm">{formatMoney(item.price_cents)}</span>}
                 {paymentBadge(item.payment_status)}
             </div>
             {item.notes && (

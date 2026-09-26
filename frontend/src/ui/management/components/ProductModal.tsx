@@ -1,19 +1,20 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Product } from '../../../api';
+import { useFocusTrap } from '../../../logic/useFocusTrap';
 
-const productSchema = z.object({
+const createProductSchema = () => z.object({
     type: z.enum(['item', 'discount_fixed', 'discount_percent']),
     name: z.string().min(1, t`Name ist erforderlich`),
     description: z.string().optional(),
     price: z.number().min(0, t`Wert muss positiv sein`)
 });
 
-type ProductFormValues = z.infer<typeof productSchema>;
+type ProductFormValues = z.infer<ReturnType<typeof createProductSchema>>;
 
 interface Props {
     isOpen: boolean;
@@ -24,6 +25,7 @@ interface Props {
 
 export default function ProductModal({ isOpen, onClose, editingProduct, onSave }: Props) {
     "use no memo";
+    const productSchema = createProductSchema();
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema)
     });
@@ -40,17 +42,31 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
     }, [isOpen, editingProduct, reset]);
 
     const onSubmit = async (data: ProductFormValues) => {
-        await onSave({ ...data, price: Math.round(Number(data.price) * 100) });
-        onClose();
+        try {
+            await onSave({ ...data, price: Math.round(Number(data.price) * 100) });
+            onClose();
+        } catch {
+            // The parent reports the API error; keep the entered values and modal open.
+            return;
+        }
     };
+
+    const titleId = useId();
+    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
 
     if (!isOpen) return null;
 
     return (
-        <div className="modal modal-open z-50">
+        <div
+            className="modal modal-open z-50"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+        >
             <div className="modal-box relative">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
+                <h3 id={titleId} className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--package-variant-closed text-primary"></span>
                     {editingProduct ? <Trans>Katalog-Eintrag bearbeiten</Trans> : <Trans>Neuen Eintrag anlegen</Trans>}
                 </h3>

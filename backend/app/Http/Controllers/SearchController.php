@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Http\Request;
 
 class SearchController extends Controller
@@ -19,6 +20,14 @@ class SearchController extends Controller
         $q = $request->input('q', '');
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
+        $currentBrand = BrandRegistry::currentIdOrNull();
+
+        // Search results are public surfaces.  Without a concrete host brand
+        // (or for a null-brand request context) fail closed instead of
+        // exposing every configured brand.
+        if ($currentBrand === null) {
+            return response()->json(['galleries' => [], 'photos' => []]);
+        }
 
         $canSeeExpired = $user && ($svc->isAdmin($user) || $svc->isPhotographer($user));
 
@@ -30,12 +39,12 @@ class SearchController extends Controller
 
             $galQuery = Gallery::whereIn('id', $allowedGalleryIds);
             $phoQuery = Photo::whereIn('gallery_id', $allowedGalleryIds);
-
-            $currentBrand = BrandRegistry::current();
-            if ($currentBrand !== null) {
-                $galQuery->where('brand', $currentBrand);
-                $phoQuery->whereHas('gallery', fn ($q) => $q->where('brand', $currentBrand));
-            }
+            $galQuery->where('brand', $currentBrand)
+                ->where('is_hidden', false);
+            $phoQuery->where('is_hidden', false)
+                ->whereHas('gallery', fn ($query) => $query
+                    ->where('brand', $currentBrand)
+                    ->where('is_hidden', false));
 
             if (! $canSeeExpired) {
                 $galQuery->where(function ($query) {
@@ -46,8 +55,17 @@ class SearchController extends Controller
                 });
             }
 
-            $galResults = $galQuery->orderBy('id', 'desc')->take(12)->get();
-            $phoResults = $phoQuery->orderBy('id', 'desc')->take(24)->get();
+            // Raw flags are only query prefilters; the effective accessor below
+            // is the authoritative inherited-visibility decision.
+            $galResults = $galQuery->orderBy('id', 'desc')->take(12)->get()
+                ->filter(fn (Gallery $gallery): bool => ! $gallery->effective_is_hidden
+                    && BrandRegistry::galleryTreeMatchesCurrent($gallery))
+                ->values();
+            $phoResults = $phoQuery->orderBy('id', 'desc')->take(24)->get()
+                ->filter(fn (Photo $photo): bool => ! $photo->effective_is_hidden
+                    && $photo->gallery instanceof Gallery
+                    && BrandRegistry::galleryTreeMatchesCurrent($photo->gallery))
+                ->values();
 
             return response()->json([
                 'galleries' => $galResults->map(fn ($g) => new GalleryResource($g))->values(),
@@ -56,18 +74,21 @@ class SearchController extends Controller
         }
 
         if (strlen($q) < 1) {
-            $currentBrand = BrandRegistry::current();
             $publicQuery = Gallery::where('is_public', true)
+                ->where('type', 'delivery')
+                ->where('brand', $currentBrand)
+                ->where('is_hidden', false)
                 ->where(function ($query) {
                     $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 });
-            if ($currentBrand !== null) {
-                $publicQuery->where('brand', $currentBrand);
-            }
-            $publicGalleryIds = $publicQuery->pluck('id')->toArray();
+            $publicGalleryIds = $this->brandScopedGalleryIds(
+                $publicQuery->pluck('id')->toArray(),
+                $currentBrand,
+            );
 
             if ($user && ! $svc->isAdmin($user)) {
                 $allowed = $user->getAllowedGalleryIds();
+                $allowed = $this->brandScopedGalleryIds($allowed, $currentBrand);
                 if (! $canSeeExpired && ! empty($allowed)) {
                     $allowed = Gallery::whereIn('id', $allowed)->where(function ($query) {
                         $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
@@ -79,8 +100,19 @@ class SearchController extends Controller
                 return response()->json(['galleries' => [], 'photos' => []]);
             }
 
-            $galleries = Gallery::whereIn('id', $publicGalleryIds)->orderBy('id', 'desc')->take(12)->get();
-            $photos = Photo::whereIn('gallery_id', $publicGalleryIds)->orderBy('id', 'desc')->take(24)->get();
+            $galleries = Gallery::whereIn('id', $publicGalleryIds)
+                ->orderBy('id', 'desc')
+                ->take(12)
+                ->get()
+                ->filter(fn (Gallery $gallery): bool => ! $gallery->effective_is_hidden)
+                ->values();
+            $photos = Photo::whereIn('gallery_id', $publicGalleryIds)
+                ->where('is_hidden', false)
+                ->orderBy('id', 'desc')
+                ->take(24)
+                ->get()
+                ->filter(fn (Photo $photo): bool => ! $photo->effective_is_hidden)
+                ->values();
 
             return response()->json([
                 'galleries' => $galleries->map(fn ($g) => new GalleryResource($g))->values(),
@@ -97,12 +129,16 @@ class SearchController extends Controller
         }
 
         $allowedGalleryIds = $user ? $user->getAllowedGalleryIds() : [];
-        $currentBrand = BrandRegistry::current();
-        $publicGalleryIds = Gallery::where('is_public', true);
-        if ($currentBrand !== null) {
-            $publicGalleryIds->where('brand', $currentBrand);
-        }
-        $publicGalleryIds = $publicGalleryIds->pluck('id')->toArray();
+        $allowedGalleryIds = $this->brandScopedGalleryIds($allowedGalleryIds, $currentBrand);
+        $publicGalleryIds = $this->brandScopedGalleryIds(
+            Gallery::where('is_public', true)
+                ->where('type', 'delivery')
+                ->where('brand', $currentBrand)
+                ->where('is_hidden', false)
+                ->pluck('id')
+                ->toArray(),
+            $currentBrand,
+        );
 
         if (! $canSeeExpired) {
             $allowedGalleryIds = empty($allowedGalleryIds) ? [] : Gallery::whereIn('id', $allowedGalleryIds)->where(function ($query) {
@@ -122,13 +158,43 @@ class SearchController extends Controller
         $photoQuery->whereIn('gallery_id', $finalIds);
         $galleryQuery->whereIn('id', $finalIds);
 
-        $galResults = $galleryQuery->take(50)->get();
-        $phoResults = $photoQuery->take(100)->get();
+        $galResults = $galleryQuery->take(50)->get()
+            ->filter(fn (Gallery $gallery): bool => ! $gallery->effective_is_hidden)
+            ->values();
+        $phoResults = $photoQuery->take(100)->get()
+            ->filter(fn (Photo $photo): bool => ! $photo->effective_is_hidden)
+            ->values();
 
         return response()->json([
             'galleries' => $galResults->map(fn ($g) => new GalleryResource($g))->values(),
             'photos' => $phoResults->map(fn ($p) => new PhotoResource($p))->values(),
         ]);
+    }
+
+    /**
+     * Restrict a user's gallery grants to the active host brand and remove
+     * effectively hidden galleries.  This is intentionally separate from
+     * cross-brand management authorization: a public search response must
+     * never contain another brand's or hidden resource row.
+     *
+     * @param  array<int, string>  $galleryIds
+     * @return array<int, string>
+     */
+    private function brandScopedGalleryIds(array $galleryIds, string $brand): array
+    {
+        if ($galleryIds === []) {
+            return [];
+        }
+
+        return Gallery::whereIn('id', $galleryIds)
+            ->where('brand', $brand)
+            ->get()
+            ->filter(fn (Gallery $gallery): bool => ! $gallery->effective_is_hidden
+                && BrandRegistry::galleryTreeMatchesCurrent($gallery))
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
     }
 
     public function locations(Request $request)
@@ -161,10 +227,16 @@ class SearchController extends Controller
     public function photoContext($id)
     {
         $photo = Photo::with('gallery')->findOrFail($id);
+        if (! $photo->gallery || ! BrandRegistry::galleryTreeMatchesCurrent($photo->gallery)) {
+            abort(404);
+        }
+        if ($photo->effective_is_hidden) {
+            abort(404);
+        }
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 
-        if (! $photo->gallery->is_public) {
+        if (! $photo->gallery->effective_is_public) {
             if (! $user || ! $svc->canAccessGallery($user, $photo->gallery_id)) {
                 abort(403);
             }
@@ -172,9 +244,21 @@ class SearchController extends Controller
 
         $breadcrumbs = [];
         $groupId = $photo->gallery->gallery_group_id;
+        // AUTH-5: cycle-safe and depth-bounded breadcrumb walk.
+        $visitedGroupIds = [];
+        $depth = 0;
         while ($groupId) {
+            $groupKey = (string) $groupId;
+            if (isset($visitedGroupIds[$groupKey]) || $depth++ > GalleryGroupSubtree::MAX_DEPTH) {
+                break;
+            }
+            $visitedGroupIds[$groupKey] = true;
+
             $group = GalleryGroup::find($groupId);
             if ($group) {
+                if (! BrandRegistry::resourceMatchesCurrent($group->brand)) {
+                    abort(404);
+                }
                 array_unshift($breadcrumbs, ['name' => $group->name, 'full_path' => 'meta/'.$group->id, 'type' => 'group']);
                 $groupId = $group->parent_id;
             } else {

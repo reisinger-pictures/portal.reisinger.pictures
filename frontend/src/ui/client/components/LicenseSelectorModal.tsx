@@ -52,6 +52,7 @@ export default function LicenseSelectorModal({photo, onClose}: LicenseSelectorMo
             thumb_url: photo.thumb_url,
             tier,
             galleryId: photo.gallery_id,
+            galleryGroupId: photo.gallery?.gallery_group_id ?? undefined,
             price
         });
         showToast('success', t`In den Warenkorb gelegt`);

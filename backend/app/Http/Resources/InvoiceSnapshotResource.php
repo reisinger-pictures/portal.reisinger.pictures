@@ -15,7 +15,7 @@ class InvoiceSnapshotResource extends JsonResource
         return [
             'id' => $this->id,
             'invoice_number' => $this->invoice_number,
-            'customer_details' => $this->customer_details,
+            'customer_details' => $this->customerDetailsForPresentation(),
             'total_net' => $this->total_net,
             'total_gross' => $this->total_gross,
             'tax_rate' => $this->tax_rate,

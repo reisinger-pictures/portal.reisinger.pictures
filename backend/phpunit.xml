@@ -28,9 +28,13 @@
     <php>
         <ini name="memory_limit" value="256M"/>
         <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:dGVzdC1vbmx5LXBocHVuaXQta2V5LTMyLWJ5dGUhISE=" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
+        <env name="JWT_SECRET" value="test-only-jwt-secret-with-sufficient-entropy-for-phpunit"/>
+        <env name="STRIPE_SECRET" value="test-server-side-placeholder"/>
+        <env name="STRIPE_CUSTOMERS_ENABLED" value="false"/>
         
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
@@ -40,9 +44,10 @@
         <env name="MEILISEARCH_KEY" value="test_meili_secret"/>
         
         <env name="MAIL_MAILER" value="smtp"/>
+        <env name="MAIL_SCHEME" value="smtp"/>
+        <env name="MAIL_REQUIRE_TLS" value="false"/>
         <env name="MAIL_HOST" value="127.0.0.1"/>
         <env name="MAIL_PORT" value="1025"/>
-        <env name="MAIL_ENCRYPTION" value="null"/>
         <env name="MAIL_FROM_ADDRESS" value="test@reisinger.pictures"/>
         
         <env name="QUEUE_CONNECTION" value="sync"/>

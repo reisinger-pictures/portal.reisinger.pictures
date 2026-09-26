@@ -51,6 +51,10 @@ use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
+// AIS-3: the `ai-generate` limiter is registered in AppServiceProvider, not
+// here: `php artisan optimize` caches routes in production and would skip this
+// file, leaving the named limiter undefined at runtime. The two AI POST routes
+// below reference `throttle:ai-generate`.
 $throttleLimit = config('app.throttle_auth', 5);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
@@ -110,6 +114,7 @@ Route::middleware('throttle:model-registration')->group(function () {
     Route::get('/model-profil/{token}', [ModelProfileAccessController::class, 'show'])->name('api.model-profile.show');
     Route::post('/model-profil/{token}', [ModelProfileAccessController::class, 'update'])->name('api.model-profile.update');
     Route::post('/model-profil/{token}/confirm', [ModelProfileAccessController::class, 'confirm'])->name('api.model-profile.confirm');
+    Route::post('/model-profil/{token}/transfer-manager', [ModelProfileAccessController::class, 'transferManager'])->name('api.model-profile.transfer-manager');
 });
 
 Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check'])->name('api.contracts.join.check');
@@ -131,9 +136,15 @@ Route::middleware("throttle:$downloadThrottle,1")->get('/photos/{id}/download', 
 Route::get('/orders/quote-decode', [QuoteController::class, 'decodeQuoteLink'])->name('api.orders.quote-decode');
 Route::middleware('throttle:'.config('app.throttle_zip_download', 3).',1')->get('/galleries/{galleryId}/download-zip', [PhotoDownloadController::class, 'downloadZip'])->name('api.galleries.download-zip');
 
+// The refresh endpoint deliberately sits outside auth:api. Its dedicated
+// httpOnly refresh cookie remains valid after the short-lived access cookie
+// expires, while the protected routes below still require a live access token.
+Route::post('/auth/refresh', [AuthController::class, 'refresh'])
+    ->middleware('throttle:api')
+    ->name('api.auth.refresh');
+
 Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
-    Route::post('/auth/refresh', [AuthController::class, 'refresh'])->name('api.auth.refresh');
     Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
     Route::get('/me/models', [ModelProfileAccessController::class, 'mine'])->name('api.me.models');
     Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->name('api.auth.profile');
@@ -149,6 +160,7 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions'])->name('api.photos.versions');
     Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata'])->name('api.photos.revert');
     Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');
+    Route::get('/orders/{id}', [OrderController::class, 'show'])->name('api.orders.show');
     Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
     Route::get('/orders/{id}/invoice', [InvoiceDownloadController::class, 'downloadInvoice'])->name('api.orders.invoice');
     Route::middleware('throttle:'.config('app.throttle_zip_download', 3).',1')->get('/orders/{id}/download-zip', [PhotoDownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
@@ -157,8 +169,8 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
 
     // AI Metadata Generation
     Route::get('/ai/status', [AIController::class, 'status'])->name('api.ai.status');
-    Route::post('/ai/generate-metadata', [AIController::class, 'generateMetadata'])->name('api.ai.generate-metadata');
-    Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText'])->name('api.ai.generate-metadata-text');
+    Route::post('/ai/generate-metadata', [AIController::class, 'generateMetadata'])->middleware('throttle:ai-generate')->name('api.ai.generate-metadata');
+    Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText'])->middleware('throttle:ai-generate')->name('api.ai.generate-metadata-text');
 
     // Coupon validation (public, auth-required)
     Route::post('/coupons/validate', [CouponCheckoutController::class, 'validateCoupon'])->name('api.coupons.validate')->middleware('throttle:coupon-validate');
@@ -263,6 +275,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::delete('/management/model-invites/{id}', [ModelInviteController::class, 'destroy'])->name('api.management.model-invites.destroy');
     Route::get('/management/models', [ModelManagementController::class, 'index'])->name('api.management.models.index');
     Route::get('/management/models/{id}/age-proof', [ModelManagementController::class, 'ageProof'])->name('api.management.models.age-proof');
+    Route::get('/management/models/{id}/contact-sheet', [ModelManagementController::class, 'contactSheet'])->name('api.management.models.contact-sheet');
     Route::get('/management/models/{id}/photos/{photoId}', [ModelManagementController::class, 'photo'])->name('api.management.models.photos.download');
     Route::delete('/management/models/{id}/photos/{photoId}', [ModelManagementController::class, 'destroyPhoto'])->name('api.management.models.photos.destroy');
     Route::post('/management/models/{id}/photos/{photoId}/primary', [ModelManagementController::class, 'setPrimaryPhoto'])->name('api.management.models.photos.primary');

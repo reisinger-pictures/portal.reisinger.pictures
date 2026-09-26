@@ -1,4 +1,5 @@
 import {describe, it, expect, vi, beforeEach} from 'vitest';
+import {screen} from '@testing-library/react';
 import {renderWithProviders} from '../../test-setup';
 import ProfileSettingsCard from '../management/components/ProfileSettingsCard';
 
@@ -34,9 +35,20 @@ describe('ProfileSettingsCard', () => {
         });
     });
 
-    it('marks the name field as required', () => {
-        const {container} = renderWithProviders(<ProfileSettingsCard />);
+    it('associates unique IDs with semantic profile field labels', () => {
+        vi.mocked(usePermissions).mockReturnValue({isPhotographer: true} as never);
+        renderWithProviders(<ProfileSettingsCard />);
 
-        expect(container.querySelector('input[name="name"]')).toBeRequired();
+        const nameInput = screen.getByRole('textbox', {name: /^Dein Name$/});
+        const ftpSlugInput = screen.getByRole('textbox', {name: /^FTP Upload Ordner \(Slug\)/});
+        const copyrightInput = screen.getByRole('textbox', {name: /^Standard-Urheber \(IPTC Copyright\)/});
+        const inputIds = [nameInput.id, ftpSlugInput.id, copyrightInput.id];
+
+        expect(nameInput).toBeRequired();
+        expect(inputIds.every(id => id.length > 0)).toBe(true);
+        expect(new Set(inputIds).size).toBe(inputIds.length);
+        expect(nameInput).toHaveAccessibleName('Dein Name');
+        expect(ftpSlugInput).toHaveAccessibleName(/^FTP Upload Ordner \(Slug\)/);
+        expect(copyrightInput).toHaveAccessibleName(/^Standard-Urheber \(IPTC Copyright\)/);
     });
 });

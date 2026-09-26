@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import {fetcher} from '../api';
+import {apiUpload, fetcher} from '../api';
 import {usePermissions} from './usePermissions';
 
 export interface WatermarkSettings {
@@ -18,16 +18,12 @@ export function useSettings() {
     );
 
     const updateWatermark = async (formData: FormData) => {
-        const response = await fetch('/api/management/settings/watermark', {
-            method: 'POST',
-            headers: {'Accept': 'application/json'},
-            credentials: 'include',
-            body: formData
-        });
-        if (!response.ok) {
-            // Ohne diesen Check würde der Aufrufer trotz Serverfehler einen
-            // Erfolgs-Toast anzeigen (res wird bislang nicht geprüft).
-            throw new Error('Fehler beim Speichern');
+        try {
+            await apiUpload<unknown>('/api/management/settings/watermark', formData);
+        } catch (error: unknown) {
+            // Keep the form-level error stable for the UI while the shared
+            // helper has already applied refresh/retry and normalised details.
+            throw new Error('Fehler beim Speichern', {cause: error});
         }
         await mutate();
     };

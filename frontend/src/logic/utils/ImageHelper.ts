@@ -1,6 +1,13 @@
-export const getCompressedBase64 = async (imageUrl: string, maxSide = 2048): Promise<string> => {
-    const res = await fetch(imageUrl);
-    const blob = await res.blob();
+import { apiDownload } from '../../api';
+
+export const getCompressedBase64 = async (
+    imageUrl: string,
+    maxSide = 2048,
+    signal?: AbortSignal
+): Promise<string> => {
+    const { blob } = signal
+        ? await apiDownload(imageUrl, { signal, accept: 'image/jpeg, image/png, image/*' })
+        : await apiDownload(imageUrl, { accept: 'image/jpeg, image/png, image/*' });
     const objectUrl = URL.createObjectURL(blob);
     
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {

@@ -51,3 +51,87 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * `rolled_over_amount_cents` (Integer)
 * `total_payable_cents` (Integer)
 * `status` (Enum: `pending`, `rollover`, `approved`, `paid`)
+
+## 3. Data-integrity contract
+
+### 3.1 Natural keys and duplicate policy (P1-M16)
+
+The active calculation workflow has one aggregate pool per calendar month and
+one statement per photographer and calendar month. Its natural keys are therefore
+`(year, month)` for `payout_pools` and `(user_id, year, month)` for
+`photographer_statements`. The nullable `payout_pools.product_id` column is not
+part of the active key until product-scoped pool calculation is introduced;
+adding it now would make the current global pool ambiguous because SQL unique
+indexes do not consistently treat multiple `NULL` values as conflicts across
+supported drivers.
+
+`V040__enforce_payout_natural_keys.php` is the deployment boundary for these
+constraints. Before adding either unique index, the migration audits both
+natural keys and emits a bounded duplicate report. **Existing financial rows
+are never deleted, merged, or silently selected as a winner.** If a duplicate
+group exists, the migration aborts and an operator must reconcile the reported
+rows in a controlled maintenance procedure before retrying it. The finance
+owner must document whether the rows are data-entry duplicates or distinct
+historical events; if they are distinct events, the pool/statement scope must
+be corrected before the constraint is retried. Once the preflight is clean,
+the named unique indexes are the durable authority for
+future writes. Run the migration during the payout-write maintenance window;
+if a concurrent write still slips past the scan, index creation fails closed
+and the migration can be retried after the write is reconciled. V011 and
+earlier deployed migrations remain unchanged.
+
+On MySQL/MariaDB, replacing the statement index first verifies that another
+index begins with `user_id` and creates `photographer_statements_user_id_fk_support`
+when needed. The composite natural-key index can therefore be replaced without
+leaving the `users` foreign key without a supporting index. PostgreSQL and
+SQLite keep their existing branches and do not receive that MySQL-only index.
+
+Payout writers use a race-safe create-or-read primitive followed by a
+transactional row lock. The unique index resolves a concurrent first insert;
+the lock makes the subsequent money arithmetic atomic and ensures an
+`approved`/`paid` statement is checked while locked before any contribution is
+added. A calculation replay therefore cannot create a second natural-key row.
+
+`PayoutCalculationService::calculatePoolShares()` is the authoritative
+calculation for the single pool identified by `(year, month)`: it replaces the
+pool-derived `total_shares_earned` and `pool_earnings_cents` fields for the
+month, while preserving surcharge earnings and locked statements. Calling the
+service directly again with the same logs is therefore idempotent. The
+power-user surcharge pass is a separate additive step and is run after the
+pool replacement.
+
+### 3.2 Full-ZIP audit counts
+
+Every new `full_zip` `DownloadLog` must provide an explicit, positive
+`photo_count`. The current gallery and order download paths always derive this
+count from the files they prepared. The `DownloadLog` model rejects omitted,
+zero, and negative counts on creation so the historical database default of
+`1` cannot silently under-count a new archive.
+
+**External contract of the empty-archive branch.** `photo_count` is derived
+from the *prepared* files, not from the number of persisted `Photo` rows: a
+photo whose source file is missing on the photos disk is skipped during
+preparation and is not counted. The gallery ZIP endpoint
+(`GET /api/galleries/{id}/download-zip`) and the order ZIP endpoint
+(`GET /api/orders/{id}/download-zip`) therefore both fail closed when
+preparation yields zero files:
+
+- HTTP status `422 Unprocessable Entity` with the exact German message
+  `Der ZIP-Download enthält keine Bilder.`
+- No ZIP bytes and **no `download_log` row** — neither a partial row nor a
+  zero-count row. A zero-count archive is never auditable and must never
+  reach payout attribution.
+
+The two endpoints wrap that message differently, and both shapes are part of
+the contract: the gallery branch catches the abort and answers
+`{"error": "Der ZIP-Download enthält keine Bilder."}`, while the order branch
+lets the exception reach the framework and answers
+`{"message": "Der ZIP-Download enthält keine Bilder."}` for JSON clients.
+Both are covered by regression tests; a third-party ZIP client must therefore
+treat either key as the authoritative reason and must not infer the count from
+the absence of a log row.
+
+Existing legacy rows are not rewritten or deleted. A stored positive legacy
+count (including the historical `1` fallback) remains readable and is used by
+payout attribution; malformed non-positive legacy values are ignored by the
+read-side calculation guard rather than converted into a payout.

@@ -38,6 +38,7 @@ export default function ClientOrdersView() {
                             const isQuote = order.is_quote_request;
                             const isPendingQuote = isQuote && order.status === 'pending';
                             const isBlocked = ['disputed', 'refunded', 'cancelled'].includes(order.status);
+                            const isPendingPayment = order.status === 'pending_payment';
                             const orderStatus = order.status;
                             return (
                                 <div key={order.id} className="card bg-base-100 border border-base-300 shadow-sm overflow-hidden">
@@ -52,12 +53,16 @@ export default function ClientOrdersView() {
                                             </div>
 {isPendingQuote ? <span className="badge badge-warning font-bold p-3"><Trans>Angebot ausständig</Trans></span> : 
 isBlocked ? <span className="badge badge-error font-bold p-3"><Trans>Zugriff gesperrt ({orderStatus})</Trans></span> :
-                                            <>                                            <button className="btn btn-primary btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/download-zip', '_blank')} title={t`Lizenzierte Bilder als ZIP herunterladen`}>
-                                                <span className="iconify mdi--zip-box"></span> <Trans>Bilder ZIP</Trans>
-                                            </button>
-                                            <button className="btn btn-outline btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/invoice', '_blank')} title={t`Rechnung als PDF herunterladen`}>
-                                                <span className="iconify mdi--file-pdf-box text-error"></span> <Trans>Beleg</Trans>
-                                            </button></>}
+                                            <>
+                                                {!isPendingPayment && (
+                                                    <button className="btn btn-primary btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/download-zip', '_blank', 'noopener,noreferrer')} title={t`Lizenzierte Bilder als ZIP herunterladen`}>
+                                                        <span className="iconify mdi--zip-box"></span> <Trans>Bilder ZIP</Trans>
+                                                    </button>
+                                                )}
+                                                <button className="btn btn-outline btn-sm shrink-0" onClick={() => window.open('/api/orders/' + order.id + '/invoice', '_blank', 'noopener,noreferrer')} title={t`Rechnung als PDF herunterladen`}>
+                                                    <span className="iconify mdi--file-pdf-box text-error"></span> <Trans>Beleg</Trans>
+                                                </button>
+                                            </>}
                                         </div>
                                     </div>
                                     {order.status === 'invoice_created' && (

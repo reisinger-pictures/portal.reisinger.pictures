@@ -2,14 +2,16 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\Brand;
+use App\Enums\UserRole;
+use App\Mail\OrgInviteMail;
 use App\Models\Org;
 use App\Models\OrgInvite;
-use App\Mail\OrgInviteMail;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
 
 class OrgInviteControllerTest extends TestCase
 {
@@ -23,15 +25,17 @@ class OrgInviteControllerTest extends TestCase
 
     private function adminToken(): string
     {
-        $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+
         return auth('api')->login($user);
     }
 
     private function clientToken(): string
     {
-        $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
+
         return auth('api')->login($user);
     }
 
@@ -159,7 +163,7 @@ class OrgInviteControllerTest extends TestCase
 
     public function test_redeem_invite_creates_user_with_client_role(): void
     {
-        $clientRole = Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]);
+        $clientRole = Role::firstOrCreate(['name' => UserRole::CLIENT->value]);
         $org = Org::factory()->create();
         $invite = OrgInvite::create([
             'email' => 'redeem@example.com',

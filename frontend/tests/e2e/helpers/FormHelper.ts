@@ -97,18 +97,20 @@ export class FormHelper {
     }
 
     async fillCheckoutForm(params: FillCheckoutFormParams) {
-        if (params.name) await this.page.fill('input[name="billing_name"]', params.name);
-        if (params.street) await this.page.fill('input[name="billing_street"]', params.street);
-        if (params.zip) await this.page.fill('input[name="billing_zip"]', params.zip);
-        if (params.city) await this.page.fill('input[name="billing_city"]', params.city);
-        if (params.acceptAgb) await this.page.locator('input[name="agb_accepted"]').check();
-        if (params.waiveWithdrawal) await this.page.locator('input[name="withdrawal_waived"]').check();
+        const main = this.page.getByRole('main');
+        if (params.name) await main.getByLabel('Vor- & Nachname').fill(params.name);
+        if (params.street) await main.getByLabel('Straße & Hausnummer').fill(params.street);
+        if (params.zip) await main.getByLabel('PLZ').fill(params.zip);
+        if (params.city) await main.getByRole('textbox', {name: 'Ort *', exact: true}).fill(params.city);
+        if (params.acceptAgb) await main.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i}).check();
+        if (params.waiveWithdrawal) await main.getByRole('checkbox', {name: /widerrufsrecht/i}).check();
     }
 
     async fillProfileForm(params: FillProfileFormParams) {
-        if (params.name) await this.page.locator('.form-control').filter({hasText: 'Dein Name'}).locator('input').fill(params.name);
-        if (params.ftpSlug) await this.page.locator('.form-control').filter({hasText: 'FTP Upload Ordner'}).locator('input').fill(params.ftpSlug);
-        if (params.copyright) await this.page.locator('.form-control').filter({hasText: 'Standard-Urheber'}).locator('input').fill(params.copyright);
+        const main = this.page.getByRole('main');
+        if (params.name) await main.getByRole('textbox', {name: 'Dein Name', exact: true}).fill(params.name);
+        if (params.ftpSlug) await main.getByRole('textbox', {name: /^FTP Upload Ordner \(Slug\)/}).fill(params.ftpSlug);
+        if (params.copyright) await main.getByRole('textbox', {name: /^Standard-Urheber \(IPTC Copyright\)/}).fill(params.copyright);
     }
 
     async fillStripeForm(_stripeFrame: unknown, card: CreditCard) {

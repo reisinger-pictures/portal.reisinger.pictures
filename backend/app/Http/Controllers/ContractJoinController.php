@@ -2,20 +2,31 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ContractCloseConflictException;
+use App\Exceptions\ContractIdentityException;
+use App\Exceptions\ContractUnavailableException;
 use App\Models\Contract;
 use App\Models\ContractSigner;
-use App\Models\ContractAuditLog;
 use App\Services\ContractAuditService;
 use App\Services\ContractCloseService;
 use App\Services\ContractTemplateService;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 class ContractJoinController extends Controller
 {
     private ContractTemplateService $contractTemplateService;
+
     private ContractAuditService $contractAuditService;
+
     private ContractCloseService $contractCloseService;
 
     public function __construct(ContractTemplateService $contractTemplateService, ContractAuditService $contractAuditService, ContractCloseService $contractCloseService)
@@ -28,15 +39,15 @@ class ContractJoinController extends Controller
     public function check($token)
     {
         $contract = Contract::where('join_token', $token)->first();
-        if (!$contract) {
+        if (! $contract) {
             return response()->json(['error' => 'Ungültiger Vertragslink'], 404);
         }
-        if ($contract->status !== 'active') {
-            return response()->json(['error' => 'Dieser Vertrag nimmt keine Unterschriften mehr an'], 410);
+
+        $availabilityResponse = $this->availabilityResponse($contract);
+        if ($availabilityResponse !== null) {
+            return $availabilityResponse;
         }
-        if ($contract->expires_at && $contract->expires_at->isPast()) {
-            return response()->json(['error' => 'Der Vertragslink ist abgelaufen'], 410);
-        }
+
         return response()->json([
             'contract_id' => $contract->id,
             'status' => $contract->status,
@@ -50,94 +61,69 @@ class ContractJoinController extends Controller
     public function join(Request $request, $token)
     {
         $contract = Contract::where('join_token', $token)->first();
-        if (!$contract || $contract->status !== 'active') {
+        if (! $contract) {
             return response()->json(['error' => 'Vertrag nicht verfügbar'], 410);
         }
 
-        if ($contract->expires_at && $contract->expires_at->isPast()) {
-            return response()->json(['error' => 'Der Vertragslink ist abgelaufen'], 410);
+        // Reject an expired/closed link before exposing its role metadata.
+        $availabilityResponse = $this->availabilityResponse($contract);
+        if ($availabilityResponse !== null) {
+            return $availabilityResponse;
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255',
-            'roles' => 'required|array|min:1',
-            'roles.*' => 'required|string|in:' . implode(',', $contract->available_roles),
-        ]);
+        $validated = $this->validateJoinRequest($request, $contract);
 
-        if (count($validated['roles']) > 1 && !$contract->allow_multiple_roles_per_signer) {
-            return response()->json(['error' => 'Mehrere Rollen pro Unterzeichner sind nicht erlaubt'], 422);
-        }
-
-        $personalToken = Str::random(64);
-
-        if ($contract->type === 'template') {
-            $existingSigner = ContractSigner::where('email', $validated['email'])
-                ->whereHas('contract', function ($q) use ($contract) {
-                    $q->where('template_id', $contract->id);
-                })
-                ->first();
-            if ($existingSigner) {
-                if ($existingSigner->status === 'signed') {
-                    return response()->json(['error' => 'Mit dieser E-Mail wurde bereits unterschrieben'], 409);
-                }
-                return response()->json([
-                    'personal_token' => $existingSigner->personal_token,
-                    'name' => $existingSigner->name,
-                    'roles' => $existingSigner->roles,
-                ]);
+        try {
+            $email = Contract::normalizeSignerEmail($validated['email']);
+            $result = $contract->type === 'template'
+                ? $this->contractTemplateService->createInstance($contract, [
+                    'name' => $validated['name'],
+                    'email' => $email,
+                    'roles' => $validated['roles'],
+                    'personal_token' => Str::random(64),
+                ])
+                : $this->createStandardJoin($contract, $request, $email);
+        } catch (ContractUnavailableException $exception) {
+            return response()->json([
+                'error' => $exception->getMessage(),
+            ], 410);
+        } catch (LockTimeoutException) {
+            return response()->json([
+                'error' => 'Der Vertrag wird gerade bearbeitet. Bitte versuche es erneut.',
+            ], 409);
+        } catch (ContractIdentityException) {
+            return response()->json([
+                'error' => 'Die Vertragsidentität ist ungültig.',
+            ], 422);
+        } catch (UniqueConstraintViolationException $exception) {
+            if (! ContractSigner::isIdentityUniqueViolation($exception)) {
+                throw $exception;
             }
 
-            $result = $this->contractTemplateService->createInstance($contract, [
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'roles' => $validated['roles'],
-                'personal_token' => $personalToken,
-            ]);
-
-            $this->contractAuditService->log($result['instance']->id, $result['signer']->id, 'opened', $request);
-
             return response()->json([
-                'personal_token' => $personalToken,
-                'name' => $result['signer']->name,
-                'roles' => $result['signer']->roles,
-            ], 201);
-        }
-
-        $existing = ContractSigner::where('contract_id', $contract->id)
-            ->where('email', $validated['email'])
-            ->where('status', 'signed')
-            ->first();
-        if ($existing) {
-            return response()->json(['error' => 'Mit dieser E-Mail wurde bereits unterschrieben'], 409);
-        }
-
-        $existingJoined = ContractSigner::where('contract_id', $contract->id)
-            ->where('email', $validated['email'])
-            ->where('status', 'joined')
-            ->first();
-        if ($existingJoined) {
-            $this->contractAuditService->log($contract->id, $existingJoined->id, 'opened', $request);
+                'error' => ContractSigner::DUPLICATE_JOIN_ERROR,
+            ], 409);
+        } catch (InvalidArgumentException) {
             return response()->json([
-                'personal_token' => $existingJoined->personal_token,
-                'name' => $existingJoined->name,
-                'roles' => $existingJoined->roles,
-            ]);
+                'error' => 'Der Vertragsbetrag ist ungültig.',
+            ], 422);
         }
 
-        $signer = ContractSigner::create([
-            'contract_id' => $contract->id,
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'roles' => $validated['roles'],
-            'personal_token' => $personalToken,
-            'status' => 'joined',
-        ]);
+        if (($result['created'] ?? false) !== true) {
+            return response()->json([
+                'error' => $result['error'] ?? 'Der Beitritt konnte nicht verarbeitet werden.',
+            ], (int) ($result['status'] ?? 409));
+        }
 
-        $this->contractAuditService->log($contract->id, $signer->id, 'opened', $request);
+        /** @var ContractSigner $signer */
+        $signer = $result['signer'];
+        /** @var Contract $instance */
+        $instance = $result['instance'];
+
+        $this->contractAuditService->log($instance->getKey(), $signer->getKey(), 'opened', $request);
 
         return response()->json([
-            'personal_token' => $personalToken,
+            'personal_token' => $signer->personal_token,
             'name' => $signer->name,
             'roles' => $signer->roles,
         ], 201);
@@ -146,42 +132,113 @@ class ContractJoinController extends Controller
     public function contractContent($personalToken)
     {
         $signer = ContractSigner::where('personal_token', $personalToken)->with('contract')->first();
-        if (!$signer) {
+        if (! $signer || ! $signer->contract) {
             return response()->json(['error' => 'Ungültiger persönlicher Link'], 404);
         }
-        if ($signer->status === 'signed') {
-            return response()->json(['error' => 'Bereits unterschrieben'], 409);
-        }
-        if ($signer->contract->status !== 'active') {
-            return response()->json(['error' => 'Der Vertrag nimmt keine Unterschriften mehr an'], 410);
+
+        try {
+            $result = DB::transaction(function () use ($personalToken, $signer): array {
+                // Use the same lock order as sign(): contract first, then its
+                // optional template, then the signer. A read therefore observes
+                // either the state before a concurrent close or the state after
+                // it, never a stale parent/deadline mix.
+                $lockedContract = $this->lockContractAndTemplate($signer->contract_id);
+                if ($lockedContract === null) {
+                    return [
+                        'status' => 404,
+                        'error' => 'Ungültiger persönlicher Link',
+                        'payload' => null,
+                    ];
+                }
+
+                $lockedSigner = ContractSigner::query()
+                    ->whereKey($signer->getKey())
+                    ->where('contract_id', $lockedContract->getKey())
+                    ->where('personal_token', $personalToken)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($lockedSigner === null) {
+                    return [
+                        'status' => 404,
+                        'error' => 'Ungültiger persönlicher Link',
+                        'payload' => null,
+                    ];
+                }
+
+                $availabilityError = $lockedContract->publicAvailabilityError(Contract::databaseNow());
+                if ($availabilityError !== null || ! $lockedContract->isPubliclyAvailableAtDatabaseTime()) {
+                    $availabilityError ??= $lockedContract->fresh()?->publicAvailabilityError(Contract::databaseNow())
+                        ?? 'Dieser Vertrag nimmt keine Unterschriften mehr an';
+
+                    return [
+                        'status' => 410,
+                        'error' => $availabilityError,
+                        'payload' => null,
+                    ];
+                }
+
+                if ($lockedSigner->status === 'signed') {
+                    return [
+                        'status' => 409,
+                        'error' => 'Bereits unterschrieben',
+                        'payload' => null,
+                    ];
+                }
+
+                $this->contractAuditService->log($lockedContract->getKey(), $lockedSigner->getKey(), 'heartbeat', request());
+                $snapshot = $this->contractCloseService->normalizedSnapshot($lockedContract);
+
+                return [
+                    'status' => 200,
+                    'error' => null,
+                    'payload' => [
+                        'contract' => [
+                            'id' => $lockedContract->id,
+                            'terms_html' => $lockedContract->terms_html,
+                            'items' => $snapshot['items'],
+                            'discounts' => $snapshot['discounts'],
+                            'total' => $this->contractCloseService->calculateTotal($lockedContract),
+                            'billing_details' => $lockedContract->billing_details,
+                            'available_roles' => $lockedContract->available_roles,
+                            'content_version' => $lockedContract->content_version,
+                        ],
+                        'signer' => [
+                            'id' => $lockedSigner->id,
+                            'name' => $lockedSigner->name,
+                            'email' => $lockedSigner->email,
+                            'roles' => $lockedSigner->roles,
+                            'status' => $lockedSigner->status,
+                        ],
+                    ],
+                ];
+            }, 3);
+        } catch (InvalidArgumentException) {
+            return response()->json(['error' => 'Der Vertragsbetrag ist ungültig.'], 422);
         }
 
-        $this->contractAuditService->log($signer->contract_id, $signer->id, 'heartbeat', request());
+        if (($result['status'] ?? 500) !== 200) {
+            return response()->json([
+                'error' => $result['error'] ?? 'Der Vertrag konnte nicht gelesen werden.',
+            ], (int) ($result['status'] ?? 500));
+        }
 
-        return response()->json([
-            'contract' => [
-                'id' => $signer->contract->id,
-                'terms_html' => $signer->contract->terms_html,
-                'items' => $signer->contract->items,
-                'discounts' => $signer->contract->discounts,
-                'billing_details' => $signer->contract->billing_details,
-                'available_roles' => $signer->contract->available_roles,
-                'content_version' => $signer->contract->content_version,
-            ],
-            'signer' => [
-                'id' => $signer->id,
-                'name' => $signer->name,
-                'email' => $signer->email,
-                'roles' => $signer->roles,
-                'status' => $signer->status,
-            ],
-        ]);
+        return response()->json($result['payload']);
     }
 
     public function pageExit($personalToken)
     {
-        $signer = ContractSigner::where('personal_token', $personalToken)->first();
-        if (!$signer) {
+        // Page exit is telemetry, not a signing or authorization operation.
+        // A beacon can legitimately arrive after the contract was closed (or
+        // after a successful signature), so signing deadlines/status are not
+        // re-evaluated here. It is still valid only for a real personal token
+        // with an associated contract; it never returns contract data or
+        // mutates signer state.
+        $signer = ContractSigner::query()
+            ->where('personal_token', $personalToken)
+            ->whereHas('contract')
+            ->first();
+        if (! $signer) {
             return response()->json(null, 404);
         }
 
@@ -192,10 +249,16 @@ class ContractJoinController extends Controller
 
     public function sign(Request $request, $personalToken)
     {
-        $signer = ContractSigner::where('personal_token', $personalToken)->first();
-        if (!$signer) {
+        $signer = ContractSigner::where('personal_token', $personalToken)->with('contract')->first();
+        if (! $signer || ! $signer->contract) {
             return response()->json(['error' => 'Ungültiger persönlicher Link'], 404);
         }
+
+        $availabilityResponse = $this->availabilityResponse($signer->contract);
+        if ($availabilityResponse !== null) {
+            return $availabilityResponse;
+        }
+
         if ($signer->status === 'signed') {
             return response()->json(['error' => 'Bereits unterschrieben'], 409);
         }
@@ -205,34 +268,353 @@ class ContractJoinController extends Controller
             'content_version' => 'required|integer',
         ]);
 
-        $affected = DB::table('contract_signers')
-            ->join('contracts', 'contract_signers.contract_id', '=', 'contracts.id')
-            ->where('contract_signers.personal_token', $personalToken)
-            ->where('contract_signers.status', 'joined')
-            ->where('contracts.status', 'active')
-            ->where('contracts.content_version', (int) $validated['content_version'])
-            ->update([
-                'contract_signers.status' => 'signed',
-                'contract_signers.signed_at' => now(),
-            ]);
+        try {
+            $result = Cache::lock($this->signLockKey($personalToken), 30)->block(10, function () use ($request, $personalToken, $signer, $validated): array {
+                return DB::transaction(function () use ($request, $personalToken, $signer, $validated): array {
+                    $lockedContract = $this->lockContractAndTemplate($signer->contract_id);
 
-        if ($affected === 0) {
-            $reloaded = ContractSigner::where('personal_token', $personalToken)->with('contract')->first();
-            if ($reloaded && $reloaded->contract->status !== 'active') {
-                return response()->json(['error' => 'Der Vertrag nimmt keine Unterschriften mehr an'], 410);
-            }
-            return response()->json(['error' => 'Der Vertrag wurde geändert. Bitte laden Sie die Seite neu und lesen Sie die aktuelle Version.'], 409);
+                    if ($lockedContract === null) {
+                        return [
+                            'status' => 404,
+                            'error' => 'Ungültiger persönlicher Link',
+                        ];
+                    }
+
+                    $lockedSigner = ContractSigner::query()
+                        ->whereKey($signer->getKey())
+                        ->where('personal_token', $personalToken)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($lockedSigner === null) {
+                        return [
+                            'status' => 404,
+                            'error' => 'Ungültiger persönlicher Link',
+                        ];
+                    }
+
+                    $availabilityError = $lockedContract->publicAvailabilityError(Contract::databaseNow());
+                    if ($availabilityError !== null || ! $lockedContract->isPubliclyAvailableAtDatabaseTime()) {
+                        $availabilityError ??= $lockedContract->fresh()?->publicAvailabilityError(Contract::databaseNow())
+                            ?? 'Dieser Vertrag nimmt keine Unterschriften mehr an';
+
+                        return [
+                            'status' => 410,
+                            'error' => $availabilityError,
+                        ];
+                    }
+
+                    if ($lockedSigner->status === 'signed') {
+                        return [
+                            'status' => 409,
+                            'error' => 'Bereits unterschrieben',
+                        ];
+                    }
+
+                    try {
+                        $this->contractCloseService->calculateTotal($lockedContract);
+                    } catch (InvalidArgumentException) {
+                        return [
+                            'status' => 422,
+                            'error' => 'Der Vertragsbetrag ist ungültig.',
+                        ];
+                    }
+
+                    if ((int) $lockedContract->content_version !== (int) $validated['content_version']) {
+                        return [
+                            'status' => 409,
+                            'error' => 'Der Vertrag wurde geändert. Bitte laden Sie die Seite neu und lesen Sie die aktuelle Version.',
+                        ];
+                    }
+
+                    $affected = ContractSigner::query()
+                        ->whereKey($lockedSigner->getKey())
+                        ->where('contract_id', $lockedContract->getKey())
+                        ->where('personal_token', $personalToken)
+                        ->where('status', 'joined')
+                        ->whereHas('contract', function (Builder $query) use ($validated): void {
+                            $query->where('content_version', (int) $validated['content_version'])
+                                ->publiclyAvailableAtDatabaseTime();
+                        })
+                        ->update([
+                            'status' => 'signed',
+                            'signed_at' => DB::raw('CURRENT_TIMESTAMP'),
+                            'updated_at' => DB::raw('CURRENT_TIMESTAMP'),
+                        ]);
+
+                    if ($affected !== 1) {
+                        $freshSigner = ContractSigner::with('contract.template')->find($lockedSigner->getKey());
+                        if ($freshSigner?->status === 'signed') {
+                            return [
+                                'status' => 409,
+                                'error' => 'Bereits unterschrieben',
+                            ];
+                        }
+
+                        $availabilityError = $freshSigner?->contract?->publicAvailabilityError(Contract::databaseNow());
+                        if ($availabilityError !== null) {
+                            return [
+                                'status' => 410,
+                                'error' => $availabilityError,
+                            ];
+                        }
+
+                        return [
+                            'status' => 409,
+                            'error' => 'Der Vertrag wurde geändert. Bitte laden Sie die Seite neu und lesen Sie die aktuelle Version.',
+                        ];
+                    }
+
+                    $this->contractAuditService->log($lockedContract->getKey(), $lockedSigner->getKey(), 'signed', $request);
+
+                    if ($lockedContract->template_id !== null) {
+                        $closeResult = $this->contractCloseService->close($lockedContract);
+                        if (! in_array(
+                            $closeResult['status'],
+                            [ContractCloseService::RESULT_CLOSED, ContractCloseService::RESULT_ALREADY_CLOSED],
+                            true,
+                        )) {
+                            // The signature update and automatic close share
+                            // the outer transaction. Roll both back when the
+                            // close claim loses a concurrent transition.
+                            throw new ContractCloseConflictException;
+                        }
+
+                        $lockedContract = $closeResult['contract'];
+                    }
+
+                    $lockedContract->load('signers');
+
+                    return [
+                        'status' => 200,
+                        'error' => null,
+                        'contract' => $lockedContract,
+                    ];
+                }, 3);
+            });
+        } catch (LockTimeoutException) {
+            return response()->json([
+                'error' => 'Die Unterschrift wird gerade verarbeitet. Bitte versuche es erneut.',
+            ], 409);
+        } catch (ContractCloseConflictException) {
+            return $this->closeConflictResponse();
+        } catch (InvalidArgumentException) {
+            return response()->json([
+                'error' => 'Der Vertragsbetrag ist ungültig.',
+            ], 422);
         }
 
-        $this->contractAuditService->log($signer->contract_id, $signer->id, 'signed', $request);
-
-        $signer->refresh();
-        if ($signer->contract->template_id !== null) {
-            $signer->contract->status = 'closed';
-            $signer->contract->save();
-            $this->contractCloseService->close($signer->contract);
+        if (($result['status'] ?? 500) !== 200) {
+            return response()->json([
+                'error' => $result['error'] ?? 'Die Unterschrift konnte nicht verarbeitet werden.',
+            ], (int) ($result['status'] ?? 500));
         }
 
         return response()->json(['success' => true, 'message' => 'Vertrag erfolgreich unterschrieben']);
+    }
+
+    /**
+     * @return array{created: bool, instance: ?Contract, signer: ?ContractSigner, error: ?string, status: int}
+     */
+    private function createStandardJoin(Contract $contract, Request $request, string $email): array
+    {
+        return Cache::lock(Contract::joinLockKey($contract->getKey(), $email), 30)->block(10, function () use ($contract, $request, $email): array {
+            return DB::transaction(function () use ($contract, $request, $email): array {
+                $lockedContract = Contract::query()
+                    ->whereKey($contract->getKey())
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($lockedContract === null || $lockedContract->type !== 'contract') {
+                    return [
+                        'created' => false,
+                        'instance' => null,
+                        'signer' => null,
+                        'error' => 'Vertrag nicht verfügbar',
+                        'status' => 410,
+                    ];
+                }
+
+                $availabilityError = $lockedContract->publicAvailabilityError(Contract::databaseNow());
+                if ($availabilityError !== null || ! $lockedContract->isPubliclyAvailableAtDatabaseTime()) {
+                    $availabilityError ??= $lockedContract->fresh()?->publicAvailabilityError(Contract::databaseNow())
+                        ?? 'Vertrag nicht verfügbar';
+
+                    return [
+                        'created' => false,
+                        'instance' => null,
+                        'signer' => null,
+                        'error' => $availabilityError,
+                        'status' => 410,
+                    ];
+                }
+
+                $validated = $this->validateJoinRequest($request, $lockedContract);
+                $email = Contract::normalizeSignerEmail($validated['email']);
+                $roles = array_values($validated['roles']);
+
+                if (count($roles) > 1 && ! $lockedContract->allow_multiple_roles_per_signer) {
+                    return [
+                        'created' => false,
+                        'instance' => null,
+                        'signer' => null,
+                        'error' => 'Mehrere Rollen pro Unterzeichner sind nicht erlaubt',
+                        'status' => 422,
+                    ];
+                }
+
+                // The cache lock, locked contract row, canonical duplicate
+                // SELECT and signer INSERT are one transaction. The V039
+                // unique index is the final authority if another connection
+                // wins the race after this check.
+                $scopeKey = Contract::joinScopeKeyFor($lockedContract);
+                $existingSigner = ContractSigner::query()
+                    ->where('join_scope_key', $scopeKey)
+                    ->where('normalized_email', $email)
+                    ->orderBy('created_at')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+
+                // Email knowledge must never reveal a previously issued
+                // personal token. A retry fails closed until the original
+                // personal link is used.
+                if ($existingSigner !== null) {
+                    return [
+                        'created' => false,
+                        'instance' => null,
+                        'signer' => null,
+                        'error' => 'Für diese E-Mail besteht bereits ein Vertrag.',
+                        'status' => 409,
+                    ];
+                }
+
+                // The final database-time predicate is deliberately adjacent
+                // to the insert. The contract row remains locked, so a
+                // concurrent close cannot commit between this check and the
+                // signer write.
+                if (! $lockedContract->isPubliclyAvailableAtDatabaseTime()) {
+                    $availabilityError = $lockedContract->fresh()?->publicAvailabilityError(Contract::databaseNow())
+                        ?? 'Vertrag nicht verfügbar';
+
+                    return [
+                        'created' => false,
+                        'instance' => null,
+                        'signer' => null,
+                        'error' => $availabilityError,
+                        'status' => 410,
+                    ];
+                }
+
+                $personalToken = Str::random(64);
+                $signer = ContractSigner::create([
+                    'contract_id' => $lockedContract->getKey(),
+                    'name' => $validated['name'],
+                    'email' => $email,
+                    'normalized_email' => $email,
+                    'join_scope_key' => $scopeKey,
+                    'roles' => $roles,
+                    'personal_token' => $personalToken,
+                    'status' => 'joined',
+                ]);
+
+                // A model event or a real clock tick may cross the deadline
+                // during the insert. Rechecking after the write makes the
+                // surrounding transaction roll the signer back instead of
+                // committing a post-deadline identity.
+                if (! $lockedContract->isPubliclyAvailableAtDatabaseTime()) {
+                    $availabilityError = $lockedContract->fresh()?->publicAvailabilityError(Contract::databaseNow())
+                        ?? 'Vertrag nicht verfügbar';
+
+                    throw new ContractUnavailableException($availabilityError);
+                }
+
+                return [
+                    'created' => true,
+                    'instance' => $lockedContract,
+                    'signer' => $signer,
+                    'error' => null,
+                    'status' => 201,
+                ];
+            }, 3);
+        });
+    }
+
+    /**
+     * Lock a contract and its optional template in the canonical order used
+     * by both public read and sign operations. A stale eager-loaded parent
+     * must never be used for a deadline decision.
+     */
+    private function lockContractAndTemplate(string $contractId): ?Contract
+    {
+        $lockedContract = Contract::query()
+            ->whereKey($contractId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($lockedContract === null) {
+            return null;
+        }
+
+        if ($lockedContract->template_id !== null) {
+            $lockedTemplate = Contract::query()
+                ->whereKey($lockedContract->template_id)
+                ->lockForUpdate()
+                ->first();
+            $lockedContract->setRelation('template', $lockedTemplate);
+        }
+
+        return $lockedContract;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validateJoinRequest(Request $request, Contract $contract): array
+    {
+        $email = $request->input('email');
+        if (is_string($email)) {
+            // Laravel's e-mail validator deliberately rejects surrounding
+            // whitespace. Join identity is explicitly whitespace-insensitive,
+            // so trim before validation on both the initial and locked retry.
+            $request->merge(['email' => trim($email)]);
+        }
+
+        return $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'roles' => 'required|array|min:1',
+            'roles.*' => ['required', 'string', Rule::in($contract->available_roles ?? [])],
+        ]);
+    }
+
+    private function closeConflictResponse()
+    {
+        return response()->json([
+            'error' => ContractCloseConflictException::RETRY_MESSAGE,
+        ], 409);
+    }
+
+    private function signLockKey(string $personalToken): string
+    {
+        return 'contract-sign:'.hash('sha256', $personalToken);
+    }
+
+    private function availabilityResponse(Contract $contract): ?JsonResponse
+    {
+        $freshContract = $contract->fresh(['template']);
+        $checkedContract = $freshContract ?? $contract;
+        $error = $checkedContract->publicAvailabilityError(Contract::databaseNow());
+
+        if ($error === null && ! $checkedContract->isPubliclyAvailableAtDatabaseTime()) {
+            $error = $checkedContract->publicAvailabilityError(Contract::databaseNow())
+                ?? 'Dieser Vertrag nimmt keine Unterschriften mehr an';
+        }
+
+        if ($error === null) {
+            return null;
+        }
+
+        return response()->json(['error' => $error], 410);
     }
 }

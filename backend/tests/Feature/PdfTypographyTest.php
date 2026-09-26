@@ -9,7 +9,10 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\ContractPricingService;
+use App\Services\ManualInvoiceService;
 use App\Support\BrandRegistry;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -30,6 +33,92 @@ class PdfTypographyTest extends TestCase
         Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
         Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
         Setting::updateOrCreate(['key' => 'bank_bic', 'brand' => 'rp'], ['value' => 'TESTAT11']);
+    }
+
+    public function test_percentage_discount_renders_display_units_from_real_manual_service_and_pdf(): void
+    {
+        $processed = (new ManualInvoiceService)->processItems([
+            [
+                'type' => 'item',
+                'description' => 'Leistung',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ],
+            [
+                'type' => 'discount_percent',
+                'description' => '10% Rabatt',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 1000,
+            ],
+            [
+                'type' => 'discount_percent',
+                'description' => 'Bruchprozent',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 1,
+            ],
+        ]);
+
+        $viewData = $this->offerViewData()['data'];
+        $viewData['items'] = $processed['items'];
+        $viewData['snapshot']->total_net = $processed['total'];
+        $viewData['snapshot']->total_gross = $processed['total'];
+
+        $html = view('pdf.manual_offer', $viewData)->render();
+        $this->assertStringContainsString('(10%)', $html);
+        $this->assertStringContainsString('(0,01%)', $html);
+        $this->assertStringNotContainsString('(1000%)', $html);
+
+        $legacyHtml = view('pdf.fragments.discount_rows', [
+            'items' => [[
+                'type' => 'discount_percent',
+                'filename' => 'Legacy',
+                'price' => 1000,
+                'calculated_percentage' => 1000,
+                'row_total' => -1000,
+            ]],
+        ])->render();
+        $this->assertStringContainsString('(10%)', $legacyHtml);
+        $this->assertStringNotContainsString('(1000%)', $legacyHtml);
+
+        $pdf = Pdf::loadView('pdf.manual_offer', $viewData)->output();
+        $this->assertStringStartsWith('%PDF-', $pdf);
+    }
+
+    public function test_large_integer_money_is_formatted_exactly_in_blade_and_pdf(): void
+    {
+        $maximum = ContractPricingService::MAX_SAFE_INTEGER;
+        $viewData = $this->offerViewData()['data'];
+        $viewData['items'] = [
+            [
+                'type' => 'item',
+                'filename' => 'Large safe item',
+                'notes' => '',
+                'qty' => 1,
+                'price' => $maximum,
+                'row_total' => $maximum,
+            ],
+            [
+                'type' => 'discount_fixed',
+                'filename' => 'Exact discount',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 123,
+                'row_total' => -123,
+            ],
+        ];
+        $viewData['snapshot']->total_net = $maximum;
+        $viewData['snapshot']->total_gross = $maximum;
+
+        $html = view('pdf.manual_offer', $viewData)->render();
+        $this->assertStringContainsString('90.071.992.547.409,91 €', $html);
+        $this->assertStringContainsString('-1,23 €', $html);
+        $this->assertStringNotContainsString('90071992547409.9', $html);
+
+        $pdf = Pdf::loadView('pdf.manual_offer', $viewData)->output();
+        $this->assertStringStartsWith('%PDF-', $pdf);
     }
 
     // -----------------------------------------------------------------------

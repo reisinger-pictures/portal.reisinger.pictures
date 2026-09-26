@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Photo;
+use App\Services\ImageProcessor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,9 +16,10 @@ class DeletePhotoFilesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
+    public int $tries = 5;
 
-    public $backoff = [30, 60, 120];
+    /** @var array<int, int> */
+    public array $backoff = [30, 60, 120, 300, 600];
 
     protected $galleryId;
 
@@ -30,6 +32,21 @@ class DeletePhotoFilesJob implements ShouldQueue
         $this->galleryId = $galleryId;
         $this->filename = $filename;
         $this->photoId = $photoId;
+    }
+
+    public function galleryId(): string
+    {
+        return $this->galleryId;
+    }
+
+    public function filename(): string
+    {
+        return $this->filename;
+    }
+
+    public function photoId(): string
+    {
+        return $this->photoId;
     }
 
     public function handle(): void
@@ -53,6 +70,15 @@ class DeletePhotoFilesJob implements ShouldQueue
             $paths[] = "{$this->galleryId}/_thumbs/{$size}/{$newThumbName}";
             $paths[] = "{$this->galleryId}/_thumbs/_watermarked/{$size}/{$newThumbName}";
         }
+
+        // Every watermarked derivative has a provenance marker sibling. Delete
+        // it with the image; leaving it behind is a permanent disk leak and a
+        // stale marker could be matched against a recreated file.
+        $markerPaths = array_map(
+            static fn (string $path): string => $path.ImageProcessor::WATERMARK_MARKER_SUFFIX,
+            $paths,
+        );
+        $paths = array_merge($paths, $markerPaths);
 
         $paths = array_values(array_unique($paths));
 

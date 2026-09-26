@@ -7,7 +7,6 @@ use App\Models\Coupon;
 use App\Models\CouponUserUsage;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
-use App\Models\Photo;
 use App\Models\Org;
 use App\Models\User;
 use App\Pricing\VolumeLicensingStrategy;
@@ -40,7 +39,7 @@ class CouponServiceTest extends TestCase
             isActive: true,
         );
         BrandRegistry::set($testBrand);
-        $this->service = new CouponService();
+        $this->service = new CouponService;
     }
 
     protected function tearDown(): void
@@ -375,7 +374,7 @@ class CouponServiceTest extends TestCase
 
         $strategy = new VolumeLicensingStrategy(
             app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B),
-            new CouponService()
+            new CouponService
         );
         $user = User::factory()->create();
 
@@ -392,7 +391,7 @@ class CouponServiceTest extends TestCase
     {
         $strategy = new VolumeLicensingStrategy(
             app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B),
-            new CouponService()
+            new CouponService
         );
         $user = User::factory()->create();
 
@@ -411,7 +410,7 @@ class CouponServiceTest extends TestCase
 
         $strategy = new VolumeLicensingStrategy(
             app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B),
-            new CouponService()
+            new CouponService
         );
         $user = User::factory()->create();
 
@@ -501,6 +500,64 @@ class CouponServiceTest extends TestCase
         ]);
 
         [$found, $error] = $this->service->findValidCoupon('PHOTOVALID', Brand::B2B, $gallery->id);
+
+        $this->assertNotNull($found);
+        $this->assertNull($error);
+    }
+
+    public function test_photographer_scope_valid_when_creator_has_group_only_access(): void
+    {
+        $photographer = User::factory()->create();
+        $group = GalleryGroup::factory()->create();
+        $gallery = Gallery::factory()->create([
+            'gallery_group_id' => $group->id,
+        ]);
+
+        $photographer->photographerGalleryGroups()->attach($group->id);
+
+        $coupon = Coupon::factory()->create([
+            'brand' => 'rp',
+            'code' => 'PHOTOGROUPVALID',
+            'active' => true,
+            'scope_type' => 'photographer',
+            'created_by' => $photographer->id,
+        ]);
+
+        [$found, $error] = $this->service->findValidCoupon('PHOTOGROUPVALID', Brand::B2B, $gallery->id);
+
+        $this->assertNotNull($found);
+        $this->assertNull($error);
+    }
+
+    public function test_photographer_scope_valid_when_parent_group_assignment_covers_child_gallery(): void
+    {
+        $parentGroup = GalleryGroup::factory()->create([
+            'brand' => 'rp',
+            'restricted_photographers' => true,
+        ]);
+        $childGroup = GalleryGroup::factory()->create([
+            'parent_id' => $parentGroup->id,
+            'brand' => 'rp',
+            'restricted_photographers' => true,
+        ]);
+        $gallery = Gallery::factory()->create([
+            'gallery_group_id' => $childGroup->id,
+            'brand' => 'rp',
+            'restricted_photographers' => true,
+        ]);
+
+        $photographer = User::factory()->create();
+        $photographer->photographerGalleryGroups()->attach($parentGroup->id);
+
+        $coupon = Coupon::factory()->create([
+            'brand' => 'rp',
+            'code' => 'PHOTONESTED',
+            'active' => true,
+            'scope_type' => 'photographer',
+            'created_by' => $photographer->id,
+        ]);
+
+        [$found, $error] = $this->service->findValidCoupon('PHOTONESTED', Brand::B2B, $gallery->id);
 
         $this->assertNotNull($found);
         $this->assertNull($error);
@@ -826,13 +883,14 @@ class CouponServiceTest extends TestCase
         $prices = is_array($priceCents) ? $priceCents : array_fill(0, $count, $priceCents);
         for ($i = 0; $i < $count; $i++) {
             $items[] = [
-                'itemId' => 'item-' . ($i + 1),
+                'itemId' => 'item-'.($i + 1),
                 'priceCents' => $prices[$i] ?? 0,
                 'tier' => 'srp',
                 'useCaseName' => 'SRP Lizenz',
                 'modifierNames' => [],
             ];
         }
+
         return $items;
     }
 
@@ -844,12 +902,13 @@ class CouponServiceTest extends TestCase
         $items = [];
         for ($i = 0; $i < $count; $i++) {
             $items[] = [
-                'id' => 'item-' . ($i + 1),
+                'id' => 'item-'.($i + 1),
                 'license_use_case_id' => '',
                 'license_modifier_ids' => [],
                 'is_quote' => $isQuote,
             ];
         }
+
         return $items;
     }
 }

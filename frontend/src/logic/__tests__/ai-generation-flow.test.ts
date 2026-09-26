@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useAI, aiResponseSchema } from '../useAI';
 
+function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
 describe('aiGenerationFlow — server mode full flow', () => {
     beforeEach(() => {
         localStorage.clear();
@@ -17,17 +24,11 @@ describe('aiGenerationFlow — server mode full flow', () => {
     function mockAvailable(response: unknown, ok = true) {
         vi.stubGlobal('fetch', ok
             ? vi.fn()
-                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-                .mockResolvedValueOnce({
-                    ok: true,
-                    json: () => Promise.resolve(response),
-                })
+                .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+                .mockResolvedValueOnce(jsonResponse(response))
             : vi.fn()
-                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-                .mockResolvedValueOnce({
-                    ok: false,
-                    json: () => Promise.resolve({ error: 'AI API Error: 502' }),
-                }),
+                .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+                .mockResolvedValueOnce(jsonResponse({ error: 'AI API Error: 502' }, 502)),
         );
     }
 
@@ -58,11 +59,8 @@ describe('aiGenerationFlow — server mode full flow', () => {
 
     it('handles empty response from server', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve({}),
-            }),
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+            .mockResolvedValueOnce(jsonResponse({})),
         );
 
         const { result } = renderHook(() => useAI());
@@ -75,11 +73,11 @@ describe('aiGenerationFlow — server mode full flow', () => {
 
     it('handles non-JSON response as validation error', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.reject(new Error('Unexpected token')),
-            }),
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
+            .mockResolvedValueOnce(new Response('<html>', {
+                status: 200,
+                headers: { 'Content-Type': 'text/html' },
+            })),
         );
 
         const { result } = renderHook(() => useAI());
@@ -91,7 +89,7 @@ describe('aiGenerationFlow — server mode full flow', () => {
 
     it('handles abort signal during request', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) }),
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' })),
         );
 
         const { result } = renderHook(() => useAI());
@@ -106,7 +104,7 @@ describe('aiGenerationFlow — server mode full flow', () => {
 
     it('handles network failure during generateMetadata', async () => {
         vi.stubGlobal('fetch', vi.fn()
-            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ enabled: true, status: 'available', model: 'gpt-4o' }) })
+            .mockResolvedValueOnce(jsonResponse({ enabled: true, status: 'available', model: 'gpt-4o' }))
             .mockRejectedValueOnce(new Error('net::ERR_CONNECTION_REFUSED')),
         );
 
@@ -114,7 +112,7 @@ describe('aiGenerationFlow — server mode full flow', () => {
         await waitFor(() => expect(result.current.isAvailable).toBe(true));
 
         await expect(result.current.generateMetadata('photo-1', '', ''))
-            .rejects.toThrow('net::ERR_CONNECTION_REFUSED');
+            .rejects.toThrow('Netzwerkfehler');
     });
 
     it('handles partial response with missing optional fields', async () => {

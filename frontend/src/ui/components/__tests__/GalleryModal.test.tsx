@@ -22,17 +22,13 @@ vi.mock('../ModalDialogShell', () => ({
     ),
 }));
 
-vi.mock('../../../logic/useFocusTrap', () => ({
-    useFocusTrap: () => ({current: null}),
-}));
-
-function setupSwr() {
+function setupSwr(presets: Array<{id: number; name: string; is_default: boolean}> = []) {
     vi.mocked(useSWR).mockImplementation(((key: unknown) => {
         if (key === '/api/management/orgs') {
             return {data: [], error: undefined, isLoading: false, mutate: vi.fn()};
         }
         if (key === '/api/management/settings/volume-presets') {
-            return {data: {presets: []}, error: undefined, isLoading: false, mutate: vi.fn()};
+            return {data: {presets}, error: undefined, isLoading: false, mutate: vi.fn()};
         }
         return {data: undefined, error: undefined, isLoading: false, mutate: vi.fn()};
     }) as never);
@@ -75,6 +71,45 @@ describe('GalleryModal forced visibility', () => {
         expect(onCreate.mock.calls[0][4]).toBe(true);
     });
 
+    it('overrides a persisted public value when the parent forces private', async () => {
+        const user = userEvent.setup();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        const editingGallery = {
+            id: 'gallery-1',
+            name: 'Bestehende Galerie',
+            slug: 'bestehende-galerie',
+            full_path: 'galleries/bestehende-galerie',
+            type: 'delivery' as const,
+            is_live: false,
+            is_public: true,
+            gallery_group_id: 'g-private',
+        };
+
+        renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[
+                    {id: 'g-private', name: 'Privater Parent', depth: 0, is_public: false},
+                ]}
+                editingGallery={editingGallery}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={onUpdate}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        const visibilitySelect = screen.getByLabelText('Sichtbarkeit');
+        expect(visibilitySelect).toHaveValue('false');
+        expect(visibilitySelect).toBeDisabled();
+
+        await user.click(screen.getByRole('button', {name: 'Speichern'}));
+
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+        expect(onUpdate.mock.calls[0][5]).toBe(false);
+    });
+
     it('keeps the user-selected visibility when the parent does not force one', async () => {
         const user = userEvent.setup();
         const onCreate = vi.fn().mockResolvedValue(undefined);
@@ -98,10 +133,182 @@ describe('GalleryModal forced visibility', () => {
 
         const nameInput = container.querySelector('input[name="name"]') as HTMLInputElement;
         await user.type(nameInput, 'Neue Galerie');
+        await user.selectOptions(screen.getByLabelText('Sichtbarkeit'), 'true');
 
         await user.click(screen.getByRole('button', {name: 'Speichern'}));
 
         expect(onCreate).toHaveBeenCalledTimes(1);
+        expect(onCreate.mock.calls[0][4]).toBe(true);
+    });
+
+    it('restores explicit public intent after the selection-only privacy rule is removed', async () => {
+        const user = userEvent.setup();
+        const onCreate = vi.fn().mockResolvedValue(undefined);
+
+        renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[]}
+                onCreate={onCreate}
+                onUpdate={vi.fn().mockResolvedValue(undefined)}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        const visibilitySelect = screen.getByLabelText('Sichtbarkeit');
+        const typeSelect = screen.getByLabelText('Galerie-Typ');
+        await user.type(screen.getByLabelText('Name der Galerie'), 'Neue Galerie');
+        await user.selectOptions(visibilitySelect, 'true');
+        await user.selectOptions(typeSelect, 'selection');
+
+        expect(visibilitySelect).toHaveValue('false');
+        expect(visibilitySelect).toBeDisabled();
+
+        await user.selectOptions(typeSelect, 'delivery');
+
+        expect(visibilitySelect).toHaveValue('true');
+        expect(visibilitySelect).toBeEnabled();
+        await user.click(screen.getByRole('button', {name: 'Speichern'}));
+        expect(onCreate.mock.calls[0][4]).toBe(true);
+    });
+
+    // Regression: `volume_preset_id` is the numeric `volume_presets.id` primary
+    // key. Seeding the form with the raw number made `z.string().optional()`
+    // reject it, so editing a gallery that already had a volume preset assigned
+    // failed validation and could not be saved at all.
+    it('keeps a numeric volume_preset_id editable and submits it unchanged', async () => {
+        const user = userEvent.setup();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        vi.clearAllMocks();
+        setupSwr([
+            {id: 7, name: 'Werbung', is_default: true},
+            {id: 9, name: 'Editorial', is_default: false},
+        ]);
+        const editingGallery = {
+            id: 'gallery-1',
+            name: 'Bestehende Galerie',
+            slug: 'bestehende-galerie',
+            full_path: 'galleries/bestehende-galerie',
+            type: 'delivery' as const,
+            is_live: false,
+            is_public: true,
+            licensing_mode: 'volume_licensing',
+            volume_preset_id: 7,
+        };
+
+        renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[]}
+                editingGallery={editingGallery}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={onUpdate}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        // The preset select's label is not tied to the control, so it is
+        // addressed through the option the API list rendered.
+        const presetSelect = screen.getByRole('option', {name: 'Werbung (Standard)'})
+            .closest('select') as HTMLSelectElement;
+        expect(Array.from(presetSelect.options).map(option => option.value)).toEqual(['', '7', '9']);
+        expect(presetSelect).toHaveValue('7');
+
+        // Saving without touching the select is the regression: the numeric id
+        // was seeded into the form as-is and failed `z.string().optional()`, so
+        // the whole gallery update was rejected.
+        await user.click(screen.getByRole('button', {name: 'Speichern'}));
+
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+        // Positional args: (id, name, slug, type, isLive, isPublic, pId, pw, exp, metadataOpts, orgIds)
+        expect(onUpdate.mock.calls[0][9]).toMatchObject({
+            licensing_mode: 'volume_licensing',
+            volume_preset_id: '7',
+        });
+    });
+
+    it('submits a newly chosen numeric preset id', async () => {
+        const user = userEvent.setup();
+        const onUpdate = vi.fn().mockResolvedValue(undefined);
+        vi.clearAllMocks();
+        setupSwr([
+            {id: 7, name: 'Werbung', is_default: true},
+            {id: 9, name: 'Editorial', is_default: false},
+        ]);
+        const editingGallery = {
+            id: 'gallery-1',
+            name: 'Bestehende Galerie',
+            slug: 'bestehende-galerie',
+            full_path: 'galleries/bestehende-galerie',
+            type: 'delivery' as const,
+            is_live: false,
+            is_public: true,
+            licensing_mode: 'volume_licensing',
+            volume_preset_id: 7,
+        };
+
+        renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[]}
+                editingGallery={editingGallery}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={onUpdate}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        const presetSelect = screen.getByRole('option', {name: 'Editorial'})
+            .closest('select') as HTMLSelectElement;
+        await user.selectOptions(presetSelect, '9');
+        await user.click(screen.getByRole('button', {name: 'Speichern'}));
+
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+        expect(onUpdate.mock.calls[0][9]).toMatchObject({volume_preset_id: '9'});
+    });
+
+    it('restores explicit private intent after a forcing parent is removed', async () => {
+        const user = userEvent.setup();
+        const onCreate = vi.fn().mockResolvedValue(undefined);
+        const availableGroups = [
+            {id: 'g-neutral', name: 'Neutraler Parent', depth: 0, is_public: null},
+            {id: 'g-public', name: 'Öffentlicher Parent', depth: 0, is_public: true},
+        ];
+
+        const {container} = renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={availableGroups}
+                defaultGroupId="g-neutral"
+                onCreate={onCreate}
+                onUpdate={vi.fn().mockResolvedValue(undefined)}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        const nameInput = container.querySelector('input[name="name"]') as HTMLInputElement;
+        const groupSelect = screen.getByLabelText('In welchem Ordner soll die Galerie liegen?');
+        const visibilitySelect = screen.getByLabelText('Sichtbarkeit');
+        await user.type(nameInput, 'Neue Galerie');
+        await user.selectOptions(visibilitySelect, 'false');
+        await user.selectOptions(groupSelect, 'g-public');
+
+        expect(visibilitySelect).toHaveValue('true');
+        expect(visibilitySelect).toBeDisabled();
+
+        await user.selectOptions(groupSelect, 'g-neutral');
+
+        expect(visibilitySelect).toHaveValue('false');
+        expect(visibilitySelect).toBeEnabled();
+        await user.click(screen.getByRole('button', {name: 'Speichern'}));
         expect(onCreate.mock.calls[0][4]).toBe(false);
     });
 });
